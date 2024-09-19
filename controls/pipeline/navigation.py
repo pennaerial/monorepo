@@ -1,23 +1,31 @@
 import asyncio
 from mavsdk import System
 
-async def navigate(gps_points, timestamps, drones):
+async def navigate(drone, gps_points, timestamps):
     """
-    Navigate the drones to the given list of GPS points based on timestamps.
+    Navigate the drone to the given list of GPS points based on timestamps.
     
     Args:
         gps_points (list of tuples): List of GPS coordinates as (latitude, longitude, altitude).
-        timestamps (list of (float, int)): Corresponding timestamp (in seconds), drone-id pairs.
-        drones (list of mavsdk.System): List of connected drones.
+        timestamps (list of float): Corresponding timestamps in seconds.
     """
+
+    start_time = asyncio.get_event_loop().time()
+
     # For now, this is just a placeholder to show function signature
     print("Starting navigation...")
-    for i, point in enumerate(gps_points):
+    for i, (point, time) in enumerate(zip(gps_points, timestamps)):
         latitude, longitude, altitude = point
-        time, drone_id = timestamps[i]
-        print(f"Navigating drone {drone_id} to point {i}: {latitude}, {longitude}, {altitude} at time {time}")
+        current_time = asyncio.get_event_loop().time() - start_time
+        wait_time = max(0, time - current_time)
+
+        print(f"Navigating to point {i}: {latitude}, {longitude}, {altitude} at time {time}")
         # Add the actual navigation logic here, e.g., sending commands to the drone
-    
+        if wait_time:
+            await asyncio.sleep(wait_time)
+        await drone.action.goto_location(latitude, longitude, altitude, 0)
+        await asyncio.sleep(3)
+
     print("Finished navigation.")
 
 async def run():
@@ -34,7 +42,7 @@ async def run():
     gps_points = [(47.3977415, 8.5455939, 10), (47.3982415, 8.5465939, 10)]
     timestamps = [0, 5]
     
-    await navigate(gps_points, timestamps)
+    await navigate(drone, gps_points, timestamps)
 
 if __name__ == "__main__":
     loop = asyncio.get_event_loop()
