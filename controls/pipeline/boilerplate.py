@@ -14,8 +14,8 @@ async def navigate(gps_points, timestamps, drones):
     print("Starting navigation...")
     for i, point in enumerate(gps_points):
         latitude, longitude, altitude = point
-        time = timestamps[i]
-        print(f"Navigating to point {i}: {latitude}, {longitude}, {altitude} at time {time}")
+        time, drone_id = timestamps[i]
+        print(f"Navigating drone {drone_id} to point {i}: {latitude}, {longitude}, {altitude} at time {time}")
         # Add the actual navigation logic here, e.g., sending commands to the drone
     
     print("Finished navigation.")
