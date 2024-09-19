@@ -1,13 +1,14 @@
 import asyncio
 from mavsdk import System
 
-async def navigate(gps_points, timestamps):
+async def navigate(gps_points, timestamps, drones):
     """
-    Navigate the drone to the given list of GPS points based on timestamps.
+    Navigate the drones to the given list of GPS points based on timestamps.
     
     Args:
         gps_points (list of tuples): List of GPS coordinates as (latitude, longitude, altitude).
-        timestamps (list of float): Corresponding timestamps in seconds.
+        timestamps (list of (float, int)): Corresponding timestamp (in seconds), drone-id pairs.
+        drones (list of mavsdk.System): List of connected drones.
     """
     # For now, this is just a placeholder to show function signature
     print("Starting navigation...")
