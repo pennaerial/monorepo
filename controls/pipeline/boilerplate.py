@@ -1,5 +1,18 @@
 import asyncio
-from mavsdk import System
+from mavsdk import System, Action
+
+async def navigate(gps_point):
+    """
+    Navigate the drone to the given GPS point.
+    
+    Args:
+        gps_point (tuple): GPS coordinates as (latitude, longitude, altitude).
+    """
+    print("Navigating to point:", gps_point)
+
+     
+
+    print("Finished navigation.")
 
 async def navigate(gps_points, timestamps):
     """
