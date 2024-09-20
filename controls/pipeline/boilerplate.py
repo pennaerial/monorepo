@@ -50,7 +50,7 @@ async def navigate(gps_point, drone):
     print(f"Latitude: {latitude}, Longitude: {longitude}, Altitude: {altitude}")
     
     await drone.action.goto_location(latitude, longitude, altitude, 0)
-    await asyncio.sleep(5)
+    await asyncio.sleep(1)
 
     print("Finished navigation.")
 
@@ -67,9 +67,10 @@ async def navigate(gps_points, drones, timestamps = []):
     print("Starting navigation...")
     for i, point in enumerate(gps_points):
         latitude, longitude, altitude = point
-        time, drone_id = timestamps[i]
-        print(f"Navigating drone {drone_id} to point {i}: {latitude}, {longitude}, {altitude} at time {time}")
+        
+        print(f"Navigating drone to point {i}: {latitude}, {longitude}, {altitude} at time {time}")
         # Add the actual navigation logic here, e.g., sending commands to the drone
+        drones[0] = await navigate(point, drones[0])
     
     print("Finished navigation.")
 
