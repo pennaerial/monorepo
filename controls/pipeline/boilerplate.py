@@ -14,20 +14,21 @@ async def navigate(gps_point):
 
     print("Finished navigation.")
 
-async def navigate(gps_points, timestamps):
+async def navigate(gps_points, timestamps, drones):
     """
-    Navigate the drone to the given list of GPS points based on timestamps.
+    Navigate the drones to the given list of GPS points based on timestamps.
     
     Args:
         gps_points (list of tuples): List of GPS coordinates as (latitude, longitude, altitude).
-        timestamps (list of float): Corresponding timestamps in seconds.
+        timestamps (list of (float, int)): Corresponding timestamp (in seconds), drone-id pairs.
+        drones (list of mavsdk.System): List of connected drones.
     """
     # For now, this is just a placeholder to show function signature
     print("Starting navigation...")
     for i, point in enumerate(gps_points):
         latitude, longitude, altitude = point
-        time = timestamps[i]
-        print(f"Navigating to point {i}: {latitude}, {longitude}, {altitude} at time {time}")
+        time, drone_id = timestamps[i]
+        print(f"Navigating drone {drone_id} to point {i}: {latitude}, {longitude}, {altitude} at time {time}")
         # Add the actual navigation logic here, e.g., sending commands to the drone
     
     print("Finished navigation.")
