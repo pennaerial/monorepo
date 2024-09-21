@@ -1,5 +1,8 @@
 import asyncio
+import numpy as np
 from mavsdk import System
+
+
 
 async def navigate(gps_points, timestamps, drones):
     """
@@ -10,6 +13,16 @@ async def navigate(gps_points, timestamps, drones):
         timestamps (list of (float, int)): Corresponding timestamp (in seconds), drone-id pairs.
         drones (list of mavsdk.System): List of connected drones.
     """
+
+    await takeoff(drones)
+
+    for i in gps_points, timestamps:
+        (latitude, longitude, altitude) = i
+        time = timestamps[i]
+        await asyncio.sleep(time[i]-time[i-1])
+        await drones.offboard.set_position_async(latitude, longitude, altitude)
+        await asyncio.sleep(10)
+
     # For now, this is just a placeholder to show function signature
     print("Starting navigation...")
     for i, point in enumerate(gps_points):
@@ -19,6 +32,11 @@ async def navigate(gps_points, timestamps, drones):
         # Add the actual navigation logic here, e.g., sending commands to the drone
     
     print("Finished navigation.")
+
+async def takeoff(drone):
+    await drone.action.arm()
+    await drone.action.takeoff()
+    await asyncio.sleep(15)
 
 async def run():
     # Connect to the Gazebo simulated PX4
@@ -34,7 +52,7 @@ async def run():
     gps_points = [(47.3977415, 8.5455939, 10), (47.3982415, 8.5465939, 10)]
     timestamps = [0, 5]
     
-    await navigate(gps_points, timestamps)
+    await navigate(gps_points, timestamps, drone)
 
 if __name__ == "__main__":
     loop = asyncio.get_event_loop()
