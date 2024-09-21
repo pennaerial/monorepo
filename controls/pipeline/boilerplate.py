@@ -33,7 +33,7 @@ async def arm_and_takeoff(drone):
 
     print("-- Taking off")
     await drone.action.takeoff()
-    await asyncio.sleep(5)
+    await asyncio.sleep(10)
 
     return drone
 
@@ -50,49 +50,37 @@ async def navigate(gps_point, drone):
     print(f"Latitude: {latitude}, Longitude: {longitude}, Altitude: {altitude}")
     
     await drone.action.goto_location(latitude, longitude, altitude, 0)
-    await asyncio.sleep(1)
+    await asyncio.sleep(20)
 
     print("Finished navigation.")
-
-async def navigate(gps_points, drones, timestamps = []):
-    """
-    Navigate the drones to the given list of GPS points based on timestamps.
-    
-    Args:
-        gps_points (list of tuples): List of GPS coordinates as (latitude, longitude, altitude).
-        timestamps (list of (float, int)): Corresponding timestamp (in seconds), drone-id pairs.
-        drones (list of mavsdk.System): List of connected drones.
-    """
-    # For now, this is just a placeholder to show function signature
-    print("Starting navigation...")
-    for i, point in enumerate(gps_points):
-        latitude, longitude, altitude = point
-        
-        print(f"Navigating drone to point {i}: {latitude}, {longitude}, {altitude} at time {time}")
-        # Add the actual navigation logic here, e.g., sending commands to the drone
-        drones[0] = await navigate(point, drones[0])
-    
-    print("Finished navigation.")
+    return drone
 
 async def run():
-    # Connect to the Gazebo simulated PX4
+    # Connect to the drones
     drones = []
-    drones.append(await connect_drone("udp://:14540"))
+    drones.append(await connect_drone("udp://10.102.218.92:14580"))
     
+    # Arm and takeoff the drone
     for drone in drones:
         await arm_and_takeoff(drone)
-
-    # drones.append(await connect_drone("udp://:14541"))
     
     # Example usage of the navigate function
     gps_points = [(47.3977415, 8.5455939, 10), (47.3982415, 8.5465939, 10)]
     timestamps = [0, 5]
     
-    await navigate(gps_points[0], drones[0])
+    drones[0] = await navigate(gps_points[0], drones[0])
     # await navigate(gps_points, drones[0])
     # await navigate(gps_points, drones, timestamps)
+    
+
+    #land all drones
+    for i in range(len(drones)):
+        print("Landing drone", i)
+        await drones[i].action.land()
+        await asyncio.sleep(10)
 
 if __name__ == "__main__":
     loop = asyncio.get_event_loop()
     print("Here")
+
     loop.run_until_complete(run())
