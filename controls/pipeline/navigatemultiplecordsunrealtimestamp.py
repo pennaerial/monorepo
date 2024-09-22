@@ -127,6 +127,7 @@ async def navigate(gps_points, timestamps, drone):
         # Wait for a few seconds to allow the drone to move
         # Wait for the specified time before sending the next command
 
+
         #TODO: GET THE TIMESTAMPS ACCURATE TO BEFORE THE DRONE MOVES VS AFTER THE DRONE GETS THERE
         if i + 1 < len(timestamps):
             next_time = timestamps[i + 1][0]
