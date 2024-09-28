@@ -195,7 +195,72 @@ async def navigate_spiral_inwards(radius, theta, address):
         radius -= radius/100
 
 
+async def navigate_set_directions_time(directions, timestamps, address):
+    drone = System()
+    await drone.connect(system_address=address)
 
+    async for state in drone.core.connection_state():
+        if state.is_connected:
+            print("Drone connected!")
+            break
+    print("Arming the drone...")
+    await drone.action.arm()
+    print("Taking off...")
+    await drone.action.takeoff()
+
+    await asyncio.sleep(10)
+    # Get the current position
+    async for position in drone.telemetry.position():
+        current_lat = position.latitude_deg
+        current_lon = position.longitude_deg
+        altitude = position.absolute_altitude_m
+        break  # Break the loop after getting the first position
+    # Get the current heading (yaw) of the drone
+    async for attitude in drone.telemetry.heading():
+        heading = attitude.heading_deg
+        break  # Break the loop after getting the first attitude
+
+    for i in range(1, len(directions)):
+        direction = directions[i][0]
+        distance = directions[i][1] / 3.281
+
+        if direction == 'forward':
+            new_lat, new_lon = calculate_new_position(current_lat, current_lon, heading, distance)
+            print('going forward')
+        if direction == 'backward':
+            new_lat, new_lon = calculate_new_position(current_lat, current_lon, -heading, distance)
+            print('going backward')
+        if direction == 'left':
+            new_lat, new_lon = calculate_new_position(current_lat, current_lon, heading + 90, distance)
+            print('going left')
+        if direction == 'right':
+            new_lat, new_lon = calculate_new_position(current_lat, current_lon, heading - 90, distance)
+            print('going right')
+        if direction == 'up':
+            altitude += distance
+            print('going up')
+        if direction == 'down':
+            altitude -= distance
+            print('going down')
+        if direction == 'cw':
+            heading += distance
+            print('turning clockwise')
+        if direction == 'ccw':
+            heading -= distance
+            print('going counterclockwise')
+        speed = distance/(timestamps[i] - timestamps[i-1])
+        await drone.set_current_speed(speed)
+        await drone.goto_location(new_lat, new_lon)
+        current_lat, current_lon = new_lat, new_lon
+
+async def navigate_circle_time(radius, theta, address):
+    pass
+
+async def navigate_inward_spiral_time(radius, theta, address):
+    pass
+
+async def navigate_outward_spiral_time(radius, theta, adress):
+    pass
 
 async def navigate_single_point(gps_point, address):
     # connect to the drone
