@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import math
 from mavsdk import System
 
@@ -220,7 +221,7 @@ async def navigate_set_directions_time(directions, timestamps, address):
         heading = attitude.heading_deg
         break  # Break the loop after getting the first attitude
 
-    for i in range(1, len(directions)):
+    for i in range(0, len(directions)):
         direction = directions[i][0]
         distance = directions[i][1] / 3.281
 
@@ -248,19 +249,138 @@ async def navigate_set_directions_time(directions, timestamps, address):
         if direction == 'ccw':
             heading -= distance
             print('going counterclockwise')
-        speed = distance/(timestamps[i] - timestamps[i-1])
+        if (i == 0):
+            speed = distance/(timestamps[i])
+        else:
+            speed = distance/(timestamps[i] - timestamps[i-1])
         await drone.set_current_speed(speed)
         await drone.goto_location(new_lat, new_lon)
         current_lat, current_lon = new_lat, new_lon
 
-async def navigate_circle_time(radius, theta, address):
-    pass
+async def navigate_circle_time(radius, theta, time, address):
+    drone = System()
+    await drone.connect(system_address=address)
 
-async def navigate_inward_spiral_time(radius, theta, address):
-    pass
+    async for state in drone.core.connection_state():
+        if state.is_connected:
+            print("Drone connected!")
+            break
+    print("Arming the drone...")
+    await drone.action.arm()
+    print("Taking off...")
+    await drone.action.takeoff()
 
-async def navigate_outward_spiral_time(radius, theta, adress):
-    pass
+    await asyncio.sleep(10)
+    # Get the current position
+    async for position in drone.telemetry.position():
+        current_lat = position.latitude_deg
+        current_lon = position.longitude_deg
+        altitude = position.absolute_altitude_m
+        break  # Break the loop after getting the first position
+    # Get the current heading (yaw) of the drone
+    async for attitude in drone.telemetry.heading():
+        heading = attitude.heading_deg
+        break  # Break the loop after getting the first attitude
+
+    start_time = datetime.now()
+
+    while ((datetime.now() - start_time).total_seconds() < time) and heading < (360 + heading):
+        heading += theta
+        # Turn
+        await drone.action.go_to_location(current_lat, current_lon, altitude, heading)
+        await asyncio.sleep(0.1)
+
+        # Calculate the new position based on distance and heading
+        distance = 2 * radius * math.sin(math.radians(theta))
+        new_lat, new_lon = calculate_new_position(current_lat, current_lon, heading, distance)
+        
+        # Move to the new location
+        await drone.action.goto_location(new_lat, new_lon, altitude, heading)
+        await asyncio.sleep(1)
+
+async def navigate_inward_spiral_time(radius, theta, time, address):
+    small_radius = radius/100
+
+    drone = System()
+    await drone.connect(system_address=address)
+
+    async for state in drone.core.connection_state():
+        if state.is_connected:
+            print("Drone connected!")
+            break
+    print("Arming the drone...")
+    await drone.action.arm()
+    print("Taking off...")
+    await drone.action.takeoff()
+
+    await asyncio.sleep(10)
+    # Get the current position
+    async for position in drone.telemetry.position():
+        current_lat = position.latitude_deg
+        current_lon = position.longitude_deg
+        altitude = position.absolute_altitude_m
+        break  # Break the loop after getting the first position
+    # Get the current heading (yaw) of the drone
+    async for attitude in drone.telemetry.heading():
+        heading = attitude.heading_deg
+        break  # Break the loop after getting the first attitude
+
+    start_time = datetime.now()
+
+    while radius > small_radius and ((datetime.now() - start_time) < time):
+        heading += theta
+        # Turn
+        await drone.action.go_to_location(current_lat, current_lon, altitude, heading)
+        await asyncio.sleep(0.1)
+        distance = 2 * radius * math.sin(math.radians(theta))
+        new_lat, new_lon = calculate_new_position(current_lat, current_lon, heading, distance)
+        # Move a little bit in the next direction
+        await drone.action.goto_location(new_lat, new_lon, altitude, heading)
+        await asyncio.sleep(1)
+        current_lat, current_lon = new_lat, new_lon
+        radius -= radius/100
+
+async def navigate_outward_spiral_time(radius, theta, time, address):
+    small_radius = radius/100
+
+    drone = System()
+    await drone.connect(system_address=address)
+
+    async for state in drone.core.connection_state():
+        if state.is_connected:
+            print("Drone connected!")
+            break
+    print("Arming the drone...")
+    await drone.action.arm()
+    print("Taking off...")
+    await drone.action.takeoff()
+
+    await asyncio.sleep(10)
+    # Get the current position
+    async for position in drone.telemetry.position():
+        current_lat = position.latitude_deg
+        current_lon = position.longitude_deg
+        altitude = position.absolute_altitude_m
+        break  # Break the loop after getting the first position
+    # Get the current heading (yaw) of the drone
+    async for attitude in drone.telemetry.heading():
+        heading = attitude.heading_deg
+        break  # Break the loop after getting the first attitude
+
+    start_time = datetime.now()
+
+    while (datetime.now() - start_time) < time:
+        heading += theta
+        # Turn
+        await drone.action.go_to_location(current_lat, current_lon, altitude, heading)
+        await asyncio.sleep(0.1)
+        distance = 2 * small_radius * math.sin(math.radians(theta))
+        new_lat, new_lon = calculate_new_position(current_lat, current_lon, heading, distance)
+        # Move a little bit in the next direction
+        await drone.action.goto_location(new_lat, new_lon, altitude, heading)
+        await asyncio.sleep(1)
+        current_lat, current_lon = new_lat, new_lon
+        small_radius += radius/100
 
 async def navigate_single_point(gps_point, address):
     # connect to the drone
