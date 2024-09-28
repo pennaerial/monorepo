@@ -1,7 +1,15 @@
 import asyncio
 from mavsdk import System
+import math
 
-async def navigate(gps_points, timestamps):
+async def connect_drone(system_address):
+    drone = System(mavsdk_server_address=system_address)
+    await drone.connect()
+    async for state in drone.core.connection_state():
+        if state.is_connected:
+            return drone
+
+async def navigate(drone, commands):
     """
     Navigate the drone to the given list of GPS points based on timestamps.
     
@@ -11,31 +19,57 @@ async def navigate(gps_points, timestamps):
     """
     # For now, this is just a placeholder to show function signature
     print("Starting navigation...")
+
+    async for pos in drone.telemetry.position():
+        lat = pos.latitude_deg
+        lon = pos.longitude_deg
+        alt = pos.relative_altitude_m
+        break  
+    async for telem in drone.telemetry.attitude_euler():
+        heading = telem.yaw_deg
+        break
+
+    gps_points = []
+    for direction, distance_in_feet in commands:
+        lat, lon, alt = calculate_new_position(lat, lon, heading, alt, direction, distance_in_feet)
+        gps_points.append((lat, lon, alt))
+
     for i, point in enumerate(gps_points):
         latitude, longitude, altitude = point
-        time = timestamps[i]
-        print(f"Navigating to point {i}: {latitude}, {longitude}, {altitude} at time {time}")
-        # Add the actual navigation logic here, e.g., sending commands to the drone
-    
+        print(f"Navigating to point {i}: {latitude}, {longitude}, {altitude}")
+        await drone.action.goto_location(latitude, longitude, altitude, 0)
+
     print("Finished navigation.")
 
 async def run():
-    # Connect to the Gazebo simulated PX4
-    drone = System()
-    await drone.connect(system_address="udp://:14540")
-    print("Waiting for drone to connect...")
-    async for state in drone.core.connection_state():
-        if state.is_connected:
-            print("Drone connected!")
-            break
-    
-    # Example usage of the navigate function
-    gps_points = [(47.3977415, 8.5455939, 10), (47.3982415, 8.5465939, 10)]
-    timestamps = [0, 5]
-    
-    await navigate(gps_points, timestamps)
+    drones = []
+    await drones.append(await connect_drone("udp://10.102.218.92:14580"))
+    commands = [("forward", 10), ("right", 10),  ("up", 10), ("backward", 10), ("left", 10), ("down", 10)]        
+    await navigate(drones[0], commands)
+
+def calculate_new_position(lat, lon, heading, alt, direction, distance_in_feet):
+    distance_in_degrees_lat = distance_in_feet / 364000
+    distance_in_degrees_lon = distance_in_feet / (math.cos(math.radians(lat)) * 288200)
+    match direction:    
+        case "forward":
+            lat = lat + distance_in_degrees_lat * math.cos(math.radians(heading))
+            lon = lon + distance_in_degrees_lon * math.sin(math.radians(heading))
+        case "backward":
+            lat = lat - distance_in_degrees_lat * math.cos(math.radians(heading))
+            lon = lon - distance_in_degrees_lon * math.sin(math.radians(heading))
+        case "left":
+            lat = lat + distance_in_degrees_lat * math.cos(math.radians(heading + 90)) 
+            lon = lon + distance_in_degrees_lon * math.sin(math.radians(heading + 90))
+        case "right":
+            lat = lat + distance_in_degrees_lat * math.cos(math.radians(heading - 90))
+            lon = lon + distance_in_degrees_lon * math.sin(math.radians(heading - 90))
+        case "up":
+            alt = alt + distance_in_feet
+        case "down":
+            alt = alt - distance_in_feet
+    return lat, lon, alt
 
 if __name__ == "__main__":
-    loop = asyncio.get_event_loop()
     print("Here")
-    loop.run_until_complete(run())
+    asyncio.run(run())
+    
