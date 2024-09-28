@@ -1,5 +1,10 @@
+
 import asyncio
+import datetime
 from mavsdk import System
+
+#async def relative_to_absolute(relativepoints, drones):
+#    origin = get_last_location(drones[0])
 
 async def navigate(gps_points, timestamps, drones):
     """
@@ -12,10 +17,39 @@ async def navigate(gps_points, timestamps, drones):
     """
     # For now, this is just a placeholder to show function signature
     print("Starting navigation...")
+    starttime = time.time()
+
     for i, point in enumerate(gps_points):
         latitude, longitude, altitude = point
         time, drone_id = timestamps[i]
         print(f"Navigating drone {drone_id} to point {i}: {latitude}, {longitude}, {altitude} at time {time}")
+        now = time.time() - starttime
+        if (now<time): 
+            time.sleep(time-now)
+        drones[i].goto_location(latitude, longitude, altitude)
+
+        # Add the actual navigation logic here, e.g., sending commands to the drone
+    
+    print("Finished navigation.")
+
+async def navigate(gps_points, drones):
+    """
+    Navigate the drones to the given list of GPS points based on timestamps.
+    
+    Args:
+        gps_points (list of tuples): List of GPS coordinates as (latitude, longitude, altitude).
+        timestamps (list of (float, int)): Corresponding timestamp (in seconds), drone-id pairs.
+        drones (list of mavsdk.System): List of connected drones.
+    """
+    # For now, this is just a placeholder to show function signature
+    print("Starting navigation...")
+    for i, point in enumerate(gps_points):
+        latitude, longitude, altitude = point
+        drone_id = drones[i]
+        print(f"Navigating drone {drone_id} to point {i}: {latitude}, {longitude}, {altitude}")
+        for drone in drones:
+            drone.goto_location(latitude, longitude, altitude)
+
         # Add the actual navigation logic here, e.g., sending commands to the drone
     
     print("Finished navigation.")
@@ -34,7 +68,10 @@ async def run():
     gps_points = [(47.3977415, 8.5455939, 10), (47.3982415, 8.5465939, 10)]
     timestamps = [0, 5]
     
-    await navigate(gps_points, timestamps)
+    await navigate(gps_points, timestamps, [drone])
+
+    gps_points = [(47.3977415, 8.5455939, 10), (47.3997415, 8.5455939, 10)]
+    await navigate (gps_points, [drone])
 
 if __name__ == "__main__":
     loop = asyncio.get_event_loop()
