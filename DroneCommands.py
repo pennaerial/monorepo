@@ -455,6 +455,97 @@ async def run():
     
     await navigate(gps_points, timestamps)
 
+class PID:
+    def __init__(self, Kp, Ki, Kd, setpoint=0):
+        self.Kp = Kp
+        self.Ki = Ki
+        self.Kd = Kd
+        self.setpoint = setpoint
+        self.integral = 0
+        self.previous_error = 0
+
+    def compute(self, current_value, dt):
+        error = self.setpoint - current_value
+        self.integral += error * dt
+        derivative = (error - self.previous_error) / dt
+        output = self.Kp * error + self.Ki * self.integral + self.Kd * derivative
+        self.previous_error = error
+        return output
+
+async def navigate_interpolated_trajectory(directions, timestamps, address):
+    drone = System()
+    await drone.connect(system_address=address)
+
+    async for state in drone.core.connection_state():
+        if state.is_connected:
+            print("Drone connected!")
+            break
+    
+    print("Arming the drone...")
+    await drone.action.arm()
+    print("Taking off...")
+    await drone.action.takeoff()
+    await asyncio.sleep(10)
+
+    # Get the initial position and heading of the drone
+    async for position in drone.telemetry.position():
+        current_lat = position.latitude_deg
+        current_lon = position.longitude_deg
+        altitude = position.absolute_altitude_m
+        break
+    
+    async for attitude in drone.telemetry.heading():
+        heading = attitude.heading_deg
+        break
+
+    # Initialize PID controllers for latitude, longitude, and altitude control
+    lat_pid = PID(Kp=1.0, Ki=0.1, Kd=0.05)
+    lon_pid = PID(Kp=1.0, Ki=0.1, Kd=0.05)
+    alt_pid = PID(Kp=1.0, Ki=0.1, Kd=0.05)
+
+    for i in range(len(directions) - 1):
+        start_time = timestamps[i]
+        end_time = timestamps[i + 1]
+        direction = directions[i]
+        next_direction = directions[i + 1]
+        
+        # Calculate the distance and heading change between the current and next point
+        distance = directions[i][1] / 3.281
+        next_distance = directions[i + 1][1] / 3.281
+        heading_change = next_direction[0] - direction[0]
+
+        # Get the time step for interpolation
+        total_time = end_time - start_time
+        time_steps = 100  # Define number of steps between points for smooth interpolation
+        dt = total_time / time_steps
+
+        # Interpolate the trajectory between the current and next waypoint
+        for step in range(time_steps):
+            progress = step / time_steps
+            interpolated_lat = current_lat + progress * (next_direction[0] - current_lat)
+            interpolated_lon = current_lon + progress * (next_direction[1] - current_lon)
+            interpolated_alt = altitude + progress * (next_direction[2] - altitude)
+
+            # Calculate PID adjustments based on the errors
+            lat_correction = lat_pid.compute(interpolated_lat, dt)
+            lon_correction = lon_pid.compute(interpolated_lon, dt)
+            alt_correction = alt_pid.compute(interpolated_alt, dt)
+
+            # Apply the corrections and move the drone
+            new_lat = current_lat + lat_correction
+            new_lon = current_lon + lon_correction
+            new_alt = altitude + alt_correction
+
+            await drone.action.goto_location(new_lat, new_lon, new_alt)
+            current_lat, current_lon, altitude = new_lat, new_lon, new_alt
+
+            await asyncio.sleep(dt)
+
+    print("Landing the drone...")
+    await drone.action.land()
+
+
+
 if __name__ == "__main__":
     loop = asyncio.get_event_loop()
     print("Here")
