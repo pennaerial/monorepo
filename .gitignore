@@ -1,0 +1,9 @@
+*.pth
+*.pkl
+*.pt
+*.pth.tar
+*.pkl.tar
+*.pt.tar
+*.pth.tar.gz
+*.pkl.tar.gz
+*.pt.tar.gz
