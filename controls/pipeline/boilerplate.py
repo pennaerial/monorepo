@@ -2,8 +2,6 @@ import asyncio
 import numpy as np
 from mavsdk import System
 
-
-
 async def navigate(gps_points, timestamps, drones):
     """
     Navigate the drones to the given list of GPS points based on timestamps.
@@ -55,6 +53,7 @@ async def run():
     await navigate(gps_points, timestamps, drone)
 
 if __name__ == "__main__":
-    loop = asyncio.get_event_loop()
-    print("Here")
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    print("hello")
     loop.run_until_complete(run())
