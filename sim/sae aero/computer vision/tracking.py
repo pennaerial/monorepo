@@ -9,15 +9,17 @@ def distance(c1, c2):
     return (c1[0] - c2[0]) ** 2 + (c1[1] - c2[1]) ** 2
 
 def detect_contour(frame):
-    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HLS)
     hsv = cv2.GaussianBlur(hsv, (5, 5), 0)
 
-    thresh = cv2.inRange(hsv, (0, 0, 180), (225, 225, 255))
+    thresh = cv2.inRange(hsv, (0, 170, 0), (180, 255, 255))
 
     contours, _ = cv2.findContours(thresh, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
     valid_contours = []
     centers = []
     area_ratios = []
+
+    #cv2.imshow('Image 2 Matches', thresh)
     # Draw contours
     for i in contours:
         M = cv2.moments(i)
@@ -33,6 +35,8 @@ def detect_contour(frame):
                 centers.append((cx, cy))
                 area_ratios.append(cv2.contourArea(i) / (width * height))
 
+            
+
     if valid_contours:
         total = list(zip(area_ratios, valid_contours, centers))
         total.sort(key = lambda x : x[0])
@@ -41,15 +45,19 @@ def detect_contour(frame):
     return valid_contours, centers
 
 def detect_payload(prev_centers, frame):
+    #print(prev_centers)
     new_contours, new_centers = detect_contour(frame)
 
     contours = []
     centers = []
     for c1 in prev_centers:
         for i, c2 in enumerate(new_centers):
-            if distance(c1, c2) < 1000:
+            if distance(c1, c2) < 800:
                 contours.append(new_contours[i])
                 centers.append(c2)
+
+    #for i in range(len(new_contours)):
+        #cv2.drawContours(frame, [new_contours[i]], -1, (0, 0, 255), 2)
 
     for i in range(len(contours)):
         cv2.drawContours(frame, [contours[i]], -1, (0, 255, 0), 2)
