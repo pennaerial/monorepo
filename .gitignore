@@ -7,3 +7,4 @@
 *.pth.tar.gz
 *.pkl.tar.gz
 *.pt.tar.gz
+.vscode/

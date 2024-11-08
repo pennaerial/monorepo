@@ -1,8 +1,9 @@
-#check if mnist_model.pth exists
+# check if mnist_model.pth exists
 import os
 import torch
 import cv2
 import torchvision
+import numpy as np
 import matplotlib.pyplot as plt
 if not os.path.exists('mnist_model.pth'):
     import requests
@@ -24,8 +25,20 @@ model = torch.jit.load('mnist_model.pth', map_location=torch.device('cpu'))
 model.eval()
 
 def process(image):
-    #TODO: return np.array of same size as image
-    pass
+    
+    gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    kernel  = cv2.getGaussianKernel(5, 1)
+    blurred_image = cv2.filter2D(gray_image, -1, kernel)
+    
+
+    ret3,th3 = cv2.threshold(blurred_image,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+
+    return np.asarray(th3)
+
+    
+     
+
+
 
 def recognize_digit():
     cap = cv2.VideoCapture(0)
