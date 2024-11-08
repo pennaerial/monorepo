@@ -2,78 +2,72 @@ import numpy as np
 from scipy.stats import norm
 import scipy.stats as stats
 
+
 def calibrate(frame):
-    # frame: array of pixels
+    """
+    Returns color range with best confidence interval
+    Args:
+        frame (List[int]): 2-D list of pixels
+    Returns:
+        range (Tuple[Int, Int]): The color rane
+    """
     
-
-    #NOTE hardcoded. This is the color of our payload
+    # Initialize variables 
     color = 131
+    curr_range = (0.0, 1.0)
+    best_confidence = 0.0
+    variance = np.var(frame)
+    std = np.sqrt(variance)
 
+    # Binary search
     low = 0.0
     high = 1.0
     mid = (low + high) / 2
-    curr_range = (0.0, 1.0)
-    best_confidence = 0.0
-    best_points = []
+
     while (high - low > 0.01):
         mid = (low + high) / 2
+        points, range = find_points_range(mid, std, color)
 
-        # Compute Z-score and range using probability
-        prob = mid
-        z_score = stats.norm.ppf(prob)
-        variance = np.var(frame)
-        std = np.sqrt(variance)
-
-        # Get threshold range based on color and Z-score
-        range = (color - z_score * std, color + z_score * std)
-
-        # Update the current range
-        
-        points = output_contour(range)
         if len(points) > 0: 
-            # If the contour set is non-empty, 
-            # continue searching with a higher confidence, but save previous
-            # only update if confidence is higher
-            if mid > best_confidence:
-                best_points = points
-                best_confidence = mid
-                curr_range = range
-    
+            curr_range = range
             low = mid
         else:
-            # if countour set is empty
-            # continue search with lower cofidence
             high = mid
     
+    best_confidence = (low + high) / 2
 
-
-    # neighborhood search
-    
-    # find  20 points within 2 percent buffer
+    # Perform a neighborhood search on 20 points within a 2% buffer
     neighborhood_low = best_confidence - 0.02 * best_confidence
-    neighborhood_high = best_confidence + 0.02 * best_confidence
-    neighborhood_conf = np.linspace(neighborhood_low, neighborhood_high, 20)  # 20 points within the range
+    neighborhood_high = best_confidence
+    neighborhood_conf = np.linspace(neighborhood_low, neighborhood_high, 20)
 
-
-    #init variables to track the best neighborhood confidence and range
-    best_neighborhood_confidence = best_confidence
-    best_neighborhood_points = best_points
     best_neighborhood_range = curr_range
-
     for conf in neighborhood_conf:
-        z_score = stats.norm.ppf(conf)
-        range = (color - z_score * std, color + z_score * std)
-        points = output_contour(range)
+        points, range = find_points_range(conf, std, color)
 
-        # Evaluate confidence based on `points` and update if better than current best
-        if len(points) > 0 and confidence(points) > confidence(best_neighborhood_points):
-            best_neighborhood_confidence = conf
-            best_neighborhood_points = points
+        if len(points) > 0 and conf > best_confidence:
+            best_confidence = conf
             best_neighborhood_range = range
 
-    # output best range. potentially could output best conf, if necessary
     return best_neighborhood_range
 
+
+def find_points_range(prob, std, color):
+    """
+    Finds the points and color value range corresponding to some probability, std, and color
+
+    Args:
+        prob (Float): probaility ranging from 0.0 - 1.0
+        std (Float): standard deviation value
+        color (Float): Ground truth or mean of distribution
+    Returns:
+        points (List[Int]): list of points in the image which correspond to range
+        range (Tuple[Int, Int]): color range corresponding to prob
+    """
+    z_score = stats.norm.ppf(prob)
+    range = (color - z_score * std, color + z_score * std)
+    points = output_contour(range)
+    return points, range
 
 
 def output_contour(threshold):
@@ -86,8 +80,3 @@ def confidence(points):
     # given points: list of points
     # outputs a confidence score
     return 1
-
-
-
-# Example call
-# print(stats.norm.ppf(0.95))  # Correct usage of stats.norm.ppf
