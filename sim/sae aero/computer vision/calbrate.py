@@ -37,16 +37,16 @@ def calibrate(frame):
     best_confidence = (low + high) / 2
 
     # Perform a neighborhood search on 20 points within a 2% buffer
-    neighborhood_low = best_confidence - 0.02 * best_confidence
+    neighborhood_low = best_confidence - 0.02
     neighborhood_high = best_confidence
     neighborhood_conf = np.linspace(neighborhood_low, neighborhood_high, 20)
 
     best_neighborhood_range = curr_range
     for conf in neighborhood_conf:
         points, range = find_points_range(conf, std, color)
-
-        if len(points) > 0 and conf > best_confidence:
-            best_confidence = conf
+        curr_conf = confidence(points)
+        if len(points) > 0 and curr_conf > best_confidence:
+            best_confidence = curr_conf
             best_neighborhood_range = range
 
     return best_neighborhood_range
