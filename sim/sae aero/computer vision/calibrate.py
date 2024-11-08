@@ -4,7 +4,7 @@ import scipy.stats as stats
 
 def calibrate(frame, color):
     # frame: array of pixels
-    # color: a V value for HSV
+    # color: a V value from HSV (ground truth for payload)
 
     low = 0.0
     high = 1.0
@@ -39,11 +39,12 @@ def calibrate(frame, color):
             low = mid
         else:
             # if countour set is empty
-            # search with lower cofidence
+            # continue search with lower cofidence
             high = mid
     
-    # neighborhood search
 
+
+    # neighborhood search
     # best_points : set of points
     # best_ confidence : highest confidence that returns something
     # best_range : corresponds to confidence
