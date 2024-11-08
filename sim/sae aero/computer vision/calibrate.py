@@ -9,7 +9,7 @@ def calibrate(frame):
     Args:
         frame (List[int]): 2-D list of pixels
     Returns:
-        range (Tuple[Int, Int]): The color rane
+        range (Tuple[Int, Int]): The color optimal color rnage
     """
     
     # Initialize variables 
