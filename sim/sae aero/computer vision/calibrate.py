@@ -2,9 +2,12 @@ import numpy as np
 from scipy.stats import norm
 import scipy.stats as stats
 
-def calibrate(frame, color):
+def calibrate(frame):
     # frame: array of pixels
-    # color: a V value from HSV (ground truth for payload)
+    
+
+    #NOTE hardcoded. This is the color of our payload
+    color = 131
 
     low = 0.0
     high = 1.0
@@ -45,10 +48,7 @@ def calibrate(frame, color):
 
 
     # neighborhood search
-    # best_points : set of points
-    # best_ confidence : highest confidence that returns something
-    # best_range : corresponds to confidence
-
+    
     # find  20 points within 2 percent buffer
     neighborhood_low = best_confidence - 0.02 * best_confidence
     neighborhood_high = best_confidence + 0.02 * best_confidence
