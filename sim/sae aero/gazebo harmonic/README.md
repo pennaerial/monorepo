@@ -11,23 +11,23 @@ This ReadMe documents the procedure for running the Gazebo simulator with a cust
 ## Setup PX4 and Gazebo for standalone mode
 From the location of your PX4 repo
 ```bash
-    cd Tools/simulation/gz
-    python3 simulation-gazebo
+cd Tools/simulation/gz
+python3 simulation-gazebo
 ```
 Verify the directory ~/.simulation-gazebo exists.
 
 Copy the custom models and worlds into the directory above.
 
 ```bash
-    cp -R models/ ~/.simulation-gazebo/models
-    cp -R worlds/ ~/.simulation-gazebo/worlds
+cp -R models/ ~/.simulation-gazebo/models
+cp -R worlds/ ~/.simulation-gazebo/worlds
 ```
 
 Copy the scripts standalone_gazebo_cmd.sh and standalone_px4_cmd.sh into the PX4-Autopilot repo:
 
 ```bash
-    cp standalone_gazebo_cmd.sh /{path_to_px4_repo}/PX4-Autopilot/
-    cp standalone_px4_cmd.sh /{path_to_px4_repo}/PX4-Autopilot/
+cp standalone_gazebo_cmd.sh /{path_to_px4_repo}/PX4-Autopilot/
+cp standalone_px4_cmd.sh /{path_to_px4_repo}/PX4-Autopilot/
 ```
 
 ## Run the startup scripts
