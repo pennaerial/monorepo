@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy
 
-cap = cv2.VideoCapture('DJI_0035.mov')
+cap = cv2.VideoCapture('DJI_0033.mov')
 
 def distance(c1, c2):
     return (c1[0] - c2[0]) ** 2 + (c1[1] - c2[1]) ** 2
@@ -12,9 +12,9 @@ def detect_contour(frame):
     hsl = cv2.cvtColor(frame, cv2.COLOR_BGR2HLS)
     hsl = cv2.GaussianBlur(hsl, (5, 5), 0)
 
-    #thresh = cv2.inRange(hsl, (0, 170, 0), (180, 255, 255))
+    thresh = cv2.inRange(hsl, (0, 170, 0), (180, 255, 255))
     #thresh = cv2.inRange(hsl, (80, 100, 0), (180, 255, 255))
-    thresh = cv2.inRange(hsl, (140, 50, 80), (180, 255, 255))
+    #thresh = cv2.inRange(hsl, (140, 50, 80), (180, 255, 255))
 
     contours, _ = cv2.findContours(thresh, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
     valid_contours = []
@@ -63,7 +63,7 @@ def detect_payload(prev_center, frame):
         cv2.circle(frame, center, 2, (0, 0, 255), -1)
 
     #cv2.imshow('Image 2 Matches', frame)
-    return center
+    return contour, center
 
 ret, prev = cap.read()
 prev = cv2.resize(prev, (2704 // 2, 1520 // 2))
@@ -78,7 +78,7 @@ while cap.isOpened():
     if frame is not None:
         # If the payload was in the previous frame
         if prev_center is not None:
-            new_center = detect_payload(prev_center, frame)
+            _, new_center = detect_payload(prev_center, frame)
             prev_center = new_center
         # If payload is obstructed
         else:
