@@ -1,24 +1,13 @@
 import os
 import cv2
 from typing import List, Tuple
+from calibrate import calibrate
+from recalibrate import recalibrate
+from threshold import threshold
 
-# Function signatures based on the tasks assigned
-def threshold(threshold: Tuple[int, int], prev_center: Tuple[int, int], frame: cv2.Mat) -> Tuple[List[Tuple[int, int]], Tuple[int, int]]:
-    """Detect points based on the given threshold and update the center."""
+
+def confidence():
     pass
-
-def confidence(points: List[Tuple[int, int]], center: Tuple[int, int]) -> float:
-    """Calculate the confidence level based on the detected points and the center."""
-    pass
-
-def calibrate(frame: cv2.Mat) -> Tuple[int, int]:
-    """Determine a threshold range based on the frame for initial calibration."""
-    pass
-
-def recalibrate(frame: cv2.Mat, prev_frame: cv2.Mat) -> bool:
-    """Check if recalibration is needed based on the difference between frames."""
-    pass
-
 def process_video(input_path: str):
     video_capture = cv2.VideoCapture(input_path)
 
@@ -38,7 +27,7 @@ def process_video(input_path: str):
         points, center = threshold(threshold_range, prev_center, frame)
 
         conf = confidence(points, center)
-        print(f"Confidence: {conf:.2f}, Center: {center}")
+        print(f"{conf:.2f}, {center}")
 
         prev_frame = frame
         prev_center = center
@@ -49,6 +38,5 @@ def process_video(input_path: str):
     video_capture.release()
     cv2.destroyAllWindows()
 
-# Example usage
-input_path = "path/to/your/video.mp4"
+input_path = ""
 process_video(input_path)
