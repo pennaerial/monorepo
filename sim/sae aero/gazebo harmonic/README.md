@@ -19,8 +19,8 @@ Verify the directory ~/.simulation-gazebo exists.
 Copy the custom models and worlds into the directory above.
 
 ```bash
-cp -R models/ ~/.simulation-gazebo/models
-cp -R worlds/ ~/.simulation-gazebo/worlds
+cp -R models/* ~/.simulation-gazebo/models
+cp -R worlds/* ~/.simulation-gazebo/worlds
 ```
 
 Copy the scripts standalone_gazebo_cmd.sh and standalone_px4_cmd.sh into the PX4-Autopilot repo:
