@@ -70,11 +70,6 @@ def find_points_range(prob, std, color):
     return points, range
 
 
-def output_contour(threshold):
-    # Kevin + Arjun Function
-    # returns a list of points given threshold, 
-    return []
-
 def confidence(points):
     # dimitris function
     # given points: list of points
