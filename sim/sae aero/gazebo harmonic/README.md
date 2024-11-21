@@ -39,13 +39,18 @@ Navigate to the location of the PX4-Autopilot repo.
 ./standalone_px4_cmd.sh
 ```
 
-Establish the ROS connection to the PX4/Gazebo server:
+Establish the middleware connection:
 
 ```bash
+MicroXRCEAgent udp4 -p 8888
 ```
 
 Run the ROS control script:
 
 ```bash
+cd {ros_workspace}
+colcon build
+source install/setup.bash
+ros2 launch {package_name} {launch_file}
 ```
 
