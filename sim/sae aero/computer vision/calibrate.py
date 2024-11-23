@@ -1,17 +1,19 @@
 import numpy as np
-from scipy.stats import norm
+import cv2
 import scipy.stats as stats
 from recalibrate import detect_contour
+from confidence import confidence
 
 def calibrate(frame):
     """
     Returns color range with best confidence interval
     Args:
-        frame (List[int]): 2-D list of pixels
+        frame (List[int] * List[int] * List[int]): 3 * 2-D list of pixels
     Returns:
         range (Tuple[Int, Int]): The color optimal color rnage
     """
-    
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV) 
+    frame = hsv[:, :, 1].copy()
     # Initialize variables 
     color = 131
     curr_range = (0.0, 1.0)
@@ -26,15 +28,15 @@ def calibrate(frame):
 
     while (high - low > 0.01):
         mid = (low + high) / 2
-        points, range = find_points_range(mid, std, color)
+        points, range = find_points_range(mid, std, color, frame)
 
         if len(points) > 0: 
             curr_range = range
             low = mid
+            best_confidence = (low + high) / 2
         else:
             high = mid
     
-    best_confidence = (low + high) / 2
 
     # Perform a neighborhood search on 20 points within a 2% buffer
     neighborhood_low = best_confidence - 0.02
@@ -43,8 +45,8 @@ def calibrate(frame):
 
     best_neighborhood_range = curr_range
     for conf in neighborhood_conf:
-        points, range = find_points_range(conf, std, color)
-        curr_conf = confidence(points)
+        points, range = find_points_range(conf, std, color, frame)
+        curr_conf = confidence(points, -1, *frame.shape)
         if len(points) > 0 and curr_conf > best_confidence:
             best_confidence = curr_conf
             best_neighborhood_range = range
@@ -52,13 +54,13 @@ def calibrate(frame):
     return best_neighborhood_range
 
 
-def find_points_range(prob, std, color):
+def find_points_range(prob, std, color, frame):
     """
     Finds the points and color value range corresponding to some probability, std, and color
 
     Args:
         prob (Float): probaility ranging from 0.0 - 1.0
-        std (Float): standard deviation value
+        std (Float): standar d deviation value
         color (Float): Ground truth or mean of distribution
     Returns:
         points (List[Int]): list of points in the image which correspond to range
@@ -66,12 +68,5 @@ def find_points_range(prob, std, color):
     """
     z_score = stats.norm.ppf(prob)
     range = (color - z_score * std, color + z_score * std)
-    points = detect_contour(range)
+    points = detect_contour(frame, range)
     return points, range
-
-
-def confidence(points):
-    # dimitris function
-    # given points: list of points
-    # outputs a confidence score
-    return 1

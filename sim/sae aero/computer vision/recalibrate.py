@@ -2,12 +2,10 @@ import cv2
 import numpy as np
 
 
-def detect_contour(frame):
-    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-    hsv = cv2.GaussianBlur(hsv, (5, 5), 0)
-
+def detect_contour(frame, range):
+    frame = cv2.GaussianBlur(frame, (5, 5), 0)
     # Threshold to isolate potential contours
-    thresh = cv2.inRange(hsv, (0, 0, 180), (225, 225, 255))
+    thresh = cv2.inRange(frame, *range)
 
     contours, _ = cv2.findContours(thresh, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
     valid_contours = []
@@ -42,7 +40,7 @@ def detect_contour(frame):
         _, best_contour, _ = total[0]  # Choose the best contour based on area ratio
         return best_contour
     else:
-        return None
+        return set()
 
 
 def contourNeighborhood(img, contour, margin):
@@ -78,9 +76,9 @@ def kl_divergence(img1, img2):
     return kl.astype(np.float32)
 
 
-def check(frame1, frame2):
-    contour1 = detect_contour(frame1)
-    contour2 = detect_contour(frame2)
+def check(frame1, frame2, range):
+    contour1 = detect_contour(frame1, range)
+    contour2 = detect_contour(frame2, range)
 
     if contour1 is None or contour2 is None:
         raise ValueError("No valid contours detected in one or both images.")
@@ -91,21 +89,21 @@ def check(frame1, frame2):
 
     return kl_divergence(region1, region2)
 
-
-# Example usage
-img1 = cv2.imread("/Users/rushilpatel/Desktop/Recalibrate1.png")
-img2 = cv2.imread("/Users/rushilpatel/Desktop/Recalibrate2.png")
-img3 = cv2.imread("/Users/rushilpatel/Desktop/Recalibrate3.png")
-
-
-def recalibrate(frame1, frame2):
+def recalibrate(frame1, frame2, range):
     try:
-        print("THE DIVERGENCE IS " + (str)(check(frame1, frame2)))
+        print("THE DIVERGENCE IS " + (str)(check(frame1, frame2, range)))
     except ValueError as e:
         print(f"Error: {e}")
-    return (check(frame1, frame2)) > 5
+    return (check(frame1, frame2, range)) > 5
 
+if __name__ == "__main__":
+    # Example usage
+    range = ((0, 0, 180), (225, 225, 255))
 
-print(recalibrate(img1, img2))
-print(recalibrate(img2, img3))
-print(recalibrate(img1, img3))
+    img1 = cv2.imread("/Users/rushilpatel/Desktop/Recalibrate1.png")
+    img2 = cv2.imread("/Users/rushilpatel/Desktop/Recalibrate2.png")
+    img3 = cv2.imread("/Users/rushilpatel/Desktop/Recalibrate3.png")
+
+    print(recalibrate(img1, img2, range))
+    print(recalibrate(img2, img3, range))
+    print(recalibrate(img1, img3, range))

@@ -3,8 +3,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy
 
-cap = cv2.VideoCapture('DJI_0033.mov')
-
 def distance(c1, c2):
     return (c1[0] - c2[0]) ** 2 + (c1[1] - c2[1]) ** 2
 
@@ -66,28 +64,29 @@ def threshold(thresh, prev_center, frame):
     #cv2.imshow('Image 2 Matches', frame)
     #print(contour)
     return contour, center
+if __name__ == "__main__":
+    cap = cv2.VideoCapture('DJI_0033.mov')
+    thresh = (170, 255)
+    ret, prev = cap.read()
+    prev = cv2.resize(prev, (2704 // 2, 1520 // 2))
+    _, prev_centers = detect_contour(thresh, prev)
+    prev_center = None
+    if prev_centers:
+        prev_center = prev_centers[0]
 
-thresh = (170, 255)
-ret, prev = cap.read()
-prev = cv2.resize(prev, (2704 // 2, 1520 // 2))
-_, prev_centers = detect_contour(thresh, prev)
-prev_center = None
-if prev_centers:
-    prev_center = prev_centers[0]
-
-while cap.isOpened():
-    ret, frame = cap.read()
-    frame = cv2.resize(frame, (2704 // 2, 1520 // 2))
-    if frame is not None:
-        # If the payload was in the previous frame
-        if prev_center is not None:
-            _, new_center = threshold(thresh, prev_center, frame)
-            prev_center = new_center
-        # If payload is obstructed
-        else:
-            _, prev_centers = detect_contour(thresh, frame)
-            if prev_centers:
-                prev_center = prev_centers[0]
-        cv2.imshow('Image 2 Matches', frame)
-    if cv2.waitKey(1) == ord('q'):
-        break
+    while cap.isOpened():
+        ret, frame = cap.read()
+        frame = cv2.resize(frame, (2704 // 2, 1520 // 2))
+        if frame is not None:
+            # If the payload was in the previous frame
+            if prev_center is not None:
+                _, new_center = threshold(thresh, prev_center, frame)
+                prev_center = new_center
+            # If payload is obstructed
+            else:
+                _, prev_centers = detect_contour(thresh, frame)
+                if prev_centers:
+                    prev_center = prev_centers[0]
+            cv2.imshow('Image 2 Matches', frame)
+        if cv2.waitKey(1) == ord('q'):
+            break
