@@ -7,7 +7,7 @@ def generate_launch_description():
         Node(
             output='screen',
             package='uav',
-            executable='temp',
+            executable='camera_feed',
             name='temp',
         )
     ])

@@ -9,16 +9,12 @@ This ReadMe documents the procedure for running the Gazebo simulator with a cust
 - ROS2 installation: 
 
 ## Setup PX4 and Gazebo for standalone mode
-From the location of your PX4 repo
-```bash
-cd Tools/simulation/gz
-python3 simulation-gazebo
-```
 Verify the directory ~/.simulation-gazebo exists.
 
-Copy the custom models and worlds into the directory above.
+FROM THIS DIRECTORY, copy the custom models and worlds into the directory above.
 
 ```bash
+cd {path_to_monorepo}/sim/sae\ aero/gazebo\ harmonic/
 cp -R models/* ~/.simulation-gazebo/models
 cp -R worlds/* ~/.simulation-gazebo/worlds
 ```
@@ -35,8 +31,8 @@ Start QGroundControl
 
 Navigate to the location of the PX4-Autopilot repo.
 ```bash
-./standalone_gazebo_cmd.sh
-./standalone_px4_cmd.sh
+bash standalone_gazebo_cmd.sh
+bash standalone_px4_cmd.sh
 ```
 
 Establish the middleware connection:
