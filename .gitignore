@@ -24,4 +24,7 @@
 build
 install
 log
+
+# Miscellaneous
+*MINST/raw/*
 src/actuator_msgs/
