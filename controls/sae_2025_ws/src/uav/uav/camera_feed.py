@@ -1,9 +1,9 @@
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image
-from cv_bridge import CvBridge
 import cv2
-
+import numpy as np
+from std_msgs.msg import Header
 
 class CameraDisplayNode(Node):
     def __init__(self):
@@ -14,14 +14,24 @@ class CameraDisplayNode(Node):
             self.listener_callback,
             10
         )
-        self.bridge = CvBridge()  # Bridge for converting ROS Image to OpenCV
         self.get_logger().info('Camera Display Node has started!')
 
     def listener_callback(self, msg):
         try:
-            # Convert ROS Image message to OpenCV image
-            cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+            # The image data is in msg.data as a byte array
+            # Convert the byte array to a NumPy array
+            img_data = np.frombuffer(msg.data, dtype=np.uint8)
             
+            # The message may be in different encoding (e.g., 'bgr8', 'rgb8', etc.)
+            # Ensure the encoding matches your camera's output.
+            # In this case, assuming 'bgr8' encoding (3 channels for BGR)
+            img_height = msg.height
+            img_width = msg.width
+            img_channels = 3  # Assuming 3 channels (BGR)
+
+            # Reshape the image data to a 2D array (height, width, channels)
+            cv_image = img_data.reshape((img_height, img_width, img_channels))
+
             # Display the image using OpenCV
             cv2.imshow("Camera Feed", cv_image)
             
@@ -50,4 +60,3 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
-
