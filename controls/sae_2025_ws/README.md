@@ -21,7 +21,9 @@ Before you begin, make sure you have the following installed:
 - PX4 Autopilot
 - QGroundControl
 
-Make sure to update your system and install necessary dependencies:
+You can refer to https://freedcamp.com/view/3502859/tasks/panel/task/61666972 for this process.
+
+Next, make sure to update your system and install necessary dependencies:
 
 ```bash
 sudo apt-get update
@@ -39,11 +41,10 @@ sudo apt-get upgrade
     git pull
     ```
 
-2. Clone the necessary repositories and submodules into sae_2025_ws:
+2. Clone the necessary submodules:
 
     ```bash
-    cd ./controls/sae_2025_ws/src/ros_gz 
-    git clone --recursive https://github.com/gazebosim/ros_gz.git
+    git submodule update --init --recursive
     ```
 
 
@@ -54,12 +55,14 @@ sudo apt-get upgrade
     ```bash
     echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc
     ```
+    For context, `>>` pipes the output of the preceding command into the succeeding file. Running the above command multiple times will just paste in `source /opt/...` multiple times into `~/.bashrc`. This setup script sets up your shell instance to recognize ROS2.
 
 2. If you're building `ros_gz_bridge` for the first time, set the Gazebo version to `harmonic`:
 
     ```bash
     export GZ_VERSION=harmonic
     ```
+    This is because the build process of `ros_gz_bridge` requires the gazebo version to be specified in shell variable `GZ_VERSION`.
 
 ---
 
@@ -72,7 +75,7 @@ sudo apt-get upgrade
     colcon build
     ```
 
-2. If you're encountering issues with OpenCV or NumPy version conflicts, follow these steps:
+2. Install OpenCV for both python and ROS2:
 
     ```bash
     sudo apt-get update
@@ -117,10 +120,10 @@ You might run into the following issues during the build process. Here are solut
 ## Launching Components
 
 ### Launch Order (All in Separate Terminals)
-
+0. Follow Setup instructions [here](../../sim/sae%20aero/gazebo%20harmonic/README.md). This should involve copying over our custom setup scripts into your local `PX4-Autopilot` folder.
 1. **From PX4-Autopilot**: 
 
-    Launch PX4 in standalone mode:
+    Launch PX4 in standalone mode (this spawns the simulator drone):
 
     ```bash
     bash standalone_px4_cmd.sh
@@ -134,7 +137,7 @@ You might run into the following issues during the build process. Here are solut
     bash standalone_gazebo_cmd.sh
     ```
 
-3. **From PX4-Autopilot**:
+3. **From Anywhere**:
 
     Start Micro XRCE Agent for communication:
 
@@ -160,17 +163,18 @@ You might run into the following issues during the build process. Here are solut
 
 6. **From `sae_2025_ws`**:
 
-    Source the workspace setup script:
+    Source the workspace setup script (this ensure that ros2 has the most recently-built versions of our workspace packages):
 
     ```bash
     source install/setup.bash
     ```
 
-    Start the ROS 2 parameter bridge:
+    Bridge the camera feed:
 
     ```bash
-    ros2 run ros_gz_bridge parameter_bridge /camera@sensor_msgs/msg/Image@gz.msgs.Image
+    ros2 run ros_gz_bridge parameter_bridge /camera@sensor_msgs/msg/Image[gz.msgs.Image
     ```
+    For information about the `ros_gz_bridge` package and its `parameter_bridge` executable, see https://gazebosim.org/docs/harmonic/ros2_integration/.
 
 7. **From Anywhere**: 
 
