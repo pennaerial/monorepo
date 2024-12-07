@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.stats import norm
 import scipy.stats as stats
-
+from recalibrate import detect_contour
 
 def calibrate(frame):
     """
@@ -66,14 +66,9 @@ def find_points_range(prob, std, color):
     """
     z_score = stats.norm.ppf(prob)
     range = (color - z_score * std, color + z_score * std)
-    points = output_contour(range)
+    points = detect_contour(range)
     return points, range
 
-
-def output_contour(threshold):
-    # Kevin + Arjun Function
-    # returns a list of points given threshold, 
-    return []
 
 def confidence(points):
     # dimitris function

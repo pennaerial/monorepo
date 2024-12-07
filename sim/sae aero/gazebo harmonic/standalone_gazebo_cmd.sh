@@ -1,0 +1,1 @@
+python3 Tools/simulation/gz/simulation-gazebo --world=custom
