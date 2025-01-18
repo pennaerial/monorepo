@@ -363,7 +363,12 @@
       <elevation>0</elevation>
     </spherical_coordinates>
     <include>
-      <uri>model://arucotag</uri>
+      <uri>model://payload</uri>
+    </include>
+    <include>
+      <uri>model://Oak tree</uri>
+      <name>Oak tree</name>
+      <pose>-2.0823041137399461 2.0504353999219358 0 0 0 0</pose>
     </include>
   </world>
 </sdf>

@@ -25,7 +25,8 @@ setup(
     entry_points={
         'console_scripts': [
             'temp = uav.temp:main',
-            'camera_feed = uav.camera_feed:main'
+            'camera_feed = uav.camera_feed:main',
+            'altitude = uav.altitude:main'
         ],
     },
 )
