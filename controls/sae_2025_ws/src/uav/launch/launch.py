@@ -5,30 +5,32 @@ import os
 
 def generate_launch_description():
     # Adjust these paths according to your setup
-    px4_path = os.path.expanduser('~/PX4-Autopilot')
-    qgc_path = os.path.expanduser('~/QGroundControl')  # Folder containing QGroundControl.AppImage
-    sae_ws_path = os.path.expanduser('~/sae_2025_ws')
+    px4_path = os.path.expanduser('~/pennair/PX4-Autopilot')
+    qgc_path = os.path.expanduser('~/pennair')  # Folder containing QGroundControl.AppImage
+    sae_ws_path = os.path.expanduser('~/pennair/monorepo/controls/sae_2025_ws')
     
     return LaunchDescription([
-        # # 1. Launch PX4 in standalone mode
-        # ExecuteProcess(
-        #     cmd=['bash', 'standalone_px4_cmd.sh'],
-        #     cwd=px4_path,
-        #     output='screen'
-        # ),
+        # 1. Launch PX4 in standalone mode
+        ExecuteProcess(
+            cmd=['bash', 'standalone_gazebo_cmd.sh'],
+            cwd=px4_path,
+            output='screen'
+        ),
 
-        # # 2. Launch Gazebo
-        # ExecuteProcess(
-        #     cmd=['bash', 'standalone_gazebo_cmd.sh'],
-        #     cwd=px4_path,
-        #     output='screen'
-        # ),
+        ExecuteProcess(
+            cmd=['bash', 'standalone_px4_cmd.sh'],
+            cwd=px4_path,
+            output='screen'
+        ),
 
-        # # 3. Start Micro XRCE Agent
-        # ExecuteProcess(
-        #     cmd=['MicroXRCEAgent', 'udp4', '-p', '8888'],
-        #     output='screen'
-        # ),
+        # 2. Launch Gazebo
+        
+
+        # 3. Start Micro XRCE Agent
+        ExecuteProcess(
+            cmd=['MicroXRCEAgent', 'udp4', '-p', '8888'],
+            output='screen'
+        ),
 
         # # 4. Launch QGroundControl
         # ExecuteProcess(
@@ -37,22 +39,14 @@ def generate_launch_description():
         #     output='screen'
         # ),
 
-        # # 5. Bridge the camera feed:
-        # # Make sure your environment is already sourced before running `ros2 launch`.
-        # ExecuteProcess(
-        #     cmd=['ros2', 'run', 'ros_gz_bridge', 'parameter_bridge', 
-        #          '/camera@sensor_msgs/msg/Image[gz.msgs.Image'],
-        #     output='screen',
-        #     cwd=sae_ws_path
-        # ),
-
-        # # 6. Launch the UAV node
-        # # Note: This assumes `ros2 launch uav launch.py` works correctly in the already sourced environment.
-        # ExecuteProcess(
-        #     cmd=['ros2', 'launch', 'uav', 'launch.py'],
-        #     output='screen',
-        #     cwd=sae_ws_path
-        # ),
+        # 5. Bridge the camera feed:
+        # Make sure your environment is already sourced before running `ros2 launch`.
+        ExecuteProcess(
+            cmd=['ros2', 'run', 'ros_gz_bridge', 'parameter_bridge', 
+                 '/camera@sensor_msgs/msg/Image[gz.msgs.Image'],
+            output='screen',
+            cwd=sae_ws_path
+        ),
 
         Node(
             output='screen',
