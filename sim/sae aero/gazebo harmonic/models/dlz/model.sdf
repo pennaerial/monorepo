@@ -12,6 +12,9 @@
           </mesh>
         </geometry>
       </visual>
+      <material>
+          <diffuse>1 0 1 1</diffuse> <!-- Pink color -->
+      </material>
     </link>
   </model>
 </sdf>
