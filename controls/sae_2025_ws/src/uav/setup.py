@@ -24,7 +24,6 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'sample_python_node = uav.sample_python_node:main',
             'temp = uav.temp:main',
             'camera_feed = uav.camera_feed:main'
         ],

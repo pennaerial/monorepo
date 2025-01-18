@@ -26,5 +26,5 @@ install
 log
 
 # Miscellaneous
-*MINST/raw/*
-src/actuator_msgs/
+crash course/data/MNIST/raw/*
+*/src/actuator_msgs/
