@@ -63,78 +63,57 @@ def find_payload(image):
     else:
         print("No pink square detected.")
 
+    if largest_green_contour is not None:
+        # Calculate the centroid of the green cylinder
+        M = cv2.moments(largest_green_contour)
+        if M["m00"] != 0:
+            cx = int(M["m10"] / M["m00"])
+            cy = int(M["m01"] / M["m00"])
+
+            # Draw a circle around the cylinder and its center
+            cv2.circle(result_image, (cx, cy), 5, (0, 255, 0), -1)
+            cv2.putText(result_image, f"Payload Center: ({cx}, {cy})", (cx + 10, cy - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
     # Display the results
     cv2.imshow("Pink Mask", pink_mask)
     cv2.imshow("Green Mask", green_mask)
     cv2.imshow("Result Image", result_image)
 
-    direction = navigate_using_shapes(frame, largest_contour, largest_green_contour)
+    direction = navigate(frame, largest_green_contour, cx, cy)
     print(direction)
 
-def navigate_using_shapes(image, square_contour, circle_contour):
-    # Calculate the centers of the square and circle
-    square_moments = cv2.moments(square_contour)
-    circle_moments = cv2.moments(circle_contour)
+def navigate(image, cylinder_contour, cx, cy):
 
-    if square_moments["m00"] == 0 or circle_moments["m00"] == 0:
-        print("Error: Contours are degenerate.")
-        return None
+    height, width, _ = image.shape
 
-    C_square = (int(square_moments["m10"] / square_moments["m00"]),
-                int(square_moments["m01"] / square_moments["m00"]))
-    C_circle = (int(circle_moments["m10"] / circle_moments["m00"]),
-                int(circle_moments["m01"] / circle_moments["m00"]))
+    # Define the center of the image (target position)
+    center_x = width // 2
+    center_y = height // 2
 
-    # Offset between the centers
-    dx = C_circle[0] - C_square[0]
-    dy = C_circle[1] - C_square[1]
+    # Calculate the relative horizontal and vertical direction to move
+    if cylinder_contour is not None:
+        dx = cx - center_x  # Horizontal offset
+        dy = cy - center_y  # Vertical offset
 
-    # Aspect ratio of the square (for orientation check)
-    x, y, w, h = cv2.boundingRect(square_contour)
-    square_aspect_ratio = w / h
+        # Decide movement based on horizontal position (left/right)
+        if abs(dx) > 50:  # Some threshold to avoid small adjustments
+            if dx > 0:
+                move_x = "Move Left"  # Payload is to the right, move left
+            else:
+                move_x = "Move Right"  # Payload is to the left, move right
+        else:
+            move_x = "Stay Horizontal"  # No horizontal movement required
 
-    # Check circle distortion (optional)
-    circle_aspect_ratio = cv2.boundingRect(circle_contour)[2] / cv2.boundingRect(circle_contour)[3]
+        # Decide movement based on vertical position (forward/backward)
+        if abs(dy) > 50:  # Some threshold to avoid small adjustments
+            if dy < 0:
+                move_y = "Move Forward"  # Payload is below the center, move forward
+            else:
+                move_y = "Move Backward"  # Payload is above the center, move backward
+        else:
+            move_y = "Stay Vertical"  # No vertical movement required
 
-    # Determine navigation directions
-    direction = {
-        "horizontal": "center",
-        "vertical": "center",
-        "height_adjustment": "stable"
-    }
-
-    # Adjust horizontal and vertical alignment
-    if dx < -10:  # Circle is to the left
-        direction["horizontal"] = "left"
-    elif dx > 10:  # Circle is to the right
-        direction["horizontal"] = "right"
-
-    if dy < -10:  # Circle is above
-        direction["vertical"] = "forward"
-    elif dy > 10:  # Circle is below
-        direction["vertical"] = "backward"
-
-    # Adjust height or tilt based on aspect ratio
-    if square_aspect_ratio < 0.9:  # Square looks tall, drone may need to descend
-        direction["height_adjustment"] = "descend"
-    elif square_aspect_ratio > 1.1:  # Square looks wide, drone may need to ascend
-        direction["height_adjustment"] = "ascend"
-
-    # Visualization (optional)
-    result_image = image.copy()
-    cv2.circle(result_image, C_square, 5, (255, 0, 0), -1)  # Square center (blue)
-    cv2.circle(result_image, C_circle, 5, (0, 255, 0), -1)  # Circle center (green)
-    cv2.line(result_image, C_square, C_circle, (0, 255, 255), 2)  # Line between centers
-    cv2.rectangle(result_image, (x, y), (x + w, y + h), (255, 0, 0), 2)  # Square bounding box
-    cv2.imshow("Navigation", result_image)
-    cv2.waitKey(1)
-
-    return direction
-
-# Example usage
-# Assuming `frame` is the video frame, `pink_square_contour` and `green_circle_contour` are detected:
-# direction = navigate_using_shapes(frame, pink_square_contour, green_circle_contour)
-# print(direction)
+        return f"Movement Directions: {move_x}, {move_y}"
 
 if __name__ == "__main__":
     # Open the video file
