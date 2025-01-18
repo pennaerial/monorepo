@@ -1,0 +1,17 @@
+<?xml version="1.0" ?>
+<sdf version="1.4">
+  <model name="payload">
+    <link name="payload_link">
+      <inertial>
+        <mass>2</mass>
+      </inertial>
+      <visual name="visual">
+        <geometry>
+          <mesh>
+            <uri>model://payload/meshes/payload.stl</uri>
+          </mesh>
+        </geometry>
+      </visual>
+    </link>
+  </model>
+</sdf>

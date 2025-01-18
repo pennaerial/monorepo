@@ -1,0 +1,17 @@
+<?xml version="1.0" ?>
+<sdf version="1.4">
+  <model name="dlz">
+    <link name="dlz_link">
+      <inertial>
+        <mass>2</mass>
+      </inertial>
+      <visual name="visual">
+        <geometry>
+          <mesh>
+            <uri>model://dlz/meshes/dlz.stl</uri>
+          </mesh>
+        </geometry>
+      </visual>
+    </link>
+  </model>
+</sdf>
