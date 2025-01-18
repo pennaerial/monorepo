@@ -1,6 +1,6 @@
 import rclpy
 from rclpy.node import Node
-from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, VehicleStatus, VehicleCommand, VehicleAttitude
+from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, VehicleStatus, VehicleCommand, VehicleAttitude, VehicleGlobalPosition
 from rclpy.clock import Clock
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy, QoSDurabilityPolicy
 
@@ -70,7 +70,14 @@ class UAV:
             VehicleAttitude,
             '/fmu/out/vehicle_attitude',
             self._attitude_callback,
-            qos_profile)        
+            qos_profile)
+
+        self.global_position_sub = self.create_subscription(
+            VehicleGlobalPosition,
+            'fmu/out/vehicle_global_position'
+            self._global_position_callback,
+            qos_profile
+        )        
 
     def _initialize_timers(self):
         """
@@ -134,14 +141,18 @@ class UAV:
             f"Velocity command sent: vx={vx}, vy={vy}, vz={vz}, yaw_rate={yaw_rate}"
         )
 
+    
+    def get_gps():
+        pass
+
+
     # Internal helper methods
     def _send_vehicle_command(self, command: int, params: dict = {}):
         """
         Publish a VehicleCommand message.
         """
-
         self.vehicle_command_publisher.publish(command, params)
-        pass
+        
 
     def _vehicle_status_callback(self, msg: OffboardControlMode):
         """
@@ -150,7 +161,6 @@ class UAV:
         Args:
             msg (VehicleStatus): The VehicleStatus message received from the UAV.
         """
-
         #store vars
         self.vehicle_status = msg
 
@@ -192,3 +202,6 @@ class UAV:
             1.0 - 2.0 * (q[0] ** 2 + q[1] ** 2)
         )
         self.node.get_logger().debug(f"Current Yaw: {self.yaw}")
+
+    def _global_position_callback():
+        
