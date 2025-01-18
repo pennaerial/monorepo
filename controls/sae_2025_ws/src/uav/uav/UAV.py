@@ -23,7 +23,11 @@ class UAV:
         """
         Initialize ROS 2 publishers and subscribers.
         """
-        pass
+
+        self.publisher_vehicle_status = self.create_publisher(VehicleStatus, '/fmu/out/vehicle_status')
+        self.publisher_trajectory_setpoint = self.create_publisher(TrajectorySetpoint, '/fmu/in/trajectory_setpoint')
+        self.publisher_vehicle_command = self.create_publisher(VehicleCommand, "/fmu/in/vehicle_command")
+        self.publisher_vehicle_attitude = self.create_publisher(VehicleAttitude, "/fmu/out/vehicle_attitude")
 
     def _initialize_timers(self):
         """
