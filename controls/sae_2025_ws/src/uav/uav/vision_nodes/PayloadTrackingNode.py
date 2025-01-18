@@ -1,9 +1,10 @@
-from cv.track import track
+from cv.track import track, conversion, confidence
 from cv.recalibrate import recalibrate
 from cv.threshold import threshold
-from cv.track import conversion, confidence
+from cv.tracking import find_payload
 from uav import VisionNode
 from numpy import ndarray as np
+from uav.srv import PayloadTracking
 
 
 class PayloadTrackingNode(VisionNode):
@@ -18,7 +19,9 @@ class PayloadTrackingNode(VisionNode):
         payload_color (np.ndarray): The color of the payload to track, in HSV format.
         """
         super().__init__('payload_tracking_node', image_topic)
-        # TODO: Initialize any additional attributes
+        
+        self.initialize_service(PayloadTracking, '/payload_tracking')
+        self.get_logger().info(f"PayloadTracking service has started, subscribing to {image_topic}.")
         pass
 
     def process_frame(self, frame: np.ndarray) -> None:
@@ -28,4 +31,12 @@ class PayloadTrackingNode(VisionNode):
         Args:
             frame (np.ndarray): The image frame to process.
         """
-        pass
+        self.processed_frame = find_payload(frame)
+    
+    def service_callback(self, request: PayloadTracking.Request, response: PayloadTracking.Response):
+        self.process_frame(self.curr_frame)
+        response.x = self.processed_frame[0]
+        response.y = self.processed_frame[1]
+        response.direction = self.processed_frame[2]
+
+        return response
