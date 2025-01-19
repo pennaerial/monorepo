@@ -1,6 +1,8 @@
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image
+from typing import Type
+from rclpy.type_support import Srv, SrvRequestT, SrvResponseT
 import cv2
 import numpy as np
 from abc import ABC, abstractmethod
@@ -35,7 +37,9 @@ class VisionNode(Node, ABC):
 
         # Internal state
         self.prev_frame = None
-        self.prev_center = (0, 0)
+
+        self.curr_frame = None
+
         self.threshold_range = None
 
     def listener_callback(self, msg: Image):
@@ -48,9 +52,21 @@ class VisionNode(Node, ABC):
         """
         try:
             frame = self.convert_image_msg_to_frame(msg)
-            self.process_frame(frame)
+            self.prev_frame = self.curr_frame
+            self.curr_frame = frame
         except Exception as e:
             self.get_logger().error(f"Failed to process image: {e}")
+
+    def service_callback(self, request: SrvRequestT, response: SrvResponseT):
+        """
+        Callback for receiving image messages. Converts the image data
+        and processes the frame.
+
+        Args:
+            msg (Image): The ROS 2 Image message.
+        """
+
+        pass
 
     def convert_image_msg_to_frame(self, msg: Image) -> np.ndarray:
         """
@@ -65,6 +81,15 @@ class VisionNode(Node, ABC):
         img_data = np.frombuffer(msg.data, dtype=np.uint8)
         frame = img_data.reshape((msg.height, msg.width, 3))  # Assuming BGR8 encoding
         return frame
+
+    def initialize_service(self, custom_service: Type[Srv[SrvRequestT, SrvResponseT]], service_name: str):
+        self.service = self.create_service(
+            custom_service,
+            service_name,
+            self.service_callback
+        )
+
+        self.get_logger().info(f"{node_name} has started, subscribing to {service_name}.")
 
     @abstractmethod
     def process_frame(self, frame: np.ndarray) -> None:
