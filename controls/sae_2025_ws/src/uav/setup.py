@@ -26,6 +26,7 @@ setup(
         'console_scripts': [
             'temp = uav.temp:main',
             'camera_feed = uav.camera_feed:main',
+            'global_position_offboard_control = uav.global_position_offboard_control:main'
         ],
     },
 )
