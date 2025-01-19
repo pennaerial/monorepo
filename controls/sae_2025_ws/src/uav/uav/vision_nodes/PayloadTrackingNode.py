@@ -23,18 +23,9 @@ class PayloadTrackingNode(VisionNode):
         self.initialize_service(PayloadTracking, '/payload_tracking')
         self.get_logger().info(f"PayloadTracking service has started, subscribing to {image_topic}.")
         pass
-
-    def process_frame(self, frame: np.ndarray) -> None:
-        """
-        Process a single frame for tracking and recalibration.
-
-        Args:
-            frame (np.ndarray): The image frame to process.
-        """
-        self.processed_frame = find_payload(frame)
     
     def service_callback(self, request: PayloadTracking.Request, response: PayloadTracking.Response):
-        self.process_frame(self.curr_frame)
+        self.processed_fram = find_payload(self.curr_frame)
         response.x = self.processed_frame[0]
         response.y = self.processed_frame[1]
         response.direction = self.processed_frame[2]
