@@ -1,3 +1,4 @@
+from this import d
 import rclpy
 from rclpy.node import Node
 from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, VehicleStatus, VehicleCommand, VehicleAttitude
@@ -58,6 +59,18 @@ class UAV:
     def takeoff(self, altitude: float = 5.0):
         """
         Command the UAV to take off to the specified altitude.
+        """
+        pass
+
+    def set_target_position(self, position: tuple[float, float, float]):
+        """
+        Set the target position for the UAV.
+        """
+        pass
+    
+    def go_to(self):
+        """
+        Command the UAV to go to a position.
         """
         pass
 

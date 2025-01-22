@@ -57,6 +57,7 @@ class VisionNode(Node, ABC):
         except Exception as e:
             self.get_logger().error(f"Failed to process image: {e}")
 
+    @abstractmethod
     def service_callback(self, request: SrvRequestT, response: SrvResponseT):
         """
         Callback for receiving image messages. Converts the image data
@@ -90,17 +91,6 @@ class VisionNode(Node, ABC):
         )
 
         self.get_logger().info(f"{node_name} has started, subscribing to {service_name}.")
-
-    @abstractmethod
-    def process_frame(self, frame: np.ndarray) -> None:
-        """
-        Abstract method for processing a single frame.
-        Must be implemented by subclasses.
-
-        Args:
-            frame (np.ndarray): The image frame to process.
-        """
-        pass
 
     def display_frame(self, frame: np.ndarray, window_name: str = "Camera Feed") -> None:
         """

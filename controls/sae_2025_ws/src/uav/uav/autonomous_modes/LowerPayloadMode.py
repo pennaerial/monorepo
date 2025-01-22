@@ -1,45 +1,27 @@
-import math
-import rlcpy
-from geometry_msgs.msg import PoseStamped
-from sensor_msgs.msg import LaserScan
 from uav import Mode, UAV
 from rclpy.node import Node
 from uav.src import PayloadTracking
 
 class LowerPayloadMode(Mode):
     """
-    A mode for lowering the payload while avoiding obstacles.
+    A mode for lowering the payload.
     """
 
-    def __init__(self, node: Node, avoidance_radius: float = 2.0):
+    def __init__(self, node: Node):
         """
         Initialize the LowerPayload.
 
         Args:
             node (Node): ROS 2 node managing the UAV.
-            avoidance_radius (float): Minimum safe distance from obstacles.
         """
         super().__init__(node)
-        self.avoidance_radius = avoidance_radius
         self.obstacle_detected = False
         self.current_pose = None
         self.payload_pose = None
 
-        self.initialize_client()
+        self.initialize_client(PayloadTracking, '/payload_tracking')
 
-    def initialize_client(self):
-        self.client = self.create_client(PayloadTracking, '/payload_tracking')
-
-        while not self.client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info('Service not available, waiting again...')
-        
-        self.request = PayloadTracking.Request()
-
-        self.future = self.client.call_async(self.request)
-
-        self.future.add_done_callback(self.service_response_callback)
-
-    def service_response_callback(self, future):
+    def service_response_callback(self, future: Future):
         response = future.result()
         if response:
             self.get_logger().info(f'Response: {response}')

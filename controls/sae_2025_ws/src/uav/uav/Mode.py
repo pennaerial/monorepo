@@ -26,6 +26,43 @@ class Mode(ABC):
         pass
 
     @abstractmethod
+    def initialize_client(self, service_type: Type[Srv[SrvRequestT, SrvResponseT]], service_name: str) -> None:
+        """
+        Create a client for a service.
+
+        Args:
+            service_type (Type[Srv[SrvRequestT, SrvResponseT]]): The type of the service.
+            service_name (str): The name of the service.
+        """
+        self.client = self.create_client(service_type, service_name)
+
+        while not self.client.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info('Service not available, waiting again...')
+        
+        self.request = service_type.Request()
+
+        self.future = self.client.call_async(self.request)
+
+        self.future.add_done_callback(self.service_response_callback)
+
+    @abstractmethod
+    def service_response_callback(self, future: Future):
+        """
+        Callback for when a service response is received.
+        """
+        pass
+
+    def setup_vision(self, vision_nodes: [VisionNode]) -> None:
+        """
+        Setup the vision node for this mode.
+
+        Args:
+            vision (VisionNode): The vision nodes to setup for this mode.
+        """
+        self.vision_nodes = vision_nodes
+        
+
+    @abstractmethod
     def on_exit(self) -> None:
         """
         Logic executed when this mode is deactivated.

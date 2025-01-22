@@ -1,6 +1,3 @@
-from cv.track import track, conversion, confidence
-from cv.recalibrate import recalibrate
-from cv.threshold import threshold
 from cv.tracking import find_payload
 from uav import VisionNode
 from numpy import ndarray as np
@@ -21,11 +18,9 @@ class PayloadTrackingNode(VisionNode):
         super().__init__('payload_tracking_node', image_topic)
         
         self.initialize_service(PayloadTracking, '/payload_tracking')
-        self.get_logger().info(f"PayloadTracking service has started, subscribing to {image_topic}.")
-        pass
     
     def service_callback(self, request: PayloadTracking.Request, response: PayloadTracking.Response):
-        self.processed_fram = find_payload(self.curr_frame)
+        self.processed_frame = find_payload(self.curr_frame)
         response.x = self.processed_frame[0]
         response.y = self.processed_frame[1]
         response.direction = self.processed_frame[2]
