@@ -7,15 +7,19 @@ class Mode(ABC):
     Provides a structured template for implementing autonomous behaviors.
     """
 
-    def __init__(self, node: Node):
+    def __init__(self, node: Node, clients: {}):
         """
         Initialize the mode with a reference to the ROS 2 node.
 
         Args:
             node (Node): The ROS 2 node instance managing the UAV and this mode.
+            clients (dict): A dictionary of service clients.
         """
         self.node = node
         self.active = False
+
+        for service_name, service_type in clients.items():
+            self.initialize_client(service_type, service_name)
 
     @abstractmethod
     def on_enter(self) -> None:
@@ -25,7 +29,6 @@ class Mode(ABC):
         """
         pass
 
-    @abstractmethod
     def initialize_client(self, service_type: Type[Srv[SrvRequestT, SrvResponseT]], service_name: str) -> None:
         """
         Create a client for a service.
@@ -60,7 +63,6 @@ class Mode(ABC):
             vision (VisionNode): The vision nodes to setup for this mode.
         """
         self.vision_nodes = vision_nodes
-        
 
     @abstractmethod
     def on_exit(self) -> None:

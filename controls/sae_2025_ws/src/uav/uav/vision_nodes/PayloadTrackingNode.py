@@ -16,13 +16,11 @@ class PayloadTrackingNode(VisionNode):
         payload_color (np.ndarray): The color of the payload to track, in HSV format.
         """
         super().__init__('payload_tracking_node', image_topic)
-        
+
         self.initialize_service(PayloadTracking, '/payload_tracking')
     
     def service_callback(self, request: PayloadTracking.Request, response: PayloadTracking.Response):
         self.processed_frame = find_payload(self.curr_frame)
-        response.x = self.processed_frame[0]
-        response.y = self.processed_frame[1]
-        response.direction = self.processed_frame[2]
+        response.x, response.y, response.direction = self.processed_frame
 
         return response

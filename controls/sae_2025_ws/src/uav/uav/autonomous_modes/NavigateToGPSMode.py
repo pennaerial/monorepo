@@ -22,5 +22,5 @@ class NavigateToGPSMode(Mode):
         Periodic logic for setting gps coord.
         """
 
-        self.target_pose = (msg.pose.position.x, msg.pose.position.y, msg.pose.position.z)
+        self.target_pose = (msg.pose.position.x, msg.pose.position.y, msg.pose.direction)
         uav.set_target_position(self.target_pose)
