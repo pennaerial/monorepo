@@ -40,6 +40,7 @@ class UAV:
         Initialize ROS 2 publishers and subscribers.
         """
 
+
         qos_profile = QoSProfile(
             reliability=QoSReliabilityPolicy.BEST_EFFORT,
             durability=QoSDurabilityPolicy.TRANSIENT_LOCAL,
@@ -78,6 +79,7 @@ class UAV:
             self._global_position_callback,
             qos_profile
         )        
+
 
     def _initialize_timers(self):
         """
