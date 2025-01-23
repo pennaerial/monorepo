@@ -15,7 +15,6 @@ class LowerPayloadMode(Mode):
             node (Node): ROS 2 node managing the UAV.
         """
         super().__init__(node)
-        self.obstacle_detected = False
         self.current_pose = None
         self.payload_pose = None
 
@@ -38,7 +37,7 @@ class LowerPayloadMode(Mode):
         self.log("Entering Payload Lowering Mode.")
 
         self.payload_location = None
-        self.obstacle_detected = False
+
         if not self.uav.arm():
             self.log("Failed to arm the UAV.")
         else:
@@ -56,12 +55,8 @@ class LowerPayloadMode(Mode):
         Periodic logic for lowering payload and handling obstacles.
         """
 
-        if self.obstacle_detected:
-            self.log("Obstacle detected. Stopping UAV.")
-            self.uav.stop()
-        else:
-            if self.current_pose is None or self.payload_location is None:
-                self.log("Current pose not available yet.")
-                return
+        if self.current_pose is None or self.payload_location is None:
+            self.log("Current pose not available yet.")
+            return
 
-            self.uav.go_to(self.payload_location[0], self.payload_location[1], self.payload_location[2])
+        self.uav.go_to(self.payload_location[0], self.payload_location[1], self.payload_location[2])
