@@ -1,6 +1,6 @@
 import rclpy
 from rclpy.node import Node
-from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, VehicleStatus, VehicleCommand, VehicleAttitude, VehicleGlobalPosition
+from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, VehicleStatus, VehicleCommand, VehicleAttitude, VehicleGlobalPosition, VehicleLocalPosition
 from rclpy.clock import Clock
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy, QoSDurabilityPolicy
 
@@ -60,6 +60,9 @@ class UAV:
         )
         self.vehicle_command_publisher = self.node.create_publisher(
             VehicleCommand, '/fmu/in/vehicle_command', 10
+        )
+        self.target_position_publisher = self.node.create_publisher(
+            VehicleLocalPosition, '/fmu/in/target_position', 10
         )
 
         # subscribers
@@ -136,7 +139,21 @@ class UAV:
             f"Velocity command sent: vx={vx}, vy={vy}, vz={vz}, yaw_rate={yaw_rate}"
         )
 
-    
+    def set_target_position(self, pos: tuple[float , float, float]):
+        """
+        Set the target position for the UAV.
+        """
+        x, y, z = pos
+        position = VehicleLocalPosition()
+        position.timestamp = int(Clock().now().nanoseconds / 1000)
+        position.x = x
+        position.y = y
+        position.z = z
+        self.target_position_publisher.publish(position)
+        self.node.get_logger().debug(f"Target position set: x={x}, y={y}, z={z}")
+
+
+
     def get_gps(self):
         if self.global_position:
             return {
