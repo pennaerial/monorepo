@@ -153,6 +153,7 @@ class UAV:
         self.node.get_logger().debug(f"Target position set: x={x}, y={y}, z={z}")
 
 
+    # Getters : VehicleStatus
 
     def get_gps(self):
         if self.global_position:
@@ -165,6 +166,29 @@ class UAV:
         else:
             self.node.get_logger().warn("No GPS data available.")
             return None
+        
+    # Getters : VehicleAttitude
+    def get_quaternion(self):
+        if self.vehicle_attitude:
+            return {
+                "q": self.vehicle_attitude.q,
+                "delta_q": self.vehicle_attitude.delta_q_reset
+            }
+        else:
+            self.node.get_logger().warn("No quaternion data available.")
+            return None
+        
+    # Getters : VehicleStatus
+    def get_state(self):
+        if self.vehicle_attitude:
+            return {
+                "nav_state": self.vehicle_attitude.nav_state,
+                "arm_state": self.vehicle_attitude.arm_state
+            }
+        else:
+            self.node.get_logger().warn("No state data available.")
+            return None
+    
 
 
     # Internal helper methods
