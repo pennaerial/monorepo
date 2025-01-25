@@ -88,14 +88,6 @@ class UAV:
         """
         self.node.create_timer(0.02, self._offboard_control_loop)
         
-    
-    # Callbacks
-    def _first_callback(self, msg: OffboardControlMode):
-        """
-        Example callback for subscriber to OffboardControlMode messages.
-        """
-        
-        pass
 
     # Public methods
     def arm(self):
@@ -165,6 +157,9 @@ class UAV:
         self.vehicle_command_publisher.publish(command, params)
         
 
+
+    # Callbacks
+    
     def _vehicle_status_callback(self, msg: VehicleStatus):
         """
         Callback for handling VehicleStatus messages.
