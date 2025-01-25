@@ -33,6 +33,9 @@ class UAV:
 
         # vehicle attitude data --> VehicleAttitude
         self.vehicle_attitude = None
+
+        # global position --> VehicleGlobalPosition
+        self.global_position = None
         
 
     def _initialize_publishers_and_subscribers(self):
@@ -60,30 +63,30 @@ class UAV:
         )
 
         # subscribers
-        self.status_sub = self.create_subscription(
+        self.status_sub = self.node.create_subscription(
             VehicleStatus,
             '/fmu/out/vehicle_status',
             self._vehicle_status_callback,
             qos_profile)
         
-        self.attitude_sub = self.create_subscription(
+        self.attitude_sub = self.node.create_subscription(
             VehicleAttitude,
             '/fmu/out/vehicle_attitude',
             self._attitude_callback,
             qos_profile)
 
-        self.global_position_sub = self.create_subscription(
+        self.global_position_sub = self.node.create_subscription(
             VehicleGlobalPosition,
-            'fmu/out/vehicle_global_position'
+            'fmu/out/vehicle_global_position',
             self._global_position_callback,
-            qos_profile
-        )        
+            qos_profile)
+        
 
     def _initialize_timers(self):
         """
         Initialize ROS 2 timers.
         """
-        # self.node.create_timer(0.02, self._offboard_control_loop)
+        self.node.create_timer(0.02, self._offboard_control_loop)
         
     
     # Callbacks
@@ -114,7 +117,7 @@ class UAV:
         """
         Command the UAV to take off to the specified altitude.
         """
-        self.publish_vehicle_command(VehicleCommand.VEHICLE_CMD_NAV_TAKEOFF, param1 = 1.0, param7=altitude) 
+        self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_NAV_TAKEOFF, param1 = 1.0, param7=altitude) 
         self.get_logger().info("Takeoff command send")
 
     def land(self):
@@ -142,8 +145,16 @@ class UAV:
         )
 
     
-    def get_gps():
-        pass
+    def get_gps(self):
+        if self.global_position:
+            return {
+                "latitude": self.global_position.lat,
+                "longitude": self.global_position.lon,
+                "altitude": self.global_position.alt,
+            }
+        else:
+            self.node.get_logger().warn("No GPS data available.")
+            return None
 
 
     # Internal helper methods
@@ -154,7 +165,7 @@ class UAV:
         self.vehicle_command_publisher.publish(command, params)
         
 
-    def _vehicle_status_callback(self, msg: OffboardControlMode):
+    def _vehicle_status_callback(self, msg: VehicleStatus):
         """
         Callback for handling VehicleStatus messages.
         
@@ -181,7 +192,7 @@ class UAV:
         else:
             self.node.get_logger().info("Pre-flight checks passed.")
         
-    def _attitude_callback(self, msg: OffboardControlMode):
+    def _attitude_callback(self, msg: VehicleAttitude):
         """
         Callback for handling VehicleStatus messages.
     
@@ -192,16 +203,34 @@ class UAV:
         # store vars
         self.vehicle_attitude = msg
 
+        
+        q = msg.q
         self.node.get_logger().info(f"Received Attitude - Quaternion: {q}")
         self.node.get_logger().debug(f"Delta Q Reset: {msg.delta_q_reset}, Reset Counter: {msg.quat_reset_counter}")
+        self.vehicle_attitude = msg
 
         # Calculate yaw
-        q = msg.q
         self.yaw = np.arctan2(
             2.0 * (q[3] * q[0] + q[1] * q[2]),
             1.0 - 2.0 * (q[0] ** 2 + q[1] ** 2)
         )
         self.node.get_logger().debug(f"Current Yaw: {self.yaw}")
 
-    def _global_position_callback():
+    def _global_position_callback(self, msg: VehicleGlobalPosition):
+
+        """
+        Callback for handling global position updates from the UAV.
         
+        Args:
+            msg (VehicleGlobalPosition): The global position message received.
+        """
+
+        self.global_position = msg
+
+        self.node.get_logger().info(
+            f"Global Position - Lat: {msg.lat}, Lon: {msg.lon}, Alt: {msg.alt}"
+        )
+        
+
+
+    
