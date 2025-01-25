@@ -217,5 +217,8 @@ class UAV:
         )
         self.node.get_logger().debug(f"Current Yaw: {self.yaw}")
 
-    def _global_position_callback():
-        pass
+    def _global_position_callback(self):
+        self.vehicle_global_position = msg
+        self.node.get_logger().debug(
+            f"Global Position Updated - Latitude: {msg.lat}, Longitude: {msg.lon}, Altitude: {msg.alt}"
+        )
