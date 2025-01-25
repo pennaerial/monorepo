@@ -363,9 +363,6 @@
       <elevation>0</elevation>
     </spherical_coordinates>
     <include>
-      <uri>model://arucotag</uri>
-    </include>
-    <include>
       <uri>model://dlz</uri>
     </include>
     <include>
