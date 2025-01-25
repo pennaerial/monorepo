@@ -14,12 +14,14 @@ class VisionNode(Node, ABC):
     and managing vision-based tasks such as tracking and calibration.
     """
 
-    def __init__(self, node_name: str, image_topic: str = '/camera', queue_size: int = 10):
+    def __init__(self, node_name: str, service_name: str, custom_service: Type[Srv[SrvRequestT, SrvResponseT]], image_topic: str = '/camera', queue_size: int = 10):
         """
         Initialize the VisionNode.
 
         Args:
             node_name (str): The name of the ROS 2 node.
+            service_name (str): The name of the ROS 2 service.
+            custom_service (Type[Srv[SrvRequestT, SrvResponseT]]): The custom service type.
             image_topic (str): The name of the image topic to subscribe to.
             queue_size (int): The size of the message queue for the subscription.
         """
@@ -40,7 +42,7 @@ class VisionNode(Node, ABC):
 
         self.curr_frame = None
 
-        self.threshold_range = None
+        self.initialize_service(custom_service, service_name)
 
     def listener_callback(self, msg: Image):
         """
@@ -90,7 +92,7 @@ class VisionNode(Node, ABC):
             self.service_callback
         )
 
-        self.get_logger().info(f"{node_name} has started, subscribing to {service_name}.")
+        self.get_logger().info(f"{service_name} Service has started.")
 
     def display_frame(self, frame: np.ndarray, window_name: str = "Camera Feed") -> None:
         """
