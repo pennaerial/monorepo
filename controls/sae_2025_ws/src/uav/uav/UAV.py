@@ -67,7 +67,7 @@ class UAV:
         """
         pass
 
-    def go_to(self, location: tuple[float, float, float]): 
+    def go_to_target(self): 
         """
         Command the UAV to go to a position.
         Args:

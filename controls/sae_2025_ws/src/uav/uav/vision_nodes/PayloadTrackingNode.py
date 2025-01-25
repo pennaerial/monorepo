@@ -3,7 +3,6 @@ from uav import VisionNode
 from numpy import ndarray as np
 from uav.srv import PayloadTracking
 
-
 class PayloadTrackingNode(VisionNode):
     """
     A vision node that performs object tracking and recalibration.

@@ -34,6 +34,10 @@ class VisionNode(Node, ABC):
             self.listener_callback,
             queue_size
         )
+        
+        self.node_name = node_name
+        self.custom_service_type = custom_service
+        self.service_name = service_name
 
         self.get_logger().info(f"{node_name} has started, subscribing to {image_topic}.")
 

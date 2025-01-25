@@ -1,5 +1,10 @@
 from abc import ABC, abstractmethod
 from rclpy.node import Node
+from rclpy.type_support import Srv, SrvRequestT, SrvResponseT
+from typing import Type
+from rclpy.task import Future
+from typing import List
+from vision_nodes import VisionNode
 
 class Mode(ABC):
     """
@@ -7,7 +12,7 @@ class Mode(ABC):
     Provides a structured template for implementing autonomous behaviors.
     """
 
-    def __init__(self, node: Node, clients: {}):
+    def __init__(self, node: Node, vision_nodes: List[VisionNode]):
         """
         Initialize the mode with a reference to the ROS 2 node.
 
@@ -18,8 +23,9 @@ class Mode(ABC):
         self.node = node
         self.active = False
 
-        for service_name, service_type in clients.items():
-            self.initialize_client(service_type, service_name)
+        self.clients = dict()
+
+        self.setup_vision(vision_nodes)
 
     @abstractmethod
     def on_enter(self) -> None:
@@ -29,33 +35,27 @@ class Mode(ABC):
         """
         pass
 
-    def initialize_client(self, service_type: Type[Srv[SrvRequestT, SrvResponseT]], service_name: str) -> None:
+    def send_request(self, service_name: str) -> None:
         """
-        Create a client for a service.
+        Send a request to a service.
 
         Args:
-            service_type (Type[Srv[SrvRequestT, SrvResponseT]]): The type of the service.
+            request (SrvRequestT): The request to send.
             service_name (str): The name of the service.
         """
-        self.client = self.create_client(service_type, service_name)
+        client = self.clients[service_name][0]
+        req = self.clients[service_name][1]
 
-        while not self.client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info('Service not available, waiting again...')
-        
-        self.request = service_type.Request()
+        future = client.call_async(req)
 
-        self.future = self.client.call_async(self.request)
+        rclpy.spin_until_future_complete(self.node, future)
+        response = future.result()
 
-        self.future.add_done_callback(self.service_response_callback)
+        rclpy.shutdown()
 
-    @abstractmethod
-    def service_response_callback(self, future: Future):
-        """
-        Callback for when a service response is received.
-        """
-        pass
+        return response
 
-    def setup_vision(self, vision_nodes: [VisionNode]) -> None:
+    def setup_vision(self, vision_nodes: List[VisionNode]) -> None:
         """
         Setup the vision node for this mode.
 
@@ -63,6 +63,13 @@ class Mode(ABC):
             vision (VisionNode): The vision nodes to setup for this mode.
         """
         self.vision_nodes = vision_nodes
+
+        for vision_node in vision_nodes:
+            client = self.create_client(vision_node.custom_service_type, vision_node.service_name)
+            self.clients[vision_node.service_name] = (client, vision_node.custom_service_type.Request())
+
+            while not client.wait_for_service(timeout_sec=1.0):
+                self.node.get_logger().info(f"Service {vision_node.service_name} not available, waiting again...")
 
     @abstractmethod
     def on_exit(self) -> None:
