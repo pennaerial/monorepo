@@ -87,14 +87,14 @@ class UAV:
         """
         Send an arm command to the UAV.
         """
-        self._send_vehicle_command(400, params={"param1": 1.0}) 
+        self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM, param1=1.0) 
         self.node.get_logger().info("Sent Arm Command")
 
     def disarm(self):
         """
         Send a disarm command to the UAV.
         """
-        self._send_vehicle_command(400, params={"param1": 0.0})
+        self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM, param1=1.0)
         self.node.get_logger().info("Sent Disarm Command")
 
 
