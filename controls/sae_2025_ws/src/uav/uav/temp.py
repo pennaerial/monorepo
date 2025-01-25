@@ -67,7 +67,7 @@ class OffboardControl(Node):
         
         self.attitude_sub = self.create_subscription(
             VehicleAttitude,
-            '/fmu/out/vehicle_attitude',
+            '/fmu/out/vehicle_attitude', 
             self.attitude_callback,
             qos_profile)
         
