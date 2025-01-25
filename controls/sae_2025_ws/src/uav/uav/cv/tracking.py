@@ -133,7 +133,7 @@ if __name__ == "__main__":
     tracker = DroneTracker()
 
     # Assuming you have a way to get the initial drone altitude
-    initial_altitude = 100  # Example initial altitude of the drone (can be from GPS)
+
     tracker.initialize_tracking(initial_altitude)
 
     while cap.isOpened():
@@ -143,7 +143,7 @@ if __name__ == "__main__":
             break
 
         # Simulate current altitude of the drone from GPS
-        current_altitude = 110  # Example current altitude of the drone (can change as the drone moves)
+
 
         # Pass the current frame, tracker, and current altitude to find_payload
         cx, cy, direction_vector = find_payload(frame, tracker, current_altitude)
