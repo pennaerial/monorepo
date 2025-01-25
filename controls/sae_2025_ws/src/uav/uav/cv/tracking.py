@@ -1,7 +1,42 @@
 import cv2
 import numpy as np
 
-def find_payload(image):
+
+class DroneTracker:
+    def __init__(self):
+        self.initial_altitude = None # To store the initial altitude of the drone
+
+    def initialize_tracking(self, alt_drone):
+        # Save the initial altitude when the tracking script starts
+        if self.initial_altitude is None:
+            self.initial_altitude = alt_drone
+            print(f"Initial drone altitude set to: {self.initial_altitude} meters")
+
+    def navigate(self, image, cx, cy, alt_drone):
+        height, width, _ = image.shape
+
+        # Define the center of the image (target position)
+        center_x = width // 2
+        center_y = height // 2
+
+        # Calculate the relative horizontal and vertical offsets
+        dx = cx - center_x
+        dy = cy - center_y
+
+        # Calculate dz (vertical offset) based on initial altitude
+        if self.initial_altitude is not None:
+            dz = alt_drone - self.initial_altitude  # Difference in altitude
+        else:
+            dz = 0  # If we haven't initialized, assume no vertical offset
+
+        # Compute magnitude and normalize
+        magnitude = np.sqrt(dx ** 2 + dy ** 2 + dz ** 2)
+        unit_vector = (dx / magnitude, dy / magnitude, dz / magnitude)
+
+        return unit_vector
+
+
+def find_payload(image, tracker, alt_drone):
     # Convert the image to HSV color space
     hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
@@ -58,70 +93,48 @@ def find_payload(image):
             cv2.rectangle(result_image, (x, y), (x + w, y + h), (255, 0, 0), 2)
 
             print(f"Green circle found at: x={x}, y={y}, width={w}, height={h}")
+
+            if largest_green_contour is not None:
+                # Calculate the centroid of the green cylinder
+                M = cv2.moments(largest_green_contour)
+                if M["m00"] != 0:
+                    cx = int(M["m10"] / M["m00"])
+                    cy = int(M["m01"] / M["m00"])
+
+                    # Draw a circle around the cylinder and its center
+                    cv2.circle(result_image, (cx, cy), 5, (0, 255, 0), -1)
+                    cv2.putText(result_image, f"Payload Center: ({cx}, {cy})", (cx + 10, cy - 10),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
+                    # Calculate direction vector with altitude reference
+                    direction_vector = tracker.navigate(frame, cx, cy, alt_drone)
+
+                    cv2.imshow("Result Image", result_image)
+                    return cx, cy, direction_vector
         else:
             print("No green circle detected within the pink square.")
     else:
         print("No pink square detected.")
 
-    if largest_green_contour is not None:
-        # Calculate the centroid of the green cylinder
-        M = cv2.moments(largest_green_contour)
-        if M["m00"] != 0:
-            cx = int(M["m10"] / M["m00"])
-            cy = int(M["m01"] / M["m00"])
-
-            # Draw a circle around the cylinder and its center
-            cv2.circle(result_image, (cx, cy), 5, (0, 255, 0), -1)
-            cv2.putText(result_image, f"Payload Center: ({cx}, {cy})", (cx + 10, cy - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-
     # Display the results
-    cv2.imshow("Pink Mask", pink_mask)
-    cv2.imshow("Green Mask", green_mask)
     cv2.imshow("Result Image", result_image)
+    return None, None, None
 
-    direction = navigate(frame, largest_green_contour, cx, cy)
-    print(direction)
-
-def navigate(image, cylinder_contour, cx, cy):
-
-    height, width, _ = image.shape
-
-    # Define the center of the image (target position)
-    center_x = width // 2
-    center_y = height // 2
-
-    # Calculate the relative horizontal and vertical direction to move
-    if cylinder_contour is not None:
-        dx = cx - center_x  # Horizontal offset
-        dy = cy - center_y  # Vertical offset
-
-        # Decide movement based on horizontal position (left/right)
-        if abs(dx) > 50:  # Some threshold to avoid small adjustments
-            if dx > 0:
-                move_x = "Move Left"  # Payload is to the right, move left
-            else:
-                move_x = "Move Right"  # Payload is to the left, move right
-        else:
-            move_x = "Stay Horizontal"  # No horizontal movement required
-
-        # Decide movement based on vertical position (forward/backward)
-        if abs(dy) > 50:  # Some threshold to avoid small adjustments
-            if dy < 0:
-                move_y = "Move Forward"  # Payload is below the center, move forward
-            else:
-                move_y = "Move Backward"  # Payload is above the center, move backward
-        else:
-            move_y = "Stay Vertical"  # No vertical movement required
-
-        return f"Movement Directions: {move_x}, {move_y}"
 
 if __name__ == "__main__":
     # Open the video file
-    cap = cv2.VideoCapture("controls\\sae_2025_ws\\src\\uav\\uav\\cv\\video_files\\download (1).mp4")
-    
+    cap = cv2.VideoCapture("download (1).mp4")
+
     if not cap.isOpened():
         print("Error: Could not open video file.")
         exit()
+
+    # Initialize the DroneTracker class
+    tracker = DroneTracker()
+
+    # Assuming you have a way to get the initial drone altitude
+    initial_altitude = 100  # Example initial altitude of the drone (can be from GPS)
+    tracker.initialize_tracking(initial_altitude)
 
     while cap.isOpened():
         ret, frame = cap.read()  # Read a frame from the video
@@ -129,11 +142,16 @@ if __name__ == "__main__":
             print("End of video or error reading frame.")
             break
 
-        # Pass the current frame to find_pink_square
-        find_payload(frame)
+        # Simulate current altitude of the drone from GPS
+        current_altitude = 110  # Example current altitude of the drone (can change as the drone moves)
+
+        # Pass the current frame, tracker, and current altitude to find_payload
+        cx, cy, direction_vector = find_payload(frame, tracker, current_altitude)
+        if cx is not None:
+            print(f"Payload Center: ({cx}, {cy}), Direction Vector: {direction_vector}")
 
         # Quit the loop if 'q' is pressed
-        if cv2.waitKey(100) == ord('q'):
+        if cv2.waitKey(50) == ord('q'):
             break
 
     cap.release()
