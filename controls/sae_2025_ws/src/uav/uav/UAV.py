@@ -87,14 +87,14 @@ class UAV:
         """
         Send an arm command to the UAV.
         """
-        self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM, param1=1.0) 
+        self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM, params={'param1': 1.0}) 
         self.node.get_logger().info("Sent Arm Command")
 
     def disarm(self):
         """
         Send a disarm command to the UAV.
         """
-        self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM, param1=1.0)
+        self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM, params={'param2': 1.0})
         self.node.get_logger().info("Sent Disarm Command")
 
 
@@ -102,7 +102,7 @@ class UAV:
         """
         Command the UAV to take off to the specified altitude.
         """
-        self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_NAV_TAKEOFF, param1 = 1.0, param7=altitude) 
+        self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_NAV_TAKEOFF, params={'param1': 1.0, 'param7': altitude}) 
         self.get_logger().info("Takeoff command send")
 
     def land(self):
@@ -182,7 +182,7 @@ class UAV:
 
 
     # Internal helper methods
-    def _send_vehicle_command(self, command: int, param1=0.0, param2=0.0, param7=0.0,
+    def _send_vehicle_command(self, command: int, params: dict = {},
                                target_system = 1, target_component = 1, source_system = 1,
                                source_component = 1,
                                from_external = True):
@@ -190,9 +190,14 @@ class UAV:
         Publish a VehicleCommand message.
         """
         msg = VehicleCommand()
-        msg.param1 = param1
-        msg.param2 = param2
-        msg.param7 = param7
+        msg.param1 = params['param1'] if 'param1' in params else 0.0
+        msg.param2 = params['param2'] if 'param2' in params else 0.0
+        msg.param3 = params['param3'] if 'param3' in params else 0.0
+        msg.param4 = params['param4'] if 'param4' in params else 0.0
+        msg.param5 = params['param5'] if 'param5' in params else 0.0
+        msg.param6 = params['param6'] if 'param6' in params else 0.0
+        msg.param7 = params['param7'] if 'param7' in params else 0.0
+
         msg.command = command
 
         msg.target_system = target_system  # system to execute command
