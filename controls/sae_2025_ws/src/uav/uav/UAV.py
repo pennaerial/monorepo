@@ -43,6 +43,7 @@ class UAV:
         Initialize ROS 2 publishers and subscribers.
         """
 
+
         qos_profile = QoSProfile(
             reliability=QoSReliabilityPolicy.BEST_EFFORT,
             durability=QoSDurabilityPolicy.TRANSIENT_LOCAL,
@@ -81,6 +82,8 @@ class UAV:
             self._global_position_callback,
             qos_profile)
         
+
+
 
     def _initialize_timers(self):
         """
@@ -146,6 +149,20 @@ class UAV:
             }
         else:
             self.node.get_logger().warn("No GPS data available.")
+            return None
+    def get_gps(self):
+        if self.vehicle_global_position is not None:
+            gps_data = {
+                "latitude": self.vehicle_global_position.lat,
+                "longitude": self.vehicle_global_position.lon,
+                "altitude": self.vehicle_global_position.alt
+            }
+            self.node.get_logger().info(
+                f"Retrieved GPS Data: Latitude={gps_data['latitude']}, Longitude={gps_data['longitude']}, Altitude={gps_data['altitude']}"
+            )
+            return gps_data
+        else:
+            self.node.get_logger().warn("No GPS data available yet.")
             return None
 
 
@@ -229,3 +246,8 @@ class UAV:
 
 
     
+    def _global_position_callback(self):
+        self.vehicle_global_position = msg
+        self.node.get_logger().debug(
+            f"Global Position Updated - Latitude: {msg.lat}, Longitude: {msg.lon}, Altitude: {msg.alt}"
+        )
