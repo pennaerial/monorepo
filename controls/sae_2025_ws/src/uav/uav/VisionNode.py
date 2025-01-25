@@ -7,6 +7,7 @@ import cv2
 import numpy as np
 from abc import ABC, abstractmethod
 
+
 class VisionNode(Node, ABC):
     """
     Base class for ROS 2 nodes that process vision data.
@@ -25,7 +26,7 @@ class VisionNode(Node, ABC):
         """
         super().__init__(node_name)
 
-        # ROS 2 Subscription
+        # ROS 2 Subscription TODO: replace with service
         self.subscription = self.create_subscription(
             Image,
             image_topic,
@@ -42,20 +43,8 @@ class VisionNode(Node, ABC):
 
         self.threshold_range = None
 
-    def listener_callback(self, msg: Image):
-        """
-        Callback for receiving image messages. Converts the image data
-        and processes the frame.
-
-        Args:
-            msg (Image): The ROS 2 Image message.
-        """
-        try:
-            frame = self.convert_image_msg_to_frame(msg)
-            self.prev_frame = self.curr_frame
-            self.curr_frame = frame
-        except Exception as e:
-            self.get_logger().error(f"Failed to process image: {e}")
+    def request_image(self):
+        pass
 
     @abstractmethod
     def service_callback(self, request: SrvRequestT, response: SrvResponseT):
@@ -68,20 +57,6 @@ class VisionNode(Node, ABC):
         """
 
         pass
-
-    def convert_image_msg_to_frame(self, msg: Image) -> np.ndarray:
-        """
-        Converts a ROS 2 Image message to a NumPy array.
-
-        Args:
-            msg (Image): The ROS 2 Image message.
-
-        Returns:
-            np.ndarray: The decoded image as a NumPy array.
-        """
-        img_data = np.frombuffer(msg.data, dtype=np.uint8)
-        frame = img_data.reshape((msg.height, msg.width, 3))  # Assuming BGR8 encoding
-        return frame
 
     def initialize_service(self, custom_service: Type[Srv[SrvRequestT, SrvResponseT]], service_name: str):
         self.service = self.create_service(
