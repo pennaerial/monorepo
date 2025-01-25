@@ -22,9 +22,6 @@ class UAV:
         # Subscribers
         self._initialize_publishers_and_subscribers()
 
-        # Timers
-        self._initialize_timers()
-
         # set yaw
         self.yaw = 0.0
 
@@ -83,13 +80,6 @@ class UAV:
             'fmu/out/vehicle_global_position',
             self._global_position_callback,
             qos_profile)
-        
-
-    def _initialize_timers(self):
-        """
-        Initialize ROS 2 timers.
-        """
-        self.node.create_timer(0.02, self._offboard_control_loop)
         
 
     # Public methods
@@ -168,11 +158,26 @@ class UAV:
 
 
     # Internal helper methods
-    def _send_vehicle_command(self, command: int, params: dict = {}):
+    def _send_vehicle_command(self, command: int, param1=0.0, param2=0.0, param7=0.0,
+                               target_system = 1, target_component = 1, source_system = 1,
+                               source_component = 1,
+                               from_external = True):
         """
         Publish a VehicleCommand message.
         """
-        self.vehicle_command_publisher.publish(command, params)
+        msg = VehicleCommand()
+        msg.param1 = param1
+        msg.param2 = param2
+        msg.param7 = param7
+        msg.command = command
+
+        msg.target_system = target_system  # system to execute command
+        msg.target_component = target_component  # component which should execute the command, 0 for all components
+        msg.source_system = source_system  # system sending the command
+        msg.source_component = source_component  # component sending the command
+        msg.from_external = from_external
+        msg.timestamp = int(Clock().now().nanoseconds / 1000) # time in microseconds
+        self.vehicle_command_publisher_.publish(msg)
         
 
 
