@@ -144,8 +144,20 @@ class UAV:
         )
 
     
-    def get_gps():
-        pass
+    def get_gps(self):
+        if self.vehicle_global_position is not None:
+            gps_data = {
+                "latitude": self.vehicle_global_position.lat,
+                "longitude": self.vehicle_global_position.lon,
+                "altitude": self.vehicle_global_position.alt
+            }
+            self.node.get_logger().info(
+                f"Retrieved GPS Data: Latitude={gps_data['latitude']}, Longitude={gps_data['longitude']}, Altitude={gps_data['altitude']}"
+            )
+            return gps_data
+        else:
+            self.node.get_logger().warn("No GPS data available yet.")
+            return None
 
 
     # Internal helper methods
@@ -206,4 +218,4 @@ class UAV:
         self.node.get_logger().debug(f"Current Yaw: {self.yaw}")
 
     def _global_position_callback():
-        
+        pass
