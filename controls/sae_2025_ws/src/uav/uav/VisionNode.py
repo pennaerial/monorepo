@@ -1,6 +1,6 @@
 import rclpy
 from rclpy.node import Node
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import Image, CameraInfo
 from typing import Type
 from rclpy.type_support import Srv, SrvRequestT, SrvResponseT
 import cv2
@@ -28,11 +28,18 @@ class VisionNode(Node, ABC):
         super().__init__(node_name)
 
         # ROS 2 Subscription
-        self.subscription = self.create_subscription(
+        self.image_subscription = self.create_subscription(
             Image,
             image_topic,
-            self.listener_callback,
+            self.image_callback,
             queue_size
+        )
+
+        self.camera_info_subscription = self.create_subscription(
+            CameraInfo,
+            '/camera_info',
+            self.camera_info_callback,
+            10
         )
         
         self.node_name = node_name
@@ -48,7 +55,7 @@ class VisionNode(Node, ABC):
 
         self.initialize_service(custom_service, service_name)
 
-    def listener_callback(self, msg: Image):
+    def image_callback(self, msg: Image):
         """
         Callback for receiving image messages. Converts the image data
         and processes the frame.
@@ -62,6 +69,16 @@ class VisionNode(Node, ABC):
             self.curr_frame = frame
         except Exception as e:
             self.get_logger().error(f"Failed to process image: {e}")
+    
+    def camera_info_callback(self, msg: CameraInfo):
+        """
+        Callback for receiving camera info messages. Stores the camera info
+        for later use.
+
+        Args:
+            msg (CameraInfo): The ROS 2 CameraInfo message.
+        """
+        self.camera_info = msg
 
     @abstractmethod
     def service_callback(self, request: SrvRequestT, response: SrvResponseT):
@@ -92,7 +109,7 @@ class VisionNode(Node, ABC):
     def initialize_service(self, custom_service: Type[Srv[SrvRequestT, SrvResponseT]], service_name: str):
         self.service = self.create_service(
             custom_service,
-            service_name,
+            f'topic/{service_name}',
             self.service_callback
         )
 

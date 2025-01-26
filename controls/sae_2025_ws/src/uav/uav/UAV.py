@@ -60,13 +60,7 @@ class UAV:
         Command the UAV to take off to the specified altitude.
         """
         pass
-
-    def set_target_position(self, position: tuple[float, float, float]):
-        """
-        Set the target position for the UAV.
-        """
-        pass
-
+    
     def go_to_target(self): 
         """
         Command the UAV to go to a position.

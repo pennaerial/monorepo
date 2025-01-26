@@ -16,11 +16,19 @@ class NavigateToGPSMode(Mode):
         """
         super().__init__(node)
         self.target_pose = None
+    
+    def set_target(self, target_pose: tuple[float, float, float]):
+        """
+        Set the target GPS coordinate.
 
-    def pose_callback(self):
+        Args:
+            target_pose (tuple[float, float, float]): The target GPS coordinate.
+        """
+        self.target_pose = target_pose
+
+    def on_update(self):
         """
         Periodic logic for setting gps coord.
         """
-
-        self.target_pose = (msg.pose.position.x, msg.pose.position.y, msg.pose.direction)
-        uav.set_target_position(self.target_pose)
+        if self.target_pose is not None:
+            self.uav.go_to_target(self.target_pose)

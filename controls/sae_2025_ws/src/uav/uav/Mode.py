@@ -18,12 +18,12 @@ class Mode(ABC):
 
         Args:
             node (Node): The ROS 2 node instance managing the UAV and this mode.
-            clients (dict): A dictionary of service clients.
+            vision_nodes (List[VisionNode]): The vision nodes to setup for this mode.
         """
         self.node = node
         self.active = False
 
-        self.clients = dict()
+        self.clients = {}
 
         self.setup_vision(vision_nodes)
 
@@ -35,7 +35,7 @@ class Mode(ABC):
         """
         pass
 
-    def send_request(self, service_name: str) -> None:
+    def send_request(self, vision_node: VisionNode) -> None:
         """
         Send a request to a service.
 
@@ -43,8 +43,8 @@ class Mode(ABC):
             request (SrvRequestT): The request to send.
             service_name (str): The name of the service.
         """
-        client = self.clients[service_name][0]
-        req = self.clients[service_name][1]
+        client = self.clients[vision_node.service_name]
+        req = vision_node.custom_service_type.Request()
 
         future = client.call_async(req)
 
@@ -65,8 +65,8 @@ class Mode(ABC):
         self.vision_nodes = vision_nodes
 
         for vision_node in vision_nodes:
-            client = self.create_client(vision_node.custom_service_type, vision_node.service_name)
-            self.clients[vision_node.service_name] = (client, vision_node.custom_service_type.Request())
+            client = self.create_client(vision_node.custom_service_type, f'topic/{vision_node.service_name}')
+            self.clients[vision_node.service_name] = client
 
             while not client.wait_for_service(timeout_sec=1.0):
                 self.node.get_logger().info(f"Service {vision_node.service_name} not available, waiting again...")

@@ -25,10 +25,9 @@ class LowerPayloadMode(Mode):
         Periodic logic for lowering payload and handling obstacles.
         """
 
-        self.payload_pose = self.send_request('payload_tracking')
+        self.payload_pose = self.send_request(self.vision_nodes[0])
         
         if self.payload_pose is None:
             self.log("Current pose not available yet.")
         else:
-            self.uav.set_target_position(self.payload_pose)
-            self.uav.go_to_target()
+            self.uav.go_to_target(self.payload_pose)
