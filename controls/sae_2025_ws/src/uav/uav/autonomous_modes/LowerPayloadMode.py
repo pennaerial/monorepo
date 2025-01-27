@@ -30,4 +30,4 @@ class LowerPayloadMode(Mode):
         if self.payload_pose is None:
             self.log("Current pose not available yet.")
         else:
-            self.uav.go_to_target(self.payload_pose)
+            self.uav.set_target_position(self.payload_pose)

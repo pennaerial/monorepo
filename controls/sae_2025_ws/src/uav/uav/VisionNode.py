@@ -3,6 +3,7 @@ from rclpy.node import Node
 from sensor_msgs.msg import Image, CameraInfo
 from typing import Type
 from rclpy.type_support import Srv, SrvRequestT, SrvResponseT
+from typing import Optional
 import cv2
 import numpy as np
 from abc import ABC, abstractmethod
@@ -14,18 +15,21 @@ class VisionNode(Node, ABC):
     and managing vision-based tasks such as tracking and calibration.
     """
 
-    def __init__(self, node_name: str, service_name: str, custom_service: Type[Srv[SrvRequestT, SrvResponseT]], image_topic: str = '/camera', queue_size: int = 10):
+    def __init__(self, node_name: str, custom_service: Type[Srv[SrvRequestT, SrvResponseT]], service_name: Optional[str] = None, image_topic: str = '/camera', queue_size: int = 10):
         """
         Initialize the VisionNode.
 
         Args:
             node_name (str): The name of the ROS 2 node.
-            service_name (str): The name of the ROS 2 service.
             custom_service (Type[Srv[SrvRequestT, SrvResponseT]]): The custom service type.
+            service_name (Optional[str]): The name of the ROS 2 service. Defaults to 'vision/{node_name}'.
             image_topic (str): The name of the image topic to subscribe to.
             queue_size (int): The size of the message queue for the subscription.
         """
         super().__init__(node_name)
+
+        if service_name is None:
+            service_name = f'vision/{node_name}'
 
         # ROS 2 Subscription
         self.image_subscription = self.create_subscription(
@@ -106,10 +110,13 @@ class VisionNode(Node, ABC):
         frame = img_data.reshape((msg.height, msg.width, 3))  # Assuming BGR8 encoding
         return frame
 
-    def initialize_service(self, custom_service: Type[Srv[SrvRequestT, SrvResponseT]], service_name: str):
+    def initialize_service(self, custom_service: Type[Srv[SrvRequestT, SrvResponseT]], service_name: Optional[str] = None):
+        if service_name is None:
+            service_name = self.service_name
+        
         self.service = self.create_service(
             custom_service,
-            f'topic/{service_name}',
+            service_name,
             self.service_callback
         )
 

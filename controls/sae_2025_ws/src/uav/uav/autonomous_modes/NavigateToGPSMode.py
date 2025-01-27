@@ -31,4 +31,4 @@ class NavigateToGPSMode(Mode):
         Periodic logic for setting gps coord.
         """
         if self.target_pose is not None:
-            self.uav.go_to_target(self.target_pose)
+            self.uav.set_target_position(self.target_pose)

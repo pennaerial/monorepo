@@ -61,9 +61,9 @@ class UAV:
         """
         pass
     
-    def go_to_target(self): 
+    def set_target_position(self): 
         """
-        Command the UAV to go to a position.
+        Set the target position for the UAV to navigate to.
         Args:
             location (tuple[float, float, float]): The position (x, y) and direction z.
         """

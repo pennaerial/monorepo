@@ -48,10 +48,7 @@ class Mode(ABC):
 
         future = client.call_async(req)
 
-        rclpy.spin_until_future_complete(self.node, future)
         response = future.result()
-
-        rclpy.shutdown()
 
         return response
 
@@ -65,7 +62,7 @@ class Mode(ABC):
         self.vision_nodes = vision_nodes
 
         for vision_node in vision_nodes:
-            client = self.create_client(vision_node.custom_service_type, f'topic/{vision_node.service_name}')
+            client = self.node.create_client(vision_node.custom_service_type, f'topic/{vision_node.service_name}')
             self.clients[vision_node.service_name] = client
 
             while not client.wait_for_service(timeout_sec=1.0):
