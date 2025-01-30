@@ -1,6 +1,9 @@
 import rclpy
 from rclpy.node import Node
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import Image, CameraInfo
+from typing import Type
+from rclpy.type_support import Srv, SrvRequestT, SrvResponseT
+from typing import Optional
 import cv2
 import numpy as np
 from abc import ABC, abstractmethod
@@ -12,33 +15,52 @@ class VisionNode(Node, ABC):
     and managing vision-based tasks such as tracking and calibration.
     """
 
-    def __init__(self, node_name: str, image_topic: str = '/camera', queue_size: int = 10):
+    def __init__(self, node_name: str, custom_service: Type[Srv[SrvRequestT, SrvResponseT]], service_name: Optional[str] = None, image_topic: str = '/camera', queue_size: int = 10):
         """
         Initialize the VisionNode.
 
         Args:
             node_name (str): The name of the ROS 2 node.
+            custom_service (Type[Srv[SrvRequestT, SrvResponseT]]): The custom service type.
+            service_name (Optional[str]): The name of the ROS 2 service. Defaults to 'vision/{node_name}'.
             image_topic (str): The name of the image topic to subscribe to.
             queue_size (int): The size of the message queue for the subscription.
         """
         super().__init__(node_name)
 
         # ROS 2 Subscription
-        self.subscription = self.create_subscription(
+        self.image_subscription = self.create_subscription(
             Image,
             image_topic,
-            self.listener_callback,
+            self.image_callback,
             queue_size
         )
+
+        self.camera_info_subscription = self.create_subscription(
+            CameraInfo,
+            '/camera_info',
+            self.camera_info_callback,
+            10
+        )
+
+
+        if service_name is None:
+            service_name = f'vision/{node_name}'
+        
+        self.node_name = node_name
+        self.custom_service_type = custom_service
+        self.service_name = service_name
 
         self.get_logger().info(f"{node_name} has started, subscribing to {image_topic}.")
 
         # Internal state
         self.prev_frame = None
-        self.prev_center = (0, 0)
-        self.threshold_range = None
 
-    def listener_callback(self, msg: Image):
+        self.curr_frame = None
+
+        self.initialize_service(custom_service, service_name)
+
+    def image_callback(self, msg: Image):
         """
         Callback for receiving image messages. Converts the image data
         and processes the frame.
@@ -48,9 +70,32 @@ class VisionNode(Node, ABC):
         """
         try:
             frame = self.convert_image_msg_to_frame(msg)
-            self.process_frame(frame)
+            self.prev_frame = self.curr_frame
+            self.curr_frame = frame
         except Exception as e:
             self.get_logger().error(f"Failed to process image: {e}")
+    
+    def camera_info_callback(self, msg: CameraInfo):
+        """
+        Callback for receiving camera info messages. Stores the camera info
+        for later use.
+
+        Args:
+            msg (CameraInfo): The ROS 2 CameraInfo message.
+        """
+        self.camera_info = msg
+
+    @abstractmethod
+    def service_callback(self, request: SrvRequestT, response: SrvResponseT):
+        """
+        Callback for receiving image messages. Converts the image data
+        and processes the frame.
+
+        Args:
+            msg (Image): The ROS 2 Image message.
+        """
+
+        pass
 
     def convert_image_msg_to_frame(self, msg: Image) -> np.ndarray:
         """
@@ -66,16 +111,17 @@ class VisionNode(Node, ABC):
         frame = img_data.reshape((msg.height, msg.width, 3))  # Assuming BGR8 encoding
         return frame
 
-    @abstractmethod
-    def process_frame(self, frame: np.ndarray) -> None:
-        """
-        Abstract method for processing a single frame.
-        Must be implemented by subclasses.
+    def initialize_service(self, custom_service: Type[Srv[SrvRequestT, SrvResponseT]], service_name: Optional[str] = None):
+        if service_name is None:
+            service_name = self.service_name
+        
+        self.service = self.create_service(
+            custom_service,
+            service_name,
+            self.service_callback
+        )
 
-        Args:
-            frame (np.ndarray): The image frame to process.
-        """
-        pass
+        self.get_logger().info(f"{service_name} Service has started.")
 
     def display_frame(self, frame: np.ndarray, window_name: str = "Camera Feed") -> None:
         """
