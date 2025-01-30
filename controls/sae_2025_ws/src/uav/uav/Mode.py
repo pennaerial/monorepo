@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import rclpy
 from rclpy.node import Node
 from rclpy.type_support import Srv, SrvRequestT, SrvResponseT
 from typing import Type
@@ -35,7 +36,7 @@ class Mode(ABC):
         """
         pass
 
-    def send_request(self, vision_node: VisionNode) -> None:
+    def send_request(self, vision_node_name: str, req: SrvRequestT) -> None:
         """
         Send a request to a service.
 
@@ -43,11 +44,13 @@ class Mode(ABC):
             request (SrvRequestT): The request to send.
             service_name (str): The name of the service.
         """
+        vision_node = self.vision_nodes[vision_node_name]
+        assert type(req) == vision_node.custom_service_type.Request
+
         client = self.clients[vision_node.service_name]
-        req = vision_node.custom_service_type.Request()
 
         future = client.call_async(req)
-
+        rclpy.spin_until_future_complete(self.node, future)
         response = future.result()
 
         return response
@@ -59,10 +62,10 @@ class Mode(ABC):
         Args:
             vision (VisionNode): The vision nodes to setup for this mode.
         """
-        self.vision_nodes = vision_nodes
+        self.vision_nodes = {vnode.node_name: vnode for vnode in vision_nodes}
 
-        for vision_node in vision_nodes:
-            client = self.node.create_client(vision_node.custom_service_type, f'topic/{vision_node.service_name}')
+        for vision_node in vision_nodes.values():
+            client = self.node.create_client(vision_node.custom_service_type, vision_node.service_name)
             self.clients[vision_node.service_name] = client
 
             while not client.wait_for_service(timeout_sec=1.0):

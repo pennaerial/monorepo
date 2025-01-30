@@ -16,7 +16,7 @@ class LowerPayloadMode(Mode):
         Args:
             node (Node): ROS 2 node managing the UAV.
         """
-        super().__init__(node, [PayloadTrackingNode()])
+        super().__init__(node, [PayloadTrackingNode])
 
         self.payload_pose = None
 
@@ -25,7 +25,7 @@ class LowerPayloadMode(Mode):
         Periodic logic for lowering payload and handling obstacles.
         """
 
-        self.payload_pose = self.send_request(self.vision_nodes[0])
+        self.payload_pose = self.send_request(PayloadTrackingNode.node_name, PayloadTracking.Request())
         
         if self.payload_pose is None:
             self.log("Current pose not available yet.")

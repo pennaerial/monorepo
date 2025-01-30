@@ -28,9 +28,6 @@ class VisionNode(Node, ABC):
         """
         super().__init__(node_name)
 
-        if service_name is None:
-            service_name = f'vision/{node_name}'
-
         # ROS 2 Subscription
         self.image_subscription = self.create_subscription(
             Image,
@@ -45,6 +42,10 @@ class VisionNode(Node, ABC):
             self.camera_info_callback,
             10
         )
+
+
+        if service_name is None:
+            service_name = f'vision/{node_name}'
         
         self.node_name = node_name
         self.custom_service_type = custom_service
