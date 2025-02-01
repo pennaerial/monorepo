@@ -1,3 +1,6 @@
+[submodule "controls/sae_2025_ws/src/actuator_msgs"]
+	path = controls/sae_2025_ws/src/actuator_msgs
+	url = https://github.com/rudislabs/actuator_msgs.git
 [submodule "controls/sae_2025_ws/src/px4_msgs"]
 	path = controls/sae_2025_ws/src/px4_msgs
 	url = https://github.com/PX4/px4_msgs.git
