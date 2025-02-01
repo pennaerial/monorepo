@@ -24,9 +24,7 @@ class LowerPayloadMode(Mode):
         """
         Periodic logic for lowering payload and handling obstacles.
         """
-        req = PayloadTracking.Request()
-        uav = UAV()
-        req.gps = uav.get_gps()
+
         self.payload_pose = self.send_request(PayloadTrackingNode.node_name, PayloadTracking.Request())
         
         if self.payload_pose is None:
