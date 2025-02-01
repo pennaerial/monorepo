@@ -15,7 +15,9 @@ class PayloadTrackingNode(VisionNode):
         super().__init__('payload_tracking', PayloadTracking)
             
     def service_callback(self, request: PayloadTracking.Request, response: PayloadTracking.Response):
-        self.processed_frame = find_payload(self.curr_frame)
+        self.camera_info
+        altitude = request.gps["altitude"] if request.gps else None
+        self.processed_frame = find_payload(self.curr_frame, self.camera_info, altitude)
         response.x, response.y, response.direction = self.processed_frame
 
         return response
