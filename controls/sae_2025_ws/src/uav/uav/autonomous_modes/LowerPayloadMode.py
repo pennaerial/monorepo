@@ -9,14 +9,15 @@ class LowerPayloadMode(Mode):
     A mode for lowering the payload.
     """
 
-    def __init__(self, node: Node):
+    def __init__(self, node: Node, uav: UAV):
         """
         Initialize the LowerPayload.
 
         Args:
             node (Node): ROS 2 node managing the UAV.
+            uav (UAV): The UAV instance to control.
         """
-        super().__init__(node, [PayloadTrackingNode])
+        super().__init__(node, uav, [PayloadTrackingNode])
 
         self.payload_pose = None
 
@@ -24,7 +25,6 @@ class LowerPayloadMode(Mode):
         """
         Periodic logic for lowering payload and handling obstacles.
         """
-
         self.payload_pose = self.send_request(PayloadTrackingNode.node_name, PayloadTracking.Request())
         
         if self.payload_pose is None:

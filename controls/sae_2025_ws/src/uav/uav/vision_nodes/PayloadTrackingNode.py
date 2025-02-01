@@ -7,7 +7,6 @@ class PayloadTrackingNode(VisionNode):
     """
     A vision node that performs object tracking and recalibration.
     """
-    
     def __init__(self):
         """
         Initialize the PayloadTrackingNode.
@@ -15,6 +14,7 @@ class PayloadTrackingNode(VisionNode):
         super().__init__('payload_tracking', PayloadTracking)
             
     def service_callback(self, request: PayloadTracking.Request, response: PayloadTracking.Response):
+        #TODO: update requests to match find_payload API
         self.processed_frame = find_payload(self.curr_frame)
         response.x, response.y, response.direction = self.processed_frame
 
