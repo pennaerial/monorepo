@@ -49,9 +49,9 @@ def generate_launch_description():
     
     return LaunchDescription([
         middleware,
-        TimerAction(period=5.0, actions=[gazebo]),  # Start Gazebo after 5 seconds
-        TimerAction(period=10.0, actions=[px4_sitl]),  # Start PX4 after 10 seconds
-        TimerAction(period=15.0, actions=[gz_ros_bridge]),  # Start Bridge after 15 seconds
-        TimerAction(period=20.0, actions=[camera_feed]),  # Start Control Node last
-        TimerAction(period=25.0, actions=[movement]),  # Start Control Node last
+        TimerAction(period=3.0, actions=[gazebo]),  # Start Gazebo after 5 seconds
+        TimerAction(period=6.0, actions=[px4_sitl]),  # Start PX4 after 10 seconds
+        TimerAction(period=9.0, actions=[gz_ros_bridge]),  # Start Bridge after 15 seconds
+        TimerAction(period=12.0, actions=[camera_feed]),  # Start Control Node last
+        TimerAction(period=20.0, actions=[movement]),  # Start Control Node last
     ])
