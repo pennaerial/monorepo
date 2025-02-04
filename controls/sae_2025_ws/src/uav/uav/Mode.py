@@ -6,6 +6,7 @@ from typing import Type
 from rclpy.task import Future
 from typing import List
 from vision_nodes import VisionNode
+from uav import UAV
 
 class Mode(ABC):
     """
@@ -13,20 +14,22 @@ class Mode(ABC):
     Provides a structured template for implementing autonomous behaviors.
     """
 
-    def __init__(self, node: Node, vision_nodes: List[VisionNode]):
+    def __init__(self, node: Node, uav: UAV, vision_nodes: List[VisionNode]):
         """
         Initialize the mode with a reference to the ROS 2 node.
 
         Args:
             node (Node): The ROS 2 node instance managing the UAV and this mode.
+            uav (UAV): The UAV instance to control.
             vision_nodes (List[VisionNode]): The vision nodes to setup for this mode.
         """
         self.node = node
         self.active = False
+        self.uav = uav
 
-        self.clients = {}
-
-        self.setup_vision(vision_nodes)
+        self.vision_clients = {}
+        self.vision_nodes = {}
+        self._vision_nodes_list = vision_nodes
 
     @abstractmethod
     def on_enter(self) -> None:
@@ -47,29 +50,13 @@ class Mode(ABC):
         vision_node = self.vision_nodes[vision_node_name]
         assert type(req) == vision_node.custom_service_type.Request
 
-        client = self.clients[vision_node.service_name]
+        client = self.vision_clients[vision_node.service_name]
 
         future = client.call_async(req)
         rclpy.spin_until_future_complete(self.node, future)
         response = future.result()
 
         return response
-
-    def setup_vision(self, vision_nodes: List[VisionNode]) -> None:
-        """
-        Setup the vision node for this mode.
-
-        Args:
-            vision (VisionNode): The vision nodes to setup for this mode.
-        """
-        self.vision_nodes = {vnode.node_name: vnode for vnode in vision_nodes}
-
-        for vision_node in vision_nodes.values():
-            client = self.node.create_client(vision_node.custom_service_type, vision_node.service_name)
-            self.clients[vision_node.service_name] = client
-
-            while not client.wait_for_service(timeout_sec=1.0):
-                self.node.get_logger().info(f"Service {vision_node.service_name} not available, waiting again...")
 
     @abstractmethod
     def on_exit(self) -> None:
