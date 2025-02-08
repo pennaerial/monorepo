@@ -1,8 +1,8 @@
 import rclpy
 from rclpy.node import Node
 from time import time
-from uav import Mode
-from uav import UAV
+import Mode
+import UAV
 from typing import List
 from vision_nodes import VisionNode
 import yaml
@@ -14,7 +14,7 @@ class ModeManager(Node):
     A ROS 2 node for managing UAV modes and mission logic.
     """
 
-    def __init__(self, mode_map: str, starting_mode: str):
+    def __init__(self, mode_map: str):
         super().__init__('mission_node')
         self.modes = {}
         self.transitions = {}
@@ -157,3 +157,10 @@ class ModeManager(Node):
         with open(filename, 'r') as file:
             data = yaml.safe_load(file)
         return data
+    
+
+if __name__ == '__main__':
+    mission_node = ModeManager('test_mode_manager')
+    print(mission_node.modes)
+    print(mission_node.transitions)
+    print(mission_node.active_mode)
