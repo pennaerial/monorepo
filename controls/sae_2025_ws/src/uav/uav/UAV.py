@@ -25,8 +25,6 @@ class UAV:
 
     def __init__(self, node: Node):
         self.node = node
-        self.nav_state = VehicleStatus.NAVIGATION_STATE_MAX
-        self.arm_state = VehicleStatus.ARMING_STATE_INIT
         self.flight_check = False
         self.failsafe = False
         
@@ -44,6 +42,13 @@ class UAV:
 
         # global position --> VehicleGlobalPosition
         self.global_position = None
+
+        self.vehicle_local_position = None
+        self.nav_state = None
+        self.arm_state = None
+        self.failsafe = None
+        self.flight_check = None
+        self.offboard_setpoint_counter = 0
         
     def _initialize_publishers_and_subscribers(self):
         """
@@ -93,6 +98,9 @@ class UAV:
             qos_profile
         )
 
+        self.vehicle_local_position_subscriber = self.node.create_subscription(
+            VehicleLocalPosition, '/fmu/out/vehicle_local_position', self._vehicle_local_position_callback, qos_profile)
+
     # -------------------------
     # Public commands
     # -------------------------
@@ -111,6 +119,15 @@ class UAV:
             params={'param1': 0.0}  # param1=0 => Disarm
         )
         self.node.get_logger().info("Sent Disarm Command")
+    
+    def engage_offboard_mode(self):
+        """Switch to offboard mode."""
+        self.node.get_logger().info("Switching to offboard mode...")
+        self._send_vehicle_command(
+            VehicleCommand.VEHICLE_CMD_DO_SET_MODE, 
+            params={'param1':1.0, 'param2':6.0}
+        )
+        # self.get_logger().info("Switching to offboard mode")
 
     def takeoff(self, altitude: float = 5.0):
         """
@@ -127,6 +144,37 @@ class UAV:
         """Command the UAV to land."""
         self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_NAV_LAND)
         self.node.get_logger().info("Landing command sent.")
+    
+    def publish_position_setpoint(self, x: float, y: float, z: float):
+        """Publish the trajectory setpoint."""
+        msg = TrajectorySetpoint()
+        msg.position = [x, y, z]
+        # Calculate yaw to point towards the waypoint
+        msg.yaw = self.calculate_yaw(x, y)
+        msg.timestamp = int(self.node.get_clock().now().nanoseconds / 1000)
+        self.trajectory_publisher.publish(msg)
+        self.node.get_logger().info(f"Publishing setpoint: pos={[x, y, z]}, yaw={msg.yaw:.2f}")
+    
+    def calculate_yaw(self, x: float, y: float) -> float:
+        """Calculate the yaw angle to point towards the next waypoint."""
+        # Calculate relative position
+        dx = x - self.vehicle_local_position.x
+        dy = y - self.vehicle_local_position.y
+        
+        # Calculate yaw angle
+        yaw = np.arctan2(dy, dx)
+        return yaw
+    
+    def publish_offboard_control_heartbeat_signal(self):
+        """Publish the offboard control mode."""
+        msg = OffboardControlMode()
+        msg.position = True
+        msg.velocity = False
+        msg.acceleration = False
+        msg.attitude = False
+        msg.body_rate = False
+        msg.timestamp = int(self.node.get_clock().now().nanoseconds / 1000)
+        self.offboard_mode_publisher.publish(msg)
 
     def set_velocity(self, vx: float, vy: float, vz: float, yaw_rate: float):
         """
@@ -180,6 +228,8 @@ class UAV:
             }
         )
         self.node.get_logger().info(f"Sent waypoint command to lat={lat}, lon={lon}, alt={alt}")
+
+    # def reached_position 
 
     # -------------------------
     # Getters / data access
@@ -266,15 +316,12 @@ class UAV:
         if msg.nav_state != self.nav_state:
             self.nav_state = msg.nav_state
             self.node.get_logger().info(f"Navigation State: {self.nav_state}")
-        if msg.arm_state != self.arm_state:
-            self.arm_state = msg.arm_state
+        if msg.arming_state != self.arm_state:
+            self.arm_state = msg.arming_state
             self.node.get_logger().info(f"Arm State: {self.arm_state}")
         if msg.failsafe and not self.failsafe:
             self.failsafe = True
             self.node.get_logger().warn("Failsafe triggered!")
-        if not msg.flight_check and not self.flight_check:
-            self.flight_check = False
-            self.node.get_logger().warn("Pre-flight checks failed!")
 
     def _attitude_callback(self, msg: VehicleAttitude):
         self.vehicle_attitude = msg
@@ -291,4 +338,10 @@ class UAV:
         self.global_position = msg
         self.node.get_logger().debug(
             f"Global Position - Lat: {msg.lat:.5f}, Lon: {msg.lon:.5f}, Alt: {msg.alt:.2f}"
+        )
+    
+    def _vehicle_local_position_callback(self, msg: VehicleLocalPosition):
+        self.vehicle_local_position = msg
+        self.node.get_logger().debug(
+            f"Local Position - x: {msg.x:.5f}, y: {msg.y:.5f}, z: {msg.z:.5f}"
         )
