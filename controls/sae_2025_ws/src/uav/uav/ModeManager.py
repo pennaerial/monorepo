@@ -5,6 +5,7 @@ from uav import Mode
 from uav import UAV
 from typing import List
 from vision_nodes import VisionNode
+import yaml
 
 #TODO: Think about how to encode the mission structure (when to switch `Modes`, etc.)
 class ModeManager(Node):
@@ -12,13 +13,15 @@ class ModeManager(Node):
     A ROS 2 node for managing UAV modes and mission logic.
     """
 
-    def __init__(self):
+    def __init__(self, mode_map: str, starting_mode: str):
         super().__init__('mission_node')
         self.modes = {}
         self.active_mode = None
         self.last_update_time = time()
         self.uav = UAV()
         self.get_logger().info("Mission Node has started!")
+        self.mode_map = self.load_yaml_to_dict(mode_map)
+        self.starting_mode = starting_mode
         
     def setup_vision(self, mode: Mode, vision_nodes: List[VisionNode]) -> None:
         """
@@ -42,6 +45,12 @@ class ModeManager(Node):
                 self.vision_clients[vision_node.service_name] = client
             mode.vision_clients[vision_node.service_name] = self.vision_clients[vision_node.service_name]
             mode.vision_clients
+    
+    def on_enter(self) -> None:
+        """
+        Logic executed when this mode is activated.
+        """
+        self.switch_mode(self.starting_mode)
 
     def add_mode(self, mode_name: str, mode_instance: Mode) -> None:
         """
@@ -81,6 +90,10 @@ class ModeManager(Node):
 
         if self.active_mode:
             self.active_mode.update(time_delta)
+            
+            state = self.active_mode.check_status()
+            if state:
+                self.switch_mode(self.mode_map[self.active_mode][state])
 
     def spin(self):
         """
@@ -93,3 +106,7 @@ class ModeManager(Node):
             self.get_logger().info("Mission Node shutting down.")
         finally:
             rclpy.shutdown()
+    def load_yaml_to_dict(filename):
+        with open(filename, 'r') as file:
+            data = yaml.safe_load(file)
+        return data
