@@ -78,7 +78,7 @@ class Mode(ABC):
         pass
 
     @abstractmethod
-    def check_state(self) -> int:
+    def check_status(self) -> int:
         """
         Check if the mode should deactivate.
         """

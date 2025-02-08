@@ -6,6 +6,7 @@ from uav import UAV
 from typing import List
 from vision_nodes import VisionNode
 import yaml
+import importlib
 
 #TODO: Think about how to encode the mission structure (when to switch `Modes`, etc.)
 class ModeManager(Node):
@@ -16,12 +17,14 @@ class ModeManager(Node):
     def __init__(self, mode_map: str, starting_mode: str):
         super().__init__('mission_node')
         self.modes = {}
+        self.transitions = {}
         self.active_mode = None
         self.last_update_time = time()
         self.uav = UAV()
         self.get_logger().info("Mission Node has started!")
-        self.mode_map = self.load_yaml_to_dict(mode_map)
-        self.starting_mode = starting_mode
+        self.mode_yaml = self.load_yaml_to_dict(mode_map)
+
+        self.setup_modes(self.mode_yaml)
         
     def setup_vision(self, mode: Mode, vision_nodes: List[VisionNode]) -> None:
         """
@@ -44,13 +47,45 @@ class ModeManager(Node):
                     self.node.get_logger().info(f"Service {vision_node.service_name} not available, waiting again...")
                 self.vision_clients[vision_node.service_name] = client
             mode.vision_clients[vision_node.service_name] = self.vision_clients[vision_node.service_name]
-            mode.vision_clients
+    
+    def setup_modes(self, mode_yaml: dict) -> None:
+        """
+        Setup the modes for the mission node.
+
+        Args:
+            mode_yaml (dict): A dictionary mapping mode names to instances of the mode.
+        """
+        for mode_name in mode_yaml.keys():
+            mode_path = mode_yaml[mode_name]['class']
+            params = mode_yaml[mode_name].get('params', {})
+            mode_instance = self.initialize_mode(mode_path, params)
+            self.add_mode(mode_name, mode_instance)
+
+            transitions = mode_yaml[mode_name].get('transitions', {})
+            self.add_transitions(mode_name, transitions)
+    
+    def initialize_mode(self, mode_path: List[str], params: dict) -> Mode:
+        module_name, class_name = mode_path.rsplit('.', 1)
+        module = importlib.import_module(module_name)
+        class_ = getattr(module, class_name)
+        return class_(self, self.uav, params)
+            
     
     def on_enter(self) -> None:
         """
         Logic executed when this mode is activated.
         """
         self.switch_mode(self.starting_mode)
+    
+    def add_transitions(self, mode_name: str, transitions: dict) -> None:
+        """
+        Add transitions to the mission node.
+
+        Args:
+            mode_name (str): Name of the mode to add transitions to.
+            transitions (dict): A dictionary mapping state to the next mode.
+        """
+        self.transitions[mode_name] = transitions
 
     def add_mode(self, mode_name: str, mode_instance: Mode) -> None:
         """
@@ -63,6 +98,18 @@ class ModeManager(Node):
         self.setup_vision(mode_instance, mode_instance._vision_nodes_list)
         self.modes[mode_name] = mode_instance
         self.get_logger().info(f"Mode {mode_name} registered.")
+
+    def transition(self, state: str) -> str:
+        """
+        Transition to the next mode based on the current state.
+
+        Args:
+            state (str): The current state of the mode.
+
+        Returns:
+            str: The name of the next mode to transition to.
+        """
+        return self.transitions[self.active_mode][state]
 
     def switch_mode(self, mode_name: str) -> None:
         """
@@ -93,7 +140,7 @@ class ModeManager(Node):
             
             state = self.active_mode.check_status()
             if state:
-                self.switch_mode(self.mode_map[self.active_mode][state])
+                self.switch_mode(self.transition(state))
 
     def spin(self):
         """
