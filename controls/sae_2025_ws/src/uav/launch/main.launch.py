@@ -40,12 +40,12 @@ def generate_launch_description():
     #         name='temp',
     #     )
     
-    movement = Node(
-            output='screen',
-            package='uav',
-            executable='global_position_offboard_control',
-            name='global_position_offboard',
-        )
+    # movement = Node(
+    #         output='screen',
+    #         package='uav',
+    #         executable='global_position_offboard_control',
+    #         name='global_position_offboard',
+    #     )
     
     camera_feed = Node(
         output='screen',
@@ -54,18 +54,18 @@ def generate_launch_description():
         name='vision_pipeline'
     )
 
-    # movement = Node(
-    #     output='screen',
-    #     package='uav',
-    #     executable='flight',
-    #     name='flight'
-    # )
+    movement = Node(
+        output='screen',
+        package='uav',
+        executable='flight',
+        name='flight'
+    )
     
     return LaunchDescription([
         middleware,
         TimerAction(period=3.0, actions=[gazebo]),  # Start Gazebo after 5 seconds
         TimerAction(period=6.0, actions=[px4_sitl]),  # Start PX4 after 10 seconds
         TimerAction(period=9.0, actions=[gz_ros_bridge]),  # Start Bridge after 15 seconds
-        TimerAction(period=12.0, actions=[camera_feed]),  # Start Control Node last
+        # TimerAction(period=12.0, actions=[camera_feed]),  # Start Control Node last
         TimerAction(period=15.0, actions=[movement]),  # Start Control Node last
     ])
