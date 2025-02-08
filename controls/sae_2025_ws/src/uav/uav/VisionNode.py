@@ -1,21 +1,17 @@
 import rclpy
 from rclpy.node import Node
-from sensor_msgs.msg import Image, CameraInfo
-from typing import Type
-from rclpy.type_support import Srv, SrvRequestT, SrvResponseT
-from typing import Optional
+from uav.src import ImageSend
 import cv2
 import numpy as np
-from abc import ABC, abstractmethod
 
-class VisionNode(Node, ABC):
+class VisionNode(Node):
     """
     Base class for ROS 2 nodes that process vision data.
     Provides an interface for handling image streams, processing frames,
     and managing vision-based tasks such as tracking and calibration.
     """
 
-    def __init__(self, node_name: str, custom_service: Type[Srv[SrvRequestT, SrvResponseT]], service_name: Optional[str] = None, image_topic: str = '/camera', queue_size: int = 10):
+    def __init__(self, node_name: str, camera_node_service_name: str):
         """
         Initialize the VisionNode.
 
@@ -28,100 +24,35 @@ class VisionNode(Node, ABC):
         """
         super().__init__(node_name)
 
-        # ROS 2 Subscription
-        self.image_subscription = self.create_subscription(
-            Image,
-            image_topic,
-            self.image_callback,
-            queue_size
-        )
+        if not self.client.wait_for_service(timeout_sec=1.0):
+            self.get_logger().error('Service not available.')
+            return
 
-        self.camera_info_subscription = self.create_subscription(
-            CameraInfo,
-            '/camera_info',
-            self.camera_info_callback,
-            10
-        )
+        self.client = self.create_client(ImageSend, camera_node_service_name)
 
-
-        if service_name is None:
-            service_name = f'vision/{node_name}'
-        
-        self.node_name = node_name
-        self.custom_service_type = custom_service
-        self.service_name = service_name
-
-        self.get_logger().info(f"{node_name} has started, subscribing to {image_topic}.")
-
-        # Internal state
-        self.prev_frame = None
-
-        self.curr_frame = None
-
-        self.initialize_service(custom_service, service_name)
-
-    def image_callback(self, msg: Image):
+    def request_image(self, cam_image: bool = False, cam_info: bool = False):
         """
-        Callback for receiving image messages. Converts the image data
-        and processes the frame.
-
-        Args:
-            msg (Image): The ROS 2 Image message.
+        Sends request for camera image or camera information.
+        """
+        request = ImageSend.Request()
+        request.cam_image = cam_image
+        request.cam_info = cam_info
+        
+        future = self.client.call_async(request)
+        future.add_done_callback(self.response_callback)
+    
+    def response_callback(self, future):
+        """
+        Handles the response from the service.
         """
         try:
-            frame = self.convert_image_msg_to_frame(msg)
-            self.prev_frame = self.curr_frame
-            self.curr_frame = frame
+            response = future.result()
+            if response.processed_image:
+                self.get_logger().info(f"Received processed image: {response.processed_image}")
+            if response.camera_info:
+                self.get_logger().info(f"Received camera info: {response.camera_info}")
         except Exception as e:
-            self.get_logger().error(f"Failed to process image: {e}")
-    
-    def camera_info_callback(self, msg: CameraInfo):
-        """
-        Callback for receiving camera info messages. Stores the camera info
-        for later use.
-
-        Args:
-            msg (CameraInfo): The ROS 2 CameraInfo message.
-        """
-        self.camera_info = msg
-
-    @abstractmethod
-    def service_callback(self, request: SrvRequestT, response: SrvResponseT):
-        """
-        Callback for receiving image messages. Converts the image data
-        and processes the frame.
-
-        Args:
-            msg (Image): The ROS 2 Image message.
-        """
-
-        pass
-
-    def convert_image_msg_to_frame(self, msg: Image) -> np.ndarray:
-        """
-        Converts a ROS 2 Image message to a NumPy array.
-
-        Args:
-            msg (Image): The ROS 2 Image message.
-
-        Returns:
-            np.ndarray: The decoded image as a NumPy array.
-        """
-        img_data = np.frombuffer(msg.data, dtype=np.uint8)
-        frame = img_data.reshape((msg.height, msg.width, 3))  # Assuming BGR8 encoding
-        return frame
-
-    def initialize_service(self, custom_service: Type[Srv[SrvRequestT, SrvResponseT]], service_name: Optional[str] = None):
-        if service_name is None:
-            service_name = self.service_name
-        
-        self.service = self.create_service(
-            custom_service,
-            service_name,
-            self.service_callback
-        )
-
-        self.get_logger().info(f"{service_name} Service has started.")
+            self.get_logger().error(f"Service call failed: {e}")
 
     def display_frame(self, frame: np.ndarray, window_name: str = "Camera Feed") -> None:
         """
