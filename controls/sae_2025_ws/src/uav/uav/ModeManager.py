@@ -41,7 +41,6 @@ class ModeManager(Node):
                     self.node.get_logger().info(f"Service {vision_node.service_name} not available, waiting again...")
                 self.vision_clients[vision_node.service_name] = client
             mode.vision_clients[vision_node.service_name] = self.vision_clients[vision_node.service_name]
-            mode.vision_clients
 
     def add_mode(self, mode_name: str, mode_instance: Mode) -> None:
         """
