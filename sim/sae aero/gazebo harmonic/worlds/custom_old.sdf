@@ -363,10 +363,7 @@
       <elevation>0</elevation>
     </spherical_coordinates>
     <include>
-      <uri>model://dlz</uri>
-    </include>
-    <include>
-      <uri>model://payload</uri>
+      <uri>model://arucotag</uri>
     </include>
   </world>
 </sdf>
