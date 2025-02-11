@@ -1,113 +1,142 @@
 import cv2
 import numpy as np
 
-def find_payload(image):
-    # Convert the image to HSV color space
+
+def find_payload(image, camera_info, altitude):
+    if altitude is None:
+        print("No altitude data available.")
+        return None
+    
     hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
-    # Define the HSV range for detecting neon pink (square)
-    lower_pink = np.array([140, 50, 50])  # Lower bound of pink
-    upper_pink = np.array([170, 255, 255])  # Upper bound of pink
-
-    # Create a mask for the pink color
+    # Detect pink square
+    lower_pink = np.array([140, 90, 50])
+    upper_pink = np.array([170, 255, 255])
     pink_mask = cv2.inRange(hsv_image, lower_pink, upper_pink)
 
-    # Apply morphological operations to clean up the mask
     kernel = np.ones((5, 5), np.uint8)
     pink_mask = cv2.morphologyEx(pink_mask, cv2.MORPH_CLOSE, kernel)
     pink_mask = cv2.morphologyEx(pink_mask, cv2.MORPH_OPEN, kernel)
 
-    # Find contours in the pink mask
     contours, _ = cv2.findContours(pink_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-    result_image = image.copy()
-
-    if contours:
-        # Find the largest contour (assuming it's the pink square)
-        largest_contour = max(contours, key=cv2.contourArea)
-
-        # Create a mask for the pink square
-        pink_square_mask = np.zeros_like(pink_mask)
-        cv2.drawContours(pink_square_mask, [largest_contour], -1, 255, thickness=cv2.FILLED)
-
-        # Mask the original image to only search within the pink square
-        masked_image = cv2.bitwise_and(image, image, mask=pink_square_mask)
-
-        # Convert the masked image to HSV
-        hsv_masked = cv2.cvtColor(masked_image, cv2.COLOR_BGR2HSV)
-
-        # Define the HSV range for detecting neon green (circle)
-        lower_green = np.array([40, 50, 50])  # Lower bound of green
-        upper_green = np.array([80, 255, 255])  # Upper bound of green
-
-        # Create a mask for the green color within the pink square
-        green_mask = cv2.inRange(hsv_masked, lower_green, upper_green)
-
-        # Find contours in the green mask
-        green_contours, _ = cv2.findContours(green_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-        if green_contours:
-            # Find the largest contour (assuming it's the green circle)
-            largest_green_contour = max(green_contours, key=cv2.contourArea)
-
-            # Draw the green circle's contour
-            cv2.drawContours(result_image, [largest_green_contour], -1, (0, 255, 0), 3)
-
-            # Get bounding box for the largest green contour
-            x, y, w, h = cv2.boundingRect(largest_green_contour)
-            cv2.rectangle(result_image, (x, y), (x + w, y + h), (255, 0, 0), 2)
-
-            print(f"Green circle found at: x={x}, y={y}, width={w}, height={h}")
-
-            if largest_green_contour is not None:
-                # Calculate the centroid of the green cylinder
-                M = cv2.moments(largest_green_contour)
-                if M["m00"] != 0:
-                    cx = int(M["m10"] / M["m00"])
-                    cy = int(M["m01"] / M["m00"])
-
-                    # Draw a circle around the cylinder and its center
-                    cv2.circle(result_image, (cx, cy), 5, (0, 255, 0), -1)
-                    cv2.putText(result_image, f"Payload Center: ({cx}, {cy})", (cx + 10, cy - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-                    # Calculate direction vector
-                    direction_vector = navigate(frame, cx, cy)
-
-                    #cv2.imshow("Pink Mask", pink_mask)
-                    #cv2.imshow("Green Mask", green_mask)
-                    cv2.imshow("Result Image", result_image)
-                    return cx, cy, direction_vector
-        else:
-            print("No green circle detected within the pink square.")
-    else:
+    if not contours:
         print("No pink square detected.")
+        return None
 
-    # Display the results
-    #cv2.imshow("Pink Mask", pink_mask)
-    #cv2.imshow("Green Mask", green_mask)
-    cv2.imshow("Result Image", result_image)
-    return None, None, None
+    largest_contour = max(contours, key=cv2.contourArea)
+    x, y, w, h = cv2.boundingRect(largest_contour)
 
-def navigate(image, cx, cy):
-    height, width, _ = image.shape
+    # Create a bounding mask for detected pink square
+    pink_square_mask = np.zeros_like(pink_mask)
+    cv2.drawContours(pink_square_mask, [largest_contour], -1, 255, thickness=cv2.FILLED)
 
-    # Define the center of the image (target position)
-    center_x = width // 2
-    center_y = height // 2
+    # Convert masked image to HSV
+    hsv_masked = cv2.bitwise_and(hsv_image, hsv_image, mask=pink_square_mask)
 
-    # Calculate the relative horizontal and vertical offsets
-    dx = cx - center_x
-    dy = cy - center_y
+    # Detect green (payload) within the pink square
+    lower_green = np.array([40, 50, 50])
+    upper_green = np.array([80, 255, 255])
+    green_mask = cv2.inRange(hsv_masked, lower_green, upper_green)
 
-    # Normalize the direction vector to a unit vector
-    magnitude = np.sqrt(dx**2 + dy**2)
-    unit_vector = (dx / magnitude, dy / magnitude)
+    green_contours, _ = cv2.findContours(green_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    #if not green_contours:
+        #print("No green cylinder detected within the pink square.")
+        #return None
 
-    return unit_vector
+    largest_green_contour = max(contours, key=cv2.contourArea)
+    M = cv2.moments(largest_green_contour)
+    if M["m00"] == 0:
+        return None
+
+    cx, cy = int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"])
+
+    # Debug visualization
+    result_image = image.copy()
+    cv2.rectangle(result_image, (x, y), (x + w, y + h), (255, 0, 255), 2)  # Pink square
+    cv2.drawContours(result_image, [largest_green_contour], -1, (0, 255, 0), 3)  # Green cylinder
+    cv2.circle(result_image, (cx, cy), 5, (0, 255, 0), -1)  # Green center point
+    #cv2.imshow("Tracking Result", result_image)
+
+    # Convert to 3D vector
+    direction_vector = compute_3d_vector(cx, cy, camera_info, altitude)
+    return direction_vector, cx, cy, result_image
+
+
+def compute_3d_vector(cx, cy, camera_info, altitude):
+    K = np.array(camera_info)  # Camera intrinsic matrix]  # Drone altitude (z-coordinate)
+
+    # Convert pixel coordinates to normalized camera coordinates
+    pixel_coords = np.array([cx, cy, 1.0])
+    cam_coords = np.linalg.inv(K) @ pixel_coords  # Apply inverse intrinsic matrix
+
+    # Convert to unit vector
+    direction = cam_coords / np.linalg.norm(cam_coords)
+    real_world_vector = cam_coords * altitude
+    direction = real_world_vector / np.linalg.norm(real_world_vector)
+    
+    return tuple(direction)
+
+def process_frame(image, camera_info, altitude, kalman):
+        # 1. Predict the next state.
+        prediction = kalman.predict()  # prediction is a 4x1 vector: [x, y, vx, vy]
+        predicted_x, predicted_y = prediction[0, 0], prediction[1, 0]
+
+        # 2. Detect payload in the frame (using your existing code)
+        result = find_payload(image, camera_info, altitude)
+        
+        if result is not None:
+            detection, cx, cy, result_image = result
+            # Assume find_payload returns the direction vector based on (cx, cy)
+            # You may need to extract (cx, cy) directly from the detection process.
+            
+            measurement = np.array([[np.float32(cx)], [np.float32(cy)]])
+            # 3. Correct the state with the new measurement.
+            corrected_state = kalman.correct(measurement)
+            estimated_x, estimated_y = corrected_state[0, 0], corrected_state[1, 0]
+        else:
+            # No detection: rely on the predicted state.
+            print("Payload not detected in current frame; using prediction.")
+            result_image = image.copy()
+            estimated_x, estimated_y = predicted_x, predicted_y
+
+        # 4. Now, use (estimated_x, estimated_y) to compute the 3D vector.
+        direction_vector = compute_3d_vector(estimated_x, estimated_y, camera_info, altitude)
+        
+        # Optionally, add visualization using estimated state.
+        cv2.circle(result_image, (int(estimated_x), int(estimated_y)), 5, (0, 0, 255), -1)  # Red dot for estimate
+        cv2.imshow("Tracking Result", result_image)
+        
+        return direction_vector, estimated_x, estimated_y
 
 if __name__ == "__main__":
     # Open the video file
-    cap = cv2.VideoCapture("controls\\sae_2025_ws\\src\\uav\\uav\\cv\\video_files\\download (1).mp4")
-    
+    cap = cv2.VideoCapture("controls\\sae_2025_ws\\src\\uav\\uav\\cv\\video_files\\a.mov")
+
+    # Assume dt (delta time) between frames is known (e.g., 1 if frame rate is constant)
+    dt = 1.0  
+
+    # Create a Kalman filter with 4 state variables and 2 measurement variables
+    kalman = cv2.KalmanFilter(4, 2)
+
+    # Define the state transition matrix A
+    kalman.transitionMatrix = np.array([[1, 0, dt, 0],
+                                        [0, 1, 0, dt],
+                                        [0, 0, 1,  0],
+                                        [0, 0, 0,  1]], dtype=np.float32)
+
+    # Define the measurement matrix H
+    kalman.measurementMatrix = np.array([[1, 0, 0, 0],
+                                        [0, 1, 0, 0]], dtype=np.float32)
+
+    # Process noise covariance matrix Q: accounts for uncertainty in the model (tune as needed)
+    kalman.processNoiseCov = np.eye(4, dtype=np.float32) * 1e-2
+
+    # Measurement noise covariance matrix R: accounts for detection uncertainty (tune as needed)
+    kalman.measurementNoiseCov = np.eye(2, dtype=np.float32) * 1e-1
+
+    # Optional: Set the initial error covariance matrix P
+    kalman.errorCovPost = np.eye(4, dtype=np.float32)
+
     if not cap.isOpened():
         print("Error: Could not open video file.")
         exit()
@@ -119,7 +148,8 @@ if __name__ == "__main__":
             break
 
         # Pass the current frame to find_payload
-        cx, cy, direction_vector = find_payload(frame)
+        #direction_vector, cx, cy = find_payload(frame, [[1, 0, 0], [0, 1, 0], [0, 0, 1]], 100)
+        direction_vector, cx, cy = process_frame(frame, [[1, 0, 0], [0, 1, 0], [0, 0, 1]], 100, kalman)
         if cx is not None:
             print(f"Payload Center: ({cx}, {cy}), Direction Vector: {direction_vector}")
 
