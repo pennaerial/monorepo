@@ -15,7 +15,7 @@ Run the following commands in a terminal to download the default simulation and 
 cd {path_to_px4_repo}/Tools/simulation/gz/
 python3 simulation-gazebo  
 ```
-Note, if the created directory already exists, you may need to add a '--overwrite' flag.
+Note, if the created directory already exists prior to running the above, you may need to add a '--overwrite' flag to the 'simulation-gazebo' command.
 
 Verify the directory ~/.simulation-gazebo exists. With files populating the models and worlds directories.
 
