@@ -9,7 +9,15 @@ This ReadMe documents the procedure for running the Gazebo simulator with a cust
 - ROS2 installation: 
 
 ## Setup PX4 and Gazebo for standalone mode
-Verify the directory ~/.simulation-gazebo exists.
+Run the following commands in a terminal to download the default simulation and model files from gazebo:
+
+```bash
+cd {path_to_px4_repo}/Tools/simulation/gz/
+python3 simulation-gazebo  
+```
+Note, if the created directory already exists, you may need to add a '--overwrite' flag.
+
+Verify the directory ~/.simulation-gazebo exists. With files populating the models and worlds directories.
 
 FROM THIS DIRECTORY, copy the custom models and worlds into the directory above.
 
