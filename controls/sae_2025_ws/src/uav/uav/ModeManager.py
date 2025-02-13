@@ -22,9 +22,14 @@ class ModeManager(Node):
         self.last_update_time = time()
         self.uav = UAV()
         self.get_logger().info("Mission Node has started!")
-        self.mode_yaml = self.load_yaml_to_dict(mode_map)
 
-        self.setup_modes(self.mode_yaml)
+        self.setup_modes(mode_map)
+
+    def on_enter(self) -> None:
+        """
+        Logic executed when this mode is activated.
+        """
+        self.switch_mode(self.starting_mode)
         
     def setup_vision(self, mode: Mode, vision_nodes: List[VisionNode]) -> None:
         """
@@ -47,45 +52,39 @@ class ModeManager(Node):
                     self.node.get_logger().info(f"Service {vision_node.service_name} not available, waiting again...")
                 self.vision_clients[vision_node.service_name] = client
             mode.vision_clients[vision_node.service_name] = self.vision_clients[vision_node.service_name]
-            
-    def setup_modes(self, mode_yaml: dict) -> None:
+    
+    def initialize_mode(self, mode_path: List[str], params: dict) -> Mode:
+        """
+        Initialize a mode instance.
+
+        Args:
+            mode_path (str): The path to the mode class.
+            params (dict): Parameters to pass to the mode
+
+        Returns:
+            Mode: An instance of the mode.
+        """
+        module_name, class_name = mode_path.rsplit('.', 1)
+        module = importlib.import_module(module_name)
+        class_ = getattr(module, class_name)
+        return class_(self, self.uav, params)
+    
+    def setup_modes(self, mode_map: str) -> None:
         """
         Setup the modes for the mission node.
 
         Args:
             mode_yaml (dict): A dictionary mapping mode names to instances of the mode.
         """
+        mode_yaml = self.load_yaml_to_dict(mode_map)
+
         for mode_name in mode_yaml.keys():
             mode_path = mode_yaml[mode_name]['class']
             params = mode_yaml[mode_name].get('params', {})
             mode_instance = self.initialize_mode(mode_path, params)
             self.add_mode(mode_name, mode_instance)
-
-            transitions = mode_yaml[mode_name].get('transitions', {})
-            self.add_transitions(mode_name, transitions)
-    
-    def initialize_mode(self, mode_path: List[str], params: dict) -> Mode:
-        module_name, class_name = mode_path.rsplit('.', 1)
-        module = importlib.import_module(module_name)
-        class_ = getattr(module, class_name)
-        return class_(self, self.uav, params)
             
-    
-    def on_enter(self) -> None:
-        """
-        Logic executed when this mode is activated.
-        """
-        self.switch_mode(self.starting_mode)
-    
-    def add_transitions(self, mode_name: str, transitions: dict) -> None:
-        """
-        Add transitions to the mission node.
-
-        Args:
-            mode_name (str): Name of the mode to add transitions to.
-            transitions (dict): A dictionary mapping state to the next mode.
-        """
-        self.transitions[mode_name] = transitions
+            self.transitions[mode_name] = mode_yaml[mode_name].get('transitions', {})
 
     def add_mode(self, mode_name: str, mode_instance: Mode) -> None:
         """
@@ -153,7 +152,17 @@ class ModeManager(Node):
             self.get_logger().info("Mission Node shutting down.")
         finally:
             rclpy.shutdown()
+
     def load_yaml_to_dict(filename):
+        """
+        Load a yaml file into a dictionary.
+
+        Args:
+            filename (str): The path to the yaml file.
+
+        Returns:
+            dict: The yaml file as a dictionary.
+        """
         with open(filename, 'r') as file:
             data = yaml.safe_load(file)
         return data
