@@ -1,3 +1,7 @@
+<<<<<<< HEAD
+#!/usr/bin/env python3
+=======
+>>>>>>> main
 import rclpy
 from rclpy.node import Node
 from uav.UAV import UAV
@@ -23,7 +27,7 @@ class OffboardControl(Node):
         self.uav = UAV(self)
         self.takeoff_complete = False
         self.timer = self.create_timer(0.1, self.timer_callback)
-        self.takeoff_height = 5.0
+        self.takeoff_height = -5.0
         self.mission_completed = False
         self.hover_time = 0
 
