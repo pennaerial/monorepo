@@ -33,8 +33,12 @@ class ModeManager():
         """
         mode_yaml = self.load_yaml_to_dict(mode_map)
 
-        for mode_name in mode_yaml.keys():     
-            self.modes[mode_name] = None       
+        for mode_name in mode_yaml.keys(): 
+            params = mode_yaml[mode_name].get('params', {})    
+            for key, value in params.items():
+                params[key] = eval(value)
+            self.modes[mode_name] = params
+            
             self.transitions[mode_name] = mode_yaml[mode_name].get('transitions', {})
 
     def transition(self, state: str) -> str:

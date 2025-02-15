@@ -68,7 +68,7 @@ class ModeManager(Node):
         module_name, class_name = mode_path.rsplit('.', 1)
         module = importlib.import_module(module_name)
         class_ = getattr(module, class_name)
-        return class_(self, self.uav, params)
+        return class_(self, self.uav, **params)
     
     def setup_modes(self, mode_map: str) -> None:
         """
@@ -80,12 +80,18 @@ class ModeManager(Node):
         mode_yaml = self.load_yaml_to_dict(mode_map)
 
         for mode_name in mode_yaml.keys():
-            mode_path = mode_yaml[mode_name]['class']
-            params = mode_yaml[mode_name].get('params', {})
+            mode_info = mode_yaml[mode_name]
+
+            mode_path = mode_info['class']
+
+            params = mode_info.get('params', {})
+            for key, value in params.items():
+                if key == 'coordinate':
+                    mode_info[key] = eval(value)
             mode_instance = self.initialize_mode(mode_path, params)
             self.add_mode(mode_name, mode_instance)
             
-            self.transitions[mode_name] = mode_yaml[mode_name].get('transitions', {})
+            self.transitions[mode_name] = mode_info.get('transitions', {})
 
     def add_mode(self, mode_name: str, mode_instance: Mode) -> None:
         """
@@ -175,3 +181,17 @@ if __name__ == '__main__':
     print(mission_node.modes)
     print(mission_node.transitions)
     print(mission_node.active_mode)
+    # mission_node.spin()
+    
+    mission_node.transition('continue')
+    print('transition continue')
+    print(mission_node.modes)
+    print(mission_node.transitions)
+    print(mission_node.active_mode)
+    
+    mission_node.transition('continue')
+    print('transition continu 2')
+    print(mission_node.modes)
+    print(mission_node.transitions)
+    print(mission_node.active_mode)
+     

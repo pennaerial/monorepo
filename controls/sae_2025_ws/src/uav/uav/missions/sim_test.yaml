@@ -1,5 +1,7 @@
 start:
   class: uav.autonomous_modes.NavigateToGPSMode
+  params:
+    coordinate: (2, 3, 2)
   transitions:
     continue: takeoff
     failure: error
