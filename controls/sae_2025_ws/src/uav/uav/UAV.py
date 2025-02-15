@@ -17,6 +17,7 @@ from rclpy.qos import (
     QoSDurabilityPolicy,
 )
 import numpy as np
+from geopy.distance import geodesic
 
 class UAV:
     """
@@ -33,6 +34,10 @@ class UAV:
 
         # set yaw
         self.yaw = 0.0
+        self.takeoff_height = -5.0
+        self.takeoff_complete = False
+        self.hover_time = 0
+
 
         # vehicle status data --> VehicleStatus object
         self.vehicle_status = None
@@ -49,6 +54,22 @@ class UAV:
         self.failsafe = None
         self.flight_check = None
         self.offboard_setpoint_counter = 0
+
+        # mission checkpoints
+        self.current_waypoint_index = 0
+        self.waypoint_threshold = 2.0
+        self.mission_completed = False
+        radius = 5.0
+        num_points = 100
+        angles = np.linspace(0, 2 * np.pi, num_points, endpoint=False)
+        self.waypoints = [[0.0, 0.0, self.takeoff_height]]  # Takeoff point
+        for angle in angles:
+            x = radius * np.cos(angle)
+            y = radius * np.sin(angle)
+            self.waypoints.append([x, y, self.takeoff_height])
+        self.waypoints.append([0.0, 0.0, self.takeoff_height])
+
+        self.waypoints = [('GPS',[40, 80, 10])]
         
     def _initialize_publishers_and_subscribers(self):
         """
@@ -111,6 +132,32 @@ class UAV:
             params={'param1': 1.0}  # param1=1 => Arm
         )
         self.node.get_logger().info("Sent Arm Command")
+    
+    def distance_to_waypoint(self, coordinate_system, waypoint) -> float:
+        """Calculate the distance to the current waypoint."""
+        if coordinate_system == 'GPS':
+            pass
+        elif coordinate_system == 'Local':
+            return np.sqrt(
+                (self.node.vehicle_local_position.x - waypoint[0]) ** 2 +
+                (self.node.vehicle_local_position.y - waypoint[1]) ** 2 +
+                (self.node.vehicle_local_position.z - waypoint[2]) ** 2
+            )
+
+    def advance_to_next_waypoint(self):
+        """Advance to the next waypoint."""
+        if self.current_waypoint_index < len(self.waypoints) - 1:
+            coordinate_system, current_waypoint = self.waypoints[self.current_waypoint_index]
+            if coordinate_system == 'GPS':
+                self.goto_gps_waypoint(current_waypoint)
+            elif coordinate_system == 'Local':
+                self.publish_position_setpoint(*current_waypoint)
+            self.node.get_logger().info(f"Advancing to waypoint {self.current_waypoint_index}")
+            if self.distance_to_waypoint() < self.waypoint_threshold:
+                self.current_waypoint_index += 1
+        else:
+            self.mission_completed = True
+            self.node.get_logger().info("Mission completed. Preparing to land.")
 
     def disarm(self):
         """Send a disarm command to the UAV."""
@@ -129,16 +176,25 @@ class UAV:
         )
         # self.get_logger().info("Switching to offboard mode")
 
-    def takeoff(self, altitude: float = 5.0):
+    def takeoff(self):
         """
         Command the UAV to take off to the specified altitude.
         This uses a NAV_TAKEOFF command; actual behavior depends on PX4 mode.
         """
-        self._send_vehicle_command(
-            VehicleCommand.VEHICLE_CMD_NAV_TAKEOFF,
-            params={'param7': altitude}  # param7 = desired altitude
-        )
+        self.publish_position_setpoint(0.0, 0.0, self.takeoff_height)
         self.node.get_logger().info("Takeoff command sent.")
+
+
+    def check_takeoff_complete(self) -> bool:
+        """Check if takeoff is complete."""
+        height_reached = abs(self.vehicle_local_position.z - self.takeoff_height) < 0.5
+        if height_reached and not self.takeoff_complete:
+            self.hover_time += 1
+            if self.hover_time >= 20:  # Reduced hover time to 2 seconds (20 * 0.1s)
+                self.takeoff_complete = True
+                self.node.get_logger().info("Takeoff complete, starting mission")
+                return True
+        return False
 
     def land(self):
         """Command the UAV to land."""
@@ -209,7 +265,7 @@ class UAV:
         self.target_position_publisher.publish(position)
         self.node.get_logger().debug(f"Target position set: x={x}, y={y}, z={z}")
 
-    def goto_gps_waypoint(self, lat: float, lon: float, alt: float):
+    def goto_gps_waypoint(self, coordinate):
         """
         Command the UAV to fly to a specific GPS location using
         a PX4 NAV_WAYPOINT command. The autopilot will handle
@@ -219,6 +275,7 @@ class UAV:
         :param lon:  target longitude (degrees)
         :param alt:  target altitude (meters AMSL)
         """
+        lat, lon, alt = coordinate
         self._send_vehicle_command(
             VehicleCommand.VEHICLE_CMD_NAV_WAYPOINT,
             params={
