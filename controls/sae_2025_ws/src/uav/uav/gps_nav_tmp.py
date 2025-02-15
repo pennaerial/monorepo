@@ -103,38 +103,6 @@ class OffboardControl(Node):
         self.current_state = "IDLE"
         self.last_state = self.current_state
 
-    ### Helper functions ###
-    
-    def set_vel(self, x_vel, y_vel, z_vel, yaw_vel):
-        self.velocity.x = x_vel
-        self.velocity.y = y_vel
-        self.velocity.z = z_vel
-        self.yaw = yaw_vel
-        # x_vel_flu, y_vel_flu, z_vel_flu, yaw_vel_flu = conversion_ned_flu(x_vel, y_vel, z_vel, yaw_vel)
-        
-        # Compute velocity in the world frame
-        cos_yaw = np.cos(self.trueYaw)
-        sin_yaw = np.sin(self.trueYaw)
-        velocity_world_x = (self.velocity.x * cos_yaw - self.velocity.y * sin_yaw)
-        velocity_world_y = (self.velocity.x * sin_yaw + self.velocity.y * cos_yaw)
-
-        trajectory_msg = TrajectorySetpoint()
-        trajectory_msg.timestamp = int(Clock().now().nanoseconds / 1000)
-        trajectory_msg.velocity[0] = velocity_world_x
-        trajectory_msg.velocity[1] = velocity_world_y
-        trajectory_msg.velocity[2] = self.velocity.z
-        trajectory_msg.position[0] = float('nan')
-        trajectory_msg.position[1] = float('nan')
-        trajectory_msg.position[2] = float('nan')
-        trajectory_msg.acceleration[0] = float('nan')
-        trajectory_msg.acceleration[1] = float('nan')
-        trajectory_msg.acceleration[2] = float('nan')
-        trajectory_msg.yaw = float('nan')
-        trajectory_msg.yawspeed = self.yaw
-
-        self.publisher_trajectory.publish(trajectory_msg)
-
-
 
     ### Callback functions ###
 

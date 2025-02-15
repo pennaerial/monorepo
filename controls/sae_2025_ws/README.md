@@ -64,6 +64,12 @@ sudo apt-get upgrade
     ```
     This is because the build process of `ros_gz_bridge` requires the gazebo version to be specified in shell variable `GZ_VERSION`.
 
+3. Make sure you have all of your ROS dependencies installed:
+   ```bash
+   # From the workspace (this) directory
+   rosdep install -r --from-paths src -i -y --rosdistro humble
+   ```
+
 ---
 
 ## Building the Workspace

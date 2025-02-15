@@ -1,4 +1,7 @@
+<<<<<<< HEAD
 #!/usr/bin/env python3
+=======
+>>>>>>> main
 import rclpy
 from rclpy.node import Node
 from uav.UAV import UAV

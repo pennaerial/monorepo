@@ -2,7 +2,11 @@ import rclpy
 from rclpy.node import Node
 from time import time
 from uav import Mode
+from uav import UAV
+from typing import List
+from vision_nodes import VisionNode
 
+#TODO: Think about how to encode the mission structure (when to switch `Modes`, etc.)
 class ModeManager(Node):
     """
     A ROS 2 node for managing UAV modes and mission logic.
@@ -13,8 +17,30 @@ class ModeManager(Node):
         self.modes = {}
         self.active_mode = None
         self.last_update_time = time()
-
+        self.uav = UAV()
         self.get_logger().info("Mission Node has started!")
+        
+    def setup_vision(self, mode: Mode, vision_nodes: List[VisionNode]) -> None:
+        """
+        Setup the vision node for this mode.
+
+        Args:
+            mode (Mode): The mode to setup vision for.
+            vision (VisionNode): The vision nodes to setup for this mode.
+        """
+        for vnode in vision_nodes:
+            if vnode.node_name not in self.vision_nodes:
+                self.vision_nodes[vnode.node_name] = vnode()
+                
+        mode.vision_nodes = {vnode.node_name: self.vision_nodes[vnode] for vnode in vision_nodes}
+
+        for vision_node in self.vision_nodes.values():
+            if vision_node.service_name not in self.vision_clients:
+                client = self.node.create_client(vision_node.custom_service_type, vision_node.service_name)
+                while not client.wait_for_service(timeout_sec=1.0):
+                    self.node.get_logger().info(f"Service {vision_node.service_name} not available, waiting again...")
+                self.vision_clients[vision_node.service_name] = client
+            mode.vision_clients[vision_node.service_name] = self.vision_clients[vision_node.service_name]
 
     def add_mode(self, mode_name: str, mode_instance: Mode) -> None:
         """
@@ -24,6 +50,7 @@ class ModeManager(Node):
             mode_name (str): Name of the mode.
             mode_instance (Mode): An instance of the mode.
         """
+        self.setup_vision(mode_instance, mode_instance._vision_nodes_list)
         self.modes[mode_name] = mode_instance
         self.get_logger().info(f"Mode {mode_name} registered.")
 
