@@ -33,6 +33,10 @@ class UAV:
 
         # set yaw
         self.yaw = 0.0
+        self.takeoff_height = -5.0
+        self.takeoff_complete = False
+        self.hover_time = 0
+
 
         # vehicle status data --> VehicleStatus object
         self.vehicle_status = None
@@ -139,6 +143,18 @@ class UAV:
             params={'param7': altitude}  # param7 = desired altitude
         )
         self.node.get_logger().info("Takeoff command sent.")
+
+
+    def check_takeoff_complete(self) -> bool:
+        """Check if takeoff is complete."""
+        height_reached = abs(self.vehicle_local_position.z - self.takeoff_height) < 0.5
+        if height_reached and not self.takeoff_complete:
+            self.hover_time += 1
+            if self.hover_time >= 20:  # Reduced hover time to 2 seconds (20 * 0.1s)
+                self.takeoff_complete = True
+                self.get_logger().info("Takeoff complete, starting mission")
+                return True
+        return False
 
     def land(self):
         """Command the UAV to land."""

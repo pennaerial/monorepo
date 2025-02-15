@@ -22,11 +22,11 @@ class OffboardControl(Node):
         super().__init__('offboard_control_waypoint_navigation')
 
         self.uav = UAV(self)
-        self.takeoff_complete = False
+        # self.takeoff_complete = False
         self.timer = self.create_timer(0.1, self.timer_callback)
-        self.takeoff_height = -5.0
+        # self.takeoff_height = -5.0
         self.mission_completed = False
-        self.hover_time = 0
+        # self.hover_time = 0
 
     def timer_callback(self):
         self.uav.publish_offboard_control_heartbeat_signal()
@@ -40,26 +40,16 @@ class OffboardControl(Node):
         if self.uav.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
             self.get_logger().info("In Offboard Mode")
             # Handle takeoff first
-            if not self.takeoff_complete:
-                self.uav.publish_position_setpoint(0.0, 0.0, self.takeoff_height)
-                self.check_takeoff_complete()
+            if not self.uav.takeoff_complete:
+                self.uav.publish_position_setpoint(0.0, 0.0, self.uav.takeoff_height)
+                self.uav.check_takeoff_complete()
             else:
                 self.uav.land()
                 self.mission_completed = True
         if self.uav.offboard_setpoint_counter < 11:
             self.uav.offboard_setpoint_counter += 1
     
-    def check_takeoff_complete(self) -> bool:
-        """Check if takeoff is complete."""
-        height_reached = abs(self.uav.vehicle_local_position.z - self.takeoff_height) < 0.5
-        if height_reached and not self.takeoff_complete:
-            self.hover_time += 1
-            if self.hover_time >= 20:  # Reduced hover time to 2 seconds (20 * 0.1s)
-                self.takeoff_complete = True
-                self.get_logger().info("Takeoff complete, starting mission")
-                return True
-        return False
-    
+
 
 def main(args=None) -> None:
     print('Starting offboard control node with waypoint navigation...')
