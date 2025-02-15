@@ -77,6 +77,13 @@ class Mode(ABC):
         """
         pass
 
+    @abstractmethod
+    def check_status(self) -> str:
+        """
+        Check if the mode should deactivate.
+        """
+        pass
+
     def activate(self) -> None:
         """
         Activate the mode. Calls the `on_enter` method.
