@@ -2,7 +2,7 @@ import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image, CameraInfo
 import numpy as np
-from uav.src import ImageSend
+from uav.src import CameraData
 import cv2
 
 
@@ -11,15 +11,15 @@ class CameraNode(Node):
     Node class to respond to requests with camera image or camera information.
     """
 
-    def __init__(self, node_name: str, image_topic: str = '/camera', queue_size: int = 10):
+    def __init__(self, node_name: str, service_name: str = '/camera_data', image_topic: str = '/camera', info_topic: str = '/camera_info', queue_size: int = 10):
         """
         Initialize the CameraNode.
 
         Args:
             node_name (str): The name of the ROS 2 node.
-            custom_service (Type[Srv[SrvRequestT, SrvResponseT]]): The custom service type.
             service_name (Optional[str]): The name of the ROS 2 service. Defaults to 'vision/{node_name}'.
             image_topic (str): The name of the image topic to subscribe to.
+            info_topic (str): The name of the image info topic to subscribe to.
             queue_size (int): The size of the message queue for the subscription.
         """
         super().__init__(node_name)
@@ -34,16 +34,13 @@ class CameraNode(Node):
 
         self.camera_info_subscription = self.create_subscription(
             CameraInfo,
-            '/camera_info',
+            info_topic,
             self.camera_info_callback,
             queue_size
         )
         
         self.processed_image = None
         self.camera_info = None
-
-        if service_name is None:
-            service_name = f'vision/{node_name}'
 
         self.service = self.create_service(
             ImageSend,
@@ -52,7 +49,7 @@ class CameraNode(Node):
         )
 
         self.get_logger().info(f"{node_name} has started, subscribing to {image_topic}.")
-        self.get_logger().info(f"{node_name} has started, subscribing to camera_info.")
+        self.get_logger().info(f"{node_name} has started, subscribing to {info_topic}.")
 
     def image_callback(self, msg: Image):
         """
@@ -75,7 +72,7 @@ class CameraNode(Node):
         """
         self.camera_info = msg
 
-    def service_callback(self, request, response):
+    def service_callback(self, request: CameraData.Request, response: CameraData.Response):
         """
         Callback for receiving image messages. Converts the image data
         and processes the frame.
@@ -85,17 +82,19 @@ class CameraNode(Node):
         """
 
         if request.cam_image:
-            if self.processed_image != None:
+            if self.processed_image:
                 processed_image_data = self.processed_image.tolist()
                 response.processed_image = processed_image_data
             else:
                 self.get_logger().warn("No processed image available.")
         
         if request.cam_info:
-            if self.camera_info != None:
+            if self.camera_info:
                 response.camera_info = self.camera_info
             else:
                 self.get_logger().warn("No camera info available.")
+
+        return response
 
     def convert_image_msg_to_frame(self, msg: Image) -> np.ndarray:
         """

@@ -1,8 +1,10 @@
-import rclpy
-from rclpy.node import Node
-from uav.src import ImageSend
+from typing import Type
+from rclpy.type_support import Srv, SrvRequestT, SrvResponseT
+from typing import Optional
+from uav.src import CameraData
 import cv2
 import numpy as np
+from abc import ABC, abstractmethod
 
 class VisionNode(Node):
     """
@@ -11,7 +13,7 @@ class VisionNode(Node):
     and managing vision-based tasks such as tracking and calibration.
     """
 
-    def __init__(self, node_name: str, camera_node_service_name: str):
+    def __init__(self, node_name: str, custom_service: Type[Srv[SrvRequestT, SrvResponseT]], service_name: Optional[str]):
         """
         Initialize the VisionNode.
 
@@ -19,22 +21,30 @@ class VisionNode(Node):
             node_name (str): The name of the ROS 2 node.
             custom_service (Type[Srv[SrvRequestT, SrvResponseT]]): The custom service type.
             service_name (Optional[str]): The name of the ROS 2 service. Defaults to 'vision/{node_name}'.
-            image_topic (str): The name of the image topic to subscribe to.
-            queue_size (int): The size of the message queue for the subscription.
         """
         super().__init__(node_name)
+
+        if service_name is None:
+            service_name = f'vision/{node_name}'
+        
+        self.node_name = node_name
+        self.custom_service_type = custom_service
+        self.service_name = service_name
+
+        self.initialize_service(custom_service, service_name)
+
+        self.client = self.create_client(CameraData, service_name)
 
         if not self.client.wait_for_service(timeout_sec=1.0):
             self.get_logger().error('Service not available.')
             return
 
-        self.client = self.create_client(ImageSend, camera_node_service_name)
 
     def request_image(self, cam_image: bool = False, cam_info: bool = False):
         """
         Sends request for camera image or camera information.
         """
-        request = ImageSend.Request()
+        request = CameraData.Request()
         request.cam_image = cam_image
         request.cam_info = cam_info
         
