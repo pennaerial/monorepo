@@ -1,40 +1,16 @@
 start:
-  class: uav.autonomous_modes.StartMode
+  class: uav.autonomous_modes.NavigateToGPSMode
   transitions:
     continue: takeoff
     failure: error
 
 takeoff:
-  class: uav.autonomous_modes.TakeoffMode
-  transitions:
-    continue: hover
-    failure: error
-
-hover:
-  class: uav.autonomous_modes.HoverMode
-  transitions:
-    continue: flight
-    complete: land
-    failure: error
-
-flight:
-  class: uav.autonomous_modes.NavigateToGPSMode
-  transitions:
-    success: hover
-    failure: error
-
-land:
-  class: uav.autonomous_modes.LandMode
+  class: uav.autonomous_modes.LowerPayloadMode
   transitions:
     continue: complete
     failure: error
-
-error:
-  class: uav.autonomous_modes.ErrorMode
-  transitions:
-    continue: complete
 
 complete:
-  class: uav.autonomous_modes.CompleteMode
+  class: uav.autonomous_modes.LowerPayloadMode
   transitions:
     continue: complete

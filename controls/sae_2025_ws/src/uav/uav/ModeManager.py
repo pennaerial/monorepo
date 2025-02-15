@@ -9,7 +9,7 @@ import yaml
 import importlib
 
 #TODO: Think about how to encode the mission structure (when to switch `Modes`, etc.)
-class ModeManager(Node):
+class ModeManager(Node):    
     """
     A ROS 2 node for managing UAV modes and mission logic.
     """
@@ -22,6 +22,7 @@ class ModeManager(Node):
         self.last_update_time = time()
         self.uav = UAV()
         self.get_logger().info("Mission Node has started!")
+        # self.starting_mode = 'start
 
         self.setup_modes(mode_map)
 
@@ -138,7 +139,8 @@ class ModeManager(Node):
             self.active_mode.update(time_delta)
             
             state = self.active_mode.check_status()
-            if state:
+            
+            if state == "continue":
                 self.switch_mode(self.transition(state))
 
     def spin(self):
@@ -153,7 +155,7 @@ class ModeManager(Node):
         finally:
             rclpy.shutdown()
 
-    def load_yaml_to_dict(filename):
+    def load_yaml_to_dict(self, filename: str):
         """
         Load a yaml file into a dictionary.
 

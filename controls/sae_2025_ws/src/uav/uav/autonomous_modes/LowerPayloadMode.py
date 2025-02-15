@@ -1,3 +1,4 @@
+import random
 from uav import Mode, UAV
 from rclpy.node import Node
 from uav.src import PayloadTracking
@@ -31,3 +32,14 @@ class LowerPayloadMode(Mode):
             self.log("Current pose not available yet.")
         else:
             self.uav.set_target_position(self.payload_pose)
+
+    def check_status(self):
+        """
+        Check the status of the payload lowering.
+
+        Returns:
+            str: The status of the payload lowering.
+        """
+        if random.random() < 0.1:
+            print('lower payload continue')
+            return 'continue'
