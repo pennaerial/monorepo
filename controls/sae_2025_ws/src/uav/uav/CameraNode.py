@@ -43,7 +43,7 @@ class CameraNode(Node):
         self.camera_info = None
 
         self.service = self.create_service(
-            ImageSend,
+            CameraData,
             service_name,
             self.service_callback
         )

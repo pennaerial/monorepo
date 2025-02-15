@@ -40,21 +40,20 @@ class VisionNode(Node):
             return
 
 
-    def request_image(self, cam_image: bool = False, cam_info: bool = False):
+    def request_image(self, cam_image: bool = False, cam_info: bool = False) -> CameraData.Response:
         """
         Sends request for camera image or camera information.
         """
         request = CameraData.Request()
-        request.cam_image = cam_image
-        request.cam_info = cam_info
+        if not cam_info and not cam_image:
+            return CameraData.Response()
+        if cam_image:
+            request.cam_image = cam_image
+        if cam_info:
+            request.cam_info = cam_info
         
         future = self.client.call_async(request)
-        future.add_done_callback(self.response_callback)
-    
-    def response_callback(self, future):
-        """
-        Handles the response from the service.
-        """
+        rclpy.spin_until_future_complete(self, future) 
         try:
             response = future.result()
             if response.processed_image:
@@ -63,6 +62,7 @@ class VisionNode(Node):
                 self.get_logger().info(f"Received camera info: {response.camera_info}")
         except Exception as e:
             self.get_logger().error(f"Service call failed: {e}")
+        return response
 
     def display_frame(self, frame: np.ndarray, window_name: str = "Camera Feed") -> None:
         """
