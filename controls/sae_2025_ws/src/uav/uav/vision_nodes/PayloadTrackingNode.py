@@ -1,21 +1,108 @@
+# payload_tracking_node.py
+import cv2
+import numpy as np
 from cv.tracking import find_payload
 from uav import VisionNode
-from numpy import ndarray as np
 from uav.srv import PayloadTracking
+from rclpy.parameter import Parameter
 
 class PayloadTrackingNode(VisionNode):
     """
-    A vision node that performs object tracking and recalibration.
+    ROS node for payload tracking with Kalman filtering.
     """
     def __init__(self):
-        """
-        Initialize the PayloadTrackingNode.
-        """
         super().__init__('payload_tracking', PayloadTracking)
+        
+        # Declare parameters
+        self.declare_parameter('debug', False)
+        self.declare_parameter('lower_pink', [140, 90, 50])
+        self.declare_parameter('upper_pink', [170, 255, 255])
+        self.declare_parameter('lower_green', [40, 50, 50])
+        self.declare_parameter('upper_green', [80, 255, 255])
+        
+        # Initialize Kalman filter
+        self.kalman = cv2.KalmanFilter(4, 2)
+        self._setup_kalman_filter()
+        
+        # Get parameters
+        self.debug = self.get_parameter('debug').value
+        self.lower_pink = np.array(self.get_parameter('lower_pink').value)
+        self.upper_pink = np.array(self.get_parameter('upper_pink').value)
+        self.lower_green = np.array(self.get_parameter('lower_green').value)
+        self.upper_green = np.array(self.get_parameter('upper_green').value)
+        
+    def _setup_kalman_filter(self):
+        """Initialize Kalman filter matrices"""
+        dt = 1  
+        
+        # State transition matrix [x, y, vx, vy]
+        self.kalman.transitionMatrix = np.array([
+            [1, 0, dt, 0],
+            [0, 1, 0, dt],
+            [0, 0, 1, 0],
+            [0, 0, 0, 1]
+        ], dtype=np.float32)
+        
+        # Measurement matrix [x, y]
+        self.kalman.measurementMatrix = np.array([
+            [1, 0, 0, 0],
+            [0, 1, 0, 0]
+        ], dtype=np.float32)
+        
+        # Tune these covariances idk
+        self.kalman.processNoiseCov = np.eye(4, dtype=np.float32) * 1e-2
+        self.kalman.measurementNoiseCov = np.eye(2, dtype=np.float32) * 1e-1
+        self.kalman.errorCovPost = np.eye(4, dtype=np.float32)
+        
+    def compute_3d_vector(self, x, y, camera_info, altitude):
+        """Convert pixel coordinates to 3D direction vector"""
+        K = np.array(camera_info)
+        pixel_coords = np.array([x, y, 1.0])
+        cam_coords = np.linalg.inv(K) @ pixel_coords
+        
+        # Convert to unit vector
+        direction = cam_coords / np.linalg.norm(cam_coords)
+        real_world_vector = cam_coords * altitude
+        return tuple(real_world_vector / np.linalg.norm(real_world_vector))
+        
+    def service_callback(self, request: PayloadTracking.Request, 
+                        response: PayloadTracking.Response):
+        """Process tracking service request with Kalman filtering"""
+        # Predict next state
+        prediction = self.kalman.predict()
+        predicted_x, predicted_y = prediction[0, 0], prediction[1, 0]
+        
+        # Get raw detection
+        detection = find_payload(
+            self.curr_frame,
+            self.lower_pink,
+            self.upper_pink,
+            self.lower_green,
+            self.upper_green
+        )
+        
+        if detection is not None:
+            cx, cy, vis_image = detection
+            # Update Kalman filter with measurement
+            measurement = np.array([[np.float32(cx)], [np.float32(cy)]])
+            corrected_state = self.kalman.correct(measurement)
+            x, y = corrected_state[0, 0], corrected_state[1, 0]
+        else:
+            # Use prediction if no detection
+            x, y = predicted_x, predicted_y
+            vis_image = self.curr_frame.copy()
             
-    def service_callback(self, request: PayloadTracking.Request, response: PayloadTracking.Response):
-        #TODO: update requests to match find_payload API
-        self.processed_frame = find_payload(self.curr_frame)
-        response.x, response.y, response.direction = self.processed_frame
-
+        # Compute 3D direction vector
+        direction = self.compute_3d_vector(x, y, request.camera_info, request.altitude)
+        
+        # Show debug visualization if enabled
+        if self.debug:
+            cv2.circle(vis_image, (int(x), int(y)), 5, (0, 0, 255), -1)
+            cv2.imshow("Tracking Debug", vis_image)
+            cv2.waitKey(1)
+            
+        # Populate response
+        response.x = x
+        response.y = y
+        response.direction = direction
         return response
