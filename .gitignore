@@ -28,3 +28,6 @@ log
 # Miscellaneous
 crash course/data/MNIST/raw/*
 */src/actuator_msgs/
+
+# submodules
+.gitmodules
