@@ -1,19 +1,29 @@
 # tracking.py
 import cv2
 import numpy as np
+from typing import Optional, Tuple
 
-def find_payload(image, lower_pink, upper_pink, lower_green, upper_green):
+def find_payload(
+    image: np.ndarray,
+    lower_pink: np.ndarray,
+    upper_pink: np.ndarray,
+    lower_green: np.ndarray,
+    upper_green: np.ndarray,
+    debug: bool = False
+) -> Optional[Tuple[int, int, np.ndarray]]:
     """
     Detect payload in image using color thresholding.
-    Returns raw detection coordinates and visualization image.
     
     Args:
-        image: Input BGR image
-        lower_pink/upper_pink: HSV threshold values for pink marker
-        lower_green/upper_green: HSV threshold values for green payload
+        image (np.ndarray): Input BGR image.
+        lower_pink (np.ndarray): Lower HSV threshold for pink marker.
+        upper_pink (np.ndarray): Upper HSV threshold for pink marker.
+        lower_green (np.ndarray): Lower HSV threshold for green payload.
+        upper_green (np.ndarray): Upper HSV threshold for green payload.
     
     Returns:
-        Tuple of (cx, cy, visualization_image) or None if no detection
+        Optional[Tuple[int, int, np.ndarray]]: A tuple (cx, cy, visualization_image)
+        if detection is successful; otherwise, None.
     """
     hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
     
@@ -51,6 +61,9 @@ def find_payload(image, lower_pink, upper_pink, lower_green, upper_green):
         
     cx, cy = int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"])
     
+    if not debug:
+        return cx, cy, None
+    
     # Create visualization image
     vis_image = image.copy()
     cv2.rectangle(vis_image, (x, y), (x + w, y + h), (255, 0, 255), 2)
@@ -58,3 +71,19 @@ def find_payload(image, lower_pink, upper_pink, lower_green, upper_green):
     cv2.circle(vis_image, (cx, cy), 5, (0, 255, 0), -1)
     
     return cx, cy, vis_image
+
+def compute_3d_vector(
+    x: float, 
+    y: float, 
+    camera_info: np.ndarray,  # expected to be a 3x3 camera intrinsic matrix
+    altitude: float
+) -> Tuple[float, float, float]:
+    """Convert pixel coordinates to a 3D direction vector."""
+    K = np.array(camera_info)
+    pixel_coords = np.array([x, y, 1.0])
+    cam_coords = np.linalg.inv(K) @ pixel_coords
+    
+    # Convert to unit vector
+    # direction = cam_coords / np.linalg.norm(cam_coords)
+    real_world_vector = cam_coords * altitude
+    return tuple(real_world_vector / np.linalg.norm(real_world_vector))

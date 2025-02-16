@@ -1,7 +1,7 @@
 # payload_tracking_node.py
 import cv2
 import numpy as np
-from cv.tracking import find_payload
+from cv.tracking import find_payload, compute_3d_vector
 from uav import VisionNode
 from uav.srv import PayloadTracking
 from rclpy.parameter import Parameter
@@ -54,17 +54,6 @@ class PayloadTrackingNode(VisionNode):
         self.kalman.measurementNoiseCov = np.eye(2, dtype=np.float32) * 1e-1
         self.kalman.errorCovPost = np.eye(4, dtype=np.float32)
         
-    def compute_3d_vector(self, x, y, camera_info, altitude):
-        """Convert pixel coordinates to 3D direction vector"""
-        K = np.array(camera_info)
-        pixel_coords = np.array([x, y, 1.0])
-        cam_coords = np.linalg.inv(K) @ pixel_coords
-        
-        # Convert to unit vector
-        direction = cam_coords / np.linalg.norm(cam_coords)
-        real_world_vector = cam_coords * altitude
-        return tuple(real_world_vector / np.linalg.norm(real_world_vector))
-        
     def service_callback(self, request: PayloadTracking.Request, 
                         response: PayloadTracking.Response):
         """Process tracking service request with Kalman filtering"""
@@ -78,7 +67,8 @@ class PayloadTrackingNode(VisionNode):
             self.lower_pink,
             self.upper_pink,
             self.lower_green,
-            self.upper_green
+            self.upper_green,
+            self.debug
         )
         
         if detection is not None:
