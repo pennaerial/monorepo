@@ -68,6 +68,8 @@ class UAV:
         self.curr_waypoint = None
         self.coordinate_system = None
         
+        self.initiated_landing = False
+        self.safe_landing_hover_time = 50
     
 
     # -------------------------
@@ -98,7 +100,9 @@ class UAV:
     def advance_to_next_waypoint(self):
         """Advance to the next waypoint."""
         # if self.current_waypoint_index < len(self.waypoints):
-        if len(self.waypoints) != 0 and self.reached_waypoint:
+        
+        # Not landing, reached last waypoint, and there is another waypoint to go to
+        if len(self.waypoints) != 0 and self.reached_waypoint and not self.initiated_landing:
             # coordinate_system, current_waypoint = self.waypoints[self.current_waypoint_index]
             self.reached_waypoint = False
             coordinate_system, current_waypoint = self.waypoints.popleft()
@@ -110,16 +114,37 @@ class UAV:
             elif coordinate_system == 'Local':
                 rel_waypoint = tuple(x-y for x, y in zip(current_waypoint, self.start_local_position))
                 self.publish_position_setpoint(rel_waypoint)
+            elif coordinate_system == 'END':
+                self.node.get_logger().info("Mission completed. Preparing to land.")
+                self.curr_waypoint = self.start_local_position
+                self.coordinate_system = 'Local'
+                self.initiated_landing = True
             # self.node.get_logger().info(f"Advancing to waypoint {self.current_waypoint_index}")
             # self.node.get_logger().info(f"Current distance: {self.distance_to_waypoint(coordinate_system, current_waypoint)}")
-        else:
+        
+        # Not landing, having reached waypoint yet
+        elif not self.initiated_landing and not self.reached_waypoint:
             self.node.get_logger().info(f"Current heading to {self.gps_to_local(self.curr_waypoint)}")
             if self.distance_to_waypoint(self.coordinate_system, self.curr_waypoint) < self.waypoint_threshold:
                 # self.current_waypoint_index += 1
                 self.reached_waypoint = True
-        # else:
-        #     self.mission_completed = True
-        #     self.node.get_logger().info("Mission completed. Preparing to land.")
+
+        # Not landing, reached waypoint but no more waypoints
+        elif not self.initiated_landing:
+            self.hover()
+
+        # Landing
+        elif self.initiated_landing:
+            if self.initiated_landing and self.safe_landing_hover_time > 0:
+                self.node.get_logger().info(f"Landing in T - {self.safe_landing_hover_time} seconds.")
+                self.safe_landing_hover_time -= 1
+                self.hover()
+            else:
+                self.land()
+                self.mission_completed = True
+
+    def hover(self):
+        self.publish_position_setpoint((self.vehicle_local_position.x, self.vehicle_local_position.y, self.vehicle_local_position.z))
 
     def disarm(self):
         """Send a disarm command to the UAV."""
@@ -145,24 +170,6 @@ class UAV:
         """
         self.publish_position_setpoint((0.0, 0.0, self.takeoff_height))
         self.node.get_logger().info("Takeoff command sent.")
-    #     radius = 5.0
-    #     num_points = 100
-    #     angles = np.linspace(0, 2 * np.pi, num_points, endpoint=False)
-    #     for angle in angles:
-    #         # Compute local displacements (x: North, y: East)
-    #         x = radius * np.cos(angle)
-    #         y = radius * np.sin(angle)
-    #         # Use self.takeoff_height as the local down value (z)
-    #         local_point = (x, y, self.takeoff_height)
-            
-    #         # Convert the local point to GPS coordinates relative to the takeoff GPS.
-    #         gps_point = self.local_to_gps(local_point)
-    #         self.waypoints.append(('GPS', gps_point))
-
-    #     # Append the final waypoint (returning to the takeoff location in the local frame).
-    #     final_local_point = (0.0, 0.0, self.takeoff_height)
-    #     final_gps_point = self.local_to_gps(final_local_point)
-    #     self.waypoints.append(('GPS', final_gps_point))
 
     def add_waypoint(self, waypoint, coordinate_system):
         self.waypoints.append((coordinate_system, waypoint))

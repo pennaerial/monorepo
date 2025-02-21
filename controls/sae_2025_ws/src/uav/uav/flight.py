@@ -43,7 +43,7 @@ class OffboardControl(Node):
         # final_gps_point = self.local_to_gps(final_local_point)
         # self.waypoints.append(('GPS', final_gps_point))
         self.waypoints.append((final_local_point))
-        self.waypoint_counter = 0
+        self.waypoints_added = False
         
 
     def timer_callback(self):
@@ -57,16 +57,17 @@ class OffboardControl(Node):
             self.get_logger().info("Vehicle armed")
         elif self.uav.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
             # self.get_logger().info("In Offboard Mode")
-            if not self.uav.takeoff_complete:
+            if not self.waypoints_added:
+                self.waypoints_added = True
+                for i in range(len(self.waypoints)):
+                    self.uav.add_waypoint(self.uav.local_to_gps(self.waypoints[i]), 'GPS')
+                self.uav.add_waypoint(None, 'END')
+            elif not self.uav.takeoff_complete:
                 self.uav.takeoff()
-                self.uav.check_takeoff_complete()
-            elif self.waypoint_counter < len(self.waypoints):
-                self.uav.add_waypoint(self.uav.local_to_gps(self.waypoints[self.waypoint_counter]), 'GPS')
-                self.waypoint_counter += 1
+                self.uav.check_takeoff_complete()                
             elif not self.uav.mission_completed:
                 self.uav.advance_to_next_waypoint()
             else:
-                self.uav.land()
                 self.mission_completed = True
         if self.uav.offboard_setpoint_counter < 11:
             self.uav.offboard_setpoint_counter += 1
