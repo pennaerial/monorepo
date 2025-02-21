@@ -27,7 +27,6 @@ class UAV:
 
     def __init__(self, node: Node):
 
-        # Initialize the Node which is managing this UAV instance
         self.node = node
 
         # Initialize necessary parameters to handle PX4 flight failures
@@ -35,55 +34,39 @@ class UAV:
         self.failsafe = False
         self.vehicle_status = None
         self.vehicle_attitude = None
-
-
+        self.nav_state = None
+        self.arm_state = None
+        self.offboard_setpoint_counter = 0
         
         # Set up Subscribers/Publishers to communicate with aircraft
         self._initialize_publishers_and_subscribers()
 
-        # set yaw
+        # set takeoff parameters
         self.yaw = 0.0
         self.takeoff_height = -5.0
         self.takeoff_complete = False
         self.hover_time = 0
 
+        # Initialize drone position
         self.start_local_position = None
         self.start_GPS_ref = None
 
-        
-        # global position --> VehicleGlobalPosition
+        # Store current drone position
         self.global_position = None
         self.vehicle_local_position = None
 
-        self.nav_state = None
-        self.arm_state = None
-        self.failsafe = None
-        self.flight_check = None
-        self.offboard_setpoint_counter = 0
 
-        # mission checkpoints
         # self.current_waypoint_index = 0
-        # self.waypoint_threshold = 2.0
-        # self.mission_completed = False
-        # radius = 5.0
-        # num_points = 100
-        # angles = np.linspace(0, 2 * np.pi, num_points, endpoint=False)
-        # self.waypoints = [('Local', (0.0, 0.0, self.takeoff_height))]  # Takeoff point
-        # for angle in angles:
-        #     x = radius * np.cos(angle)
-        #     y = radius * np.sin(angle)
-        #     self.waypoints.append(('Local', (x, y, self.takeoff_height)))
-        # self.waypoints.append(('Local', (0.0, 0.0, self.takeoff_height)))
-
-        # self.waypoints = [('GPS',(47.397972, 8.546165, 5.0))]
-
-        self.current_waypoint_index = 0
         self.waypoint_threshold = 2.0
         self.mission_completed = False
 
         # Start with an empty list of waypoints (will store GPS waypoints)
         self.waypoints = []
-       
+
+        self.waypoints = deque()
+        self.reached_waypoint = True
+        self.curr_waypoint = None
+        self.coordinate_system = None
         
     
 
@@ -114,8 +97,13 @@ class UAV:
 
     def advance_to_next_waypoint(self):
         """Advance to the next waypoint."""
-        if self.current_waypoint_index < len(self.waypoints):
-            coordinate_system, current_waypoint = self.waypoints[self.current_waypoint_index]
+        # if self.current_waypoint_index < len(self.waypoints):
+        if len(self.waypoints) != 0 and self.reached_waypoint:
+            # coordinate_system, current_waypoint = self.waypoints[self.current_waypoint_index]
+            self.reached_waypoint = False
+            coordinate_system, current_waypoint = self.waypoints.popleft()
+            self.curr_waypoint = current_waypoint
+            self.coordinate_system = coordinate_system
             if coordinate_system == 'GPS':
                 local_target = self.gps_to_local(current_waypoint)
                 self.publish_position_setpoint(local_target)
@@ -123,12 +111,15 @@ class UAV:
                 rel_waypoint = tuple(x-y for x, y in zip(current_waypoint, self.start_local_position))
                 self.publish_position_setpoint(rel_waypoint)
             # self.node.get_logger().info(f"Advancing to waypoint {self.current_waypoint_index}")
-            self.node.get_logger().info(f"Current distance: {self.distance_to_waypoint(coordinate_system, current_waypoint)}")
-            if self.distance_to_waypoint(coordinate_system, current_waypoint) < self.waypoint_threshold:
-                self.current_waypoint_index += 1
+            # self.node.get_logger().info(f"Current distance: {self.distance_to_waypoint(coordinate_system, current_waypoint)}")
         else:
-            self.mission_completed = True
-            self.node.get_logger().info("Mission completed. Preparing to land.")
+            self.node.get_logger().info(f"Current heading to {self.gps_to_local(self.curr_waypoint)}")
+            if self.distance_to_waypoint(self.coordinate_system, self.curr_waypoint) < self.waypoint_threshold:
+                # self.current_waypoint_index += 1
+                self.reached_waypoint = True
+        # else:
+        #     self.mission_completed = True
+        #     self.node.get_logger().info("Mission completed. Preparing to land.")
 
     def disarm(self):
         """Send a disarm command to the UAV."""
@@ -386,9 +377,9 @@ class UAV:
 
     def _global_position_callback(self, msg: VehicleGlobalPosition):
         self.global_position = msg
-        self.node.get_logger().info(
-            f"Global Position - Lat: {msg.lat:.7f}, Lon: {msg.lon:.7f}, Alt: {msg.alt:.7f}"
-        )
+        # self.node.get_logger().info(
+            # f"Global Position - Lat: {msg.lat:.7f}, Lon: {msg.lon:.7f}, Alt: {msg.alt:.7f}"
+        # )
     
     def _vehicle_local_position_callback(self, msg: VehicleLocalPosition):
         if not self.start_local_position:
