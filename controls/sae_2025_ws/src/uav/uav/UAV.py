@@ -145,24 +145,27 @@ class UAV:
         """
         self.publish_position_setpoint((0.0, 0.0, self.takeoff_height))
         self.node.get_logger().info("Takeoff command sent.")
-        radius = 5.0
-        num_points = 100
-        angles = np.linspace(0, 2 * np.pi, num_points, endpoint=False)
-        for angle in angles:
-            # Compute local displacements (x: North, y: East)
-            x = radius * np.cos(angle)
-            y = radius * np.sin(angle)
-            # Use self.takeoff_height as the local down value (z)
-            local_point = (x, y, self.takeoff_height)
+    #     radius = 5.0
+    #     num_points = 100
+    #     angles = np.linspace(0, 2 * np.pi, num_points, endpoint=False)
+    #     for angle in angles:
+    #         # Compute local displacements (x: North, y: East)
+    #         x = radius * np.cos(angle)
+    #         y = radius * np.sin(angle)
+    #         # Use self.takeoff_height as the local down value (z)
+    #         local_point = (x, y, self.takeoff_height)
             
-            # Convert the local point to GPS coordinates relative to the takeoff GPS.
-            gps_point = self.local_to_gps(local_point)
-            self.waypoints.append(('GPS', gps_point))
+    #         # Convert the local point to GPS coordinates relative to the takeoff GPS.
+    #         gps_point = self.local_to_gps(local_point)
+    #         self.waypoints.append(('GPS', gps_point))
 
-        # Append the final waypoint (returning to the takeoff location in the local frame).
-        final_local_point = (0.0, 0.0, self.takeoff_height)
-        final_gps_point = self.local_to_gps(final_local_point)
-        self.waypoints.append(('GPS', final_gps_point))
+    #     # Append the final waypoint (returning to the takeoff location in the local frame).
+    #     final_local_point = (0.0, 0.0, self.takeoff_height)
+    #     final_gps_point = self.local_to_gps(final_local_point)
+    #     self.waypoints.append(('GPS', final_gps_point))
+
+    def add_waypoint(self, waypoint, coordinate_system):
+        self.waypoints.append((coordinate_system, waypoint))
 
 
     def check_takeoff_complete(self) -> bool:
