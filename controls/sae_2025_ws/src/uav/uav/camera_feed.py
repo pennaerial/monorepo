@@ -120,8 +120,10 @@ def find_payload(image):
         cv2.imshow("masked image", masked_image)
 
         # Detect neon green (circle) within the pink square
-        lower_green = np.array([71 / 2, 50, 50])
-        upper_green = np.array([160 / 2, 255, 255])
+        # lower_green = np.array([71 / 2, 50, 50])
+        lower_green = np.array([25, 50, 50])
+        upper_green = np.array([95, 255, 255])
+        # upper_green = np.array([160 / 2, 255, 255])
         green_mask = cv2.inRange(hsv_masked, lower_green, upper_green)
         green_image = cv2.bitwise_and(image, image, mask=green_mask)
 

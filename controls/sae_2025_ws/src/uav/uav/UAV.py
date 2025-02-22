@@ -17,7 +17,7 @@ from rclpy.qos import (
     QoSDurabilityPolicy,
 )
 import numpy as np
-from geopy.distance import geodesic
+# from geopy.distance import geodesic
 
 class UAV:
     """
@@ -34,9 +34,10 @@ class UAV:
 
         # set yaw
         self.yaw = 0.0
-        self.takeoff_height = -5.0
+        self.takeoff_height = -3.0
         self.takeoff_complete = False
         self.hover_time = 0
+        self.vehicle_local_position = VehicleLocalPosition()
 
 
         # vehicle status data --> VehicleStatus object
@@ -59,17 +60,17 @@ class UAV:
         self.current_waypoint_index = 0
         self.waypoint_threshold = 2.0
         self.mission_completed = False
-        radius = 5.0
+        radius = 1.0
         num_points = 100
         angles = np.linspace(0, 2 * np.pi, num_points, endpoint=False)
-        self.waypoints = [[0.0, 0.0, self.takeoff_height]]  # Takeoff point
+        self.waypoints = [('Local', [0.0, 5.0, self.takeoff_height])]  # Takeoff point
         for angle in angles:
             x = radius * np.cos(angle)
             y = radius * np.sin(angle)
-            self.waypoints.append([x, y, self.takeoff_height])
-        self.waypoints.append([0.0, 0.0, self.takeoff_height])
+            self.waypoints.append(('Local', [0.0 + x, 5.0 + y, self.takeoff_height]))
+        self.waypoints.append(('Local', [0.0, 5.0, self.takeoff_height]))
 
-        self.waypoints = [('GPS',[40, 80, 10])]
+        # self.waypoints = [('GPS',[40, 80, 10])]
         
     def _initialize_publishers_and_subscribers(self):
         """
@@ -139,9 +140,9 @@ class UAV:
             pass
         elif coordinate_system == 'Local':
             return np.sqrt(
-                (self.node.vehicle_local_position.x - waypoint[0]) ** 2 +
-                (self.node.vehicle_local_position.y - waypoint[1]) ** 2 +
-                (self.node.vehicle_local_position.z - waypoint[2]) ** 2
+                (self.vehicle_local_position.x - waypoint[0]) ** 2 +
+                (self.vehicle_local_position.y - waypoint[1]) ** 2 +
+                (self.vehicle_local_position.z - waypoint[2]) ** 2
             )
 
     def advance_to_next_waypoint(self):
@@ -153,11 +154,14 @@ class UAV:
             elif coordinate_system == 'Local':
                 self.publish_position_setpoint(*current_waypoint)
             self.node.get_logger().info(f"Advancing to waypoint {self.current_waypoint_index}")
-            if self.distance_to_waypoint() < self.waypoint_threshold:
+            if self.distance_to_waypoint(coordinate_system, current_waypoint) < self.waypoint_threshold:
                 self.current_waypoint_index += 1
         else:
-            self.mission_completed = True
-            self.node.get_logger().info("Mission completed. Preparing to land.")
+            # Original code:
+            # self.mission_completed = True
+            # self.node.get_logger().info("Mission completed. Preparing to land.")
+            # Add infinite length task to take the screen shot:
+            self.current_waypoint_index = 0
 
     def disarm(self):
         """Send a disarm command to the UAV."""
