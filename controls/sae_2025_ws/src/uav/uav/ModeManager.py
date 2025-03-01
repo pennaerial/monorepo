@@ -7,6 +7,7 @@ from typing import List
 from vision_nodes import VisionNode
 import yaml
 import importlib
+import inspect
 
 #TODO: Think about how to encode the mission structure (when to switch `Modes`, etc.)
 class ModeManager(Node):    
@@ -54,7 +55,7 @@ class ModeManager(Node):
                 self.vision_clients[vision_node.service_name] = client
             mode.vision_clients[vision_node.service_name] = self.vision_clients[vision_node.service_name]
     
-    def initialize_mode(self, mode_path: List[str], params: dict) -> Mode:
+    def initialize_mode(self, mode_path: List[str]) -> Mode:
         """
         Initialize a mode instance.
 
@@ -67,8 +68,7 @@ class ModeManager(Node):
         """
         module_name, class_name = mode_path.rsplit('.', 1)
         module = importlib.import_module(module_name)
-        class_ = getattr(module, class_name)
-        return class_(self, self.uav, **params)
+        return getattr(module, class_name)
     
     def setup_modes(self, mode_map: str) -> None:
         """
@@ -85,13 +85,29 @@ class ModeManager(Node):
             mode_path = mode_info['class']
 
             params = mode_info.get('params', {})
-            for key, value in params.items():
-                if key == 'coordinate':
-                    mode_info[key] = eval(value)
-            mode_instance = self.initialize_mode(mode_path, params)
-            self.add_mode(mode_name, mode_instance)
+            class_ = self.initialize_mode(mode_path)
+
+            arguments = inspect.signature(class_.__init__).parameters
+            args = {}
+            for arg_name, arg_info in arguments.items():
+                if arg_name in params:
+                    if arg_info.annotation == tuple:
+                        args[arg_name] = eval(params[arg_name])
+                    else:
+                        args[arg_name] = params[arg_name]
+
+                elif arg_info.default != inspect.Parameter.empty:
+                    args[arg_name] = arg_info.default
+                else:
+                    raise ValueError(f"Missing required parameter {arg_name} for mode {mode_name}")
+
+            self.add_mode(mode_name, class_(self, self.uav, **args))
+            
+            
             
             self.transitions[mode_name] = mode_info.get('transitions', {})
+        
+        
 
     def add_mode(self, mode_name: str, mode_instance: Mode) -> None:
         """

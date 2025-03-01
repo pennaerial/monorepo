@@ -3,16 +3,16 @@ start:
   params:
     coordinate: (2, 3, 2)
   transitions:
-    continue: takeoff
+    loop: takeoff
     failure: error
 
 takeoff:
   class: uav.autonomous_modes.LowerPayloadMode
   transitions:
-    continue: complete
+    loop: complete
     failure: error
 
 complete:
   class: uav.autonomous_modes.LowerPayloadMode
   transitions:
-    continue: complete
+    loop: complete

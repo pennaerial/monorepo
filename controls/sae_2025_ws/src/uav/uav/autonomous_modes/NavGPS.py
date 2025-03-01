@@ -1,15 +1,20 @@
-import random
 from typing import List
 from uav import Mode
 from rclpy.node import Node
 from uav import UAV
+
 
 class NavGPS(Mode):
     """
     A mode for navigating to a GPS coordinate
     """
 
-    def __init__(self, node: Node, uav: UAV, coordinates: List[tuple[tuple[float, float, float], float]]):
+    def __init__(
+        self,
+        node: Node,
+        uav: UAV,
+        coordinates: List[tuple[tuple[float, float, float], float]],
+    ):
         """
         Initialize the NavigateToGPSMode.
 
@@ -19,7 +24,7 @@ class NavGPS(Mode):
             coordinate (tuple[float, float, float]): The coordinate (x, y, z).
         """
         super().__init__(node, uav, [])
-        
+
         self.times_between = []
         for coordinate, time_between in coordinates:
             super().uav.add_waypoint(coordinate, "GPS")
@@ -48,12 +53,12 @@ class NavGPS(Mode):
     def check_status(self) -> str:
         """
         Check the status of the mode.
-        
+
         Returns:
             str: The status of the mode.
         """
-        
+
         if super().uav.coordinate_system == "END":
             return "finshed"
         else:
-            return "continue"
+            return "loop"
