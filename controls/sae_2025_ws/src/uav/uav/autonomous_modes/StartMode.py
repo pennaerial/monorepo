@@ -3,12 +3,12 @@ from rclpy.node import Node
 from uav import UAV
 
 
-class LandingMode(Mode):
+class StartMode(Mode):
     """
     A mode for taking off vertically.
     """
 
-    def __init__(self, node: Node, uav: UAV, altitude: float):
+    def __init__(self, node: Node, uav: UAV):
         """
         Initialize the LandingMode
 
@@ -26,7 +26,7 @@ class LandingMode(Mode):
         """
         if not self.command_sent:
             self.command_sent = True
-            super().uav.land()
+            self.uav.arm()
     
     def check_status(self) -> str:
         """
@@ -35,4 +35,7 @@ class LandingMode(Mode):
         Returns:
             str: The status of the mode.
         """
-        return "loop"
+        if self.uav.arm_state == 2:
+            return "complete"
+        else:
+            return "loop"

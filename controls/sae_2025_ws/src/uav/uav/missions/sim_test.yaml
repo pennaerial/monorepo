@@ -1,7 +1,15 @@
+start:
+  class: uav.autonomous_modes.StartMode
+  transitions:
+    loop: start
+    complete: takeoff
+    failure: error
+
 takeoff:
   class: uav.autonomous_modes.VerticalTakeoffMode
   transitions:
     loop: takeoff
+    complete: gps
     failure: error
 
 gps:
@@ -10,6 +18,7 @@ gps:
     coordinates: [((2, 3, 2), 5), ((2, 3, 2), 3)]
   transitions:
     loop: gps
+    complete: land
     failure: error
 
 land:

@@ -26,7 +26,7 @@ class VerticalTakeoffMode(Mode):
         """
         if not self.command_sent:
             self.command_sent = True
-            self.uav.takeoff()
+            super().uav.takeoff()
     
     def check_status(self) -> str:
         """
