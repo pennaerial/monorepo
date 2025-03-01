@@ -101,6 +101,7 @@ class UAV:
         # if self.current_waypoint_index < len(self.waypoints):
         
         # Not landing, reached last waypoint, and there is another waypoint to go to
+        self.node.get_logger().info(f"Waypoints remaining: {len(self.waypoints)}")
         if len(self.waypoints) != 0 and self.reached_waypoint and not self.initiated_landing:
             # coordinate_system, current_waypoint = self.waypoints[self.current_waypoint_index]
             self.reached_waypoint = False
