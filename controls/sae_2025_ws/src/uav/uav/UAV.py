@@ -57,11 +57,10 @@ class UAV:
 
 
         # self.current_waypoint_index = 0
-        self.waypoint_threshold = 2.0
+        self.waypoint_threshold = 0.5
         self.mission_completed = False
 
         # Start with an empty list of waypoints (will store GPS waypoints)
-        self.waypoints = []
 
         self.waypoints = deque()
         self.reached_waypoint = True
@@ -69,7 +68,7 @@ class UAV:
         self.coordinate_system = None
         
         self.initiated_landing = False
-        self.safe_landing_hover_time = 50
+        self.safe_landing_hover_time = 10
     
 
     # -------------------------
