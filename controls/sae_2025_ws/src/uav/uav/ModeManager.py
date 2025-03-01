@@ -23,7 +23,7 @@ class ModeManager(Node):
         self.last_update_time = time()
         self.uav = UAV()
         self.get_logger().info("Mission Node has started!")
-        # self.starting_mode = 'start
+        self.starting_mode = 'takeoff'
 
         self.setup_modes(mode_map)
 
