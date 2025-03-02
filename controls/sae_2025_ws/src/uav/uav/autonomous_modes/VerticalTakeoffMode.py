@@ -16,7 +16,7 @@ class VerticalTakeoffMode(Mode):
             uav (UAV): The UAV instance to control.
             altitude (float): The altitude to take off to.
         """
-        super().__init__(node, uav, [])
+        super().__init__(node, uav)
         self.command_sent = False
 
     def on_update(self, time_delta: float) -> None:

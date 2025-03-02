@@ -8,7 +8,7 @@ setup(
     name=package_name,
     version='0.0.0',
     packages=find_packages(exclude=['test']),
-    py_modules=['uav.UAV', 'uav.ModeManager', 'uav.Mode', 'uav.mission', 'uav.vision_nodes.VisionNode'],
+    py_modules=[],
     data_files=[
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
@@ -34,7 +34,8 @@ setup(
             'camera_feed = uav.camera_feed:main',
             'global_position_offboard_control = uav.global_position_offboard_control:main',
             'flight = uav.flight:main',
-            'mission = uav.mission:main'
+            'mission = uav.mission:main',
+            'payload_tracking_node = uav.vision_nodes.PayloadTrackingNode:main',
         ],
     },
 )

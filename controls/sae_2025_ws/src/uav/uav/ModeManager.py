@@ -10,12 +10,13 @@ import importlib
 import inspect
 import ast
 
+VISION_NODE_PATH = 'uav.vision_nodes'
+
 class ModeManager(Node):    
     """
     A ROS 2 node for managing UAV modes and mission logic.
     """
-
-    def __init__(self, mode_map: str):
+    def __init__(self, mode_map: str, vision_nodes: str):
         super().__init__('mission_node')
         self.modes = {}
         self.transitions = {}
@@ -23,7 +24,8 @@ class ModeManager(Node):
         self.last_update_time = time()
         self.uav = UAV(self)
         self.get_logger().info("Mission Node has started!")
-        self.vision_nodes = {}
+        self.vision_clients = {}
+        self.setup_vision(vision_nodes)
         self.setup_modes(mode_map)
 
     def on_enter(self) -> None:
@@ -32,27 +34,22 @@ class ModeManager(Node):
         """
         self.switch_mode(self.starting_mode)
         
-    def setup_vision(self, mode: Mode, vision_nodes: List[VisionNode]) -> None:
+    def setup_vision(self, vision_nodes: str) -> None:
         """
         Setup the vision node for this mode.
 
         Args:
             mode (Mode): The mode to setup vision for.
-            vision (VisionNode): The vision nodes to setup for this mode.
+            vision (str): The comma-separated string of vision nodes to setup for this mode.
         """
-        for vnode in vision_nodes:
-            if vnode.node_name not in self.vision_nodes:
-                self.vision_nodes[vnode.node_name] = vnode()
-                
-        mode.vision_nodes = {vnode.node_name: self.vision_nodes[vnode] for vnode in vision_nodes}
-
-        for vision_node in self.vision_nodes.values():
-            if vision_node.service_name not in self.vision_clients:
-                client = self.node.create_client(vision_node.custom_service_type, vision_node.service_name)
+        module = importlib.import_module(VISION_NODE_PATH)
+        for vision_node in vision_nodes.split(','):
+            vision_class = getattr(module, vision_node)
+            if vision_class.service_name() not in self.vision_clients:
+                client = self.create_client(vision_class.srv, vision_class.service_name())
                 while not client.wait_for_service(timeout_sec=1.0):
-                    self.node.get_logger().info(f"Service {vision_node.service_name} not available, waiting again...")
-                self.vision_clients[vision_node.service_name] = client
-            mode.vision_clients[vision_node.service_name] = self.vision_clients[vision_node.service_name]
+                    self.get_logger().info(f"Service {vision_class.service_name()} not available, waiting again...")
+                self.vision_clients[vision_class.service_name()] = client
     
     def initialize_mode(self, mode_path: str, params: dict) -> Mode:
         module_name, class_name = mode_path.rsplit('.', 1)
@@ -108,7 +105,6 @@ class ModeManager(Node):
             mode_name (str): Name of the mode.
             mode_instance (Mode): An instance of the mode.
         """
-        self.setup_vision(mode_instance, mode_instance._vision_nodes_list)
         self.modes[mode_name] = mode_instance
         self.get_logger().info(f"Mode {mode_name} registered.")
 

@@ -7,36 +7,50 @@ import cv2
 import numpy as np
 import rclpy
 from rclpy.node import Node
+from abc import abstractmethod
+from uav.utils import camel_to_snake
 
-class VisionNode(Node):
+class VisionMeta(type):
+    """
+    Metaclass for VisionNode.
+    """
+    def __new__(cls, name, bases, dct):
+        cls = super().__new__(cls, name, bases, dct)
+        cls.__name__ = camel_to_snake(name)
+        return cls
+
+    def node_name(cls):
+        return cls.__name__
+    
+    def __str__(cls):
+        return cls.__name__
+    
+    def service_name(cls):
+        return f'vision/{cls.__name__}'
+
+class VisionNode(Node, metaclass=VisionMeta):
     """
     Base class for ROS 2 nodes that process vision data.
     Provides an interface for handling image streams, processing frames,
     and managing vision-based tasks such as tracking and calibration.
     """
 
-    def __init__(self, node_name: str, custom_service, service_name: Optional[str], display: bool = False):
+    def __init__(self, custom_service, display: bool = False):
         """
         Initialize the VisionNode.
 
         Args:
-            node_name (str): The name of the ROS 2 node.
             custom_service (Type[Srv[SrvRequestT, SrvResponseT]]): The custom service type.
-            service_name (Optional[str]): The name of the ROS 2 service. Defaults to 'vision/{node_name}'.
             display (bool): Whether to display the image in a window. 
         """
-        super().__init__(node_name)
-
-        if service_name is None:
-            service_name = f'vision/{node_name}'
+        super().__init__(self.__class__.__name__)
         
-        self.node_name = node_name
+        self.node_name = self.__class__.node_name()
         self.custom_service_type = custom_service
-        self.service_name = service_name
+        self.service_name = self.__class__.service_name()
 
-        self.initialize_service(custom_service, service_name)
 
-        self.client = self.create_client(CameraData, service_name)
+        self.client = self.create_client(CameraData, '/camera_data')
 
         self.image = None
         self.camera_info = None

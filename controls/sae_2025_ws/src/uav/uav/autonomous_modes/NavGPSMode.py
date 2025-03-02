@@ -18,7 +18,7 @@ class NavGPSMode(Mode):
             uav (UAV): The UAV instance to control.
             coordinate (tuple[float, float, float]): The coordinate (x, y, z).
         """
-        super().__init__(node, uav, [])
+        super().__init__(node, uav)
         self.uav = uav
         
         self.times_between = []
@@ -55,6 +55,6 @@ class NavGPSMode(Mode):
         """
         
         if self.uav.coordinate_system == "END":
-            return "finshed"
+            return "finished"
         else:
             return "continue"
