@@ -1,10 +1,12 @@
-from typing import Type
-from rclpy.type_support import Srv, SrvRequestT, SrvResponseT
+# from typing import Type
+# from rclpy.type_support import Srv, SrvRequestT, SrvResponseT
 from typing import Optional
-from uav.src import CameraData
+from uav_interfaces.srv import CameraData
+from sensor_msgs.msg import Image
 import cv2
 import numpy as np
-from abc import ABC, abstractmethod
+import rclpy
+from rclpy.node import Node
 
 class VisionNode(Node):
     """
@@ -13,7 +15,7 @@ class VisionNode(Node):
     and managing vision-based tasks such as tracking and calibration.
     """
 
-    def __init__(self, node_name: str, custom_service: Type[Srv[SrvRequestT, SrvResponseT]], service_name: Optional[str]):
+    def __init__(self, node_name: str, custom_service, service_name: Optional[str], display: bool = False):
         """
         Initialize the VisionNode.
 
@@ -21,6 +23,7 @@ class VisionNode(Node):
             node_name (str): The name of the ROS 2 node.
             custom_service (Type[Srv[SrvRequestT, SrvResponseT]]): The custom service type.
             service_name (Optional[str]): The name of the ROS 2 service. Defaults to 'vision/{node_name}'.
+            display (bool): Whether to display the image in a window. 
         """
         super().__init__(node_name)
 
@@ -35,12 +38,29 @@ class VisionNode(Node):
 
         self.client = self.create_client(CameraData, service_name)
 
+        self.image = None
+        self.camera_info = None
+        self.display = display
+
         if not self.client.wait_for_service(timeout_sec=1.0):
             self.get_logger().error('Service not available.')
             return
 
+    def convert_image_msg_to_frame(self, msg: Image) -> np.ndarray:
+        """
+        Converts a ROS 2 Image message to a NumPy array.
 
-    def request_image(self, cam_image: bool = False, cam_info: bool = False) -> CameraData.Response:
+        Args:
+            msg (Image): The ROS 2 Image message.
+
+        Returns:
+            np.ndarray: The decoded image as a NumPy array.
+        """
+        img_data = np.frombuffer(msg.data, dtype=np.uint8)
+        frame = img_data.reshape((msg.height, msg.width, 3))  # Assuming BGR8 encoding
+        return frame
+
+    def request_data(self, cam_image: bool = False, cam_info: bool = False) -> CameraData.Response:
         """
         Sends request for camera image or camera information.
         """
@@ -48,7 +68,7 @@ class VisionNode(Node):
         if not cam_info and not cam_image:
             return CameraData.Response()
         if cam_image:
-            request.cam_image = cam_image
+            request.cam_image = self.convert_image_msg_to_frame(cam_image)
         if cam_info:
             request.cam_info = cam_info
         
@@ -56,15 +76,19 @@ class VisionNode(Node):
         rclpy.spin_until_future_complete(self, future) 
         try:
             response = future.result()
-            if response.processed_image:
-                self.get_logger().info(f"Received processed image: {response.processed_image}")
+            if response.image:
+                self.get_logger().info(f"Received image: {response.image}")
             if response.camera_info:
                 self.get_logger().info(f"Received camera info: {response.camera_info}")
         except Exception as e:
             self.get_logger().error(f"Service call failed: {e}")
+        self.image = response.image
+        self.camera_info = response.camera_info
+        if self.display:
+            self.display_frame(self.image, self.node_name)
         return response
 
-    def display_frame(self, frame: np.ndarray, window_name: str = "Camera Feed") -> None:
+    def display_frame(self, frame: np.ndarray, window_name: str) -> None:
         """
         Displays the given frame using OpenCV.
 

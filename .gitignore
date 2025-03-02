@@ -31,4 +31,4 @@ crash course/data/MNIST/raw/*
 */venv/
 
 # submodules
-#.gitmodules
+.gitmodules

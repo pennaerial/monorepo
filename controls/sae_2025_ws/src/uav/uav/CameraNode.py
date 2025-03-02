@@ -1,8 +1,8 @@
 import rclpy
 from rclpy.node import Node
-from sensor_msgs.msg import Image, CameraInfo
-import numpy as np
-from uav.src import CameraData
+from sensor_msgs.msg import CameraInfo
+from uav_interfaces.srv import CameraData
+from sensor_msgs.msg import Image
 import cv2
 
 
@@ -11,7 +11,7 @@ class CameraNode(Node):
     Node class to respond to requests with camera image or camera information.
     """
 
-    def __init__(self, node_name: str, service_name: str = '/camera_data', image_topic: str = '/camera', info_topic: str = '/camera_info', queue_size: int = 10):
+    def __init__(self, node_name: str, service_name: str = '/camera_data', image_topic: str = '/camera', info_topic: str = '/camera_info', queue_size: int = 10, display: bool = False):
         """
         Initialize the CameraNode.
 
@@ -21,6 +21,7 @@ class CameraNode(Node):
             image_topic (str): The name of the image topic to subscribe to.
             info_topic (str): The name of the image info topic to subscribe to.
             queue_size (int): The size of the message queue for the subscription.
+            display (bool): Whether to display the image in a window.
         """
         super().__init__(node_name)
 
@@ -39,8 +40,9 @@ class CameraNode(Node):
             queue_size
         )
         
-        self.processed_image = None
+        self.image = None
         self.camera_info = None
+        self.display = display
 
         self.service = self.create_service(
             CameraData,
@@ -53,14 +55,13 @@ class CameraNode(Node):
 
     def image_callback(self, msg: Image):
         """
-        Callback for receiving image requests. Converts the image data
-        and processes the frame.
+        Callback for receiving image requests. 
         """
-        try:
+        self.image = msg.data
+        if self.display:
             frame = self.convert_image_msg_to_frame(msg)
-            self.processed_image = frame
-        except Exception as e:
-            self.get_logger().error(f"Failed to process image: {e}")
+            cv2.imshow("Camera Feed", frame)
+            cv2.waitKey(1)
     
     def camera_info_callback(self, msg: CameraInfo):
         """
@@ -74,19 +75,17 @@ class CameraNode(Node):
 
     def service_callback(self, request: CameraData.Request, response: CameraData.Response):
         """
-        Callback for receiving image messages. Converts the image data
-        and processes the frame.
+        Callback for receiving image messages. 
 
         Args:
             msg (Image): The ROS 2 Image message.
         """
 
         if request.cam_image:
-            if self.processed_image:
-                processed_image_data = self.processed_image.tolist()
-                response.processed_image = processed_image_data
+            if self.image:
+                response.image = self.image
             else:
-                self.get_logger().warn("No processed image available.")
+                self.get_logger().warn("No image available.")
         
         if request.cam_info:
             if self.camera_info:
@@ -95,17 +94,3 @@ class CameraNode(Node):
                 self.get_logger().warn("No camera info available.")
 
         return response
-
-    def convert_image_msg_to_frame(self, msg: Image) -> np.ndarray:
-        """
-        Converts a ROS 2 Image message to a NumPy array.
-
-        Args:
-            msg (Image): The ROS 2 Image message.
-
-        Returns:
-            np.ndarray: The decoded image as a NumPy array.
-        """
-        img_data = np.frombuffer(msg.data, dtype=np.uint8)
-        frame = img_data.reshape((msg.height, msg.width, 3))  # Assuming BGR8 encoding
-        return frame

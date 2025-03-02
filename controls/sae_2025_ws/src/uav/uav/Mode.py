@@ -1,11 +1,11 @@
 from abc import ABC, abstractmethod
 import rclpy
 from rclpy.node import Node
-from rclpy.type_support import Srv, SrvRequestT, SrvResponseT
+# from rclpy.type_support import SrvRequestT
 from typing import Type
 from rclpy.task import Future
 from typing import List
-from vision_nodes import VisionNode
+from uav.vision_nodes import VisionNode
 from uav import UAV
 
 class Mode(ABC):
@@ -31,7 +31,6 @@ class Mode(ABC):
         self.vision_nodes = {}
         self._vision_nodes_list = vision_nodes
 
-    @abstractmethod
     def on_enter(self) -> None:
         """
         Logic executed when this mode is activated.
@@ -39,7 +38,7 @@ class Mode(ABC):
         """
         pass
 
-    def send_request(self, vision_node_name: str, req: SrvRequestT) -> None:
+    def send_request(self, vision_node_name: str, req) -> None:
         """
         Send a request to a service.
 
@@ -58,7 +57,6 @@ class Mode(ABC):
 
         return response
 
-    @abstractmethod
     def on_exit(self) -> None:
         """
         Logic executed when this mode is deactivated.

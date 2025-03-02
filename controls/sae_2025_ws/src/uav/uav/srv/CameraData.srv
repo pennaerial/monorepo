@@ -1,5 +1,0 @@
-bool cam_info
-bool cam_image
----
-uint8[][] processed_image
-sensor_msgs/CameraInfo camera_info
