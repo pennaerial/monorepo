@@ -5,7 +5,6 @@ import os
 
 def main():
     rclpy.init()
-    # Instantiate ModeManager with the sim_test.yaml configuration file.
     cwd = os.getcwd()
     mission_node = ModeManager(f'{cwd}/src/uav/uav/missions/sim_test.yaml')
     mission_node.spin()
