@@ -4,7 +4,7 @@ from uav import Mode
 from rclpy.node import Node
 from uav import UAV
 
-class NavGPS(Mode):
+class NavGPSMode(Mode):
     """
     A mode for navigating to a GPS coordinate
     """
@@ -19,13 +19,14 @@ class NavGPS(Mode):
             coordinate (tuple[float, float, float]): The coordinate (x, y, z).
         """
         super().__init__(node, uav, [])
+        self.uav = uav
         
         self.times_between = []
         for coordinate, time_between in coordinates:
-            super().uav.add_waypoint(coordinate, "GPS")
+            self.uav.add_waypoint(coordinate, "GPS")
             self.times_between.append(time_between)
 
-        super().uav.add_waypoint(None, "END")
+        self.uav.add_waypoint(None, "END")
 
         self.index = 0
         self.time_between = 0
@@ -42,7 +43,7 @@ class NavGPS(Mode):
 
         if self.time_between > self.times_between[self.index]:
             self.time_between = 0
-            super().uav.advance_to_next_waypoint()
+            self.uav.advance_to_next_waypoint()
             self.index += 1
 
     def check_status(self) -> str:
@@ -53,7 +54,7 @@ class NavGPS(Mode):
             str: The status of the mode.
         """
         
-        if super().uav.coordinate_system == "END":
+        if self.uav.coordinate_system == "END":
             return "finshed"
         else:
             return "continue"

@@ -1,14 +1,15 @@
+#!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
 from time import time
-import Mode
-import UAV
+from uav import Mode, UAV
 from typing import List
-from vision_nodes import VisionNode
+from uav.vision_nodes import VisionNode
 import yaml
 import importlib
+import inspect
+import ast
 
-#TODO: Think about how to encode the mission structure (when to switch `Modes`, etc.)
 class ModeManager(Node):    
     """
     A ROS 2 node for managing UAV modes and mission logic.
@@ -22,8 +23,7 @@ class ModeManager(Node):
         self.last_update_time = time()
         self.uav = UAV(self)
         self.get_logger().info("Mission Node has started!")
-        # self.starting_mode = 'start
-
+        self.vision_nodes = {}
         self.setup_modes(mode_map)
 
     def on_enter(self) -> None:
@@ -54,21 +54,32 @@ class ModeManager(Node):
                 self.vision_clients[vision_node.service_name] = client
             mode.vision_clients[vision_node.service_name] = self.vision_clients[vision_node.service_name]
     
-    def initialize_mode(self, mode_path: List[str], params: dict) -> Mode:
-        """
-        Initialize a mode instance.
-
-        Args:
-            mode_path (str): The path to the mode class.
-            params (dict): Parameters to pass to the mode
-
-        Returns:
-            Mode: An instance of the mode.
-        """
+    def initialize_mode(self, mode_path: str, params: dict) -> Mode:
         module_name, class_name = mode_path.rsplit('.', 1)
         module = importlib.import_module(module_name)
-        class_ = getattr(module, class_name)
-        return class_(self, self.uav, **params)
+        mode_class = getattr(module, class_name)
+
+        signature = inspect.signature(mode_class.__init__)
+        args = {}
+
+        for name, param in signature.parameters.items():
+            if name == 'self':
+                continue
+            if name in params:
+                param_value = params[name]
+                if param.annotation in (str, inspect.Parameter.empty) or name in ('node', 'uav'):
+                    args[name] = param_value
+                else:
+                    try:
+                        args[name] = ast.literal_eval(param_value)
+                    except (ValueError, SyntaxError):
+                        raise ValueError(f"Parameter '{name}' must be a valid literal for mode '{mode_path}'. Received: {param_value}")
+            elif param.default != inspect.Parameter.empty:
+                args[name] = param.default
+            else:
+                raise ValueError(f"Missing required parameter '{name}' for mode '{mode_path}'")
+
+        return mode_class(**args)
     
     def setup_modes(self, mode_map: str) -> None:
         """
@@ -84,15 +95,11 @@ class ModeManager(Node):
 
             mode_path = mode_info['class']
 
-            params = mode_info.get('params', {})
-            for key, value in params.items():
-                if key == 'coordinate':
-                    mode_info[key] = eval(value)
-            mode_instance = self.initialize_mode(mode_path, params)
-            self.add_mode(mode_name, mode_instance)
-            
+            params = mode_info.get('params', {}) | {'node': self, 'uav': self.uav}
+            mode = self.initialize_mode(mode_path, params)
+            self.add_mode(mode_name, mode)
             self.transitions[mode_name] = mode_info.get('transitions', {})
-
+        
     def add_mode(self, mode_name: str, mode_instance: Mode) -> None:
         """
         Register a mode to the mission node.
