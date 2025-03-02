@@ -4,12 +4,13 @@ import numpy as np
 from uav.cv.tracking import find_payload
 from uav.vision_nodes import VisionNode
 from uav_interfaces.srv import PayloadTracking
-from rclpy.parameter import Parameter
+import rclpy
 
 class PayloadTrackingNode(VisionNode):
     """
     ROS node for payload tracking with Kalman filtering.
     """
+    srv = PayloadTracking
     def __init__(self):
         super().__init__('payload_tracking', PayloadTracking)
         
@@ -30,6 +31,8 @@ class PayloadTrackingNode(VisionNode):
         self.upper_pink = np.array(self.get_parameter('upper_pink').value)
         self.lower_green = np.array(self.get_parameter('lower_green').value)
         self.upper_green = np.array(self.get_parameter('upper_green').value)
+
+        self.create_service(PayloadTracking, self.service_name, self.service_callback)
         
     def _setup_kalman_filter(self):
         """Initialize Kalman filter matrices"""
@@ -96,3 +99,8 @@ class PayloadTrackingNode(VisionNode):
         response.y = y
         response.direction = direction
         return response
+
+def main():
+    rclpy.init()
+    node = PayloadTrackingNode()
+    rclpy.spin(node)

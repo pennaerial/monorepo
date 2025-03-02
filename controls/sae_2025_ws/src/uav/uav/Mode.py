@@ -14,22 +14,18 @@ class Mode(ABC):
     Provides a structured template for implementing autonomous behaviors.
     """
 
-    def __init__(self, node: Node, uav: UAV, vision_nodes: List[VisionNode]):
+    def __init__(self, node: Node, uav: UAV):
         """
         Initialize the mode with a reference to the ROS 2 node.
 
         Args:
             node (Node): The ROS 2 node instance managing the UAV and this mode.
             uav (UAV): The UAV instance to control.
-            vision_nodes (List[VisionNode]): The vision nodes to setup for this mode.
         """
         self.node = node
         self.active = False
         self.uav = uav
-
         self.vision_clients = {}
-        self.vision_nodes = {}
-        self._vision_nodes_list = vision_nodes
 
     def on_enter(self) -> None:
         """
@@ -38,20 +34,16 @@ class Mode(ABC):
         """
         pass
 
-    def send_request(self, vision_node_name: str, req) -> None:
+    def send_request(self, vision_node: VisionNode, request) -> None:
         """
         Send a request to a service.
 
         Args:
             request (SrvRequestT): The request to send.
-            service_name (str): The name of the service.
+            service_name (VIsionNode): The name of the service.
         """
-        vision_node = self.vision_nodes[vision_node_name]
-        assert type(req) == vision_node.custom_service_type.Request
-
         client = self.vision_clients[vision_node.service_name]
-
-        future = client.call_async(req)
+        future = client.call_async(request)
         rclpy.spin_until_future_complete(self.node, future)
         response = future.result()
 

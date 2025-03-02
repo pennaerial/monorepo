@@ -1,13 +1,22 @@
 #!/usr/bin/env python3
 import rclpy
-from uav.ModeManager import ModeManager
+import sys
 import os
+from uav.ModeManager import ModeManager
+import importlib
+import ast
 
 def main():
+    if len(sys.argv) > 2:
+        yaml_file = sys.argv[1]
+        vision_nodes = sys.argv[2]
+    else:
+        cwd = os.getcwd() # default
+        yaml_file = f'{cwd}/src/uav/uav/missions/sim_test.yaml'
+        vision_nodes = ''
     rclpy.init()
-    # Instantiate ModeManager with the sim_test.yaml configuration file.
-    cwd = os.getcwd()
-    mission_node = ModeManager(f'{cwd}/src/uav/uav/missions/sim_test.yaml')
+    mission_node = ModeManager(yaml_file, vision_nodes)
     mission_node.spin()
+
 if __name__ == '__main__':
     main()

@@ -16,7 +16,7 @@ class LandingMode(Mode):
             node (Node): ROS 2 node managing the UAV.
             uav (UAV): The UAV instance to control.
         """
-        super().__init__(node, uav, [])
+        super().__init__(node, uav)
 
         self.command_sent = False
 

@@ -17,7 +17,7 @@ class NavigateToGPSMode(Mode):
             uav (UAV): The UAV instance to control.
             coordinate (tuple[float, float, float]): The coordinate (x, y, z).
         """
-        super().__init__(node, uav, [])
+        super().__init__(node, uav)
         self.target_pos = None
     
     def set_target(self, target_pos: tuple[float, float, float]):
