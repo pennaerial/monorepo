@@ -8,7 +8,7 @@ setup(
     name=package_name,
     version='0.0.0',
     packages=find_packages(exclude=['test']),
-    py_modules=[],
+    py_modules=['uav.UAV', 'uav.UAV_hardware'],
     data_files=[
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
