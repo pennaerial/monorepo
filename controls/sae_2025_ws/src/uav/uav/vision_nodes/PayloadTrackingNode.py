@@ -60,7 +60,7 @@ class PayloadTrackingNode(VisionNode):
     def service_callback(self, request: PayloadTracking.Request, 
                         response: PayloadTracking.Response):
         """Process tracking service request with Kalman filtering"""
-        image, _ = self.request_data(cam_image=True, cam_info=False)
+        image, camera_info = self.request_data(cam_image=True, cam_info=True)
         image = self.convert_image_msg_to_frame(image)
         # Predict next state
         prediction = self.kalman.predict()
@@ -88,7 +88,7 @@ class PayloadTrackingNode(VisionNode):
             vis_image = image.copy()
             
         # Compute 3D direction vector
-        direction = self.compute_3d_vector(x, y, request.camera_info, request.altitude)
+        direction = self.compute_3d_vector(x, y, camera_info, request.altitude)
         
         # Show debug visualization if enabled
         if self.debug:

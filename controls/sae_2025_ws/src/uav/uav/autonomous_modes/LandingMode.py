@@ -1,4 +1,4 @@
-from uav import Mode
+from uav.autonomous_modes import Mode
 from rclpy.node import Node
 from uav import UAV
 

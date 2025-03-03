@@ -3,8 +3,6 @@ import rclpy
 import sys
 import os
 from uav.ModeManager import ModeManager
-import importlib
-import ast
 
 def main():
     if len(sys.argv) > 2:

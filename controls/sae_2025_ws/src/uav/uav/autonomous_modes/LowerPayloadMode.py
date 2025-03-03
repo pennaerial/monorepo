@@ -1,5 +1,6 @@
 import random
-from uav import Mode, UAV
+from uav import UAV
+from uav.autonomous_modes import Mode
 from rclpy.node import Node
 from uav_interfaces.srv import PayloadTracking
 from uav.vision_nodes import PayloadTrackingNode

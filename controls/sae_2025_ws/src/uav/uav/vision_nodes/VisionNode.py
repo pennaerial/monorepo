@@ -7,7 +7,6 @@ import cv2
 import numpy as np
 import rclpy
 from rclpy.node import Node
-from abc import abstractmethod
 from uav.utils import camel_to_snake
 
 class VisionMeta(type):

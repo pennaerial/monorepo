@@ -5,7 +5,6 @@ from uav_interfaces.srv import CameraData
 from sensor_msgs.msg import Image
 import cv2
 
-
 class CameraNode(Node):
     """
     Node class to respond to requests with camera image or camera information.

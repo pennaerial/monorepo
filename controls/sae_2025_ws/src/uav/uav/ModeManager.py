@@ -2,9 +2,8 @@
 import rclpy
 from rclpy.node import Node
 from time import time
-from uav import Mode, UAV
-from typing import List
-from uav.vision_nodes import VisionNode
+from uav import UAV
+from uav.autonomous_modes import Mode
 import yaml
 import importlib
 import inspect

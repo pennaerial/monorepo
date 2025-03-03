@@ -2,9 +2,6 @@ from abc import ABC, abstractmethod
 import rclpy
 from rclpy.node import Node
 # from rclpy.type_support import SrvRequestT
-from typing import Type
-from rclpy.task import Future
-from typing import List
 from uav.vision_nodes import VisionNode
 from uav import UAV
 

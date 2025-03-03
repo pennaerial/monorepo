@@ -1,7 +1,6 @@
 from time import time
 import yaml
 
-#TODO: Think about how to encode the mission structure (when to switch `Modes`, etc.)
 class ModeManager():    
     """
     A ROS 2 node for managing UAV modes and mission logic.
