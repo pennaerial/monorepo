@@ -52,8 +52,6 @@ class VisionNode(Node, metaclass=VisionMeta):
 
         self.client = self.create_client(CameraData, '/camera_data')
 
-        self.image = None
-        self.camera_info = None
         self.display = display
 
         if not self.client.wait_for_service(timeout_sec=1.0):
@@ -96,11 +94,9 @@ class VisionNode(Node, metaclass=VisionMeta):
                 self.get_logger().info(f"Received camera info: {response.camera_info}")
         except Exception as e:
             self.get_logger().error(f"Service call failed: {e}")
-        self.image = response.image
-        self.camera_info = response.camera_info
         if self.display:
-            self.display_frame(self.image, self.node_name)
-        return response
+            self.display_frame(self.convert_image_msg_to_frame(response.image), self.node_name)
+        return response.image, response.camera_info
 
     def display_frame(self, frame: np.ndarray, window_name: str) -> None:
         """

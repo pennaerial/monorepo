@@ -70,7 +70,12 @@ def generate_launch_description():
     sae_ws_path = os.getcwd()
 
     vision_nodes = []
-    vision_node_actions = []
+    vision_node_actions = [Node(
+        package='uav',
+        executable='camera',
+        name='camera',
+        output='screen'
+    )]
     for node in extract_vision_nodes(YAML_PATH):
         vision_nodes.append(node)
 
@@ -82,6 +87,9 @@ def generate_launch_description():
             name=exe_name,
             output='screen'
         ))
+
+    if len(vision_nodes) == 0:
+        vision_node_actions = []
 
     # Define the processes.
     middleware = ExecuteProcess(

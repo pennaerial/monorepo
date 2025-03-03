@@ -94,3 +94,9 @@ class CameraNode(Node):
                 self.get_logger().warn("No camera info available.")
 
         return response
+    
+def main():
+    rclpy.init()
+    node = CameraNode("camera_node")
+    rclpy.spin(node)
+    rclpy.shutdown()

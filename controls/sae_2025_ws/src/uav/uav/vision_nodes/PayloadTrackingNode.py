@@ -60,13 +60,15 @@ class PayloadTrackingNode(VisionNode):
     def service_callback(self, request: PayloadTracking.Request, 
                         response: PayloadTracking.Response):
         """Process tracking service request with Kalman filtering"""
+        image, _ = self.request_data(cam_image=True, cam_info=False)
+        image = self.convert_image_msg_to_frame(image)
         # Predict next state
         prediction = self.kalman.predict()
         predicted_x, predicted_y = prediction[0, 0], prediction[1, 0]
         
         # Get raw detection
         detection = find_payload(
-            self.image,
+            image,
             self.lower_pink,
             self.upper_pink,
             self.lower_green,
@@ -83,7 +85,7 @@ class PayloadTrackingNode(VisionNode):
         else:
             # Use prediction if no detection
             x, y = predicted_x, predicted_y
-            vis_image = self.image.copy()
+            vis_image = image.copy()
             
         # Compute 3D direction vector
         direction = self.compute_3d_vector(x, y, request.camera_info, request.altitude)
@@ -104,3 +106,4 @@ def main():
     rclpy.init()
     node = PayloadTrackingNode()
     rclpy.spin(node)
+    rclpy.shutdown()
