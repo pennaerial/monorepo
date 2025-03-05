@@ -1,0 +1,12 @@
+start:
+  class: uav.autonomous_modes.StartMode
+  transitions:
+    complete: takeoff
+
+takeoff:
+  class: uav.autonomous_modes.VerticalTakeoffMode
+  transitions:
+    complete: land
+    
+land:
+  class: uav.autonomous_modes.LandingMode

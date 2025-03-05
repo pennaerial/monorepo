@@ -1,4 +1,5 @@
 from uav.autonomous_modes import Mode
+from px4_msgs.msg import VehicleStatus
 from rclpy.node import Node
 from uav import UAV
 
@@ -18,15 +19,16 @@ class StartMode(Mode):
         """
         super().__init__(node, uav)
 
-        self.command_sent = False
+        # self.command_sent = False
 
     def on_update(self, time_delta: float) -> None:
         """
         Periodic logic for taking off vertically.
         """
-        if not self.command_sent:
-            self.command_sent = True
-            self.uav.arm()
+        # if not self.command_sent:
+            # self.command_sent = True
+        self.uav.arm()
+        self.node.get_logger().info("arming vehicle")
     
     def check_status(self) -> str:
         """
@@ -35,7 +37,7 @@ class StartMode(Mode):
         Returns:
             str: The status of the mode.
         """
-        if self.uav.arm_state == 2:
+        if self.uav.arm_state == VehicleStatus.ARMING_STATE_ARMED:
             return "complete"
         else:
-            return "loop"
+            return "continue"

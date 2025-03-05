@@ -35,4 +35,4 @@ class LandingMode(Mode):
         Returns:
             str: The status of the mode.
         """
-        return "loop"
+        return "continue"

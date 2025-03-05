@@ -4,13 +4,13 @@ import yaml
 import re
 
 from launch import LaunchDescription
-from launch.actions import ExecuteProcess, LogInfo, RegisterEventHandler
+from launch.actions import ExecuteProcess, LogInfo, RegisterEventHandler, TimerAction
 from launch.event_handlers import OnProcessStart
 from launch_ros.actions import Node
 # from  uav.utils import camel_to_snake #TODO: investigate why importing this breaks gazebo
 
 HARDCODE_PATH = False
-YAML_PATH = f'{os.getcwd()}/src/uav/uav/missions/sim_test.yaml'
+YAML_PATH = f'{os.getcwd()}/src/uav/uav/missions/basic.yaml'
 
 def find_folder(folder_name, search_path):
     for root, dirs, files in os.walk(search_path):
@@ -127,6 +127,10 @@ def generate_launch_description():
         name='mission'
     )
 
+    delayed_mission = TimerAction(
+        period=15.0,
+        actions=[mission]
+    )
 
     # Build the launch description.
     ld = LaunchDescription([
@@ -142,7 +146,7 @@ def generate_launch_description():
             OnProcessStart(target_action=px4_sitl, on_start=[gz_ros_bridge, LogInfo(msg="PX4 SITL started.")])
         ),
         RegisterEventHandler(
-            OnProcessStart(target_action=gz_ros_bridge, on_start=[mission, LogInfo(msg="gz_ros_bridge started.")])
+            OnProcessStart(target_action=gz_ros_bridge, on_start=[delayed_mission, LogInfo(msg="gz_ros_bridge started.")])
         )
     ])
 

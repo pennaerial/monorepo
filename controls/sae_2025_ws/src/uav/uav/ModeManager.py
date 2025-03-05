@@ -26,6 +26,15 @@ class ModeManager(Node):
         self.vision_clients = {}
         self.setup_vision(vision_nodes)
         self.setup_modes(mode_map)
+    
+    def get_active_mode(self) -> Mode:
+        """
+        Get the active mode.
+
+        Returns:
+            Mode: The active mode.
+        """
+        return self.modes[self.active_mode]
 
     def on_enter(self) -> None:
         """
@@ -41,6 +50,8 @@ class ModeManager(Node):
             mode (Mode): The mode to setup vision for.
             vision (str): The comma-separated string of vision nodes to setup for this mode.
         """
+        if vision_nodes.strip() == '':
+            return
         module = importlib.import_module(VISION_NODE_PATH)
         for vision_node in vision_nodes.split(','):
             vision_class = getattr(module, vision_node)
@@ -117,6 +128,7 @@ class ModeManager(Node):
         Returns:
             str: The name of the next mode to transition to.
         """
+        self.get_logger().info(f"Transitioning from {self.active_mode} based on state {state}.")
         return self.transitions[self.active_mode][state]
 
     def switch_mode(self, mode_name: str) -> None:
@@ -127,11 +139,11 @@ class ModeManager(Node):
             mode_name (str): Name of the mode to activate.
         """
         if self.active_mode:
-            self.active_mode.deactivate()
+            self.get_active_mode().deactivate()
 
         if mode_name in self.modes:
-            self.active_mode = self.modes[mode_name]
-            self.active_mode.activate()
+            self.active_mode = mode_name
+            self.get_active_mode().activate()
         else:
             self.get_logger().error(f"Mode {mode_name} not found.")
 
@@ -139,22 +151,32 @@ class ModeManager(Node):
         """
         Execute one spin cycle of the node, updating the active mode.
         """
+        self.uav.publish_offboard_control_heartbeat_signal()
+        self.uav.engage_offboard_mode()
         current_time = time()
         time_delta = current_time - self.last_update_time
         self.last_update_time = current_time
 
-        if self.active_mode:
-            self.active_mode.update(time_delta)
+        if self.active_mode and self.uav.flight_check:
+            self.get_active_mode().update(time_delta)
             
-            state = self.active_mode.check_status()
+            state = self.get_active_mode().check_status()
             
-            if state == "continue":
+            if state != "continue":
                 self.switch_mode(self.transition(state))
 
     def spin(self):
         """
         Run the mission node loop.
         """
+        # try:
+        #     while rclpy.ok():
+        #         self.get_logger().info("Press Enter to start the mission.")
+        # except KeyboardInterrupt:
+        #     self.get_logger().info("Starting mission.")
+        # finally:
+        #     self.switch_mode('start')
+        self.switch_mode('start')
         try:
             while rclpy.ok():
                 self.spin_once()

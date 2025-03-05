@@ -155,12 +155,11 @@ class UAV:
     
     def engage_offboard_mode(self):
         """Switch to offboard mode."""
-        self.node.get_logger().info("Switching to offboard mode...")
         self._send_vehicle_command(
             VehicleCommand.VEHICLE_CMD_DO_SET_MODE, 
             params={'param1':1.0, 'param2':6.0}
         )
-        # self.get_logger().info("Switching to offboard mode")
+        # self.node.get_logger().info("Switching to offboard mode")
 
     def takeoff(self):
         """
@@ -365,14 +364,18 @@ class UAV:
     def _vehicle_status_callback(self, msg: VehicleStatus):
         self.vehicle_status = msg
         if msg.nav_state != self.nav_state:
-            self.nav_state = msg.nav_state
             self.node.get_logger().info(f"Navigation State: {self.nav_state}")
         if msg.arming_state != self.arm_state:
-            self.arm_state = msg.arming_state
             self.node.get_logger().info(f"Arm State: {self.arm_state}")
         if msg.failsafe and not self.failsafe:
-            self.failsafe = True
             self.node.get_logger().warn("Failsafe triggered!")
+        if msg.flight_checks_pass and not self.flight_check:
+            self.node.get_logger().info("Flight checks passed.")
+        self.nav_state = msg.nav_state
+        self.arm_state = msg.arming_state
+        self.failsafe = msg.failsafe
+        self.flight_check = msg.flight_checks_pass
+        self.node.get_logger().info(f"Nav State: {self.nav_state}, Arm State: {self.arm_state}, Failsafe: {self.failsafe}, Flight Check: {self.flight_check}")
 
     def _attitude_callback(self, msg: VehicleAttitude):
         self.vehicle_attitude = msg

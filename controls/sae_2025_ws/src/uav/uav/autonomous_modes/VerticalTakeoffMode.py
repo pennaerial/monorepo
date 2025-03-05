@@ -37,4 +37,4 @@ class VerticalTakeoffMode(Mode):
         if self.uav.check_takeoff_complete():
             return "complete"
         else:
-            return "loop"
+            return "continue"
