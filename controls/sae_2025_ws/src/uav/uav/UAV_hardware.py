@@ -8,6 +8,7 @@ from px4_msgs.msg import (
     VehicleAttitude,
     VehicleGlobalPosition,
     VehicleLocalPosition,
+    SensorGps
 )
 from rclpy.clock import Clock
 from rclpy.qos import (
@@ -56,6 +57,7 @@ class UAV:
         # Store current drone position
         self.global_position = None
         self.vehicle_local_position = None
+        self.sensor_gps = None
 
 
         # self.current_waypoint_index = 0
@@ -178,10 +180,18 @@ class UAV:
     
     def enter_mission(self):
         self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_DO_SET_MODE, params={'param1': 1.0, 'param2': 6.0})
+    
+    def set_origin(self):
+        lat = self.sensor_gps.latitude_deg
+        lon = self.sensor_gps.longitude_deg
+        alt = self.sensor_gps.altitude_msl_m
+        self.node.get_logger().info(f"Lat {lat}, Lon {lon}, Alt {alt}, type: {type(lat)}")
+        self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_SET_GPS_GLOBAL_ORIGIN,
+                                   params={'param1':0.0, 'param2':0.0, 'param3': 0.0, 'param4': 0.0, 'param5':lat, 'param6': lon, 'param7': alt})
 
     def test(self, waypoint):
-        self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_NAV_PATHPLANNING,
-                                   params={'param1':1.0, 'param2':0.0, 'param3': 1.0, 'param4': 0.0, 'param5':waypoint[0], 'param6': waypoint[1], 'param7': waypoint[2]})
+        self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_DO_REPOSITION,
+                                   params={'param1':5.0, 'param2':0.0, 'param3': 0.0, 'param4': 0.0, 'param5':waypoint[0], 'param6': waypoint[1], 'param7': waypoint[2]})
         
     # def test2(self):
     #     self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_DO_SET_MODE,
@@ -395,6 +405,9 @@ class UAV:
             # f"Global Position - Lat: {msg.lat:.7f}, Lon: {msg.lon:.7f}, Alt: {msg.alt:.7f}"
         # )
     
+    def _vehicle_gps_callback(self, msg: SensorGps):
+        self.sensor_gps = msg
+    
     def _vehicle_local_position_callback(self, msg: VehicleLocalPosition):
         if not self.start_local_position:
             self.start_local_position = (msg.x, msg.y, msg.z)
@@ -452,6 +465,13 @@ class UAV:
             VehicleGlobalPosition,
             'fmu/out/vehicle_global_position',
             self._global_position_callback,
+            qos_profile
+        )
+
+        self.vehicle_gps_sub = self.node.create_subscription(
+            SensorGps,
+            '/fmu/out/vehicle_gps_position',
+            self._vehicle_gps_callback,
             qos_profile
         )
 
