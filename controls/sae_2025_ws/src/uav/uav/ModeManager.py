@@ -8,6 +8,7 @@ import yaml
 import importlib
 import inspect
 import ast
+from px4_msgs.msg import VehicleStatus
 
 VISION_NODE_PATH = 'uav.vision_nodes'
 
@@ -17,10 +18,12 @@ class ModeManager(Node):
     """
     def __init__(self, mode_map: str, vision_nodes: str):
         super().__init__('mission_node')
+        self.timer = self.create_timer(0.1, self.spin_once)
         self.modes = {}
         self.transitions = {}
         self.active_mode = None
         self.last_update_time = time()
+        self.start_time = self.last_update_time
         self.uav = UAV(self)
         self.get_logger().info("Mission Node has started!")
         self.vision_clients = {}
@@ -151,31 +154,49 @@ class ModeManager(Node):
         """
         Execute one spin cycle of the node, updating the active mode.
         """
+        
         self.uav.publish_offboard_control_heartbeat_signal()
         self.uav.engage_offboard_mode()
         current_time = time()
-        time_delta = current_time - self.last_update_time
-        self.last_update_time = current_time
-
-        if self.active_mode and self.uav.flight_check:
-            self.get_active_mode().update(time_delta)
-            
+        if current_time - self.start_time < 1 or not (self.uav.vehicle_local_position and self.uav.sensor_gps): # Need to wait for the uav to be ready
+            return
+        if self.failsafe:
+            if not self.uav.emergency_landing:
+                self.uav.hover()
+                self.get_logger().info("Failsafe: Switching to AUTO_LOITER mode.")
+                self.uav.emergency_landing = True
+            if self.uav.nav_state == VehicleStatus.NAVIGATION_STATE_AUTO_LOITER:
+                self.uav.land()  # Initiate the landing procedure.
+                self.get_logger().info("Failsafe: Initiating landing.")
+            return
+        if self.uav.arm_state != VehicleStatus.ARMING_STATE_ARMED:
+            self.uav.arm()
+            if not self.uav.origin_set:
+                self.uav.set_origin()
+            self.get_logger().info(f"Arming {'and setting origin' if not self.uav.set_origin else ''}")
+        
+        if self.uav.nav_state != VehicleStatus.NAVIGATION_STATE_AUTO_LOITER and not self.uav.takeoff_gps: # after takeoff has occurred state will be AUTO_LOITER
+            self.uav.takeoff()                                                                              # takeoff_gps is set after calling takeoff() once
+        elif self.uav.nav_state == VehicleStatus.NAVIGATION_STATE_AUTO_LOITER:
+            self.get_logger().info("Takeoff Complete. Engaging Offboard Mode")
+            self.uav.engage_offboard_mode()
+        elif self.uav.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
+            # Start the mission
+            if self.active_mode and self.uav.flight_check:
+                time_delta = current_time - self.last_update_time
+                self.last_update_time = current_time
+                self.get_active_mode().update(time_delta)
             state = self.get_active_mode().check_status()
-            
-            if state != "continue":
+            if state != 'continue':
                 self.switch_mode(self.transition(state))
-
+        elif self.uav.nav_state == VehicleStatus.NAVIGATION_STATE_AUTO_LAND:
+            self.get_logger().info("Landing")
+        else:
+            self.get_logger().info(f"Self.nav_state: {self.uav.nav_state}")
     def spin(self):
         """
         Run the mission node loop.
         """
-        # try:
-        #     while rclpy.ok():
-        #         self.get_logger().info("Press Enter to start the mission.")
-        # except KeyboardInterrupt:
-        #     self.get_logger().info("Starting mission.")
-        # finally:
-        #     self.switch_mode('start')
         self.switch_mode('start')
         try:
             while rclpy.ok():

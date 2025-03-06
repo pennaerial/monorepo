@@ -8,42 +8,41 @@ class NavGPSMode(Mode):
     A mode for navigating to a GPS coordinate
     """
 
-    def __init__(self, node: Node, uav: UAV, coordinates: List[tuple[tuple[float, float, float], float]]):
+    def __init__(self, node: Node, uav: UAV, coordinates: List[tuple[tuple[float, float, float], float, str]], margin: float = 0.5):
         """
         Initialize the NavigateToGPSMode.
 
         Args:
             node (Node): ROS 2 node managing the UAV.
             uav (UAV): The UAV instance to control.
-            coordinate (tuple[float, float, float]): The coordinate (x, y, z).
+            coordinates (List[tuple[tuple[float, float, float], float, str]]): The coordinates to navigate to (x/y/z or lon/lat/alt, wait time, GPS/LOCAL).
+            margin (float): The margin of error for the GPS coordinate.
         """
         super().__init__(node, uav)
         self.uav = uav
-        
-        self.times_between = []
-        for coordinate, time_between in coordinates:
-            self.uav.add_waypoint(coordinate, "GPS")
-            self.times_between.append(time_between)
-
-        self.uav.add_waypoint(None, "END")
-
+        self.coordinates = coordinates
+        self.margin = margin
+        self.coordinates, self.wait_time, self.coordinate_system = coordinates[0]
         self.index = 0
-        self.time_between = 0
 
     def on_update(self, time_delta: float) -> None:
         """
         Periodic logic for setting gps coord.
         """
-
-        if self.index >= len(self.times_between):
-            return
-
-        self.time_between += time_delta
-
-        if self.time_between > self.times_between[self.index]:
-            self.time_between = 0
-            self.uav.advance_to_next_waypoint()
-            self.index += 1
+        if self.uav.distance_to_waypoint(self.coordinate_system, self.coordinates) < self.margin:
+            if self.wait_time > 0:
+                self.wait_time -= time_delta
+            else:
+                self.index += 1
+                if self.index < len(self.coordinates):
+                    self.coordinates, self.wait_time, self.coordinate_system = self.coordinates[self.index]
+                    if self.coordinate_system == "GPS":
+                        local_target = self.uav.gps_to_local(self.coordinates)
+                    elif self.coordinate_system == "LOCAL":
+                        local_target = tuple(target - offset for target, offset in zip(self.coordinates, self.uav.local_origin))
+                    else: 
+                        raise ValueError(f"Invalid coordinate system {self.coordinate_system}")
+                    self.uav.publish_position_setpoint(local_target)
 
     def check_status(self) -> str:
         """
@@ -52,8 +51,7 @@ class NavGPSMode(Mode):
         Returns:
             str: The status of the mode.
         """
-        
-        if self.uav.coordinate_system == "END":
+        if self.index >= len(self.coordinates):
             return "finished"
         else:
             return "continue"

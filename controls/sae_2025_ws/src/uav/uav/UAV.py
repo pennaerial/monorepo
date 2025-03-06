@@ -7,6 +7,7 @@ from px4_msgs.msg import (
     VehicleAttitude,
     VehicleGlobalPosition,
     VehicleLocalPosition,
+    SensorGps,
 )
 from rclpy.clock import Clock
 from rclpy.qos import (
@@ -18,6 +19,9 @@ from rclpy.qos import (
 import numpy as np
 import math
 from collections import deque
+from std_msgs.msg import Bool
+from uav.px4_modes import PX4CustomMainMode
+from uav.utils import R_earth
 
 class UAV:
     """
@@ -35,41 +39,23 @@ class UAV:
         self.vehicle_attitude = None
         self.nav_state = None
         self.arm_state = None
-        self.offboard_setpoint_counter = 0
         
         # Set up Subscribers/Publishers to communicate with aircraft
         self._initialize_publishers_and_subscribers()
 
         # set takeoff parameters
+        self.origin_set = False
         self.yaw = 0.0
-        self.takeoff_height = -5.0
-        self.takeoff_complete = False
-        self.hover_time = 0
+        self.takeoff_amount = 5.0
 
         # Initialize drone position
-        self.start_local_position = None
-        self.start_GPS_ref = None
+        self.local_origin = None
+        self.GPS_origin = None
 
         # Store current drone position
         self.global_position = None
-        self.vehicle_local_position = None
-
-
-        # self.current_waypoint_index = 0
-        self.waypoint_threshold = 0.5
-        self.mission_completed = False
-
-        # Start with an empty list of waypoints (will store GPS waypoints)
-
-        self.waypoints = deque()
-        self.reached_waypoint = True
-        self.curr_waypoint = None
-        self.coordinate_system = None
-        
-        self.initiated_landing = False
-        self.safe_landing_hover_time = 10
+        self.local_position = None
     
-
     # -------------------------
     # Public commands
     # -------------------------
@@ -80,70 +66,31 @@ class UAV:
             params={'param1': 1.0}  # param1=1 => Arm
         )
         self.node.get_logger().info("Sent Arm Command")
-
+        
     
+    def set_origin(self):
+        lat = self.gps.latitude_deg
+        lon = self.gps.longitude_deg
+        alt = self.gps.altitude_msl_m
+        self.node.get_logger().info(f"Setting origin to {lat}, {lon}, {alt}, type: {type(lat)}")
+        self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_SET_GPS_GLOBAL_ORIGIN,
+                                   params={'param1':0.0, 'param2':0.0, 'param3': 0.0, 'param4': 0.0, 'param5':lat, 'param6': lon, 'param7': alt})
+        self.origin_set = True
+
     def distance_to_waypoint(self, coordinate_system, waypoint) -> float:
         """Calculate the distance to the current waypoint."""
         if coordinate_system == 'GPS':
             curr_gps = self.get_gps()
-            # self.node.get_logger().info(f"Currently at {curr_gps['lat']}, {curr_gps['lon']}, {curr_gps['alt']}")
             return self.gps_distance_3d(waypoint[0], waypoint[1], waypoint[2], curr_gps[0], curr_gps[1], curr_gps[2])
-        elif coordinate_system == 'Local':
+        elif coordinate_system == 'LOCAL':
             return np.sqrt(
-                (self.vehicle_local_position.x - waypoint[0]) ** 2 +
-                (self.vehicle_local_position.y - waypoint[1]) ** 2 +
-                (self.vehicle_local_position.z - waypoint[2]) ** 2
+                (self.local_position.x - waypoint[0]) ** 2 +
+                (self.local_position.y - waypoint[1]) ** 2 +
+                (self.local_position.z - waypoint[2]) ** 2
             )
 
-    def advance_to_next_waypoint(self):
-        """Advance to the next waypoint."""
-        # if self.current_waypoint_index < len(self.waypoints):
-        
-        # Not landing, reached last waypoint, and there is another waypoint to go to
-        self.node.get_logger().info(f"Waypoints remaining: {len(self.waypoints)}")
-        if len(self.waypoints) != 0 and self.reached_waypoint and not self.initiated_landing:
-            # coordinate_system, current_waypoint = self.waypoints[self.current_waypoint_index]
-            self.reached_waypoint = False
-            coordinate_system, current_waypoint = self.waypoints.popleft()
-            self.curr_waypoint = current_waypoint
-            self.coordinate_system = coordinate_system
-            if coordinate_system == 'GPS':
-                local_target = self.gps_to_local(current_waypoint)
-                self.publish_position_setpoint(local_target)
-            elif coordinate_system == 'Local':
-                rel_waypoint = tuple(x-y for x, y in zip(current_waypoint, self.start_local_position))
-                self.publish_position_setpoint(rel_waypoint)
-            elif coordinate_system == 'END':
-                self.node.get_logger().info("Mission completed. Preparing to land.")
-                self.curr_waypoint = self.start_local_position
-                self.coordinate_system = 'Local'
-                self.initiated_landing = True
-            # self.node.get_logger().info(f"Advancing to waypoint {self.current_waypoint_index}")
-            # self.node.get_logger().info(f"Current distance: {self.distance_to_waypoint(coordinate_system, current_waypoint)}")
-        
-        # Not landing, having reached waypoint yet
-        elif not self.initiated_landing and not self.reached_waypoint:
-            self.node.get_logger().info(f"Current heading to {self.gps_to_local(self.curr_waypoint)}")
-            if self.distance_to_waypoint(self.coordinate_system, self.curr_waypoint) < self.waypoint_threshold:
-                # self.current_waypoint_index += 1
-                self.reached_waypoint = True
-
-        # Not landing, reached waypoint but no more waypoints
-        elif not self.initiated_landing:
-            self.hover()
-
-        # Landing
-        elif self.initiated_landing:
-            if self.initiated_landing and self.safe_landing_hover_time > 0:
-                self.node.get_logger().info(f"Landing in T - {self.safe_landing_hover_time} seconds.")
-                self.safe_landing_hover_time -= 1
-                self.hover()
-            else:
-                self.land()
-                self.mission_completed = True
-
     def hover(self):
-        self.publish_position_setpoint((self.vehicle_local_position.x, self.vehicle_local_position.y, self.vehicle_local_position.z))
+        self.publish_position_setpoint((self.local_position.x, self.local_position.y, self.local_position.z))
 
     def disarm(self):
         """Send a disarm command to the UAV."""
@@ -157,54 +104,44 @@ class UAV:
         """Switch to offboard mode."""
         self._send_vehicle_command(
             VehicleCommand.VEHICLE_CMD_DO_SET_MODE, 
-            params={'param1':1.0, 'param2':6.0}
+            params={'param1':1.0, 'param2': PX4CustomMainMode.OFFBOARD}
         )
-        # self.node.get_logger().info("Switching to offboard mode")
+        self.node.get_logger().info("Switching to offboard mode")
 
     def takeoff(self):
         """
         Command the UAV to take off to the specified altitude.
         This uses a NAV_TAKEOFF command; actual behavior depends on PX4 mode.
         """
-        self.publish_position_setpoint((0.0, 0.0, self.takeoff_height))
+        if not self.takeoff_gps:
+            lat = self.gps.latitude_deg
+            lon = self.gps.longitude_deg
+            alt = self.gps.altitude_msl_m
+            self.takeoff_gps = (lat, lon, alt + self.takeoff_amount)
+        self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_NAV_TAKEOFF,
+                                   params={'param1':10.0, 'param2':0.0, 'param3': 0.0, 'param4': 0.0, 'param5': self.takeoff_gps[0], 'param6': self.takeoff_gps[1], 'param7': self.takeoff_gps[2]})
         self.node.get_logger().info("Takeoff command sent.")
-
-    def add_waypoint(self, waypoint, coordinate_system):
-        self.waypoints.append((coordinate_system, waypoint))
-
-
-    def check_takeoff_complete(self) -> bool:
-        """Check if takeoff is complete."""
-        height_reached = abs(self.vehicle_local_position.z - self.takeoff_height) < 0.5
-        if height_reached and not self.takeoff_complete:
-            self.hover_time += 1
-            if self.hover_time >= 20:  # Reduced hover time to 2 seconds (20 * 0.1s)
-                self.takeoff_complete = True
-                self.node.get_logger().info("Takeoff complete, starting mission")
-                return True
-        return False
 
     def land(self):
         """Command the UAV to land."""
         self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_NAV_LAND)
         self.node.get_logger().info("Landing command sent.")
     
-    def publish_position_setpoint(self, coordinate):
-        x, y, z = coordinate
+    def publish_position_setpoint(self, coordinate, calculate_yaw=False):
         """Publish the trajectory setpoint."""
+        x, y, z = coordinate
         msg = TrajectorySetpoint()
         msg.position = [x, y, z]
-        # Calculate yaw to point towards the waypoint
-        msg.yaw = self.calculate_yaw(x, y)
+        msg.yaw = self.calculate_yaw(x, y) if calculate_yaw else 0.0
         msg.timestamp = int(self.node.get_clock().now().nanoseconds / 1000)
         self.trajectory_publisher.publish(msg)
-        # self.node.get_logger().info(f"Publishing setpoint: pos={[x, y, z]}, yaw={msg.yaw:.2f}")
-    
+        self.node.get_logger().info(f"Publishing setpoint: pos={[x, y, z]}, yaw={msg.yaw:.2f}")
+        
     def calculate_yaw(self, x: float, y: float) -> float:
         """Calculate the yaw angle to point towards the next waypoint."""
         # Calculate relative position
-        dx = x - self.vehicle_local_position.x
-        dy = y - self.vehicle_local_position.y
+        dx = x - self.local_position.x
+        dy = y - self.local_position.y
         
         # Calculate yaw angle
         yaw = np.arctan2(dy, dx)
@@ -260,14 +197,11 @@ class UAV:
                 z is Down (meters)
         """
         target_lat, target_lon, target_alt = target
-        ref_lat, ref_lon, ref_alt = self.start_GPS_ref
+        ref_lat, ref_lon, ref_alt = self.GPS_origin
 
         # Convert differences in latitude and longitude from degrees to radians
         d_lat = math.radians(target_lat - ref_lat)
         d_lon = math.radians(target_lon - ref_lon)
-
-        # Earth's radius in meters (WGS84)
-        R_earth = 6378137.0
 
         # Compute local displacements
         x = d_lat * R_earth  # North displacement
@@ -291,7 +225,7 @@ class UAV:
             tuple: (lat, lon, alt) GPS coordinate corresponding to local_pos.
         """
         x, y, z = local_pos
-        lat0, lon0, alt0 = self.start_GPS_ref
+        lat0, lon0, alt0 = self.GPS_origin
         R_earth = 6378137.0  # Earth's radius in meters
 
         # Convert displacements from meters to degrees
@@ -363,19 +297,20 @@ class UAV:
     # -------------------------
     def _vehicle_status_callback(self, msg: VehicleStatus):
         self.vehicle_status = msg
-        if msg.nav_state != self.nav_state:
-            self.node.get_logger().info(f"Navigation State: {self.nav_state}")
-        if msg.arming_state != self.arm_state:
-            self.node.get_logger().info(f"Arm State: {self.arm_state}")
-        if msg.failsafe and not self.failsafe:
-            self.node.get_logger().warn("Failsafe triggered!")
-        if msg.flight_checks_pass and not self.flight_check:
-            self.node.get_logger().info("Flight checks passed.")
         self.nav_state = msg.nav_state
         self.arm_state = msg.arming_state
         self.failsafe = msg.failsafe
         self.flight_check = msg.flight_checks_pass
         self.node.get_logger().info(f"Nav State: {self.nav_state}, Arm State: {self.arm_state}, Failsafe: {self.failsafe}, Flight Check: {self.flight_check}")
+
+    def _vehicle_gps_callback(self, msg: SensorGps):
+        self.gps = msg
+
+    def _failsafe_callback(self, msg: Bool):
+        # When a manual failsafe command is received, set the failsafe flag.
+        if msg.data:
+            self.failsafe = True
+            self.get_logger().info("Failsafe command received – initiating failsafe landing sequence.")
 
     def _attitude_callback(self, msg: VehicleAttitude):
         self.vehicle_attitude = msg
@@ -394,12 +329,12 @@ class UAV:
         # )
     
     def _vehicle_local_position_callback(self, msg: VehicleLocalPosition):
-        if not self.start_local_position:
-            self.start_local_position = (msg.x, msg.y, msg.z)
-            self.start_GPS_ref = (msg.ref_lat, msg.ref_lon, msg.ref_alt)
-            self.node.get_logger().info(f"Local start position: {self.start_local_position}")
-            self.node.get_logger().info(f"GPS start position: {self.start_GPS_ref}")
-        self.vehicle_local_position = msg
+        if not self.local_origin:
+            self.local_origin = (msg.x, msg.y, msg.z)
+            self.GPS_origin = (msg.ref_lat, msg.ref_lon, msg.ref_alt)
+            self.node.get_logger().info(f"Local start position: {self.local_origin}")
+            self.node.get_logger().info(f"GPS start position: {self.GPS_origin}")
+        self.local_position = msg
         
         # self.node.get_logger().info(
         #     f"Local Position - x: {msg.x:.5f}, y: {msg.y:.5f}, z: {msg.z:.5f}"
@@ -450,6 +385,13 @@ class UAV:
             VehicleGlobalPosition,
             'fmu/out/vehicle_global_position',
             self._global_position_callback,
+            qos_profile
+        )
+        
+        self.vehicle_gps_sub = self.node.create_subscription(
+            SensorGps,
+            '/fmu/out/vehicle_gps_position',
+            self._vehicle_gps_callback,
             qos_profile
         )
 

@@ -14,7 +14,8 @@ def main():
         vision_nodes = ''
     rclpy.init()
     mission_node = ModeManager(yaml_file, vision_nodes)
-    mission_node.spin()
+    rclpy.spin(mission_node)
+    rclpy.shutdown()
 
 if __name__ == '__main__':
     main()

@@ -18,15 +18,11 @@ class LandingMode(Mode):
         """
         super().__init__(node, uav)
 
-        self.command_sent = False
-
     def on_update(self, time_delta: float) -> None:
         """
         Periodic logic for taking off vertically.
         """
-        if not self.command_sent:
-            self.command_sent = True
-            super().uav.land()
+        super().uav.land()
     
     def check_status(self) -> str:
         """
