@@ -217,7 +217,8 @@ class UAV:
         msg = TrajectorySetpoint()
         msg.position = [x, y, z]
         # Calculate yaw to point towards the waypoint
-        msg.yaw = self.calculate_yaw(x, y)
+        # msg.yaw = self.calculate_yaw(x, y)
+        msg.yaw = 0.0
         msg.timestamp = int(self.node.get_clock().now().nanoseconds / 1000)
         self.trajectory_publisher.publish(msg)
         # self.node.get_logger().info(f"Publishing setpoint: pos={[x, y, z]}, yaw={msg.yaw:.2f}")
