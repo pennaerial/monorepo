@@ -44,6 +44,25 @@ class OffboardControl(Node):
 
     def initialize_waypoints(self):
         waypoints = []
+        radius = 5.0
+        num_points = 100
+        angles = np.linspace(0, 2 * np.pi, num_points, endpoint=False)
+        for angle in angles:
+            # Compute local displacements (x: North, y: East)
+            x = radius * np.cos(angle)
+            y = radius * np.sin(angle)
+            # Use self.takeoff_height as the local down value (z)
+            local_point = (x, y, -5.0)
+            
+            # Convert the local point to GPS coordinates relative to the takeoff GPS.
+            # gps_point = self.local_to_gps(local_point)
+            waypoints.append((local_point, "Local"))
+
+        # Append the final waypoint (returning to the takeoff location in the local frame).
+        final_local_point = (0.0, 0.0, -5.0)
+        # final_gps_point = self.local_to_gps(final_local_point)
+        # self.waypoints.append(('GPS', final_gps_point))
+        waypoints.append((final_local_point, "Local"))
         waypoints.append((None, "END"))
         return waypoints
     

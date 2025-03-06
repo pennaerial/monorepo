@@ -61,7 +61,7 @@ class UAV:
 
 
         # self.current_waypoint_index = 0
-        self.waypoint_threshold = 0.5
+        self.waypoint_threshold = 2
         self.mission_completed = False
 
         # Start with an empty list of waypoints (will store GPS waypoints)
@@ -118,8 +118,8 @@ class UAV:
                 local_target = self.gps_to_local(current_waypoint)
                 self.publish_position_setpoint(local_target)
             elif coordinate_system == 'Local':
-                rel_waypoint = tuple(x-y for x, y in zip(current_waypoint, self.start_local_position))
-                self.publish_position_setpoint(rel_waypoint)
+                # rel_waypoint = tuple(x-y for x, y in zip(current_waypoint, self.start_local_position))
+                self.publish_position_setpoint(current_waypoint)
             elif coordinate_system == 'END':
                 self.node.get_logger().info("Mission completed. Preparing to land.")
                 self.curr_waypoint = self.start_local_position
@@ -130,7 +130,7 @@ class UAV:
         
         # Not landing, having reached waypoint yet
         elif not self.initiated_landing and not self.reached_waypoint:
-            self.node.get_logger().info(f"Current heading to {self.gps_to_local(self.curr_waypoint)}")
+            self.node.get_logger().info(f"Current heading to {self.curr_waypoint}")
             if self.distance_to_waypoint(self.coordinate_system, self.curr_waypoint) < self.waypoint_threshold:
                 # self.current_waypoint_index += 1
                 self.reached_waypoint = True
