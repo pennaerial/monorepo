@@ -28,7 +28,7 @@ class UAV:
 
     def __init__(self, node: Node):
 
-        self.takeoff_gps = (47.397972478335, 8.546165422517436, 5.0)
+        self.takeoff_gps = None
 
         self.node = node
 
@@ -46,7 +46,7 @@ class UAV:
 
         # set takeoff parameters
         self.yaw = 0.0
-        self.takeoff_height = -5.0
+        self.takeoff_height = None
         self.takeoff_complete = False
         self.hover_time = 0
 
@@ -72,7 +72,7 @@ class UAV:
         self.coordinate_system = None
         
         self.initiated_landing = False
-        self.safe_landing_hover_time = 10
+        self.safe_landing_hover_time = 30
     
 
     # -------------------------
@@ -105,7 +105,9 @@ class UAV:
         # if self.current_waypoint_index < len(self.waypoints):
         
         # Not landing, reached last waypoint, and there is another waypoint to go to
-        self.node.get_logger().info(f"Waypoints remaining: {len(self.waypoints)}")
+        # self.node.get_logger().info(f"Waypoints remaining: {len(self.waypoints)}")
+        if len(self.waypoints) == 0:
+            self.hover()
         if len(self.waypoints) != 0 and self.reached_waypoint and not self.initiated_landing:
             # coordinate_system, current_waypoint = self.waypoints[self.current_waypoint_index]
             self.reached_waypoint = False
@@ -134,12 +136,12 @@ class UAV:
                 self.reached_waypoint = True
 
         # Not landing, reached waypoint but no more waypoints
-        elif not self.initiated_landing:
-            self.hover()
+        # elif not self.initiated_landing:
+        #     self.hover()
 
         # Landing
         elif self.initiated_landing:
-            if self.initiated_landing and self.safe_landing_hover_time > 0:
+            if self.safe_landing_hover_time > 0:
                 self.node.get_logger().info(f"Landing in T - {self.safe_landing_hover_time} seconds.")
                 self.safe_landing_hover_time -= 1
                 self.hover()
@@ -148,7 +150,9 @@ class UAV:
                 self.mission_completed = True
 
     def hover(self):
-        self.publish_position_setpoint((self.vehicle_local_position.x, self.vehicle_local_position.y, self.vehicle_local_position.z))
+        self._send_vehicle_command(
+            VehicleCommand.VEHICLE_CMD_DO_SET_MODE,
+            params={'param1':1.0, 'param2':4.0, 'param3': 3.0})
 
     def disarm(self):
         """Send a disarm command to the UAV."""
@@ -172,6 +176,11 @@ class UAV:
         Command the UAV to take off to the specified altitude.
         This uses a NAV_TAKEOFF command; actual behavior depends on PX4 mode.
         """
+        if not self.takeoff_gps:
+            lat = self.sensor_gps.latitude_deg
+            lon = self.sensor_gps.longitude_deg
+            alt = self.sensor_gps.altitude_msl_m
+            self.takeoff_gps = (lat, lon, alt + 5.0)
         self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_NAV_TAKEOFF,
                                    params={'param1':10.0, 'param2':0.0, 'param3': 0.0, 'param4': 0.0, 'param5':self.takeoff_gps[0], 'param6': self.takeoff_gps[1], 'param7': self.takeoff_gps[2]})
 
