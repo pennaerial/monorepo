@@ -175,6 +175,9 @@ class UAV:
 
     def add_waypoint(self, waypoint, coordinate_system):
         self.waypoints.append((coordinate_system, waypoint))
+    
+    def enter_mission(self):
+        self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_DO_SET_MODE, params={'param1': 1.0, 'param2': 6.0})
 
     def test(self, waypoint):
         self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_NAV_PATHPLANNING,

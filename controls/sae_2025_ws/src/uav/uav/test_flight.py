@@ -31,7 +31,6 @@ class OffboardControl(Node):
     def timer_callback(self):
         self.uav.publish_offboard_control_heartbeat_signal()
         if self.mission_completed or not self.uav.vehicle_local_position:
-            # self.get_logger().info("No position data yet...")
             return
         if self.uav.offboard_setpoint_counter == 10:
             self.uav.engage_offboard_mode()
@@ -41,13 +40,14 @@ class OffboardControl(Node):
             # self.get_logger().info("In Offboard Mode")
             if not self.uav.takeoff_complete:
                 self.uav.takeoff()
-        # elif self.uav.nav_state == VehicleStatus.NAVIGATION_STATE_AUTO_LOITER:
-        #     self.get_logger().info("Beginning Test")
-        # elif self.uav.nav_state == VehicleStatus.NAVIGATION_STATE_POSCTL:
-        #     self.get_logger().info("NAVIGATION")
+        elif self.uav.nav_state == VehicleStatus.NAVIGATION_STATE_AUTO_LOITER:
+            self.uav.enter_mission()
+            self.get_logger().info("Beginning Test")
+        elif self.uav.nav_state == VehicleStatus.NAVIGATION_STATE_POSCTL:
+            self.get_logger().info("NAVIGATION")
         else:
             self.get_logger().info(f"Self.nav_state: {self.uav.nav_state}")
-            self.uav.test((self.takeoff_gps[0]+0.001, self.takeoff_gps[1]+0.001, 7.0))
+            # self.uav.test((self.takeoff_gps[0]+0.001, self.takeoff_gps[1]+0.001, 7.0))
         if self.uav.offboard_setpoint_counter < 11:
             self.uav.offboard_setpoint_counter += 1
         
