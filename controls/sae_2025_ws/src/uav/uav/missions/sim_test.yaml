@@ -1,34 +1,16 @@
 start:
-  class: uav.autonomous_modes.StartMode
-  transitions:
-    loop: start
-    complete: takeoff
-    failure: error
-
-takeoff:
-  class: uav.autonomous_modes.VerticalTakeoffMode
-  transitions:
-    loop: takeoff
-    complete: gps
-    failure: error
-
-gps:
   class: uav.autonomous_modes.NavGPSMode
   params:
-    coordinates: '[((2, 3, 2), 5), ((2, 3, 2), 3)]'
+    coordinates: '[((2, 3, 2), 5, "LOCAL"), ((2, 3, 2), 3, "LOCAL")]'
   transitions:
-    loop: gps
     complete: land
-    failure: error
 
 land:
   class: uav.autonomous_modes.LandingMode
-  transitions:
-    loop: land
 
-payload:
-  class: uav.autonomous_modes.LowerPayloadMode
-  transitions:
-    loop: payload
-    complete: land
-    failure: error
+# payload:
+#   class: uav.autonomous_modes.LowerPayloadMode
+#   transitions:
+#     loop: payload
+#     complete: land
+#     failure: error

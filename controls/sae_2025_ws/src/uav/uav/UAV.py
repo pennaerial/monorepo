@@ -28,7 +28,7 @@ class UAV:
     Skeleton class for UAV control and interfacing with PX4 via ROS 2.
     """
 
-    def __init__(self, node: Node):
+    def __init__(self, node: Node, takeoff_amount=5.0):
 
         self.node = node
 
@@ -46,7 +46,7 @@ class UAV:
         # set takeoff parameters
         self.origin_set = False
         self.yaw = 0.0
-        self.takeoff_amount = 5.0
+        self.takeoff_amount = takeoff_amount
 
         # Initialize drone position
         self.local_origin = None

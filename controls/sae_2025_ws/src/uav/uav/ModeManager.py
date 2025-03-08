@@ -158,7 +158,7 @@ class ModeManager(Node):
         self.uav.publish_offboard_control_heartbeat_signal()
         self.uav.engage_offboard_mode()
         current_time = time()
-        if current_time - self.start_time < 1 or not (self.uav.vehicle_local_position and self.uav.sensor_gps): # Need to wait for the uav to be ready
+        if current_time - self.start_time < 1 or not (self.uav.local_position and self.uav.gps): # Need to wait for the uav to be ready
             return
         if self.failsafe:
             if not self.uav.emergency_landing:
@@ -174,8 +174,7 @@ class ModeManager(Node):
             if not self.uav.origin_set:
                 self.uav.set_origin()
             self.get_logger().info(f"Arming {'and setting origin' if not self.uav.set_origin else ''}")
-        
-        if self.uav.nav_state != VehicleStatus.NAVIGATION_STATE_AUTO_LOITER and not self.uav.takeoff_gps: # after takeoff has occurred state will be AUTO_LOITER
+        elif self.uav.nav_state != VehicleStatus.NAVIGATION_STATE_AUTO_LOITER and not self.uav.takeoff_gps: # after takeoff has occurred state will be AUTO_LOITER
             self.uav.takeoff()                                                                              # takeoff_gps is set after calling takeoff() once
         elif self.uav.nav_state == VehicleStatus.NAVIGATION_STATE_AUTO_LOITER:
             self.get_logger().info("Takeoff Complete. Engaging Offboard Mode")
@@ -185,11 +184,20 @@ class ModeManager(Node):
             if self.active_mode and self.uav.flight_check:
                 time_delta = current_time - self.last_update_time
                 self.last_update_time = current_time
-                self.get_active_mode().update(time_delta)
+                try:
+                    self.get_active_mode().update(time_delta)
+                except Exception as e:
+                    self.get_logger().error(f"Error in mode {self.active_mode}: {e}")
+                    self.failsafe = True
+                    return
             state = self.get_active_mode().check_status()
+            if state == 'error':
+                self.get_logger().error(f"Error in mode {self.active_mode}. Switching to failsafe.")
+                self.failsafe = True
+                return
             if state != 'continue':
                 self.switch_mode(self.transition(state))
-        elif self.uav.nav_state == VehicleStatus.NAVIGATION_STATE_AUTO_LAND:
+        elif self.uav.nav_state == VehicleStatus.NAVIGATION_STATE_AUTO_LAND: # nav_state will/should change when LandingMode is spun
             self.get_logger().info("Landing")
         else:
             self.get_logger().info(f"Self.nav_state: {self.uav.nav_state}")
