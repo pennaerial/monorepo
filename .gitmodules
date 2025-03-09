@@ -8,3 +8,4 @@
 [submodule "controls/sae_2025_ws/src/ros_gz"]
 	path = controls/sae_2025_ws/src/ros_gz
 	url = https://github.com/gazebosim/ros_gz.git
+	branch = humble
