@@ -2,7 +2,6 @@ from typing import List
 from uav.autonomous_modes import Mode
 from rclpy.node import Node
 from uav import UAV
-
 class NavGPSMode(Mode):
     """
     A mode for navigating to a GPS coordinate
@@ -16,32 +15,46 @@ class NavGPSMode(Mode):
             node (Node): ROS 2 node managing the UAV.
             uav (UAV): The UAV instance to control.
             coordinates (List[tuple[tuple[float, float, float], float, str]]): The coordinates to navigate to (x/y/z or lon/lat/alt, wait time, GPS/LOCAL).
+                                                                               Local are NED coordinates, relative to the starting position (https://docs.px4.io/main/en/ros2/user_guide.html#ros-2-px4-frame-conventions).
             margin (float): The margin of error for the GPS coordinate.
         """
         super().__init__(node, uav)
         self.coordinates = coordinates
+        self.goal = None
         self.margin = margin
-        self.coordinates, self.wait_time, self.coordinate_system = coordinates[0]
-        self.index = 0
+        self.index = -1
 
     def on_update(self, time_delta: float) -> None:
         """
         Periodic logic for setting gps coord.
         """
-        if self.uav.distance_to_waypoint(self.coordinate_system, self.coordinates) < self.margin:
-            if self.wait_time > 0:
-                self.wait_time -= time_delta
-            else:
+        if self.index != -1:
+            dist = self.uav.distance_to_waypoint(self.coordinate_system, self.goal)
+            self.node.get_logger().info(f"Distance to waypoint: {dist}, current position: {self.uav.get_local_position()}")
+        if self.goal is None or self.uav.distance_to_waypoint(self.coordinate_system, self.goal) < self.margin:
+            if self.index == -1 or self.wait_time <= 0:
                 self.index += 1
-                if self.index < len(self.coordinates):
-                    self.coordinates, self.wait_time, self.coordinate_system = self.coordinates[self.index]
-                    if self.coordinate_system == "GPS":
-                        local_target = self.uav.gps_to_local(self.coordinates)
-                    elif self.coordinate_system == "LOCAL":
-                        local_target = tuple(target - offset for target, offset in zip(self.coordinates, self.uav.local_origin))
-                    else: 
-                        raise ValueError(f"Invalid coordinate system {self.coordinate_system}")
-                    self.uav.publish_position_setpoint(local_target)
+                if self.index >= len(self.coordinates):
+                    return
+                self.goal, self.wait_time, self.coordinate_system = self.coordinates[self.index]
+                self.uav.publish_position_setpoint(self.get_local_target())
+            else:
+                self.wait_time -= time_delta
+                self.node.get_logger().info(f"Holding - waiting for {self.wait_time} more seconds")
+
+    def get_local_target(self) -> tuple[float, float, float]:
+        """
+        Get the local target of the UAV.
+
+        Returns:
+            tuple[float, float, float]: The local target of the UAV.
+        """
+        if self.coordinate_system == "GPS":
+            return self.uav.gps_to_local(self.goal)
+        elif self.coordinate_system == "LOCAL":
+            return tuple(float(x) for x in self.goal)
+        else: 
+            raise ValueError(f"Invalid coordinate system {self.coordinate_system}")
 
     def check_status(self) -> str:
         """

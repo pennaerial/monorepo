@@ -161,18 +161,17 @@ class ModeManager(Node):
                 self.uav.land()  # Initiate the landing procedure.
                 self.get_logger().info("Failsafe: Initiating landing.")
             return
+        if not self.uav.origin_set:
+            self.uav.set_origin()
         if self.uav.arm_state != VehicleStatus.ARMING_STATE_ARMED:
             if self.active_mode is not None and self.get_active_mode() == LandingMode and self.uav.nav_state != VehicleStatus.NAVIGATION_STATE_AUTO_LAND:
-                self.get_logger().info(f"Succesfuly Landed UAV")
+                self.get_logger().info(f"Succesfully Landed UAV")
                 self.get_logger().info(f"Finishing Mission")
                 self.destroy_node()
             self.uav.arm()
             self.get_logger().info(f"Arming UAV")
             self.start_time = current_time
-        if self.uav.local_position is None or self.uav.gps is None: # Need to wait for the uav to be ready
-            return
-        if not self.uav.origin_set:
-            self.uav.set_origin()
+        if self.uav.local_position is None or self.uav.global_position is None: # Need to wait for the uav to be ready
             return
         if not self.uav.attempted_takeoff:
             self.uav.takeoff()

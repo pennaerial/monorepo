@@ -10,7 +10,7 @@ from launch_ros.actions import Node
 # from  uav.utils import camel_to_snake #TODO: investigate why importing this breaks gazebo
 
 HARDCODE_PATH = False
-YAML_PATH = f'{os.getcwd()}/src/uav/uav/missions/basic.yaml'
+YAML_PATH = f'{os.getcwd()}/src/uav/uav/missions/basic_waypoints.yaml'
 
 def find_folder(folder_name, search_path):
     for root, dirs, files in os.walk(search_path):

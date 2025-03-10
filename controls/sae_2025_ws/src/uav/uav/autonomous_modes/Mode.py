@@ -21,7 +21,7 @@ class Mode(ABC):
         """
         self.node = node
         self.active = False
-        self.uav = uav
+        self.uav: UAV = uav
         self.vision_clients = {}
 
     def on_enter(self) -> None:

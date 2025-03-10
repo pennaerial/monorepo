@@ -7,7 +7,7 @@ from px4_msgs.msg import (
     VehicleAttitude,
     VehicleGlobalPosition,
     VehicleLocalPosition,
-    SensorGps,
+    SensorGps
 )
 from rclpy.clock import Clock
 from rclpy.qos import (
@@ -58,7 +58,6 @@ class UAV:
 
         # Store current drone position
         self.global_position = None
-        self.gps = None
         self.local_position = None
     
     # -------------------------
@@ -74,10 +73,10 @@ class UAV:
         
     
     def set_origin(self):
-        lat = self.gps.latitude_deg
-        lon = self.gps.longitude_deg
-        alt = self.gps.altitude_msl_m
-        self.node.get_logger().info(f"Setting origin to {lat}, {lon}, {alt}, type: {type(lat)}")
+        lat = self.global_position.lat
+        lon = self.global_position.lon
+        alt = self.global_position.alt
+        self.node.get_logger().info(f"Setting origin to {lat}, {lon}, {alt}")
         self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_SET_GPS_GLOBAL_ORIGIN,
                                    params={'param1':0.0, 'param2':0.0, 'param3': 0.0, 'param4': 0.0, 'param5':lat, 'param6': lon, 'param7': alt})
         self.origin_set = True
@@ -120,9 +119,9 @@ class UAV:
         """
         if not self.attempted_takeoff:
             self.attempted_takeoff = True
-            lat = self.gps.latitude_deg
-            lon = self.gps.longitude_deg
-            alt = self.gps.altitude_msl_m
+            lat = self.global_position.lat
+            lon = self.global_position.lon
+            alt = self.global_position.alt
             takeoff_gps = (lat, lon, alt + self.takeoff_amount)
             self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_NAV_TAKEOFF,
                                     params={'param1':10.0, 'param2':0.0, 'param3': 0.0, 'param4': 0.0, 'param5': takeoff_gps[0], 'param6': takeoff_gps[1], 'param7': takeoff_gps[2]})
@@ -258,6 +257,17 @@ class UAV:
         else:
             self.node.get_logger().warn("No GPS data available.")
             return None
+        
+    def get_local_position(self):
+        if self.local_position:
+            return (
+                self.local_position.x,
+                self.local_position.y,
+                self.local_position.z
+            )
+        else:
+            self.node.get_logger().warn("No local position data available.")
+            return None
 
     # -------------------------
     # Internal helper methods
@@ -310,9 +320,6 @@ class UAV:
         if self.DEBUG:
             self.node.get_logger().info(f"Nav State: {self.nav_state}, Arm State: {self.arm_state}, Failsafe: {self.failsafe}, Flight Check: {self.flight_check}")
 
-    def _vehicle_gps_callback(self, msg: SensorGps):
-        self.gps = msg
-
     def _failsafe_callback(self, msg: Bool):
         # When a manual failsafe command is received, set the failsafe flag.
         if msg.data:
@@ -330,10 +337,11 @@ class UAV:
         self.node.get_logger().debug(f"Attitude - Yaw: {self.yaw}")
 
     def _global_position_callback(self, msg: VehicleGlobalPosition):
+        self.node.destroy_subscription(self.vehicle_gps_sub) # vehicle_gps_sub is available faster but more coarse
         self.global_position = msg
-        # self.node.get_logger().info(
-            # f"Global Position - Lat: {msg.lat:.7f}, Lon: {msg.lon:.7f}, Alt: {msg.alt:.7f}"
-        # )
+
+    def _vehicle_gps_callback(self, msg: SensorGps):
+        self.global_position = msg
     
     def _vehicle_local_position_callback(self, msg: VehicleLocalPosition):
         if not self.local_origin:
@@ -342,10 +350,6 @@ class UAV:
             self.node.get_logger().info(f"Local start position: {self.local_origin}")
             self.node.get_logger().info(f"GPS start position: {self.GPS_origin}")
         self.local_position = msg
-        
-        # self.node.get_logger().info(
-        #     f"Local Position - x: {msg.x:.5f}, y: {msg.y:.5f}, z: {msg.z:.5f}"
-        # )
 
     def _initialize_publishers_and_subscribers(self):
         """
@@ -394,7 +398,7 @@ class UAV:
             self._global_position_callback,
             qos_profile
         )
-        
+
         self.vehicle_gps_sub = self.node.create_subscription(
             SensorGps,
             '/fmu/out/vehicle_gps_position',
@@ -402,8 +406,13 @@ class UAV:
             qos_profile
         )
 
+        
         self.vehicle_local_position_subscriber = self.node.create_subscription(
-            VehicleLocalPosition, '/fmu/out/vehicle_local_position', self._vehicle_local_position_callback, qos_profile)
+            VehicleLocalPosition, 
+            '/fmu/out/vehicle_local_position', 
+            self._vehicle_local_position_callback, 
+            qos_profile
+        )
 
 
     # def set_velocity(self, vx: float, vy: float, vz: float, yaw_rate: float):
