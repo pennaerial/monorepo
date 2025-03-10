@@ -33,6 +33,7 @@ class UAV:
         self.node = node
         self.DEBUG = DEBUG
         self.node.get_logger().info(f"Initializing UAV with DEBUG={DEBUG}")
+        self.vision_clients = {}
 
         # Initialize necessary parameters to handle PX4 flight failures
         self.flight_check = False

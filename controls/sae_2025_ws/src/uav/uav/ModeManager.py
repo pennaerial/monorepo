@@ -27,7 +27,6 @@ class ModeManager(Node):
         self.start_time = self.last_update_time
         self.uav = UAV(self, DEBUG=DEBUG)
         self.get_logger().info("Mission Node has started!")
-        self.vision_clients = {}
         self.setup_vision(vision_nodes)
         self.setup_modes(mode_map)
     
@@ -53,11 +52,11 @@ class ModeManager(Node):
         module = importlib.import_module(VISION_NODE_PATH)
         for vision_node in vision_nodes.split(','):
             vision_class = getattr(module, vision_node)
-            if vision_class.service_name() not in self.vision_clients:
+            if vision_class.service_name() not in self.uav.vision_clients:
                 client = self.create_client(vision_class.srv, vision_class.service_name())
                 while not client.wait_for_service(timeout_sec=1.0):
                     self.get_logger().info(f"Service {vision_class.service_name()} not available, waiting again...")
-                self.vision_clients[vision_class.service_name()] = client
+                self.uav.vision_clients[vision_class.service_name()] = client
     
     def initialize_mode(self, mode_path: str, params: dict) -> Mode:
         module_name, class_name = mode_path.rsplit('.', 1)

@@ -81,12 +81,12 @@ class CameraNode(Node):
         """
 
         if request.cam_image:
-            if self.image:
+            if self.image is not None:
                 response.image = self.image
             else:
                 self.get_logger().warn("No image available.")
         
-        if request.cam_info:
+        if request.cam_info is not None:
             if self.camera_info:
                 response.camera_info = self.camera_info
             else:

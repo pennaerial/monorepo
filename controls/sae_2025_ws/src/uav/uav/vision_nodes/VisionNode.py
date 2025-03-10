@@ -9,30 +9,24 @@ import rclpy
 from rclpy.node import Node
 from uav.utils import camel_to_snake
 
-class VisionMeta(type):
-    """
-    Metaclass for VisionNode.
-    """
-    def __new__(cls, name, bases, dct):
-        cls = super().__new__(cls, name, bases, dct)
-        cls.__name__ = camel_to_snake(name)
-        return cls
-
-    def node_name(cls):
-        return cls.__name__
-    
-    def __str__(cls):
-        return cls.__name__
-    
-    def service_name(cls):
-        return f'vision/{cls.__name__}'
-
-class VisionNode(Node, metaclass=VisionMeta):
+class VisionNode(Node):
     """
     Base class for ROS 2 nodes that process vision data.
     Provides an interface for handling image streams, processing frames,
     and managing vision-based tasks such as tracking and calibration.
     """
+
+    @classmethod
+    def node_name(cls):
+        return camel_to_snake(cls.__name__)
+
+    @classmethod
+    def service_name(cls):
+        return f'vision/{cls.node_name()}'
+    
+    @classmethod
+    def __str__(cls):
+        return cls.node_name()
 
     def __init__(self, custom_service, display: bool = False):
         """
@@ -44,10 +38,7 @@ class VisionNode(Node, metaclass=VisionMeta):
         """
         super().__init__(self.__class__.__name__)
         
-        self.node_name = self.__class__.node_name()
         self.custom_service_type = custom_service
-        self.service_name = self.__class__.service_name()
-
 
         self.client = self.create_client(CameraData, '/camera_data')
 
@@ -78,10 +69,8 @@ class VisionNode(Node, metaclass=VisionMeta):
         request = CameraData.Request()
         if not cam_info and not cam_image:
             return CameraData.Response()
-        if cam_image:
-            request.cam_image = self.convert_image_msg_to_frame(cam_image)
-        if cam_info:
-            request.cam_info = cam_info
+        request.cam_image = cam_image
+        request.cam_info = cam_info
         
         future = self.client.call_async(request)
         rclpy.spin_until_future_complete(self, future) 
@@ -94,7 +83,7 @@ class VisionNode(Node, metaclass=VisionMeta):
         except Exception as e:
             self.get_logger().error(f"Service call failed: {e}")
         if self.display:
-            self.display_frame(self.convert_image_msg_to_frame(response.image), self.node_name)
+            self.display_frame(self.convert_image_msg_to_frame(response.image), self.node_name())
         return response.image, response.camera_info
 
     def display_frame(self, frame: np.ndarray, window_name: str) -> None:

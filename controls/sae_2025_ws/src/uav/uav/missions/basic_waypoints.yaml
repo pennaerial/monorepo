@@ -7,10 +7,3 @@ start:
 
 land:
   class: uav.autonomous_modes.LandingMode
-
-# payload:
-#   class: uav.autonomous_modes.LowerPayloadMode
-#   transitions:
-#     loop: payload
-#     complete: land
-#     failure: error

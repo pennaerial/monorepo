@@ -12,7 +12,7 @@ class PayloadTrackingNode(VisionNode):
     """
     srv = PayloadTracking
     def __init__(self):
-        super().__init__('payload_tracking', PayloadTracking)
+        super().__init__('payload_tracking', self.__class__.srv)
         
         # Declare parameters
         self.declare_parameter('debug', False)
@@ -32,7 +32,7 @@ class PayloadTrackingNode(VisionNode):
         self.lower_green = np.array(self.get_parameter('lower_green').value)
         self.upper_green = np.array(self.get_parameter('upper_green').value)
 
-        self.create_service(PayloadTracking, self.service_name, self.service_callback)
+        self.create_service(PayloadTracking, self.service_name(), self.service_callback)
         
     def _setup_kalman_filter(self):
         """Initialize Kalman filter matrices"""
@@ -60,6 +60,7 @@ class PayloadTrackingNode(VisionNode):
     def service_callback(self, request: PayloadTracking.Request, 
                         response: PayloadTracking.Response):
         """Process tracking service request with Kalman filtering"""
+        self.get_logger().info('Received payload tracking request.')
         image, camera_info = self.request_data(cam_image=True, cam_info=True)
         image = self.convert_image_msg_to_frame(image)
         # Predict next state

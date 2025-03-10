@@ -39,7 +39,7 @@ class Mode(ABC):
             request (SrvRequestT): The request to send.
             service_name (VIsionNode): The name of the service.
         """
-        client = self.vision_clients[vision_node.service_name]
+        client = self.uav.vision_clients[vision_node.service_name()]
         future = client.call_async(request)
         rclpy.spin_until_future_complete(self.node, future)
         response = future.result()

@@ -22,12 +22,12 @@ class LowerPayloadMode(Mode):
 
         self.payload_pose = None
 
-    def on_update(self):
+    def on_update(self, time_delta: float) -> None:
         """
         Periodic logic for lowering payload and handling obstacles.
         """
         request = PayloadTracking.Request()
-        request.altitude = self.uav.get_altitude()
+        request.altitude = self.uav.get_gps()[2]
         self.payload_pose = self.send_request(PayloadTrackingNode, request)
         
         if self.payload_pose is None:
@@ -35,7 +35,7 @@ class LowerPayloadMode(Mode):
         else:
             self.uav.set_target_position(self.payload_pose)
 
-    def check_status(self):
+    def check_status(self) -> str:
         """
         Check the status of the payload lowering.
 

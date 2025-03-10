@@ -1,0 +1,14 @@
+start:
+  class: uav.autonomous_modes.NavGPSMode
+  params:
+    coordinates: '[((0, 10, -10), 1, "LOCAL"),]'
+  transitions:
+    finished: payload
+
+payload:
+  class: uav.autonomous_modes.LowerPayloadMode
+  transitions:
+    complete: land
+
+land:
+  class: uav.autonomous_modes.LandingMode
