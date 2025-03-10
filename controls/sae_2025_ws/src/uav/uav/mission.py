@@ -13,7 +13,7 @@ def main():
         yaml_file = f'{cwd}/src/uav/uav/missions/sim_test.yaml'
         vision_nodes = ''
     rclpy.init()
-    mission_node = ModeManager(yaml_file, vision_nodes)
+    mission_node = ModeManager(yaml_file, vision_nodes, DEBUG=True)
     rclpy.spin(mission_node)
     rclpy.shutdown()
 

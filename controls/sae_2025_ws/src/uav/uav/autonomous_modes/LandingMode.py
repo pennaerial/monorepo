@@ -1,6 +1,7 @@
 from uav.autonomous_modes import Mode
 from rclpy.node import Node
 from uav import UAV
+from px4_msgs.msg import VehicleStatus
 
 
 class LandingMode(Mode):
@@ -22,7 +23,7 @@ class LandingMode(Mode):
         """
         Periodic logic for taking off vertically.
         """
-        super().uav.land()
+        self.uav.land()
     
     def check_status(self) -> str:
         """
@@ -31,4 +32,7 @@ class LandingMode(Mode):
         Returns:
             str: The status of the mode.
         """
-        return "continue"
+        if self.uav.vehicle_status == VehicleStatus.NAVIGATION_STATE_AUTO_LAND:
+            return "continue"
+        else:
+            return "terminate"

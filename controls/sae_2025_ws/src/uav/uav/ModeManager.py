@@ -3,7 +3,7 @@ import rclpy
 from rclpy.node import Node
 from time import time
 from uav import UAV
-from uav.autonomous_modes import Mode
+from uav.autonomous_modes import Mode, LandingMode
 import yaml
 import importlib
 import inspect
@@ -16,15 +16,16 @@ class ModeManager(Node):
     """
     A ROS 2 node for managing UAV modes and mission logic.
     """
-    def __init__(self, mode_map: str, vision_nodes: str):
+    def __init__(self, mode_map: str, vision_nodes: str, DEBUG=False):
         super().__init__('mission_node')
         self.timer = self.create_timer(0.1, self.spin_once)
         self.modes = {}
         self.transitions = {}
+        self.failsafe = False
         self.active_mode = None
         self.last_update_time = time()
         self.start_time = self.last_update_time
-        self.uav = UAV(self)
+        self.uav = UAV(self, DEBUG=DEBUG)
         self.get_logger().info("Mission Node has started!")
         self.vision_clients = {}
         self.setup_vision(vision_nodes)
@@ -38,12 +39,6 @@ class ModeManager(Node):
             Mode: The active mode.
         """
         return self.modes[self.active_mode]
-
-    def on_enter(self) -> None:
-        """
-        Logic executed when this mode is activated.
-        """
-        self.switch_mode(self.starting_mode)
         
     def setup_vision(self, vision_nodes: str) -> None:
         """
@@ -100,6 +95,8 @@ class ModeManager(Node):
         """
         mode_yaml = self.load_yaml_to_dict(mode_map)
 
+        assert 'start' in mode_yaml, "No start mode defined in mode map."
+
         for mode_name in mode_yaml.keys():
             mode_info = mode_yaml[mode_name]
 
@@ -154,12 +151,7 @@ class ModeManager(Node):
         """
         Execute one spin cycle of the node, updating the active mode.
         """
-        
-        self.uav.publish_offboard_control_heartbeat_signal()
-        self.uav.engage_offboard_mode()
         current_time = time()
-        if current_time - self.start_time < 1 or not (self.uav.local_position and self.uav.gps): # Need to wait for the uav to be ready
-            return
         if self.failsafe:
             if not self.uav.emergency_landing:
                 self.uav.hover()
@@ -170,17 +162,35 @@ class ModeManager(Node):
                 self.get_logger().info("Failsafe: Initiating landing.")
             return
         if self.uav.arm_state != VehicleStatus.ARMING_STATE_ARMED:
+            if self.active_mode is not None and self.get_active_mode() == LandingMode and self.uav.nav_state != VehicleStatus.NAVIGATION_STATE_AUTO_LAND:
+                self.get_logger().info(f"Succesfuly Landed UAV")
+                self.get_logger().info(f"Finishing Mission")
+                self.destroy_node()
             self.uav.arm()
-            if not self.uav.origin_set:
-                self.uav.set_origin()
-            self.get_logger().info(f"Arming {'and setting origin' if not self.uav.set_origin else ''}")
-        elif self.uav.nav_state != VehicleStatus.NAVIGATION_STATE_AUTO_LOITER and not self.uav.takeoff_gps: # after takeoff has occurred state will be AUTO_LOITER
-            self.uav.takeoff()                                                                              # takeoff_gps is set after calling takeoff() once
+            self.get_logger().info(f"Arming UAV")
+            self.start_time = current_time
+        if self.uav.local_position is None or self.uav.gps is None: # Need to wait for the uav to be ready
+            return
+        if not self.uav.origin_set:
+            self.uav.set_origin()
+            return
+        if not self.uav.attempted_takeoff:
+            self.uav.takeoff()
+            self.get_logger().info("Attempting takeoff")
+            self.start_time = current_time # Reset the start time because we will starting publishing heartbeat
+            return
+        self.uav.publish_offboard_control_heartbeat_signal()
+        if self.uav.nav_state == VehicleStatus.NAVIGATION_STATE_AUTO_TAKEOFF:
+            self.get_logger().info("Taking off")
+        elif current_time - self.start_time < 1:
+            return
         elif self.uav.nav_state == VehicleStatus.NAVIGATION_STATE_AUTO_LOITER:
             self.get_logger().info("Takeoff Complete. Engaging Offboard Mode")
             self.uav.engage_offboard_mode()
         elif self.uav.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
             # Start the mission
+            if self.active_mode is None:
+                self.switch_mode('start')
             if self.active_mode and self.uav.flight_check:
                 time_delta = current_time - self.last_update_time
                 self.last_update_time = current_time
@@ -190,13 +200,15 @@ class ModeManager(Node):
                     self.get_logger().error(f"Error in mode {self.active_mode}: {e}")
                     self.failsafe = True
                     return
-            state = self.get_active_mode().check_status()
-            if state == 'error':
-                self.get_logger().error(f"Error in mode {self.active_mode}. Switching to failsafe.")
-                self.failsafe = True
-                return
-            if state != 'continue':
-                self.switch_mode(self.transition(state))
+                state = self.get_active_mode().check_status()
+                if state == 'error':
+                    self.get_logger().error(f"Error in mode {self.active_mode}. Switching to failsafe.")
+                    self.failsafe = True
+                elif state == 'terminate':
+                    self.get_logger().info(f"Mission has completed.")
+                    self.destroy_node()
+                elif state != 'continue':
+                    self.switch_mode(self.transition(state))
         elif self.uav.nav_state == VehicleStatus.NAVIGATION_STATE_AUTO_LAND: # nav_state will/should change when LandingMode is spun
             self.get_logger().info("Landing")
         else:

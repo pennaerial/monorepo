@@ -28,12 +28,15 @@ class UAV:
     Skeleton class for UAV control and interfacing with PX4 via ROS 2.
     """
 
-    def __init__(self, node: Node, takeoff_amount=5.0):
+    def __init__(self, node: Node, takeoff_amount=5.0, DEBUG=False):
 
         self.node = node
+        self.DEBUG = DEBUG
+        self.node.get_logger().info(f"Initializing UAV with DEBUG={DEBUG}")
 
         # Initialize necessary parameters to handle PX4 flight failures
         self.flight_check = False
+        self.emergency_landing = False
         self.failsafe = False
         self.vehicle_status = None
         self.vehicle_attitude = None
@@ -47,6 +50,7 @@ class UAV:
         self.origin_set = False
         self.yaw = 0.0
         self.takeoff_amount = takeoff_amount
+        self.attempted_takeoff = False
 
         # Initialize drone position
         self.local_origin = None
@@ -54,6 +58,7 @@ class UAV:
 
         # Store current drone position
         self.global_position = None
+        self.gps = None
         self.local_position = None
     
     # -------------------------
@@ -104,7 +109,7 @@ class UAV:
         """Switch to offboard mode."""
         self._send_vehicle_command(
             VehicleCommand.VEHICLE_CMD_DO_SET_MODE, 
-            params={'param1':1.0, 'param2': PX4CustomMainMode.OFFBOARD}
+            params={'param1':1.0, 'param2': PX4CustomMainMode.OFFBOARD.value}
         )
         self.node.get_logger().info("Switching to offboard mode")
 
@@ -113,14 +118,15 @@ class UAV:
         Command the UAV to take off to the specified altitude.
         This uses a NAV_TAKEOFF command; actual behavior depends on PX4 mode.
         """
-        if not self.takeoff_gps:
+        if not self.attempted_takeoff:
+            self.attempted_takeoff = True
             lat = self.gps.latitude_deg
             lon = self.gps.longitude_deg
             alt = self.gps.altitude_msl_m
-            self.takeoff_gps = (lat, lon, alt + self.takeoff_amount)
-        self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_NAV_TAKEOFF,
-                                   params={'param1':10.0, 'param2':0.0, 'param3': 0.0, 'param4': 0.0, 'param5': self.takeoff_gps[0], 'param6': self.takeoff_gps[1], 'param7': self.takeoff_gps[2]})
-        self.node.get_logger().info("Takeoff command sent.")
+            takeoff_gps = (lat, lon, alt + self.takeoff_amount)
+            self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_NAV_TAKEOFF,
+                                    params={'param1':10.0, 'param2':0.0, 'param3': 0.0, 'param4': 0.0, 'param5': takeoff_gps[0], 'param6': takeoff_gps[1], 'param7': takeoff_gps[2]})
+            self.node.get_logger().info("Takeoff command sent.")
 
     def land(self):
         """Command the UAV to land."""
@@ -300,8 +306,9 @@ class UAV:
         self.nav_state = msg.nav_state
         self.arm_state = msg.arming_state
         self.failsafe = msg.failsafe
-        self.flight_check = msg.flight_checks_pass
-        self.node.get_logger().info(f"Nav State: {self.nav_state}, Arm State: {self.arm_state}, Failsafe: {self.failsafe}, Flight Check: {self.flight_check}")
+        self.flight_check = msg.pre_flight_checks_pass
+        if self.DEBUG:
+            self.node.get_logger().info(f"Nav State: {self.nav_state}, Arm State: {self.arm_state}, Failsafe: {self.failsafe}, Flight Check: {self.flight_check}")
 
     def _vehicle_gps_callback(self, msg: SensorGps):
         self.gps = msg

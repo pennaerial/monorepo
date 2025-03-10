@@ -57,12 +57,12 @@ sudo apt-get upgrade
     ```
     For context, `>>` pipes the output of the preceding command into the succeeding file. Running the above command multiple times will just paste in `source /opt/...` multiple times into `~/.bashrc`. This setup script sets up your shell instance to recognize ROS2.
 
-2. If you're building `ros_gz_bridge` for the first time, set the Gazebo version to `harmonic`:
+2. If you're building `ros_gz`, set the Gazebo version to `harmonic`:
 
     ```bash
     export GZ_VERSION=harmonic
     ```
-    This is because the build process of `ros_gz_bridge` requires the gazebo version to be specified in shell variable `GZ_VERSION`.
+    This is because the build process of `ros_gz` requires the gazebo version to be specified in shell variable `GZ_VERSION`.
 
 3. Make sure you have all of your ROS dependencies installed:
    ```bash

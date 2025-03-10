@@ -19,7 +19,6 @@ class NavGPSMode(Mode):
             margin (float): The margin of error for the GPS coordinate.
         """
         super().__init__(node, uav)
-        self.uav = uav
         self.coordinates = coordinates
         self.margin = margin
         self.coordinates, self.wait_time, self.coordinate_system = coordinates[0]
