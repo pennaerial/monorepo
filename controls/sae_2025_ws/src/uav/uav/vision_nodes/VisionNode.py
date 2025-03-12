@@ -61,6 +61,9 @@ class VisionNode(Node):
         img_data = np.frombuffer(msg.data, dtype=np.uint8)
         frame = img_data.reshape((msg.height, msg.width, 3))  # Assuming BGR8 encoding
         return frame
+    
+    def send_req(self, req):
+        return self.client.call_async(req)
 
     def request_data(self, cam_image: bool = False, cam_info: bool = False) -> CameraData.Response:
         """
@@ -72,8 +75,10 @@ class VisionNode(Node):
         request.cam_image = cam_image
         request.cam_info = cam_info
         
-        future = self.client.call_async(request)
+        future = self.send_req(request)
+        self.get_logger().info('Sending request to CameraNode...')
         rclpy.spin_until_future_complete(self, future) 
+        self.get_logger().info('Request sent.')
         try:
             response = future.result()
             if response.image:

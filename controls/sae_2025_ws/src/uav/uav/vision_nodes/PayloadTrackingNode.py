@@ -62,9 +62,12 @@ class PayloadTrackingNode(VisionNode):
         """Process tracking service request with Kalman filtering"""
         self.get_logger().info('Received payload tracking request.')
         image, camera_info = self.request_data(cam_image=True, cam_info=True)
+        self.get_logger().info('Received camera data.')
         image = self.convert_image_msg_to_frame(image)
+        self.get_logger().info('Converted image to frame.')
         # Predict next state
         prediction = self.kalman.predict()
+        self.get_logger().info('Predicted next state.')
         predicted_x, predicted_y = prediction[0, 0], prediction[1, 0]
         
         # Get raw detection

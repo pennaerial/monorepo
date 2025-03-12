@@ -29,6 +29,7 @@ class LowerPayloadMode(Mode):
         request = PayloadTracking.Request()
         request.altitude = self.uav.get_gps()[2]
         self.payload_pose = self.send_request(PayloadTrackingNode, request)
+        self.node.get_logger().info(f"Payload pose: {self.payload_pose}")
         
         if self.payload_pose is None:
             self.log("Current pose not available yet.")
@@ -42,6 +43,4 @@ class LowerPayloadMode(Mode):
         Returns:
             str: The status of the payload lowering.
         """
-        if random.random() < 0.1:
-            print('lower payload continue')
-            return 'continue'
+        return 'continue'

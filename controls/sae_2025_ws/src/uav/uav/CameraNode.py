@@ -56,7 +56,7 @@ class CameraNode(Node):
         """
         Callback for receiving image requests. 
         """
-        self.image = msg.data
+        self.image = msg
         if self.display:
             frame = self.convert_image_msg_to_frame(msg)
             cv2.imshow("Camera Feed", frame)
@@ -79,6 +79,7 @@ class CameraNode(Node):
         Args:
             msg (Image): The ROS 2 Image message.
         """
+        self.get_logger().info("Received request for camera data.")
 
         if request.cam_image:
             if self.image is not None:
@@ -91,7 +92,7 @@ class CameraNode(Node):
                 response.camera_info = self.camera_info
             else:
                 self.get_logger().warn("No camera info available.")
-
+        self.get_logger().info("Sending camera data.")
         return response
     
 def main():

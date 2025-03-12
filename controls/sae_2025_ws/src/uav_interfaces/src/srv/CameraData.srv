@@ -1,5 +1,5 @@
 bool cam_info
 bool cam_image
 ---
-sensor_msgs/Image processed_image
+sensor_msgs/Image image
 sensor_msgs/CameraInfo camera_info
