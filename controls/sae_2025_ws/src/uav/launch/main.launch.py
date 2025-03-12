@@ -11,6 +11,8 @@ from launch_ros.actions import Node
 
 HARDCODE_PATH = False
 YAML_PATH = f'{os.getcwd()}/src/uav/uav/missions/basic_payload_landing.yaml'
+GZ_CAMERA_TOPIC = '/world/custom/model/x500_mono_cam_down_0/link/camera_link/sensor/imager/image'
+GZ_CAMERA_INFO_TOPIC = '/world/custom/model/x500_mono_cam_down_0/link/camera_link/sensor/imager/camera_info'
 
 def find_folder(folder_name, search_path):
     for root, dirs, files in os.walk(search_path):
@@ -112,12 +114,22 @@ def generate_launch_description():
         name='px4_sitl'
     )
 
-    gz_ros_bridge = ExecuteProcess(
+    gz_ros_bridge_camera = ExecuteProcess(
         cmd=['ros2', 'run', 'ros_gz_bridge', 'parameter_bridge',
-             '/camera@sensor_msgs/msg/Image[gz.msgs.Image'],
+             f'{GZ_CAMERA_TOPIC}@sensor_msgs/msg/Image[gz.msgs.Image',
+              '--ros-args', '--remap', '/world/custom/model/x500_mono_cam_down_0/link/camera_link/sensor/imager/image:=/camera'],
         output='screen',
         cwd=sae_ws_path,
-        name='gz_ros_bridge'
+        name='gz_ros_bridge_camera'
+    )
+
+    gz_ros_bridge_camera_info = ExecuteProcess(
+        cmd=['ros2', 'run', 'ros_gz_bridge', 'parameter_bridge',
+             f'{GZ_CAMERA_INFO_TOPIC}@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo',
+              '--ros-args', '--remap', '/world/custom/model/x500_mono_cam_down_0/link/camera_link/sensor/imager/camera_info:=/camera_info'],
+        output='screen',
+        cwd=sae_ws_path,
+        name='gz_ros_bridge_camera_info'
     )
 
     mission = ExecuteProcess(
@@ -143,11 +155,14 @@ def generate_launch_description():
             OnProcessStart(target_action=gazebo, on_start=[px4_sitl, LogInfo(msg="Gazebo started.")])
         ),
         RegisterEventHandler(
-            OnProcessStart(target_action=px4_sitl, on_start=[gz_ros_bridge, LogInfo(msg="PX4 SITL started.")])
+            OnProcessStart(target_action=px4_sitl, on_start=[gz_ros_bridge_camera, LogInfo(msg="PX4 SITL started.")])
         ),
         RegisterEventHandler(
-            OnProcessStart(target_action=gz_ros_bridge, on_start=[delayed_mission, LogInfo(msg="gz_ros_bridge started.")])
-        )
+            OnProcessStart(target_action=gz_ros_bridge_camera, on_start=[gz_ros_bridge_camera_info, LogInfo(msg="gz_ros_bridge_camera started.")])
+        ),
+        RegisterEventHandler(
+            OnProcessStart(target_action=gz_ros_bridge_camera_info, on_start=[delayed_mission, LogInfo(msg="gz_ros_bridge_camera_info started.")])
+        ),
     ])
 
     return ld
