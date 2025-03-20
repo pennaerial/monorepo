@@ -23,6 +23,7 @@ class Mode(ABC):
         self.active = False
         self.uav: UAV = uav
         self.vision_clients = {}
+        self.sent_request = False
 
     def on_enter(self) -> None:
         """
@@ -31,7 +32,7 @@ class Mode(ABC):
         """
         pass
 
-    def send_request(self, vision_node: VisionNode, request) -> None:
+    def send_request(self, vision_node: VisionNode, request):
         """
         Send a request to a service.
 
@@ -39,12 +40,16 @@ class Mode(ABC):
             request (SrvRequestT): The request to send.
             service_name (VIsionNode): The name of the service.
         """
-        client = self.uav.vision_clients[vision_node.service_name()]
-        future = client.call_async(request)
-        rclpy.spin_until_future_complete(self.node, future)
-        response = future.result()
-
-        return response
+        if self.sent_request:
+            if self.future.done():
+                response = self.future.result()
+                self.sent_request = False
+                assert type(response) == vision_node.srv.Response, f"Expected response type {vision_node.srv.Response}, got {type(response)}."
+                return response
+        else:
+            self.sent_request = True
+            client = self.uav.vision_clients[vision_node.service_name()]
+            self.future = client.call_async(request)
 
     def on_exit(self) -> None:
         """

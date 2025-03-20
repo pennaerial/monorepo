@@ -1,7 +1,7 @@
 # payload_tracking_node.py
 import cv2
 import numpy as np
-from uav.cv.tracking import find_payload
+from uav.cv.tracking import find_payload, compute_3d_vector
 from uav.vision_nodes import VisionNode
 from uav_interfaces.srv import PayloadTracking
 import rclpy
@@ -92,7 +92,7 @@ class PayloadTrackingNode(VisionNode):
             vis_image = image.copy()
             
         # Compute 3D direction vector
-        direction = self.compute_3d_vector(x, y, camera_info, request.altitude)
+        direction = compute_3d_vector(x, y, camera_info, request.altitude)
         
         # Show debug visualization if enabled
         if self.debug:

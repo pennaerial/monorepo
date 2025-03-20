@@ -28,25 +28,44 @@ class VisionNode(Node):
     def __str__(cls):
         return cls.node_name()
 
-    def __init__(self, custom_service, display: bool = False):
+    def __init__(self, custom_service, display: bool = False, use_service: bool = False):
         """
         Initialize the VisionNode.
 
         Args:
             custom_service (Type[Srv[SrvRequestT, SrvResponseT]]): The custom service type.
             display (bool): Whether to display the image in a window. 
+            use_service (bool): Whether to use the custom CameraNode service.
         """
         super().__init__(self.__class__.__name__)
+
+        self.image = None
         
         self.custom_service_type = custom_service
 
-        self.client = self.create_client(CameraData, '/camera_data')
+        self.use_service = use_service
+
+        if use_service:
+            self.client = self.create_client(CameraData, '/camera_data')
+
+            if not self.client.wait_for_service(timeout_sec=1.0):
+                self.get_logger().error('Service not available.')
+                return
+
+        else:
+            self.image_subscription = self.create_subscription(
+                CameraData,
+                '/camera_node_data',
+                self.image_callback,
+                10
+            )
 
         self.display = display
 
-        if not self.client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().error('Service not available.')
-            return
+        
+    def image_callback(self, msg: CameraData):
+        self.image = msg.image
+        self.camera_info = msg.camera_info
 
     def convert_image_msg_to_frame(self, msg: Image) -> np.ndarray:
         """
@@ -69,12 +88,21 @@ class VisionNode(Node):
         """
         Sends request for camera image or camera information.
         """
+
+        if not self.use_service:
+            if self.image and self.camera_info:
+                return self.image, self.camera_info
+            else:
+                self.get_logger().info('No camera data available.')
+                return
+
+        self.get_logger().info('Requesting camera data from service...')
         request = CameraData.Request()
         if not cam_info and not cam_image:
             return CameraData.Response()
         request.cam_image = cam_image
         request.cam_info = cam_info
-        
+            
         future = self.send_req(request)
         self.get_logger().info('Sending request to CameraNode...')
         rclpy.spin_until_future_complete(self, future) 

@@ -51,7 +51,7 @@ def find_payload(
     green_contours, _ = cv2.findContours(green_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     
     if not green_contours:
-        M = cv2.moments(largest_contour, key=cv2.contourArea)
+        M = cv2.moments(largest_contour)
         if M["m00"] == 0:
             return None        
         cx, cy = int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"])
@@ -124,7 +124,7 @@ def find_dlz(
     pink_square_mask = np.zeros_like(pink_mask)
     cv2.drawContours(pink_square_mask, [largest_contour], -1, 255, thickness=cv2.FILLED)
     hsv_masked = cv2.bitwise_and(hsv_image, hsv_image, mask=pink_square_mask)
-    M = cv2.moments(largest_contour, key=cv2.contourArea)
+    M = cv2.moments(largest_contour)  
     if M["m00"] == 0:
         return None        
     cx, cy = int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"])
