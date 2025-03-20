@@ -65,7 +65,7 @@ class CameraNode(Node):
         Callback for receiving image requests. 
         """
         self.image = msg
-        self.publisher.publish(self.image)
+        # PUBLISH TODO: 
         if self.display:
             frame = self.convert_image_msg_to_frame(msg)
             cv2.imshow("Camera Feed", frame)
