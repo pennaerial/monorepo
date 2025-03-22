@@ -80,7 +80,6 @@ class CameraNode(Node):
             msg (Image): The ROS 2 Image message.
         """
         self.get_logger().info("Received request for camera data.")
-
         if request.cam_image:
             if self.image is not None:
                 response.image = self.image

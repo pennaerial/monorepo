@@ -87,7 +87,8 @@ def generate_launch_description():
             package='uav',
             executable=exe_name,
             name=exe_name,
-            output='screen'
+            output='screen',
+            parameters=[{'debug': False}]
         ))
 
     if len(vision_nodes) == 0:

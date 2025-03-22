@@ -1,7 +1,7 @@
 # payload_tracking_node.py
 import cv2
 import numpy as np
-from uav.cv.tracking import find_payload
+from uav.cv.tracking import find_payload, compute_3d_vector, rotate_image
 from uav.vision_nodes import VisionNode
 from uav_interfaces.srv import PayloadTracking
 import rclpy
@@ -15,7 +15,6 @@ class PayloadTrackingNode(VisionNode):
         super().__init__('payload_tracking', self.__class__.srv)
         
         # Declare parameters
-        self.declare_parameter('debug', False)
         self.declare_parameter('lower_pink', [140, 90, 50])
         self.declare_parameter('upper_pink', [170, 255, 255])
         self.declare_parameter('lower_green', [40, 50, 50])
@@ -26,7 +25,6 @@ class PayloadTrackingNode(VisionNode):
         self._setup_kalman_filter()
         
         # Get parameters
-        self.debug = self.get_parameter('debug').value
         self.lower_pink = np.array(self.get_parameter('lower_pink').value)
         self.upper_pink = np.array(self.get_parameter('upper_pink').value)
         self.lower_green = np.array(self.get_parameter('lower_green').value)
@@ -60,14 +58,12 @@ class PayloadTrackingNode(VisionNode):
     def service_callback(self, request: PayloadTracking.Request, 
                         response: PayloadTracking.Response):
         """Process tracking service request with Kalman filtering"""
-        self.get_logger().info('Received payload tracking request.')
         image, camera_info = self.request_data(cam_image=True, cam_info=True)
-        self.get_logger().info('Received camera data.')
         image = self.convert_image_msg_to_frame(image)
-        self.get_logger().info('Converted image to frame.')
+        image = rotate_image(image, -request.yaw)
+
         # Predict next state
         prediction = self.kalman.predict()
-        self.get_logger().info('Predicted next state.')
         predicted_x, predicted_y = prediction[0, 0], prediction[1, 0]
         
         # Get raw detection
@@ -75,7 +71,7 @@ class PayloadTrackingNode(VisionNode):
             image,
             self.lower_pink,
             self.upper_pink,
-            self.lower_green,
+            self.lower_green,   
             self.upper_green,
             self.debug
         )
@@ -86,13 +82,14 @@ class PayloadTrackingNode(VisionNode):
             measurement = np.array([[np.float32(cx)], [np.float32(cy)]])
             corrected_state = self.kalman.correct(measurement)
             x, y = corrected_state[0, 0], corrected_state[1, 0]
+            x, y = cx, cy
         else:
             # Use prediction if no detection
             x, y = predicted_x, predicted_y
             vis_image = image.copy()
             
         # Compute 3D direction vector
-        direction = self.compute_3d_vector(x, y, camera_info, request.altitude)
+        direction = compute_3d_vector(x, y, np.array(camera_info.k, ).reshape(3, 3), request.altitude)
         
         # Show debug visualization if enabled
         if self.debug:
@@ -101,8 +98,8 @@ class PayloadTrackingNode(VisionNode):
             cv2.waitKey(1)
             
         # Populate response
-        response.x = x
-        response.y = y
+        response.x = float(x)
+        response.y = float(y)
         response.direction = direction
         return response
 
