@@ -133,11 +133,15 @@ class UAV:
         self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_NAV_LAND)
         self.node.get_logger().info("Landing command sent.")
     
-    def publish_position_setpoint(self, coordinate, calculate_yaw=False):
+    def publish_position_setpoint(self, coordinate, calculate_yaw=False, relative=False):
         """Publish the trajectory setpoint."""
         x, y, z = coordinate
+        if relative:
+            x += self.local_position.x
+            y += self.local_position.y
+            z += self.local_position.z
         msg = TrajectorySetpoint()
-        msg.position = [x, y, z]
+        msg.position = [float(x), float(y), float(z)]
         msg.yaw = self.calculate_yaw(x, y) if calculate_yaw else 0.0
         msg.timestamp = int(self.node.get_clock().now().nanoseconds / 1000)
         self.trajectory_publisher.publish(msg)
@@ -335,7 +339,11 @@ class UAV:
             2.0 * (q[3] * q[0] + q[1] * q[2]),
             1.0 - 2.0 * (q[0]**2 + q[1]**2)
         )
-        self.node.get_logger().debug(f"Attitude - Yaw: {self.yaw}")
+        self.roll = np.arcsin(2.0 * (q[3] * q[1] - q[2] * q[0]))
+        self.pitch = np.arctan2(
+            2.0 * (q[3] * q[2] + q[0] * q[1]),
+            1.0 - 2.0 * (q[1]**2 + q[2]**2)
+        )
 
     def _global_position_callback(self, msg: VehicleGlobalPosition):
         self.node.destroy_subscription(self.vehicle_gps_sub) # vehicle_gps_sub is available faster but more coarse

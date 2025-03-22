@@ -1,7 +1,7 @@
 # payload_tracking_node.py
 import cv2
 import numpy as np
-from uav.cv.tracking import find_payload, compute_3d_vector
+from uav.cv.tracking import find_payload, compute_3d_vector, rotate_image
 from uav.vision_nodes import VisionNode
 from uav_interfaces.srv import PayloadTracking
 import rclpy
@@ -58,14 +58,12 @@ class PayloadTrackingNode(VisionNode):
     def service_callback(self, request: PayloadTracking.Request, 
                         response: PayloadTracking.Response):
         """Process tracking service request with Kalman filtering"""
-        self.get_logger().info('Received payload tracking request.')
         image, camera_info = self.request_data(cam_image=True, cam_info=True)
-        self.get_logger().info('Received camera data.')
         image = self.convert_image_msg_to_frame(image)
-        self.get_logger().info('Converted image to frame.')
+        image = rotate_image(image, -request.yaw)
+
         # Predict next state
         prediction = self.kalman.predict()
-        self.get_logger().info('Predicted next state.')
         predicted_x, predicted_y = prediction[0, 0], prediction[1, 0]
         
         # Get raw detection
@@ -73,7 +71,7 @@ class PayloadTrackingNode(VisionNode):
             image,
             self.lower_pink,
             self.upper_pink,
-            self.lower_green,
+            self.lower_green,   
             self.upper_green,
             self.debug
         )
@@ -84,6 +82,7 @@ class PayloadTrackingNode(VisionNode):
             measurement = np.array([[np.float32(cx)], [np.float32(cy)]])
             corrected_state = self.kalman.correct(measurement)
             x, y = corrected_state[0, 0], corrected_state[1, 0]
+            x, y = cx, cy
         else:
             # Use prediction if no detection
             x, y = predicted_x, predicted_y

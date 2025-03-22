@@ -1,7 +1,7 @@
 start:
   class: uav.autonomous_modes.NavGPSMode
   params:
-    coordinates: '[((0, 10, -10), 1, "LOCAL"),]'
+    coordinates: '[((5, 10, -10), 1, "LOCAL"),]'
   transitions:
     finished: payload
 

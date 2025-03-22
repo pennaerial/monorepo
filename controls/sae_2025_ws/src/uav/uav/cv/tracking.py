@@ -59,7 +59,7 @@ def find_payload(
             return cx, cy, None
         vis_image = image.copy()
         cv2.rectangle(vis_image, (x, y), (x + w, y + h), (255, 0, 255), 2)
-        cv2.drawContours(vis_image, [largest_green], -1, (0, 255, 0), 3)
+        cv2.drawContours(vis_image, [largest_contour], -1, (0, 255, 0), 3)
         cv2.circle(vis_image, (cx, cy), 5, (0, 255, 0), -1)
         return cx, cy, vis_image
         
@@ -81,6 +81,28 @@ def find_payload(
     cv2.circle(vis_image, (cx, cy), 5, (0, 255, 0), -1)
     
     return cx, cy, vis_image
+
+def rotate_image(image: np.ndarray, angle: float) -> np.ndarray:
+    """
+    Rotate an image by the specified angle.
+
+    Args:
+        image (np.ndarray): The input image.
+        angle (float): The rotation angle in degrees. Typically, use the negative
+                       of the camera yaw to compensate for rotation.
+                       
+    Returns:
+        np.ndarray: The rotated image.
+    """
+    # Get image dimensions
+    (h, w) = image.shape[:2]
+    # Compute the center of the image
+    center = (w / 2, h / 2)
+    # Compute the rotation matrix (note: negative angle to correct orientation)
+    M = cv2.getRotationMatrix2D(center, angle, 1.0)
+    # Perform the affine transformation (rotation)
+    rotated = cv2.warpAffine(image, M, (w, h))
+    return rotated
 
 def find_dlz(
     image: np.ndarray,
@@ -145,8 +167,6 @@ def compute_3d_vector(
     """Convert pixel coordinates to a 3D direction vector."""
     K = np.array(camera_info)
     pixel_coords = np.array([x, y, 1.0])
-    print(f"Pixel coords: {pixel_coords}") 
-    print(f"Camera info: {K}")
     cam_coords = np.linalg.inv(K) @ pixel_coords
     
     # Convert to unit vector

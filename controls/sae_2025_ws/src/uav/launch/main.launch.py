@@ -88,7 +88,7 @@ def generate_launch_description():
             executable=exe_name,
             name=exe_name,
             output='screen',
-            parameters=[{'debug': True}]
+            parameters=[{'debug': False}]
         ))
 
     if len(vision_nodes) == 0:
