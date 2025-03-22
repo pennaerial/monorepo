@@ -28,13 +28,13 @@ class LowerPayloadMode(Mode):
         """
         request = PayloadTracking.Request()
         request.altitude = self.uav.get_gps()[2]
-        self.payload_pose = self.send_request(PayloadTrackingNode, request)
-        self.node.get_logger().info(f"Payload pose: {self.payload_pose}")
+        payload_pose = self.send_request(PayloadTrackingNode, request)
+        self.node.get_logger().info(f"Payload pose: {payload_pose}")
         
-        if self.payload_pose is None:
+        if payload_pose is None:
             self.log("Current pose not available yet.")
         else:
-            self.uav.set_target_position(self.payload_pose)
+            self.uav.publish_position_setpoint(payload_pose.direction)
 
     def check_status(self) -> str:
         """

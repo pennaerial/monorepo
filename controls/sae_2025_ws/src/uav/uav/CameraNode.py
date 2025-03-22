@@ -52,20 +52,11 @@ class CameraNode(Node):
         self.get_logger().info(f"{node_name} has started, subscribing to {image_topic}.")
         self.get_logger().info(f"{node_name} has started, subscribing to {info_topic}.")
 
-        self.publisher = self.create_publisher(
-            CameraData,
-            '/camera_node_data',
-            10
-        )
-
-        self.get_logger().info(f"{node_name} has started, publishing to /camera_node_data.")
-
     def image_callback(self, msg: Image):
         """
         Callback for receiving image requests. 
         """
         self.image = msg
-        # PUBLISH TODO: 
         if self.display:
             frame = self.convert_image_msg_to_frame(msg)
             cv2.imshow("Camera Feed", frame)

@@ -145,6 +145,8 @@ def compute_3d_vector(
     """Convert pixel coordinates to a 3D direction vector."""
     K = np.array(camera_info)
     pixel_coords = np.array([x, y, 1.0])
+    print(f"Pixel coords: {pixel_coords}") 
+    print(f"Camera info: {K}")
     cam_coords = np.linalg.inv(K) @ pixel_coords
     
     # Convert to unit vector

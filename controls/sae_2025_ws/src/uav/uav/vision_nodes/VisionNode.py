@@ -2,7 +2,7 @@
 # from rclpy.type_support import Srv, SrvRequestT, SrvResponseT
 from typing import Optional
 from uav_interfaces.srv import CameraData
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import Image, CameraInfo
 import cv2
 import numpy as np
 import rclpy
@@ -38,9 +38,10 @@ class VisionNode(Node):
             use_service (bool): Whether to use the custom CameraNode service.
         """
         super().__init__(self.__class__.__name__)
-
-        self.image = None
         
+        self.declare_parameter('debug', False)
+        self.debug = self.get_parameter('debug').value
+
         self.custom_service_type = custom_service
 
         self.use_service = use_service
@@ -51,21 +52,42 @@ class VisionNode(Node):
             if not self.client.wait_for_service(timeout_sec=1.0):
                 self.get_logger().error('Service not available.')
                 return
-
         else:
             self.image_subscription = self.create_subscription(
-                CameraData,
-                '/camera_node_data',
+                Image,
+                '/camera',
                 self.image_callback,
                 10
             )
 
+            self.camera_info_subscription = self.create_subscription(
+                CameraInfo,
+                '/camera_info',
+                self.camera_info_callback,
+                10
+            )
+
+            self.image = None
+            self.camera_info = None
+
         self.display = display
 
         
-    def image_callback(self, msg: CameraData):
-        self.image = msg.image
-        self.camera_info = msg.camera_info
+    def image_callback(self, msg: Image):
+        """
+        Callback for receiving image requests. 
+        """
+        self.image = msg
+    
+    def camera_info_callback(self, msg: CameraInfo):
+        """
+        Callback for receiving camera info messages. Stores the camera info
+        for later use.
+
+        Args:
+            msg (CameraInfo): The ROS 2 CameraInfo message.
+        """
+        self.camera_info = msg
 
     def convert_image_msg_to_frame(self, msg: Image) -> np.ndarray:
         """
@@ -88,35 +110,34 @@ class VisionNode(Node):
         """
         Sends request for camera image or camera information.
         """
-
         if not self.use_service:
-            if self.image and self.camera_info:
-                return self.image, self.camera_info
-            else:
-                self.get_logger().info('No camera data available.')
-                return
-
-        self.get_logger().info('Requesting camera data from service...')
-        request = CameraData.Request()
-        if not cam_info and not cam_image:
-            return CameraData.Response()
-        request.cam_image = cam_image
-        request.cam_info = cam_info
-            
-        future = self.send_req(request)
-        self.get_logger().info('Sending request to CameraNode...')
-        rclpy.spin_until_future_complete(self, future) 
-        self.get_logger().info('Request sent.')
-        try:
-            response = future.result()
-            if response.image:
-                self.get_logger().info(f"Received image: {response.image}")
-            if response.camera_info:
-                self.get_logger().info(f"Received camera info: {response.camera_info}")
-        except Exception as e:
-            self.get_logger().error(f"Service call failed: {e}")
-        if self.display:
-            self.display_frame(self.convert_image_msg_to_frame(response.image), self.node_name())
+            response = CameraData.Response()
+            if cam_image:
+                response.image = self.image
+            if cam_info:
+                response.camera_info = self.camera_info
+        else:
+            self.get_logger().info('Requesting camera data from service...')
+            request = CameraData.Request()
+            if not cam_info and not cam_image:
+                return CameraData.Response()
+            request.cam_image = cam_image
+            request.cam_info = cam_info
+                
+            future = self.send_req(request)
+            self.get_logger().info('Sending request to CameraNode...')
+            rclpy.spin_until_future_complete(self, future) 
+            self.get_logger().info('Request sent.')
+            try:
+                response = future.result()
+                if response.image:
+                    self.get_logger().info(f"Received image: {response.image}")
+                if response.camera_info:
+                    self.get_logger().info(f"Received camera info: {response.camera_info}")
+            except Exception as e:
+                self.get_logger().error(f"Service call failed: {e}")
+            if self.display:
+                self.display_frame(self.convert_image_msg_to_frame(response.image), self.node_name())
         return response.image, response.camera_info
 
     def display_frame(self, frame: np.ndarray, window_name: str) -> None:

@@ -15,7 +15,6 @@ class PayloadTrackingNode(VisionNode):
         super().__init__('payload_tracking', self.__class__.srv)
         
         # Declare parameters
-        self.declare_parameter('debug', False)
         self.declare_parameter('lower_pink', [140, 90, 50])
         self.declare_parameter('upper_pink', [170, 255, 255])
         self.declare_parameter('lower_green', [40, 50, 50])
@@ -26,7 +25,6 @@ class PayloadTrackingNode(VisionNode):
         self._setup_kalman_filter()
         
         # Get parameters
-        self.debug = self.get_parameter('debug').value
         self.lower_pink = np.array(self.get_parameter('lower_pink').value)
         self.upper_pink = np.array(self.get_parameter('upper_pink').value)
         self.lower_green = np.array(self.get_parameter('lower_green').value)
@@ -92,7 +90,7 @@ class PayloadTrackingNode(VisionNode):
             vis_image = image.copy()
             
         # Compute 3D direction vector
-        direction = compute_3d_vector(x, y, camera_info, request.altitude)
+        direction = compute_3d_vector(x, y, np.array(camera_info.k, ).reshape(3, 3), request.altitude)
         
         # Show debug visualization if enabled
         if self.debug:
@@ -101,8 +99,8 @@ class PayloadTrackingNode(VisionNode):
             cv2.waitKey(1)
             
         # Populate response
-        response.x = x
-        response.y = y
+        response.x = float(x)
+        response.y = float(y)
         response.direction = direction
         return response
 
