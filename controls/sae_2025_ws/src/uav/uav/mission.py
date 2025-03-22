@@ -10,7 +10,7 @@ def main():
         vision_nodes = sys.argv[2]
     else:
         cwd = os.getcwd() # default
-        yaml_file = f'{cwd}/src/uav/uav/missions/basic.yaml'
+        yaml_file = f'{cwd}/src/uav/uav/missions/basic_payload_landing.yaml'
         vision_nodes = ''
     rclpy.init()
     mission_node = ModeManager(yaml_file, vision_nodes, DEBUG=False)

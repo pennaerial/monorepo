@@ -25,8 +25,12 @@ class OffboardControl(Node):
         self.uav = UAV(self)
         self.timer = self.create_timer(0.1, self.timer_callback)
         self.mission_completed = False
-        self.waypoints_added = False
         self.initialized = False
+
+        self.lat = 47.39796891466088
+        self.lon = 8.546228412074504
+        self.cruise_alt = 15.0
+        self.vision_alt = 1.0
 
         # Message Clarity
         self.armed_message = False
@@ -34,12 +38,18 @@ class OffboardControl(Node):
         self.offboard_message = False
         self.land_message = False
 
-        self.waypoints = self.initialize_waypoints()
-        self.waypoints_added = False
+        # self.waypoints = self.initialize_waypoints()
+        self.DLZ_reached_added = False
+        self.DLZ_reached = False
+        self.payload_identified_added = False
+        self.payload_identified = False
+        self.payload_reached_added = False
+        self.payload_reached = False
 
         # Failsafe
         self.failsafe = False
         self.create_subscription(Bool, 'failsafe_trigger', self.failsafe_callback, 10)
+        self.timer = 100
 
 
     def initialize_waypoints(self):
@@ -76,6 +86,7 @@ class OffboardControl(Node):
         self.uav.publish_offboard_control_heartbeat_signal()
         if self.mission_completed or not self.uav.vehicle_local_position or not self.uav.sensor_gps:
             return
+
         if self.failsafe:
             if not self.uav.initiated_landing:
                 self.uav.hover()
@@ -85,7 +96,7 @@ class OffboardControl(Node):
                 self.uav.land()  # Initiate the landing procedure.
                 self.get_logger().info("Failsafe: Initiating landing.")
             return
-        
+
         if self.uav.offboard_setpoint_counter == 10:
             self.uav.arm()
             self.initialized = True
@@ -98,19 +109,40 @@ class OffboardControl(Node):
                 self.get_logger().info("Taking Off")
                 self.takeoff_message = True
             self.uav.takeoff()
-        elif self.uav.nav_state == VehicleStatus.NAVIGATION_STATE_AUTO_LOITER and not self.uav.initiated_landing and not self.waypoints_added:
+        elif self.uav.nav_state == VehicleStatus.NAVIGATION_STATE_AUTO_LOITER and not self.uav.initiated_landing and not self.DLZ_reached:
             self.get_logger().info("Takeoff Complete. Starting Offboard Mode")
             self.uav.engage_offboard_mode()
         elif self.uav.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
             if not self.offboard_message:
                 self.get_logger().info("Entered Offboard Mode")
                 self.offboard_message = True
-            if not self.waypoints_added:
-                for waypoint, coordinate_system in self.waypoints:
-                    self.uav.add_waypoint(waypoint, coordinate_system)
-                self.waypoints_added = True
+            if not self.DLZ_reached_added:
+                self.uav.add_waypoint((self.lat, self.lon, self.cruise_alt), "GPS")
+                self.DLZ_reached_added = True
+            elif not self.DLZ_reached:
+                self.uav.advance_to_next_waypoint(hover=False)
+                if self.uav.at_location("GPS", (self.lat, self.lon, self.cruise_alt)):
+                    self.DLZ_reached = True
+            elif not self.payload_identified_added:
+                self.uav.add_waypoint((self.lat, self.lon, self.vision_alt), "GPS")
+                self.payload_identified_added = True
+            elif not self.payload_identified:
+                self.uav.advance_to_next_waypoint(hover=False)
+                if self.uav.at_location("GPS", (self.lat, self.lon, self.vision_alt)):
+                    self.payload_identified = True
+            elif not self.payload_reached_added:
+                self.uav.add_waypoint(self.get_payload_gps(), "GPS")
+                self.payload_reached_added = True
+            elif not self.payload_reached:
+                if self.uav.reached_payload() or self.timer < 0:
+                    self.payload_reached = True
+                    self.uav.add_waypoint(None, "END")
+                else: 
+                    self.timer -= 1
+                    self.get_logger().info(f"Timer: {self.timer}")
+                    self.uav.advance_to_next_waypoint(hover=False)
             else:
-                self.uav.advance_to_next_waypoint()
+                self.uav.advance_to_next_waypoint(hover=False)
         elif self.uav.initiated_landing:
             self.uav.advance_to_next_waypoint()
         elif self.uav.nav_state == VehicleStatus.NAVIGATION_STATE_AUTO_LAND:
@@ -125,6 +157,8 @@ class OffboardControl(Node):
         if self.uav.offboard_setpoint_counter < 11:
             self.uav.offboard_setpoint_counter += 1
         
+    def get_payload_gps(self):
+        return (self.lat, self.lon, 0.0)
     
 
 

@@ -10,7 +10,7 @@ from launch_ros.actions import Node
 # from  uav.utils import camel_to_snake #TODO: investigate why importing this breaks gazebo
 
 HARDCODE_PATH = False
-YAML_PATH = f'{os.getcwd()}/src/uav/uav/missions/basic_payload_landing.yaml'
+YAML_PATH = f'/home/alan/pennair/monorepo/controls/sae_2025_ws/src/uav/uav/missions/basic_payload_landing.yaml'
 GZ_CAMERA_TOPIC = '/world/custom/model/x500_mono_cam_down_0/link/camera_link/sensor/imager/image'
 GZ_CAMERA_INFO_TOPIC = '/world/custom/model/x500_mono_cam_down_0/link/camera_link/sensor/imager/camera_info'
 

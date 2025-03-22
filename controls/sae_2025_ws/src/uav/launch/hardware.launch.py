@@ -5,9 +5,9 @@ import os
 
 def generate_launch_description():
     # Adjust these paths according to your setup
-    px4_path = os.path.expanduser('~/PX4-Autopilot')
+    px4_path = os.path.expanduser('~/pennair/PX4-Autopilot')
     # qgc_path = os.path.expanduser('~/pennair')  # Folder containing QGroundControl.AppImage
-    sae_ws_path = os.path.expanduser('~/penn-air/monorepo/controls/sae_2025_ws')
+    sae_ws_path = os.path.expanduser('~/pennair/monorepo/controls/sae_2025_ws')
 
     px4_sitl = ExecuteProcess(
             cmd=['bash', 'standalone_px4_cmd.sh'],
