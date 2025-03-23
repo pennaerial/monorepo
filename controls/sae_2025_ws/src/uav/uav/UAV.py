@@ -75,13 +75,14 @@ class UAV:
         
     
     def set_origin(self):
-        lat = self.global_position.lat
-        lon = self.global_position.lon
-        alt = self.global_position.alt
-        self.node.get_logger().info(f"Setting origin to {lat}, {lon}, {alt}")
-        self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_SET_GPS_GLOBAL_ORIGIN,
+        if self.global_position:  
+            lat = self.global_position.lat
+            lon = self.global_position.lon
+            alt = self.global_position.alt
+            self.node.get_logger().info(f"Setting origin to {lat}, {lon}, {alt}")
+            self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_SET_GPS_GLOBAL_ORIGIN,
                                    params={'param1':0.0, 'param2':0.0, 'param3': 0.0, 'param4': 0.0, 'param5':lat, 'param6': lon, 'param7': alt})
-        self.origin_set = True
+            self.origin_set = True
 
     def distance_to_waypoint(self, coordinate_system, waypoint) -> float:
         """Calculate the distance to the current waypoint."""
@@ -394,8 +395,11 @@ class UAV:
         self.global_position = msg
 
     def _vehicle_gps_callback(self, msg: SensorGps):
-        self.global_position = msg
-    
+        self.global_position = VehicleGlobalPosition()
+        self.global_position.lat = msg.latitude_deg
+        self.global_position.lon = msg.longitude_deg
+        self.global_position.alt = msg.altitude_msl_m
+        
     def _vehicle_local_position_callback(self, msg: VehicleLocalPosition):
         if not self.local_origin:
             self.local_origin = (msg.x, msg.y, msg.z)

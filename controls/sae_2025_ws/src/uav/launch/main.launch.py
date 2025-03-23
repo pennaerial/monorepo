@@ -115,7 +115,7 @@ def launch_setup(context, *args, **kwargs):
     
     # Define the middleware process.
     middleware = ExecuteProcess(
-        cmd=['MicroXRCEAgent', 'udp4', '-p', '8888'],
+        cmd=['MicroXRCEAgent', 'udp4', '-p', '8888'] if sim_bool else ['MicroXRCEAgent', 'serial', '--dev', '/dev/serial0', '-b', '921600'],
         output='screen',
         name='middleware'
     )
