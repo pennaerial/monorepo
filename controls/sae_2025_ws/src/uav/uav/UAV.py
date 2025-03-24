@@ -227,6 +227,29 @@ class UAV:
 
         return (x, y, z)
     
+    def uav_to_local(self, point):
+            """
+            Converts a point in the UAV's local frame to the global frame.
+            
+            :param point: A tuple (point_x, point_y, point_z) in the UAV's local frame.
+            :return: A tuple (goal_x, goal_y, goal_z) representing the point in the global frame.
+            """
+            current_pos = self.get_local_position()
+            point_x, point_y, point_z = point
+
+            # Rotate the x and y points according to the UAV's yaw angle.
+            rotated_point_x = point_x * math.cos(self.yaw) - point_y * math.sin(self.yaw)
+            rotated_point_y = point_x * math.sin(self.yaw) + point_y * math.cos(self.yaw)
+
+            # The z-point remains unchanged.
+            point = (
+                current_pos[0] + rotated_point_x,
+                current_pos[1] + rotated_point_y,
+                current_pos[2] + point_z
+            )
+
+            return point
+    
     def local_to_gps(self, local_pos):
         """
         Convert a local NED coordinate to a GPS coordinate.

@@ -11,7 +11,7 @@ class LowerPayloadMode(Mode):
     A mode for lowering the payload.
     """
 
-    def __init__(self, node: Node, uav: UAV, offsets: Optional[Tuple[float, float, float]] = [0, 0, 0]):
+    def __init__(self, node: Node, uav: UAV, offsets: Optional[Tuple[float, float, float]] = (0.0, 0.0, 0.0)):
         """
         Initialize the LowerPayload.
 
@@ -27,12 +27,22 @@ class LowerPayloadMode(Mode):
         self.payload_pose = None
         self.altitude_constant = 2
         self.done = False
-        self.offset_x, self.offset_y, self.offset_z = offsets
+        self.offsets = offsets
+        self.goal_pos = None
 
     def on_update(self, time_delta: float) -> None:
         """
         Periodic logic for lowering payload and handling obstacles.
         """
+        if self.goal_pos:
+            if self.uav.distance_to_waypoint('LOCAL', self.goal_pos) > 0.05:
+                self.uav.publish_position_setpoint(self.goal_pos)
+            else:
+                if True: # TODO: Add logic for successful payload capture
+                    self.done = True
+                else:
+                    pass # TODO: Add logic for payload mechanism lowering
+            return
         # If UAV is unstable, skip the update
         if self.uav.roll > 0.1 or self.uav.pitch > 0.1:
             self.node.get_logger().info("Roll or pitch detected. Waiting for stabilization.")
@@ -41,9 +51,6 @@ class LowerPayloadMode(Mode):
         request = PayloadTracking.Request()
         request.altitude = -self.uav.get_local_position()[2]
         request.yaw = float(self.uav.yaw)
-        request.offset_x = self.offset_x
-        request.offset_y = self.offset_y
-        request.offset_z = self.offset_z
         payload_pose = self.send_request(PayloadTrackingNode, request)
         
         # If no payload pose is received, exit early
@@ -57,7 +64,8 @@ class LowerPayloadMode(Mode):
                 np.abs(payload_pose.direction[1]) < request.altitude / 10):
                 direction = [0, 0, request.altitude / self.altitude_constant]
                 if request.altitude < 0.5:
-                    self.done = True
+                    self.goal_pos = self.uav.uav_to_local(self.offsets)
+                    self.uav.publish_position_setpoint(self.goal_pos)
             else:
                 direction = [-payload_pose.direction[1], payload_pose.direction[0], 0]
         else:
