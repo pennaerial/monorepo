@@ -61,7 +61,7 @@ class UAV:
 
 
         # self.current_waypoint_index = 0
-        self.waypoint_threshold = 0.5
+        self.waypoint_threshold = 2
         self.mission_completed = False
 
         # Start with an empty list of waypoints (will store GPS waypoints)
@@ -100,13 +100,13 @@ class UAV:
                 (self.vehicle_local_position.z - waypoint[2]) ** 2
             )
 
-    def advance_to_next_waypoint(self):
+    def advance_to_next_waypoint(self, hover=True):
         """Advance to the next waypoint."""
         # if self.current_waypoint_index < len(self.waypoints):
         
         # Not landing, reached last waypoint, and there is another waypoint to go to
         # self.node.get_logger().info(f"Waypoints remaining: {len(self.waypoints)}")    
-        if len(self.waypoints) == 0:
+        if len(self.waypoints) == 0 and hover:
             self.hover()
         if len(self.waypoints) != 0 and self.reached_waypoint and not self.initiated_landing:
             # coordinate_system, current_waypoint = self.waypoints[self.current_waypoint_index]
@@ -116,10 +116,12 @@ class UAV:
             self.coordinate_system = coordinate_system
             if coordinate_system == 'GPS':
                 local_target = self.gps_to_local(current_waypoint)
+                self.node.get_logger().info(f"Local target: {local_target}")
+                self.node.get_logger().info(f"Current Pos: {(self.vehicle_local_position.x, self.vehicle_local_position.y, self.vehicle_local_position.z)}")
                 self.publish_position_setpoint(local_target)
             elif coordinate_system == 'Local':
-                rel_waypoint = tuple(x-y for x, y in zip(current_waypoint, self.start_local_position))
-                self.publish_position_setpoint(rel_waypoint)
+                # rel_waypoint = tuple(x-y for x, y in zip(current_waypoint, self.start_local_position))
+                self.publish_position_setpoint(current_waypoint)
             elif coordinate_system == 'END':
                 self.node.get_logger().info("Mission completed. Preparing to land.")
                 self.curr_waypoint = self.start_local_position
@@ -130,10 +132,13 @@ class UAV:
         
         # Not landing, having reached waypoint yet
         elif not self.initiated_landing and not self.reached_waypoint:
-            self.node.get_logger().info(f"Current heading to {self.gps_to_local(self.curr_waypoint)}")
-            if self.distance_to_waypoint(self.coordinate_system, self.curr_waypoint) < self.waypoint_threshold:
+            self.node.get_logger().info(f"Current heading to {self.curr_waypoint}")
+            if self.at_location(self.coordinate_system, self.curr_waypoint):
                 # self.current_waypoint_index += 1
                 self.reached_waypoint = True
+            else:
+                local_target = self.gps_to_local(self.curr_waypoint)
+                self.publish_position_setpoint(local_target)
 
         # Not landing, reached waypoint but no more waypoints
         # elif not self.initiated_landing:
@@ -148,6 +153,9 @@ class UAV:
             else:
                 self.land()
                 self.mission_completed = True
+
+    def at_location(self, coordinate_system, waypoint):
+        return self.distance_to_waypoint(coordinate_system, waypoint) < self.waypoint_threshold
 
     def hover(self):
         self._send_vehicle_command(
@@ -184,6 +192,19 @@ class UAV:
         self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_NAV_TAKEOFF,
                                    params={'param1':10.0, 'param2':0.0, 'param3': 0.0, 'param4': 0.0, 'param5':self.takeoff_gps[0], 'param6': self.takeoff_gps[1], 'param7': self.takeoff_gps[2]})
 
+    def vtol_takeoff(self):
+        """
+        Command the UAV to take off to the specified altitude.
+        This uses a NAV_TAKEOFF command; actual behavior depends on PX4 mode.
+        """
+        if not self.takeoff_gps:
+            lat = self.sensor_gps.latitude_deg
+            lon = self.sensor_gps.longitude_deg
+            alt = self.sensor_gps.altitude_msl_m
+            self.takeoff_gps = (lat, lon, alt + 5.0)
+        self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_NAV_VTOL_TAKEOFF,
+                                   params={'param1':10.0, 'param2':0.0, 'param3': 0.0, 'param4': 0.0, 'param5':self.takeoff_gps[0] + 1, 'param6': self.takeoff_gps[1], 'param7': self.takeoff_gps[2]})
+
     def add_waypoint(self, waypoint, coordinate_system):
         self.waypoints.append((coordinate_system, waypoint))
     
@@ -205,6 +226,9 @@ class UAV:
     # def test2(self):
     #     self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_DO_SET_MODE,
     #                                params={'param1': 0.0})
+
+    def reached_payload(self):
+        return np.abs(self.vehicle_local_position.z) <= 1.0
 
     def land(self):
         """Command the UAV to land."""

@@ -32,8 +32,7 @@ class LowerPayloadMode(Mode):
         if self.uav.roll > 0.1 or self.uav.pitch > 0.1:
             self.node.get_logger().info("Roll or pitch detected. Waiting for stabilization.")
             return
-
-        # Prepare and send the payload tracking request
+          
         request = PayloadTracking.Request()
         request.altitude = -self.uav.get_local_position()[2]
         request.yaw = float(self.uav.yaw)
