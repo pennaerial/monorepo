@@ -5,6 +5,7 @@ from uav.cv.tracking import find_payload, compute_3d_vector, rotate_image
 from uav.vision_nodes import VisionNode
 from uav_interfaces.srv import PayloadTracking
 import rclpy
+from uav.utils import pink, green, blue
 
 class PayloadTrackingNode(VisionNode):
     """
@@ -14,21 +15,9 @@ class PayloadTrackingNode(VisionNode):
     def __init__(self):
         super().__init__('payload_tracking', self.__class__.srv)
         
-        # Declare parameters
-        self.declare_parameter('lower_pink', [140, 155, 50])
-        self.declare_parameter('upper_pink', [170, 255, 255])
-        self.declare_parameter('lower_green', [50, 155, 50])
-        self.declare_parameter('upper_green', [100, 255, 255])
-        
         # Initialize Kalman filter
         self.kalman = cv2.KalmanFilter(4, 2)
         self._setup_kalman_filter()
-        
-        # Get parameters
-        self.lower_pink = np.array(self.get_parameter('lower_pink').value)
-        self.upper_pink = np.array(self.get_parameter('upper_pink').value)
-        self.lower_green = np.array(self.get_parameter('lower_green').value)
-        self.upper_green = np.array(self.get_parameter('upper_green').value)
 
         self.create_service(PayloadTracking, self.service_name(), self.service_callback)
         
@@ -69,15 +58,13 @@ class PayloadTrackingNode(VisionNode):
         # Get raw detection
         detection = find_payload(
             image,
-            self.lower_pink,
-            self.upper_pink,
-            self.lower_green,   
-            self.upper_green,
+            *pink,
+            *(green if request.payload_color == 'green' else blue if request.payload_color == 'blue' else pink),
             self.debug
         )
-        
+        dlz_empty = False
         if detection is not None:
-            cx, cy = detection
+            cx, cy, dlz_empty = detection
             # Update Kalman filter with measurement
             measurement = np.array([[np.float32(cx)], [np.float32(cy)]])
             corrected_state = self.kalman.correct(measurement)
@@ -94,6 +81,7 @@ class PayloadTrackingNode(VisionNode):
         response.x = float(x)
         response.y = float(y)
         response.direction = direction
+        response.dlz_empty = dlz_empty
         return response
 
 def main():

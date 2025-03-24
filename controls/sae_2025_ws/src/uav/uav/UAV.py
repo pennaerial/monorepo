@@ -227,11 +227,12 @@ class UAV:
 
         return (x, y, z)
     
-    def uav_to_local(self, point):
+    def uav_to_local(self, point, relative=False):
             """
             Converts a point in the UAV's local frame to the global frame.
             
             :param point: A tuple (point_x, point_y, point_z) in the UAV's local frame.
+            :param relative: If True, the point is relative to the current local position.
             :return: A tuple (goal_x, goal_y, goal_z) representing the point in the global frame.
             """
             current_pos = self.get_local_position()
@@ -242,11 +243,14 @@ class UAV:
             rotated_point_y = point_x * math.sin(self.yaw) + point_y * math.cos(self.yaw)
 
             # The z-point remains unchanged.
-            point = (
-                current_pos[0] + rotated_point_x,
-                current_pos[1] + rotated_point_y,
-                current_pos[2] + point_z
-            )
+            if relative:
+                point = (
+                    current_pos[0] + rotated_point_x,
+                    current_pos[1] + rotated_point_y,
+                    current_pos[2] + point_z
+                )
+            else:
+                point = (rotated_point_x, rotated_point_y, point_z)
 
             return point
     

@@ -1,0 +1,30 @@
+start:
+  class: uav.autonomous_modes.NavGPSMode
+  params:
+    coordinates: '[((5, 10, -10), 1, "LOCAL"),]'
+  transitions:
+    finished: dropoff
+
+dropoff:
+  class: uav.autonomous_modes.PayloadDropoffMode
+  params:
+    offsets: '(0, 0, 0)'
+  transitions:
+    complete: pickup
+
+pickup:
+  class: uav.autonomous_modes.PayloadPickupMode
+  params:
+    color: 'blue'
+  transitions:
+    complete: return
+
+return:
+  class: uav.autonomous_modes.NavGPSMode
+  params:
+    coordinates: '[((0, 0, -5), 1, "LOCAL"),]'
+  transitions:
+    finished: land
+
+land:
+  class: uav.autonomous_modes.LandingMode

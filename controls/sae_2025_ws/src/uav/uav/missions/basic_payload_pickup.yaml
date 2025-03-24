@@ -6,9 +6,9 @@ start:
     finished: payload
 
 payload:
-  class: uav.autonomous_modes.LowerPayloadMode
+  class: uav.autonomous_modes.PayloadPickupMode
   params:
-    offsets: '(0, 0, 0)'
+    color: 'blue'
   transitions:
     complete: land
 

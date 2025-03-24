@@ -1,6 +1,8 @@
 float64 altitude
 float64 yaw
+string payload_color
 ---
 float64 x
 float64 y
 float64[3] direction
+bool dlz_empty

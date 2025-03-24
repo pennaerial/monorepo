@@ -5,93 +5,90 @@ from typing import Optional, Tuple
 
 def find_payload(
     image: np.ndarray,
-    lower_pink: np.ndarray,
-    upper_pink: np.ndarray,
-    lower_green: np.ndarray,
-    upper_green: np.ndarray,
+    lower_zone: np.ndarray,
+    upper_zone: np.ndarray,
+    lower_payload: np.ndarray,
+    upper_payload: np.ndarray,
     debug: bool = False
-) -> Optional[Tuple[int, int, Optional[np.ndarray]]]:
+) -> Optional[Tuple[int, int, bool]]:
     """
     Detect payload in image using color thresholding.
     
-    This function first detects the largest pink area in the image. It then creates a filled (binary)
-    mask for the entire area inside that pink region—even if it’s a donut shape—and restricts the search
-    for a green square to that area. If a green square is detected, its center is returned; otherwise,
-    the center of the pink region is returned.
-    
     Args:
         image (np.ndarray): Input BGR image.
-        lower_pink (np.ndarray): Lower HSV threshold for pink marker.
-        upper_pink (np.ndarray): Upper HSV threshold for pink marker.
-        lower_green (np.ndarray): Lower HSV threshold for green payload.
-        upper_green (np.ndarray): Upper HSV threshold for green payload.
+        lower_zone (np.ndarray): Lower HSV threshold for zone marker.
+        upper_zone (np.ndarray): Upper HSV threshold for zone marker.
+        lower_payload (np.ndarray): Lower HSV threshold for payload.
+        upper_payload (np.ndarray): Upper HSV threshold for payload.
         debug (bool): If True, return an image with visualizations.
     
     Returns:
-        Optional[Tuple[int, int]]: A tuple (cx, cy)
+        Optional[Tuple[int, int, bool]]: A tuple (cx, cy, zone_empty) if detection is successful;
+        otherwise, None.
     """
     # Convert to HSV color space.
     hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
-    # Create pink mask and clean it using morphological operations.
-    pink_mask = cv2.inRange(hsv_image, lower_pink, upper_pink)
+    # Create zone mask and clean it using morphological operations.
+    zone_mask = cv2.inRange(hsv_image, lower_zone, upper_zone)
     kernel = np.ones((5, 5), np.uint8)
-    pink_mask = cv2.morphologyEx(pink_mask, cv2.MORPH_CLOSE, kernel)
-    pink_mask = cv2.morphologyEx(pink_mask, cv2.MORPH_OPEN, kernel)
+    zone_mask = cv2.morphologyEx(zone_mask, cv2.MORPH_CLOSE, kernel)
+    zone_mask = cv2.morphologyEx(zone_mask, cv2.MORPH_OPEN, kernel)
 
-    # Find all external contours in the pink mask.
-    contours, _ = cv2.findContours(pink_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    # Find all external contours in the zone mask.
+    contours, _ = cv2.findContours(zone_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if not contours:
         return None
 
-    # Find the largest pink contour.
-    largest_pink_contour = max(contours, key=cv2.contourArea)
+    # Find the largest zone contour.
+    largest_zone_contour = max(contours, key=cv2.contourArea)
 
-    # Create a filled mask from the largest pink contour.
-    pink_filled_mask = np.zeros_like(pink_mask)
-    cv2.drawContours(pink_filled_mask, [largest_pink_contour], -1, 255, thickness=cv2.FILLED)
+    # Create a filled mask from the largest zone contour.
+    zone_filled_mask = np.zeros_like(zone_mask)
+    cv2.drawContours(zone_filled_mask, [largest_zone_contour], -1, 255, thickness=cv2.FILLED)
 
-    # Detect green areas in the original HSV image.
-    green_mask_full = cv2.inRange(hsv_image, lower_green, upper_green)
+    # Detect payload areas in the original HSV image.
+    payload_mask_full = cv2.inRange(hsv_image, lower_payload, upper_payload)
 
-    # Restrict the green mask to the pink-filled region.
-    green_mask = cv2.bitwise_and(green_mask_full, pink_filled_mask)
+    # Restrict the payload mask to the zone-filled region.
+    payload_mask = cv2.bitwise_and(payload_mask_full, zone_filled_mask)
 
-    # Clean the resulting green mask.
-    green_mask = cv2.morphologyEx(green_mask, cv2.MORPH_OPEN, kernel)
-    green_mask = cv2.morphologyEx(green_mask, cv2.MORPH_CLOSE, kernel)
+    # Clean the resulting payload mask.
+    payload_mask = cv2.morphologyEx(payload_mask, cv2.MORPH_OPEN, kernel)
+    payload_mask = cv2.morphologyEx(payload_mask, cv2.MORPH_CLOSE, kernel)
 
-    # Find external contours in the green mask.
-    green_contours, _ = cv2.findContours(green_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
+    # Find external contours in the payload mask.
+    payload_contours, _ = cv2.findContours(payload_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    largest_payload_contour = None
     
-    if green_contours:
-        # If green is detected, compute the centroid of the largest green contour.
-        largest_green_contour = max(green_contours, key=cv2.contourArea)
-        M_green = cv2.moments(largest_green_contour)
-        if M_green["m00"] == 0:
+    if payload_contours and lower_payload is not lower_zone and upper_payload is not upper_zone: 
+        # If payload is detected, compute the centroid of the largest payload contour.
+        largest_payload_contour = max(payload_contours, key=cv2.contourArea)
+        M_payload = cv2.moments(largest_payload_contour)
+        if M_payload["m00"] == 0:
             return None
-        cx, cy = int(M_green["m10"] / M_green["m00"]), int(M_green["m01"] / M_green["m00"])
+        cx, cy = int(M_payload["m10"] / M_payload["m00"]), int(M_payload["m01"] / M_payload["m00"])
     else:
-        # Fallback: if no green is found, compute the centroid of the pink area.
-        M_pink = cv2.moments(pink_filled_mask)
-        if M_pink["m00"] == 0:
+        # Fallback: if no payload is found, compute the centroid of the zone area.
+        M_zone = cv2.moments(zone_filled_mask)
+        if M_zone["m00"] == 0:
             return None
-        cx, cy = int(M_pink["m10"] / M_pink["m00"]), int(M_pink["m01"] / M_pink["m00"])
+        cx, cy = int(M_zone["m10"] / M_zone["m00"]), int(M_zone["m01"] / M_zone["m00"])
     
     if debug:
         vis_image = image.copy()
 
-        cv2.drawContours(vis_image, [largest_pink_contour], -1, (255, 0, 255), 2)
-        # If green was detected, draw its contour.
-        if green_contours:
-            cv2.drawContours(vis_image, [largest_green_contour], -1, (0, 255, 0), 2)
+        cv2.drawContours(vis_image, [largest_zone_contour], -1, (0, 255, 0), 2)
+        # If payload was detected, draw its contour.
+        if payload_contours:
+            cv2.drawContours(vis_image, [largest_payload_contour], -1, (0, 255, 0), 2)
         # Mark the detected center.
         cv2.circle(vis_image, (cx, cy), 5, (0, 0, 255), -1)
-        cv2.imshow("Find Payload Debug", vis_image)
+        cv2.namedWindow("Payload Tracking", cv2.WINDOW_AUTOSIZE)
+        cv2.imshow("Payload Tracking", vis_image)
         cv2.waitKey(1)
     
-    return cx, cy
+    return cx, cy, not bool(payload_contours)
 
 def rotate_image(image: np.ndarray, angle: float) -> np.ndarray:
     """
