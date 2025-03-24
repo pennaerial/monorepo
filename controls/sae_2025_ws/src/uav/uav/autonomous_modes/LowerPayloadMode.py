@@ -4,25 +4,30 @@ from uav.autonomous_modes import Mode
 from rclpy.node import Node
 from uav_interfaces.srv import PayloadTracking
 from uav.vision_nodes import PayloadTrackingNode
+from typing import Optional, Tuple
 
 class LowerPayloadMode(Mode):
     """
     A mode for lowering the payload.
     """
 
-    def __init__(self, node: Node, uav: UAV):
+    def __init__(self, node: Node, uav: UAV, offsets: Optional[Tuple[float, float, float]] = [0, 0, 0]):
         """
         Initialize the LowerPayload.
 
         Args:
             node (Node): ROS 2 node managing the UAV.
             uav (UAV): The UAV instance to control.
+            offsets (Optional[Tuple[float, float, float]]): The offsets for the payload lowering. 
+                Should denote the position of the camera relative to the payload mechanism, in meters
+                In NED frame: x is forward, y is right, and z is down.
         """
         super().__init__(node, uav)
 
         self.payload_pose = None
         self.altitude_constant = 2
         self.done = False
+        self.offset_x, self.offset_y, self.offset_z = offsets
 
     def on_update(self, time_delta: float) -> None:
         """
@@ -36,6 +41,9 @@ class LowerPayloadMode(Mode):
         request = PayloadTracking.Request()
         request.altitude = -self.uav.get_local_position()[2]
         request.yaw = float(self.uav.yaw)
+        request.offset_x = self.offset_x
+        request.offset_y = self.offset_y
+        request.offset_z = self.offset_z
         payload_pose = self.send_request(PayloadTrackingNode, request)
         
         # If no payload pose is received, exit early

@@ -7,6 +7,8 @@ start:
 
 payload:
   class: uav.autonomous_modes.LowerPayloadMode
+  params:
+    offsets: '(0, 0, 0)'
   transitions:
     complete: land
 

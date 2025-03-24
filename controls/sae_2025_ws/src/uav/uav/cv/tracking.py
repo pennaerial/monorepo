@@ -173,14 +173,20 @@ def compute_3d_vector(
     x: float, 
     y: float, 
     camera_info: np.ndarray,  # expected to be a 3x3 camera intrinsic matrix
-    altitude: float
+    altitude: float,
+    offset_x: float = 0, # in meters
+    offset_y: float = 0, # in meters
+    offset_z: float = 0  # in meters
 ) -> Tuple[float, float, float]:
     """Convert pixel coordinates to a 3D direction vector."""
     K = np.array(camera_info)
     pixel_coords = np.array([x, y, 1.0])
     cam_coords = np.linalg.inv(K) @ pixel_coords
     
-    # Convert to unit vector
-    # direction = cam_coords / np.linalg.norm(cam_coords)
-    real_world_vector = cam_coords * altitude
-    return tuple(real_world_vector / np.linalg.norm(real_world_vector))
+    target_point_sensor = cam_coords * altitude
+    
+    sensor_to_center_offset = np.array([offset_x, offset_y, offset_z])
+    
+    target_point_center = target_point_sensor + sensor_to_center_offset
+    
+    return tuple(target_point_center / np.linalg.norm(target_point_center))

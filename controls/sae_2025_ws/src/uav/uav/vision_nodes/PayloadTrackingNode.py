@@ -88,7 +88,7 @@ class PayloadTrackingNode(VisionNode):
             x, y = predicted_x, predicted_y
             
         # Compute 3D direction vector
-        direction = compute_3d_vector(x, y, np.array(camera_info.k, ).reshape(3, 3), request.altitude)
+        direction = compute_3d_vector(x, y, np.array(camera_info.k, ).reshape(3, 3), request.altitude, request.offset_x, request.offset_y, request.offset_z)
             
         # Populate response
         response.x = float(x)

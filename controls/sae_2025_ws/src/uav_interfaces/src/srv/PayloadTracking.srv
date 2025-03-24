@@ -1,5 +1,8 @@
 float64 altitude
 float64 yaw
+float64 offset_x
+float64 offset_y
+float64 offset_z
 ---
 float64 x
 float64 y
