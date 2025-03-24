@@ -28,25 +28,37 @@ class LowerPayloadMode(Mode):
         """
         Periodic logic for lowering payload and handling obstacles.
         """
+        # If UAV is unstable, skip the update
         if self.uav.roll > 0.1 or self.uav.pitch > 0.1:
             self.node.get_logger().info("Roll or pitch detected. Waiting for stabilization.")
             return
+
+        # Prepare and send the payload tracking request
         request = PayloadTracking.Request()
         request.altitude = -self.uav.get_local_position()[2]
         request.yaw = float(self.uav.yaw)
         payload_pose = self.send_request(PayloadTrackingNode, request)
+        
+        # If no payload pose is received, exit early
         if payload_pose is None:
-            pass
-        else:
-            if np.abs(payload_pose.direction[0]) < 0.1 and np.abs(payload_pose.direction[1]) < 0.1:
-                dir = [0, 0, request.altitude / self.altitude_constant]
+            return
+
+        # Determine the direction vector based on altitude and payload pose
+        if request.altitude < 1:
+            # If payload pose direction is within a small threshold
+            if (np.abs(payload_pose.direction[0]) < request.altitude / 10 and
+                np.abs(payload_pose.direction[1]) < request.altitude / 10):
+                direction = [0, 0, request.altitude / self.altitude_constant]
                 if request.altitude < 0.1:
                     self.done = True
             else:
-                dir = [-payload_pose.direction[1], payload_pose.direction[0], 0]
-            self.node.get_logger().info(f"Direction: {dir}")
+                direction = [-payload_pose.direction[1], payload_pose.direction[0], 0]
+        else:
+            direction = [-payload_pose.direction[1], payload_pose.direction[0],
+                        request.altitude / self.altitude_constant]
 
-            self.uav.publish_position_setpoint(dir, relative=True)
+        self.node.get_logger().info(f"Direction: {direction}")
+        self.uav.publish_position_setpoint(direction, relative=True)
 
     def check_status(self) -> str:
         """

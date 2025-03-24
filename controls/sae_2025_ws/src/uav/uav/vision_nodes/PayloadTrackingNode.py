@@ -60,7 +60,7 @@ class PayloadTrackingNode(VisionNode):
         """Process tracking service request with Kalman filtering"""
         image, camera_info = self.request_data(cam_image=True, cam_info=True)
         image = self.convert_image_msg_to_frame(image)
-        image = rotate_image(image, -request.yaw)
+        image = rotate_image(image, -np.rad2deg(request.yaw))
 
         # Predict next state
         prediction = self.kalman.predict()
