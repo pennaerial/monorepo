@@ -21,7 +21,7 @@ class LowerPayloadMode(Mode):
         super().__init__(node, uav)
 
         self.payload_pose = None
-        self.altitude_constant = 3
+        self.altitude_constant = 2
         self.done = False
 
     def on_update(self, time_delta: float) -> None:
@@ -48,7 +48,7 @@ class LowerPayloadMode(Mode):
             if (np.abs(payload_pose.direction[0]) < request.altitude / 10 and
                 np.abs(payload_pose.direction[1]) < request.altitude / 10):
                 direction = [0, 0, request.altitude / self.altitude_constant]
-                if request.altitude < 0.1:
+                if request.altitude < 0.5:
                     self.done = True
             else:
                 direction = [-payload_pose.direction[1], payload_pose.direction[0], 0]

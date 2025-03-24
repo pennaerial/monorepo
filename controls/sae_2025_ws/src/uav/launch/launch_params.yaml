@@ -1,5 +1,5 @@
 # launch_params.yaml
-mission_name: basic
+mission_name: basic_payload_landing
 uav_debug: false
-vision_debug: false
+vision_debug: true
 sim: true

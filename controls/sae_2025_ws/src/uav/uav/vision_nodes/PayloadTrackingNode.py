@@ -15,10 +15,10 @@ class PayloadTrackingNode(VisionNode):
         super().__init__('payload_tracking', self.__class__.srv)
         
         # Declare parameters
-        self.declare_parameter('lower_pink', [140, 90, 50])
+        self.declare_parameter('lower_pink', [140, 155, 50])
         self.declare_parameter('upper_pink', [170, 255, 255])
-        self.declare_parameter('lower_green', [40, 50, 50])
-        self.declare_parameter('upper_green', [80, 255, 255])
+        self.declare_parameter('lower_green', [50, 155, 50])
+        self.declare_parameter('upper_green', [100, 255, 255])
         
         # Initialize Kalman filter
         self.kalman = cv2.KalmanFilter(4, 2)
@@ -77,7 +77,7 @@ class PayloadTrackingNode(VisionNode):
         )
         
         if detection is not None:
-            cx, cy, vis_image = detection
+            cx, cy = detection
             # Update Kalman filter with measurement
             measurement = np.array([[np.float32(cx)], [np.float32(cy)]])
             corrected_state = self.kalman.correct(measurement)
@@ -86,16 +86,9 @@ class PayloadTrackingNode(VisionNode):
         else:
             # Use prediction if no detection
             x, y = predicted_x, predicted_y
-            vis_image = image.copy()
             
         # Compute 3D direction vector
         direction = compute_3d_vector(x, y, np.array(camera_info.k, ).reshape(3, 3), request.altitude)
-        
-        # Show debug visualization if enabled
-        if self.debug:
-            cv2.circle(vis_image, (int(x), int(y)), 5, (0, 0, 255), -1)
-            cv2.imshow("Tracking Debug", vis_image)
-            cv2.waitKey(1)
             
         # Populate response
         response.x = float(x)
