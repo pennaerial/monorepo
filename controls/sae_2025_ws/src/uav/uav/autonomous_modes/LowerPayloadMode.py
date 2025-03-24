@@ -54,7 +54,7 @@ class LowerPayloadMode(Mode):
                 direction = [-payload_pose.direction[1], payload_pose.direction[0], 0]
         else:
             direction = [-payload_pose.direction[1], payload_pose.direction[0],
-                        request.altitude / self.altitude_constant]
+                        payload_pose.direction[2] / self.altitude_constant]
 
         self.node.get_logger().info(f"Direction: {direction}")
         self.uav.publish_position_setpoint(direction, relative=True)
