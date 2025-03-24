@@ -4,9 +4,7 @@ import yaml
 import re
 
 from launch import LaunchDescription
-from launch.actions import (DeclareLaunchArgument, ExecuteProcess, LogInfo,
-                            RegisterEventHandler, TimerAction, OpaqueFunction)
-from launch.substitutions import LaunchConfiguration
+from launch.actions import ExecuteProcess, LogInfo, RegisterEventHandler, TimerAction, OpaqueFunction
 from launch.event_handlers import OnProcessStart
 from launch_ros.actions import Node
 
@@ -33,8 +31,8 @@ def find_folder_with_heuristic(folder_name, home_dir, keywords=('penn', 'air')):
 
 def extract_vision_nodes(yaml_path):
     """
-    Reads the YAML mission file, retrieves the corresponding vision node source files from
-    os.getcwd()/src/uav/vision_nodes/, searches for imports from uav.vision_nodes,
+    Reads the mission YAML file, retrieves the vision node source files from
+    os.getcwd()/src/uav/uav/autonomous_modes/, searches for imports from uav.vision_nodes,
     and returns a set of vision node class names.
     """
     vision_nodes = set()
@@ -47,7 +45,7 @@ def extract_vision_nodes(yaml_path):
             # Extract the class name from the fully qualified path.
             _, _, class_name = class_path.rpartition('.')
             # Build the file path assuming the file is located at:
-            # os.getcwd()/src/uav/vision_nodes/{class_name}.py
+            # os.getcwd()/src/uav/uav/autonomous_modes/{class_name}.py
             file_path = os.path.join(os.getcwd(), 'src', 'uav', 'uav', 'autonomous_modes', f"{class_name}.py")
             try:
                 with open(file_path, 'r') as source_file:
@@ -64,15 +62,25 @@ def extract_vision_nodes(yaml_path):
                 print(f"Error processing {file_path}: {e}")
     return vision_nodes
 
+def load_launch_parameters():
+    params_file = os.path.join(os.getcwd(), 'src', 'uav', 'launch', 'launch_params.yaml')
+    with open(params_file, 'r') as f:
+         return yaml.safe_load(f)
+
 def launch_setup(context, *args, **kwargs):
-    # Resolve launch parameters from the context.
-    mission_name = LaunchConfiguration('mission_name').perform(context)
-    debug_str = LaunchConfiguration('debug').perform(context)
-    # Convert the debug string to a boolean.
-    debug = debug_str.lower() == 'true'
+    # Load launch parameters from the YAML file.
+    params = load_launch_parameters()
+    mission_name = params.get('mission_name', 'basic')
+    uav_debug = str(params.get('uav_debug', 'false'))
+    vision_debug = str(params.get('vision_debug', 'false'))
+    sim = str(params.get('sim', 'false'))
     
-    # Build the YAML path using the resolved mission name.
-    YAML_PATH = f'{os.getcwd()}/src/uav/uav/missions/{mission_name}.yaml'
+    # Convert debug and simulation flags to booleans.
+    vision_debug_bool = vision_debug.lower() == 'true'
+    sim_bool = sim.lower() == 'true'
+    
+    # Build the mission YAML file path using the mission name.
+    YAML_PATH = os.path.join(os.getcwd(), 'src', 'uav', 'uav', 'missions', f"{mission_name}.yaml")
     
     # Build vision node actions.
     vision_nodes = []
@@ -92,25 +100,26 @@ def launch_setup(context, *args, **kwargs):
             executable=exe_name,
             name=exe_name,
             output='screen',
-            parameters=[{'debug': debug}]
+            parameters=[{'debug': vision_debug_bool}]
         ))
     
-    # If no vision nodes found, clear the actions.
+    # Clear vision node actions if none are found.
     if len(vision_nodes) == 0:
         vision_node_actions = []
     
-    # Find paths.
+    # Find required paths.
     px4_path = (find_folder_with_heuristic('PX4-Autopilot', os.path.expanduser('~'))
                 if not HARDCODE_PATH else os.path.expanduser('~/PX4-Autopilot'))
     sae_ws_path = os.getcwd()
     
-    # Define the processes.
+    # Define the middleware process.
     middleware = ExecuteProcess(
         cmd=['MicroXRCEAgent', 'udp4', '-p', '8888'],
         output='screen',
         name='middleware'
     )
     
+    # Define the Gazebo process.
     gazebo = ExecuteProcess(
         cmd=['bash', 'standalone_gazebo_cmd.sh'],
         cwd=px4_path,
@@ -118,6 +127,7 @@ def launch_setup(context, *args, **kwargs):
         name='gazebo'
     )
     
+    # Define the PX4 SITL process.
     px4_sitl = ExecuteProcess(
         cmd=['bash', 'standalone_px4_cmd.sh'],
         cwd=px4_path,
@@ -125,10 +135,11 @@ def launch_setup(context, *args, **kwargs):
         name='px4_sitl'
     )
     
+    # Define the ROS-Gazebo bridge for the camera topics.
     gz_ros_bridge_camera = ExecuteProcess(
         cmd=['ros2', 'run', 'ros_gz_bridge', 'parameter_bridge',
-             f'{GZ_CAMERA_TOPIC}@sensor_msgs/msg/Image[gz.msgs.Image',
-             '--ros-args', '--remap', '/world/custom/model/x500_mono_cam_down_0/link/camera_link/sensor/imager/image:=/camera'],
+            f'{GZ_CAMERA_TOPIC}@sensor_msgs/msg/Image[gz.msgs.Image',
+            '--ros-args', '--remap', '/world/custom/model/x500_mono_cam_down_0/link/camera_link/sensor/imager/image:=/camera'],
         output='screen',
         cwd=sae_ws_path,
         name='gz_ros_bridge_camera'
@@ -136,15 +147,19 @@ def launch_setup(context, *args, **kwargs):
     
     gz_ros_bridge_camera_info = ExecuteProcess(
         cmd=['ros2', 'run', 'ros_gz_bridge', 'parameter_bridge',
-             f'{GZ_CAMERA_INFO_TOPIC}@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo',
-             '--ros-args', '--remap', '/world/custom/model/x500_mono_cam_down_0/link/camera_link/sensor/imager/camera_info:=/camera_info'],
+            f'{GZ_CAMERA_INFO_TOPIC}@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo',
+            '--ros-args', '--remap', '/world/custom/model/x500_mono_cam_down_0/link/camera_link/sensor/imager/camera_info:=/camera_info'],
         output='screen',
         cwd=sae_ws_path,
         name='gz_ros_bridge_camera_info'
     )
     
+    # Define the mission process.
+    mission_cmd = ['ros2', 'run', 'uav', 'mission', uav_debug, YAML_PATH, ','.join(vision_nodes)]
+    if not sim_bool:
+         mission_cmd += ['--ros-args', '-r', '/image_raw:=/camera']
     mission = ExecuteProcess(
-        cmd=['ros2', 'run', 'uav', 'mission', YAML_PATH, ','.join(vision_nodes)],
+        cmd=mission_cmd,
         output='screen',
         emulate_tty=True,
         name='mission'
@@ -160,7 +175,7 @@ def launch_setup(context, *args, **kwargs):
         *vision_node_actions,
         middleware,
         RegisterEventHandler(
-            OnProcessStart(target_action=middleware, on_start=[gazebo, LogInfo(msg="Middleware started.")])
+            OnProcessStart(target_action=middleware, on_start=[gazebo if sim_bool else delayed_mission, LogInfo(msg="Middleware started.")])
         ),
         RegisterEventHandler(
             OnProcessStart(target_action=gazebo, on_start=[px4_sitl, LogInfo(msg="Gazebo started.")])
@@ -177,22 +192,6 @@ def launch_setup(context, *args, **kwargs):
     ]
 
 def generate_launch_description():
-    # Declare launch arguments for mission_name and debug.
-    mission_name_arg = DeclareLaunchArgument(
-        'mission_name',
-        default_value='basic',
-        description='Name of the mission (used to select the mission YAML file)'
-    )
-    debug_arg = DeclareLaunchArgument(
-        'debug',
-        default_value='false',
-        description='Enable debug mode (true or false)'
-    )
-    
-    # Use an OpaqueFunction to set up the rest of the launch configuration
-    # after resolving the launch parameters.
     return LaunchDescription([
-        mission_name_arg,
-        debug_arg,
         OpaqueFunction(function=launch_setup)
     ])
