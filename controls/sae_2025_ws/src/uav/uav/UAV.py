@@ -133,8 +133,15 @@ class UAV:
         self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_NAV_LAND)
         self.node.get_logger().info("Landing command sent.")
     
-    def publish_position_setpoint(self, coordinate, calculate_yaw=False, relative=False):
-        """Publish the trajectory setpoint."""
+    def publish_position_setpoint(self, coordinate, yaw=None, calculate_yaw=False, relative=False):
+        """Publish the trajectory setpoint.
+        
+        Args:
+            coordinate (tuple): (x, y, z) in the local frame.
+            yaw (float): Yaw angle in radians (optional).
+            calculate_yaw (bool): Calculate yaw angle based on the next waypoint.
+            relative (bool): If True, the position is relative to the current local position.
+        """
         x, y, z = coordinate
         if relative:
             x += self.local_position.x
@@ -142,7 +149,7 @@ class UAV:
             z += self.local_position.z
         msg = TrajectorySetpoint()
         msg.position = [float(x), float(y), float(z)]
-        msg.yaw = self.calculate_yaw(x, y) if calculate_yaw else 0.0
+        msg.yaw = self.calculate_yaw(x, y) if calculate_yaw else yaw if yaw else float(self.yaw)
         msg.timestamp = int(self.node.get_clock().now().nanoseconds / 1000)
         self.trajectory_publisher.publish(msg)
         self.node.get_logger().info(f"Publishing setpoint: pos={[x, y, z]}, yaw={msg.yaw:.2f}")
@@ -335,15 +342,13 @@ class UAV:
         self.vehicle_attitude = msg
 
         q = msg.q
-        self.yaw = np.arctan2(
-            2.0 * (q[3] * q[0] + q[1] * q[2]),
-            1.0 - 2.0 * (q[0]**2 + q[1]**2)
-        )
-        self.roll = np.arcsin(2.0 * (q[3] * q[1] - q[2] * q[0]))
-        self.pitch = np.arctan2(
-            2.0 * (q[3] * q[2] + q[0] * q[1]),
-            1.0 - 2.0 * (q[1]**2 + q[2]**2)
-        )
+        w, x, y, z = q[0], q[1], q[2], q[3]
+
+        self.roll = np.arctan2(2.0 * (w * x + y * z),
+                            1.0 - 2.0 * (x**2 + y**2))
+        self.pitch = np.arcsin(2.0 * (w * y - z * x))
+        self.yaw = np.arctan2(2.0 * (w * z + x * y),
+                            1.0 - 2.0 * (y**2 + z**2))
 
     def _global_position_callback(self, msg: VehicleGlobalPosition):
         self.node.destroy_subscription(self.vehicle_gps_sub) # vehicle_gps_sub is available faster but more coarse
