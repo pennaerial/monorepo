@@ -31,13 +31,14 @@ setup(
     entry_points={
         'console_scripts': [
             'temp = uav.temp:main',
-            'camera_feed = uav.camera_feed:main',
+            'vision_pipeline = uav.vision_pipeline:main',
             'global_position_offboard_control = uav.global_position_offboard_control:main',
             'flight = uav.flight:main',
             'mission = uav.mission:main',
             'payload_tracking_node = uav.vision_nodes.PayloadTrackingNode:main',
             'camera = uav.CameraNode:main',
             'test_flight = uav.test_flight:main',
+            'vtol_testing = uav.vtol_testing:main'
         ],
     },
 )
