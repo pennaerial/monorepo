@@ -3,3 +3,4 @@ mission_name: mission
 uav_debug: false
 vision_debug: true
 sim: true
+vehicle_type: 0 # 0 for quadrotor, 1 for tiltrotor VTOL

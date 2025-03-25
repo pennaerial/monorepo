@@ -134,14 +134,15 @@ class UAV:
         self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_NAV_LAND)
         self.node.get_logger().info("Landing command sent.")
 
-    def vtol_transition_to(self, vtol_state):
+    def vtol_transition_to(self, vtol_state, immediate=False):
         """
         Command a VTOL transition.
         Following https://mavlink.io/en/messages/common.html#MAV_CMD_DO_VTOL_TRANSITION
         """
         assert vtol_state in ['MC', 'FW'], "VTOL state must be 'MC' or 'FW'."
-        state = VtolVehicleStatus.VEHICLE_VTOL_STATE_MC if vtol_state == 'MC' else VtolVehicleStatus.VEHICLE_VTOL_STATE_FW
-        self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_DO_VTOL_TRANSITION, params={'param1': state})
+        state = VtolVehicleStatus.VEHICLE_VTOL_STATE_TRANSITION_TO_MC if vtol_state == 'MC' else VtolVehicleStatus.VEHICLE_VTOL_STATE_TRANSITION_TO_FW
+        immediate = 1 if immediate else 0
+        self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_DO_VTOL_TRANSITION, params={'param1': float(state), 'param2': float(immediate)})
         self.node.get_logger().info(f"VTOL transition command sent: {state}. Transitioning to {vtol_state} mode.")
     
     def publish_position_setpoint(self, coordinate, yaw=None, calculate_yaw=False, relative=False):
