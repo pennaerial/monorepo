@@ -3,6 +3,7 @@ from px4_msgs.msg import (
     OffboardControlMode,
     TrajectorySetpoint,
     VehicleStatus,
+    VtolVehicleStatus,
     VehicleCommand,
     VehicleAttitude,
     VehicleGlobalPosition,
@@ -132,6 +133,16 @@ class UAV:
         """Command the UAV to land."""
         self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_NAV_LAND)
         self.node.get_logger().info("Landing command sent.")
+
+    def vtol_transition_to(self, vtol_state):
+        """
+        Command a VTOL transition.
+        Following https://mavlink.io/en/messages/common.html#MAV_CMD_DO_VTOL_TRANSITION
+        """
+        assert vtol_state in ['MC', 'FW'], "VTOL state must be 'MC' or 'FW'."
+        state = VtolVehicleStatus.VEHICLE_VTOL_STATE_MC if vtol_state == 'MC' else VtolVehicleStatus.VEHICLE_VTOL_STATE_FW
+        self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_DO_VTOL_TRANSITION, params={'param1': state})
+        self.node.get_logger().info(f"VTOL transition command sent: {state}. Transitioning to {vtol_state} mode.")
     
     def publish_position_setpoint(self, coordinate, yaw=None, calculate_yaw=False, relative=False):
         """Publish the trajectory setpoint.
