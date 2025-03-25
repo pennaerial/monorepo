@@ -53,9 +53,8 @@ class PayloadPickupMode(Mode):
             return
 
         if self.goal_pos:
-            if self.uav.distance_to_waypoint('LOCAL', self.goal_pos) > 0.05:
-                self.uav.publish_position_setpoint(self.goal_pos)
-            else:
+            self.uav.publish_position_setpoint(self.goal_pos)
+            if self.uav.distance_to_waypoint('LOCAL', self.goal_pos) <= 0.05:
                 if response.dlz_empty or True:
                     self.done = True
                 else:

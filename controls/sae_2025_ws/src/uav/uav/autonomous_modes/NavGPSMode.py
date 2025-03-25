@@ -28,16 +28,21 @@ class NavGPSMode(Mode):
         """
         Periodic logic for setting gps coord.
         """
+        dist = 0
         if self.index != -1:
             dist = self.uav.distance_to_waypoint(self.coordinate_system, self.goal)
             self.node.get_logger().info(f"Distance to waypoint: {dist}, current position: {self.uav.get_local_position()}")
-        if self.goal is None or self.uav.distance_to_waypoint(self.coordinate_system, self.goal) < self.margin:
+            
+        if dist >= self.margin:
+            self.uav.publish_position_setpoint(self.target) # PX4 expects stream of setpoints
+        elif self.goal is None or dist < self.margin:
             if self.index == -1 or self.wait_time <= 0:
                 self.index += 1
                 if self.index >= len(self.coordinates):
                     return
                 self.goal, self.wait_time, self.coordinate_system = self.coordinates[self.index]
-                self.uav.publish_position_setpoint(self.get_local_target())
+                self.target = self.get_local_target()
+                self.uav.publish_position_setpoint(self.target)
             else:
                 self.wait_time -= time_delta
                 self.node.get_logger().info(f"Holding - waiting for {self.wait_time} more seconds")
