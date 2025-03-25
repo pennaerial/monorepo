@@ -121,7 +121,7 @@ def launch_setup(context, *args, **kwargs):
     
     # Define the Gazebo process.
     gazebo = ExecuteProcess(
-        cmd=['bash', 'standalone_gazebo_cmd.sh'],
+        cmd=['python3', 'Tools/simulation/gz/simulation-gazebo', '--world=custom'],
         cwd=px4_path,
         output='screen',
         name='gazebo'
@@ -129,11 +129,12 @@ def launch_setup(context, *args, **kwargs):
     
     # Define the PX4 SITL process.
     px4_sitl = ExecuteProcess(
-        cmd=['bash', 'standalone_px4_cmd.sh'],
+        cmd=['bash', '-c', 'PX4_GZ_STANDALONE=1 PX4_SYS_AUTOSTART=4001 PX4_SIM_MODEL=gz_x500_mono_cam_down PX4_GZ_WORLD=custom ./build/px4_sitl_default/bin/px4'],
         cwd=px4_path,
         output='screen',
         name='px4_sitl'
     )
+
     
     # Define the ROS-Gazebo bridge for the camera topics.
     gz_ros_bridge_camera = ExecuteProcess(
