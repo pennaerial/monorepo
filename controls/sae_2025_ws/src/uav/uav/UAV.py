@@ -21,7 +21,7 @@ import numpy as np
 import math
 from collections import deque
 from std_msgs.msg import Bool
-from uav.px4_modes import PX4CustomMainMode
+from uav.px4_modes import PX4CustomMainMode, PX4CustomSubModeAuto
 from uav.utils import R_earth
 
 class UAV:
@@ -40,6 +40,8 @@ class UAV:
         self.flight_check = False
         self.emergency_landing = False
         self.failsafe = False
+        self.failsafe_px4 = False
+        self.failsafe_trigger = False
         self.vehicle_status = None
         self.vehicle_attitude = None
         self.nav_state = None
@@ -97,8 +99,10 @@ class UAV:
             )
 
     def hover(self):
-        self.publish_position_setpoint((self.local_position.x, self.local_position.y, self.local_position.z))
-
+        self._send_vehicle_command(
+            VehicleCommand.VEHICLE_CMD_DO_SET_MODE,
+            params={'param1': 1.0, 'param2': PX4CustomMainMode.AUTO.value, 'param3': PX4CustomSubModeAuto.LOITER.value}
+        )
     def disarm(self):
         """Send a disarm command to the UAV."""
         self._send_vehicle_command(
@@ -367,16 +371,18 @@ class UAV:
         self.vehicle_status = msg
         self.nav_state = msg.nav_state
         self.arm_state = msg.arming_state
-        self.failsafe = msg.failsafe
+        self.failsafe_px4 = msg.failsafe
         self.flight_check = msg.pre_flight_checks_pass
+        self.failsafe = self.failsafe_px4 or self.failsafe_trigger
         if self.DEBUG:
-            self.node.get_logger().info(f"Nav State: {self.nav_state}, Arm State: {self.arm_state}, Failsafe: {self.failsafe}, Flight Check: {self.flight_check}")
+            self.node.get_logger().info(f"Nav State: {self.nav_state}, Arm State: {self.arm_state}, Failsafe: {self.failsafe_px4}, Flight Check: {self.flight_check}")
 
     def _failsafe_callback(self, msg: Bool):
         # When a manual failsafe command is received, set the failsafe flag.
         if msg.data:
-            self.failsafe = True
-            self.get_logger().info("Failsafe command received – initiating failsafe landing sequence.")
+            self.failsafe_trigger = True
+            self.failsafe = self.failsafe_px4 or self.failsafe_trigger
+            self.node.get_logger().info("Failsafe command received – initiating failsafe landing sequence.")
 
     def _attitude_callback(self, msg: VehicleAttitude):
         self.vehicle_attitude = msg
@@ -470,7 +476,13 @@ class UAV:
             self._vehicle_local_position_callback, 
             qos_profile
         )
-
+        
+        self.failsafe_trigger_subscriber = self.node.create_subscription(
+            Bool, 
+            '/failsafe_trigger', 
+            self._failsafe_callback, 
+            qos_profile
+        )
 
     # def set_velocity(self, vx: float, vy: float, vz: float, yaw_rate: float):
     #     """

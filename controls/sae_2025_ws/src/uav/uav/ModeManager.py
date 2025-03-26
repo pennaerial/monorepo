@@ -21,7 +21,6 @@ class ModeManager(Node):
         self.timer = self.create_timer(0.1, self.spin_once)
         self.modes = {}
         self.transitions = {}
-        self.failsafe = False
         self.active_mode = None
         self.last_update_time = time()
         self.start_time = self.last_update_time
@@ -151,12 +150,12 @@ class ModeManager(Node):
         Execute one spin cycle of the node, updating the active mode.
         """
         current_time = time()
-        if self.failsafe:
+        if self.uav.failsafe:
             if not self.uav.emergency_landing:
                 self.uav.hover()
                 self.get_logger().info("Failsafe: Switching to AUTO_LOITER mode.")
                 self.uav.emergency_landing = True
-            if self.uav.nav_state == VehicleStatus.NAVIGATION_STATE_AUTO_LOITER:
+            if self.uav.nav_state == VehicleStatus.NAVIGATION_STATE_AUTO_LOITER or self.uav.arm_state != VehicleStatus.ARMING_STATE_ARMED:
                 self.uav.land()  # Initiate the landing procedure.
                 self.get_logger().info("Failsafe: Initiating landing.")
             return
@@ -196,12 +195,12 @@ class ModeManager(Node):
                     self.get_active_mode().update(time_delta)
                 except Exception as e:
                     self.get_logger().error(f"Error in mode {self.active_mode}: {e}")
-                    self.failsafe = True
+                    self.uav.failsafe = True
                     return
                 state = self.get_active_mode().check_status()
                 if state == 'error':
                     self.get_logger().error(f"Error in mode {self.active_mode}. Switching to failsafe.")
-                    self.failsafe = True
+                    self.uav.failsafe = True
                 elif state == 'terminate':
                     self.get_logger().info(f"Mission has completed.")
                     self.destroy_node()
