@@ -31,8 +31,9 @@ def find_payload(
 
     # Create zone mask and clean it using morphological operations.
     zone_mask = cv2.inRange(hsv_image, lower_zone, upper_zone)
-    kernel = np.ones((5, 5), np.uint8)
-    zone_mask = cv2.morphologyEx(zone_mask, cv2.MORPH_CLOSE, kernel)
+    kernel = np.ones((17, 17), np.uint8)
+    dilated = cv2.dilate(zone_mask, kernel, iterations=1)
+    zone_mask = cv2.morphologyEx(dilated, cv2.MORPH_CLOSE, kernel)
     zone_mask = cv2.morphologyEx(zone_mask, cv2.MORPH_OPEN, kernel)
 
     # Find all external contours in the zone mask.
@@ -87,6 +88,7 @@ def find_payload(
         cv2.namedWindow("Payload Tracking", cv2.WINDOW_AUTOSIZE)
         cv2.imshow("Payload Tracking", vis_image)
         cv2.waitKey(1)
+        input()
     
     return cx, cy, not bool(payload_contours)
 
@@ -187,3 +189,8 @@ def compute_3d_vector(
     target_point_center = target_point_sensor + sensor_to_center_offset
     
     return tuple(target_point_center / np.linalg.norm(target_point_center))
+
+if __name__ == "__main__":
+    # Test the functions
+    image = cv2.imread("/Users/ethanyu/VSCodeProjects/monorepo/good_images/image_20250322_191023.png")
+    print(find_payload(image, (140, 155, 50), (170, 255, 255), (140, 155, 50), (170, 255, 255), True))
