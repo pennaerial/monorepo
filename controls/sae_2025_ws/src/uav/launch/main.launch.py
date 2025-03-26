@@ -108,6 +108,13 @@ def launch_setup(context, *args, **kwargs):
     if len(vision_nodes) == 0:
         vision_node_actions = []
     
+    if not sim_bool:
+        vision_node_actions.prepend(ExecuteProcess(
+            cmd=['ros2', 'run', 'v4l2_camera', 'v4l2_camera_node', '--ros-args', '-p', 'image_size:="[640,480]"'],
+            output='screen',
+            name='cam2image'
+        ))
+    
     # Find required paths.
     px4_path = (find_folder_with_heuristic('PX4-Autopilot', os.path.expanduser('~'))
                 if not HARDCODE_PATH else os.path.expanduser('~/PX4-Autopilot'))
