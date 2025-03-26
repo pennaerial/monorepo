@@ -87,5 +87,10 @@ class PayloadTrackingNode(VisionNode):
 def main():
     rclpy.init()
     node = PayloadTrackingNode()
-    rclpy.spin(node)
+    try:    
+        rclpy.spin(node)
+    except Exception as e:
+        print(e)
+        node.publish_failsafe()
+
     rclpy.shutdown()

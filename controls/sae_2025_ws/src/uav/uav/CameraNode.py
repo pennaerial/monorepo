@@ -4,6 +4,7 @@ from sensor_msgs.msg import CameraInfo
 from uav_interfaces.srv import CameraData
 from sensor_msgs.msg import Image
 import cv2
+import std_msg.Bool
 
 class CameraNode(Node):
     """
@@ -49,6 +50,8 @@ class CameraNode(Node):
             self.service_callback
         )
 
+        self.failsafe_publisher = self.create_publisher(Bool, '/failsafe_trigger', 10)
+
         self.get_logger().info(f"{node_name} has started, subscribing to {image_topic}.")
         self.get_logger().info(f"{node_name} has started, subscribing to {info_topic}.")
 
@@ -93,6 +96,9 @@ class CameraNode(Node):
                 self.get_logger().warn("No camera info available.")
         self.get_logger().info("Sending camera data.")
         return response
+    
+    def publish_failsafe(self):
+        self.failsafe_publisher.publish(Bool())
     
 def main():
     rclpy.init()

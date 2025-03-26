@@ -8,6 +8,7 @@ import numpy as np
 import rclpy
 from rclpy.node import Node
 from uav.utils import camel_to_snake
+from std_msgs.msg import Bool
 
 class VisionNode(Node):
     """
@@ -71,7 +72,7 @@ class VisionNode(Node):
             self.camera_info = None
 
         self.display = display
-
+        self.failsafe_publisher = self.create_publisher(Bool, '/failsafe_trigger', 10)
         
     def image_callback(self, msg: Image):
         """
@@ -159,3 +160,6 @@ class VisionNode(Node):
         Cleanup resources, such as OpenCV windows.
         """
         cv2.destroyAllWindows()
+
+    def publish_failsafe(self):
+        self.failsafe_publisher.publish(Bool())
