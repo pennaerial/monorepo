@@ -105,7 +105,7 @@ class CameraNode(Node):
         return response
     
     def publish_failsafe(self):
-        self.failsafe_publisher.publish(Bool())
+        self.failsafe_publisher.publish(Bool(data=True))
     
 def main():
     rclpy.init()

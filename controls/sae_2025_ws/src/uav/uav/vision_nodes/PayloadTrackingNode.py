@@ -54,7 +54,6 @@ class PayloadTrackingNode(VisionNode):
         # Predict next state
         prediction = self.kalman.predict()
         predicted_x, predicted_y = prediction[0, 0], prediction[1, 0]
-        
         # Get raw detection
         detection = find_payload(
             image,
