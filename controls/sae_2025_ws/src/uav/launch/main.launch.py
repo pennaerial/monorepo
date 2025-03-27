@@ -7,6 +7,7 @@ from launch import LaunchDescription
 from launch.actions import ExecuteProcess, LogInfo, RegisterEventHandler, TimerAction, OpaqueFunction
 from launch.event_handlers import OnProcessStart
 from launch_ros.actions import Node
+from uav.utils import vehicle_map
 
 GZ_CAMERA_TOPIC = '/world/custom/model/x500_mono_cam_down_0/link/camera_link/sensor/imager/image'
 GZ_CAMERA_INFO_TOPIC = '/world/custom/model/x500_mono_cam_down_0/link/camera_link/sensor/imager/camera_info'
@@ -74,7 +75,7 @@ def launch_setup(context, *args, **kwargs):
     uav_debug = str(params.get('uav_debug', 'false'))
     vision_debug = str(params.get('vision_debug', 'false'))
     sim = str(params.get('sim', 'false'))
-    vehicle_type = 'quadcopter' if params.get('vehicle_type', 0) == 0 else 'tiltrotor_vtol'
+    vehicle_type = vehicle_map[params.get('vehicle_type', 0)]
     
     # Convert debug and simulation flags to booleans.
     vision_debug_bool = vision_debug.lower() == 'true'
@@ -142,6 +143,9 @@ def launch_setup(context, *args, **kwargs):
     elif vehicle_type == 'tiltrotor_vtol':
         autostart = 4020
         model = 'gz_tiltrotor'
+    elif vehicle_type == 'fixed_wing':
+        autostart = 4003
+        model = 'gz_rc_cessna'
     else:
         raise ValueError(f"Invalid vehicle type: {vehicle_type}")
     px4_sitl = ExecuteProcess(
