@@ -88,7 +88,6 @@ def find_payload(
         cv2.namedWindow("Payload Tracking", cv2.WINDOW_AUTOSIZE)
         cv2.imshow("Payload Tracking", vis_image)
         cv2.waitKey(1)
-        input()
     
     return cx, cy, not bool(payload_contours)
 

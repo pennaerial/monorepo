@@ -109,6 +109,11 @@ class CameraNode(Node):
     
 def main():
     rclpy.init()
-    node = CameraNode("camera_node")
+    try:
+        node = CameraNode("camera_node")
+    except Exception as e:
+        print(e)
+        node.publish_failsafe()
+        return
     rclpy.spin(node)
     rclpy.shutdown()

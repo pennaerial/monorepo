@@ -5,9 +5,6 @@ start:
   transitions:
     finished: payload
 
-vision:
-  class: uav.vision_nodes.PayloadTrackingNode
-
 payload:
   class: uav.autonomous_modes.PayloadPickupMode
   params:
