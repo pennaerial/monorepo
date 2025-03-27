@@ -4,7 +4,9 @@ from sensor_msgs.msg import CameraInfo
 from uav_interfaces.srv import CameraData
 from sensor_msgs.msg import Image
 import cv2
-import std_msg.Bool
+from std_msgs.msg import Bool
+from rclpy.qos import QoSProfile, DurabilityPolicy, ReliabilityPolicy
+
 
 class CameraNode(Node):
     """
@@ -50,7 +52,12 @@ class CameraNode(Node):
             self.service_callback
         )
 
-        self.failsafe_publisher = self.create_publisher(Bool, '/failsafe_trigger', 10)
+        qos_profile = QoSProfile(
+                        depth=10,
+                        durability=DurabilityPolicy.TRANSIENT_LOCAL,  # Ensures messages persist for new subscribers
+                        reliability=ReliabilityPolicy.RELIABLE
+                    )
+        self.failsafe_publisher = self.create_publisher(Bool, '/failsafe_trigger', qos_profile)
 
         self.get_logger().info(f"{node_name} has started, subscribing to {image_topic}.")
         self.get_logger().info(f"{node_name} has started, subscribing to {info_topic}.")

@@ -423,7 +423,7 @@ class UAV:
             reliability=QoSReliabilityPolicy.BEST_EFFORT,
             durability=QoSDurabilityPolicy.TRANSIENT_LOCAL,
             history=QoSHistoryPolicy.KEEP_LAST,
-            depth=1
+            depth=10
         )
 
         # Publishers

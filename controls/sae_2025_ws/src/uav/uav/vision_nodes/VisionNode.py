@@ -9,6 +9,7 @@ import rclpy
 from rclpy.node import Node
 from uav.utils import camel_to_snake
 from std_msgs.msg import Bool
+from rclpy.qos import QoSProfile, DurabilityPolicy, ReliabilityPolicy
 
 class VisionNode(Node):
     """
@@ -72,7 +73,12 @@ class VisionNode(Node):
             self.camera_info = None
 
         self.display = display
-        self.failsafe_publisher = self.create_publisher(Bool, '/failsafe_trigger', 10)
+        qos_profile = QoSProfile(
+                        depth=10,
+                        durability=DurabilityPolicy.TRANSIENT_LOCAL,  # Ensures messages persist for new subscribers
+                        reliability=ReliabilityPolicy.RELIABLE
+                    )
+        self.failsafe_publisher = self.create_publisher(Bool, '/failsafe_trigger', qos_profile)
         
     def image_callback(self, msg: Image):
         """

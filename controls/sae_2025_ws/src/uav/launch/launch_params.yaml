@@ -1,6 +1,6 @@
 # launch_params.yaml
-mission_name: basic
+mission_name: basic_payload_pickup
 uav_debug: false
-vision_debug: false
-sim: false
+vision_debug: true
+sim: true
 vehicle_type: 0 # 0 for quadrotor, 1 for tiltrotor VTOL

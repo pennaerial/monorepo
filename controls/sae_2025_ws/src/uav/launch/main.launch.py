@@ -109,7 +109,7 @@ def launch_setup(context, *args, **kwargs):
         vision_node_actions = []
     
     if not sim_bool:
-        vision_node_actions.prepend(ExecuteProcess(
+        vision_node_actions.insert(0, ExecuteProcess(
             cmd=['ros2', 'run', 'v4l2_camera', 'v4l2_camera_node', '--ros-args', '-p', 'image_size:="[640,480]"'],
             output='screen',
             name='cam2image'
