@@ -31,7 +31,7 @@ class NavGPSMode(Mode):
         dist = 0
         if self.index != -1:
             dist = self.uav.distance_to_waypoint(self.coordinate_system, self.goal)
-            self.node.get_logger().info(f"Distance to waypoint: {dist}, current position: {self.uav.get_local_position()}")
+            self.log(f"Distance to waypoint: {dist}, current position: {self.uav.get_local_position()}")
             
         if dist >= self.margin:
             self.uav.publish_position_setpoint(self.target) # PX4 expects stream of setpoints
@@ -45,7 +45,7 @@ class NavGPSMode(Mode):
                 self.uav.publish_position_setpoint(self.target)
             else:
                 self.wait_time -= time_delta
-                self.node.get_logger().info(f"Holding - waiting for {self.wait_time} more seconds")
+                self.log(f"Holding - waiting for {self.wait_time} more seconds")
 
     def get_local_target(self) -> tuple[float, float, float]:
         """
@@ -69,6 +69,6 @@ class NavGPSMode(Mode):
             str: The status of the mode.
         """
         if self.index >= len(self.coordinates):
-            return "finished"
+            return "complete"
         else:
             return "continue"

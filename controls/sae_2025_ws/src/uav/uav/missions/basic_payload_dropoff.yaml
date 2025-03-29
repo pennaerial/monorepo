@@ -3,7 +3,7 @@ start:
   params:
     coordinates: '[((5, 10, -10), 1, "LOCAL"),]'
   transitions:
-    finished: payload
+    complete: payload
 
 payload:
   class: uav.autonomous_modes.PayloadDropoffMode

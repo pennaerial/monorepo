@@ -146,6 +146,9 @@ def launch_setup(context, *args, **kwargs):
     elif vehicle_type == 'fixed_wing':
         autostart = 4003
         model = 'gz_rc_cessna'
+    elif vehicle_type == 'standard_vtol':
+        autostart = 4004
+        model = 'gz_standard_vtol'
     else:
         raise ValueError(f"Invalid vehicle type: {vehicle_type}")
     px4_sitl = ExecuteProcess(

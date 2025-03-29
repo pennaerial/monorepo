@@ -41,7 +41,7 @@ class PayloadDropoffMode(Mode):
         """
         # If UAV is unstable, skip the update
         if self.uav.roll > 0.1 or self.uav.pitch > 0.1:
-            self.node.get_logger().info("Roll or pitch detected. Waiting for stabilization.")
+            self.log("Roll or pitch detected. Waiting for stabilization.")
             return
         
         if self.mode == 1:
@@ -86,7 +86,7 @@ class PayloadDropoffMode(Mode):
             else:
                 direction[2] = 0
 
-        self.node.get_logger().info(f"Direction: {direction}")
+        self.log(f"Direction: {direction}")
         self.uav.publish_position_setpoint(direction, relative=True)
 
     def check_status(self) -> str:

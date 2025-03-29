@@ -3,6 +3,6 @@ start:
   params:
     coordinates: '[((5, 3, -10), 5, "LOCAL"), ((10, 1, -1), 20, "LOCAL"), ((-5, 3, -10), 3, "LOCAL"), ((5, 3, -10), 3, "LOCAL")]'
   transitions:
-    finished: land
+    complete: land
 land:
   class: uav.autonomous_modes.LandingMode

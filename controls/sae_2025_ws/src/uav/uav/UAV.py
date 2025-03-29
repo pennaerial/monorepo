@@ -46,6 +46,9 @@ class UAV:
         self.vehicle_attitude = None
         self.nav_state = None
         self.arm_state = None
+
+        self.system_id = 1
+        self.component_id = 1
         
         # Set up Subscribers/Publishers to communicate with aircraft
         self._initialize_publishers_and_subscribers()
@@ -141,11 +144,15 @@ class UAV:
 
     def vtol_transition_to(self, vtol_state, immediate=False):
         """
-        Command a VTOL transition.
+        Command a VTOL transition. 
         Following https://mavlink.io/en/messages/common.html#MAV_CMD_DO_VTOL_TRANSITION
+
+        Args:
+            vtol_state (str): The desired VTOL state ('MC' or 'FW').
+            immediate (bool): If True, the transition should be immediate.
         """
         assert vtol_state in ['MC', 'FW'], "VTOL state must be 'MC' or 'FW'."
-        state = VtolVehicleStatus.VEHICLE_VTOL_STATE_TRANSITION_TO_MC if vtol_state == 'MC' else VtolVehicleStatus.VEHICLE_VTOL_STATE_TRANSITION_TO_FW
+        state = VtolVehicleStatus.VEHICLE_VTOL_STATE_MC if vtol_state == 'MC' else VtolVehicleStatus.VEHICLE_VTOL_STATE_FW
         immediate = 1 if immediate else 0
         self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_DO_VTOL_TRANSITION, params={'param1': float(state), 'param2': float(immediate)})
         self.node.get_logger().info(f"VTOL transition command sent: {state}. Transitioning to {vtol_state} mode.")
@@ -332,10 +339,10 @@ class UAV:
         self,
         command: int,
         params: dict = {},
-        target_system=1,
-        target_component=1,
-        source_system=1,
-        source_component=1,
+        target_system=None,
+        target_component=None,
+        source_system=None,
+        source_component=None,
         from_external=True
     ):
         """
@@ -348,16 +355,16 @@ class UAV:
         msg.param2 = params.get('param2', 0.0)
         msg.param3 = params.get('param3', 0.0)
         msg.param4 = params.get('param4', 0.0)
-        msg.param5 = params.get('param5', 0.0)  # lat
-        msg.param6 = params.get('param6', 0.0)  # lon
-        msg.param7 = params.get('param7', 0.0)  # alt
+        msg.param5 = params.get('param5', 0.0)
+        msg.param6 = params.get('param6', 0.0)
+        msg.param7 = params.get('param7', 0.0)
 
         msg.command = command
 
-        msg.target_system = target_system
-        msg.target_component = target_component
-        msg.source_system = source_system
-        msg.source_component = source_component
+        msg.target_system = target_system if target_system else self.system_id
+        msg.target_component = target_component if target_component else self.component_id
+        msg.source_system = source_system if source_system else self.system_id
+        msg.source_component = source_component if source_component else self.component_id
         msg.from_external = from_external
         msg.timestamp = int(Clock().now().nanoseconds / 1000)  # microseconds
 
@@ -373,6 +380,11 @@ class UAV:
         self.arm_state = msg.arming_state
         self.failsafe_px4 = msg.failsafe
         self.flight_check = msg.pre_flight_checks_pass
+        self.is_vtol = msg.is_vtol
+        self.system_id = msg.system_id
+        self.component_id = msg.component_id
+        if msg.is_vtol:
+            self.vehicle_type = 'MC' if msg.vehicle_type == 0 else 'FW'
         self.failsafe = self.failsafe_px4 or self.failsafe_trigger
         if self.DEBUG:
             self.node.get_logger().info(f"Nav State: {self.nav_state}, Arm State: {self.arm_state}, Failsafe: {self.failsafe_px4}, Flight Check: {self.flight_check}")
