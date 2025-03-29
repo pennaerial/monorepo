@@ -156,6 +156,15 @@ class UAV:
         immediate = 1 if immediate else 0
         self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_DO_VTOL_TRANSITION, params={'param1': float(state), 'param2': float(immediate)})
         self.node.get_logger().info(f"VTOL transition command sent: {state}. Transitioning to {vtol_state} mode.")
+
+    def drop_payload(self):
+        self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_DO_SET_ACTUATOR, params={'param1': 1.0})
+
+    def pickup_payload(self):
+        self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_DO_SET_ACTUATOR, params={'param1': -1.0})
+
+    def disable_servo(self):
+        self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_DO_SET_ACTUATOR, params={'param1': 0.0})
     
     def publish_position_setpoint(self, coordinate, yaw=None, calculate_yaw=False, relative=False):
         """Publish the trajectory setpoint.
