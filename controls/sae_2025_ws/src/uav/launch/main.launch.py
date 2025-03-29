@@ -75,11 +75,13 @@ def launch_setup(context, *args, **kwargs):
     uav_debug = str(params.get('uav_debug', 'false'))
     vision_debug = str(params.get('vision_debug', 'false'))
     sim = str(params.get('sim', 'false'))
+    run_mission = str(params.get('run_mission', 'true'))
     vehicle_type = vehicle_map[params.get('vehicle_type', 0)]
     
     # Convert debug and simulation flags to booleans.
     vision_debug_bool = vision_debug.lower() == 'true'
     sim_bool = sim.lower() == 'true'
+    run_mission_bool = run_mission.lower() == 'true'
     
     # Build the mission YAML file path using the mission name.
     YAML_PATH = os.path.join(os.getcwd(), 'src', 'uav', 'uav', 'missions', f"{mission_name}.yaml")
@@ -111,7 +113,7 @@ def launch_setup(context, *args, **kwargs):
     
     if not sim_bool:
         vision_node_actions.insert(0, ExecuteProcess(
-            cmd=['ros2', 'run', 'v4l2_camera', 'v4l2_camera_node', '--ros-args', '-p', 'image_size:="[640,480]"'],
+            cmd=['ros2', 'run', 'v4l2_camera', 'v4l2_camera_node', '--ros-args', '-p', 'image_size:=[640,480]', '--ros-args', '--remap', '/image_raw:=/camera'],
             output='screen',
             name='cam2image'
         ))
@@ -179,8 +181,6 @@ def launch_setup(context, *args, **kwargs):
     
     # Define the mission process.
     mission_cmd = ['ros2', 'run', 'uav', 'mission', uav_debug, YAML_PATH, ','.join(vision_nodes)]
-    if not sim_bool:
-         mission_cmd += ['--ros-args', '-r', '/image_raw:=/camera']
     mission = ExecuteProcess(
         cmd=mission_cmd,
         output='screen',
@@ -190,7 +190,7 @@ def launch_setup(context, *args, **kwargs):
     
     delayed_mission = TimerAction(
         period=15.0,
-        actions=[mission]
+        actions=[mission] if run_mission_bool else []
     )
     
     # Build and return the complete list of actions.

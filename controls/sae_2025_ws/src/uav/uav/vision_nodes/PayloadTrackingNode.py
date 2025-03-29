@@ -52,8 +52,8 @@ class PayloadTrackingNode(VisionNode):
         image = rotate_image(image, -np.rad2deg(request.yaw))
 
         # Predict next state
-        prediction = self.kalman.predict()
-        predicted_x, predicted_y = prediction[0, 0], prediction[1, 0]
+        # prediction = self.kalman.predict()
+        # predicted_x, predicted_y = prediction[0, 0], prediction[1, 0]
         # Get raw detection
         detection = find_payload(
             image,
@@ -65,13 +65,16 @@ class PayloadTrackingNode(VisionNode):
         if detection is not None:
             cx, cy, dlz_empty = detection
             # Update Kalman filter with measurement
-            measurement = np.array([[np.float32(cx)], [np.float32(cy)]])
-            corrected_state = self.kalman.correct(measurement)
-            x, y = corrected_state[0, 0], corrected_state[1, 0]
+            # measurement = np.array([[np.float32(cx)], [np.float32(cy)]])
+            # corrected_state = self.kalman.correct(measurement)
+            # x, y = corrected_state[0, 0], corrected_state[1, 0]
             x, y = cx, cy
         else:
-            # Use prediction if no detection
-            x, y = predicted_x, predicted_y
+            # # Use prediction if no detection
+            # x, y = predicted_x, predicted_y
+            x, y = image.shape[:2]
+            x /= 2
+            y /= 2
             
         # Compute 3D direction vector
         direction = compute_3d_vector(x, y, np.array(camera_info.k, ).reshape(3, 3), request.altitude)
