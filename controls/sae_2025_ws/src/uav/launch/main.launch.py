@@ -104,7 +104,7 @@ def launch_setup(context, *args, **kwargs):
             executable=exe_name,
             name=exe_name,
             output='screen',
-            parameters=[{'debug': vision_debug_bool}]
+            parameters=[{'debug': vision_debug_bool, 'sim': sim_bool}]
         ))
     
     # Clear vision node actions if none are found.

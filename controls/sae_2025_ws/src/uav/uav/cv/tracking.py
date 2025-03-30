@@ -31,14 +31,18 @@ def find_payload(
 
     # Create zone mask and clean it using morphological operations.
     zone_mask = cv2.inRange(hsv_image, lower_zone, upper_zone)
-    kernel = np.ones((17, 17), np.uint8)
-    dilated = cv2.dilate(zone_mask, kernel, iterations=1)
+    kernel = np.ones((5, 5), np.uint8)
+    dilated = cv2.dilate(zone_mask, kernel, iterations=3)
     zone_mask = cv2.morphologyEx(dilated, cv2.MORPH_CLOSE, kernel)
     zone_mask = cv2.morphologyEx(zone_mask, cv2.MORPH_OPEN, kernel)
 
     # Find all external contours in the zone mask.
     contours, _ = cv2.findContours(zone_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if not contours:
+        if debug:
+            vis_image = image.copy()
+            cv2.imshow("Payload Tracking", vis_image)
+            cv2.waitKey(1)
         return None
 
     # Find the largest zone contour.
@@ -75,7 +79,6 @@ def find_payload(
         if M_zone["m00"] == 0:
             return None
         cx, cy = int(M_zone["m10"] / M_zone["m00"]), int(M_zone["m01"] / M_zone["m00"])
-    
     if debug:
         vis_image = image.copy()
 
@@ -87,7 +90,21 @@ def find_payload(
         cv2.circle(vis_image, (cx, cy), 5, (0, 0, 255), -1)
         cv2.namedWindow("Payload Tracking", cv2.WINDOW_AUTOSIZE)
         cv2.imshow("Payload Tracking", vis_image)
+        cv2.imshow(f"DLZ Mask {lower_zone}, {upper_zone}", zone_mask)
+        cv2.imshow(f"Payload Mask {lower_payload}, {upper_payload}", payload_mask)
         cv2.waitKey(1)
+        
+    
+    #def click_event(event, x, y, flags, param):
+    #    if event == cv2.EVENT_LBUTTONDOWN:
+    #        hsv_img = param['hsv']
+    #        hsv_value = hsv_img[y, x]
+    #        print(hsv_value)
+    #cv2.namedWindow("image")
+    #cv2.setMouseCallback("image", click_event, param={'hsv':hsv_image})
+    #while True:
+    #    cv2.imshow('image', image)
+    #    cv2.waitKey(1)
     
     return cx, cy, not bool(payload_contours)
 

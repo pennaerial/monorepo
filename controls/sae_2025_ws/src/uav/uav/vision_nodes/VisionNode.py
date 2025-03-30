@@ -4,6 +4,7 @@ from typing import Optional
 from uav_interfaces.srv import CameraData
 from sensor_msgs.msg import Image, CameraInfo
 import cv2
+from cv_bridge import CvBridge
 import numpy as np
 import rclpy
 from rclpy.node import Node
@@ -43,7 +44,8 @@ class VisionNode(Node):
         
         self.declare_parameter('debug', False)
         self.debug = self.get_parameter('debug').value
-
+        self.declare_parameter('sim', True)
+        self.sim = self.get_parameter('sim').value
         self.custom_service_type = custom_service
 
         self.use_service = use_service
@@ -72,6 +74,8 @@ class VisionNode(Node):
             self.image = None
             self.camera_info = None
 
+        if not self.sim:
+            self.bridge = CvBridge()
         self.display = display
         qos_profile = QoSProfile(
                         depth=10,
@@ -106,8 +110,11 @@ class VisionNode(Node):
         Returns:
             np.ndarray: The decoded image as a NumPy array.
         """
-        img_data = np.frombuffer(msg.data, dtype=np.uint8)
-        frame = img_data.reshape((msg.height, msg.width, 3))  # Assuming BGR8 encoding
+        if self.sim:
+            img_data = np.frombuffer(msg.data, dtype=np.uint8)
+            frame = img_data.reshape((msg.height, msg.width, 3))  # Assuming BGR8 encoding
+        else:
+            frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
         return frame
     
     def send_req(self, req):
