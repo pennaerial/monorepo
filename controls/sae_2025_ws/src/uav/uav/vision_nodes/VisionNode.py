@@ -4,7 +4,6 @@ from typing import Optional
 from uav_interfaces.srv import CameraData
 from sensor_msgs.msg import Image, CameraInfo
 import cv2
-from cv_bridge import CvBridge
 import numpy as np
 import rclpy
 from rclpy.node import Node
@@ -75,6 +74,7 @@ class VisionNode(Node):
             self.camera_info = None
 
         if not self.sim:
+            from cv_bridge import CvBridge
             self.bridge = CvBridge()
         self.display = display
         qos_profile = QoSProfile(
