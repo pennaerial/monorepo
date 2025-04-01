@@ -76,10 +76,10 @@ class PayloadDropoffMode(Mode):
         camera_offsets = tuple(x / request.altitude for x in self.camera_offsets) if request.altitude > 1 else self.camera_offsets
         direction = [x + y + z for x, y, z in zip(direction, offsets, self.uav.uav_to_local(camera_offsets))]
 
-        if request.altitude < 2:
+        if request.altitude < 1:
             # If payload pose direction is within a small threshold
-            if (np.abs(direction[0]) < request.altitude / 50 and
-                np.abs(direction[1]) < request.altitude / 50):
+            if (np.abs(direction[0]) < request.altitude / 25 and
+                np.abs(direction[1]) < request.altitude / 25):
                 self.uav.land()
                 self.mode = 1
                 return
