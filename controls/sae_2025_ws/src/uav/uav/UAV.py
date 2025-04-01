@@ -50,7 +50,7 @@ class UAV:
         self.system_id = 1
         self.component_id = 1
         
-        self.max_acceleration = 2.0
+        self.max_acceleration = 0.01
         
         # Set up Subscribers/Publishers to communicate with aircraft
         self._initialize_publishers_and_subscribers()
@@ -187,7 +187,7 @@ class UAV:
         msg.yaw = self.calculate_yaw(x, y) if calculate_yaw else yaw if yaw else float(self.yaw)
         msg.timestamp = int(self.node.get_clock().now().nanoseconds / 1000)
         norm_dir = np.array([x, y, z]) / np.linalg.norm(np.array([x, y, z]))
-        msg.acceleration = [norm_dir[0] * self.max_acceleration, norm_dir[1] * self.max_acceleration, norm_dir[2] * self.max_acceleration]
+        msg.velocity = [norm_dir[0] * self.max_acceleration, norm_dir[1] * self.max_acceleration, norm_dir[2] * self.max_acceleration]
         self.trajectory_publisher.publish(msg)
         self.node.get_logger().info(f"Publishing setpoint: pos={[x, y, z]}, yaw={msg.yaw:.2f}")
         
