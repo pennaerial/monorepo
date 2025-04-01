@@ -44,7 +44,7 @@ class VelocityControlPayloadPickupMode(Mode):
           
         request = PayloadTracking.Request()
         request.altitude = -self.uav.get_local_position()[2]
-        request.yaw = float(self.uav.yaw)
+        request.yaw = float(self.uav.yaw) 
         request.payload_color = self.color
         response = self.send_request(PayloadTrackingNode, request)
         
@@ -61,11 +61,14 @@ class VelocityControlPayloadPickupMode(Mode):
                     pass # TODO: Extend servo
             return
         
-        Kx = 0.5
-        Ky = 0.5
-        Kz = 0.5
-        direction = [-response.direction[1] * Ky, response.direction[0] * Kx,
-                        response.direction[2] * Kz / self.altitude_constant]
+        Kx = 0.2
+        Ky = 0.2
+        Kz = 0.1
+        direction = [-response.direction[1], response.direction[0],
+                        response.direction[2] / self.altitude_constant] 
+        
+        velocity = [Kx * -response.direction[1] / response.direction[1], Ky * response.direction[0] / response.direction[0], Kz * response.direction[2] / response.direction[2] / self.altitude_constant]
+        # velocity = [-response.direction[1] * Ky, response.direction[0] * Kx, response.direction[2] * Kz / self.altitude_constant]
         
         camera_offsets = tuple(x / request.altitude for x in self.camera_offsets) if request.altitude > 1 else self.camera_offsets
         direction = [x + y for x, y in zip(direction, self.uav.uav_to_local(camera_offsets))]
@@ -84,7 +87,7 @@ class VelocityControlPayloadPickupMode(Mode):
                 direction[2] = 0
 
         self.log(f"Direction: {direction}")
-        self.uav.publish_velocity_setpoint(direction, relative=True)
+        self.uav.publish_velocity_setpoint(direction, velocity, relative=True)
 
     def check_status(self) -> str:
         """

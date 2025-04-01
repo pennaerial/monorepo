@@ -190,6 +190,29 @@ class UAV:
         msg.acceleration = [norm_dir[0] * self.max_acceleration, norm_dir[1] * self.max_acceleration, norm_dir[2] * self.max_acceleration]
         self.trajectory_publisher.publish(msg)
         self.node.get_logger().info(f"Publishing setpoint: pos={[x, y, z]}, yaw={msg.yaw:.2f}")
+
+    def publish_velocity_setpoint(self, coordinate, velocity, yaw=None, relative=False):
+        """Publish the trajectory setpoint.
+        
+        Args:
+            coordinate (tuple): (vx, vy, vz) in the local frame.
+            yaw (float): Yaw angle in radians (optional).
+        """
+        x, y, z = coordinate
+        if relative:
+            x += self.local_position.x
+            y += self.local_position.y
+            z += self.local_position.z
+        vx, vy, vz = velocity
+
+        msg = TrajectorySetpoint()
+        msg.position = [float(x), float(y), float(z)]
+        msg.velocity = [float(vx), float(vy), float(vz)]
+        msg.acceleration = [float('nan'), float('nan'), float('nan')]
+        msg.yaw = yaw if yaw else float(self.yaw)
+        msg.timestamp = int(self.node.get_clock().now().nanoseconds / 1000)
+        self.trajectory_publisher.publish(msg)
+        self.node.get_logger().info(f"Publishing velocity setpoint: pos={[x, y, z]}, vel={[vx, vy, vz]}, yaw={msg.yaw:.2f}")
         
     def calculate_yaw(self, x: float, y: float) -> float:
         """Calculate the yaw angle to point towards the next waypoint."""

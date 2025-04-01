@@ -246,6 +246,14 @@ class UAV:
         msg.timestamp = int(self.node.get_clock().now().nanoseconds / 1000)
         self.trajectory_publisher.publish(msg)
         # self.node.get_logger().info(f"Publishing setpoint: pos={[x, y, z]}, yaw={msg.yaw:.2f}")
+
+    def publish_velocity_setpoint(self, velocity):
+        """Publish the velocity setpoint."""
+        msg = TrajectorySetpoint()
+        msg.velocity = velocity
+        msg.timestamp = int(self.node.get_clock().now().nanoseconds / 1000)
+        self.trajectory_publisher.publish(msg)
+        # self.node.get_logger().info(f"Publishing velocity setpoint: vel={velocity}")
     
     def calculate_yaw(self, x: float, y: float) -> float:
         """Calculate the yaw angle to point towards the next waypoint."""
