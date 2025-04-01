@@ -1,5 +1,5 @@
 # launch_params.yaml
-mission_name: basic_payload_dropoff
+mission_name: vel_control_payload_pickup
 uav_debug: false
 vision_debug: true
 sim: false
