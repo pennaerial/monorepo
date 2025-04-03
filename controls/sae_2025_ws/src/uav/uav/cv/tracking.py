@@ -2,6 +2,7 @@
 import cv2
 import numpy as np
 from typing import Optional, Tuple
+import os
 
 def find_payload(
     image: np.ndarray,
@@ -9,7 +10,9 @@ def find_payload(
     upper_zone: np.ndarray,
     lower_payload: np.ndarray,
     upper_payload: np.ndarray,
-    debug: bool = False
+    uuid: str,
+    debug: bool = False,
+    save_vision: bool = False,
 ) -> Optional[Tuple[int, int, bool]]:
     """
     Detect payload in image using color thresholding.
@@ -21,6 +24,7 @@ def find_payload(
         lower_payload (np.ndarray): Lower HSV threshold for payload.
         upper_payload (np.ndarray): Upper HSV threshold for payload.
         debug (bool): If True, return an image with visualizations.
+        save_vision (bool): If True, save the visualization image.
     
     Returns:
         Optional[Tuple[int, int, bool]]: A tuple (cx, cy, zone_empty) if detection is successful;
@@ -39,10 +43,16 @@ def find_payload(
     # Find all external contours in the zone mask.
     contours, _ = cv2.findContours(zone_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if not contours:
-        if debug:
+        if debug or save_vision:
             vis_image = image.copy()
+        if debug:
             cv2.imshow("Payload Tracking", vis_image)
             cv2.waitKey(1)
+        if save_vision:
+            import time
+            time = int(time.time())
+            path = os.path.expanduser(f"~/vision_imgs/{uuid}")
+            cv2.imwrite(os.path.join(path, f"payload_{time}.png"), vis_image)
         return None
 
     # Find the largest zone contour.
@@ -79,7 +89,7 @@ def find_payload(
         if M_zone["m00"] == 0:
             return None
         cx, cy = int(M_zone["m10"] / M_zone["m00"]), int(M_zone["m01"] / M_zone["m00"])
-    if debug:
+    if debug or save_vision:
         vis_image = image.copy()
 
         cv2.drawContours(vis_image, [largest_zone_contour], -1, (0, 255, 0), 2)
@@ -88,12 +98,19 @@ def find_payload(
             cv2.drawContours(vis_image, [largest_payload_contour], -1, (0, 255, 0), 2)
         # Mark the detected center.
         cv2.circle(vis_image, (cx, cy), 5, (0, 0, 255), -1)
+    if debug:
         cv2.namedWindow("Payload Tracking", cv2.WINDOW_AUTOSIZE)
         cv2.imshow("Payload Tracking", vis_image)
         cv2.imshow(f"DLZ Mask {lower_zone}, {upper_zone}", zone_mask)
         cv2.imshow(f"Payload Mask {lower_payload}, {upper_payload}", payload_mask)
         cv2.waitKey(1)
-        
+    if save_vision:
+        import time
+        time = int(time.time())
+        path = os.path.expanduser(f"~/vision_imgs/{uuid}")
+        cv2.imwrite(os.path.join(path, f"payload_{time}.png"), vis_image)
+        cv2.imwrite(os.path.join(path, f"zone_mask_{time}.png"), zone_mask)
+        cv2.imwrite(os.path.join(path, f"payload_mask_{time}.png"), payload_mask)
     
     #def click_event(event, x, y, flags, param):
     #    if event == cv2.EVENT_LBUTTONDOWN:

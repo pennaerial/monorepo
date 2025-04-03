@@ -77,11 +77,13 @@ def launch_setup(context, *args, **kwargs):
     sim = str(params.get('sim', 'false'))
     run_mission = str(params.get('run_mission', 'true'))
     vehicle_type = vehicle_map[params.get('vehicle_type', 0)]
+    save_vision = str(params.get('save_vision', 'false'))
     
     # Convert debug and simulation flags to booleans.
     vision_debug_bool = vision_debug.lower() == 'true'
     sim_bool = sim.lower() == 'true'
     run_mission_bool = run_mission.lower() == 'true'
+    save_vision_bool = save_vision.lower() == 'true'
     
     # Build the mission YAML file path using the mission name.
     YAML_PATH = os.path.join(os.getcwd(), 'src', 'uav', 'uav', 'missions', f"{mission_name}.yaml")
@@ -104,7 +106,7 @@ def launch_setup(context, *args, **kwargs):
             executable=exe_name,
             name=exe_name,
             output='screen',
-            parameters=[{'debug': vision_debug_bool, 'sim': sim_bool}]
+            parameters=[{'debug': vision_debug_bool, 'sim': sim_bool, 'save_vision': save_vision_bool}],
         ))
     
     # Clear vision node actions if none are found.

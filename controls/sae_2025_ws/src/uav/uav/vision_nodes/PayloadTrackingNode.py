@@ -59,7 +59,9 @@ class PayloadTrackingNode(VisionNode):
             image,
             *pink,
             *(green if request.payload_color == 'green' else blue if request.payload_color == 'blue' else pink),
-            self.debug
+            self.uuid,
+            self.debug,
+            self.save_vision
         )
         dlz_empty = False
         if detection is not None:

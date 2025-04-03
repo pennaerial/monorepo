@@ -4,7 +4,9 @@ from typing import Optional
 from uav_interfaces.srv import CameraData
 from sensor_msgs.msg import Image, CameraInfo
 import cv2
+import os
 import numpy as np
+import uuid
 import rclpy
 from rclpy.node import Node
 from uav.utils import camel_to_snake
@@ -45,7 +47,12 @@ class VisionNode(Node):
         self.debug = self.get_parameter('debug').value
         self.declare_parameter('sim', True)
         self.sim = self.get_parameter('sim').value
+        self.declare_parameter('save_vision', False)
+        self.save_vision = self.get_parameter('save_vision').value
         self.custom_service_type = custom_service
+        if self.save_vision:
+            self.uuid = str(uuid.uuid4())
+            os.makedirs(os.path.expanduser(f"~/vision_imgs/{self.uuid}"), exist_ok=True)
 
         self.use_service = use_service
 
