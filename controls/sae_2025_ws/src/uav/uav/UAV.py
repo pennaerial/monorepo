@@ -29,7 +29,7 @@ class UAV:
     Skeleton class for UAV control and interfacing with PX4 via ROS 2.
     """
 
-    def __init__(self, node: Node, takeoff_amount=5.0, DEBUG=False):
+    def __init__(self, node: Node, takeoff_amount=5.0, DEBUG=False, camera_offsets=(0.0, 0.0, 0.0)):
 
         self.node = node
         self.DEBUG = DEBUG
@@ -51,6 +51,9 @@ class UAV:
         self.component_id = 1
         
         self.max_acceleration = 0.01
+        
+        # Camera position relative to the payload mechanism, in meters (NED frame)
+        self.camera_offsets = camera_offsets
         
         # Set up Subscribers/Publishers to communicate with aircraft
         self._initialize_publishers_and_subscribers()

@@ -24,7 +24,12 @@ class ModeManager(Node):
         self.active_mode = None
         self.last_update_time = time()
         self.start_time = self.last_update_time
-        self.uav = UAV(self, DEBUG=DEBUG)
+        
+        # Load launch parameters to get camera_offsets
+        launch_params = self.load_launch_params()
+        camera_offsets = tuple(launch_params.get('camera_offsets', [0.0, 0.0, 0.0]))
+        
+        self.uav = UAV(self, DEBUG=DEBUG, camera_offsets=camera_offsets)
         self.get_logger().info("Mission Node has started!")
         self.setup_vision(vision_nodes)
         self.setup_modes(mode_map)
@@ -236,6 +241,17 @@ class ModeManager(Node):
         with open(filename, 'r') as file:
             data = yaml.safe_load(file)
         return data
+        
+    def load_launch_params(self):
+        """
+        Load the launch parameters from the launch_params.yaml file.
+        
+        Returns:
+            dict: The launch parameters as a dictionary.
+        """
+        import os
+        params_file = os.path.join(os.getcwd(), 'src', 'uav', 'launch', 'launch_params.yaml')
+        return self.load_yaml_to_dict(params_file)
     
 
 if __name__ == '__main__':

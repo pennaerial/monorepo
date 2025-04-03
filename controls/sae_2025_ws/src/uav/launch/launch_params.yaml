@@ -6,3 +6,6 @@ sim: true
 run_mission: true
 vehicle_type: 0 # 0 for quadrotor, 1 for tiltrotor VTOL, 2 for fixed-wing, 3 for standard VTOL
 save_vision: true
+
+# Camera offsets relative to payload mechanism in NED frame (forward, right, down) in meters
+camera_offsets: [0.0, 0.0, 0.0]

@@ -13,7 +13,7 @@ class PayloadDropoffMode(Mode):
     A mode for dropping off the payload.
     """
 
-    def __init__(self, node: Node, uav: UAV, offsets: Optional[Tuple[float, float, float]] = (0.0, 0.0, 0.0), camera_offsets: Optional[Tuple[float, float, float]] = (0.0, 0.0, 0.0)):
+    def __init__(self, node: Node, uav: UAV, offsets: Optional[Tuple[float, float, float]] = (0.0, 0.0, 0.0)):
         """
         Initialize the LowerPayload.
 
@@ -23,16 +23,12 @@ class PayloadDropoffMode(Mode):
             offsets (Optional[Tuple[float, float, float]]):
                 Should denote the position of dropoff relative to the center of zone, in meters
                 In NED frame: x is forward, y is right, and z is down.
-            camera_offsets (Optional[Tuple[float, float, float]]):
-                Should denote the position of the camera relative to the payload mechanism, in meters
-                In NED frame: x is forward, y is right, and z is down.
         """
         super().__init__(node, uav)
 
         self.response = None
         self.done = False
         self.offsets = offsets
-        self.camera_offsets = camera_offsets
         self.mode = 0 # 0 for uav centering, 1 for landing, 2 for retracting, 3 for taking off
 
     def on_update(self, time_delta: float) -> None:
@@ -73,8 +69,7 @@ class PayloadDropoffMode(Mode):
         direction = [-response.direction[1], response.direction[0], response.direction[2]]
         
         offsets = tuple(x / request.altitude for x in self.offsets) if request.altitude > 1 else self.offsets
-        camera_offsets = tuple(x / request.altitude for x in self.camera_offsets) if request.altitude > 1 else self.camera_offsets
-        direction = [x + y + z for x, y, z in zip(direction, offsets, self.uav.uav_to_local(camera_offsets))]
+        direction = [x + y + z for x, y, z in zip(direction, offsets, self.uav.uav_to_local(self.uav.camera_offsets))]
 
         if request.altitude < 1:
             # If payload pose direction is within a small threshold
