@@ -5,7 +5,7 @@ from uav.cv.tracking import find_payload, compute_3d_vector, rotate_image
 from uav.vision_nodes import VisionNode
 from uav_interfaces.srv import PayloadTracking
 import rclpy
-from uav.utils import pink, green, blue
+from uav.utils import pink, green, blue, yellow
 
 class PayloadTrackingNode(VisionNode):
     """
@@ -14,6 +14,13 @@ class PayloadTrackingNode(VisionNode):
     srv = PayloadTracking
     def __init__(self):
         super().__init__('payload_tracking', self.__class__.srv)
+
+        self.color_map = {
+            'pink': pink,
+            'green': green,
+            'blue': blue,
+            'yellow': yellow
+        }
         
         # Initialize Kalman filter
         self.kalman = cv2.KalmanFilter(4, 2)
@@ -58,7 +65,7 @@ class PayloadTrackingNode(VisionNode):
         detection = find_payload(
             image,
             *pink,
-            *(green if request.payload_color == 'green' else blue if request.payload_color == 'blue' else pink),
+            *(self.color_map[request.payload_color]),
             self.uuid,
             self.debug,
             self.save_vision
