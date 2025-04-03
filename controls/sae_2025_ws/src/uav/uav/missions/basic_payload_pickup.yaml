@@ -8,7 +8,7 @@ start:
 payload:
   class: uav.autonomous_modes.PayloadPickupMode
   params:
-    color: 'blue'
+    color: 'yellow'
   transitions:
     complete: land
 

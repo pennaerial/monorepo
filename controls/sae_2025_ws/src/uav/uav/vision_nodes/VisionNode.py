@@ -50,8 +50,8 @@ class VisionNode(Node):
         self.declare_parameter('save_vision', False)
         self.save_vision = self.get_parameter('save_vision').value
         self.custom_service_type = custom_service
+        self.uuid = str(uuid.uuid4())
         if self.save_vision:
-            self.uuid = str(uuid.uuid4())
             os.makedirs(os.path.expanduser(f"~/vision_imgs/{self.uuid}"), exist_ok=True)
 
         self.use_service = use_service
