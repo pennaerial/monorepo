@@ -162,10 +162,10 @@ class UAV:
         self.node.get_logger().info(f"VTOL transition command sent: {state}. Transitioning to {vtol_state} mode.")
 
     def drop_payload(self):
-        self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_DO_SET_ACTUATOR, params={'param1': 1.0})
+        self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_DO_SET_ACTUATOR, params={'param1': -1.0})
 
     def pickup_payload(self):
-        self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_DO_SET_ACTUATOR, params={'param1': -1.0})
+        self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_DO_SET_ACTUATOR, params={'param1': 1.0})
 
     def disable_servo(self):
         self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_DO_SET_ACTUATOR, params={'param1': 0.0})

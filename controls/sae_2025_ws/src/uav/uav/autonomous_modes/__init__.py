@@ -4,3 +4,4 @@ from .PayloadDropoffMode import PayloadDropoffMode
 from .PayloadPickupMode import PayloadPickupMode
 from .NavGPSMode import NavGPSMode
 from .TransitionMode import TransitionMode
+from .DropoffTestMode import DropoffTestMode

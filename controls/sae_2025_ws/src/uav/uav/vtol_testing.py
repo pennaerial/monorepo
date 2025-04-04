@@ -1,6 +1,6 @@
 import rclpy
 from rclpy.node import Node
-from uav.UAV_hardware import UAV
+from uav.UAV import UAV
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
 from px4_msgs.msg import (
     OffboardControlMode,
@@ -24,34 +24,27 @@ class OffboardControl(Node):
 
         self.uav = UAV(self)
         self.timer = self.create_timer(0.1, self.timer_callback)
-        self.mission_completed = False
-        self.armed_message = False
-        self.takeoff_message = False
-        self.initialized = False
+        self.timer1 = 0
+        self.lower_time = 1.87
+        self.done = False
+        self.last_time = time.time()
 
     def timer_callback(self):
-        self.uav.publish_offboard_control_heartbeat_signal()
-        if self.mission_completed or not self.uav.vehicle_local_position or not self.uav.sensor_gps:
-            return
+        self.curr_time = time.time()
+        time_delta = self.curr_time - self.last_time
+        self.last_time = self.curr_time
+        if self.timer1 < self.lower_time and self.timer1 >= 0:
+            self.get_logger().info(f"Dropping: time passed {self.timer1}")
+            self.uav.drop_payload()
+            self.timer1 += time_delta
+        if self.timer1 >= self.lower_time:
+            self.lowering = False
+            self.uav.pickup_payload()
+            self.timer1 -= time_delta
+        if self.timer1 < 0:
+            self.uav.disable_servo()
+            self.done = True
 
-        if self.uav.offboard_setpoint_counter == 10:
-            self.uav.arm()
-            self.initialized = True
-            self.uav.set_origin()
-            if not self.armed_message:
-                self.get_logger().info("Vehicle armed, Origin Set")
-                self.armed_message = True
-        elif not self.uav.takeoff_complete:
-            if not self.takeoff_message:
-                self.get_logger().info("Taking Off")
-                self.takeoff_message = True
-            self.uav.vtol_takeoff()
-        if self.uav.offboard_setpoint_counter < 11:
-            self.uav.offboard_setpoint_counter += 1
-        
-    def get_payload_gps(self):
-        return (self.lat, self.lon, 0.0)
-    
 
 
 def main(args=None) -> None:

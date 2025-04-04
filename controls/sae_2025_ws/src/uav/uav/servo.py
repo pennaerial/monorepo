@@ -15,38 +15,33 @@ class OscillatoryServoCommandNode(Node):
             depth=1
         )
         self.vehicle_command_pub = self.create_publisher(VehicleCommand, '/fmu/in/vehicle_command', qos_profile)
-        # Timer to update and send servo command at a fixed rate (e.g., every 0.1 seconds)
-        self.timer_period = 0.1  # seconds
-        self.timer = self.create_timer(self.timer_period, self.timer_callback)
-        
-        # Oscillation parameters
-        self.start_time = self.get_clock().now().nanoseconds / 1e9  # in seconds
-        self.frequency = 0.25            # oscillation frequency in Hz (0.5 Hz gives a 2-second period)
-        self.amplitude = 0.5            # PWM amplitude (µs); oscillates from 1500-500=1000 to 1500+500=2000 µs
-        self.center = 0.0            # center PWM value in µs
+        self.timer = self.create_timer(0.1, self.timer_callback)
+        self.timer1 = 0
+        self.lower_time = 0.5
+        self.lowering = True        
+        self.last_time = self.get_clock().now().nanoseconds / 1e9  # in seconds
+
 
     def timer_callback(self):
-        current_time = self.get_clock().now().nanoseconds / 1e9  # seconds
-        elapsed = current_time - self.start_time
-        
-        # Calculate oscillatory PWM value using sine wave.
-        pwm_value = self.center + self.amplitude + math.sin(2 * math.pi * self.frequency * elapsed)
-        
-        # Build the servo command message.
         msg = VehicleCommand()
+        current_time = self.get_clock().now().nanoseconds / 1e9  # seconds
+        time_delta = current_time - self.last_time
+        self.last_time = current_time
+        if self.timer1 < self.lower_time and self.lowering:
+            self.get_logger().info(f"Dropping: time passed {self.timer1}")
+            msg.param1 = -1.0
+            self.timer1 += time_delta
+        elif self.timer1 >= 0:
+            self.get_logger().info(f"Dropping: time passed {self.timer1}")
+            self.lowering = False
+            msg.param1 = 1.0
+            self.timer1 -= time_delta
+        elif self.timer1 < 0:
+            self.get_logger().info(f"Done")
+            msg.param1 = 0.0        
         msg.command = VehicleCommand.VEHICLE_CMD_DO_SET_ACTUATOR
-        msg.param1 = float(pwm_value)
-        msg.param2 = 0.0
-        msg.param3 = 0.0
-        msg.param4 = 0.0
-        msg.param5 = 0.0
-        msg.param6 = 0.0
-        msg.param7 = 0.0
-        msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
-        
         self.vehicle_command_pub.publish(msg)
-        # msg = ActuatorServos()
-        self.get_logger().info(f"Published servo PWM: {pwm_value:.1f} µs")
+        # self.get_logger().info(f"Current time_delta: {time_delta:.5f}")
 
 def main(args=None):
     rclpy.init(args=args)
