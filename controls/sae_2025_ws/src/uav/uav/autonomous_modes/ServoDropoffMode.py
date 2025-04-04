@@ -8,7 +8,7 @@ from typing import Optional, Tuple
 from px4_msgs.msg import VehicleStatus
 import cv2
 
-class DropoffTestMode(Mode):
+class ServoDropoffMode(Mode):
     """
     A mode for dropping off the payload.
     """
@@ -29,8 +29,9 @@ class DropoffTestMode(Mode):
         """
         super().__init__(node, uav)
 
-        self.timer = 0
+        
         self.lower_time = 1.87
+        self.timer = self.lower_time
         self.done = False
         # 0 for uav centering, 1 for landing, 2 for retracting, 3 for taking off
 
@@ -39,16 +40,18 @@ class DropoffTestMode(Mode):
         Periodic logic for lowering payload and handling obstacles.
         """
         # If UAV is unstable, skip the update
-        if self.timer < self.lower_time and self.timer >= 0:
+        if self.timer >= 0:
             self.uav.drop_payload()
-            self.timer += time_delta
-        if self.timer >= self.lower_time:
+            self.timer -= time_delta
+        if self.timer < 0 and self.timer > -self.lower_time:
             self.lowering = False
             self.uav.pickup_payload()
             self.timer -= time_delta
-        if self.timer < 0:
+        if self.timer < -self.lower_time:
             self.uav.disable_servo()
             self.done = True
+
+        
 
     def check_status(self) -> str:
         """
