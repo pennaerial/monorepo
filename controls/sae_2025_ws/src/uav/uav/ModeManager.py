@@ -16,7 +16,7 @@ class ModeManager(Node):
     """
     A ROS 2 node for managing UAV modes and mission logic.
     """
-    def __init__(self, mode_map: str, vision_nodes: str, DEBUG=False):
+    def __init__(self, mode_map: str, vision_nodes: str, camera_offsets, DEBUG=False):
         super().__init__('mission_node')
         self.timer = self.create_timer(0.1, self.spin_once)
         self.modes = {}
@@ -25,6 +25,7 @@ class ModeManager(Node):
         self.last_update_time = time()
         self.start_time = self.last_update_time
         self.uav = UAV(self, DEBUG=DEBUG)
+        self.uav.camera_offsets = camera_offsets
         self.get_logger().info("Mission Node has started!")
         self.setup_vision(vision_nodes)
         self.setup_modes(mode_map)

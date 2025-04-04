@@ -51,6 +51,8 @@ class UAV:
         self.component_id = 1
         
         self.max_acceleration = 0.01
+
+        self.camera_offsets = None
         
         # Set up Subscribers/Publishers to communicate with aircraft
         self._initialize_publishers_and_subscribers()

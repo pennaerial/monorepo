@@ -13,7 +13,7 @@ class PayloadDropoffMode(Mode):
     A mode for dropping off the payload.
     """
 
-    def __init__(self, node: Node, uav: UAV, offsets: Optional[Tuple[float, float, float]] = (0.0, 0.0, 0.0), camera_offsets: Optional[Tuple[float, float, float]] = (0.0, 0.0, 0.0)):
+    def __init__(self, node: Node, uav: UAV, offsets: Optional[Tuple[float, float, float]] = (0.0, 0.0, 0.0)):
         """
         Initialize the LowerPayload.
 
@@ -23,16 +23,13 @@ class PayloadDropoffMode(Mode):
             offsets (Optional[Tuple[float, float, float]]):
                 Should denote the position of dropoff relative to the center of zone, in meters
                 In NED frame: x is forward, y is right, and z is down.
-            camera_offsets (Optional[Tuple[float, float, float]]):
-                Should denote the position of the camera relative to the payload mechanism, in meters
-                In NED frame: x is forward, y is right, and z is down.
         """
         super().__init__(node, uav)
 
         self.response = None
         self.done = False
         self.offsets = offsets
-        self.camera_offsets = camera_offsets
+        self.camera_offsets = self.uav.camera_offsets
         self.mode = 0 # 0 for uav centering, 1 for landing, 2 for retracting, 3 for taking off
 
     def on_update(self, time_delta: float) -> None:

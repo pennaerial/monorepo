@@ -12,7 +12,7 @@ class PayloadPickupMode(Mode):
     A mode for picking up a payload.
     """
 
-    def __init__(self, node: Node, uav: UAV, color: str = 'green', camera_offsets: Optional[Tuple[float, float, float]] = (0.0, 0.0, 0.0)):
+    def __init__(self, node: Node, uav: UAV, color: str = 'green'):
         """
         Initialize the LowerPayload.
 
@@ -20,16 +20,12 @@ class PayloadPickupMode(Mode):
             node (Node): ROS 2 node managing the UAV.
             uav (UAV): The UAV instance to control.
             color (str): The color of the payload to track.
-            camera_offsets (Optional[Tuple[float, float, float]]): The camera_offsets for the payload lowering. 
-                Should denote the position of the camera relative to the payload mechanism, in meters
-                In NED frame: x is forward, y is right, and z is down.
         """
         super().__init__(node, uav)
 
         self.response = None
         self.altitude_constant = 3
         self.done = False
-        self.camera_offsets = camera_offsets
         self.color = color
         self.goal_pos = None
 
@@ -64,7 +60,7 @@ class PayloadPickupMode(Mode):
         direction = [-response.direction[1], response.direction[0],
                         response.direction[2] / self.altitude_constant]
         
-        camera_offsets = tuple(x / request.altitude for x in self.camera_offsets) if request.altitude > 1 else self.camera_offsets
+        camera_offsets = tuple(x / request.altitude for x in self.uav.camera_offsets) if request.altitude > 1 else self.uav.camera_offsets
         direction = [x + y for x, y in zip(direction, self.uav.uav_to_local(camera_offsets))]
 
         # Determine the direction vector based on altitude and payload pose

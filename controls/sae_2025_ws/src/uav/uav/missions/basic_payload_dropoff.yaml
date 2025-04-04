@@ -8,7 +8,6 @@ start:
 payload:
   class: uav.autonomous_modes.PayloadDropoffMode
   params:
-    camera_offsets: '(-0.13, 0, 0)'
     offsets: '(0, 0, 0)'
   transitions:
     complete: land

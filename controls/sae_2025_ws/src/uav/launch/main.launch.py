@@ -78,6 +78,7 @@ def launch_setup(context, *args, **kwargs):
     run_mission = str(params.get('run_mission', 'true'))
     vehicle_type = vehicle_map[params.get('vehicle_type', 0)]
     save_vision = str(params.get('save_vision', 'false'))
+    camera_offsets = params.get('camera_offsets', [0, 0, 0])
     
     # Convert debug and simulation flags to booleans.
     vision_debug_bool = vision_debug.lower() == 'true'
@@ -182,7 +183,8 @@ def launch_setup(context, *args, **kwargs):
     )
     
     # Define the mission process.
-    mission_cmd = ['ros2', 'run', 'uav', 'mission', uav_debug, YAML_PATH, ','.join(vision_nodes)]
+    camera_offsets_str = ','.join(str(offset) for offset in camera_offsets)
+    mission_cmd = ['ros2', 'run', 'uav', 'mission', uav_debug, YAML_PATH, camera_offsets_str, ','.join(vision_nodes)]
     mission = ExecuteProcess(
         cmd=mission_cmd,
         output='screen',
