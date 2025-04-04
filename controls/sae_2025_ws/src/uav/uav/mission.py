@@ -8,12 +8,12 @@ def main():
     if len(sys.argv) > 3:
         debug = sys.argv[1]
         yaml_file = sys.argv[2]
+        servo_only = sys.argv[3]
         try:
-            camera_offsets = [float(offset.strip()) for offset in sys.argv[3].split(',')]
+            camera_offsets = [float(offset.strip()) for offset in sys.argv[4].split(',')]
         except Exception as e:
             print(f"Error parsing camera_offsets: {e}")
             camera_offsets = [0, 0, 0]
-        servo_only = sys.argv[4]
         vision_nodes = sys.argv[5]
     else:
         cwd = os.getcwd() # default

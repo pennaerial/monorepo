@@ -86,7 +86,6 @@ def launch_setup(context, *args, **kwargs):
     sim_bool = sim.lower() == 'true'
     run_mission_bool = run_mission.lower() == 'true'
     save_vision_bool = save_vision.lower() == 'true'
-    servo_only_bool = servo_only.lower() == 'true'
     
     # Build the mission YAML file path using the mission name.
     YAML_PATH = os.path.join(os.getcwd(), 'src', 'uav', 'uav', 'missions', f"{mission_name}.yaml")
@@ -186,7 +185,8 @@ def launch_setup(context, *args, **kwargs):
     
     # Define the mission process.
     camera_offsets_str = ','.join(str(offset) for offset in camera_offsets)
-    mission_cmd = ['ros2', 'run', 'uav', 'mission', uav_debug, YAML_PATH, camera_offsets_str, servo_only_bool, ','.join(vision_nodes)]
+    mission_cmd = ['ros2', 'run', 'uav', 'mission', uav_debug, YAML_PATH, servo_only, camera_offsets_str, ','.join(vision_nodes)]
+    print(mission_cmd)
     mission = ExecuteProcess(
         cmd=mission_cmd,
         output='screen',
