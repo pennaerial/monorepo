@@ -186,7 +186,6 @@ def launch_setup(context, *args, **kwargs):
     # Define the mission process.
     camera_offsets_str = ','.join(str(offset) for offset in camera_offsets)
     mission_cmd = ['ros2', 'run', 'uav', 'mission', uav_debug, YAML_PATH, servo_only, camera_offsets_str, ','.join(vision_nodes)]
-    print(mission_cmd)
     mission = ExecuteProcess(
         cmd=mission_cmd,
         output='screen',

@@ -29,7 +29,7 @@ class UAV:
     Skeleton class for UAV control and interfacing with PX4 via ROS 2.
     """
 
-    def __init__(self, node: Node, takeoff_amount=5.0, DEBUG=False):
+    def __init__(self, node: Node, takeoff_amount=5.0, DEBUG=False, camera_offsets=[0, 0, 0]):
 
         self.node = node
         self.DEBUG = DEBUG
@@ -52,14 +52,14 @@ class UAV:
         
         self.max_acceleration = 0.01
 
-        self.camera_offsets = None
+        self.camera_offsets = camera_offsets
         
         # Set up Subscribers/Publishers to communicate with aircraft
         self._initialize_publishers_and_subscribers()
 
         # set takeoff parameters
         self.origin_set = False
-        self.yaw = 0.0
+        self.yaw = None
         self.takeoff_amount = takeoff_amount
         self.attempted_takeoff = False
 
@@ -84,13 +84,14 @@ class UAV:
         
     
     def set_origin(self):
-        if self.global_position:  
+        if self.global_position and self.yaw:  
             lat = self.global_position.lat
             lon = self.global_position.lon
             alt = self.global_position.alt
             self.node.get_logger().info(f"Setting origin to {lat}, {lon}, {alt}")
             self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_SET_GPS_GLOBAL_ORIGIN,
                                    params={'param1':0.0, 'param2':0.0, 'param3': 0.0, 'param4': 0.0, 'param5':lat, 'param6': lon, 'param7': alt})
+            self.camera_offsets = self.uav_to_local(self.camera_offsets)
             self.origin_set = True
 
     def distance_to_waypoint(self, coordinate_system, waypoint) -> float:

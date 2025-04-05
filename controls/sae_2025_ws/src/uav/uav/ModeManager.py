@@ -24,8 +24,7 @@ class ModeManager(Node):
         self.active_mode = None
         self.last_update_time = time()
         self.start_time = self.last_update_time
-        self.uav = UAV(self, DEBUG=DEBUG)
-        self.uav.camera_offsets = camera_offsets
+        self.uav = UAV(self, DEBUG=DEBUG, camera_offsets=camera_offsets)
         self.get_logger().info("Mission Node has started!")
         self.setup_vision(vision_nodes)
         self.setup_modes(mode_map)
