@@ -18,8 +18,8 @@ export const profile = {
     // city: "Seoul",
     // region: "Gyeonggi-do",
     // you can also add lat and lng to the location to get a more precise location
-    // lat: 0,
-    // lng: 0,
+    lat: 39.6837,
+    lng: 75.7497,
   },
   hobbies: ["Graphic Design/Art", "Badminton", "Hiking", "Reading", "Baking"],
   funFacts: [
