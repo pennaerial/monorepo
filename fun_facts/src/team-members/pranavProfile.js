@@ -1,7 +1,7 @@
 // Copy this file to a new one (e.g., `alexProfile.js`) and update the fields.
 // Keep the export name `profile` so the app can auto-discover it.
 export const profile = {
-  name: "Your Name",
+  name: "Pranav Gupta",
   class: {
     // Your graduation year (e.g., 2028)
     year: 2029,
