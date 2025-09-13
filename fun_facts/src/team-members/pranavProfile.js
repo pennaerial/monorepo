@@ -14,7 +14,7 @@ export const profile = {
     country: "United States",
     // If in the US, include your state (e.g., "Pennsylvania").
     // If international, you can optionally add city or region instead.
-    state: "Dallas, TX",
+    state: "Texas",
     // city: "Seoul",
     // region: "Gyeonggi-do",
     // you can also add lat and lng to the location to get a more precise location
