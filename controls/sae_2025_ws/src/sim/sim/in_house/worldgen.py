@@ -1,6 +1,11 @@
+import random as r
 import xml.etree.ElementTree as ET
+
 from xml.dom import minidom
 from pathlib import Path
+from courses.ascent import AscentCourse
+from courses.descent import DescentCourse
+from courses.slalom import SlalomCourse
 
 def add_hoops(input_file, output_file, hoop_positions):
     # Expand ~, make absolute, and validate paths
@@ -51,17 +56,19 @@ def add_hoops(input_file, output_file, hoop_positions):
     lines = [ln for ln in pretty.splitlines() if ln.strip() != ""]
     out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
-if __name__ == "__main__":
-    from courses import DescentCourse
+def generate_world(gen_style, course_params):
+    courses = ['ascent', 'descent', 'slalom']
 
-    course = DescentCourse(dlz=(10, 0, 1), uav=(0, 0, 1), num_hoops=5, max_dist=10, start_height=10)
-    hoop_positions = course.generate_course()
-    for hoop in hoop_positions:
-        print(hoop)
+    if gen_style.lower() == 'random':
+        course_id = r.uniform(0, len(courses) - 1)
+    elif gen_style.lower() == "previous":
+        pass
+    elif gen_style.lower() == "ascent":
+        pass
+    elif gen_style.lower() == "descent":
+        pass
+    elif gen_style.lower() == "slalom":
+        pass
 
-    # Use ~-safe paths
     ip_file = '/home/avaniko/penn-air/monorepo/controls/sae_2025_ws/src/sim/sim/worlds/template.sdf'
     op_file = '/home/avaniko/penn-air/monorepo/controls/sae_2025_ws/src/sim/sim/worlds/custom.sdf'
-
-    add_hoops(ip_file, op_file, hoop_positions)
-    print(f"Generated descent course with {len(hoop_positions)} hoops → {Path(op_file).expanduser().resolve()}")
