@@ -61,14 +61,31 @@ def generate_world(gen_style, course_params):
 
     if gen_style.lower() == 'random':
         course_id = r.uniform(0, len(courses) - 1)
-    elif gen_style.lower() == "previous":
-        pass
-    elif gen_style.lower() == "ascent":
-        pass
-    elif gen_style.lower() == "descent":
-        pass
-    elif gen_style.lower() == "slalom":
-        pass
+        gen_style = courses[course_id]
+        
+    if gen_style.lower() == "previous":
+        return
 
-    ip_file = '/home/avaniko/penn-air/monorepo/controls/sae_2025_ws/src/sim/sim/worlds/template.sdf'
-    op_file = '/home/avaniko/penn-air/monorepo/controls/sae_2025_ws/src/sim/sim/worlds/custom.sdf'
+    elif gen_style.lower() == "ascent":
+        course = AscentCourse(dlz=course_params.dlz, 
+                              uav=course_params.uav, 
+                              num_hoops=course_params.num_hoops, 
+                              max_dist=course_params.max_dist, 
+                              start_height=course_params.asc_start_height)
+        hoop_poses = course.generate_course()
+    elif gen_style.lower() == "descent":
+        course = DescentCourse(dlz=course_params.dlz, 
+                              uav=course_params.uav, 
+                              num_hoops=course_params.num_hoops, 
+                              max_dist=course_params.max_dist, 
+                              start_height=course_params.des_start_height)
+        hoop_poses = course.generate_course()
+    elif gen_style.lower() == "slalom":
+        course = SlalomCourse(dlz=course_params.dlz, 
+                              uav=course_params.uav, 
+                              num_hoops=course_params.num_hoops, 
+                              max_dist=course_params.max_dist,
+                              width=course_params.width,
+                              height=course_params.height)
+
+    add_hoops(input_file=course_params.ip_file, output_file=course_params.op_file, hoop_positions=hoop_poses)
