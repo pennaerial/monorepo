@@ -1,0 +1,52 @@
+<?xml version="1.0" ?>
+<sdf version="1.4">
+  <model name="hoop">
+  <static>true</static>
+    <link name="hoop">
+    <pose> 0 0 0 0 1.5707 0 </pose>
+      <inertial>
+        <mass>2</mass>
+      </inertial>
+      <visual name="visual">
+      <pose> 0 0 0 0 0 0 </pose>
+        <geometry>
+          <mesh>
+            <uri>model://hoop/meshes/HoopSTL.stl</uri>
+            <scale> .005 .005 .005 </scale>
+          </mesh>
+        </geometry>
+        <material>
+          <diffuse>1 0 0 1</diffuse> <!-- Pink color -->
+      </material>
+      </visual>
+      <collision name="collision">
+        <!-- Use the same pose as the visual so they line up -->
+        <pose> 0 0 0 0 0 0 </pose>
+        <geometry>
+          <mesh>
+            <uri>model://hoop/meshes/HoopSTL.stl</uri>
+            <scale> .005 .005 .005 </scale>
+          </mesh>
+        </geometry>
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.8</mu>
+              <mu2>0.8</mu2>
+            </ode>
+          </friction>
+          <contact>
+            <ode>
+              <kp>1e6</kp>
+              <kd>1</kd>
+              <min_depth>0.001</min_depth>
+              <max_vel>0.2</max_vel>
+            </ode>
+          </contact>
+        </surface>
+      </collision>
+      <self_collide>false</self_collide>
+      <enable_wind>false</enable_wind>
+    </link>
+  </model>
+</sdf>
