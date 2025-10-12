@@ -6,8 +6,6 @@ from launch import LaunchDescription
 from launch.actions import ExecuteProcess, LogInfo, RegisterEventHandler, TimerAction, OpaqueFunction
 from launch.event_handlers import OnProcessStart
 from launch_ros.actions import Node
-from launch.substitutions import LaunchConfiguration
-from launch.actions import DeclareLaunchArgument
 from sim.in_house.worldgen import generate_world
 
 
@@ -124,19 +122,13 @@ def launch_setup(context, *args, **kwargs):
     # Load parameters from YAML file
     params = load_launch_params()
     
-    # Override with launch arguments if provided
-    competition_type = LaunchConfiguration('competition_type').perform(context)
-    course_type = LaunchConfiguration('course_type').perform(context)
-    enable_scoring = LaunchConfiguration('enable_scoring').perform(context).lower() == 'true'
-    enable_camera_bridge = LaunchConfiguration('enable_camera_bridge').perform(context).lower() == 'true'
-    num_hoops = int(LaunchConfiguration('num_hoops').perform(context))
-    max_dist = float(LaunchConfiguration('max_dist').perform(context))
-    
-    # Update params with launch arguments
-    params['competition']['type'] = competition_type
-    params['course']['type'] = course_type
-    params['simulation']['enable_scoring'] = enable_scoring
-    params['ros2']['enable_camera_bridge'] = enable_camera_bridge
+    # Use YAML values directly
+    competition_type = params['competition']['type']
+    course_type = params['course']['type']
+    enable_scoring = params['simulation'].get('enable_scoring', True)
+    enable_camera_bridge = params['ros2'].get('enable_camera_bridge', True)
+    num_hoops = params['course'][course_type]['num_hoops']
+    max_dist = params['course'][course_type]['max_dist']
     
     # Extract course parameters
     course_params_raw = params['course'][course_type].copy()
@@ -311,36 +303,5 @@ def launch_setup(context, *args, **kwargs):
 
 def generate_launch_description():
     return LaunchDescription([
-        # Launch arguments
-        DeclareLaunchArgument(
-            'competition_type',
-            default_value='in_house',
-            description='Type of competition (in_house, iarc, custom)'
-        ),
-        DeclareLaunchArgument(
-            'course_type',
-            default_value='slalom',
-            description='Type of course (slalom, ascent, descent, custom)'
-        ),
-        DeclareLaunchArgument(
-            'enable_scoring',
-            default_value='true',
-            description='Enable scoring node'
-        ),
-        DeclareLaunchArgument(
-            'enable_camera_bridge',
-            default_value='true',
-            description='Enable camera topic bridging'
-        ),
-        DeclareLaunchArgument(
-            'num_hoops',
-            default_value='5',
-            description='Number of hoops in the course'
-        ),
-        DeclareLaunchArgument(
-            'max_dist',
-            default_value='10',
-            description='Maximum distance between hoops'
-        ),
         OpaqueFunction(function=launch_setup)
     ])
