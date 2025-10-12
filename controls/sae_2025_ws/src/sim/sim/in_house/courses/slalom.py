@@ -1,6 +1,6 @@
 import random as r
 from typing import List, Tuple
-from course_style import Pose, CourseStyle
+from .course_style import Pose, CourseStyle
 
 class SlalomCourse(CourseStyle):
     def __init__(self,

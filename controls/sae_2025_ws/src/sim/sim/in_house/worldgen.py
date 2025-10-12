@@ -3,9 +3,9 @@ import xml.etree.ElementTree as ET
 
 from xml.dom import minidom
 from pathlib import Path
-from courses.ascent import AscentCourse
-from courses.descent import DescentCourse
-from courses.slalom import SlalomCourse
+from .courses.ascent import AscentCourse
+from .courses.descent import DescentCourse
+from .courses.slalom import SlalomCourse
 
 def add_hoops(input_file, output_file, hoop_positions):
     # Expand ~, make absolute, and validate paths
@@ -87,5 +87,5 @@ def generate_world(gen_style, course_params):
                               max_dist=course_params.max_dist,
                               width=course_params.width,
                               height=course_params.height)
-
+        hoop_poses = course.generate_course()
     add_hoops(input_file=course_params.ip_file, output_file=course_params.op_file, hoop_positions=hoop_poses)
