@@ -1,5 +1,5 @@
 # launch_params.yaml
-mission_name: basic
+mission_name: sae_aero_2025
 uav_debug: false
 vision_debug: false
 sim: true
