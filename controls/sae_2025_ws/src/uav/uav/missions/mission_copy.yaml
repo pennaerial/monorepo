@@ -1,0 +1,48 @@
+start:
+  class: uav.autonomous_modes.NavGPSMode
+  params:
+    coordinates: '[((5, 10, -10), 1, "LOCAL"),]'
+  transitions:
+    complete: multi_pickup
+
+multi_pickup:
+  class: uav.autonomous_modes.MultiPickupMode
+  params:
+    payloads: 
+    - 'blue'
+    - 'red'
+    - 'green'
+  transitions:
+    complete: dropoff1
+
+dropoff1:
+  class: uav.autonomous_modes.PayloadDropoffMode
+  params:
+    offsets: '(0, 0, 0)'
+  transitions:
+    complete: dropoff2
+
+dropoff2:
+  class: uav.autonomous_modes.PayloadDropoffMode
+  params:
+    offsets: '(0, 0, 0)'
+  transitions:
+    complete: dropoff2
+
+dropoff3:
+  class: uav.autonomous_modes.PayloadDropoffMode
+  params:
+    offsets: '(0, 0, 0)'
+  transitions:
+    complete: dropoff3
+
+
+return:
+  class: uav.autonomous_modes.NavGPSMode
+  params:
+    coordinates: '[((0, 0, -5), 1, "LOCAL"),]'
+  transitions:
+    complete: land
+
+land:
+  class: uav.autonomous_modes.LandingMode
