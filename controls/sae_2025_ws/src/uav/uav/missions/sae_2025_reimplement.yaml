@@ -1,4 +1,11 @@
 start:
+  class: uav.autonomous_modes.NavGPSMode
+  params:
+    coordinates: '[((0, 0, -10), 1, "LOCAL"),]'
+  transitions:
+    complete: payload
+
+payload:
   class: uav.autonomous_modes.PayloadDropoffMode
   params:
     offsets: '(0, 0, 0)'
