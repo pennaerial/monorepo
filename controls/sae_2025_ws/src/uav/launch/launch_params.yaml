@@ -1,5 +1,5 @@
 # launch_params.yaml
-mission_name: basic
+mission_name: reimplement_mission
 uav_debug: false
 vision_debug: false
 sim: true
