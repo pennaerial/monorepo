@@ -9,7 +9,7 @@ from launch.event_handlers import OnProcessStart
 from launch_ros.actions import Node
 from uav.utils import vehicle_map
 
-GZ_CAMERA_TOPIC = '/world/custom/model/x500_mono_cam_down_0/link/camera_link/sensor/imager/image'
+GZ_CAMERA_TOPIC = '/world/default/model/x500_mono_cam_down_0/link/camera_link/sensor/imager/image'
 GZ_CAMERA_INFO_TOPIC = '/world/custom/model/x500_mono_cam_down_0/link/camera_link/sensor/imager/camera_info'
 HARDCODE_PATH = False
 
@@ -136,7 +136,7 @@ def launch_setup(context, *args, **kwargs):
     
     # Define the Gazebo process.
     gazebo = ExecuteProcess(
-        cmd=['python3', 'Tools/simulation/gz/simulation-gazebo', '--world=custom'],
+        cmd=['python3', 'Tools/simulation/gz/simulation-gazebo'],
         cwd=px4_path,
         output='screen',
         name='gazebo'
@@ -168,7 +168,8 @@ def launch_setup(context, *args, **kwargs):
     gz_ros_bridge_camera = ExecuteProcess(
         cmd=['ros2', 'run', 'ros_gz_bridge', 'parameter_bridge',
             f'{GZ_CAMERA_TOPIC}@sensor_msgs/msg/Image[gz.msgs.Image',
-            '--ros-args', '--remap', '/world/custom/model/x500_mono_cam_down_0/link/camera_link/sensor/imager/image:=/camera'],
+            ],
+            #'--ros-args', '--remap', '/world/default/model/x500_mono_cam_down_0/link/camera_link/sensor/imager/image:=/camera'
         output='screen',
         cwd=sae_ws_path,
         name='gz_ros_bridge_camera'

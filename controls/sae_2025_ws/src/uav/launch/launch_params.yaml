@@ -1,11 +1,11 @@
 # launch_params.yaml
-mission_name: basic
+mission_name: sae_2025_reimplement
 uav_debug: false
 vision_debug: false
 sim: true
 run_mission: true
 vehicle_type: 0 # 0 for quadrotor, 1 for tiltrotor VTOL, 2 for fixed-wing, 3 for standard VTOL
-save_vision: false
+save_vision: true
 servo_only: false
 camera_offsets: [0, 0, 0] #Should denote the position of the camera relative to the payload mechanism, in meters
                               # In NED frame: x is forward, y is right, and z is down.

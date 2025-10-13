@@ -1,0 +1,9 @@
+payload:
+  class: uav.autonomous_modes.PayloadDropoffMode
+  params:
+    offsets: '(0, 0, 0)'
+  transitions:
+    complete: land
+
+land:
+  class: uav.autonomous_modes.LandingMode

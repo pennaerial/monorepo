@@ -4,7 +4,7 @@
 [submodule "controls/sae_2025_ws/src/px4_msgs"]
 	path = controls/sae_2025_ws/src/px4_msgs
 	url = https://github.com/PX4/px4_msgs.git
-	branch = release/1.15
+	branch = release/1.16
 [submodule "controls/sae_2025_ws/src/ros_gz"]
 	path = controls/sae_2025_ws/src/ros_gz
 	url = https://github.com/gazebosim/ros_gz.git
