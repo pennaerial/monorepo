@@ -27,14 +27,14 @@ dropoff2:
   params:
     offsets: '(0, 0, 0)'
   transitions:
-    complete: dropoff2
+    complete: dropoff3
 
 dropoff3:
   class: uav.autonomous_modes.PayloadDropoffMode
   params:
     offsets: '(0, 0, 0)'
   transitions:
-    complete: dropoff3
+    complete: return
 
 
 return:
