@@ -32,6 +32,14 @@ course:
     num_hoops: 4
     max_dist: 8
     start_height: 2     # Height of first hoop
+  
+  straight:
+    dlz: [0, 0, 0]        # Drop zone at origin
+    uav: [0, 0, 0]        # UAV starts at origin
+    num_hoops: 5          # 5 hoops in a line
+    max_dist: 10          # Total course length ~10m
+    height: 2.0           # All hoops at 2m height
+    spacing: 2.0          # 2m between hoops
 
 # Simulation Configuration
 simulation:
