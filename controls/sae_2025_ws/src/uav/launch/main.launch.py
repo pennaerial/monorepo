@@ -136,8 +136,7 @@ def launch_setup(context, *args, **kwargs):
     
     # Define the Gazebo process.
     gazebo = ExecuteProcess(
-        cmd=['python3', 'Tools/simulation/gz/simulation-gazebo', '--world=custom'],
-        cwd=px4_path,
+        cmd=['ros2', 'launch', 'sim', 'sim.launch.py'],
         output='screen',
         name='gazebo'
     )

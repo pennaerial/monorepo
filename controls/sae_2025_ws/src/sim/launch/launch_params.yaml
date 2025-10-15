@@ -54,7 +54,7 @@ simulation:
 
 # ROS2 Configuration
 ros2:
-  middleware_port: 8888       # MicroXRCEAgent port
+  middleware_port: 8889       # MicroXRCEAgent port
   enable_camera_bridge: true # Enable camera topic bridging
   enable_imu_bridge: true     # Enable IMU topic bridging
   
