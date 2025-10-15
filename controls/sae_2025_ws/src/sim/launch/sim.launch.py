@@ -277,7 +277,7 @@ def launch_setup(context, *args, **kwargs):
                 'competition_type': params['competition']['type'],
                 'competition_name': params['competition']['name'],
                 'course_type': course_type,
-                'hoop_positions': hoop_positions,  # Add hoop positions
+                'hoop_positions': str(hoop_positions),  # Add hoop positions as string
                 'position_poll_rate': sim_params.get('position_poll_rate', 10.0),
                 'scoring_rate': sim_params.get('scoring_rate', 5.0),
                 'hoop_tolerance': sim_params.get('scoring', {}).get('hoop_tolerance', 1.5),

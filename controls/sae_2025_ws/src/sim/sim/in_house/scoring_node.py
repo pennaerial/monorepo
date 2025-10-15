@@ -20,7 +20,7 @@ class ScoringNode(Node):
         super().__init__('scoring_node')
         
         # Declare parameters
-        self.declare_parameter('hoop_positions', [])
+        self.declare_parameter('hoop_positions', '[]')
         self.declare_parameter('hoop_tolerance', 1.5)
         self.declare_parameter('competition_type', 'in_house')
         self.declare_parameter('competition_name', 'test')
@@ -65,20 +65,24 @@ class ScoringNode(Node):
     def load_hoop_positions_from_params(self):
         """Load hoop positions from ROS2 parameters."""
         try:
-            hoop_positions_param = self.get_parameter('hoop_positions').get_parameter_value().double_array_value
+            hoop_positions_str = self.get_parameter('hoop_positions').get_parameter_value().string_value
             
-            if len(hoop_positions_param) == 0:
+            if hoop_positions_str == '[]' or not hoop_positions_str:
                 self.get_logger().error("No hoop positions provided in parameters!")
                 raise ValueError("No hoop positions provided in parameters")
             
-            # Convert parameter array to list of tuples
+            # Parse string representation of list
+            import ast
+            hoop_positions_list = ast.literal_eval(hoop_positions_str)
+            
+            # Convert to list of tuples
             hoop_positions = []
-            for i in range(0, len(hoop_positions_param), 3):
-                if i + 2 < len(hoop_positions_param):
+            for i in range(0, len(hoop_positions_list), 3):
+                if i + 2 < len(hoop_positions_list):
                     hoop_positions.append((
-                        hoop_positions_param[i],
-                        hoop_positions_param[i + 1],
-                        hoop_positions_param[i + 2]
+                        hoop_positions_list[i],
+                        hoop_positions_list[i + 1],
+                        hoop_positions_list[i + 2]
                     ))
             
             self.set_course_hoops(hoop_positions)

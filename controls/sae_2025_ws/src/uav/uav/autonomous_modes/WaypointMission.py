@@ -36,8 +36,7 @@ class WaypointMission(Mode):
         # UAV state
         self.uav_position = None
         self.offboard_setpoint_counter = 0
-        
-        # Mission timer
+                # Mission timer
         self.start_timer = self.node.create_timer(5.0, self.start_mission)
         
         self.node.get_logger().info("Waypoint Mission initialized")
