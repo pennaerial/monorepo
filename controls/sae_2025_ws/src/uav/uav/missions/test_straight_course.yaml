@@ -1,14 +1,18 @@
-# Test Mission for Straight Course - Scoring Node Test
-# This mission flies through all 5 hoops in the straight course at height 2m
-
+# Straight course, LOCAL frame, pauses at each hoop for 2s
 start:
-  class: "uav.autonomous_modes.WaypointMission"
+  class: "uav.autonomous_modes.NavGPSMode"
   params:
-    waypoints: "[[0, 0, 0.5], [0, 0, 2.0], [1.0, 0, 2.0], [2.0, 0, 2.0], [3.0, 0, 2.0], [4.0, 0, 2.0], [5.0, 0, 2.0], [6.0, 0, 2.0], [3.0, 0, 2.0], [0, 0, 2.0], [0, 0, 0.5], [0, 0, 0.0]]"
-    waypoint_tolerance: "0.5"
-    speed: "1.0"
-    loiter_time: "1.0"
-    altitude: "2.0"
+    # [(x,y,z), wait_seconds, 'LOCAL']
+    coordinates: "[[ (0,0,0.5), 1, 'LOCAL' ],
+                   [ (0,0,2.0), 1, 'LOCAL' ],
+                   [ (2.0,0,2.0), 2, 'LOCAL' ],
+                   [ (4.0,0,2.0), 2, 'LOCAL' ],
+                   [ (6.0,0,2.0), 2, 'LOCAL' ],
+                   [ (8.0,0,2.0), 2, 'LOCAL' ],
+                   [ (10.0,0,2.0), 2, 'LOCAL' ],
+                   [ (0,0,2.0), 1, 'LOCAL' ],
+                   [ (0,0,0.5), 1, 'LOCAL' ]]"
+    margin: "0.5"
   transitions:
     complete: land
 
