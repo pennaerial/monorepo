@@ -3,6 +3,7 @@
 import rclpy
 from rclpy.node import Node
 from px4_msgs.msg import VehicleLocalPosition
+from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy, QoSDurabilityPolicy
 from std_msgs.msg import Float32, String
 from geometry_msgs.msg import Point
 from typing import List, Tuple, Optional, Dict, Any
@@ -50,12 +51,18 @@ class ScoringNode(Node):
         self.score_publisher = self.create_publisher(Float32, '/scoring/results', 10)
         self.status_publisher = self.create_publisher(String, '/scoring/status', 10)
         
-        # Subscriber for UAV position
+        # Subscriber for UAV position (match PX4 best-effort sensor QoS)
+        qos = QoSProfile(
+            reliability=QoSReliabilityPolicy.BEST_EFFORT,
+            history=QoSHistoryPolicy.KEEP_LAST,
+            depth=10,
+            durability=QoSDurabilityPolicy.VOLATILE,
+        )
         self.position_subscription = self.create_subscription(
             VehicleLocalPosition,
             '/fmu/out/vehicle_local_position',
             self.position_callback,
-            10
+            qos
         )
         
         # Timer for periodic scoring updates
