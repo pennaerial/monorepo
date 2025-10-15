@@ -3,16 +3,15 @@ start:
   class: "uav.autonomous_modes.NavGPSMode"
   params:
     # [(x,y,z), wait_seconds, 'LOCAL']
-    coordinates: "[[ (0,0,0.5), 1, 'LOCAL' ],
-                   [ (0,0,2.0), 1, 'LOCAL' ],
-                   [ (2.0,0,2.0), 2, 'LOCAL' ],
-                   [ (4.0,0,2.0), 2, 'LOCAL' ],
-                   [ (6.0,0,2.0), 2, 'LOCAL' ],
-                   [ (8.0,0,2.0), 2, 'LOCAL' ],
-                   [ (10.0,0,2.0), 2, 'LOCAL' ],
-                   [ (0,0,2.0), 1, 'LOCAL' ],
-                   [ (0,0,0.5), 1, 'LOCAL' ]]"
-    margin: "0.5"
+    coordinates: "[[ (0,0,-0.5), 1, 'LOCAL' ],
+                   [ (0,0,-2.0), 1, 'LOCAL' ],
+                   [ (0,2.0,-2.0), 2, 'LOCAL' ],
+                   [ (0,4.0,-2.0), 2, 'LOCAL' ],
+                   [ (0,6.0,-2.0), 2, 'LOCAL' ],
+                   [ (0,8.0,-2.0), 2, 'LOCAL' ],
+                   [ (0,10.0,-2.0), 2, 'LOCAL' ],
+                   [ (0,0,-10.0), 1, 'LOCAL' ]]"
+    margin: "0.1"
   transitions:
     complete: land
 

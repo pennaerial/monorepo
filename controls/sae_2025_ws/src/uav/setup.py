@@ -39,7 +39,6 @@ setup(
             'camera = uav.CameraNode:main',
             'test_flight = uav.test_flight:main',
             'vtol_testing = uav.vtol_testing:main',
-            'waypoint_mission = uav.autonomous_modes.WaypointMission:main'
         ],
     },
 )

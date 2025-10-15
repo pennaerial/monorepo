@@ -51,9 +51,9 @@ class StraightCourse(CourseStyle):
             hoop_z = self.height
             
             # Add small random variation (±0.2m) for realism
-            variation_x = r.uniform(-0.2, 0.2)
-            variation_y = r.uniform(-0.2, 0.2)
-            variation_z = r.uniform(-0.1, 0.1)
+            variation_x = 0
+            variation_y = 0
+            variation_z = 0
             
             # Final position with variation
             final_x = hoop_x + variation_x
