@@ -225,6 +225,46 @@ def launch_setup(context, *args, **kwargs):
         name='px4_sitl'
     )
     
+    # Calculate hoop positions for scoring node
+    hoop_positions = []
+    if course_type == 'straight':
+        # Calculate hoop positions for straight course
+        num_hoops = course_params_dict['num_hoops']
+        height = course_params_dict['height']
+        spacing = course_params_dict['spacing']
+        
+        for i in range(num_hoops):
+            x = 2.0 + (i * spacing)  # Start at x=2, then spacing apart
+            y = 0.0
+            z = height
+            hoop_positions.extend([x, y, z])  # Flatten for ROS2 parameter array
+    elif course_type == 'slalom':
+        # Calculate hoop positions for slalom course
+        num_hoops = course_params_dict['num_hoops']
+        height = course_params_dict['height']
+        width = course_params_dict['width']
+        
+        for i in range(num_hoops):
+            x = 2.0 + (i * 2.0)  # 2m spacing
+            y = (i % 2) * width - width/2  # Alternating left/right
+            z = height
+            hoop_positions.extend([x, y, z])
+    elif course_type in ['ascent', 'descent']:
+        # Calculate hoop positions for ascent/descent course
+        num_hoops = course_params_dict['num_hoops']
+        start_height = course_params_dict.get('start_height', 2.0)
+        
+        for i in range(num_hoops):
+            x = 2.0 + (i * 2.0)  # 2m spacing
+            y = 0.0
+            if course_type == 'ascent':
+                z = start_height + (i * 0.5)  # Increasing height
+            else:  # descent
+                z = start_height - (i * 0.5)  # Decreasing height
+            hoop_positions.extend([x, y, z])
+    
+    print(f"Calculated {len(hoop_positions)//3} hoop positions for scoring: {hoop_positions}")
+    
     # Define the scoring node (only if enabled)
     scoring_node = None
     if sim_params.get('enable_scoring', True):
@@ -237,6 +277,7 @@ def launch_setup(context, *args, **kwargs):
                 'competition_type': params['competition']['type'],
                 'competition_name': params['competition']['name'],
                 'course_type': course_type,
+                'hoop_positions': hoop_positions,  # Add hoop positions
                 'position_poll_rate': sim_params.get('position_poll_rate', 10.0),
                 'scoring_rate': sim_params.get('scoring_rate', 5.0),
                 'hoop_tolerance': sim_params.get('scoring', {}).get('hoop_tolerance', 1.5),

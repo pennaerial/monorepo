@@ -1,0 +1,18 @@
+# Test Mission for Straight Course - Scoring Node Test
+# This mission flies through all 5 hoops in the straight course at height 2m
+
+start:
+  class: "uav.autonomous_modes.WaypointMission"
+  params:
+    waypoints: "[[0, 0, 0.5], [0, 0, 2.0], [1.0, 0, 2.0], [2.0, 0, 2.0], [3.0, 0, 2.0], [4.0, 0, 2.0], [5.0, 0, 2.0], [6.0, 0, 2.0], [3.0, 0, 2.0], [0, 0, 2.0], [0, 0, 0.5], [0, 0, 0.0]]"
+    waypoint_tolerance: 0.5
+    speed: 1.0
+    loiter_time: 1.0
+    altitude: 2.0
+  transitions:
+    complete: land
+
+land:
+  class: "uav.autonomous_modes.LandingMode"
+  params: {}
+  transitions: {}

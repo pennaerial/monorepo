@@ -19,8 +19,15 @@ class ScoringNode(Node):
     def __init__(self):
         super().__init__('scoring_node')
         
+        # Declare parameters
+        self.declare_parameter('hoop_positions', [])
+        self.declare_parameter('hoop_tolerance', 1.5)
+        self.declare_parameter('competition_type', 'in_house')
+        self.declare_parameter('competition_name', 'test')
+        self.declare_parameter('course_type', 'straight')
+        
         # Scoring parameters
-        self.hoop_radius = 1.0  # meters - radius for scoring
+        self.hoop_radius = self.get_parameter('hoop_tolerance').get_parameter_value().double_value
         self.min_altitude = 0.5  # minimum altitude to score
         self.max_altitude = 10.0  # maximum altitude to score
         
@@ -50,7 +57,36 @@ class ScoringNode(Node):
         # Timer for periodic scoring updates
         self.create_timer(0.1, self.update_scoring)  # 10Hz
         
+        # Load hoop positions from parameters
+        self.load_hoop_positions_from_params()
+        
         self.get_logger().info("Scoring node initialized")
+    
+    def load_hoop_positions_from_params(self):
+        """Load hoop positions from ROS2 parameters."""
+        try:
+            hoop_positions_param = self.get_parameter('hoop_positions').get_parameter_value().double_array_value
+            
+            if len(hoop_positions_param) == 0:
+                self.get_logger().error("No hoop positions provided in parameters!")
+                raise ValueError("No hoop positions provided in parameters")
+            
+            # Convert parameter array to list of tuples
+            hoop_positions = []
+            for i in range(0, len(hoop_positions_param), 3):
+                if i + 2 < len(hoop_positions_param):
+                    hoop_positions.append((
+                        hoop_positions_param[i],
+                        hoop_positions_param[i + 1],
+                        hoop_positions_param[i + 2]
+                    ))
+            
+            self.set_course_hoops(hoop_positions)
+            self.get_logger().info(f"Loaded {len(hoop_positions)} hoops from parameters")
+            
+        except Exception as e:
+            self.get_logger().error(f"Failed to load hoop positions from parameters: {e}")
+            raise
     
     def set_course_hoops(self, hoop_poses: List[Tuple[float, float, float]]):
         """
@@ -142,14 +178,6 @@ def main(args=None):
     rclpy.init(args=args)
     
     scoring_node = ScoringNode()
-    
-    # Example: Set up a simple course for testing
-    test_hoops = [
-        (5, 0, 2),
-        (10, 0, 2),
-        (15, 0, 2)
-    ]
-    scoring_node.set_course_hoops(test_hoops)
     
     try:
         rclpy.spin(scoring_node)
