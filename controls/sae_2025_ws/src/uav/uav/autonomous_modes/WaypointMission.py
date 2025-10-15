@@ -34,7 +34,6 @@ class WaypointMission(Mode):
         self.waypoint_start_time = None
         
         # UAV state
-        self.uav_position = None
         self.offboard_setpoint_counter = 0
                 # Mission timer
         self.start_timer = self.node.create_timer(5.0, self.start_mission)
@@ -59,7 +58,7 @@ class WaypointMission(Mode):
     
     def on_update(self, time_delta: float):
         """Periodic update called by ModeManager."""
-        if not self.mission_active or not self.uav_position:
+        if not self.mission_active or not self.uav.local_position:
             return
         
         if self.current_waypoint >= len(self.waypoints):
@@ -70,7 +69,7 @@ class WaypointMission(Mode):
         target = self.waypoints[self.current_waypoint]
         target_x, target_y, target_z = target
         
-        current_x, current_y, current_z = self.uav_position
+        current_x, current_y, current_z = self.uav.local_position.x, self.uav.local_position.y, self.uav.local_position.z
         distance = math.sqrt(
             (current_x - target_x)**2 + 
             (current_y - target_y)**2 + 
@@ -122,22 +121,13 @@ class WaypointMission(Mode):
     
     def publish_offboard_control_mode(self):
         """Publish offboard control mode."""
-        msg = OffboardControlMode()
-        msg.position = True
-        msg.velocity = False
-        msg.acceleration = False
-        msg.attitude = False
-        msg.body_rate = False
-        self.uav.publish_offboard_control_mode()
+        self.uav.publish_offboard_control_heartbeat_signal()
     
     def arm_vehicle(self):
         """Arm the vehicle."""
         self.uav.arm()
         self.node.get_logger().info("Arming vehicle...")
     
-    def position_callback(self, msg):
-        """Update UAV position."""
-        self.uav_position = (msg.x, msg.y, msg.z)
 
 def main(args=None):
     rclpy.init(args=args)
