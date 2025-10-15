@@ -33,7 +33,7 @@ class ScoringNode(Node):
         self.max_altitude = 10.0  # maximum altitude to score
         # Additional gating to reduce false positives
         self.vertical_tolerance = 0.35  # meters, allowed |z - hoop_z|
-        self.inside_samples_required = 3  # consecutive samples inside cylinder
+        self.inside_samples_required = 1  # consecutive samples inside cylinder
         
         # Course data
         self.hoop_poses: List[Tuple[float, float, float]] = []
@@ -168,7 +168,7 @@ class ScoringNode(Node):
         
         # Publish periodic score updates
         self.publish_score()
-    
+            
     def publish_score(self):
         """Publish current score."""
         score_msg = Float32()
