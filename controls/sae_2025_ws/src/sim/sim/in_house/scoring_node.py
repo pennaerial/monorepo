@@ -30,6 +30,9 @@ class ScoringNode(Node):
         self.hoop_radius = self.get_parameter('hoop_tolerance').get_parameter_value().double_value
         self.min_altitude = 0.5  # minimum altitude to score
         self.max_altitude = 10.0  # maximum altitude to score
+        # Additional gating to reduce false positives
+        self.vertical_tolerance = 0.35  # meters, allowed |z - hoop_z|
+        self.inside_samples_required = 3  # consecutive samples inside cylinder
         
         # Course data
         self.hoop_poses: List[Tuple[float, float, float]] = []
@@ -41,6 +44,7 @@ class ScoringNode(Node):
         self.uav_position: Optional[Tuple[float, float, float]] = None
         self.position_history: List[Tuple[float, float, float, float]] = []  # x, y, z, timestamp
         self.max_history = 100  # Keep last 100 positions
+        self.prev_position: Optional[Tuple[float, float, float]] = None
         
         # Publishers
         self.score_publisher = self.create_publisher(Float32, '/scoring/results', 10)
@@ -101,11 +105,20 @@ class ScoringNode(Node):
         """
         self.hoop_poses = hoop_poses
         self.passed_hoops = [False] * len(hoop_poses)
+        # Track consecutive "inside" samples for each hoop
+        self.inside_counters = [0] * len(hoop_poses)
         self.get_logger().info(f"Course set with {len(hoop_poses)} hoops")
     
     def position_callback(self, msg: VehicleLocalPosition):
-        """Callback for UAV position updates."""
-        self.uav_position = (msg.x, msg.y, msg.z)
+        """Callback for UAV position updates.
+        PX4 publishes local position in NED (z positive down). Convert to Up for scoring.
+        """
+        # Convert to Up axis for z
+        z_up = -float(msg.z)
+        x = float(msg.x)
+        y = float(msg.y)
+        self.prev_position = self.uav_position
+        self.uav_position = (x, y, z_up)
         
         # Add to position history
         current_time = time.time()
@@ -120,28 +133,31 @@ class ScoringNode(Node):
         if not self.uav_position or not self.hoop_poses:
             return
         
-        x, y, z = self.uav_position
+        x, y, z_up = self.uav_position
         
-        # Check each hoop for passage
+        # Check each hoop for passage (cylindrical gate + vertical tolerance)
         for i, hoop_pos in enumerate(self.hoop_poses):
-            if not self.passed_hoops[i]:
-                hoop_x, hoop_y, hoop_z = hoop_pos
-                
-                # Calculate distance to hoop center
-                distance = math.sqrt((x - hoop_x)**2 + (y - hoop_y)**2 + (z - hoop_z)**2)
-                
-                # Check if UAV passed through hoop
-                if (distance <= self.hoop_radius and 
-                    self.min_altitude <= z <= self.max_altitude):
-                    
-                    self.passed_hoops[i] = True
-                    self.current_score += 1
-                    
-                    self.get_logger().info(f"Hoop {i+1} passed! Score: {self.current_score}")
-                    
-                    # Publish score update
-                    self.publish_score()
-                    self.publish_status(f"Hoop {i+1} passed")
+            if self.passed_hoops[i]:
+                continue
+            hoop_x, hoop_y, hoop_z = hoop_pos
+            # Horizontal (x,y) distance to ring axis
+            r_xy = math.hypot(x - hoop_x, y - hoop_y)
+            dz = abs(z_up - hoop_z)
+            inside = (r_xy <= self.hoop_radius) and (dz <= self.vertical_tolerance) and (self.min_altitude <= z_up <= self.max_altitude)
+            if inside:
+                self.inside_counters[i] += 1
+            else:
+                # small hysteresis: decay to avoid stickiness
+                if self.inside_counters[i] > 0:
+                    self.inside_counters[i] -= 1
+            
+            if self.inside_counters[i] >= self.inside_samples_required:
+                self.passed_hoops[i] = True
+                self.current_score += 1
+                self.get_logger().info(f"Hoop {i+1} passed! Score: {self.current_score}")
+                self.publish_score()
+                self.publish_status(f"Hoop {i+1} passed")
+                # do not continue counting for this hoop
         
         # Publish periodic score updates
         self.publish_score()
