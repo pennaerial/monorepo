@@ -6,7 +6,7 @@ start:
     complete: payload
 
 payload:
-  class: uav.autonomous_modes.PayloadDropoffMode
+  class: uav.autonomous_modes.LandOnPinkMode
   params:
     offsets: '(0, 0, 0)'
   transitions:
