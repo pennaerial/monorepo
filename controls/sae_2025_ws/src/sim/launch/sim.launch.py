@@ -12,7 +12,7 @@ from sim.in_house.worldgen import generate_world
 class CourseParams:
     """Data class to hold course parameters for worldgen.py"""
     def __init__(self, dlz, uav, num_hoops, max_dist, width=None, height=None, 
-                 asc_start_height=None, des_start_height=None, ip_file=None, op_file=None):
+                 asc_start_height=None, des_start_height=None, spacing=None, ip_file=None, op_file=None):
         self.dlz = dlz
         self.uav = uav
         self.num_hoops = num_hoops
@@ -21,6 +21,7 @@ class CourseParams:
         self.height = height
         self.asc_start_height = asc_start_height
         self.des_start_height = des_start_height
+        self.spacing = spacing
         self.ip_file = ip_file
         self.op_file = op_file
 
@@ -149,6 +150,9 @@ def launch_setup(context, *args, **kwargs):
         course_params_dict['height'] = course_params_raw['height']
     elif course_type in ['ascent', 'descent']:
         course_params_dict['start_height'] = course_params_raw['start_height']
+    elif course_type == 'straight':
+        course_params_dict['height'] = course_params_raw['height']
+        course_params_dict['spacing'] = course_params_raw['spacing']
     
     # Extract simulation parameters
     sim_params = params['simulation']
@@ -171,6 +175,7 @@ def launch_setup(context, *args, **kwargs):
         height=course_params_dict.get('height'),
         asc_start_height=course_params_dict.get('start_height'),
         des_start_height=course_params_dict.get('start_height'),
+        spacing=course_params_dict.get('spacing'),
         # CHANGE HARDCODED PATH LATER, BASE ON PARAMs
         ip_file="/Users/David/Documents/projects/pennair/monorepo/controls/sae_2025_ws/src/sim/sim/in_house/worlds/template.sdf", 
         op_file=os.path.expanduser(f"~/.simulation-gazebo/worlds/{world_name}.sdf")
