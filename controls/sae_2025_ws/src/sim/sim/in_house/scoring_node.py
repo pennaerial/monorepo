@@ -130,7 +130,7 @@ class ScoringNode(Node):
             # NEW: Transform drone position to hoop local frame
             drone_pos_in_hoop = self._world_to_hoop_local(
                 (x, y, z), 
-                (hoop_x, hoop_y, hoop_z), 
+                (hoop_y, hoop_x, hoop_z), #for some reason, we need to flip these 
                 (roll, pitch, yaw)
             )
             

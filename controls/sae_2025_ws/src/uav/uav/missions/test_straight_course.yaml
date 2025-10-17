@@ -1,14 +1,14 @@
-# Straight course, LOCAL frame, pauses at each hoop for 2s
+# Reversed straight course, LOCAL frame, pauses at each hoop for 2s
 start:
   class: "uav.autonomous_modes.NavGPSMode"
   params:
     # [(x,y,z), wait_seconds, 'LOCAL']
-    coordinates: "[[ (0,0,-0.5), 1, 'LOCAL' ],
-                   [ (0,0,-1.7), 1, 'LOCAL' ],
+    coordinates: "[[ (0,0,-10.0), 1, 'LOCAL' ],
+                   [ (0,10.0,-2.0), 1, 'LOCAL' ],
+                   [ (0,8.0,-1.7), 1, 'LOCAL' ],
                    [ (0,4.0,-1.7), 1, 'LOCAL' ],
-                   [ (0,8.0,-1.7), 2, 'LOCAL' ],
-                   [ (0,10.0,-2.0), 2, 'LOCAL' ],
-                   [ (0,0,-10.0), 1, 'LOCAL' ]]"
+                   [ (0,0,-1.7), 1, 'LOCAL' ],
+                   [ (0,0,-0.5), 1, 'LOCAL' ]]"
     margin: "0.1"
   transitions:
     complete: land
