@@ -109,11 +109,52 @@ class ScoringNode(Node):
         self.get_logger().info(f"Course set with {len(hoop_poses)} hoops")
 
     def update_scoring(self):
-        """Periodic scoring update - placeholder for now."""
+        """Check if drone passes through any hoop and publish status."""
+        if not self.uav_position or not self.hoop_poses:
+            return
+        
+        x, y, z = self.uav_position
+        
+        # Check each hoop for passage
+        for i, hoop in enumerate(self.hoop_poses):
+            if self.passed_hoops[i]:  # Skip if already passed
+                continue
+                
+            hoop_x, hoop_y, hoop_z, roll, pitch, yaw = hoop
+            
+            # Calculate distance to hoop center
+            distance = math.sqrt((x - hoop_x)**2 + (y - hoop_y)**2 + (z - hoop_z)**2)
+            
+            # Get tolerance from parameters (with generous buffer)
+            tolerance = self.get_parameter('hoop_tolerance').get_parameter_value().double_value
+            
+            # Check if drone is within hoop (with generous buffer)
+            if distance <= tolerance:
+                # Mark hoop as passed
+                self.passed_hoops[i] = True
+                self.current_score += 1
+                
+                # Publish status message
+                status_msg = String()
+                status_msg.data = f"Hoop {i+1} passed! Score: {self.current_score}"
+                self.status_publisher.publish(status_msg)
+                
+                # Publish score update
+                score_msg = Float32()
+                score_msg.data = float(self.current_score)
+                self.score_publisher.publish(score_msg)
+                
+                # Log the achievement
+                self.get_logger().info(f"🎯 HOOP {i+1} PASSED! Distance: {distance:.2f}m, Score: {self.current_score}")
+                
+                # Log drone position when passing
+                self.get_logger().info(f"Drone at: x={x:.2f}, y={y:.2f}, z={z:.2f}")
+                self.get_logger().info(f"Hoop {i+1} at: x={hoop_x:.2f}, y={hoop_y:.2f}, z={hoop_z:.2f}")
+        
+        # Publish periodic status (even if no hoop passed)
         if self.uav_position:
-            # For now, just log that we're getting position updates
-            x, y, z = self.uav_position
-            self.get_logger().info(f"UAV Position: x={x:.2f}, y={y:.2f}, z={z:.2f}", throttle_duration_sec=2.0)
+            # Throttled position logging
+            self.get_logger().info(f"UAV Position: x={x:.2f}, y={y:.2f}, z={z:.2f}", throttle_duration_sec=5.0)
     
     
     def position_callback(self, msg: VehicleLocalPosition):
