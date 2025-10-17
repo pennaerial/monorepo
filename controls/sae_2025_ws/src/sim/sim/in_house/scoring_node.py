@@ -25,10 +25,10 @@ class ScoringNode(Node):
         self.declare_parameter('hoop_tolerance', 1.5)  # Now represents hoop radius
         self.declare_parameter('competition_type', 'in_house')
         self.declare_parameter('competition_name', 'test')
-        self.declare_parameter('course_type', 'straight')'
+        self.declare_parameter('course_type', 'straight')
         
         # Add these 3 lines after your existing parameters
-        self.declare_parameter('landing_bonus', 50.0)  # Bonus points for landing at origin
+        self.declare_parameter('landing_bonus', 5.0)  # Bonus points for landing at origin
         self.declare_parameter('landing_tolerance', 2.0)  # Distance tolerance for landing
         self.declare_parameter('landing_altitude_max', 1.0)  # Max altitude to consider "landed"
 
@@ -191,7 +191,7 @@ class ScoringNode(Node):
         x, y, z = self.uav_position
         
         # Check if all hoops have been passed
-        all_hoops_passed = all(self.passed_hoops)
+        all_hoops_passed = any(self.passed_hoops)
         if not all_hoops_passed:
             return
         
