@@ -293,7 +293,7 @@ def launch_setup(context, *args, **kwargs):
                 'hoop_positions': str(hoop_positions),  # Add hoop positions as string
                 'position_poll_rate': sim_params.get('position_poll_rate', 10.0),
                 'scoring_rate': sim_params.get('scoring_rate', 5.0),
-                'hoop_tolerance': sim_params.get('scoring', {}).get('hoop_tolerance', 1.5),
+                'hoop_tolerance': sim_params.get('scoring', {}).get('hoop_tolerance', 1.0),
                 'max_flight_time': sim_params.get('scoring', {}).get('max_flight_time', 300),
                 'points_per_hoop': sim_params.get('scoring', {}).get('points_per_hoop', 10)
             }]

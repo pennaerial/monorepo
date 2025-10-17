@@ -22,7 +22,7 @@ class ScoringNode(Node):
         
         # Declare parameters
         self.declare_parameter('hoop_positions', '[]')
-        self.declare_parameter('hoop_tolerance', 1.5)
+        self.declare_parameter('hoop_tolerance', 0.001)
         self.declare_parameter('competition_type', 'in_house')
         self.declare_parameter('competition_name', 'test')
         self.declare_parameter('course_type', 'straight')
@@ -117,19 +117,24 @@ class ScoringNode(Node):
         
         # Check each hoop for passage
         for i, hoop in enumerate(self.hoop_poses):
+            
+
             if self.passed_hoops[i]:  # Skip if already passed
                 continue
-                
+            
             hoop_x, hoop_y, hoop_z, roll, pitch, yaw = hoop
+            self.get_logger().info(f"🎯HOOP {i} x: {hoop_x}, y {hoop_y}, z {hoop_z}")
             
             # Calculate distance to hoop center
-            distance = math.sqrt((x - hoop_x)**2 + (y - hoop_y)**2 + (z - hoop_z)**2)
+            distance = math.sqrt((x - hoop_y)**2 + (y - hoop_x)**2 + (z - hoop_z)**2)
             
             # Get tolerance from parameters (with generous buffer)
             tolerance = self.get_parameter('hoop_tolerance').get_parameter_value().double_value
+            self.get_logger().info(f"🎯MMMMMMMMMM {i} distance: {distance}, tolerance {tolerance}")
+
             
             # Check if drone is within hoop (with generous buffer)
-            if distance <= tolerance:
+            if distance <= 1.0:
                 # Mark hoop as passed
                 self.passed_hoops[i] = True
                 self.current_score += 1
