@@ -30,7 +30,7 @@ class ScoringNode(Node):
         # Course data (SAME AS BEFORE)
         self.hoop_poses: List[Tuple[float, float, float, float, float, float]] = []
         self.passed_hoops: List[bool] = []
-        self.current_score = 0
+        self.current_score = 0.0
         self.start_time = time.time()
         
         # UAV tracking (SAME AS BEFORE)
@@ -147,7 +147,9 @@ class ScoringNode(Node):
                 if last_side != 0 and last_side != current_side:
                     # Drone passed through the hoop!
                     self.passed_hoops[i] = True
-                    self.current_score += 1
+                    curr = time.time()
+                    #time decay
+                    self.current_score += 10 * (0.99 ** (curr - self.start_time))
                     
                     # Publish status message (SAME AS BEFORE)
                     status_msg = String()
