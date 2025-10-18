@@ -8,7 +8,7 @@ competition:
 
 # Course Configuration
 course:
-  type: "straight"    # Options: "slalom", "ascent", "descent", "custom"
+  type: "straight"    # Options: "slalom", "ascent", "descent", "random"
   
   # Course-specific parameters
   slalom:
@@ -45,7 +45,6 @@ course:
 simulation:
   world_name: "custom"   # Gazebo world name
   enable_scoring: true   # Enable scoring node
-  enable_logging: true   # Enable detailed logging
   uav_model: "gz_x500_mono_cam_down"  # UAV model to use
   
   # Timing parameters
@@ -64,7 +63,6 @@ simulation:
 ros2:
   middleware_port: 8889       # MicroXRCEAgent port
   enable_camera_bridge: true # Enable camera topic bridging
-  enable_imu_bridge: true     # Enable IMU topic bridging
   
   # Topic remapping
   topics:
@@ -73,14 +71,3 @@ ros2:
     vehicle_position: "/fmu/out/vehicle_local_position"
     vehicle_attitude: "/fmu/out/vehicle_attitude"
     scoring_results: "/scoring/results"
-
-# Debug and Testing
-debug:
-  enable_debug_output: false  # Enable debug logging
-  save_world_file: false      # Save generated world file for inspection
-  test_mode: false            # Run in test mode (no actual simulation)
-  
-  # Test parameters
-  test:
-    simulated_uav_path: "test_path.txt"  # File with simulated UAV positions
-    expected_score: 50                   # Expected score for validation

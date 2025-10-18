@@ -20,42 +20,42 @@ class ScoringNode(Node):
     def __init__(self):
         super().__init__('scoring_node')
         
-        # Declare parameters (SAME AS BEFORE)
+        # Declare parameters
         self.declare_parameter('hoop_positions', '[]')
-        self.declare_parameter('hoop_tolerance', 1.5)  # Now represents hoop radius
+        self.declare_parameter('hoop_tolerance', 1.5) 
         self.declare_parameter('competition_type', 'in_house')
         self.declare_parameter('competition_name', 'test')
         self.declare_parameter('course_type', 'straight')
         
-        # Add these 3 lines after your existing parameters
-        self.declare_parameter('landing_bonus', 5.0)  # Bonus points for landing at origin
-        self.declare_parameter('landing_tolerance', 2.0)  # Distance tolerance for landing
-        self.declare_parameter('landing_altitude_max', 1.0)  # Max altitude to consider "landed"
+        # landing bonus parameters
+        self.declare_parameter('landing_bonus', 5.0)  
+        self.declare_parameter('landing_tolerance', 2.0) 
+        self.declare_parameter('landing_altitude_max', 0.4)  
 
         
-        # Course data (SAME AS BEFORE)
+        # Course data
         self.hoop_poses: List[Tuple[float, float, float, float, float, float]] = []
         self.passed_hoops: List[bool] = []
         self.current_score = 0.0
         self.start_time = time.time()
         
-        # UAV tracking (SAME AS BEFORE)
+        # UAV tracking
         self.uav_position: Optional[Tuple[float, float, float]] = None
         self.position_history: List[Tuple[float, float, float, float]] = []
         self.max_history = 100
         self.prev_position: Optional[Tuple[float, float, float]] = None
         
-        # NEW: Directional detection tracking
+        # Directional detection tracking
         self.drone_last_side: List[int] = []  # Track which side of each hoop drone is on
         self.landed_at_origin = False
         self.landing_bonus_awarded = False
         
-        # Publishers (SAME AS BEFORE)
+        # Publishers
         self.score_publisher = self.create_publisher(Float32, '/scoring/results', 10)
         self.status_publisher = self.create_publisher(String, '/scoring/status', 10)
         self.drone_publisher = self.create_publisher(Float32MultiArray, '/scoring/drone_position', 10)
         
-        # Subscriber (SAME AS BEFORE)
+        # Subscriber
         qos = QoSProfile(
             reliability=QoSReliabilityPolicy.BEST_EFFORT,
             history=QoSHistoryPolicy.KEEP_LAST,
@@ -69,14 +69,14 @@ class ScoringNode(Node):
             qos
         )
         
-        # Timer (SAME AS BEFORE)
+        # Timer for score updating
         self.create_timer(0.1, self.update_scoring)  # 10Hz
         
         self.load_hoop_positions_from_params()
         self.get_logger().info("Scoring node initialized.")
     
     def load_hoop_positions_from_params(self):
-        """Load hoop positions from ROS2 parameters. (SAME AS BEFORE)"""
+        """Load hoop positions from ROS2 parameters."""
         try:
             hoop_positions_str = self.get_parameter('hoop_positions').get_parameter_value().string_value
             
