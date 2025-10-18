@@ -1,0 +1,13 @@
+start:
+  class: uav.autonomous_modes.CircularFlightMode
+  params:
+    center: '[0, 0, -10]'  # Center of circle in LOCAL coordinates (x, y, z)
+    radius: '5.0'          # Radius in meters
+    altitude: '-10'        # Altitude in meters (negative for NED frame)
+    num_points: '24'       # Number of waypoints around the circle
+    wait_time_per_point: '2.0'  # Seconds to wait at each waypoint
+    coordinate_system: 'LOCAL'  # Use LOCAL coordinate system
+  transitions:
+    complete: land
+land:
+  class: uav.autonomous_modes.LandingMode
