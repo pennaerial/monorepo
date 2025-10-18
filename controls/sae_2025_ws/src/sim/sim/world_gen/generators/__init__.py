@@ -1,0 +1,1 @@
+"generator class handdles specific courses like hoopgen"

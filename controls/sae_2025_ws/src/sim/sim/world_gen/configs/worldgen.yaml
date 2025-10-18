@@ -1,0 +1,16 @@
+input_sdf: "~/sim/worlds/empty.world"     # expands to user's home dir
+output_sdf: "~/sim/worlds/hoops.world"    
+generatorName: "hoop"                     # currently using HoopWorldGenerator, can change with future generators with name "{generatorName}gen.py"
+style: "slalom"                           # for hoopgen we have: ascent | descent | slalom | straight | random | previous
+
+# numbers mean nothing just an example rn
+params:
+  dlz: [0.0, 0.0, 1.5]
+  uav: [0.0, -2.0, 1.0]
+  num_hoops: 6
+  max_dist: 12.0
+  width: 2.0
+  height: 1.5
+  spacing: 4.0
+  asc_start_height: 1.0
+  des_start_height: 2.0
