@@ -100,7 +100,6 @@ def get_default_params():
                 'hoop_tolerance': 1.5,
                 'max_flight_time': 300,
                 'points_per_hoop': 10,
-                'penalty_per_second': 0.1
             }
         },
         'ros2': {

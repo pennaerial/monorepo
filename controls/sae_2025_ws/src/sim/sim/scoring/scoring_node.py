@@ -21,20 +21,22 @@ class ScoringNode(Node):
     def __init__(self, node_name='scoring_node'):
         super().__init__(node_name)
         
-        # Base scoring parameters that all competitions might need
-        self.declare_parameter('time_limit', 0.0)  # Time limit in seconds, 0 means no limit
-        self.declare_parameter('enable_landing_bonus', True)  # Whether landing bonus is enabled
+        # Declare parameters
+        self.declare_parameter('hoop_positions', '[]')
+        self.declare_parameter('hoop_tolerance', 1.5) 
+        self.declare_parameter('competition_type', 'in_house')
+        self.declare_parameter('competition_name', 'test')
+        self.declare_parameter('course_type', 'straight')
         
-        # Landing bonus parameters (only used if enable_landing_bonus is True)
-        self.declare_parameter('landing_bonus', 5.0)  # Bonus points for landing at origin
-        self.declare_parameter('landing_tolerance', 2.0)  # Distance tolerance for landing
-        self.declare_parameter('landing_altitude_max', 1.0)  # Max altitude to consider "landed"
-        
-        # Initialize competition-specific parameters
-        self.initialize_scoring_parameters()
+        # landing bonus parameters
+        self.declare_parameter('landing_bonus', 5.0)  
+        self.declare_parameter('landing_tolerance', 2.0) 
+        self.declare_parameter('landing_altitude_max', 0.4)  
 
         
-        # Base scoring data
+        # Course data
+        self.hoop_poses: List[Tuple[float, float, float, float, float, float]] = []
+        self.passed_hoops: List[bool] = []
         self.current_score = 0.0
         self.start_time = time.time()
         
@@ -44,20 +46,17 @@ class ScoringNode(Node):
         self.max_history = 100
         self.prev_position: Optional[Tuple[float, float, float]] = None
         
-        # Landing bonus parameters
-        self.declare_parameter('landing_bonus', 5.0)  # Bonus points for landing at origin
-        self.declare_parameter('landing_tolerance', 2.0)  # Distance tolerance for landing
-        self.declare_parameter('landing_altitude_max', 1.0)  # Max altitude to consider "landed"
-        
+        # Directional detection tracking
+        self.drone_last_side: List[int] = []  # Track which side of each hoop drone is on
         self.landed_at_origin = False
         self.landing_bonus_awarded = False
         
-        # Publishers (SAME AS BEFORE)
+        # Publishers
         self.score_publisher = self.create_publisher(Float32, '/scoring/results', 10)
         self.status_publisher = self.create_publisher(String, '/scoring/status', 10)
         self.drone_publisher = self.create_publisher(Float32MultiArray, '/scoring/drone_position', 10)
         
-        # Subscriber (SAME AS BEFORE)
+        # Subscriber
         qos = QoSProfile(
             reliability=QoSReliabilityPolicy.BEST_EFFORT,
             history=QoSHistoryPolicy.KEEP_LAST,
@@ -71,29 +70,46 @@ class ScoringNode(Node):
             qos
         )
         
-        # Timer (SAME AS BEFORE)
+        # Timer for score updating
         self.create_timer(0.1, self.update_scoring)  # 10Hz
         
         self.load_hoop_positions_from_params()
         self.get_logger().info("Scoring node initialized.")
     
-    def setup_scoring_system(self):
-        """
-        Initialize scoring system. Should be implemented by child classes.
-        """
-        raise NotImplementedError("Subclasses must implement setup_scoring_system()")
-
-    def initialize_scoring_parameters(self) -> None:
-        """
-        Initialize parameters for scoring. Should be implemented by child classes.
-        """
-        raise NotImplementedError("Subclasses must implement initialize_scoring_parameters()")
-
-    def update_score(self) -> None:
-        """
-        Update score based on current state. Should be implemented by child classes.
-        """
-        raise NotImplementedError("Subclasses must implement update_score()")
+    def load_hoop_positions_from_params(self):
+        """Load hoop positions from ROS2 parameters."""
+        try:
+            hoop_positions_str = self.get_parameter('hoop_positions').get_parameter_value().string_value
+            
+            if hoop_positions_str == '[]' or not hoop_positions_str:
+                self.get_logger().error("No hoop positions provided in parameters!")
+                raise ValueError("No hoop positions provided in parameters")
+            
+            import ast
+            hoop_positions_list = ast.literal_eval(hoop_positions_str)
+            
+            hoop_positions = []
+            for i in range(0, len(hoop_positions_list), 6): 
+                if i + 5 < len(hoop_positions_list):  
+                    hoop_positions.append((
+                        hoop_positions_list[i],     # x
+                        hoop_positions_list[i + 1], # y
+                        hoop_positions_list[i + 2], # z
+                        hoop_positions_list[i + 3], # roll
+                        hoop_positions_list[i + 4], # pitch
+                        hoop_positions_list[i + 5]  # yaw
+                    ))
+            
+            self.set_course_hoops(hoop_positions)
+            self.get_logger().info(f"Loaded {len(hoop_positions)} hoops from parameters")
+            
+            for i, hoop in enumerate(hoop_positions):
+                x, y, z, roll, pitch, yaw = hoop
+                self.get_logger().info(f"Hoop {i+1}: x={x:.2f}, y={y:.2f}, z={z:.2f}, roll={roll:.2f}, pitch={pitch:.2f}, yaw={yaw:.2f}")
+            
+        except Exception as e:
+            self.get_logger().error(f"Failed to load hoop positions from parameters: {e}")
+            raise
         
     def set_course_hoops(self, hoop_poses: List[Tuple[float, float, float, float, float, float]]):
         """Set the hoop positions for scoring. (UPDATED)"""
