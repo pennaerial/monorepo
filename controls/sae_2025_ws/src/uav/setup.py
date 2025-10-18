@@ -38,7 +38,7 @@ setup(
             'payload_tracking_node = uav.vision_nodes.PayloadTrackingNode:main',
             'camera = uav.CameraNode:main',
             'test_flight = uav.test_flight:main',
-            'vtol_testing = uav.vtol_testing:main'
+            'vtol_testing = uav.vtol_testing:main',
         ],
     },
 )

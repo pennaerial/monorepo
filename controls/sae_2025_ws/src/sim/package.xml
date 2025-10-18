@@ -3,9 +3,16 @@
 <package format="3">
   <name>sim</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
-  <maintainer email="zhandavid4@gmail.com">David</maintainer>
-  <license>TODO: License declaration</license>
+  <description>Simulation framework for UAV competitions</description>
+  <maintainer email="pennair@example.com">pennair</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <depend>rclpy</depend>
+  <depend>std_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>px4_msgs</depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>
