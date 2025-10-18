@@ -263,20 +263,3 @@ class ScoringNode(Node):
         drone_position = Float32MultiArray()
         drone_position.data = [x, y, z_up]
         self.drone_publisher.publish(drone_position)
-   
-def main(args=None):
-    """Main function for scoring node. (SAME AS BEFORE)"""
-    rclpy.init(args=args)
-    
-    scoring_node = ScoringNode()
-    
-    try:
-        rclpy.spin(scoring_node)
-    except KeyboardInterrupt:
-        pass
-    finally:
-        scoring_node.destroy_node()
-        rclpy.shutdown()
-
-if __name__ == '__main__':
-    main()

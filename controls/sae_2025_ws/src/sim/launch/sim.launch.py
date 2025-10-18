@@ -6,7 +6,7 @@ from launch import LaunchDescription
 from launch.actions import ExecuteProcess, LogInfo, RegisterEventHandler, TimerAction, OpaqueFunction
 from launch.event_handlers import OnProcessStart
 from launch_ros.actions import Node
-from sim.in_house.worldgen import generate_world
+from sim.world_gen.hoop_gen import generate_world
 
 
 class CourseParams:
