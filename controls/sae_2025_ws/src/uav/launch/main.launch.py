@@ -140,6 +140,13 @@ def launch_setup(context, *args, **kwargs):
         output='screen',
         name='gazebo'
     )
+
+    camera_feed = Node(
+        output='screen',
+        package='uav',
+        executable='camera_feed',
+        name='camera_feed',
+    )
     
     # Define the PX4 SITL process.
     if vehicle_type == 'quadcopter':
@@ -196,6 +203,11 @@ def launch_setup(context, *args, **kwargs):
         period=15.0,
         actions=[mission] if run_mission_bool else []
     )
+
+    delayed_camera_feed = TimerAction(
+        period=12.0,
+        actions=[camera_feed]
+    )
     
     # Build and return the complete list of actions.
     return [
@@ -214,7 +226,10 @@ def launch_setup(context, *args, **kwargs):
             OnProcessStart(target_action=gz_ros_bridge_camera, on_start=[gz_ros_bridge_camera_info, LogInfo(msg="gz_ros_bridge_camera started.")])
         ),
         RegisterEventHandler(
-            OnProcessStart(target_action=gz_ros_bridge_camera_info, on_start=[delayed_mission, LogInfo(msg="gz_ros_bridge_camera_info started.")])
+            OnProcessStart(target_action=gz_ros_bridge_camera_info, on_start=[delayed_camera_feed, LogInfo(msg="camera_feed started.")])
+        ),
+        RegisterEventHandler(
+            OnProcessStart(target_action=delayed_camera_feed, on_start=[delayed_mission, LogInfo(msg="Mission started.")])
         ),
     ]
 
