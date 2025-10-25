@@ -204,9 +204,15 @@ def launch_setup(context, *args, **kwargs):
         actions=[mission] if run_mission_bool else []
     )
 
-    delayed_camera_feed = TimerAction(
-        period=12.0,
-        actions=[camera_feed]
+    camera_feed_cmd = [
+        'ros2', 'run', 'uav', 'camera_feed', 'true'
+    ]
+
+    camera_feed = ExecuteProcess(
+        cmd=camera_feed_cmd,
+        output='screen',
+        cwd=sae_ws_path,
+        name='camera_feed'
     )
     
     # Build and return the complete list of actions.
@@ -226,10 +232,10 @@ def launch_setup(context, *args, **kwargs):
             OnProcessStart(target_action=gz_ros_bridge_camera, on_start=[gz_ros_bridge_camera_info, LogInfo(msg="gz_ros_bridge_camera started.")])
         ),
         RegisterEventHandler(
-            OnProcessStart(target_action=gz_ros_bridge_camera_info, on_start=[delayed_camera_feed, LogInfo(msg="camera_feed started.")])
+            OnProcessStart(target_action=gz_ros_bridge_camera_info, on_start=[camera_feed, LogInfo(msg="Camera feed started.")])
         ),
         RegisterEventHandler(
-            OnProcessStart(target_action=delayed_camera_feed, on_start=[delayed_mission, LogInfo(msg="Mission started.")])
+            OnProcessStart(target_action=camera_feed, on_start=[delayed_mission, LogInfo(msg="Mission started.")])
         ),
     ]
 
