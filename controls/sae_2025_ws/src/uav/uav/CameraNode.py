@@ -111,6 +111,7 @@ def main():
     rclpy.init()
     try:
         node = CameraNode("camera_node")
+        # node = CameraNode("camera_node",display=True)
     except Exception as e:
         print(e)
         node.publish_failsafe()
