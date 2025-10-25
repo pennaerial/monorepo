@@ -268,6 +268,8 @@ def launch_setup(context, *args, **kwargs):
         output='screen',
         name='gazebo'
     )
+
+
     
     # Define the PX4 SITL process
     print("start px4_sitl")
@@ -326,6 +328,19 @@ def launch_setup(context, *args, **kwargs):
             cwd=sae_ws_path,
             name='gz_ros_bridge_camera_info'
         )
+
+        gz_ros_bridge_depth_camera = None
+        if sim_params["uav_model"] == "gz_x500_depth":
+            
+            gz_ros_bridge_depth_camera = ExecuteProcess(
+                cmd=['ros2', 'run', 'ros_gz_bridge', 'parameter_bridge',
+                    '/depth_camera@sensor_msgs/msg/Image@gz.msgs.Image',
+                    '/depth_camera/points@sensor_msgs/msg/PointCloud2@gz.msgs.PointCloudPacked'
+                    ],
+                output='screen',
+                cwd=sae_ws_path,
+                name='gz_ros_bridge_depth_camera'
+            )
     
     # Delayed scoring node start (only if scoring is enabled)
     delayed_scoring = None
@@ -341,6 +356,8 @@ def launch_setup(context, *args, **kwargs):
         bridge_actions.append(gz_ros_bridge_camera)
     if gz_ros_bridge_camera_info is not None:
         bridge_actions.append(gz_ros_bridge_camera_info)
+    if gz_ros_bridge_depth_camera is not None:
+        bridge_actions.append(gz_ros_bridge_depth_camera)
     
     # Add delayed scoring if enabled
     if delayed_scoring is not None:

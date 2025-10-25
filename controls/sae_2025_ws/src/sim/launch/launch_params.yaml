@@ -47,7 +47,7 @@ simulation:
   enable_scoring: true   # Enable scoring node
   # uav_model: "gz_x500_mono_cam_down"  # UAV model to use
   # uav_model: "gz_x500_depth"
-  uav_model: "gz_x500_mono_cam"
+  uav_model: "gz_x500_depth"
   
   # Timing parameters
   position_poll_rate: 10.0    # Hz - UAV position polling rate
