@@ -96,7 +96,8 @@ def launch_setup(context, *args, **kwargs):
         package='uav',
         executable='camera',
         name='camera',
-        output='screen'
+        output='screen',
+        parameters=[{'display': True}]
     )]
     for node in extract_vision_nodes(YAML_PATH):
         vision_nodes.append(node)
@@ -108,7 +109,7 @@ def launch_setup(context, *args, **kwargs):
             executable=exe_name,
             name=exe_name,
             output='screen',
-            parameters=[{'debug': vision_debug_bool, 'sim': sim_bool, 'save_vision': save_vision_bool}],
+            parameters=[{'debug': vision_debug_bool, 'sim': sim_bool, 'save_vision': save_vision_bool, 'display': True}],
         ))
     
     # Clear vision node actions if none are found.
