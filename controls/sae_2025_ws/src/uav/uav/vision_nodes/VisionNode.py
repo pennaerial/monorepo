@@ -84,6 +84,17 @@ class VisionNode(Node):
             from cv_bridge import CvBridge
             self.bridge = CvBridge()
         self.display = display
+
+        #new changes from here on
+        if not self.sim:
+            from cv_bridge import CvBridge
+            self.bridge = CvBridge()
+        
+        self.declare_parameter('display', display)
+        self.display = self.get_parameter('display').value
+
+
+
         qos_profile = QoSProfile(
                         depth=10,
                         durability=DurabilityPolicy.TRANSIENT_LOCAL,  # Ensures messages persist for new subscribers
