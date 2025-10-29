@@ -4,6 +4,7 @@ from sensor_msgs.msg import CameraInfo
 from uav_interfaces.srv import CameraData
 from sensor_msgs.msg import Image
 import cv2
+import numpy as np
 from std_msgs.msg import Bool
 from rclpy.qos import QoSProfile, DurabilityPolicy, ReliabilityPolicy
 
@@ -13,7 +14,7 @@ class CameraNode(Node):
     Node class to respond to requests with camera image or camera information.
     """
 
-    def __init__(self, node_name: str, service_name: str = '/camera_data', image_topic: str = '/camera', info_topic: str = '/camera_info', queue_size: int = 10, display: bool = False):
+    def __init__(self, node_name: str, service_name: str = '/camera_data', image_topic: str = '/camera', info_topic: str = '/camera_info', queue_size: int = 10, display: bool = True):
         """
         Initialize the CameraNode.
 
@@ -64,13 +65,28 @@ class CameraNode(Node):
 
     def image_callback(self, msg: Image):
         """
-        Callback for receiving image requests. 
+        Callback for receiving image requests.
         """
         self.image = msg
         if self.display:
             frame = self.convert_image_msg_to_frame(msg)
             cv2.imshow("Camera Feed", frame)
             cv2.waitKey(1)
+
+    def convert_image_msg_to_frame(self, msg: Image):
+        """
+        Convert ROS Image message to OpenCV frame.
+
+        Args:
+            msg (Image): The ROS 2 Image message.
+
+        Returns:
+            np.ndarray: OpenCV image frame.
+        """
+        height = msg.height
+        width = msg.width
+        image = np.frombuffer(msg.data, dtype=np.uint8).reshape((height, width, 3))
+        return image
     
     def camera_info_callback(self, msg: CameraInfo):
         """
