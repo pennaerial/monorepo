@@ -9,19 +9,6 @@ from launch.event_handlers import OnProcessStart
 from launch_ros.actions import Node
 from uav.utils import vehicle_map
 
-# GZ_CAMERA_TOPIC = '/world/custom/model/x500_mono_cam_down_0/link/camera_link/sensor/imager/image'
-# GZ_CAMERA_INFO_TOPIC = '/world/custom/model/x500_mono_cam_down_0/link/camera_link/sensor/imager/camera_info'
-# GZ_CAMERA_TOPIC = '/world/custom/model/x500_depth_0/link/camera_link/sensor/imager/image'
-# GZ_CAMERA_INFO_TOPIC = '/world/custom/model/x500_depth_0/link/camera_link/sensor/imager/camera_info'
-
-# GZ_CAMERA_TOPIC = '/world/custom/model/x500_mono_cam_0/link/camera_link/sensor/imager/image'
-# GZ_CAMERA_INFO_TOPIC = '/world/custom/model/x500_mono_cam_0/link/camera_link/sensor/imager/camera_info'
-
-
-GZ_CAMERA_TOPIC = '/world/custom/model/x500_depth_0/link/camera_link/sensor/imager/image'
-GZ_CAMERA_INFO_TOPIC = '/world/custom/model/x500_depth_0/link/camera_link/sensor/imager/camera_info'
-
-
 HARDCODE_PATH = False
 
 def find_folder(folder_name, search_path):
@@ -156,8 +143,7 @@ def launch_setup(context, *args, **kwargs):
     if vehicle_type == 'quadcopter':
         autostart = 4001
         # model = 'gz_x500_mono_cam_down'
-        model = 'gz_x500_depth'
-        # model = 'gz_x500_mono_cam'
+        model = 'gz_x500_mono_cam'
     elif vehicle_type == 'tiltrotor_vtol':
         autostart = 4020
         model = 'gz_tiltrotor'
@@ -169,12 +155,17 @@ def launch_setup(context, *args, **kwargs):
         model = 'gz_standard_vtol'
     else:
         raise ValueError(f"Invalid vehicle type: {vehicle_type}")
+    
     px4_sitl = ExecuteProcess(
         cmd=['bash', '-c', f'PX4_GZ_STANDALONE=1 PX4_SYS_AUTOSTART={autostart} PX4_SIM_MODEL={model} PX4_GZ_WORLD=custom ./build/px4_sitl_default/bin/px4'],
         cwd=px4_path,
         output='screen',
         name='px4_sitl'
     )
+
+    topic_model_name = model[3:]
+    GZ_CAMERA_TOPIC = f'/world/custom/model/{topic_model_name}_0/link/camera_link/sensor/imager/image'
+    GZ_CAMERA_INFO_TOPIC = f'/world/custom/model/{topic_model_name}_0/link/camera_link/sensor/imager/camera_info'
 
     # Define the ROS-Gazebo bridge for the camera topics.
     # gz_ros_bridge_camera = ExecuteProcess(
@@ -190,12 +181,10 @@ def launch_setup(context, *args, **kwargs):
     gz_ros_bridge_camera = ExecuteProcess(
         cmd=['ros2', 'run', 'ros_gz_bridge', 'parameter_bridge',
             # Use the EXACT topic name from gz topic -l
-            # '/world/custom/model/x500_mono_cam_0/link/camera_link/sensor/imager/image@sensor_msgs/msg/Image[gz.msgs.Image',
-            '/world/custom/model/x500_depth_0/link/camera_link/sensor/imager/image@sensor_msgs/msg/Image[gz.msgs.Image',
-            # '/world/custom/model/x500_mono_cam_down_0/link/camera_link/sensor/imager/image@sensor_msgs/msg/Image[gz.msgs.Image',
+            f'{GZ_CAMERA_TOPIC}@sensor_msgs/msg/Image[gz.msgs.Image',
             '--ros-args', '--remap',
             # Also use the EXACT topic name for the remap source
-            '/world/custom/model/x500_mono_cam_0/link/camera_link/sensor/imager/image:=/camera'],
+            f'{GZ_CAMERA_TOPIC}:=/camera'],
         output='screen',
         cwd=sae_ws_path,
         name='gz_ros_bridge_camera'
@@ -203,9 +192,7 @@ def launch_setup(context, *args, **kwargs):
     gz_ros_bridge_camera_info = ExecuteProcess(
         cmd=['ros2', 'run', 'ros_gz_bridge', 'parameter_bridge',
             f'{GZ_CAMERA_INFO_TOPIC}@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo',
-            # '--ros-args', '--remap', '/world/custom/model/x500_mono_cam_0/link/camera_link/sensor/imager/camera_info:=/camera_info'],
-            '--ros-args', '--remap', '/world/custom/model/x500_depth_0/link/camera_link/sensor/imager/camera_info:=/camera_info'],
-            # '--ros-args', '--remap', '/world/custom/model/x500_mono_cam_down_0/link/camera_link/sensor/imager/camera_info:=/camera_info'],
+            '--ros-args', '--remap', f'{GZ_CAMERA_INFO_TOPIC}:=/camera_info'],
         output='screen',
         cwd=sae_ws_path,
         name='gz_ros_bridge_camera_info'
