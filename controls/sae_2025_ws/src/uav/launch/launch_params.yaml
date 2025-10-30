@@ -1,5 +1,5 @@
 # launch_params.yaml for team 3
-mission_name: triangle
+mission_name: test_straight_course
 uav_debug: false
 vision_debug: true
 sim: true
