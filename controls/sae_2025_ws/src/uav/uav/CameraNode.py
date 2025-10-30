@@ -44,11 +44,7 @@ class CameraNode(Node):
         
         self.image = None
         self.camera_info = None
-        #self.display = display
-        # Let a ROS 2 parameter override the constructor default
-        # new changes from here on
-        self.declare_parameter('display', display)
-        self.display = self.get_parameter('display').value
+        self.display = display
 
         self.service = self.create_service(
             CameraData,
