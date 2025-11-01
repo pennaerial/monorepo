@@ -142,7 +142,7 @@ def launch_setup(context, *args, **kwargs):
     # Define the PX4 SITL process.
     if vehicle_type == 'quadcopter':
         autostart = 4001
-        model = 'gz_x500_mono_cam'
+        model = 'gz_x500_mono_cam_down'
     elif vehicle_type == 'tiltrotor_vtol':
         autostart = 4020
         model = 'gz_tiltrotor'
