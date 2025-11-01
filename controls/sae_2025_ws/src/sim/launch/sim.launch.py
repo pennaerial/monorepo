@@ -294,8 +294,21 @@ def launch_setup(context, *args, **kwargs):
                 'scoring_rate': sim_params.get('scoring_rate', 5.0),
                 'hoop_tolerance': sim_params.get('scoring', {}).get('hoop_tolerance', 1.0),
                 'max_flight_time': sim_params.get('scoring', {}).get('max_flight_time', 300),
-                'points_per_hoop': sim_params.get('scoring', {}).get('points_per_hoop', 10)
+                'points_per_hoop': sim_params.get('scoring', {}).get('points_per_hoop', 10),
+                'world_name': world_name  # Pass world name for visual_config topic
             }]
+        )
+    
+    # Define the ROS-Gazebo bridge for visual_config topic (for hoop coloring)
+    gz_ros_bridge_visual_config = None
+    if sim_params.get('enable_scoring', True):
+        print("start gz_ros_bridge_visual_config")
+        gz_ros_bridge_visual_config = ExecuteProcess(
+            cmd=['ros2', 'run', 'ros_gz_bridge', 'parameter_bridge',
+                f'/world/{world_name}/visual_config@ros_gz_interfaces/msg/MaterialColor[gz.msgs.MaterialColor'],
+            output='screen',
+            cwd=sae_ws_path,
+            name='gz_ros_bridge_visual_config'
         )
     
     # Define the ROS-Gazebo bridge for camera topics (only if enabled)
@@ -335,6 +348,8 @@ def launch_setup(context, *args, **kwargs):
     
     # Build action list based on enabled features
     bridge_actions = []
+    if gz_ros_bridge_visual_config is not None:
+        bridge_actions.append(gz_ros_bridge_visual_config)
     if gz_ros_bridge_camera is not None:
         bridge_actions.append(gz_ros_bridge_camera)
     if gz_ros_bridge_camera_info is not None:

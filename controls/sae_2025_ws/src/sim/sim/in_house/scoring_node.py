@@ -4,8 +4,9 @@ import rclpy
 from rclpy.node import Node
 from px4_msgs.msg import VehicleLocalPosition
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy, QoSDurabilityPolicy
-from std_msgs.msg import Float32, String, Float32MultiArray
+from std_msgs.msg import Float32, String, Float32MultiArray, ColorRGBA, Header
 from geometry_msgs.msg import Point
+from ros_gz_interfaces.msg import MaterialColor, Entity
 from typing import List, Tuple, Optional, Dict, Any
 import math
 import time
@@ -26,6 +27,7 @@ class ScoringNode(Node):
         self.declare_parameter('competition_type', 'in_house')
         self.declare_parameter('competition_name', 'test')
         self.declare_parameter('course_type', 'straight')
+        self.declare_parameter('world_name', 'custom')  # Gazebo world name
         
         # landing bonus parameters
         self.declare_parameter('landing_bonus', 5.0)  
@@ -55,6 +57,21 @@ class ScoringNode(Node):
         self.status_publisher = self.create_publisher(String, '/scoring/status', 10)
         self.drone_publisher = self.create_publisher(Float32MultiArray, '/scoring/drone_position', 10)
         
+        # Publisher for hoop color updates (MaterialColor messages to Gazebo)
+        world_name = self.get_parameter('world_name').get_parameter_value().string_value
+        self.visual_config_topic = f'/world/{world_name}/visual_config'
+        self.visual_config_publisher = self.create_publisher(
+            MaterialColor, 
+            self.visual_config_topic, 
+            10
+        )
+        self.get_logger().info(f"Initialized visual config publisher on topic: {self.visual_config_topic}")
+        
+        # Track last hoop color update to throttle updates
+        self.last_color_update_time = 0.0
+        self.color_update_interval = 0.5  # Update colors at 2Hz max
+        self.initial_color_setup_done = False  # Track if initial setup is complete
+        
         # Subscriber
         qos = QoSProfile(
             reliability=QoSReliabilityPolicy.BEST_EFFORT,
@@ -73,6 +90,7 @@ class ScoringNode(Node):
         self.create_timer(0.1, self.update_scoring)  # 10Hz
         
         self.load_hoop_positions_from_params()
+        
         self.get_logger().info("Scoring node initialized.")
     
     def load_hoop_positions_from_params(self):
@@ -178,6 +196,20 @@ class ScoringNode(Node):
             else:
                 # Drone not in hoop, reset side tracking
                 self.drone_last_side[i] = 0
+        
+        # Update hoop colors (throttled)
+        current_time = time.time()
+        if current_time - self.last_color_update_time >= self.color_update_interval:
+            # Do initial setup on first update if not done yet
+            if not self.initial_color_setup_done:
+                # Wait a bit after startup for Gazebo to be ready
+                if current_time - self.start_time >= 2.0:
+                    self.initial_color_setup_done = True
+                    self.get_logger().info("Initial hoop colors set (first hoop green, others red)")
+            
+            self.update_hoop_colors()
+            self.last_color_update_time = current_time
+        
         self.check_landing_bonus()
         # Throttled position logging (SAME AS BEFORE)
         if self.uav_position:
@@ -278,7 +310,75 @@ class ScoringNode(Node):
         drone_position = Float32MultiArray()
         drone_position.data = [x, y, z_up]
         self.drone_publisher.publish(drone_position)
-   
+    
+    def get_next_hoop_index(self) -> Optional[int]:
+        """
+        Find the index of the next hoop that hasn't been passed yet.
+        Returns None if all hoops have been passed.
+        """
+        if not self.passed_hoops or not self.hoop_poses:
+            return None
+        
+        for i, passed in enumerate(self.passed_hoops):
+            if not passed:
+                return i
+        return None  # All hoops passed
+    
+    def update_hoop_colors(self):
+        """
+        Update hoop colors: green for next hoop, red for all others.
+        Publishes MaterialColor messages to Gazebo via ros_gz_bridge.
+        """
+        if not self.hoop_poses:
+            return
+        
+        next_hoop_idx = self.get_next_hoop_index()
+        
+        # Define colors (RGBA values 0-1)
+        green_color = ColorRGBA(r=0.0, g=1.0, b=0.0, a=1.0)   # Green
+        red_color = ColorRGBA(r=1.0, g=0.0, b=0.0, a=1.0)     # Red
+        
+        # Update all hoops
+        for i in range(len(self.hoop_poses)):
+            hoop_num = i + 1  # Hoops are numbered starting from 1
+            
+            # Choose color: green if this is the next hoop, red otherwise
+            if i == next_hoop_idx:
+                color = green_color
+            else:
+                color = red_color
+            
+            # Create MaterialColor message
+            msg = MaterialColor()
+            msg.header = Header()
+            msg.header.stamp = self.get_clock().now().to_msg()
+            
+            # Entity name format: "hoop_{num}::hoop::visual" 
+            # (model_name::link_name::visual_name)
+            msg.entity = Entity()
+            msg.entity.name = f"hoop_{hoop_num}::hoop::visual"
+            msg.entity.type = Entity.VISUAL  # Entity type: VISUAL = 4
+            msg.entity.id = 0  # ID not needed when using name
+            
+            # Set material colors
+            msg.ambient = color
+            msg.diffuse = color
+            msg.specular = ColorRGBA(r=0.5, g=0.5, b=0.5, a=1.0)  # Gray specular
+            msg.emissive = ColorRGBA(r=0.0, g=0.0, b=0.0, a=1.0)  # No emissive
+            msg.shininess = 32.0
+            
+            # Apply to first matching entity
+            msg.entity_match = MaterialColor.FIRST
+            
+            # Publish the message
+            self.visual_config_publisher.publish(msg)
+        
+        if next_hoop_idx is not None:
+            self.get_logger().debug(
+                f"Updated hoop colors: hoop_{next_hoop_idx + 1} is green, others are red",
+                throttle_duration_sec=2.0
+            )
+    
 def main(args=None):
     """Main function for scoring node. (SAME AS BEFORE)"""
     rclpy.init(args=args)
