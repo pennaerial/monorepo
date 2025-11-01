@@ -142,7 +142,6 @@ def launch_setup(context, *args, **kwargs):
     # Define the PX4 SITL process.
     if vehicle_type == 'quadcopter':
         autostart = 4001
-        # model = 'gz_x500_mono_cam_down'
         model = 'gz_x500_mono_cam'
     elif vehicle_type == 'tiltrotor_vtol':
         autostart = 4020
@@ -167,17 +166,6 @@ def launch_setup(context, *args, **kwargs):
     GZ_CAMERA_TOPIC = f'/world/custom/model/{topic_model_name}_0/link/camera_link/sensor/imager/image'
     GZ_CAMERA_INFO_TOPIC = f'/world/custom/model/{topic_model_name}_0/link/camera_link/sensor/imager/camera_info'
 
-    # Define the ROS-Gazebo bridge for the camera topics.
-    # gz_ros_bridge_camera = ExecuteProcess(
-    #     cmd=['ros2', 'run', 'ros_gz_bridge', 'parameter_bridge',
-    #         f'{GZ_CAMERA_TOPIC}@sensor_msgs/msg/Image[gz.msgs.Image',
-    #         '--ros-args', '--remap', '/world/custom/model/x500_mono_cam_down_0/link/camera_link/sensor/imager/image:=/camera'],
-    #     output='screen',
-    #     cwd=sae_ws_path,
-    #     name='gz_ros_bridge_camera'
-    # )
-    
-    # CORRECTED VERSION
     gz_ros_bridge_camera = ExecuteProcess(
         cmd=['ros2', 'run', 'ros_gz_bridge', 'parameter_bridge',
             # Use the EXACT topic name from gz topic -l
