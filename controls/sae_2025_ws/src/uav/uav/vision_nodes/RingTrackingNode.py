@@ -60,20 +60,20 @@ class RingTrackingNode(VisionNode):
     # ---------------------  PUBLISHER CALLBACK  ---------------------
     def timer_callback(self):
         """Runs at 20 Hz; performs detection and publishes results."""
-        # Acquire newest data
+        # Ensure we have at least one image and camera_info before proceeding
+        if self.image is None or self.camera_info is None:
+            return  # wait until the bridge delivers first data
+
+        # Acquire newest data via helper (now guaranteed to be non-None)
         image_msg, camera_info_msg = self.request_data(cam_image=True, cam_info=True)
-        if image_msg is None:
-            # No camera yet – skip until first frame arrives
-            return
 
         image = self.convert_image_msg_to_frame(image_msg)
 
-        # NOTE: Replace the following with actual ring-finding algorithm
-        # For now we reuse the existing find_payload helper (update later)
+        # TODO: implement proper ring-detection; placeholder uses "pink" threshold
         detection = find_payload(
             image,
-            *pink,
-            *(self.color_map[request.payload_color]),
+            *pink,                      # low HSV bound
+            *self.color_map["pink"],   # high HSV bound
             self.uuid,
             self.debug,
             self.save_vision
