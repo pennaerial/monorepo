@@ -213,7 +213,7 @@ def launch_setup(context, *args, **kwargs):
             OnProcessStart(target_action=gazebo, on_start=[px4_sitl, LogInfo(msg="Gazebo started.")])
         ),
         RegisterEventHandler(
-            OnProcessStart(target_action=px4_sitl, on_start=[gz_ros_bridge_camera, LogInfo(msg="PX4 SITL started.ffffffffffffffffffffffffffffffffffffffffffffffffffffffff")])
+            OnProcessStart(target_action=px4_sitl, on_start=[delayed_bridge, LogInfo(msg="PX4 SITL started.ffffffffffffffffffffffffffffffffffffffffffffffffffffffff")])
         ),
         RegisterEventHandler(
             OnProcessStart(target_action=gz_ros_bridge_camera, on_start=[gz_ros_bridge_camera_info, LogInfo(msg="gz_ros_bridge_camera started.")])
