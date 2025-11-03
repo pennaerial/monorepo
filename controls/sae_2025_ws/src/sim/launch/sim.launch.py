@@ -335,10 +335,10 @@ def launch_setup(context, *args, **kwargs):
     
     # Build action list based on enabled features
     bridge_actions = []
-    if gz_ros_bridge_camera is not None:
-        bridge_actions.append(gz_ros_bridge_camera)
-    if gz_ros_bridge_camera_info is not None:
-        bridge_actions.append(gz_ros_bridge_camera_info)
+    # if gz_ros_bridge_camera is not None:
+    #     bridge_actions.append(gz_ros_bridge_camera)
+    # if gz_ros_bridge_camera_info is not None:
+    #     bridge_actions.append(gz_ros_bridge_camera_info)
     
     # Add delayed scoring if enabled
     if delayed_scoring is not None:

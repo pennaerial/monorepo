@@ -196,6 +196,11 @@ def launch_setup(context, *args, **kwargs):
         period=15.0,
         actions=[mission] if run_mission_bool else []
     )
+
+    delayed_bridge = TimerAction(
+        period=30.0,
+        actions=[gz_ros_bridge_camera]
+    )
     
     # Build and return the complete list of actions.
     return [
@@ -208,7 +213,7 @@ def launch_setup(context, *args, **kwargs):
             OnProcessStart(target_action=gazebo, on_start=[px4_sitl, LogInfo(msg="Gazebo started.")])
         ),
         RegisterEventHandler(
-            OnProcessStart(target_action=px4_sitl, on_start=[gz_ros_bridge_camera, LogInfo(msg="PX4 SITL started.")])
+            OnProcessStart(target_action=px4_sitl, on_start=[delayed_bridge, LogInfo(msg="PX4 SITL started.ffffffffffffffffffffffffffffffffffffffffffffffffffffffff")])
         ),
         RegisterEventHandler(
             OnProcessStart(target_action=gz_ros_bridge_camera, on_start=[gz_ros_bridge_camera_info, LogInfo(msg="gz_ros_bridge_camera started.")])
