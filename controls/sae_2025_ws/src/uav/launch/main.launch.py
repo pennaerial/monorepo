@@ -90,6 +90,9 @@ def launch_setup(context, *args, **kwargs):
     # Build the mission YAML file path using the mission name.
     YAML_PATH = os.path.join(os.getcwd(), 'src', 'uav', 'uav', 'missions', f"{mission_name}.yaml")
     
+    # ------------------------------------------------------------
+    # 1) COMMON SETUP  (applies to both sim and real-hardware runs)
+    # ------------------------------------------------------------
     # Build vision node actions.
     vision_nodes = []
     vision_node_actions = [Node(
@@ -111,17 +114,28 @@ def launch_setup(context, *args, **kwargs):
             parameters=[{'debug': vision_debug_bool, 'sim': sim_bool, 'save_vision': save_vision_bool}],
         ))
     
+    # ------------------------------------------------------------
+    # 2) NON-SIMULATION ONLY  (hardware / real camera pipeline)
+    # ------------------------------------------------------------
     # Clear vision node actions if none are found.
     if len(vision_nodes) == 0:
         vision_node_actions = []
-    
+
+    # Real-hardware camera pipeline (not used in simulation)
     if not sim_bool:
         vision_node_actions.insert(0, ExecuteProcess(
-            cmd=['ros2', 'run', 'v4l2_camera', 'v4l2_camera_node', '--ros-args', '-p', 'image_size:=[640,480]', '--ros-args', '--remap', '/image_raw:=/camera'],
+            cmd=[
+                'ros2', 'run', 'v4l2_camera', 'v4l2_camera_node',
+                '--ros-args', '-p', 'image_size:=[640,480]',
+                '--ros-args', '--remap', '/image_raw:=/camera'
+            ],
             output='screen',
             name='cam2image'
         ))
     
+    # ------------------------------------------------------------
+    # 3) SIMULATION-SPECIFIC SETUP (Gazebo, PX4-SITL, bridges)
+    # ------------------------------------------------------------
     # Find required paths.
     px4_path = (find_folder_with_heuristic('PX4-Autopilot', os.path.expanduser('~'))
                 if not HARDCODE_PATH else os.path.expanduser('~/PX4-Autopilot'))
@@ -156,8 +170,34 @@ def launch_setup(context, *args, **kwargs):
         model = 'gz_standard_vtol'
     else:
         raise ValueError(f"Invalid vehicle type: {vehicle_type}")
+
+    
+    # For PX4_GZ_WORLD=a/custom to work, you need the SDF file at ./a/custom.sdf.
+    # By default PX4-Gazebo looks for the world SDF file in $PX4_GZ_RESOURCE_PATH/worlds or the relative path.
+    # Typically, this means './a/custom.sdf' (relative to the PX4 SITL working directory) must exist.
+    #
+    # The default location PX4 expects for the "custom" world is 'worlds/custom.sdf' under your PX4-Autopilot directory.
+    # If you want to use 'a/custom', you need to:
+    #   1. Place your custom SDF file at '<PX4-Autopilot>/a/custom.sdf'
+    #   2. OR arrange for './a/custom.sdf' to exist relative to your px4_path (PX4-Autopilot).
+    #   3. You can symlink or copy your desired world SDF into this location.
+    #
+    # For example, to use your own world:
+    #     mkdir -p <PX4-Autopilot>/a
+    #     cp /path/to/myworld.sdf <PX4-Autopilot>/a/custom.sdf
+    #
+    # PX4 will load the world you place there when PX4_GZ_WORLD is set to 'a/custom'.
+
+    candidate_world = os.path.join(px4_path, 'a', 'custom.sdf')
+    if os.path.exists(candidate_world):
+        world_arg = 'a/custom'
+        print("[INFO] PX4_GZ_WORLD set to 'a/custom' (a/custom.sdf found).")
+    else:
+        world_arg = 'custom'
+        print("[INFO] PX4_GZ_WORLD set to 'custom' (a/custom.sdf NOT found, using default).")
+
     px4_sitl = ExecuteProcess(
-        cmd=['bash', '-c', f'PX4_GZ_STANDALONE=1 PX4_SYS_AUTOSTART={autostart} PX4_SIM_MODEL={model} PX4_GZ_WORLD=custom ./build/px4_sitl_default/bin/px4'],
+        cmd=['bash', '-c', f'PX4_GZ_STANDALONE=1 PX4_SYS_AUTOSTART={autostart} PX4_SIM_MODEL={model} PX4_GZ_WORLD={world_arg} ./build/px4_sitl_default/bin/px4'],
         cwd=px4_path,
         output='screen',
         name='px4_sitl'
@@ -182,9 +222,16 @@ def launch_setup(context, *args, **kwargs):
         name='gz_ros_bridge_camera_info'
     )
     
-    # Define the mission process.
+    # MISSION MANAGER MODE NEEDED FOR BOTH SIM AND NON-SIM
     camera_offsets_str = ','.join(str(offset) for offset in camera_offsets)
-    mission_cmd = ['ros2', 'run', 'uav', 'mission', uav_debug, YAML_PATH, servo_only, camera_offsets_str, ','.join(vision_nodes)]
+    mission_cmd = [
+        'ros2', 'run', 'uav', 'mission',
+        uav_debug,
+        YAML_PATH,
+        servo_only,
+        camera_offsets_str,
+        ','.join(vision_nodes)
+    ]
     mission = ExecuteProcess(
         cmd=mission_cmd,
         output='screen',
