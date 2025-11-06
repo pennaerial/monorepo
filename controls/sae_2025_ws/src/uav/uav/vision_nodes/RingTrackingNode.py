@@ -108,7 +108,11 @@ class RingTrackingNode(VisionNode):
 #         response.dlz_empty = dlz_empty
 #         return response
         if detection is None:
-            return  # nothing to publish this cycle
+            # Publish constant dummy vector so downstream nodes see a steady stream
+            dummy = self.publish_msg_type()
+            dummy.data = [0.0, 0.0, 0.0, 0.0, 1.0, 0.0]  # x,y,dir_x,dir_y,dir_z,flag
+            self.ring_pub.publish(dummy)
+            return
 
         cx, cy, dlz_empty = detection
 
