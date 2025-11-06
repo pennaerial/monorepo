@@ -191,12 +191,29 @@ def launch_setup(context, *args, **kwargs):
     if os.path.exists(candidate_world):
         world_arg = 'a/custom'
         print("[INFO] PX4_GZ_WORLD set to 'a/custom' (a/custom.sdf found).")
+        print("[INFO] PX4_GZ_WORLD set to 'a/custom' (a/custom.sdf found).")
+        print("[INFO] PX4_GZ_WORLD set to 'a/custom' (a/custom.sdf found).")
+        print("[INFO] PX4_GZ_WORLD set to 'a/custom' (a/custom.sdf found).")
+        print("[INFO] PX4_GZ_WORLD set to 'a/custom' (a/custom.sdf found).")
+        print("[INFO] PX4_GZ_WORLD set to 'a/custom' (a/custom.sdf found).")
+        print("[INFO] PX4_GZ_WORLD set to 'a/custom' (a/custom.sdf found).")
+
     else:
         world_arg = 'custom'
+        print("[INFO] PX4_GZ_WORLD set to 'custom' (a/custom.sdf NOT found, using default).") 
+        print("[INFO] PX4_GZ_WORLD set to 'custom' (a/custom.sdf NOT found, using default).")
+        print("[INFO] PX4_GZ_WORLD set to 'custom' (a/custom.sdf NOT found, using default).")
+        print("[INFO] PX4_GZ_WORLD set to 'custom' (a/custom.sdf NOT found, using default).")
+        print("[INFO] PX4_GZ_WORLD set to 'custom' (a/custom.sdf NOT found, using default).")
+        print("[INFO] PX4_GZ_WORLD set to 'custom' (a/custom.sdf NOT found, using default).")
+        print("[INFO] PX4_GZ_WORLD set to 'custom' (a/custom.sdf NOT found, using default).")
+        print("[INFO] PX4_GZ_WORLD set to 'custom' (a/custom.sdf NOT found, using default).")
+        print("[INFO] PX4_GZ_WORLD set to 'custom' (a/custom.sdf NOT found, using default).")
+        print("[INFO] PX4_GZ_WORLD set to 'custom' (a/custom.sdf NOT found, using default).")
         print("[INFO] PX4_GZ_WORLD set to 'custom' (a/custom.sdf NOT found, using default).")
 
     px4_sitl = ExecuteProcess(
-        cmd=['bash', '-c', f'PX4_GZ_STANDALONE=1 PX4_SYS_AUTOSTART={autostart} PX4_SIM_MODEL={model} PX4_GZ_WORLD={world_arg} ./build/px4_sitl_default/bin/px4'],
+        cmd=['bash', '-c', f'PX4_GZ_STANDALONE=1 PX4_SYS_AUTOSTART={autostart} PX4_SIM_MODEL={model} PX4_GZ_WORLD=a/custom ./build/px4_sitl_default/bin/px4'],
         cwd=px4_path,
         output='screen',
         name='px4_sitl'
@@ -242,6 +259,11 @@ def launch_setup(context, *args, **kwargs):
         period=15.0,
         actions=[mission] if run_mission_bool else []
     )
+
+    delayed_bridge = TimerAction(
+        period=30.0,
+        actions = [gz_ros_bridge_camera]
+    )
     
     # Build and return the complete list of actions.
     return [
@@ -254,7 +276,7 @@ def launch_setup(context, *args, **kwargs):
             OnProcessStart(target_action=gazebo, on_start=[px4_sitl, LogInfo(msg="Gazebo started.")])
         ),
         RegisterEventHandler(
-            OnProcessStart(target_action=px4_sitl, on_start=[gz_ros_bridge_camera, LogInfo(msg="PX4 SITL started.")])
+            OnProcessStart(target_action=px4_sitl, on_start=[delayed_mission, LogInfo(msg="PX4 SITL started.")])
         ),
         RegisterEventHandler(
             OnProcessStart(target_action=gz_ros_bridge_camera, on_start=[gz_ros_bridge_camera_info, LogInfo(msg="gz_ros_bridge_camera started.")])
