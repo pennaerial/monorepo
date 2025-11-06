@@ -2,8 +2,8 @@ import numpy as np
 from uav import UAV
 from uav.autonomous_modes import Mode
 from rclpy.node import Node
-from uav_interfaces.srv import PayloadTracking
-from uav.vision_nodes import PayloadTrackingNode
+from uav_interfaces.srv import HoopTracking
+from uav.vision_nodes import HoopTrackingNode
 from typing import Optional, Tuple
 from px4_msgs.msg import VehicleStatus
 import cv2
@@ -45,7 +45,7 @@ class PayloadDropoffMode(Mode):
         request = HoopTracking.Request()
         request.altitude = -self.uav.get_local_position()[2]
         request.yaw = float(self.uav.yaw)
-        request.hoop_color = 'orange'
+        request.payload_color = 'red'
         response = self.send_request(HoopTrackingNode, request)
         
         # If no hoop pose is received, exit early
