@@ -140,18 +140,19 @@ def launch_setup(context, *args, **kwargs):
     )
     
     # Define the PX4 SITL process.
+
+    model = params.get('model')
+    if not model:
+        raise ValueError("Model name must be specified in launch_params.yaml")
+    
     if vehicle_type == 'quadcopter':
         autostart = 4001
-        model = 'gz_x500_mono_cam_down'
     elif vehicle_type == 'tiltrotor_vtol':
         autostart = 4020
-        model = 'gz_tiltrotor'
     elif vehicle_type == 'fixed_wing':
         autostart = 4003
-        model = 'gz_rc_cessna'
     elif vehicle_type == 'standard_vtol':
         autostart = 4004
-        model = 'gz_standard_vtol'
     else:
         raise ValueError(f"Invalid vehicle type: {vehicle_type}")
     
