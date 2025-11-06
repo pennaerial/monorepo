@@ -172,22 +172,21 @@ def launch_setup(context, *args, **kwargs):
         raise ValueError(f"Invalid vehicle type: {vehicle_type}")
 
     
-    # For PX4_GZ_WORLD=a/custom to work, you need the SDF file at ./a/custom.sdf.
-    # By default PX4-Gazebo looks for the world SDF file in $PX4_GZ_RESOURCE_PATH/worlds or the relative path.
-    # Typically, this means './a/custom.sdf' (relative to the PX4 SITL working directory) must exist.
+    # For PX4_GZ_WORLD=a/custom to work, you need the SDF file at <PX4-Autopilot>/a/custom.sdf.
+    # By default, this selection uses print statements to indicate which world is set:
     #
-    # The default location PX4 expects for the "custom" world is 'worlds/custom.sdf' under your PX4-Autopilot directory.
-    # If you want to use 'a/custom', you need to:
-    #   1. Place your custom SDF file at '<PX4-Autopilot>/a/custom.sdf'
-    #   2. OR arrange for './a/custom.sdf' to exist relative to your px4_path (PX4-Autopilot).
-    #   3. You can symlink or copy your desired world SDF into this location.
+    #     print("[INFO] PX4_GZ_WORLD set to 'a/custom' (a/custom.sdf found).")
+    #     print("[INFO] PX4_GZ_WORLD set to 'custom' (a/custom.sdf NOT found, using default).")
     #
-    # For example, to use your own world:
+    # These print statements output to the stdout of the launch process, which usually appears
+    # in your terminal where you ran `ros2 launch uav main.launch.py` or similar.
+    #
+    # If you want to see which SDF was chosen, watch your launch terminal for these [INFO] messages.
+    #
+    # To make 'a/custom' work, place your desired SDF at <PX4-Autopilot>/a/custom.sdf:
     #     mkdir -p <PX4-Autopilot>/a
-    #     cp /path/to/myworld.sdf <PX4-Autopilot>/a/custom.sdf
+    #     cp /path/to/your/my_custom_world.sdf <PX4-Autopilot>/a/custom.sdf
     #
-    # PX4 will load the world you place there when PX4_GZ_WORLD is set to 'a/custom'.
-
     candidate_world = os.path.join(px4_path, 'a', 'custom.sdf')
     if os.path.exists(candidate_world):
         world_arg = 'a/custom'
