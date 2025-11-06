@@ -7,7 +7,7 @@ find_package(sensor_msgs REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 
 # Find all .msg and .srv files
-file(GLOB MSG_FILES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "src/msg/*.msg")
+file(GLOB MSG_FILES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "msg/*.msg")
 file(GLOB SRV_FILES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "src/srv/*.srv")
 
 rosidl_generate_interfaces(${PROJECT_NAME}
