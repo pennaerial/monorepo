@@ -1,0 +1,5 @@
+{
+    "python.analysis.extraPaths": [
+        "./build/uav_interfaces/rosidl_generator_py"
+    ]
+}
