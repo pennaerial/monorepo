@@ -9,8 +9,8 @@ from launch.event_handlers import OnProcessStart
 from launch_ros.actions import Node
 from uav.utils import vehicle_map
 
-GZ_CAMERA_TOPIC = '/world/custom/model/x500_mono_cam_down_0/link/camera_link/sensor/imager/image'
-GZ_CAMERA_INFO_TOPIC = '/world/custom/model/x500_mono_cam_down_0/link/camera_link/sensor/imager/camera_info'
+GZ_CAMERA_TOPIC = '/world/custom/model/x500_mono_cam_0/link/camera_link/sensor/imager/image'
+GZ_CAMERA_INFO_TOPIC = '/world/custom/model/x500_mono_cam_0/link/camera_link/sensor/imager/camera_info'
 HARDCODE_PATH = False
 
 def find_folder(folder_name, search_path):
@@ -145,7 +145,7 @@ def launch_setup(context, *args, **kwargs):
     # Define the PX4 SITL process.
     if vehicle_type == 'quadcopter':
         autostart = 4001
-        model = 'gz_x500_mono_cam_down'
+        model = 'gz_x500_mono_cam'
     elif vehicle_type == 'tiltrotor_vtol':
         autostart = 4020
         model = 'gz_tiltrotor'
@@ -168,7 +168,7 @@ def launch_setup(context, *args, **kwargs):
     gz_ros_bridge_camera = ExecuteProcess(
         cmd=['ros2', 'run', 'ros_gz_bridge', 'parameter_bridge',
             f'{GZ_CAMERA_TOPIC}@sensor_msgs/msg/Image[gz.msgs.Image',
-            '--ros-args', '--remap', '/world/custom/model/x500_mono_cam_down_0/link/camera_link/sensor/imager/image:=/camera'],
+            '--ros-args', '--remap', '/world/custom/model/x500_mono_cam_0/link/camera_link/sensor/imager/image:=/camera'],
         output='screen',
         cwd=sae_ws_path,
         name='gz_ros_bridge_camera'
@@ -177,7 +177,7 @@ def launch_setup(context, *args, **kwargs):
     gz_ros_bridge_camera_info = ExecuteProcess(
         cmd=['ros2', 'run', 'ros_gz_bridge', 'parameter_bridge',
             f'{GZ_CAMERA_INFO_TOPIC}@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo',
-            '--ros-args', '--remap', '/world/custom/model/x500_mono_cam_down_0/link/camera_link/sensor/imager/camera_info:=/camera_info'],
+            '--ros-args', '--remap', '/world/custom/model/x500_mono_cam_0/link/camera_link/sensor/imager/camera_info:=/camera_info'],
         output='screen',
         cwd=sae_ws_path,
         name='gz_ros_bridge_camera_info'

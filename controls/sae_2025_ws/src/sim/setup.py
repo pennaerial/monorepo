@@ -13,11 +13,15 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='David',
-    maintainer_email='zhandavid4@gmail.com',
+    maintainer='felicia',
+    maintainer_email='iordachifelicia19@gmail.com',
     description='TODO: Package description',
     license='TODO: License declaration',
-    tests_require=['pytest'],
+    extras_require={
+        'test': [
+            'pytest',
+        ],
+    },
     entry_points={
         'console_scripts': [
         ],
