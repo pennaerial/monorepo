@@ -1,5 +1,5 @@
 # launch_params.yaml for team 3
-mission_name: test_straight_course
+mission_name: test_hoop_tracking.yaml
 uav_debug: false
 vision_debug: true
 sim: true
