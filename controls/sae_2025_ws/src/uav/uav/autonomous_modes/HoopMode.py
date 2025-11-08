@@ -83,7 +83,9 @@ class HoopMode(Mode):
 
         # Transform from camera frame to UAV NED frame (forward-facing camera)
         # Camera: X=right, Y=down, Z=forward -> UAV NED: X=forward, Y=right, Z=down
-        # Note: Camera Y down = positive, UAV Z down = positive, so direct mapping
+        # Camera Y is down (positive), UAV Z is down (positive), so direct mapping
+        # Camera X is right (positive), UAV Y is right (positive), so direct mapping
+        # Camera Z is forward (positive), UAV X is forward (positive), so direct mapping
         self.log(f"Raw response.direction: {response.direction}")
         direction = [response.direction[2], response.direction[0], response.direction[1]]
         self.log(f"After frame transform: {direction}")
@@ -93,7 +95,7 @@ class HoopMode(Mode):
         direction = [x + y + z for x, y, z in zip(direction, offsets, self.uav.uav_to_local(camera_offsets))]
 
         # Check if centered on hoop (left/right and up/down)
-        threshold = 0.2
+        threshold = 0.1
         if (np.abs(direction[1]) < threshold and
             np.abs(direction[2]) < threshold):
             # Centered! Fly forward through the hoop

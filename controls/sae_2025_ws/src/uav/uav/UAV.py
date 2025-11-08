@@ -173,23 +173,27 @@ class UAV:
     
     def publish_position_setpoint(self, coordinate, yaw=None, calculate_yaw=False, relative=False):
         """Publish the trajectory setpoint.
-        
+
         Args:
             coordinate (tuple): (x, y, z) in the local frame.
             yaw (float): Yaw angle in radians (optional).
             calculate_yaw (bool): Calculate yaw angle based on the next waypoint.
             relative (bool): If True, the position is relative to the current local position.
         """
-        x, y, z = coordinate
+        dx, dy, dz = coordinate
         if relative:
-            x += self.local_position.x
-            y += self.local_position.y
-            z += self.local_position.z
+            x = dx + self.local_position.x
+            y = dy + self.local_position.y
+            z = dz + self.local_position.z
+        else:
+            x, y, z = dx, dy, dz
         msg = TrajectorySetpoint()
         msg.position = [float(x), float(y), float(z)]
         msg.yaw = self.calculate_yaw(x, y) if calculate_yaw else yaw if yaw else float(self.yaw)
         msg.timestamp = int(self.node.get_clock().now().nanoseconds / 1000)
-        norm_dir = np.array([x, y, z]) / np.linalg.norm(np.array([x, y, z]))
+        # Calculate velocity direction based on relative offset to target
+        rel_offset = np.array([x - self.local_position.x, y - self.local_position.y, z - self.local_position.z])
+        norm_dir = rel_offset / np.linalg.norm(rel_offset)
         msg.velocity = [norm_dir[0] * self.max_acceleration, norm_dir[1] * self.max_acceleration, norm_dir[2] * self.max_acceleration]
         self.trajectory_publisher.publish(msg)
         self.node.get_logger().info(f"Publishing setpoint: pos={[x, y, z]}, yaw={msg.yaw:.2f}")
