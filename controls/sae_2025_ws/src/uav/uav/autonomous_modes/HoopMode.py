@@ -91,7 +91,6 @@ class HoopMode(Mode):
         offsets = tuple(x / request.altitude for x in self.offsets) if request.altitude > 1 else self.offsets
         camera_offsets = tuple(x / request.altitude for x in self.camera_offsets) if request.altitude > 1 else self.camera_offsets
         direction = [x + y + z for x, y, z in zip(direction, offsets, self.uav.uav_to_local(camera_offsets))]
-        self.log(f"After offsets: {direction}")
 
         # Check if centered on hoop (left/right and up/down)
         threshold = 0.2
@@ -106,9 +105,9 @@ class HoopMode(Mode):
         # Not centered yet - adjust position without moving forward
         # Negate the direction because we want to move TOWARD the target, not in the direction OF the target
         direction[0] = 0  # Zero out forward movement until centered
-        direction[1] = direction[1]  # Negate Y
-        direction[2] = direction[2]  # Negate Z
-
+        direction[1] = -direction[1]  # Negate Y
+        direction[2] = -direction[2]  # Negate Z
+        
         self.log(f"Centering - Publishing direction: {direction}")
         self.uav.publish_position_setpoint(direction, relative=True)
 
