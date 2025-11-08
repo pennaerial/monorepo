@@ -8,9 +8,9 @@ from typing import Optional, Tuple
 from px4_msgs.msg import VehicleStatus
 import cv2
 
-class PayloadDropoffMode(Mode):
+class HoopMode(Mode):
     """
-    A mode for dropping off the payload.
+    A mode for flying through a hoop.
     """
 
     def __init__(self, node: Node, uav: UAV, offsets: Optional[Tuple[float, float, float]] = (0.0, 0.0, 0.0)):
@@ -41,7 +41,31 @@ class PayloadDropoffMode(Mode):
         if self.uav.roll > 0.1 or self.uav.pitch > 0.1:
             self.log("Roll or pitch detected. Waiting for stabilization.")
             return
-          
+
+        # Mode transitions for post-hoop states
+        if self.mode == 1:
+            # After starting forward motion, advance to clearing phase
+            self.mode = 2
+            self.forward_start_pos = self.uav.get_local_position()
+            return
+
+        if self.mode == 2:
+            # Check if we've traveled enough distance forward (e.g., 2 meters)
+            current_pos = self.uav.get_local_position()
+            distance_traveled = np.linalg.norm(
+                np.array(current_pos[:2]) - np.array(self.forward_start_pos[:2])
+            )
+            if distance_traveled > 2.0:  # 2 meters clearance
+                self.mode = 3
+                self.done = True
+            else:
+                # Keep moving forward
+                self.uav.publish_position_setpoint((1, 0, 0), relative=True)
+            return
+
+        if self.mode == 3:
+            return  # Done, waiting for transition
+    
         request = HoopTracking.Request()
         request.altitude = -self.uav.get_local_position()[2]
         request.yaw = float(self.uav.yaw)
@@ -59,9 +83,11 @@ class PayloadDropoffMode(Mode):
         direction = [x + y + z for x, y, z in zip(direction, offsets, self.uav.uav_to_local(camera_offsets))]
 
         # If payload pose direction is within a small threshold
-        if (np.abs(direction[0]) < request.direction[2] and
-            np.abs(direction[1]) < request.direction[2]):
-            self.uav.publish_position_setpoint((0, 0, 1), relative=True)
+        threshold = 0.1
+        if (np.abs(direction[0]) < threshold and
+            np.abs(direction[1]) < threshold):
+            self.uav.publish_position_setpoint((1, 0, 0), relative=True)
+            self.mode = 1
             return
         else:
             direction[2] = 0

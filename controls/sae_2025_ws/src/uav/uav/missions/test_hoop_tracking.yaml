@@ -15,7 +15,7 @@ start:
     complete: hoops
 
 hoops:
-  class: "uav.vision_modes.HoopMode"
+  class: "uav.autonomous_modes.HoopMode"
   params: {}
   transitions:
     complete: land

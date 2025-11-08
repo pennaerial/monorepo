@@ -389,7 +389,9 @@ def find_hoop(
     #while True:
     #    cv2.imshow('image', image)
     #    cv2.waitKey(1)
-    return x, y, not bool(contours)
+    if closest_hoop is not None:
+      return closest_hoop[0], closest_hoop[1], False
+    return None
 
 if __name__ == "__main__":
     # Test the functions
