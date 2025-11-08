@@ -33,29 +33,6 @@ class RingTrackingNode(VisionNode):
         # Publish at ≥20 Hz (0.05 s)
         self.timer_period = 0.05  # seconds
         self.timer = self.create_timer(self.timer_period, self.timer_callback)
-
-    def _setup_kalman_filter(self):
-        """Initialize Kalman filter matrices"""
-        dt = 1  
-        
-        # State transition matrix [x, y, vx, vy]
-        self.kalman.transitionMatrix = np.array([
-            [1, 0, dt, 0],
-            [0, 1, 0, dt],
-            [0, 0, 1, 0],
-            [0, 0, 0, 1]
-        ], dtype=np.float32)
-        
-        # Measurement matrix [x, y]
-        self.kalman.measurementMatrix = np.array([
-            [1, 0, 0, 0],
-            [0, 1, 0, 0]
-        ], dtype=np.float32)
-        
-        # Tune these covariances idk
-        self.kalman.processNoiseCov = np.eye(4, dtype=np.float32) * 1e-2
-        self.kalman.measurementNoiseCov = np.eye(2, dtype=np.float32) * 1e-1
-        self.kalman.errorCovPost = np.eye(4, dtype=np.float32)
         
     # ---------------------  PUBLISHER CALLBACK  ---------------------
     def timer_callback(self):
@@ -128,8 +105,10 @@ class RingTrackingNode(VisionNode):
         msg.data = [float(cx), float(cy)] + list(direction) + [1.0 if dlz_empty else 0.0]
         self.ring_pub.publish(msg)
 
-        if self.display:
-            self.display_frame(image, self.node_name())
+        # if self.display:
+        #     self.display_frame(image, self.node_name())
+        self.display_frame(image, self.node_name())
+
 
         # ---------------------  LEGACY SERVICE CALLBACK (optional)  ---------------------
 

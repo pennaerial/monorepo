@@ -37,7 +37,7 @@ class PayloadPickupMode(Mode):
         if self.uav.roll > 0.1 or self.uav.pitch > 0.1:
             self.log("Roll or pitch detected. Waiting for stabilization.")
             return
-          
+        
         request = PayloadTracking.Request()
         request.altitude = -self.uav.get_local_position()[2]
         request.yaw = float(self.uav.yaw)
