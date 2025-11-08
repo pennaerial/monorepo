@@ -52,12 +52,12 @@ class HoopTrackingNode(VisionNode):
         self.kalman.measurementNoiseCov = np.eye(2, dtype=np.float32) * 1e-1
         self.kalman.errorCovPost = np.eye(4, dtype=np.float32)
         
-    def service_callback(self, request: HoopTracking.Request, 
+    def service_callback(self, request: HoopTracking.Request,
                         response: HoopTracking.Response):
         """Process tracking service request with Kalman filtering"""
         image, camera_info = self.request_data(cam_image=True, cam_info=True)
         image = self.convert_image_msg_to_frame(image)
-        image = rotate_image(image, -np.rad2deg(request.yaw))
+        # No image rotation needed for forward-facing camera (yaw just changes pointing direction)
 
         # Predict next state
         # prediction = self.kalman.predict()
