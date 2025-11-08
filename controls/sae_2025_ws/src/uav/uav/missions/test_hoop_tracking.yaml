@@ -9,7 +9,7 @@ start:
   class: "uav.autonomous_modes.NavGPSMode"
   params:
     # [(x,y,z), wait_seconds, 'LOCAL']
-    coordinates: '[((0, 0, -3), 1, "LOCAL"),]'
+    coordinates: '[((0, 0, -1), 1, "LOCAL"),]'
     margin: "0.1"
   transitions:
     complete: hoops
