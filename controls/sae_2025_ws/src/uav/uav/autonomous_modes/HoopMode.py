@@ -90,7 +90,7 @@ class HoopMode(Mode):
         if (np.abs(direction[1]) < threshold and
             np.abs(direction[2]) < threshold):
             # Centered! Fly forward through the hoop
-            self.uav.publish_position_setpoint((1, 0, 0), relative=True)
+            self.uav.publish_position_setpoint((-1, 0, 0), relative=True)
             self.mode = 1
             return
 
