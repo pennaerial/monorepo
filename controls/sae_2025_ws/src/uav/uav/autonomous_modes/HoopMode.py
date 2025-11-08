@@ -86,6 +86,7 @@ class HoopMode(Mode):
         # Camera Y is down (positive), UAV Z is down (positive), so direct mapping
         # Camera X is right (positive), UAV Y is right (positive), so direct mapping
         # Camera Z is forward (positive), UAV X is forward (positive), so direct mapping
+        self.log(f"Pixel coords: x={response.x}, y={response.y}")
         self.log(f"Raw response.direction: {response.direction}")
         direction = [response.direction[2], response.direction[0], response.direction[1]]
         self.log(f"After frame transform: {direction}")
