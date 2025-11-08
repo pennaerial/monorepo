@@ -223,175 +223,97 @@ def compute_3d_vector(
     
     return tuple(target_point_center / np.linalg.norm(target_point_center))
 
-def draw_crosshair(frame, center, size=10, color=(0, 255, 0), thickness=2):
-    x, y = center
-    cv2.line(frame, (x - size, y), (x + size, y), color, thickness)
-    cv2.line(frame, (x, y - size), (x, y + size), color, thickness)
-    
 def find_hoop(
     image: np.ndarray,
-    lower_zone: np.ndarray,
-    upper_zone: np.ndarray,
-    lower_payload: np.ndarray,
-    upper_payload: np.ndarray,
+    lower_hoop1: np.ndarray,
+    upper_hoop1: np.ndarray,
+    lower_hoop2: np.ndarray,
+    upper_hoop2: np.ndarray,
     uuid: str,
     debug: bool = False,
     save_vision: bool = False,
 ) -> Optional[Tuple[int, int, bool]]:
     """
-    Detect hoop in image using color thresholding.
+    Detect a colored hoop in an image using two HSV ranges (for full red/orange coverage).
+
     Args:
         image (np.ndarray): Input BGR image.
-        lower_zone (np.ndarray): Lower HSV threshold for zone marker.
-        upper_zone (np.ndarray): Upper HSV threshold for zone marker.
-        lower_payload (np.ndarray): Lower HSV threshold for payload.
-        upper_payload (np.ndarray): Upper HSV threshold for payload.
-        debug (bool): If True, return an image with visualizations.
-        save_vision (bool): If True, save the visualization image.
+        lower_hoop1, upper_hoop1 (np.ndarray): First HSV range for hoop color.
+        lower_hoop2, upper_hoop2 (np.ndarray): Second HSV range (for hue wraparound).
+        uuid (str): Unique ID for saving vision data.
+        debug (bool): If True, show visualization windows.
+        save_vision (bool): If True, save visualization frames.
+
     Returns:
-        Optional[Tuple[int, int, bool]]: A tuple (cx, cy, zone_empty) if detection is successful;
-        otherwise, None.
+        Optional[Tuple[int, int, bool]]:
+            (cx, cy, zone_empty)
+            cx, cy = coordinates of hoop center if detected.
+            zone_empty = True if no hoop is detected, False otherwise.
     """
-    # Convert to HSV color space.
-    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-    unique_centers = []
-    hoop_radius_dict = {}
-    # # Create zone mask and clean it using morphological operations.
-    # zone_mask = cv2.inRange(hsv_image, lower_zone, upper_zone)
-    # kernel = np.ones((5, 5), np.uint8)
-    # dilated = cv2.dilate(zone_mask, kernel, iterations=3)
-    # zone_mask = cv2.morphologyEx(dilated, cv2.MORPH_CLOSE, kernel)
-    # zone_mask = cv2.morphologyEx(zone_mask, cv2.MORPH_OPEN, kernel)
-    # # Find all external contours in the zone mask.
-    # contours, _ = cv2.findContours(zone_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    # if not contours:
-    #     if debug or save_vision:
-    #         vis_image = image.copy()
-    #     if debug:
-    #         cv2.imshow("Payload Tracking", vis_image)
-    #         cv2.waitKey(1)
-    #     if save_vision:
-    #         import time
-    #         time = int(time.time())
-    #         path = os.path.expanduser(f"~/vision_imgs/{uuid}")
-    #         cv2.imwrite(os.path.join(path, f"payload_{time}.png"), vis_image)
-    #     return None
-    # Reddish-orange dual range
-    lower_red1 = np.array([0, 120, 70])
-    upper_red1 = np.array([10, 255, 255])
-    lower_red2 = np.array([11, 120, 70])
-    upper_red2 = np.array([25, 255, 255])
-    mask1 = cv2.inRange(hsv, lower_red1, upper_red1)
-    mask2 = cv2.inRange(hsv, lower_red2, upper_red2)
+    # Convert to HSV
+    hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+
+    # Create dual masks for hue wraparound (e.g. red 0–10° and 170–180°)
+    mask1 = cv2.inRange(hsv_image, lower_hoop1, upper_hoop1)
+    mask2 = cv2.inRange(hsv_image, lower_hoop2, upper_hoop2)
     mask = cv2.bitwise_or(mask1, mask2)
-    mask = cv2.GaussianBlur(mask, (5, 5), 0)
-    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((5,5), np.uint8))
-    detection_frame = image.copy()
+
+    # Morphological cleaning
+    kernel = np.ones((5, 5), np.uint8)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+
+    # Find contours
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    detected_in_frame = False
-    current_frame_hoops = []
-    for c in contours:
-        area = cv2.contourArea(c)
-        if area < 500:
-            continue
-        (x, y), radius = cv2.minEnclosingCircle(c)
-        if radius > 10:
-            center = (int(x), int(y))
-            radius = int(radius)
-            detected_in_frame = True
-            current_frame_hoops.append((center, radius))
-            # Add unique centers
-            if all(np.linalg.norm(np.array(center) - np.array(c_prev)) > 20 for c_prev in unique_centers):
-                unique_centers.append(center)
-                hoop_radius_dict[center] = radius
-            else:
-                hoop_radius_dict[center] = radius  # update radius
-    # Determine closest hoop (largest radius)
-    if current_frame_hoops:
-        closest_hoop = max(current_frame_hoops, key=lambda x: x[1])[0]
-    else:
-        closest_hoop = None
-    # Draw all hoops
-    for center, radius in current_frame_hoops:
-        # Highlight closest hoop in red
-        if closest_hoop == center:
-            color = (0, 0, 255)
-        else:
-            color = (0, 255, 0)
-        inner_radius = max(3, radius // 3)
-        cv2.circle(detection_frame, center, inner_radius, color, 2)
-        draw_crosshair(detection_frame, center, size=8, color=color, thickness=2)
-        cv2.putText(detection_frame, f"{center}", (center[0]-40, center[1]-radius-10),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
-        # Overlay status
-        text = f"Detected hoops: {len(current_frame_hoops)}"
-        cv2.putText(detection_frame, text, (20, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-        # Side-by-side display
-        mask_bgr = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
-        combined_display = np.hstack((mask_bgr, detection_frame))
-        cv2.imshow("Mask + Detection Side-by-Side", combined_display)
-    # # Find the largest zone contour.
-    # largest_zone_contour = max(contours, key=cv2.contourArea)
-    # # Create a filled mask from the largest zone contour.
-    # zone_filled_mask = np.zeros_like(zone_mask)
-    # cv2.drawContours(zone_filled_mask, [largest_zone_contour], -1, 255, thickness=cv2.FILLED)
-    # # Detect payload areas in the original HSV image.
-    # payload_mask_full = cv2.inRange(hsv_image, lower_payload, upper_payload)
-    # # Restrict the payload mask to the zone-filled region.
-    # payload_mask = cv2.bitwise_and(payload_mask_full, zone_filled_mask)
-    # # Clean the resulting payload mask.
-    # payload_mask = cv2.morphologyEx(payload_mask, cv2.MORPH_OPEN, kernel)
-    # payload_mask = cv2.morphologyEx(payload_mask, cv2.MORPH_CLOSE, kernel)
-    # # Find external contours in the payload mask.
-    # payload_contours, _ = cv2.findContours(payload_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    # largest_payload_contour = None
-    # if payload_contours and lower_payload is not lower_zone and upper_payload is not upper_zone:
-    #     # If payload is detected, compute the centroid of the largest payload contour.
-    #     largest_payload_contour = max(payload_contours, key=cv2.contourArea)
-    #     M_payload = cv2.moments(largest_payload_contour)
-    #     if M_payload["m00"] == 0:
-    #         return None
-    #     cx, cy = int(M_payload["m10"] / M_payload["m00"]), int(M_payload["m01"] / M_payload["m00"])
-    # else:
-    #     # Fallback: if no payload is found, compute the centroid of the zone area.
-    #     M_zone = cv2.moments(zone_filled_mask)
-    #     if M_zone["m00"] == 0:
-    #         return None
-    #     cx, cy = int(M_zone["m10"] / M_zone["m00"]), int(M_zone["m01"] / M_zone["m00"])
-    # if debug or save_vision:
-    #     vis_image = image.copy()
-    #     cv2.drawContours(vis_image, [largest_zone_contour], -1, (0, 255, 0), 2)
-    #     # If payload was detected, draw its contour.
-    #     if payload_contours:
-    #         cv2.drawContours(vis_image, [largest_payload_contour], -1, (0, 255, 0), 2)
-    #     # Mark the detected center.
-    #     cv2.circle(vis_image, (cx, cy), 5, (0, 0, 255), -1)
-    # if debug:
-    #     cv2.namedWindow("Payload Tracking", cv2.WINDOW_AUTOSIZE)
-    #     cv2.imshow("Payload Tracking", vis_image)
-    #     cv2.imshow(f"DLZ Mask {lower_zone}, {upper_zone}", zone_mask)
-    #     cv2.imshow(f"Payload Mask {lower_payload}, {upper_payload}", payload_mask)
-    #     cv2.waitKey(1)
-    # if save_vision:
-    #     import time
-    #     time = int(time.time())
-    #     path = os.path.expanduser(f"~/vision_imgs/{uuid}")
-    #     cv2.imwrite(os.path.join(path, f"payload_{time}.png"), vis_image)
-    #     cv2.imwrite(os.path.join(path, f"zone_mask_{time}.png"), zone_mask)
-    #     cv2.imwrite(os.path.join(path, f"payload_mask_{time}.png"), payload_mask)
-    #def click_event(event, x, y, flags, param):
-    #    if event == cv2.EVENT_LBUTTONDOWN:
-    #        hsv_img = param['hsv']
-    #        hsv_value = hsv_img[y, x]
-    #        print(hsv_value)
-    #cv2.namedWindow("image")
-    #cv2.setMouseCallback("image", click_event, param={'hsv':hsv_image})
-    #while True:
-    #    cv2.imshow('image', image)
-    #    cv2.waitKey(1)
-    if closest_hoop is not None:
-      return closest_hoop[0], closest_hoop[1], False
-    return None
+
+    if not contours:
+        if debug or save_vision:
+            vis_image = image.copy()
+        if debug:
+            cv2.imshow("Hoop Detection", vis_image)
+            cv2.imshow("Hoop Mask", mask)
+            cv2.waitKey(1)
+        if save_vision:
+            import time
+            t = int(time.time())
+            path = os.path.expanduser(f"~/vision_imgs/{uuid}")
+            os.makedirs(path, exist_ok=True)
+            cv2.imwrite(os.path.join(path, f"hoop_{t}.png"), vis_image)
+        return None
+
+    # Select largest contour (assumed hoop)
+    largest_contour = max(contours, key=cv2.contourArea)
+    if cv2.contourArea(largest_contour) < 200:  # filter out small noise
+        return None
+
+    # Compute centroid
+    M = cv2.moments(largest_contour)
+    if M["m00"] == 0:
+        return None
+    cx, cy = int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"])
+
+    # Visualization
+    if debug or save_vision:
+        vis_image = image.copy()
+        cv2.drawContours(vis_image, [largest_contour], -1, (0, 255, 0), 2)
+        cv2.circle(vis_image, (cx, cy), 6, (0, 255, 0), 2)
+        cv2.drawMarker(vis_image, (cx, cy), (0, 255, 0), markerType=cv2.MARKER_CROSS, markerSize=10, thickness=2)
+
+        if debug:
+            cv2.imshow("Hoop Detection", vis_image)
+            cv2.imshow("Hoop Mask", mask)
+            cv2.waitKey(1)
+
+        if save_vision:
+            import time
+            t = int(time.time())
+            path = os.path.expanduser(f"~/vision_imgs/{uuid}")
+            os.makedirs(path, exist_ok=True)
+            cv2.imwrite(os.path.join(path, f"hoop_{t}.png"), vis_image)
+            cv2.imwrite(os.path.join(path, f"hoop_mask_{t}.png"), mask)
+
+    return cx, cy, not bool(contours)
+
 
 if __name__ == "__main__":
     # Test the functions
