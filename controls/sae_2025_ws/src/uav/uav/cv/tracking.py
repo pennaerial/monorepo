@@ -383,18 +383,18 @@ def find_hoop(
 
     if not contours:
         # Optional visualization/saving when nothing found
-        if debug:
-            cv2.imshow("Hoop Detection", image)
-            cv2.imshow("Hoop Mask", mask)
-            cv2.waitKey(1)
-        if save_vision:
-            import time
-            t = int(time.time())
-            script_dir = os.path.dirname(os.path.abspath(__file__))
-            outdir = os.path.join(script_dir, f"vision_imgs_{uuid}")
-            os.makedirs(outdir, exist_ok=True)
-            cv2.imwrite(os.path.join(outdir, f"hoop_none_{t}.png"), image)
-            cv2.imwrite(os.path.join(outdir, f"mask_none_{t}.png"), mask)
+        # if debug:
+        #     cv2.imshow("Hoop Detection", image)
+        #     cv2.imshow("Hoop Mask", mask)
+        #     cv2.waitKey(1)
+        # if save_vision:
+        #     import time
+        #     t = int(time.time())
+        #     script_dir = os.path.dirname(os.path.abspath(__file__))
+        #     outdir = os.path.join(script_dir, f"vision_imgs_{uuid}")
+        #     os.makedirs(outdir, exist_ok=True)
+        #     cv2.imwrite(os.path.join(outdir, f"hoop_none_{t}.png"), image)
+        #     cv2.imwrite(os.path.join(outdir, f"mask_none_{t}.png"), mask)
         return None
 
     H, W = image.shape[:2]
@@ -461,10 +461,10 @@ def find_hoop(
 
     # If everything got filtered out
     if not candidates:
-        if debug:
-            cv2.imshow("Hoop Detection", image)
-            cv2.imshow("Hoop Mask", mask)
-            cv2.waitKey(1)
+        # if debug:
+        #     cv2.imshow("Hoop Detection", image)
+        #     cv2.imshow("Hoop Mask", mask)
+        #     cv2.waitKey(1)
         return None
 
     # ------------------------------------------
@@ -487,31 +487,31 @@ def find_hoop(
     # -----------------------------------------
     # (6) Show / save visualization if requested
     # -----------------------------------------
-    if debug or save_vision:
-        vis = image.copy()
+    # if debug or save_vision:
+    #     vis = image.copy()
 
-        # Draw every candidate thin blue (good to see alternatives)
-        for c in candidates:
-            cv2.drawContours(vis, [c["contour"]], -1, (255, 0, 0), 1)
+    #     # Draw every candidate thin blue (good to see alternatives)
+    #     for c in candidates:
+    #         cv2.drawContours(vis, [c["contour"]], -1, (255, 0, 0), 1)
 
-        # Highlight the chosen one in green, mark center
-        cv2.drawContours(vis, [best_contour], -1, (0, 255, 0), 2)
-        cv2.circle(vis, (cx, cy), 6, (0, 255, 0), 2)
-        cv2.drawMarker(vis, (cx, cy), (0, 255, 0), cv2.MARKER_CROSS, 10, 2)
+    #     # Highlight the chosen one in green, mark center
+    #     cv2.drawContours(vis, [best_contour], -1, (0, 255, 0), 2)
+    #     cv2.circle(vis, (cx, cy), 6, (0, 255, 0), 2)
+    #     cv2.drawMarker(vis, (cx, cy), (0, 255, 0), cv2.MARKER_CROSS, 10, 2)
 
-        if debug:
-            cv2.imshow("Hoop Detection", vis)
-            cv2.imshow("Hoop Mask", mask)
-            cv2.waitKey(1)
+    #     if debug:
+    #         cv2.imshow("Hoop Detection", vis)
+    #         cv2.imshow("Hoop Mask", mask)
+    #         cv2.waitKey(1)
 
-        if save_vision:
-            import time
-            t = int(time.time())
-            script_dir = os.path.dirname(os.path.abspath(__file__))
-            outdir = os.path.join(script_dir, f"vision_imgs_{uuid}")
-            os.makedirs(outdir, exist_ok=True)
-            cv2.imwrite(os.path.join(outdir, f"hoop_{t}.png"), vis)
-            cv2.imwrite(os.path.join(outdir, f"mask_{t}.png"), mask)
+    #     if save_vision:
+    #         import time
+    #         t = int(time.time())
+    #         script_dir = os.path.dirname(os.path.abspath(__file__))
+    #         outdir = os.path.join(script_dir, f"vision_imgs_{uuid}")
+    #         os.makedirs(outdir, exist_ok=True)
+    #         cv2.imwrite(os.path.join(outdir, f"hoop_{t}.png"), vis)
+    #         cv2.imwrite(os.path.join(outdir, f"mask_{t}.png"), mask)
 
     # Keep your original return contract: zone_empty is False when we detected something
     return cx, cy, False
