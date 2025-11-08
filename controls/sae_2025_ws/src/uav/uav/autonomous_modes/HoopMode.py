@@ -37,6 +37,8 @@ class HoopMode(Mode):
         """
         Periodic logic for finding hoop and flying through it.
         """
+        self.log(f"=== MODE {self.mode} ===")
+
         # If UAV is unstable, skip the update
         if self.uav.roll > 0.1 or self.uav.pitch > 0.1:
             self.log("Roll or pitch detected. Waiting for stabilization.")
@@ -55,11 +57,14 @@ class HoopMode(Mode):
             distance_traveled = np.linalg.norm(
                 np.array(current_pos[:2]) - np.array(self.forward_start_pos[:2])
             )
+            self.log(f"Distance traveled: {distance_traveled:.2f}m")
             if distance_traveled > 2.0:  # 2 meters clearance
                 self.mode = 3
                 self.done = True
+                self.log("DONE! Clearing complete")
             else:
                 # Keep moving forward
+                self.log("Mode 2: Publishing (1, 0, 0)")
                 self.uav.publish_position_setpoint((1, 0, 0), relative=True)
             return
 
@@ -79,17 +84,21 @@ class HoopMode(Mode):
         # Transform from camera frame to UAV NED frame (forward-facing camera)
         # Camera: X=right, Y=down, Z=forward -> UAV NED: X=forward, Y=right, Z=down
         # Note: Camera Y down = positive, UAV Z down = positive, so direct mapping
+        self.log(f"Raw response.direction: {response.direction}")
         direction = [response.direction[2], response.direction[0], -response.direction[1]]
-        
+        self.log(f"After frame transform: {direction}")
+
         offsets = tuple(x / request.altitude for x in self.offsets) if request.altitude > 1 else self.offsets
         camera_offsets = tuple(x / request.altitude for x in self.camera_offsets) if request.altitude > 1 else self.camera_offsets
         direction = [x + y + z for x, y, z in zip(direction, offsets, self.uav.uav_to_local(camera_offsets))]
+        self.log(f"After offsets: {direction}")
 
         # Check if centered on hoop (left/right and up/down)
         threshold = 0.1
         if (np.abs(direction[1]) < threshold and
             np.abs(direction[2]) < threshold):
             # Centered! Fly forward through the hoop
+            self.log(f"CENTERED! Publishing: (-1, 0, 0)")
             self.uav.publish_position_setpoint((-1, 0, 0), relative=True)
             self.mode = 1
             return
@@ -97,7 +106,7 @@ class HoopMode(Mode):
         # Not centered yet - adjust position without moving forward
         direction[0] = 0  # Zero out forward movement until centered
 
-        self.log(f"Direction: {direction}")
+        self.log(f"Centering - Publishing direction: {direction}")
         self.uav.publish_position_setpoint(direction, relative=True)
 
     def check_status(self) -> str:
