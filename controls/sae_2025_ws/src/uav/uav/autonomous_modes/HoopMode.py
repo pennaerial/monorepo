@@ -85,7 +85,7 @@ class HoopMode(Mode):
         # Camera: X=right, Y=down, Z=forward -> UAV NED: X=forward, Y=right, Z=down
         # Note: Camera Y down = positive, UAV Z down = positive, so direct mapping
         self.log(f"Raw response.direction: {response.direction}")
-        direction = [response.direction[2], response.direction[0], -response.direction[1]]
+        direction = [response.direction[2], response.direction[0], response.direction[1]]
         self.log(f"After frame transform: {direction}")
 
         offsets = tuple(x / request.altitude for x in self.offsets) if request.altitude > 1 else self.offsets
@@ -98,8 +98,8 @@ class HoopMode(Mode):
         if (np.abs(direction[1]) < threshold and
             np.abs(direction[2]) < threshold):
             # Centered! Fly forward through the hoop
-            self.log(f"CENTERED! Publishing: (-1, 0, 0)")
-            self.uav.publish_position_setpoint((-1, 0, 0), relative=True)
+            self.log(f"CENTERED! Publishing: (1, 0, 0)")
+            self.uav.publish_position_setpoint((1, 0, 0), relative=True)
             self.mode = 1
             return
 
