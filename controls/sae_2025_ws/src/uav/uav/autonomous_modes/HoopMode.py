@@ -78,7 +78,8 @@ class HoopMode(Mode):
 
         # Transform from camera frame to UAV NED frame (forward-facing camera)
         # Camera: X=right, Y=down, Z=forward -> UAV NED: X=forward, Y=right, Z=down
-        direction = [response.direction[2], response.direction[0], response.direction[1]]
+        # Note: Camera Y down = positive, UAV Z down = positive, so direct mapping
+        direction = [response.direction[2], response.direction[0], -response.direction[1]]
         
         offsets = tuple(x / request.altitude for x in self.offsets) if request.altitude > 1 else self.offsets
         camera_offsets = tuple(x / request.altitude for x in self.camera_offsets) if request.altitude > 1 else self.camera_offsets
