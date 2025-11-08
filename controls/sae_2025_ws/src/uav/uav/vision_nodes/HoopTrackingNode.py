@@ -5,7 +5,7 @@ from uav.cv.tracking import find_payload, compute_3d_vector, find_hoop
 from uav.vision_nodes import VisionNode
 from uav_interfaces.srv import HoopTracking
 import rclpy
-from uav.utils import pink, green, blue, yellow, red
+from uav.utils import pink, green, blue, yellow, red, orange
 
 class HoopTrackingNode(VisionNode):
     """
@@ -20,7 +20,8 @@ class HoopTrackingNode(VisionNode):
             'green': green,
             'blue': blue,
             'yellow': yellow,
-            'red': red
+            'red': red,
+            'orange': orange
         }
         
         # Initialize Kalman filter
@@ -66,6 +67,7 @@ class HoopTrackingNode(VisionNode):
         detection = find_hoop(
             image,
             *red,
+            *orange,
             *(self.color_map[request.payload_color]),
             self.uuid,
             self.debug,
