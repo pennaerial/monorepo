@@ -84,15 +84,17 @@ class HoopMode(Mode):
         camera_offsets = tuple(x / request.altitude for x in self.camera_offsets) if request.altitude > 1 else self.camera_offsets
         direction = [x + y + z for x, y, z in zip(direction, offsets, self.uav.uav_to_local(camera_offsets))]
 
-        # If payload pose direction is within a small threshold
+        # Check if centered on hoop (left/right and up/down)
         threshold = 0.1
-        if (np.abs(direction[0]) < threshold and
-            np.abs(direction[1]) < threshold):
+        if (np.abs(direction[1]) < threshold and
+            np.abs(direction[2]) < threshold):
+            # Centered! Fly forward through the hoop
             self.uav.publish_position_setpoint((1, 0, 0), relative=True)
             self.mode = 1
             return
-        else:
-            direction[2] = 0
+
+        # Not centered yet - adjust position without moving forward
+        direction[0] = 0  # Zero out forward movement until centered
 
         self.log(f"Direction: {direction}")
         self.uav.publish_position_setpoint(direction, relative=True)
