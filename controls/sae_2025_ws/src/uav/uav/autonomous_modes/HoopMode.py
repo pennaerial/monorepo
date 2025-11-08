@@ -94,7 +94,7 @@ class HoopMode(Mode):
         self.log(f"After offsets: {direction}")
 
         # Check if centered on hoop (left/right and up/down)
-        threshold = 0.1
+        threshold = 0.2
         if (np.abs(direction[1]) < threshold and
             np.abs(direction[2]) < threshold):
             # Centered! Fly forward through the hoop
@@ -106,8 +106,8 @@ class HoopMode(Mode):
         # Not centered yet - adjust position without moving forward
         # Negate the direction because we want to move TOWARD the target, not in the direction OF the target
         direction[0] = 0  # Zero out forward movement until centered
-        direction[1] = -direction[1]  # Negate Y
-        direction[2] = -direction[2]  # Negate Z
+        direction[1] = direction[1]  # Negate Y
+        direction[2] = direction[2]  # Negate Z
 
         self.log(f"Centering - Publishing direction: {direction}")
         self.uav.publish_position_setpoint(direction, relative=True)
