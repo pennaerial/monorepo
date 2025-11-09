@@ -9,6 +9,8 @@ from launch.event_handlers import OnProcessStart
 from launch_ros.actions import Node
 from uav.utils import vehicle_map
 
+GZ_CAMERA_TOPIC = '/world/custom/model/x500_mono_cam_down_0/link/camera_link/sensor/camera/image'
+GZ_CAMERA_INFO_TOPIC = '/world/custom/model/x500_mono_cam_down_0/link/camera_link/sensor/camera/camera_info'
 HARDCODE_PATH = False
 
 def find_folder(folder_name, search_path):
@@ -157,7 +159,7 @@ def launch_setup(context, *args, **kwargs):
         raise ValueError(f"Invalid vehicle type: {vehicle_type}")
     
     px4_sitl = ExecuteProcess(
-        cmd=['bash', '-c', f'PX4_GZ_STANDALONE=1 PX4_SYS_AUTOSTART={autostart} PX4_SIM_MODEL={model} PX4_GZ_WORLD=custom ./build/px4_sitl_default/bin/px4'],
+        cmd=['bash', '-c', f'PX4_GZ_STANDALONE=1 PX4_SYS_AUTOSTART={autostart} PX4_SIM_MODEL={model} ./build/px4_sitl_default/bin/px4'],
         cwd=px4_path,
         output='screen',
         name='px4_sitl'
@@ -171,9 +173,7 @@ def launch_setup(context, *args, **kwargs):
         cmd=['ros2', 'run', 'ros_gz_bridge', 'parameter_bridge',
             # Use the EXACT topic name from gz topic -l
             f'{GZ_CAMERA_TOPIC}@sensor_msgs/msg/Image[gz.msgs.Image',
-            '--ros-args', '--remap',
-            # Also use the EXACT topic name for the remap source
-            f'{GZ_CAMERA_TOPIC}:=/camera'],
+            '--ros-args', '--remap', f'{GZ_CAMERA_TOPIC}:=/camera'],
         output='screen',
         cwd=sae_ws_path,
         name='gz_ros_bridge_camera'
