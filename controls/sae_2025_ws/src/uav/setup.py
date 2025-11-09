@@ -39,7 +39,8 @@ setup(
             'camera = uav.CameraNode:main',
             'test_flight = uav.test_flight:main',
             'vtol_testing = uav.vtol_testing:main',
-            'hoop_tracking = uav.vision_nodes.TemuVisionNode:main'
+            'temu_vision_node = uav.vision_nodes.TemuVisionNode:main'
+            # 'hoop_tracking = uav.vision_nodes.TemuVisionNode:main'
         ],
     },
 )

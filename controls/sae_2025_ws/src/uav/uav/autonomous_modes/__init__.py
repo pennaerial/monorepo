@@ -6,3 +6,4 @@ from .NavGPSMode import NavGPSMode
 from .TransitionMode import TransitionMode
 from .ServoDropoffMode import ServoDropoffMode
 from .WaypointMission import WaypointMission
+from .TemuNavMode import TemuNavMode

@@ -1,0 +1,10 @@
+# src/uav/uav/missions/temu_mission1.yaml
+
+start:
+  # Set TemuNavMode to initial mode
+  class: uav.autonomous_modes.TemuNavMode
+  
+  # transitions is empty
+  # because TemuNavMode keeps running and returns 'continue',
+  # it does not terminate on its own.
+  transitions: {}
