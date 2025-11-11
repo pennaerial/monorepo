@@ -228,6 +228,36 @@ class Visualization:
         return result
     
 
+def find_hoop(image):
+    """
+    Detect hoop and return its largest contour (Nx2 array).
+    Returns:
+        np.ndarray: contour points (N, 2) if found
+        None: if nothing detected
+    """
+    # Initialize pipeline
+    pre = PreProcessing(method="open_close", kernel_size=5)
+    seg = Segmentation(method="threshold")
+    post = PostProcessing(kernel_open=7, kernel_close=7, area_ratio=0.005)
+
+    hsv = ColorSpace(mode="HSV").apply(image)
+    hsv_pre = pre.apply(hsv)
+    filtered = filter_red_orange(hsv_pre)
+    mask = seg.apply(filtered)
+    mask = post.apply(mask)
+
+    # Find largest contour
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    if not contours:
+        return None
+    largest = max(contours, key=cv2.contourArea)
+
+    # Convert contour format from (N,1,2) → (N,2)
+    # largest = largest.reshape(-1, 2).astype(float)
+
+    return largest
+
+
 # ========== Image Pipeline ==========
 if __name__ == "__main__":
     # Load image

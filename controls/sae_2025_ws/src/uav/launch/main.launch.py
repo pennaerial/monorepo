@@ -50,6 +50,8 @@ def extract_vision_nodes(yaml_path):
                 with open(file_path, 'r') as source_file:
                     source = source_file.read()
                     # Look for any "from uav.vision_nodes import ..." lines.
+                    # Remove commented-out lines
+                    source = "\n".join(line for line in source.splitlines() if not line.strip().startswith("#"))
                     matches = re.findall(r'from\s+uav\.vision_nodes\s+import\s+([^\n]+)', source)
                     for match in matches:
                         # Allow for multiple imports on the same line, e.g., "A, B"
@@ -97,6 +99,7 @@ def launch_setup(context, *args, **kwargs):
         output='screen'
     )]
     for node in extract_vision_nodes(YAML_PATH):
+        print("vision node loaded: ", node)
         vision_nodes.append(node)
         # Convert CamelCase node names to snake_case executable names.
         s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', node)

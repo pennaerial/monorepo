@@ -2,6 +2,9 @@ from typing import List
 from uav.autonomous_modes import Mode
 from rclpy.node import Node
 from uav import UAV
+from uav_interfaces.srv import HoopTracking
+from uav.vision_nodes import HoopTrackingNode
+
 class NavGPSMode(Mode):
     """
     A mode for navigating to a GPS coordinate
