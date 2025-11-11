@@ -1,5 +1,5 @@
 # launch_params.yaml
-mission_name: test1hoop
+mission_name: test_straight_course
 uav_debug: false
 vision_debug: false
 sim: true
