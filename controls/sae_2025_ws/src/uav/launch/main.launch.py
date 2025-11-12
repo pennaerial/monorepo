@@ -197,20 +197,6 @@ def launch_setup(context, *args, **kwargs):
         actions=[mission] if run_mission_bool else []
     )
     
-    # Kill any lingering processes from previous runs.
-    
-    kill_gz = ExecuteProcess(
-        cmd=['pkill', '-9', 'gz'],
-        output='screen',
-        name='kill_gz'
-    )
-    
-    kill_microxrce = ExecuteProcess(
-        cmd=['pkill', '-9', 'MicroXRCEAgent'],
-        output='screen',
-        name='kill_microxrce'
-    )
-    
     # Build and return the complete list of actions.
     return [
         kill_px4,
