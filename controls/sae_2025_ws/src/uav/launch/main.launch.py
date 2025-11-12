@@ -199,9 +199,6 @@ def launch_setup(context, *args, **kwargs):
     
     # Build and return the complete list of actions.
     return [
-        kill_px4,
-        kill_gz,
-        kill_microxrce,
         *vision_node_actions,
         middleware,
         RegisterEventHandler(
