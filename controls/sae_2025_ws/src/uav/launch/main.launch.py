@@ -198,11 +198,6 @@ def launch_setup(context, *args, **kwargs):
     )
     
     # Kill any lingering processes from previous runs.
-    kill_px4 = ExecuteProcess(
-        cmd=['pkill', '-9', 'px4'],
-        output='screen',
-        name='kill_px4'
-    )
     
     kill_gz = ExecuteProcess(
         cmd=['pkill', '-9', 'gz'],
