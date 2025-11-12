@@ -1,7 +1,6 @@
 # TEAM 6 IN PROGRESS HOOP DETECTION
 import cv2
 import numpy as np
-from scipy.spatial import distance
 from typing import Optional, Tuple
 import os
 
@@ -61,7 +60,8 @@ def detect_hoop(
                 if 0.4 < aspect_ratio < 1.6 and circularity > 0.3:
                     center = (int(x), int(y))
                     cam_pos = (w // 2, h)
-                    dist = distance.euclidean(center, cam_pos)
+                    # Calculate Euclidean distance without scipy
+                    dist = np.sqrt((center[0] - cam_pos[0])**2 + (center[1] - cam_pos[1])**2)
                     size_score = (MA + ma) / 2
 
                     hoop_candidates.append({
