@@ -9,8 +9,8 @@ from launch.event_handlers import OnProcessStart
 from launch_ros.actions import Node
 from uav.utils import vehicle_map
 
-GZ_CAMERA_TOPIC = '/world/custom/model/x500_mono_cam_down_0/link/camera_link/sensor/camera/image'
-GZ_CAMERA_INFO_TOPIC = '/world/custom/model/x500_mono_cam_down_0/link/camera_link/sensor/camera/camera_info'
+GZ_CAMERA_TOPIC = '/world/custom/model/x500_mono_cam_0/link/camera_link/sensor/camera/image'
+GZ_CAMERA_INFO_TOPIC = '/world/custom/model/x500_mono_cam_0/link/camera_link/sensor/camera/camera_info'
 HARDCODE_PATH = False
 
 def find_folder(folder_name, search_path):
@@ -145,7 +145,7 @@ def launch_setup(context, *args, **kwargs):
     # Define the PX4 SITL process.
     if vehicle_type == 'quadcopter':
         autostart = 4001
-        model = 'gz_x500_mono_cam_down'
+        model = 'gz_x500_mono_cam'
     elif vehicle_type == 'tiltrotor_vtol':
         autostart = 4020
         model = 'gz_tiltrotor'
