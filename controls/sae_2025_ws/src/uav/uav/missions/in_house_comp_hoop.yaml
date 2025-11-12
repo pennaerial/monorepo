@@ -3,12 +3,14 @@ start:
   params:
     coordinates: '[((-5, -10, -10), 1, "LOCAL"),]'
   transitions:
-    complete: payload
+    complete: hoop
 
-payload:
-  class: uav.autonomous_modes.PayloadPickupMode
+hoop:
+  class: uav.autonomous_modes.HoopNavigationMode
   params:
-    color: 'yellow'
+    approach_distance: 5.0
+    pass_distance: 3.0
+    speed_factor: 1.5
   transitions:
     complete: land
 
