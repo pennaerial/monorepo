@@ -184,7 +184,7 @@ def launch_setup(context, *args, **kwargs):
     
     # Generate world using existing worldgen.py
     try:
-        generate_world(course_type, course_params_obj)
+        # generate_world(course_type, course_params_obj)
         print(f"Generated world file: {course_params_obj.op_file}")
 
         # Create the course object (same logic as in generate_world function)
