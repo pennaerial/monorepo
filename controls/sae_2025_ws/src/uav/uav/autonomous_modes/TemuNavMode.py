@@ -46,14 +46,20 @@ class TemuNavMode(Mode):
         uav_x_rel = self.z 
         
         
-        scaling_factor_xy = 1.0 # [-1, 1] -> [-0.5m, 0.5m]
+        scaling_factor_x = 1.0
+        scaling_factor_y = -1.0 # [-1, 1] -> [-0.5m, 0.5m]
         scaling_factor_z = 1.0  # forward
         
         point = (
-            self.z * scaling_factor_z,  # X 
-            self.x * scaling_factor_xy, # Y 
-            self.y * scaling_factor_xy  # Z 
+            self.x * scaling_factor_x,  # X 
+            # self.z * scaling_factor_z, # Y 
+            self.z, 
+            self.y * scaling_factor_y  # Z 
         )
+
+        # point = (
+        #     0, 0, -2
+        # )
         
         self.log(f"Publishing relative setpoint: {point}")
         self.uav.publish_position_setpoint(point, relative=True)

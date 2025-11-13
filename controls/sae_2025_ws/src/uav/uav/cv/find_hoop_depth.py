@@ -2,7 +2,6 @@ import cv2
 import numpy as np
 from typing import Optional, Tuple
 import os
-from skimage.measure import EllipseModel, ransac
 from decimal import Decimal, ROUND_DOWN
 
 K_matrix = np.array([
@@ -12,7 +11,8 @@ K_matrix = np.array([
     ])
 
     # Known real radius (meters)
-real_world_r = 0.33 #actually 0.551
+# real_world_r = 0.33 #actually 0.551
+real_world_r = 0.551 #actually 0.551
 
 object_points = np.array([
     [real_world_r, 0, 0],
@@ -41,7 +41,7 @@ def find_hoop_w_depth(
         Optional[Tuple[float, float, float, np.ndarray]]: A tuple (vector_x, vector_y, vector_z, img) if detection is successful;
         otherwise, a tuple (None, None, None, img).
     """
-    img = cv2.resize(img, (1532//2, 796//2))
+    img = cv2.resize(image, (1532//2, 796//2))
     copy = img.copy()
     copy = cv2.cvtColor(copy, cv2.COLOR_RGB2GRAY, None)
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV, None)

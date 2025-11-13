@@ -8,6 +8,7 @@ import rclpy
 from cv_bridge import CvBridge
 from uav.utils import pink, green, blue, yellow
 from geometry_msgs.msg import Vector3
+from std_msgs.msg import String
 
 from std_srvs.srv import Empty
 
