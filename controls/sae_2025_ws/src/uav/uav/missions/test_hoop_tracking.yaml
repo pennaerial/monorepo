@@ -1,0 +1,26 @@
+# # Vision pipeline for camera feed display
+# vision:
+#   class: "uav.vision_nodes.VisionNode"
+#   params: {}
+#   transitions: {}
+
+# # Straight course, LOCAL frame, pauses at each hoop for 2s
+start:
+  class: "uav.autonomous_modes.NavGPSMode"
+  params:
+    # [(x,y,z), wait_seconds, 'LOCAL']
+    coordinates: '[((0, 0, -2), 1, "LOCAL"),]'
+    margin: "0.1"
+  transitions:
+    complete: hoops
+
+hoops:
+  class: "uav.autonomous_modes.HoopMode"
+  params: {}
+  transitions:
+    complete: land
+
+land:
+  class: "uav.autonomous_modes.LandingMode"
+  params: {}
+  transitions: {}
