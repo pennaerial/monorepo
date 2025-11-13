@@ -94,8 +94,8 @@ def get_default_params():
             'world_name': 'custom',
             'enable_scoring': True,
             # 'uav_model': 'gz_x500_mono_cam_down',
-            # 'uav_model': "gz_x500_depth",
-            'uav_model': "gz_x500_mono_cam",
+            'uav_model': "gz_x500_depth",
+            # 'uav_model': "gz_x500_mono_cam",
             'position_poll_rate': 10.0,
             'scoring_rate': 5.0,
             'scoring': {
