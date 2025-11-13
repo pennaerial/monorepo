@@ -23,6 +23,7 @@
 # # Straight course, LOCAL frame, pauses at each hoop for 2s
 start:
   class: "uav.autonomous_modes.HoopTraverseMode"
+  params: {}
   transitions:
     complete: land
 
