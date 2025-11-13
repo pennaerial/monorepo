@@ -157,7 +157,7 @@ def launch_setup(context, *args, **kwargs):
     else:
         raise ValueError(f"Invalid vehicle type: {vehicle_type}")
     px4_sitl = ExecuteProcess(
-        cmd=['bash', '-c', f'PX4_GZ_STANDALONE=1 PX4_SYS_AUTOSTART={autostart} PX4_SIM_MODEL={model} ./build/px4_sitl_default/bin/px4'],
+        cmd=['bash', '-c', f'PX4_GZ_STANDALONE=1 PX4_SYS_AUTOSTART={autostart} PX4_SIM_MODEL={model} PX4_GZ_WORLD=custom ./build/px4_sitl_default/bin/px4'],
         cwd=px4_path,
         output='screen',
         name='px4_sitl'
