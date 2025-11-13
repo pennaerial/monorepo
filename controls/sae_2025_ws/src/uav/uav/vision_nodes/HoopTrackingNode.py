@@ -13,17 +13,19 @@ class HoopTrackingNode(VisionNode):
     Publishes the detected hoop pose as a ROS topic.
     """
 
-    def __init__(self, display: bool = True):
-        super().__init__('hoop_tracking')
+    def __init__(self, display: bool = False):
+        super().__init__('hoop_tracking', self.__class__.srv)
         
         self.display = display
 
         # Publisher for hoop pose
-        self.pose_pub = self.create_publisher(PoseStamped, '/hoop_pose', 10)
-        self.timer = self.create_timer(0.1, self.process_frame)  # 10Hz
-        self.get_logger().info("HoopTrackingNode started (Topic mode).")
+        # self.pose_pub = self.create_publisher(PoseStamped, '/hoop_pose', 10)
+        # self.timer = self.create_timer(0.1, self.process_frame)  # 10Hz
+        # self.get_logger().info("HoopTrackingNode started (Topic mode).")
+
+        self.create_service(PayloadTracking, self.service_name(), self.service_callback)
         
-    def process_frame(self):
+    def service_callback(self):
         """Main loop: get camera image, detect hoop, estimate pose, and publish."""
 
         # Request image
@@ -36,13 +38,13 @@ class HoopTrackingNode(VisionNode):
 
         # Detect the largest contour
         contour = find_hoop(frame)  # (N,1,2)
-        # PnP pose estimation
-        pose = estimate_pose(contour)
-        # Kalman filter
-        filtered_pose = apply_kalman_filter(pose)
+        # # PnP pose estimation
+        # pose = estimate_pose(contour)
+        # # Kalman filter
+        # filtered_pose = apply_kalman_filter(pose)
 
-        # Publish the filtered pose
-        self.pose_pub.publish(filtered_pose)
+        # # Publish the filtered pose
+        # self.pose_pub.publish(filtered_pose)
 
         # Visualization
         if self.display:
@@ -61,6 +63,5 @@ def main():
     except Exception as e:
         print(e)
         node.publish_failsafe()
-    finally:
-        node.cleanup()
-        rclpy.shutdown()
+
+    rclpy.shutdown()
