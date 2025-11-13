@@ -5,24 +5,43 @@ import numpy as np
 from uav.cv.in_house.hoop import detect_hoop
 from uav.cv.tracking import compute_3d_vector, rotate_image
 from uav.vision_nodes import VisionNode
-from uav_interfaces.srv import HoopTracking
+from uav_interfaces.msg import HoopTracking, UAVState
 import rclpy
 
 
 class HoopTrackingNode(VisionNode):
     """
     ROS node for hoop tracking with Kalman filtering.
+    Publishes tracking data continuously.
     """
-    srv = HoopTracking
     
     def __init__(self):
-        super().__init__('hoop_tracking', self.__class__.srv)
+        super().__init__('hoop_tracking', None)
         
         # Initialize Kalman filter
         self.kalman = cv2.KalmanFilter(4, 2)
         self._setup_kalman_filter()
 
-        self.create_service(HoopTracking, self.service_name(), self.service_callback)
+        # Create publisher for hoop tracking data
+        self.tracking_publisher = self.create_publisher(
+            HoopTracking, 
+            '/vision/hoop_tracking', 
+            10
+        )
+        
+        # Subscribe to UAV state
+        self.uav_state_sub = self.create_subscription(
+            UAVState,
+            '/uav_state',
+            self.uav_state_callback,
+            10
+        )
+        
+        self.current_altitude = 0.0
+        self.current_yaw = 0.0
+        
+        # Create timer to publish tracking data at regular intervals
+        self.timer = self.create_timer(0.1, self.publish_tracking_data)  # 10 Hz
         
     def _setup_kalman_filter(self):
         """Initialize Kalman filter matrices"""
@@ -47,12 +66,21 @@ class HoopTrackingNode(VisionNode):
         self.kalman.measurementNoiseCov = np.eye(2, dtype=np.float32) * 1e-1
         self.kalman.errorCovPost = np.eye(4, dtype=np.float32)
         
-    def service_callback(self, request: HoopTracking.Request, 
-                        response: HoopTracking.Response):
-        """Process tracking service request with Kalman filtering"""
+    def uav_state_callback(self, msg: UAVState):
+        """Update current UAV state from subscription"""
+        self.current_altitude = msg.altitude
+        self.current_yaw = msg.yaw
+        
+    def publish_tracking_data(self):
+        """Publish hoop tracking data at regular intervals"""
         image, camera_info = self.request_data(cam_image=True, cam_info=True)
+        
+        # Check if we have valid image and camera info
+        if image is None or camera_info is None:
+            return
+            
         image = self.convert_image_msg_to_frame(image)
-        image = rotate_image(image, -np.rad2deg(request.yaw))
+        image = rotate_image(image, -np.rad2deg(self.current_yaw))
 
         # Predict next state
         prediction = self.kalman.predict()
@@ -83,14 +111,16 @@ class HoopTrackingNode(VisionNode):
                 x, y = w / 2, h / 2
         
         # Compute 3D direction vector
-        direction = compute_3d_vector(x, y, np.array(camera_info.k).reshape(3, 3), request.altitude)
+        direction = compute_3d_vector(x, y, np.array(camera_info.k).reshape(3, 3), self.current_altitude)
             
-        # Populate response
-        response.x = float(x)
-        response.y = float(y)
-        response.direction = direction
-        response.hoop_detected = hoop_detected
-        return response
+        # Create and publish message
+        msg = HoopTracking()
+        msg.x = float(x)
+        msg.y = float(y)
+        msg.direction = direction
+        msg.hoop_detected = hoop_detected
+        
+        self.tracking_publisher.publish(msg)
 
 
 def main():

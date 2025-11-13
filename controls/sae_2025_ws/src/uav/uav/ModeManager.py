@@ -42,21 +42,14 @@ class ModeManager(Node):
     def setup_vision(self, vision_nodes: str) -> None:
         """
         Setup the vision node for this mode.
+        Vision nodes now use pub/sub instead of services.
 
         Args:
-            mode (Mode): The mode to setup vision for.
-            vision (str): The comma-separated string of vision nodes to setup for this mode.
+            vision_nodes (str): The comma-separated string of vision nodes (kept for compatibility, but not used).
         """
-        if vision_nodes.strip() == '':
-            return
-        module = importlib.import_module(VISION_NODE_PATH)
-        for vision_node in vision_nodes.split(','):
-            vision_class = getattr(module, vision_node)
-            if vision_class.service_name() not in self.uav.vision_clients:
-                client = self.create_client(vision_class.srv, vision_class.service_name())
-                while not client.wait_for_service(timeout_sec=1.0):
-                    self.get_logger().info(f"Service {vision_class.service_name()} not available, waiting again...")
-                self.uav.vision_clients[vision_class.service_name()] = client
+        # Vision nodes now publish data continuously via topics
+        # Modes subscribe to the topics they need directly
+        pass
     
     def initialize_mode(self, mode_path: str, params: dict) -> Mode:
         module_name, class_name = mode_path.rsplit('.', 1)

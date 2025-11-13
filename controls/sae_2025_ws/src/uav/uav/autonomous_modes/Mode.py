@@ -1,8 +1,6 @@
 from abc import ABC, abstractmethod
 import rclpy
 from rclpy.node import Node
-# from rclpy.type_support import SrvRequestT
-from uav.vision_nodes import VisionNode
 from uav import UAV
 
 class Mode(ABC):
@@ -22,8 +20,8 @@ class Mode(ABC):
         self.node = node
         self.active = False
         self.uav: UAV = uav
-        self.vision_clients = {}
-        self.sent_request = False
+        self.vision_subscriptions = {}
+        self.latest_vision_data = {}
 
     def on_enter(self) -> None:
         """
@@ -31,25 +29,36 @@ class Mode(ABC):
         Should include any initialization required for the mode.
         """
         pass
-
-    def send_request(self, vision_node: VisionNode, request):
+    
+    def subscribe_to_vision(self, topic: str, msg_type, key: str = None):
         """
-        Send a request to a service.
-
+        Subscribe to a vision topic and store the latest message.
+        
         Args:
-            request (SrvRequestT): The request to send.
-            service_name (VIsionNode): The name of the service.
+            topic (str): The topic to subscribe to.
+            msg_type: The message type.
+            key (str): Optional key for storing the data. Defaults to topic name.
         """
-        if self.sent_request:
-            if self.future.done():
-                response = self.future.result()
-                self.sent_request = False
-                assert type(response) == vision_node.srv.Response, f"Expected response type {vision_node.srv.Response}, got {type(response)}."
-                return response
-        else:
-            self.sent_request = True
-            client = self.uav.vision_clients[vision_node.service_name()]
-            self.future = client.call_async(request)
+        if key is None:
+            key = topic
+        
+        def callback(msg):
+            self.latest_vision_data[key] = msg
+        
+        sub = self.node.create_subscription(msg_type, topic, callback, 10)
+        self.vision_subscriptions[key] = sub
+    
+    def get_vision_data(self, key: str):
+        """
+        Get the latest vision data for a given key.
+        
+        Args:
+            key (str): The key for the vision data.
+            
+        Returns:
+            The latest message, or None if no data received yet.
+        """
+        return self.latest_vision_data.get(key, None)
 
     def on_exit(self) -> None:
         """

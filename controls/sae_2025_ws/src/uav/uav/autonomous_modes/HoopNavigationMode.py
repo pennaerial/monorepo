@@ -2,8 +2,7 @@ import numpy as np
 from uav import UAV
 from uav.autonomous_modes import Mode
 from rclpy.node import Node
-from uav_interfaces.srv import HoopTracking
-from uav.vision_nodes import HoopTrackingNode
+from uav_interfaces.msg import HoopTracking
 from typing import Optional, Tuple
 import cv2
 
@@ -34,6 +33,9 @@ class HoopNavigationMode(Mode):
         self.passing_through = False
         self.hoop_pass_target = None
         self.initial_hoop_detection = False
+        
+        # Subscribe to hoop tracking data
+        self.subscribe_to_vision('/vision/hoop_tracking', HoopTracking, 'hoop')
 
     def on_enter(self) -> None:
         """
@@ -58,14 +60,11 @@ class HoopNavigationMode(Mode):
         # Get current altitude
         current_altitude = -self.uav.get_local_position()[2]
         
-        # Request hoop tracking
-        request = HoopTracking.Request()
-        request.altitude = current_altitude
-        request.yaw = float(self.uav.yaw)
-        response = self.send_request(HoopTrackingNode, request)
+        # Get latest hoop tracking data
+        tracking_data = self.get_vision_data('hoop')
         
-        # If no response received yet, exit early
-        if response is None:
+        # If no tracking data received yet, exit early
+        if tracking_data is None:
             return
 
         # If we're already passing through, just go straight
@@ -78,7 +77,7 @@ class HoopNavigationMode(Mode):
             return
 
         # Check if hoop is detected
-        if not response.hoop_detected:
+        if not tracking_data.hoop_detected:
             self.log("No hoop detected. Holding position.")
             # If we never detected a hoop, just hold position
             if not self.initial_hoop_detection:
@@ -97,10 +96,10 @@ class HoopNavigationMode(Mode):
         self.initial_hoop_detection = True
 
         # Convert direction vector from camera frame to UAV frame
-        # response.direction is [x, y, z] in camera frame
+        # tracking_data.direction is [x, y, z] in camera frame
         # Camera frame: x right, y down, z forward
         # UAV frame: x forward (North), y left (West), z up
-        direction = [-response.direction[1], response.direction[0], -response.direction[2]]
+        direction = [-tracking_data.direction[1], tracking_data.direction[0], -tracking_data.direction[2]]
         
         # Apply camera offsets
         camera_offsets = tuple(x / current_altitude for x in self.uav.camera_offsets) if current_altitude > 1 else self.uav.camera_offsets
