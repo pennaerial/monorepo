@@ -16,7 +16,7 @@ class HoopTrackingNode(VisionNode):
         super().__init__('hoop_tracking', self.__class__.srv)
 
         self.color_map = {
-            'pink': pink,
+            'pink': pink, 
             'green': green,
             'blue': blue,
             'yellow': yellow,
