@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # hoop_tracking_simple_node.py
+
 import cv2
 import numpy as np
 import rclpy
@@ -54,6 +55,8 @@ class HoopTrackingSimple(Node):
     def __init__(self):
         super().__init__('hoop_tracking_simple')
         self.srv = self.create_service(PayloadTracking, 'hoop_tracking', self.service_cb)
+        # Optional: track last detection state if you ever want to log only on change
+        self.last_detection_status = None
 
     # Replace with your camera input
     def get_frame_and_K(self):
@@ -115,16 +118,44 @@ class HoopTrackingSimple(Node):
 
         if found:
             if is_line:
+                # line-like shape, treat as "right vector"
                 dir_vec = FULL_RIGHT_VECTOR.copy()
                 used_x, used_y = cx, cy
                 dlz_empty = False
             else:
+                # full-ish ellipse
                 if max(a, b) >= MIN_AXIS_PIX and not is_partial:
                     used_x, used_y = cx, cy
                     dlz_empty = False
                 dir_vec = pixel_to_ray(used_x, used_y, K)
         else:
+            # no contour found, aim at image center
             dir_vec = pixel_to_ray(used_x, used_y, K)
+
+        # ---------------- Logging / printing ----------------
+        if found and not dlz_empty:
+            if is_line:
+                status = (
+                    f"HOOP DETECTED (line-like) at (x={used_x:.1f}, y={used_y:.1f}), "
+                    f"axes=({a:.1f}, {b:.1f}), partial={is_partial}"
+                )
+            else:
+                status = (
+                    f"HOOP DETECTED at (x={used_x:.1f}, y={used_y:.1f}), "
+                    f"axes=({a:.1f}, {b:.1f}), partial={is_partial}"
+                )
+        elif found and dlz_empty:
+            status = (
+                "HOOP CANDIDATE FOUND but REJECTED "
+                f"(axes too small or partial): axes=({a:.1f}, {b:.1f}), partial={is_partial}"
+            )
+        else:
+            status = "NO HOOP DETECTED (aiming at image center)"
+
+        # Print to terminal and log to ROS
+        print(status)
+        self.get_logger().info(status)
+        # ----------------------------------------------------
 
         response.x = float(used_x)
         response.y = float(used_y)
