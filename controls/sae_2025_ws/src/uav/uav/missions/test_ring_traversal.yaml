@@ -1,0 +1,14 @@
+start:
+  class: uav.autonomous_modes.NavGPSMode
+  params:
+    coordinates: '[((0, 0, 10), 1, "LOCAL"),]'
+  transitions:
+    complete: ring_traversal
+
+ring_traversal:
+  class: uav.autonomous_modes.RingTraversalMode
+  transitions:
+    complete: land
+
+land:
+  class: uav.autonomous_modes.LandingMode

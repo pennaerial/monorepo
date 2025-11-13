@@ -1,7 +1,7 @@
 # payload_tracking_node.py
 import cv2
 import numpy as np
-from uav.cv.tracking import find_payload, compute_3d_vector, rotate_image
+from uav.cv.tracking import find_payload, compute_3d_vector
 from uav.vision_nodes import VisionNode
 # from uav_interfaces.srv import PayloadTracking  # OLD: not using a custom service anymore
 import rclpy
@@ -15,16 +15,16 @@ class RingTrackingNode(VisionNode):
     def __init__(self):
         super().__init__(custom_service=None)  # not using a custom service anymore. Rather, using publisher
 
-        self.color_map = {
-            'pink': pink,
-            'green': green,
-            'blue': blue,
-            'yellow': yellow
-        }
+        # self.color_map = {
+        #     'pink': pink,
+        #     'green': green,
+        #     'blue': blue,
+        #     'yellow': yellow
+        # }
         
         # Initialize Kalman filter
-        self.kalman = cv2.KalmanFilter(4, 2)
-        self._setup_kalman_filter()
+        # self.kalman = cv2.KalmanFilter(4, 2)
+        # self._setup_kalman_filter()
 
         from std_msgs.msg import Float64MultiArray  # moved here to avoid global import clutter
         self.publish_msg_type = Float64MultiArray
@@ -47,6 +47,7 @@ class RingTrackingNode(VisionNode):
         image = self.convert_image_msg_to_frame(image_msg)
 
         # TODO: implement proper ring-detection; placeholder uses "pink" threshold
+        # this outputs cx, cy, and dlz_empty
         detection = find_payload(
             image,
             *pink,                      # low HSV bound
@@ -59,35 +60,35 @@ class RingTrackingNode(VisionNode):
 
 ####### OLD PAYLOADTRACKING NODE CODE ##############
 
-# dlz_empty = False
-#         if detection is not None:
-#             cx, cy, dlz_empty = detection
-#             # Update Kalman filter with measurement
-#             # measurement = np.array([[np.float32(cx)], [np.float32(cy)]])
-#             # corrected_state = self.kalman.correct(measurement)
-#             # x, y = corrected_state[0, 0], corrected_state[1, 0]
-#             x, y = cx, cy
-#         else:
-#             # # Use prediction if no detection
-#             # x, y = predicted_x, predicted_y
-#             x, y = image.shape[:2]
-#             x /= 2
-#             y /= 2
+        dlz_empty = False
+        if detection is not None:
+            cx, cy, dlz_empty = detection
+            # Update Kalman filter with measurement
+            # measurement = np.array([[np.float32(cx)], [np.float32(cy)]])
+            # corrected_state = self.kalman.correct(measurement)
+            # x, y = corrected_state[0, 0], corrected_state[1, 0]
+            x, y = cx, cy
+        else:
+            # # Use prediction if no detection
+            # x, y = predicted_x, predicted_y
+            x, y = image.shape[:2]
+            x /= 2
+            y /= 2
             
         
-#         # Compute 3D direction vector
-#         direction = compute_3d_vector(x, y, np.array(camera_info.k, ).reshape(3, 3), request.altitude)
+        # # Compute 3D direction vector
+        # direction = compute_3d_vector(x, y, np.array(camera_info.k, ).reshape(3, 3), request.altitude)
             
-#         # Populate response
-#         response.x = float(x)
-#         response.y = float(y)
-#         response.direction = direction
-#         response.dlz_empty = dlz_empty
-#         return response
+        # # Populate response
+        # response.x = float(x)
+        # response.y = float(y)
+        # response.direction = direction
+        # response.dlz_empty = dlz_empty
+        # return response
         if detection is None:
             # Publish constant dummy vector so downstream nodes see a steady stream
             dummy = self.publish_msg_type()
-            dummy.data = [0.0, 0.0, 0.0, 0.0, 1.0, 0.0]  # x,y,dir_x,dir_y,dir_z,flag
+            dummy.data = [0.0, 0.0, 1.0, 0.0, 0.0, 0.0]  # x,y,dir_x,dir_y,dir_z,flag
             self.ring_pub.publish(dummy)
             return
 
