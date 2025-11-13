@@ -74,10 +74,15 @@ class ModeManager(Node):
                 if param.annotation in (str, inspect.Parameter.empty) or name in ('node', 'uav'):
                     args[name] = param_value
                 else:
-                    try:
-                        args[name] = ast.literal_eval(param_value)
-                    except (ValueError, SyntaxError):
-                        raise ValueError(f"Parameter '{name}' must be a valid literal for mode '{mode_path}'. Received: {param_value}")
+                    # If param_value is already not a string (e.g., loaded from YAML as a native type),
+                    # use it directly. Otherwise, parse it with ast.literal_eval.
+                    if not isinstance(param_value, str):
+                        args[name] = param_value
+                    else:
+                        try:
+                            args[name] = ast.literal_eval(param_value)
+                        except (ValueError, SyntaxError):
+                            raise ValueError(f"Parameter '{name}' must be a valid literal for mode '{mode_path}'. Received: {param_value}")
             elif param.default != inspect.Parameter.empty:
                 args[name] = param.default
             else:
