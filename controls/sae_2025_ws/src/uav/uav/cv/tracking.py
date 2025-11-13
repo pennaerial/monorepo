@@ -3,6 +3,9 @@ import cv2
 import numpy as np
 from typing import Optional, Tuple
 import os
+from pathlib import Path
+import math
+import warnings
 
 def find_payload(
     image: np.ndarray,
@@ -515,6 +518,104 @@ def find_hoop(
 
     # Keep your original return contract: zone_empty is False when we detected something
     return cx, cy, False
+
+
+try:
+    import torch
+    TORCH_AVAILABLE = True
+except ImportError:
+    TORCH_AVAILABLE = False
+    warnings.warn("PyTorch not available. Using fallback detection method.")
+# --- Paste key helpers from Ellipse-YOLO (shortened) ---
+def make_red_mask(hsv_img,
+                  lower_red1=(0, 50, 50), upper_red1=(10, 255, 255),
+                  lower_red2=(170, 50, 50), upper_red2=(180, 255, 255)):
+    mask1 = cv2.inRange(hsv_img, lower_red1, upper_red1)
+    mask2 = cv2.inRange(hsv_img, lower_red2, upper_red2)
+    mask = cv2.bitwise_or(mask1, mask2)
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel, iterations=2)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=2)
+    return mask
+# --- import or define detect_hoops_ellipse_yolo and hough fallback ---
+from .ellipse_yolo_pipeline import detect_hoops_ellipse_yolo  # if separate file
+# If you keep this standalone, paste detect_hoops_ellipse_yolo() definition here.
+# =====================================================================
+# =====================================================================
+def find_hoop_ellipse_yolo(
+    image: np.ndarray,
+    lower_hoop1: np.ndarray = np.array([0, 50, 50]),
+    upper_hoop1: np.ndarray = np.array([10, 255, 255]),
+    lower_hoop2: np.ndarray = np.array([170, 50, 50]),
+    upper_hoop2: np.ndarray = np.array([180, 255, 255]),
+    uuid: str = "default",
+    debug: bool = False,
+    save_vision: bool = False,
+    use_model: bool = True,
+    model_path: Optional[str] = None,
+    use_red_mask: bool = True,
+    use_inner_edges: bool = True,
+    use_partial_circles: bool = True,
+) -> Optional[Tuple[int, int, bool]]:
+    """
+    Find hoop center using Ellipse-YOLO (or fallback).
+    Returns (cx, cy, False) or None if not found.
+    """
+    # -------------------------------------------------------------
+    # (1) Convert to HSV and create mask (same as original find_hoop)
+    # -------------------------------------------------------------
+    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    mask = make_red_mask(hsv, lower_hoop1, upper_hoop1, lower_hoop2, upper_hoop2)
+    # -------------------------------------------------------------
+    # (2) Run Ellipse-YOLO detection (model or fallback automatically)
+    # -------------------------------------------------------------
+    result_img, detected_ellipses, nearest_idx, edge_img, _ = detect_hoops_ellipse_yolo(
+        image,
+        model_path=model_path,
+        use_model=use_model,
+        use_red_mask=use_red_mask,
+        lower_red1=tuple(lower_hoop1),
+        upper_red1=tuple(upper_hoop1),
+        lower_red2=tuple(lower_hoop2),
+        upper_red2=tuple(upper_hoop2),
+        use_inner_edges=use_inner_edges,
+        use_partial_circles=use_partial_circles,
+        draw_all_ellipses=False
+    )
+    # -------------------------------------------------------------
+    # (3) Handle no detections (identical return behavior)
+    # -------------------------------------------------------------
+    if not detected_ellipses or nearest_idx is None:
+        if debug:
+            cv2.imshow("Hoop Detection", image)
+            cv2.imshow("Hoop Mask", mask)
+            cv2.waitKey(1)
+        if save_vision:
+            os.makedirs(f"vision_imgs_{uuid}", exist_ok=True)
+            cv2.imwrite(f"vision_imgs_{uuid}/ellipse_none.png", image)
+            cv2.imwrite(f"vision_imgs_{uuid}/mask_none.png", mask)
+        return None
+    # -------------------------------------------------------------
+    # (4) Extract best ellipse (same order as original)
+    # -------------------------------------------------------------
+    best_ellipse = detected_ellipses[nearest_idx]
+    cx, cy = best_ellipse["center"]
+    # -------------------------------------------------------------
+    # (5) Visualization & saving (same order & style)
+    # -------------------------------------------------------------
+    if debug or save_vision:
+        vis = result_img.copy()
+        cv2.circle(vis, (cx, cy), 6, (0, 255, 0), 2)
+        cv2.drawMarker(vis, (cx, cy), (0, 255, 0), cv2.MARKER_CROSS, 10, 2)
+        if debug:
+            cv2.imshow("Hoop Detection", vis)
+            cv2.imshow("Inner Edges", edge_img)
+            cv2.waitKey(1)
+        if save_vision:
+            os.makedirs(f"vision_imgs_{uuid}", exist_ok=True)
+            cv2.imwrite(f"vision_imgs_{uuid}/ellipse_result.png", vis)
+            cv2.imwrite(f"vision_imgs_{uuid}/ellipse_edges.png", edge_img)
+    return int(cx), int(cy), False
 
 
 if __name__ == "__main__":
