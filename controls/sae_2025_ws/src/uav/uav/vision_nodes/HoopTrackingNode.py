@@ -68,7 +68,6 @@ class HoopTrackingNode(VisionNode):
             image,
             *red,
             *orange,
-            *(self.color_map[request.payload_color]),
             self.uuid,
             self.debug,
             self.save_vision
