@@ -2,6 +2,7 @@
 import cv2
 import numpy as np
 from uav.cv.find_hoop import find_hoop
+from uav.cv.find_hoop_depth import find_hoop_w_depth
 from uav.vision_nodes.VisionNode import VisionNode
 import rclpy
 from cv_bridge import CvBridge
@@ -21,20 +22,6 @@ class TemuVisionNode(VisionNode):
     def __init__(self):
         super().__init__('hoop_tracking', display=False, use_service=False)
         self.bridge = CvBridge()
-
-        # TEST
-        # self.hoop_waypoints = [
-        #     np.array([1.0, 0.0, -2.0]),  # Hoop 1 (start_x + 0*spacing)
-        #     np.array([3.0, 0.0, -2.0]),  # Hoop 2 (start_x + 1*spacing)
-        #     np.array([5.0, 0.0, -2.0]),  # Hoop 3
-        #     np.array([7.0, 0.0, -2.0]),  # Hoop 4
-        #     np.array([9.0, 0.0, -2.0]),  # Hoop 5
-        # ]
-        # self.target_hoop_index = 0
-        # self.distance_threshold = 0.5  
-        # self.mission_complete = False
-        
-        # save uav local position
         self.uav_local_position = None
 
         self.hoop_directions_publisher = self.create_publisher(msg_type=Vector3, topic='/hoop_directions', qos_profile=10, )
@@ -50,19 +37,21 @@ class TemuVisionNode(VisionNode):
         self.get_logger().info("Empty service called (placeholder).")
         return response
     def image_callback(self, msg):
-        print("image callback but currently does nothing")
-        # self.sim = True
-        # image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
-        # x, y, img = find_hoop(image)
-        # self.display_frame(img, "result")
-        x = 10.0
-        y = 10.0
-        z = 1.0
-
+        self.get_logger().info("Received image for hoop tracking.")
+        self.sim = True
+        image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+        x, y, z, img = find_hoop_w_depth(image)
+        self.display_frame(img, "result")
         self.publish_directions(x, y, z)
     
     def publish_directions(self, x, y, z):
-        msg = Vector3()
+        '''
+        NOTE: 
+        x is left right relative to the drone
+        y is top down relative to the drone
+        z is forward backward relative to the drone
+        '''
+        msg = Vector3() 
         msg.x = float(x)
         msg.y = float(y)
         msg.z = float(z)
