@@ -3,6 +3,7 @@ from uav import UAV
 from uav.autonomous_modes import Mode
 from rclpy.node import Node
 from uav_interfaces.msg import HoopTracking
+from uav.vision_nodes import HoopTrackingNode
 from typing import Optional, Tuple
 import cv2
 
