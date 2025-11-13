@@ -1,7 +1,7 @@
 # launch_params.yaml
 mission_name: test_hoop_tracking
 uav_debug: false
-vision_debug: false
+vision_debug: true ##change to show the window
 sim: true
 run_mission: true
 vehicle_type: 0 # 0 for quadrotor, 1 for tiltrotor VTOL, 2 for fixed-wing, 3 for standard VTOL
