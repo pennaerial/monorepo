@@ -19,7 +19,8 @@ def launch_setup(context, *args, **kwargs):
     mission_name = params.get('mission_name', 'basic')
     uav_debug = str(params.get('uav_debug', 'false'))
     vision_debug = str(params.get('vision_debug', 'false'))
-    sim_bool = str(params.get('sim', 'false'))
+    sim = str(params.get('sim', 'false'))
+    sim_name = str(params.get('sim_name', 'custom'))
     run_mission = str(params.get('run_mission', 'true'))
     vehicle_type = vehicle_map[params.get('vehicle_type', 0)]
     save_vision = str(params.get('save_vision', 'false'))
@@ -92,32 +93,11 @@ def launch_setup(context, *args, **kwargs):
         raise ValueError(f"Invalid vehicle type: {vehicle_type}")
 
     
-    topic_model_name = model[3:]  # remove 'gz_' prefix
-
-    arch = platform.machine().lower()
-    if arch in ("x86_64", "amd64", "i386", "i686"):
-        platform_type = "x86"
-    elif arch in ("arm64", "aarch64", "armv7l", "arm"):
-        platform_type = "arm"
-    else:
-        raise ValueError(f"Unknown architecture: {arch}")
-
-    camera_topic_name = (
-        "imager" if platform_type == "x86" else "camera"
-    )  # windows -> 'imager'   mac -> 'camera'
-    GZ_CAMERA_TOPIC = f"/world/custom/model/{topic_model_name}_0/link/camera_link/sensor/{camera_topic_name}/image"
-    GZ_CAMERA_INFO_TOPIC = f"/world/custom/model/{topic_model_name}_0/link/camera_link/sensor/{camera_topic_name}/camera_info"
-
-    sae_ws_path = os.path.expanduser(os.getcwd())
-    
-    gz_ros_bridge_camera = Node(
-        package="ros_gz_bridge",
-        executable="parameter_bridge",
-        arguments=[f"{GZ_CAMERA_TOPIC}@sensor_msgs/msg/Image[gz.msgs.Image"],
-        remappings=[(GZ_CAMERA_TOPIC, "/camera")],
-        output="screen",
-        name="gz_ros_bridge_camera",
-        cwd=sae_ws_path,
+    px4_sitl = ExecuteProcess(
+        cmd=['bash', '-c', f'PX4_GZ_STANDALONE=1 PX4_SYS_AUTOSTART={autostart} PX4_SIM_MODEL={model} PX4_GZ_WORLD={sim_name} ./build/px4_sitl_default/bin/px4'],
+        cwd=px4_path,
+        output='screen',
+        name='px4_sitl'
     )
 
     gz_ros_bridge_camera_info = Node(

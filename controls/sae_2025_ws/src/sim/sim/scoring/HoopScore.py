@@ -10,9 +10,9 @@ from typing import List, Tuple, Optional, Dict, Any
 import math
 import time
 from sim_interfaces.srv import HoopList
-from sim.scoring import ScoringNode
 
-class HoopScoringNode(ScoringNode):
+
+class HoopNode(ScoringNode):
     """
     Scoring node for in-house competition.
     Tracks UAV position and scores hoop passages using directional detection.
@@ -26,13 +26,11 @@ class HoopScoringNode(ScoringNode):
         """
         Initialize the hoop scoring node.
         
-        Args:
-            hoop_tolerance: Distance tolerance for hoop passage (meters)
-            landing_bonus: Points awarded for landing bonus
-            landing_tolerance: Distance tolerance for landing (meters)
-            landing_altitude_max: Maximum altitude to be considered "landed" (meters)
-        """
-        super().__init__(competition_name="in_house")
+        # Declare parameters
+        self.declare_parameter('hoop_tolerance', 1.5) 
+        self.declare_parameter('competition_type', 'in_house')
+        self.declare_parameter('competition_name', 'test')
+        self.declare_parameter('course_type', 'straight')
         
         # Store parameters
         self.hoop_tolerance = hoop_tolerance
@@ -76,40 +74,8 @@ class HoopScoringNode(ScoringNode):
         # Timer for score updating
         self.create_timer(0.1, self.update_scoring)  # 10Hz
         
-        # Service client for getting hoop positions
-        self.hoop_client = self.create_client(HoopList, "list_hoops")
-        self.hoops_loaded = False
-        self.create_timer(0.5, self._try_request_hoops)
-
-    def _try_request_hoops(self):
-        if self.hoops_loaded:
-            return
-
-        if not self.hoop_client.wait_for_service(timeout_sec=0.0):
-            self.get_logger().warn("Waiting for 'list_hoops' service...", throttle_duration_sec=5.0)
-            return
-
-        future = self.hoop_client.call_async(HoopList.Request())
-        future.add_done_callback(self._on_hoops_response)
-        self.hoops_loaded = True  # prevent repeated calls
-
-    def _on_hoops_response(self, future):
-        try:
-            response = future.result()
-        except Exception as e:
-            self.get_logger().error(f"'list_hoops' failed: {e}")
-            self.hoops_loaded = False  # try again later
-            return
-
-        self.hoop_poses = []
-        self.passed_hoops = []
-        self.drone_last_side = []
-        for hoop in response.hoop_positions:
-            self.hoop_poses.append((hoop.x, hoop.y, hoop.z, hoop.roll, hoop.pitch, hoop.yaw))
-            self.passed_hoops.append(False)
-            self.drone_last_side.append(0)
-
-        self.get_logger().info(f"Loaded {len(self.hoop_poses)} hoops from 'list_hoops'")
+        self.load_hoop_positions()
+        self.get_logger().info("Scoring node initialized.")
     
     def load_hoop_positions(self):
         """Load hoop positions from ROS2 parameters."""
@@ -120,14 +86,11 @@ class HoopScoringNode(ScoringNode):
 
             req = HoopList.Request()  # empty request
             future = client.call_async(req)
+
             # Block here until the service returns, before main spin()
-            # rclpy.spin_until_future_complete(self, future)
-            # rclpy.spin_until_future_complete(self, future)
+            rclpy.spin_until_future_complete(self, future)
 
             if future.result() is None:
-                self.get_logger().error(
-                    f"'list_hoops' failed with exception: {future.exception()}"
-                )
                 raise RuntimeError("Service call to 'list_hoops' failed")
 
             response = future.result()
@@ -137,7 +100,7 @@ class HoopScoringNode(ScoringNode):
             self.passed_hoops = []
             self.drone_last_side = []
 
-            for i, hoop in enumerate(response.hoop_positions):
+            for i, hoop in enumerate(response.hoops):
                 x = float(hoop.x)
                 y = float(hoop.y)
                 z = float(hoop.z)

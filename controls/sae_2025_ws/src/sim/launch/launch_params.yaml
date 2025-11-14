@@ -1,2 +1,26 @@
-competition: 0 # 0 for in_house, 1 for iarc, 2 for custom
-use_scoring: false
+# Simulation Framework Launch Parameters
+# This file defines parameters for different competition types and courses
+
+# Competition Type Configuration
+competition:
+  type: "in_house"  # Options: "in_house", "iarc", "custom"
+  name: "beans"    # Competition name for logging/scoring
+
+# Simulation Configuration
+simulation:
+  world_name: "in_house"   # Gazebo world name
+  enable_scoring: true   # Enable scoring node
+  uav_model: "gz_x500_mono_cam_down"  # UAV model to use
+
+# ROS2 Configuration
+ros2:
+  middleware_port: 8889       # MicroXRCEAgent port
+  enable_camera_bridge: true # Enable camera topic bridging
+  
+  # Topic remapping
+  topics:
+    camera: "/camera"
+    camera_info: "/camera_info"
+    vehicle_position: "/fmu/out/vehicle_local_position"
+    vehicle_attitude: "/fmu/out/vehicle_attitude"
+    scoring_results: "/scoring/results"

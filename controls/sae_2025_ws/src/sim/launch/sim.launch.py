@@ -25,13 +25,32 @@ from sim.constants import (
 )
 import json
 
-def load_sim_launch_parameters():
-    """Load simulation launch parameters from YAML."""
-    # Try source location first (for development - no rebuild needed)
-    source_paths = [
-        Path(__file__).parent / 'launch_params.yaml',
-        Path(os.getcwd()) / 'src' / 'sim' / 'launch' / 'launch_params.yaml',
-    ]
+
+def find_folder_with_heuristic(folder_name, home_dir, keywords=('penn', 'air')):
+    """Find folder using heuristic search."""
+    immediate_dirs = [d for d in os.listdir(home_dir) if os.path.isdir(os.path.join(home_dir, d))]
+    if folder_name in immediate_dirs:
+        return os.path.join(home_dir, folder_name)
+    for d in immediate_dirs:
+        if any(kw.lower() in d.lower() for kw in keywords):
+            result = find_folder(folder_name, os.path.join(home_dir, d))
+            if result:
+                return result
+    return find_folder(folder_name, home_dir)
+
+
+def find_folder(folder_name, search_path):
+    """Find folder recursively."""
+    for root, dirs, files in os.walk(search_path):
+        if folder_name in dirs:
+            return os.path.join(root, folder_name)
+    return None
+
+
+def load_launch_params():
+    """Load parameters from launch_params.yaml file."""
+    launch_file_dir = os.path.dirname(os.path.abspath(__file__))
+    params_file = os.path.join(launch_file_dir, 'launch_params.yaml')
     
     for path in source_paths:
         if path.exists():
@@ -77,90 +96,34 @@ def load_sim_parameters(competition: str, logger: logging.Logger) -> str:
     )
     return load_yaml_to_dict(config_path), config_path
 
-def initialize_mode(logger: logging.Logger, node_path: str, params: dict) -> Node:
-    """
-    Initialize a node from a class path and parameters.
-    
-    Args:
-        node_path: Dot-separated path to the node class (e.g., 'sim.world_gen.HoopCourseNode')
-        params: Dictionary of parameters to pass to the node constructor
-        
-    Returns:
-        Initialized node instance
-        
-    Raises:
-        ValueError: If node_path is invalid or parameters are missing/invalid
-        ImportError: If the module cannot be imported
-        AttributeError: If the class is not found in the module
-    """
-    logger.debug(f"Initializing mode: {node_path} with params: {params}")
-    
-    # Parse node path
-    try:
-        module_name, class_name = node_path.rsplit(".", 1)
-    except ValueError:
-        raise ValueError(f"Invalid node path format: '{node_path}'. Expected 'module.ClassName'")
-    
-    # Import module
-    try:
-        module = importlib.import_module(module_name)
-    except ImportError as e:
-        raise ImportError(f"Failed to import module '{module_name}': {e}")
-    
-    # Get class
-    if not hasattr(module, class_name):
-        raise AttributeError(f"Class '{class_name}' not found in module '{module_name}'")
-    
-    node_class = getattr(module, class_name)
-    
-    # Build arguments from parameters
-    try:
-        args = build_node_arguments(node_class, params)
-        logger.debug(f"Initializing {class_name} with args: {list(args.keys())}")
-    except ValueError as e:
-        raise ValueError(f"Failed to build arguments for {node_path}: {e}")
-    
-    # Instantiate node
-    try:
-        return node_class(**args)
-    except Exception as e:
-        logger.error(f"Failed to initialize {node_path} with args {args}: {e}")
-        raise
-
 def launch_setup(context, *args, **kwargs):
     """Setup launch configuration."""
-
-    logger = launch.logging.get_logger('sim.launch')
     
-    # Get launch arguments
-    try:
-        params = load_sim_launch_parameters()
-    except Exception as e:
-        raise RuntimeError(f"Failed to load launch parameters: {e}")
+    # Load parameters from YAML file
+    params = load_launch_params()
     
-    # Map competition numbers to names
-    competition_num = params.get("competition", DEFAULT_COMPETITION.value)
-    try:
-        competition_type = Competition(competition_num)
-        competition = COMPETITION_NAMES[competition_type]
-    except (ValueError, KeyError):
-        valid_values = [e.value for e in Competition]
-        raise ValueError(
-            f"Invalid competition: {competition_num}. Must be one of {valid_values}"
-        )
+    # Use YAML values directly
+    competition_type = params['competition']['type']
+    
+    # Extract simulation parameters
+    sim_params = params['simulation']
+    ros_params = params['ros2']
+    
+    print(f"Launching {params['competition']['type']} competition: {params['competition']['name']}")
+    print(f"Course type: {course_type}")
+    print(f"Course parameters: {course_params_dict}")
+    
+    # Generate world file using worldgen.py
+    world_name = f"{params['competition']['type']}_{params['competition']['name']}"
+    
 
-    scoring_param = params.get("scoring", DEFAULT_USE_SCORING)
-
-    if isinstance(scoring_param, str):
-        use_scoring = scoring_param.lower() == 'true'
-    else:
-        use_scoring = bool(scoring_param)
-
-
-    px4_path_raw = LaunchConfiguration("px4_path").perform(context)
-
-    if px4_path_raw is None:
-        raise RuntimeError("PX4 path is required")
+    # Ensure output directory exists
+    os.makedirs(os.path.dirname(course_params_obj.op_file), exist_ok=True)
+    
+    # Find required paths
+    px4_path = find_folder_with_heuristic('PX4-Autopilot', os.path.expanduser('~'))
+    if not px4_path:
+        raise RuntimeError("PX4-Autopilot directory not found")
     
     px4_path = os.path.expanduser(px4_path_raw)
 
@@ -195,39 +158,70 @@ def launch_setup(context, *args, **kwargs):
     
     world_params = sim_params["world"].copy()
     
-    # Initialize world node - it will generate the world file automatically
-    world = Node(
-        package="sim",
-        executable=camel_to_snake(world_params["name"]),
-        arguments=[json.dumps(world_params["params"])],
-        output="screen",
-        name=world_params["name"],
-        cwd=sae_ws_path,
+    # Define the simulation process
+
+    sim_cmd = ['ros2', 'run', 'sim', 'simulation', uav_debug, YAML_PATH]
+    sim = ExecuteProcess(
+        cmd=sim_cmd,
+        output='screen',
+        emulate_tty=True,
+        name='mission'
     )
-
-    # Initialize scoring node if requested
-    scoring = None
-    if use_scoring:
-        if "scoring" not in sim_params:
-            logger.warning(f"Scoring requested but no 'scoring' section in sim config: {sim_config_path}")
-        else:
-            scoring = Node(
-                package="sim",
-                executable=camel_to_snake(sim_params["scoring"]["name"]),
-                arguments=[sim_params["scoring"]["params"]],
-                output="screen",
-                name=sim_params["scoring"]["name"],
-                cwd=sae_ws_path,
-            )
-
+    
+    # Define the ROS-Gazebo bridge for camera topics (only if enabled)
+    gz_ros_bridge_camera = None
+    gz_ros_bridge_camera_info = None
+    
+    if ros_params.get('enable_camera_bridge', True):
+        camera_topic = ros_params['topics']['camera']
+        camera_info_topic = ros_params['topics']['camera_info']
+        
+        print("start gz_ros_bridge_camera")
+        gz_ros_bridge_camera = ExecuteProcess(
+            cmd=['ros2', 'run', 'ros_gz_bridge', 'parameter_bridge',
+                f'/world/{world_name}/model/{sim_params["uav_model"]}_0/link/camera_link/sensor/imager/image@sensor_msgs/msg/Image[gz.msgs.Image',
+                '--ros-args', '--remap', f'/world/{world_name}/model/{sim_params["uav_model"]}_0/link/camera_link/sensor/imager/image:={camera_topic}'],
+            output='screen',
+            cwd=sae_ws_path,
+            name='gz_ros_bridge_camera'
+        )
+        
+        gz_ros_bridge_camera_info = ExecuteProcess(
+            cmd=['ros2', 'run', 'ros_gz_bridge', 'parameter_bridge',
+                f'/world/{world_name}/model/{sim_params["uav_model"]}_0/link/camera_link/sensor/imager/camera_info@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo',
+                '--ros-args', '--remap', f'/world/{world_name}/model/{sim_params["uav_model"]}_0/link/camera_link/sensor/imager/camera_info:={camera_info_topic}'],
+            output='screen',
+            cwd=sae_ws_path,
+            name='gz_ros_bridge_camera_info'
+        )
+    
+    # Delayed scoring node start (only if scoring is enabled)
+    # delayed_scoring = None
+    # if scoring_node is not None:
+    #     delayed_scoring = TimerAction(
+    #         period=10.0,
+    #         actions=[scoring_node]
+    #     )
+    
+    # Build action list based on enabled features
+    bridge_actions = []
+    if gz_ros_bridge_camera is not None:
+        bridge_actions.append(gz_ros_bridge_camera)
+    if gz_ros_bridge_camera_info is not None:
+        bridge_actions.append(gz_ros_bridge_camera_info)
+    
+    # # Add delayed scoring if enabled
+    # if delayed_scoring is not None:
+    #     bridge_actions.append(delayed_scoring)
+    
     # Build and return the complete list of actions
     actions = [
         download_gz_models,
         RegisterEventHandler(
-            OnProcessExit(
-                target_action=download_gz_models,
-                on_exit=[LogInfo(msg="Gazebo models downloaded."), world],
-            )
+            OnProcessStart(target_action=middleware, on_start=[sim, LogInfo(msg="Middleware started.")])
+        ),
+        RegisterEventHandler(
+            OnProcessStart(target_action=sim, on_start=[gazebo, LogInfo(msg="Sim node started.")])
         ),
         RegisterEventHandler(
             OnProcessIO(

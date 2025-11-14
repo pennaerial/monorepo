@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
-project(sim_interfaces)
+project(uav_interfaces)
 
 find_package(ament_cmake REQUIRED)
 find_package(builtin_interfaces REQUIRED)

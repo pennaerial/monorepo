@@ -2,6 +2,8 @@
 mission_name: test_straight_course
 uav_debug: false
 vision_debug: false
+sim: true
+sim_name: 'in_house'
 run_mission: true
 vehicle_type: 0 # 0 for quadrotor, 1 for tiltrotor VTOL, 2 for fixed-wing, 3 for standard VTOL
 save_vision: false
