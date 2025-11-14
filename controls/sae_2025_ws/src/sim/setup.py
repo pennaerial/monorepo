@@ -31,6 +31,7 @@ setup(
         # Launch files
         (os.path.join('share', package_name, 'launch'), glob('launch/*.launch.py')),
         (os.path.join('share', package_name, 'launch'), glob('launch/*.yaml')),
+        (os.path.join('share', package_name, 'worlds'), glob('sim/world_gen/worlds/*.sdf')),
 
         # Worlds and simulations
         (os.path.join('share', package_name, 'worlds'), glob('sim/world_gen/worlds/*.sdf')),

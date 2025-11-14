@@ -1,5 +1,5 @@
 <package format="3">
-  <name>uav_interfaces</name>
+  <name>sim_interfaces</name>
   <version>0.0.1</version>
   <description>Interfaces for UAV project</description>
 
