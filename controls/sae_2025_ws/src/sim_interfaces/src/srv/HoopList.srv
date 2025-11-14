@@ -1,4 +1,4 @@
 #Request has no fields
 
 ---
-sim_interfaces/msg/HoopPose[] hoopPositions
+HoopPose[] hoop_positions

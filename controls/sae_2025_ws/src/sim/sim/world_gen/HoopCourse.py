@@ -274,7 +274,7 @@ class HoopCourseNode(WorldNode):
         self.srv = self.create_service(HoopList, "list_hoops", self.hoop_list_req)
     
     def hoop_list_req(self, request, response):
-        response.hoopPositions = self.hoop_positions
+        response.hoop_positions = self.hoop_positions
         return response
 
 
