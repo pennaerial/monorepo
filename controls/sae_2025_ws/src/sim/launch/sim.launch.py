@@ -58,7 +58,6 @@ def launch_setup(context, *args, **kwargs):
     ros_params = params['ros2']
     
     print(f"Launching {params['competition']['type']} competition: {params['competition']['name']}")
-    print(f"Course parameters: {course_params_dict}")
     
     # Generate world file using worldgen.py
     world_name = f"{params['competition']['type']}_{params['competition']['name']}"
@@ -103,7 +102,7 @@ def launch_setup(context, *args, **kwargs):
     
     # Define the simulation process
 
-    sim_cmd = ['ros2', 'run', 'sim', 'simulation', uav_debug, YAML_PATH]
+    sim_cmd = ['ros2', 'run', 'sim', 'simulation', uav_debug, YAML_PATH, world_name]
     sim = ExecuteProcess(
         cmd=sim_cmd,
         output='screen',
