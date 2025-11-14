@@ -110,7 +110,6 @@ def launch_setup(context, *args, **kwargs):
     ros_params = params['ros2']
     
     print(f"Launching {params['competition']['type']} competition: {params['competition']['name']}")
-    print(f"Course type: {course_type}")
     print(f"Course parameters: {course_params_dict}")
     
     # Generate world file using worldgen.py
