@@ -6,58 +6,11 @@ competition:
   type: "in_house"  # Options: "in_house", "iarc", "custom"
   name: "beans"    # Competition name for logging/scoring
 
-# Course Configuration
-course:
-  type: "straight"    # Options: "slalom", "ascent", "descent", "random"
-  
-  # Course-specific parameters
-  slalom:
-    dlz: [10, 5, 0]      # Drop zone coordinates [x, y, z]
-    uav: [0, 0, 0]       # UAV starting position [x, y, z]
-    num_hoops: 5          # Number of hoops to generate
-    max_dist: 10         # Maximum distance between hoops
-    width: 3             # Hoop width
-    height: 4            # Hoop height
-  
-  ascent:
-    dlz: [10, 5, 0]
-    uav: [0, 0, 0]
-    num_hoops: 4
-    max_dist: 8
-    start_height: 2     # Height of first hoop
-  
-  descent:
-    dlz: [10, 5, 0]
-    uav: [0, 0, 0]
-    num_hoops: 4
-    max_dist: 8
-    start_height: 2     # Height of first hoop
-  
-  straight:
-    dlz: [0, 0, 0]        # Drop zone at origin
-    uav: [0, 0, 0]        # UAV starts at origin
-    num_hoops: 5          # 5 hoops in a line
-    max_dist: 10          # Total course length ~10m
-    height: 2.0           # All hoops at 2m height
-    spacing: 2.0          # 2m between hoops
-
 # Simulation Configuration
 simulation:
-  world_name: "custom"   # Gazebo world name
+  world_name: "in_house"   # Gazebo world name
   enable_scoring: true   # Enable scoring node
   uav_model: "gz_x500_mono_cam_down"  # UAV model to use
-  
-  # Timing parameters
-  position_poll_rate: 10.0    # Hz - UAV position polling rate
-  scoring_rate: 5.0           # Hz - Scoring calculation rate
-  
-  # Scoring parameters
-  scoring:
-    hoop_tolerance: 1.5       # meters - Distance tolerance for hoop passage
-    max_flight_time: 300      # seconds - Maximum allowed flight time
-    points_per_hoop: 10       # Points awarded per hoop passage
-    penalty_per_second: 0.1   # Points deducted per second over time limit
-
 
 # ROS2 Configuration
 ros2:

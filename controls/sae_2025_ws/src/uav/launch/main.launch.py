@@ -73,6 +73,7 @@ def launch_setup(context, *args, **kwargs):
     uav_debug = str(params.get('uav_debug', 'false'))
     vision_debug = str(params.get('vision_debug', 'false'))
     sim = str(params.get('sim', 'false'))
+    sim_name = str(params.get('sim_name', 'custom'))
     run_mission = str(params.get('run_mission', 'true'))
     vehicle_type = vehicle_map[params.get('vehicle_type', 0)]
     save_vision = str(params.get('save_vision', 'false'))
@@ -157,7 +158,7 @@ def launch_setup(context, *args, **kwargs):
         raise ValueError(f"Invalid vehicle type: {vehicle_type}")
     
     px4_sitl = ExecuteProcess(
-        cmd=['bash', '-c', f'PX4_GZ_STANDALONE=1 PX4_SYS_AUTOSTART={autostart} PX4_SIM_MODEL={model} PX4_GZ_WORLD=custom ./build/px4_sitl_default/bin/px4'],
+        cmd=['bash', '-c', f'PX4_GZ_STANDALONE=1 PX4_SYS_AUTOSTART={autostart} PX4_SIM_MODEL={model} PX4_GZ_WORLD={sim_name} ./build/px4_sitl_default/bin/px4'],
         cwd=px4_path,
         output='screen',
         name='px4_sitl'

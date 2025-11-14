@@ -9,9 +9,10 @@ from geometry_msgs.msg import Point
 from typing import List, Tuple, Optional, Dict, Any
 import math
 import time
+from sim_interfaces.srv import HoopList
 
 
-class ScoringNode(Node):
+class HoopNode(ScoringNode):
     """
     ROS2 node for in-house competition scoring.
     Tracks UAV position and scores hoop passages using directional detection.
@@ -21,7 +22,6 @@ class ScoringNode(Node):
         super().__init__('scoring_node')
         
         # Declare parameters
-        self.declare_parameter('hoop_positions', '[]')
         self.declare_parameter('hoop_tolerance', 1.5) 
         self.declare_parameter('competition_type', 'in_house')
         self.declare_parameter('competition_name', 'test')
@@ -72,42 +72,53 @@ class ScoringNode(Node):
         # Timer for score updating
         self.create_timer(0.1, self.update_scoring)  # 10Hz
         
-        self.load_hoop_positions_from_params()
+        self.load_hoop_positions()
         self.get_logger().info("Scoring node initialized.")
     
-    def load_hoop_positions_from_params(self):
+    def load_hoop_positions(self):
         """Load hoop positions from ROS2 parameters."""
         try:
-            hoop_positions_str = self.get_parameter('hoop_positions').get_parameter_value().string_value
-            
-            if hoop_positions_str == '[]' or not hoop_positions_str:
-                self.get_logger().error("No hoop positions provided in parameters!")
-                raise ValueError("No hoop positions provided in parameters")
-            
-            import ast
-            hoop_positions_list = ast.literal_eval(hoop_positions_str)
-            
-            hoop_positions = []
-            for i in range(0, len(hoop_positions_list), 6): 
-                if i + 5 < len(hoop_positions_list):  
-                    hoop_positions.append((
-                        hoop_positions_list[i],     # x
-                        hoop_positions_list[i + 1], # y
-                        hoop_positions_list[i + 2], # z
-                        hoop_positions_list[i + 3], # roll
-                        hoop_positions_list[i + 4], # pitch
-                        hoop_positions_list[i + 5]  # yaw
-                    ))
-            
-            self.set_course_hoops(hoop_positions)
-            self.get_logger().info(f"Loaded {len(hoop_positions)} hoops from parameters")
-            
-            for i, hoop in enumerate(hoop_positions):
-                x, y, z, roll, pitch, yaw = hoop
-                self.get_logger().info(f"Hoop {i+1}: x={x:.2f}, y={y:.2f}, z={z:.2f}, roll={roll:.2f}, pitch={pitch:.2f}, yaw={yaw:.2f}")
-            
+            client = self.create_client(HoopList, "list_hoops")
+            while not client.wait_for_service(timeout_sec=1.0):
+                self.get_logger().warn("Waiting for 'list_hoops' service...")
+
+            req = HoopList.Request()  # empty request
+            future = client.call_async(req)
+
+            # Block here until the service returns, before main spin()
+            rclpy.spin_until_future_complete(self, future)
+
+            if future.result() is None:
+                raise RuntimeError("Service call to 'list_hoops' failed")
+
+            response = future.result()
+
+            # Expecting response.hoops to be a list of HoopPose messages
+            self.hoop_poses = []
+            self.passed_hoops = []
+            self.drone_last_side = []
+
+            for i, hoop in enumerate(response.hoops):
+                x = float(hoop.x)
+                y = float(hoop.y)
+                z = float(hoop.z)
+                roll = float(hoop.roll)
+                pitch = float(hoop.pitch)
+                yaw = float(hoop.yaw)
+
+                self.hoop_poses.append((x, y, z, roll, pitch, yaw))
+                self.passed_hoops.append(False)
+                self.drone_last_side.append(0)
+
+                self.get_logger().info(
+                    f"Hoop {i+1}: x={x:.2f}, y={y:.2f}, z={z:.2f}, "
+                    f"roll={roll:.2f}, pitch={pitch:.2f}, yaw={yaw:.2f}"
+                )
+
+            self.get_logger().info(f"Loaded {len(self.hoop_poses)} hoops from 'list_hoops' service.")
+
         except Exception as e:
-            self.get_logger().error(f"Failed to load hoop positions from parameters: {e}")
+            self.get_logger().error(f"Failed to load hoop positions: {e}")
             raise
         
     def set_course_hoops(self, hoop_poses: List[Tuple[float, float, float, float, float, float]]):
