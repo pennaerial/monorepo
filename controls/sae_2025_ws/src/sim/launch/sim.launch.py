@@ -163,7 +163,13 @@ def launch_setup(context, *args, **kwargs):
             OnProcessStart(target_action=middleware, on_start=[sim, LogInfo(msg="Middleware started.")])
         ),
         RegisterEventHandler(
-            OnProcessStart(target_action=sim, on_start=[gazebo, LogInfo(msg="Sim node started.")])
+            OnProcessStart(target_action=sim, on_start=[TimerAction(
+                    period=1.0,   # seconds; tweak this
+                    actions=[
+                        gazebo,
+                        LogInfo(msg="Sim started, launching Gazebo after delay.")
+                    ]
+                )])
         ),
         RegisterEventHandler(
             OnProcessStart(target_action=gazebo, on_start=[px4_sitl, LogInfo(msg="Gazebo started.")])

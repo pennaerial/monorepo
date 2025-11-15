@@ -7,6 +7,7 @@ from abc import ABC, abstractmethod
 from typing import List, Tuple
 from sim_interfaces.srv import HoopList
 from sim.world_gen import WorldNode
+import math
 
 Pose = Tuple[float, float, float, float, float, float]
 
@@ -314,12 +315,87 @@ class HoopCourseNode(WorldNode):
 
         # Add new hoops with given positions
         for i, pos in enumerate(hoop_positions, start=1):
-            x, y, z, roll, pitch, yaw = pos
             inc = ET.Element("include")
+            x, y, z, roll, pitch, yaw = pos
+            z = 1 if z < 1 else z
             ET.SubElement(inc, "uri").text = "model://hoop"
             ET.SubElement(inc, "pose").text = f"{x} {y} {z} {roll} {pitch} {yaw}"
             ET.SubElement(inc, "name").text = f"hoop_{i}"
             world.append(inc)
+        
+       
+        # Use last two hoops to define the approach direction
+        if len(hoop_positions) >= 2:
+            (prev_x, prev_y, _prev_z, *_), (end_x, end_y, end_z, *_) = hoop_positions[-2], hoop_positions[-1]
+        else:
+            # Fallback: only one hoop; use UAV->hoop direction
+            start_x, start_y, _ = self.uav
+            end_x, end_y, end_z, *_, = hoop_positions[-1]
+            prev_x, prev_y = start_x, start_y
+
+        # Direction vector in XY from previous hoop to final hoop
+        dir_x = end_x - prev_x
+        dir_y = end_y - prev_y
+        length = math.hypot(dir_x, dir_y)
+        if length == 0:
+            # Degenerate case: fall back to +X
+            dir_x, dir_y = 1.0, 0.0
+        else:
+            dir_x /= length
+            dir_y /= length
+
+        # Perpendicular vector (rotate by +90 degrees)
+        perp_x = -dir_y
+        perp_y = dir_x
+
+        # How far apart to space the DLZs (meters)
+        spacing = 3.0
+        num_dlz = 3
+
+        # Center DLZs around the final hoop's XY position
+        center_x = end_x
+        center_y = end_y
+
+        # DLZs on the ground
+        dlz_z = 0.0
+
+        # Yaw aligned with the approach direction
+        yaw = math.atan2(dir_y, dir_x)
+        roll = 0.0
+        pitch = 0.0
+# Colors for 3 DLZs
+        colors = [
+            ("red",   "1 0 0 1"),
+            ("green", "0 1 0 1"),
+            ("blue",  "0 0 1 1"),
+        ]
+
+        for i in range(num_dlz):
+            offset = (i - (num_dlz - 1) / 2.0) * spacing  # -s, 0, +s
+            dlz_x = center_x + offset * perp_x
+            dlz_y = center_y + offset * perp_y
+
+            color_name, rgba = colors[i]
+
+            dlz_inc = ET.Element("include")
+            ET.SubElement(dlz_inc, "uri").text = "model://dlz"
+            ET.SubElement(dlz_inc, "name").text = f"dlz_{i+1}"
+            ET.SubElement(dlz_inc, "pose").text = f"{dlz_x} {dlz_y} {dlz_z} {roll} {pitch} {yaw}"
+
+            # --- Material override ---
+            # This forces all visuals of the included model to use the chosen color
+            model_override = ET.SubElement(dlz_inc, "model")
+            link_override = ET.SubElement(model_override, "link", {"name": "link"})  # assumes main link is "link"
+            visual_override = ET.SubElement(link_override, "visual", {"name": "visual"})
+            material = ET.SubElement(visual_override, "material")
+            # ambient = ET.SubElement(material, "ambient")
+            diffuse = ET.SubElement(material, "diffuse")
+
+            # ambient.text = rgba
+            diffuse.text = rgba
+
+            world.append(dlz_inc)
+
 
         # --- remove whitespace-only text/tail nodes to avoid minidom producing extra blank lines ---
         def strip_whitespace(elem):
