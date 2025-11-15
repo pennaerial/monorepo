@@ -1,3 +1,12 @@
+import numpy as np
+from uav import UAV
+from uav.autonomous_modes import Mode
+from rclpy.node import Node
+# from uav_interfaces.srv import PayloadTracking
+from uav.vision_nodes import RingTrackingNode
+from typing import Optional, Tuple
+import cv2
+
 class RingTraversalMode(Mode):
     """Simple mode that listens to /ring_tracking and moves the UAV along the published direction vector until it is nearly centred, then reports completion."""
 
@@ -15,7 +24,7 @@ class RingTraversalMode(Mode):
         )
 
     def _ring_cb(self, msg):
-        # msg.data = [x, y, dir_x, dir_y, dir_z, flag]
+        #msg.data = [x, y, dir_x, dir_y, dir_z, flag]
         if len(msg.data) >= 6:
             self.latest_vec = msg.data
 
@@ -23,6 +32,7 @@ class RingTraversalMode(Mode):
         if self.latest_vec is None:
             self.log("Waiting for ring data ...")
             return
+        self.log("Shit is working")
         # Use dir vector for guidance
         dir_x, dir_y, dir_z = self.latest_vec[2:5]
         vec = np.array([dir_x, dir_y, dir_z])

@@ -1,5 +1,5 @@
 # launch_params.yaml
-mission_name: test_ringn_traversal
+mission_name: test_ring_traversal
 uav_debug: false
 vision_debug: false
 sim: true

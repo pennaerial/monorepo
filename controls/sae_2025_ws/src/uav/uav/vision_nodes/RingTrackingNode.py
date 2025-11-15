@@ -4,6 +4,7 @@ import numpy as np
 from uav.cv.tracking import find_payload, compute_3d_vector
 from uav.vision_nodes import VisionNode
 # from uav_interfaces.srv import PayloadTracking  # OLD: not using a custom service anymore
+from std_srvs.srv import Trigger
 import rclpy
 from uav.utils import pink, green, blue, yellow
 
@@ -11,28 +12,49 @@ class RingTrackingNode(VisionNode):
     """
     ROS node for ring tracking
     """
-    # srv = PayloadTracking # OLD: not using service anymore, instead using topic
+    srv = Trigger # OLD: not using service anymore, instead using topic
+
+    @staticmethod
+    def service_name() -> str:
+        # ModeManager calls vision_class.service_name()
+        return "/vision/ring_tracking_node"
+
     def __init__(self):
         super().__init__(custom_service=None)  # not using a custom service anymore. Rather, using publisher
 
-        # self.color_map = {
-        #     'pink': pink,
-        #     'green': green,
-        #     'blue': blue,
-        #     'yellow': yellow
-        # }
+        self.color_map = {
+            'pink': pink,
+            'green': green,
+            'blue': blue,
+            'yellow': yellow
+        }
         
         # Initialize Kalman filter
         # self.kalman = cv2.KalmanFilter(4, 2)
         # self._setup_kalman_filter()
-
+        
         from std_msgs.msg import Float64MultiArray  # moved here to avoid global import clutter
+
+        self.trigger_srv = self.create_service(
+            self.__class__.srv,
+            self.__class__.service_name(),
+            self._handle_trigger,
+        )
+
         self.publish_msg_type = Float64MultiArray
         self.ring_pub = self.create_publisher(self.publish_msg_type, '/ring_tracking', 10)
 
         # Publish at ≥20 Hz (0.05 s)
         self.timer_period = 0.05  # seconds
         self.timer = self.create_timer(self.timer_period, self.timer_callback)
+    
+    
+    #Fake service
+    def _handle_trigger(self, request, response):
+        # Minimal “I’m alive” response
+        response.success = True
+        response.message = "RingTrackingNode is running (fake service)."
+        return response
         
     # ---------------------  PUBLISHER CALLBACK  ---------------------
     def timer_callback(self):
@@ -88,7 +110,7 @@ class RingTrackingNode(VisionNode):
         if detection is None:
             # Publish constant dummy vector so downstream nodes see a steady stream
             dummy = self.publish_msg_type()
-            dummy.data = [0.0, 0.0, 1.0, 0.0, 0.0, 0.0]  # x,y,dir_x,dir_y,dir_z,flag
+            dummy.data = [0.0, 0.0, -10.0, 0.0, 0.0, 0.0]  # x,y,dir_x,dir_y,dir_z,flag
             self.ring_pub.publish(dummy)
             return
 
