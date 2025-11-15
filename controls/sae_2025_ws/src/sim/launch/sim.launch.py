@@ -14,16 +14,6 @@ import logging
 from launch.substitutions import LaunchConfiguration
 from launch.event_handlers import OnProcessStart, OnProcessExit, OnProcessIO
 from launch_ros.actions import Node
-from sim.utils import find_package_resource, load_yaml_to_dict, build_node_arguments, camel_to_snake
-import importlib
-from pathlib import Path
-from sim.constants import (
-    Competition, 
-    COMPETITION_NAMES, 
-    DEFAULT_COMPETITION,
-    DEFAULT_USE_SCORING
-)
-import json
 
 
 def find_folder_with_heuristic(folder_name, home_dir, keywords=('penn', 'air')):
@@ -108,15 +98,16 @@ def launch_setup(context, *args, **kwargs):
     # Extract simulation parameters
     sim_params = params['simulation']
     ros_params = params['ros2']
+    sim_type = params['competition']['type']
     
     print(f"Launching {params['competition']['type']} competition: {params['competition']['name']}")
     
     # Generate world file using worldgen.py
     world_name = f"{params['competition']['type']}_{params['competition']['name']}"
     
-
+    YAML_PATH = os.path.join(os.getcwd(), 'src', 'sim', 'sim', 'simulations', f"{sim_type}.yaml")
     # Ensure output directory exists
-    os.makedirs(os.path.dirname(course_params_obj.op_file), exist_ok=True)
+    os.makedirs(os.path.dirname(f"~/.simulation-gazebo/worlds/{world_name}.sdf"), exist_ok=True)
     
     # Find required paths
     px4_path = find_folder_with_heuristic('PX4-Autopilot', os.path.expanduser('~'))
@@ -157,13 +148,13 @@ def launch_setup(context, *args, **kwargs):
     world_params = sim_params["world"].copy()
     
     # Define the simulation process
-
+    uav_debug = 'False'
     sim_cmd = ['ros2', 'run', 'sim', 'simulation', uav_debug, YAML_PATH, world_name]
     sim = ExecuteProcess(
         cmd=sim_cmd,
         output='screen',
         emulate_tty=True,
-        name='mission'
+        name='sim'
     )
     
     # Define the ROS-Gazebo bridge for camera topics (only if enabled)

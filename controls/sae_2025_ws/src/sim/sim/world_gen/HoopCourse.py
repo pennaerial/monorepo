@@ -6,6 +6,7 @@ from pathlib import Path
 from abc import ABC, abstractmethod
 from typing import List, Tuple
 from sim_interfaces.srv import HoopList
+from sim.world_gen import WorldNode
 
 Pose = Tuple[float, float, float, float, float, float]
 
@@ -224,6 +225,7 @@ class StraightCourse(CourseStyle):
         """
         hoops = []
         x_dlz, y_dlz, z_dlz = self.dlz
+        print(self.uav)
         x_uav, y_uav, z_uav = self.uav
         
         # Calculate total course length
@@ -262,14 +264,20 @@ class HoopCourseNode(WorldNode):
     ROS node for generating hoop course for in house comp.
     """
 
-    def __init__(self, course, dlz, uav, num_hoops, max_dist, world_name, output_file):
-        super().__init__('in_house_world_gen')
+    def __init__(self, course: str, dlz: Tuple[float, float, float],
+                 uav: Tuple[float, float, float],
+                 num_hoops: int,
+                 max_dist: int,
+                 world_name: str, output_file: str):
+        super().__init__()
         self.course = course
         self.dlz = dlz
         self.uav = uav
         self.num_hoops = num_hoops
         self.max_dist = max_dist
         self.world_name = world_name
+        self.output_file = output_file
+        print("WORLD GENERATION NODE")
         self.generate_world()
         self.srv = self.create_service(HoopList, "list_hoops", self.hoop_list_req)
     
@@ -282,6 +290,8 @@ class HoopCourseNode(WorldNode):
         # Expand ~, make absolute, and validate paths
         in_path = Path(input_file).expanduser().resolve()
         out_path = Path(output_file).expanduser().resolve()
+        print(in_path)
+        print(out_path)
         if not in_path.exists():
             raise FileNotFoundError(
                 f"Input SDF not found: {in_path}\nCWD: {Path.cwd().resolve()}"
@@ -312,7 +322,7 @@ class HoopCourseNode(WorldNode):
             world.append(inc)
 
         # --- remove whitespace-only text/tail nodes to avoid minidom producing extra blank lines ---
-        def strip_whitespace(self, elem):
+        def strip_whitespace(elem):
             if elem.text is not None and elem.text.strip() == "":
                 elem.text = None
             for child in list(elem):
@@ -330,28 +340,28 @@ class HoopCourseNode(WorldNode):
     def generate_world(self):
         courses = ['ascent', 'descent', 'slalom']
 
-        if gen_style.lower() == 'random':
+        if self.course.lower() == 'random':
             course_id = r.uniform(0, len(courses) - 1)
-            gen_style = courses[course_id]
+            self.course = courses[course_id]
             
-        if gen_style.lower() == "previous":
+        if self.course.lower() == "previous":
             return
 
-        elif gen_style.lower() == "ascent":
+        elif self.course.lower() == "ascent":
             course = AscentCourse(dlz=self.dlz, 
                                 uav=self.uav, 
                                 num_hoops=self.num_hoops, 
                                 max_dist=self.max_dist, 
                                 start_height=2)
             hoop_poses = course.generate_course()
-        elif gen_style.lower() == "descent":
+        elif self.course.lower() == "descent":
             course = DescentCourse(dlz=self.dlz, 
                                 uav=self.uav, 
                                 num_hoops=self.num_hoops, 
                                 max_dist=self.max_dist, 
                                 start_height=4)
             hoop_poses = course.generate_course()
-        elif gen_style.lower() == "slalom":
+        elif self.course.lower() == "slalom":
             course = SlalomCourse(dlz=self.dlz, 
                                 uav=self.uav, 
                                 num_hoops=self.num_hoops, 
@@ -359,7 +369,7 @@ class HoopCourseNode(WorldNode):
                                 width=4,
                                 height=2)
             hoop_poses = course.generate_course()
-        elif gen_style.lower() == "straight":
+        elif self.course.lower() == "straight":
             course = StraightCourse(dlz=self.dlz, 
                                 uav=self.uav, 
                                 num_hoops=self.num_hoops, 
@@ -368,6 +378,6 @@ class HoopCourseNode(WorldNode):
                                 spacing=2)
             hoop_poses = course.generate_course()
         self.hoop_positions = hoop_poses
-        add_hoops(input_file=self.world_name, output_file=course_params.op_file, hoop_positions=hoop_poses)
+        self.add_hoops(input_file=self.world_name, output_file=self.output_file, hoop_positions=hoop_poses)
 
 
