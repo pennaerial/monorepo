@@ -2,9 +2,22 @@
 
 start:
   # Set TemuNavMode to initial mode
-  class: uav.autonomous_modes.TemuNavMode
-  
+  class: uav.autonomous_modes.NavGPSMode
+
+  params:
+    coordinates: '[((0, -3, -3), 2, "LOCAL")]'
   # transitions is empty
   # because TemuNavMode keeps running and returns 'continue',
   # it does not terminate on its own.
+  transitions:
+    complete: temu_nav
+
+temu_nav:
+  class: uav.autonomous_modes.TemuNavMode 
+
   transitions: {}
+
+#     complete: land
+# land:
+#   class: uav.autonomous_modes.LandingMode
+

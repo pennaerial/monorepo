@@ -8,7 +8,7 @@ competition:
 
 # Course Configuration
 course:
-  type: "straight"    # Options: "slalom", "ascent", "descent", "random"
+  type: "slalom"    # Options: "slalom", "ascent", "descent", "random"
   
   # Course-specific parameters
   slalom:
