@@ -110,7 +110,7 @@ class RingTrackingNode(VisionNode):
         if detection is None:
             # Publish constant dummy vector so downstream nodes see a steady stream
             dummy = self.publish_msg_type()
-            dummy.data = [0, 0, 5.0, 5.0, 5.0, 0.0]  # x,y,dir_x,dir_y,dir_z,flag
+            dummy.data = [0.0, 0.0, 5.0, 5.0, 0.0, 0.0]  # x,y,dir_x,dir_y,dir_z,flag
             self.ring_pub.publish(dummy)
             return
 
