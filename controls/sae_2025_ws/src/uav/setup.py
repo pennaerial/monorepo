@@ -37,6 +37,7 @@ setup(
             'mission = uav.mission:main',
             'payload_tracking_node = uav.vision_nodes.PayloadTrackingNode:main',
             'hoop_tracking_node = uav.vision_nodes.HoopTrackingNode:main',
+            'landing_node = uav.vision_nodes.LandingNode:main',
             'trajectory_planning_node = uav.trajectory_nodes.TrajectoryPlanningNode:main',
             'camera = uav.CameraNode:main',
             'test_flight = uav.test_flight:main',
