@@ -4,11 +4,22 @@ from typing import Optional, Tuple
 import os
 from decimal import Decimal, ROUND_DOWN
 
-K_matrix = np.array([
-        [0.5984375 * 539.9363327026367, 0.0, 0.5984375 * 640.0],
-        [0.0, 0.4145833333 * 539.9363708496094, 0.4145833333 * 480.0],
-        [0.0, 0.0, 1.0]
-    ])
+# K_matrix = np.array([
+#         [0.5984375 * 539.9363327026367, 0.0, 0.5984375 * 640.0],
+#         [0.0, 0.4145833333 * 539.9363708496094, 0.4145833333 * 480.0],
+#         [0.0, 0.0, 1.0]
+#     ])
+s = 766 / 1280.0  
+# The scaling factor is the same for x and y 
+fx_orig = 539.9363327 
+fy_orig = 539.9363708 
+# Note: fx and fy are slightly different 
+cx_orig = 640.0 
+cy_orig = 480.0 
+K_matrix = np.array([ 
+    [s * fx_orig, 0.0, s * cx_orig], 
+    [0.0, s * fy_orig, s * cy_orig], 
+    [0.0, 0.0, 1.0] ])
 
     # Known real radius (meters)
 # real_world_r = 0.33 #actually 0.551
@@ -29,6 +40,7 @@ def truncateDec(num):
 
 def find_hoop_w_depth(
         image: np.ndarray,
+        debug: bool = True
 ):
     """
     Detect hoop center in image using color thresholding.
@@ -41,7 +53,7 @@ def find_hoop_w_depth(
         Optional[Tuple[float, float, float, np.ndarray]]: A tuple (vector_x, vector_y, vector_z, img) if detection is successful;
         otherwise, a tuple (None, None, None, img).
     """
-    img = cv2.resize(image, (1532//2, 796//2))
+    img = cv2.resize(image, (766, 575))
     copy = img.copy()
     copy = cv2.cvtColor(copy, cv2.COLOR_RGB2GRAY, None)
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV, None)
@@ -95,8 +107,9 @@ def find_hoop_w_depth(
         if moments['m00'] != 0:
             Cx = int(moments['m10'] / moments['m00'])
             Cy = int(moments['m01'] / moments['m00'])
-            cv2.circle(img, (Cx, Cy), 4, (255, 255, 255), -1)
-            cv2.arrowedLine(img, (w//2, h//2), (Cx, Cy ), (255, 0, 0), 2, cv2.LINE_AA, 0, 0.1)
+            if debug:
+                cv2.circle(img, (Cx, Cy), 4, (255, 255, 255), -1)
+                cv2.arrowedLine(img, (w//2, h//2), (Cx, Cy ), (255, 0, 0), 2, cv2.LINE_AA, 0, 0.1)
             (xc, yc), (major, minor), angle_deg = cv2.fitEllipse(contour)
 
             a = major / 2
@@ -110,7 +123,8 @@ def find_hoop_w_depth(
             if xc - a > Cx or xc + a < Cx or yc + a < Cy or yc - a > Cy:
                 break
 
-            cv2.ellipse(img, (int(xc), int(yc)), (int(major/2), int(minor/2)), angle_deg, 0, 360, (255, 0, 0), 2)
+            if debug:
+                cv2.ellipse(img, (int(xc), int(yc)), (int(major/2), int(minor/2)), angle_deg, 0, 360, (255, 0, 0), 2)
 
             # Apply rotation to the unrotated vertices
             vertices = []
@@ -119,8 +133,9 @@ def find_hoop_w_depth(
                 rotated_y = M[1, 0] * v_unrotated[0] + M[1, 1] * v_unrotated[1] + M[1, 2]
                 vertices.append((int(rotated_x), int(rotated_y)))
             
-            for vertex in vertices:
-                cv2.circle(img, (vertex[0], vertex[1]), 4, (255, 255, 255), -1)
+            if debug:
+                for vertex in vertices:
+                    cv2.circle(img, (vertex[0], vertex[1]), 4, (255, 255, 255), -1)
 
             image_points = np.array([
                 vertices[0], 
@@ -135,7 +150,8 @@ def find_hoop_w_depth(
             x = truncateDec(tvec[0][0])
             y = -truncateDec(tvec[1][0])
             z = truncateDec(tvec[2][0])
-            cv2.putText(img, f"Center@({x, y, z})", (Cx-20, Cy-10), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1, cv2.LINE_AA)
+            if debug:
+                cv2.putText(img, f"Center@({x, y, z})", (Cx-20, Cy-10), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1, cv2.LINE_AA)
             return x, y, z, img
         return None, None, None, img
     return None, None, None, img

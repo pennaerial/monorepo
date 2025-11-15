@@ -38,11 +38,15 @@ class TemuVisionNode(VisionNode):
         self.get_logger().info("Empty service called (placeholder).")
         return response
     def image_callback(self, msg):
-        self.get_logger().info("Received image for hoop tracking.")
+        # self.get_logger().info("Received image for hoop tracking.")
         self.sim = True
         image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
         x, y, z, img = find_hoop_w_depth(image)
         self.display_frame(img, "result")
+
+        if x is None or y is None or z is None:
+            return
+
         self.publish_directions(x, y, z)
     
     def publish_directions(self, x, y, z):
