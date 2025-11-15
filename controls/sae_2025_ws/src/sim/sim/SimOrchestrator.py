@@ -13,6 +13,8 @@ import importlib
 import inspect
 import ast
 from rclpy.executors import MultiThreadedExecutor
+from sim.world_gen import WorldNode
+from sim.scoring import ScoringNode
 
 class SimOrchestrator(Node):
     """
@@ -21,37 +23,65 @@ class SimOrchestrator(Node):
     
     def __init__(self, yml_path):
         super().__init__('sim_orchestrator')
+        print("Orhc NODE!!!!!!!!!!!!!")
+        print(yml_path)
         sim_params = self.load_yaml_to_dict(yml_path)
+        print(sim_params)
         world_params = sim_params['world']
         self.world_node = self.initialize_mode(world_params['class'], world_params['params'])
         scoring_params = sim_params['scoring']
         self.scoring_node = self.initialize_mode(scoring_params['class'], scoring_params['params'])
 
     
-    def initialize_mode(self, node_path: str, params: dict) -> Mode:
-        module_name, class_name = mode_path.rsplit('.', 1)
+    def initialize_mode(self, node_path: str, params: dict) -> Node:
+        print(params)
+        module_name, class_name = node_path.rsplit('.', 1)
         module = importlib.import_module(module_name)
-        mode_class = getattr(module, class_name)
+        node_class = getattr(module, class_name)
 
-        signature = inspect.signature(mode_class.__init__)
+        signature = inspect.signature(node_class.__init__)
         args = {}
-
+        print(signature.parameters.items())
         for name, param in signature.parameters.items():
             if name == 'self':
                 continue
+
+            # Get a value for this parameter, or default, or error
             if name in params:
                 param_value = params[name]
-                if param.annotation in (str, inspect.Parameter.empty) or name in ('node', 'uav'):
-                    args[name] = param_value
-                else:
-                    try:
-                        args[name] = ast.literal_eval(param_value)
-                    except (ValueError, SyntaxError):
-                        raise ValueError(f"Parameter '{name}' must be a valid literal for mode '{mode_path}'. Received: {param_value}")
             elif param.default != inspect.Parameter.empty:
-                args[name] = param.default
+                param_value = param.default
             else:
-                raise ValueError(f"Missing required parameter '{name}' for mode '{mode_path}'")
+                raise ValueError(
+                    f"Missing required parameter '{name}' for mode '{node_path}'"
+                )
+
+            # Only try literal_eval if:
+            #  - the *value* is a string (coming from CLI/env/etc),
+            #  - and the annotation says it's not a string,
+            #  - and it's not one of your special cases.
+            if (
+                isinstance(param_value, str)
+                and param.annotation not in (str, inspect.Parameter.empty)
+                and name not in ('node')   # your custom bypasses
+            ):
+                try:
+                    param_value = ast.literal_eval(param_value)
+                except (ValueError, SyntaxError):
+                    raise ValueError(
+                        f"Parameter '{name}' must be a valid literal for mode "
+                        f"'{node_path}'. Received: {param_value}"
+                    )
+
+            # Optional: convert lists to tuples for Tuple[...] annotations
+            if (
+                hasattr(param.annotation, '__origin__')
+                and param.annotation.__origin__ is tuple
+                and isinstance(param_value, list)
+            ):
+                param_value = tuple(param_value)
+
+            args[name] = param_value
 
         return node_class(**args)
 

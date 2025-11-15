@@ -1,17 +1,18 @@
 # Simulation Configuration
 world:
-    class: sim.world_gen.HoopCourse
+    class: sim.world_gen.HoopCourseNode
     params:
       course: "straight"
-      dlz: [10, 5, 0]      # Drop zone coordinates [x, y, z]
-      uav: [0, 0, 0]       # UAV starting position [x, y, z]
+      dlz: '[10, 5, 0]'      # Drop zone coordinates [x, y, z]
+      uav: '[0, 0, 0]'       # UAV starting position [x, y, z]
       num_hoops: 5          # Number of hoops to generate
       max_dist: 10
-      world_name: "in_house"   # Gazebo world name
+      world_name: "src/sim/sim/world_gen/worlds/template.sdf"   # Gazebo world name
+      output_file: "~/.simulation-gazebo/worlds/in_house_beans.sdf"
   
   # Scoring parameters
 scoring:
-  class: sim.scoring.HoopScore
+  class: sim.scoring.HoopScoringNode
   params:
     args:
       hoop_tolerance: 1.5       # meters - Distance tolerance for hoop passage

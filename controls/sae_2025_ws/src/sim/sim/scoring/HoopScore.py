@@ -10,16 +10,16 @@ from typing import List, Tuple, Optional, Dict, Any
 import math
 import time
 from sim_interfaces.srv import HoopList
+from sim.scoring import ScoringNode
 
-
-class HoopNode(ScoringNode):
+class HoopScoringNode(ScoringNode):
     """
     ROS2 node for in-house competition scoring.
     Tracks UAV position and scores hoop passages using directional detection.
     """
     
     def __init__(self):
-        super().__init__('scoring_node')
+        super().__init__()
         
         # Declare parameters
         self.declare_parameter('hoop_tolerance', 1.5) 
