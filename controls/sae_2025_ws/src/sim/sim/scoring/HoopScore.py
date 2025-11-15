@@ -69,8 +69,41 @@ class HoopScoringNode(ScoringNode):
         # Timer for score updating
         self.create_timer(0.1, self.update_scoring)  # 10Hz
         
-        self.load_hoop_positions()
-        self.get_logger().info("Scoring node initialized.")
+        # self.load_hoop_positions()
+        # self.get_logger().info("Scoring node initialized.")
+        self.hoop_client = self.create_client(HoopList, "list_hoops")
+        self.hoops_loaded = False
+        self.create_timer(0.5, self._try_request_hoops)
+
+    def _try_request_hoops(self):
+        if self.hoops_loaded:
+            return
+
+        if not self.hoop_client.wait_for_service(timeout_sec=0.0):
+            self.get_logger().warn("Waiting for 'list_hoops' service...", throttle_duration_sec=5.0)
+            return
+
+        future = self.hoop_client.call_async(HoopList.Request())
+        future.add_done_callback(self._on_hoops_response)
+        self.hoops_loaded = True  # prevent repeated calls
+
+    def _on_hoops_response(self, future):
+        try:
+            response = future.result()
+        except Exception as e:
+            self.get_logger().error(f"'list_hoops' failed: {e}")
+            self.hoops_loaded = False  # try again later
+            return
+
+        self.hoop_poses = []
+        self.passed_hoops = []
+        self.drone_last_side = []
+        for hoop in response.hoop_positions:
+            self.hoop_poses.append((hoop.x, hoop.y, hoop.z, hoop.roll, hoop.pitch, hoop.yaw))
+            self.passed_hoops.append(False)
+            self.drone_last_side.append(0)
+
+        self.get_logger().info(f"Loaded {len(self.hoop_poses)} hoops from 'list_hoops'")
     
     def load_hoop_positions(self):
         """Load hoop positions from ROS2 parameters."""
@@ -81,11 +114,14 @@ class HoopScoringNode(ScoringNode):
 
             req = HoopList.Request()  # empty request
             future = client.call_async(req)
-
             # Block here until the service returns, before main spin()
-            rclpy.spin_until_future_complete(self, future)
+            # rclpy.spin_until_future_complete(self, future)
+            # rclpy.spin_until_future_complete(self, future)
 
             if future.result() is None:
+                self.get_logger().error(
+                    f"'list_hoops' failed with exception: {future.exception()}"
+                )
                 raise RuntimeError("Service call to 'list_hoops' failed")
 
             response = future.result()
@@ -95,7 +131,7 @@ class HoopScoringNode(ScoringNode):
             self.passed_hoops = []
             self.drone_last_side = []
 
-            for i, hoop in enumerate(response.hoops):
+            for i, hoop in enumerate(response.hoop_positions):
                 x = float(hoop.x)
                 y = float(hoop.y)
                 z = float(hoop.z)
@@ -263,6 +299,7 @@ class HoopScoringNode(ScoringNode):
         y = float(msg.y)
         self.prev_position = self.uav_position
         self.uav_position = (x, y, z_up)
+        print(self.hoop_poses)
         current_time = time.time()
         self.position_history.append((x, y, z_up, current_time))
         

@@ -27,7 +27,7 @@ def main():
     DEBUG = debug.lower() == 'true'
     rclpy.init()
     sim_node = SimOrchestrator(yaml_file)
-    rclpy.spin(sim_node)
+    sim_node.spin()
     sim_node.destroy_node()
     rclpy.shutdown()
 
