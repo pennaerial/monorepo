@@ -9,7 +9,7 @@ class LandingMode(Mode):
     A mode for taking off vertically.
     """
 
-    def __init__(self, node: Node, uav: UAV):
+    def __init__(self, node: Node, uav: UAV, color: str = 'red'):
         """
         Initialize the LandingMode
 
@@ -18,6 +18,7 @@ class LandingMode(Mode):
             uav (UAV): The UAV instance to control.
         """
         super().__init__(node, uav)
+        self.color = color
 
     def on_update(self, time_delta: float) -> None:
         """

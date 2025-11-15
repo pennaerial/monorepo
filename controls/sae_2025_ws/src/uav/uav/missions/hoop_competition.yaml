@@ -1,0 +1,9 @@
+start:
+  class: uav.autonomous_modes.HoopMode
+  transitions:
+    complete: land 
+
+land:
+  class: uav.autonomous_modes.LandingMode
+  params:
+    color: 'red' # change this based on color of landing pad given
