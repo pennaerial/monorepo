@@ -58,7 +58,8 @@ def launch_setup(context, *args, **kwargs):
     
     YAML_PATH = os.path.join(os.getcwd(), 'src', 'sim', 'sim', 'simulations', f"{params['competition']}.yaml")
     # Ensure output directory exists
-    os.makedirs(os.path.dirname(f"~/.simulation-gazebo/worlds/{params['competition']}.sdf"), exist_ok=True)
+    os.makedirs(os.path.dirname(os.path.expanduser(f"~/.simulation-gazebo/worlds/{params['competition']}.sdf")), exist_ok=True)
+    print(os.path.dirname(os.path.expanduser(f"~/.simulation-gazebo/worlds/{params['competition']}.sdf")),)
     
     # Find required paths
     px4_path = find_folder_with_heuristic('PX4-Autopilot', os.path.expanduser('~'))
