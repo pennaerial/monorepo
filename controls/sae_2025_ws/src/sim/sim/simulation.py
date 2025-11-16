@@ -12,7 +12,7 @@ def main():
     from pathlib import Path
 
     src_models_dir = os.path.join(os.getcwd(), "src", "sim", "sim", "world_gen", "models")
-    dst_models_dir = os.path.expanduser("~/.simulation-gazebo")
+    dst_models_dir = os.path.expanduser("~/.simulation-gazebo/models")
 
     # Only copy if source exists and it's a directory
     if os.path.exists(src_models_dir) and os.path.isdir(src_models_dir):
