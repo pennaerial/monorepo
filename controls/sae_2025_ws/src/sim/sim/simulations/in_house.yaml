@@ -1,0 +1,24 @@
+# Simulation Configuration
+world:
+    class: sim.world_gen.HoopCourseNode
+    params:
+      course: "bezier"
+      dlz: '[10, 5, 0]'      # Drop zone coordinates [x, y, z]
+      uav: '[0, 0, 0]'       # UAV starting position [x, y, z]
+      num_hoops: 10          # Number of hoops to generate
+      max_dist: 1
+      world_name: "src/sim/sim/world_gen/worlds/template.sdf"   # Gazebo world name
+      output_file: "~/.simulation-gazebo/worlds/in_house_beans.sdf"
+  
+  # Scoring parameters
+scoring:
+  class: sim.scoring.HoopScoringNode
+  params:
+    args:
+      hoop_tolerance: 1.5       # meters - Distance tolerance for hoop passage
+      max_flight_time: 300      # seconds - Maximum allowed flight time
+      points_per_hoop: 10       # Points awarded per hoop passage
+      penalty_per_second: 0.1   # Points deducted per second over time limit
+      # Timing parameters
+      position_poll_rate: 10.0    # Hz - UAV position polling rate
+      scoring_rate: 5.0           # Hz - Scoring calculation rate
