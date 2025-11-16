@@ -3,17 +3,10 @@
 import os
 import launch
 from launch import LaunchDescription
-from launch.actions import (
-    ExecuteProcess,
-    LogInfo,
-    RegisterEventHandler,
-    OpaqueFunction,
-    DeclareLaunchArgument,
-)
-import logging
-from launch.substitutions import LaunchConfiguration
-from launch.event_handlers import OnProcessStart, OnProcessExit, OnProcessIO
+from launch.actions import ExecuteProcess, LogInfo, RegisterEventHandler, OpaqueFunction, DeclareLaunchArgument
 from launch_ros.actions import Node
+from launch.substitutions import LaunchConfiguration
+from launch.event_handlers import OnProcessStart
 
 
 def find_folder_with_heuristic(folder_name, home_dir, keywords=('penn', 'air')):
@@ -48,19 +41,11 @@ def load_launch_params():
     
     # Fallback to installed location (for production/deployed packages)
     try:
-        from ament_index_python.packages import get_package_share_directory
-        package_share = Path(get_package_share_directory('sim'))
-        installed_params = package_share / 'launch' / 'launch_params.yaml'
-        if installed_params.exists():
-            return load_yaml_to_dict(installed_params)
-    except Exception:
-        pass
-    
-    # If not found, raise error
-    raise FileNotFoundError(
-        f"Launch params file not found. Checked source paths: {source_paths} "
-        f"and installed location."
-    )
+        with open(params_file, 'r') as f:
+            params = yaml.safe_load(f)
+        return params
+    except FileNotFoundError:
+        print(f"Warning: {params_file} not found")
 
 def load_sim_parameters(competition: str, logger: logging.Logger) -> str:
     """
@@ -91,141 +76,85 @@ def launch_setup(context, *args, **kwargs):
     
     # Load parameters from YAML file
     params = load_launch_params()
+    model = LaunchConfiguration('model').perform(context)
+
+    # Only override if not empty / None (usually always present because of defaults)
+    if model is not None:
+        params['model'] = model
     
-    # Use YAML values directly
-    competition_type = params['competition']['type']
+    print(f"Launching {params['competition']} competition: with model {params['model']}")
     
-    # Extract simulation parameters
-    sim_params = params['simulation']
-    ros_params = params['ros2']
-    sim_type = params['competition']['type']
-    
-    print(f"Launching {params['competition']['type']} competition: {params['competition']['name']}")
-    
-    # Generate world file using worldgen.py
-    world_name = f"{params['competition']['type']}_{params['competition']['name']}"
-    
-    YAML_PATH = os.path.join(os.getcwd(), 'src', 'sim', 'sim', 'simulations', f"{sim_type}.yaml")
+    YAML_PATH = os.path.join(os.getcwd(), 'src', 'sim', 'sim', 'simulations', f"{params['competition']}.yaml")
     # Ensure output directory exists
-    os.makedirs(os.path.dirname(f"~/.simulation-gazebo/worlds/{world_name}.sdf"), exist_ok=True)
+    os.makedirs(os.path.dirname(f"~/.simulation-gazebo/worlds/{params['competition']}.sdf"), exist_ok=True)
     
     # Find required paths
     px4_path = find_folder_with_heuristic('PX4-Autopilot', os.path.expanduser('~'))
     if not px4_path:
         raise RuntimeError("PX4-Autopilot directory not found")
     
-    px4_path = os.path.expanduser(px4_path_raw)
-
-    sae_ws_path = os.path.expanduser(os.getcwd())
-
-    download_gz_models = ExecuteProcess(
-        cmd=[
-            "python3",
-            "Tools/simulation/gz/simulation-gazebo",
-            "--dryrun",
-        ],
-        cwd=px4_path,
-        output="screen",
-        name="download_gz_models",
-    )
-
-    spawn_world = ExecuteProcess(
-        cmd=[
-            "python3",
-            "Tools/simulation/gz/simulation-gazebo",
-            f"--world={competition}",
-        ],
-        cwd=px4_path,
-        output="screen",
-        name="spawn_world",
-    )
-
-    sim_params, sim_config_path = load_sim_parameters(competition, logger)
-
-    if "world" not in sim_params:
-        raise ValueError(f"Missing 'world' section in simulation config: {sim_config_path}")
+    sae_ws_path = os.getcwd()
     
-    world_params = sim_params["world"].copy()
+    print("launch world")
+    spawn_world = ExecuteProcess(
+        cmd=['python3', 'Tools/simulation/gz/simulation-gazebo', f"--world={params['competition']}"],
+        cwd=px4_path,
+        output='screen',
+        name='launch world'
+    )
     
     # Define the simulation process
     uav_debug = 'False'
-    sim_cmd = ['ros2', 'run', 'sim', 'simulation', uav_debug, YAML_PATH, world_name]
-    sim = ExecuteProcess(
-        cmd=sim_cmd,
+    sim = Node(
+        package='sim',
+        executable='simulation',
+        arguments=[uav_debug, YAML_PATH, params['competition']],
         output='screen',
         emulate_tty=True,
         name='sim'
     )
+
+    topic_model_name = params['model'][3:] # remove 'gz_' prefix
+    GZ_CAMERA_TOPIC = f'/world/custom/model/{topic_model_name}_0/link/camera_link/sensor/camera/image'
+    GZ_CAMERA_INFO_TOPIC = f'/world/custom/model/{topic_model_name}_0/link/camera_link/sensor/camera/camera_info'
+
+    gz_ros_bridge_camera = Node(
+        package='ros_gz_bridge',
+        executable='parameter_bridge',
+        arguments=[
+            f'{GZ_CAMERA_TOPIC}@sensor_msgs/msg/Image[gz.msgs.Image'
+        ],
+        remappings=[
+            (GZ_CAMERA_TOPIC, '/camera')
+        ],
+        output='screen',
+        name='gz_ros_bridge_camera',
+        cwd=sae_ws_path
+    )
     
-    # Define the ROS-Gazebo bridge for camera topics (only if enabled)
-    gz_ros_bridge_camera = None
-    gz_ros_bridge_camera_info = None
-    
-    if ros_params.get('enable_camera_bridge', True):
-        camera_topic = ros_params['topics']['camera']
-        camera_info_topic = ros_params['topics']['camera_info']
-        
-        print("start gz_ros_bridge_camera")
-        gz_ros_bridge_camera = ExecuteProcess(
-            cmd=['ros2', 'run', 'ros_gz_bridge', 'parameter_bridge',
-                f'/world/{world_name}/model/{sim_params["uav_model"]}_0/link/camera_link/sensor/imager/image@sensor_msgs/msg/Image[gz.msgs.Image',
-                '--ros-args', '--remap', f'/world/{world_name}/model/{sim_params["uav_model"]}_0/link/camera_link/sensor/imager/image:={camera_topic}'],
-            output='screen',
-            cwd=sae_ws_path,
-            name='gz_ros_bridge_camera'
-        )
-        
-        gz_ros_bridge_camera_info = ExecuteProcess(
-            cmd=['ros2', 'run', 'ros_gz_bridge', 'parameter_bridge',
-                f'/world/{world_name}/model/{sim_params["uav_model"]}_0/link/camera_link/sensor/imager/camera_info@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo',
-                '--ros-args', '--remap', f'/world/{world_name}/model/{sim_params["uav_model"]}_0/link/camera_link/sensor/imager/camera_info:={camera_info_topic}'],
-            output='screen',
-            cwd=sae_ws_path,
-            name='gz_ros_bridge_camera_info'
-        )
-    
-    # Delayed scoring node start (only if scoring is enabled)
-    # delayed_scoring = None
-    # if scoring_node is not None:
-    #     delayed_scoring = TimerAction(
-    #         period=10.0,
-    #         actions=[scoring_node]
-    #     )
-    
-    # Build action list based on enabled features
-    bridge_actions = []
-    if gz_ros_bridge_camera is not None:
-        bridge_actions.append(gz_ros_bridge_camera)
-    if gz_ros_bridge_camera_info is not None:
-        bridge_actions.append(gz_ros_bridge_camera_info)
-    
-    # # Add delayed scoring if enabled
-    # if delayed_scoring is not None:
-    #     bridge_actions.append(delayed_scoring)
+    gz_ros_bridge_camera_info = Node(
+        package='ros_gz_bridge',
+        executable='parameter_bridge',
+        arguments=[
+            f'{GZ_CAMERA_INFO_TOPIC}@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo'
+        ],
+        remappings=[
+            (GZ_CAMERA_INFO_TOPIC, '/camera_info')
+        ],
+        output='screen',
+        name='gz_ros_bridge_camera_info',
+        cwd=sae_ws_path
+    )
     
     # Build and return the complete list of actions
-    actions = [
-        download_gz_models,
+    return [
+        spawn_world,
         RegisterEventHandler(
-            OnProcessStart(target_action=middleware, on_start=[sim, LogInfo(msg="Middleware started.")])
+            OnProcessStart(target_action=spawn_world, on_start=[gz_ros_bridge_camera, gz_ros_bridge_camera_info, LogInfo(msg="World Launched.")])
+        ),      
+        RegisterEventHandler( 
+            OnProcessStart(target_action=gz_ros_bridge_camera, on_start=[sim, LogInfo(msg="Bridge camera topics started.")])
         ),
-        RegisterEventHandler(
-            OnProcessStart(target_action=sim, on_start=[TimerAction(
-                    period=1.0,   # seconds; tweak this
-                    actions=[
-                        gazebo,
-                        LogInfo(msg="Sim started, launching Gazebo after delay.")
-                    ]
-                )])
-        ),
-        RegisterEventHandler(
-            OnProcessIO(
-                target_action=world,
-                on_stderr=lambda event: (
-                    [spawn_world, LogInfo(msg="Simulation world node started."), scoring] if b"Successfully generated world file:" in event.text else None
-                )
-            )
-        )
     ]
     
     if scoring:
@@ -243,5 +172,6 @@ def launch_setup(context, *args, **kwargs):
 
 def generate_launch_description():
     return LaunchDescription([
+        DeclareLaunchArgument('model', default_value='gz_x500_mono_cam'),
         OpaqueFunction(function=launch_setup)
     ])

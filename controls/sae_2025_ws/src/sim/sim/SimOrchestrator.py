@@ -26,7 +26,6 @@ class SimOrchestrator(Node):
         print("Orhc NODE!!!!!!!!!!!!!")
         print(yml_path)
         sim_params = self.load_yaml_to_dict(yml_path)
-        print(sim_params)
         world_params = sim_params['world']
         self.world_node = self.initialize_mode(world_params['class'], world_params['params'])
         scoring_params = sim_params['scoring']
