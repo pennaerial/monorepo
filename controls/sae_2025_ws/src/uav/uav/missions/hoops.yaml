@@ -1,0 +1,9 @@
+start:
+  class: uav.autonomous_modes.HoopTrackingMode
+  params:
+    hoop_tolerance: '1.5'
+  transitions:
+    complete: land
+
+land:
+  class: uav.autonomous_modes.LandingMode

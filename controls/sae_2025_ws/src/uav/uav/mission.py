@@ -22,6 +22,10 @@ def main():
         debug = 'false'
         camera_offsets = [0, 0, 0]
         servo_only = 'false'
+    
+    print(f"[MISSION] Reading YAML from: {yaml_file}")
+    print(f"[MISSION] YAML exists: {os.path.exists(yaml_file)}")
+    
     servo_only = servo_only.lower() == 'true'
     DEBUG = debug.lower() == 'true'
     rclpy.init()

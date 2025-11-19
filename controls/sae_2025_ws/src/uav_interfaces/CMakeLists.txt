@@ -6,9 +6,15 @@ find_package(builtin_interfaces REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 
-# Find all .msg and .srv files
+# Explicitly list service files (recommended over GLOB)
+set(SRV_FILES
+  "src/srv/CameraData.srv"
+  "src/srv/PayloadTracking.srv"
+  "src/srv/HoopTracking.srv"
+)
+
+# Find all .msg files
 file(GLOB MSG_FILES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "src/msg/*.msg")
-file(GLOB SRV_FILES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "src/srv/*.srv")
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   ${MSG_FILES}
