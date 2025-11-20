@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
-# hoop_tracking_simple_node.py
+# hoop_center_node.py
 import cv2
 import numpy as np
 import rclpy
-from rclpy.node import Node
-from uav_interfaces.srv import PayloadTracking  # expects fields: x, y, direction, dlz_empty
+from uav.vision_nodes import VisionNode
 
 # ---------------- Tunables ----------------
-# Red hue wraps around the 0–180 boundary in OpenCV HSV, so we define two subranges.
 HSV_RANGES = {
-    "red1": ((0, 100, 100), (10, 255, 255)),      # lower red
-    "red2": ((160, 100, 100), (179, 255, 255)),   # upper red
+    "red1": ((0, 100, 100), (10, 255, 255)),
+    "red2": ((160, 100, 100), (179, 255, 255)),
 }
 
 MORPH_KERNEL = (5, 5)
@@ -23,11 +21,11 @@ AREA_COVERAGE_MIN = 0.6
 FULL_RIGHT_VECTOR = np.array([1.0, 0.0, 0.0], dtype=np.float32)
 
 
-def rotate_image(frame, yaw_rad: float):
-    if abs(yaw_rad) < 1e-6:
+def rotate_image(frame, yaw_deg: float):
+    if abs(yaw_deg) < 1e-6:
         return frame
     h, w = frame.shape[:2]
-    M = cv2.getRotationMatrix2D((w / 2, h / 2), np.degrees(yaw_rad), 1.0)
+    M = cv2.getRotationMatrix2D((w / 2, h / 2), yaw_deg, 1.0)
     return cv2.warpAffine(frame, M, (w, h), flags=cv2.INTER_LINEAR)
 
 
@@ -43,21 +41,15 @@ def ellipse_area(a: float, b: float) -> float:
     return np.pi * (0.5 * a) * (0.5 * b)
 
 
-class HoopTrackingSimple(Node):
+class HoopCenterNode(VisionNode):
     """
-    ROS2 node:
-      - Detects red hoops
-      - Fits ellipse to find center
-      - Returns vector to hoop center
+    ROS node for hoop tracking - detects red hoops and returns center vector.
     """
-
+    srv = HoopCenterNode
+    
     def __init__(self):
-        super().__init__('hoop_tracking_simple')
-        self.srv = self.create_service(PayloadTracking, 'hoop_tracking', self.service_cb)
-
-    # Replace with your camera input
-    def get_frame_and_K(self):
-        raise NotImplementedError("Connect this to your camera image + intrinsics provider.")
+        super().__init__('hoop_center_node', self.__class__.srv)
+        self.create_service(HoopCenterNode, self.service_name(), self.service_callback)
 
     def mask_red(self, frame_bgr: np.ndarray) -> np.ndarray:
         """Combine two HSV masks for red."""
@@ -94,21 +86,22 @@ class HoopTrackingSimple(Node):
 
         return True, (float(cx), float(cy)), (float(a), float(b)), is_line, is_partial
 
-    def service_cb(self, request, response):
-        try:
-            frame_bgr, K = self.get_frame_and_K()
-        except NotImplementedError as e:
-            self.get_logger().error(str(e))
-            response.x = 0.0
-            response.y = 0.0
-            response.direction = np.array([0.0, 0.0, 1.0], dtype=np.float32)
-            response.dlz_empty = True
-            return response
-
-        yaw = getattr(request, "yaw", 0.0)
-        frame_bgr = rotate_image(frame_bgr, yaw)
-
+    def service_callback(self, request: HoopCenterNode.Request, 
+                        response: HoopCenterNode.Response):
+        """Process hoop tracking service request"""
+        # Get image and camera info from VisionNode
+        image, camera_info = self.request_data(cam_image=True, cam_info=True)
+        frame_bgr = self.convert_image_msg_to_frame(image)
+        
+        # Rotate image based on yaw
+        frame_bgr = rotate_image(frame_bgr, -np.rad2deg(request.yaw))
+        
+        # Get camera matrix
+        K = np.array(camera_info.k).reshape(3, 3)
+        
+        # Find hoop ellipse
         found, (cx, cy), (a, b), is_line, is_partial = self.find_ellipse(frame_bgr)
+        
         h, w = frame_bgr.shape[:2]
         used_x, used_y = (w / 2.0, h / 2.0)
         dlz_empty = True
@@ -126,6 +119,7 @@ class HoopTrackingSimple(Node):
         else:
             dir_vec = pixel_to_ray(used_x, used_y, K)
 
+        # Populate response
         response.x = float(used_x)
         response.y = float(used_y)
         response.direction = dir_vec
@@ -135,14 +129,14 @@ class HoopTrackingSimple(Node):
 
 def main():
     rclpy.init()
-    node = HoopTrackingSimple()
+    node = HoopCenterNode()
     try:
         rclpy.spin(node)
-    except KeyboardInterrupt:
-        pass
-    finally:
-        node.destroy_node()
-        rclpy.shutdown()
+    except Exception as e:
+        print(e)
+        node.publish_failsafe()
+    
+    rclpy.shutdown()
 
 
 if __name__ == "__main__":
