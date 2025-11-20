@@ -5,7 +5,7 @@ vision_debug: false
 sim: true
 run_mission: true
 vehicle_type: 0 # 0 for quadrotor, 1 for tiltrotor VTOL, 2 for fixed-wing, 3 for standard VTOL
-model: 'gz_x500_mono_cam' # make sure model corresponds to correct vehicle_type
+model: 'gz_x500_mono_cam_down' # make sure model corresponds to correct vehicle_type
 save_vision: false
 servo_only: false
 camera_offsets: [0, 0, 0] #Should denote the position of the camera relative to the payload mechanism, in meters

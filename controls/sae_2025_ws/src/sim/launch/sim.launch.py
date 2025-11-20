@@ -93,7 +93,7 @@ def get_default_params():
         'simulation': {
             'world_name': 'custom',
             'enable_scoring': True,
-            'uav_model': 'gz_x500_mono_cam',
+            'uav_model': 'gz_x500_mono_cam_down',
             'position_poll_rate': 10.0,
             'scoring_rate': 5.0,
             'scoring': {

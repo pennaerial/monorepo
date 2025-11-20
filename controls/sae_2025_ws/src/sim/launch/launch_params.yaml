@@ -45,7 +45,7 @@ course:
 simulation:
   world_name: "custom"   # Gazebo world name
   enable_scoring: true   # Enable scoring node
-  uav_model: "gz_x500_mono_cam"  # UAV model to use
+  uav_model: "gz_x500_mono_cam_down"  # UAV model to use
   
   # Timing parameters
   position_poll_rate: 10.0    # Hz - UAV position polling rate
