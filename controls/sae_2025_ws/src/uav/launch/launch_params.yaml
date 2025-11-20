@@ -1,6 +1,6 @@
 # launch_params.yaml
-mission_name: test_hoop_tracking
-uav_debug: false
+mission_name: multi_hoop_tracking
+uav_debug: true
 vision_debug: true ##change to show the window
 sim: true
 run_mission: true

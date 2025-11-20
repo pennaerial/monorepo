@@ -1,7 +1,7 @@
 # tracking.py
 import cv2
 import numpy as np
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List, Dict
 import os
 from pathlib import Path
 import math
@@ -317,6 +317,306 @@ def compute_3d_vector(
 
 #     return cx, cy, not bool(contours)
 
+# def find_hoop(
+#     image: np.ndarray,
+#     lower_hoop1: np.ndarray,
+#     upper_hoop1: np.ndarray,
+#     lower_hoop2: np.ndarray,
+#     upper_hoop2: np.ndarray,
+#     uuid: str,
+#     debug: bool = False,
+#     save_vision: bool = False,
+#     # ----- Optional tuning knobs (do not break your original calls) -----
+#     min_area: float = 300.0,  # ignore tiny specks; scale with resolution
+#     w_area: float = 3.0,      # weight: larger blob area (proxy for "closer")
+#     w_circ: float = 1.5,      # weight: circularity (roundness)
+#     w_ring: float = 1.0,      # weight: ring-ness (hollow vs solid)
+#     w_center: float = 1.0     # penalty weight: distance from image center
+# ) -> Optional[Tuple[int, int, bool]]:
+#     """
+#     Robust multi-hoop detector that selects the best candidate via a weighted score.
+
+#     Pipeline:
+#       1) Convert BGR -> HSV and threshold with two hue bands to cover red wrap-around
+#       2) Morphological filtering to clean noise
+#       3) Find *all* external contours (candidates)
+#       4) For each candidate compute:
+#             - area            (pixel area of contour)
+#             - circularity     (4πA/P² ∈ [0,1], 1 = perfect circle)
+#             - ring_score      (hollow-ness via erosion; 1 = very ring-like)
+#             - center distance (normalized to [0,1] by image diagonal)
+#       5) Score candidates: w_area*area_norm + w_circ*circularity + w_ring*ring_score - w_center*center_dist
+#       6) Choose highest-scoring candidate and return its centroid (cx, cy)
+
+#     Args:
+#         image: BGR frame (H x W x 3) as np.uint8
+#         lower_hoop1 / upper_hoop1: HSV bounds for red/orange band A (e.g. [0,120,80]..[10,255,255])
+#         lower_hoop2 / upper_hoop2: HSV bounds for wrap-around band B (e.g. [170,120,80]..[180,255,255])
+#         uuid: used only when saving debug imagery
+#         debug: if True, show OpenCV windows with overlays
+#         save_vision: if True, save annotated frame & mask beside this script
+#         min_area: reject tiny contours (tune based on resolution)
+#         w_area, w_circ, w_ring, w_center: scoring weights
+
+#     Returns:
+#         (cx, cy, False) if at least one hoop-like blob is selected; None otherwise.
+#         The third value keeps your original contract (zone_empty=False when detected).
+#     """
+#     # -----------------------------
+#     # (1) HSV + dual mask (red wrap)
+#     # -----------------------------
+#     hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+
+#     # Two masks because hue wraps at 0/180 (red sits at both ends)
+#     mask1 = cv2.inRange(hsv, lower_hoop1, upper_hoop1)
+#     mask2 = cv2.inRange(hsv, lower_hoop2, upper_hoop2)
+#     mask  = cv2.bitwise_or(mask1, mask2)
+
+#     # --------------------------------------------
+#     # (2) Morphology: remove speckle, fill pinholes
+#     # --------------------------------------------
+#     kernel = np.ones((5, 5), np.uint8)
+#     mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN,  kernel)  # erode->dilate (removes small white noise)
+#     mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)  # dilate->erode (fills small black gaps)
+
+#     # --------------------------------
+#     # (3) Contours = candidate regions
+#     # --------------------------------
+#     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+#     if not contours:
+#         # Optional visualization/saving when nothing found
+#         # if debug:
+#         #     cv2.imshow("Hoop Detection", image)
+#         #     cv2.imshow("Hoop Mask", mask)
+#         #     cv2.waitKey(1)
+#         # if save_vision:
+#         #     import time
+#         #     t = int(time.time())
+#         #     script_dir = os.path.dirname(os.path.abspath(__file__))
+#         #     outdir = os.path.join(script_dir, f"vision_imgs_{uuid}")
+#         #     os.makedirs(outdir, exist_ok=True)
+#         #     cv2.imwrite(os.path.join(outdir, f"hoop_none_{t}.png"), image)
+#         #     cv2.imwrite(os.path.join(outdir, f"mask_none_{t}.png"), mask)
+#         return None
+
+#     H, W = image.shape[:2]
+#     diag = float(np.hypot(W, H))  # used to normalize center distance
+#     candidates: List[Dict] = []
+
+#     # ---------------------------------------------------
+#     # (4) Measure each candidate to build ranking metrics
+#     # ---------------------------------------------------
+#     for c in contours:
+#         area = cv2.contourArea(c)
+#         if area < min_area:
+#             continue  # filter tiny noise
+
+#         # Centroid via moments. If m00==0, centroid is undefined.
+#         M = cv2.moments(c)
+#         if M["m00"] == 0:
+#             continue
+#         cx = float(M["m10"] / M["m00"])
+#         cy = float(M["m01"] / M["m00"])
+
+#         # Circularity: 4πA/P^2, 1.0 is a perfect circle, near 0.0 is a very skinny shape.
+#         perim = cv2.arcLength(c, True)
+#         if perim <= 0:
+#             continue
+#         circularity = float(4.0 * np.pi * area / (perim * perim))
+#         circularity = max(0.0, min(1.0, circularity))
+
+#         # Enclosing circle radius (for scale of erosion below)
+#         (_, _), er = cv2.minEnclosingCircle(c)
+#         er = float(er)
+
+#         # Ring-ness (hollow score): fill contour -> erode -> compare area
+#         # A ring loses less area under erosion than a solid disk of same outline.
+#         single = np.zeros((H, W), dtype=np.uint8)
+#         cv2.drawContours(single, [c], -1, 255, thickness=-1)  # filled blob
+
+#         # Erode with kernel ~10% of enclosing radius (>=1 and odd size)
+#         k = max(1, int(er * 0.10))
+#         if k % 2 == 0:
+#             k += 1
+#         kern = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k))
+#         eroded = cv2.erode(single, kern, iterations=1)
+
+#         filled_area = float(np.count_nonzero(single)) + 1e-9  # avoid /0
+#         eroded_area = float(np.count_nonzero(eroded))
+#         ring_score = 1.0 - (eroded_area / filled_area)        # 0..1 (higher => more hollow)
+#         ring_score = max(0.0, min(1.0, ring_score))
+
+#         # Distance from the image center (normalize by diagonal so it's 0..~0.5)
+#         dx = cx - (W * 0.5)
+#         dy = cy - (H * 0.5)
+#         center_dist_norm = float(np.hypot(dx, dy) / diag)
+
+#         candidates.append({
+#             "contour": c,
+#             "cx": int(round(cx)),
+#             "cy": int(round(cy)),
+#             "area": float(area),
+#             "circularity": circularity,
+#             "ring_score": ring_score,
+#             "center_dist_norm": center_dist_norm
+#         })
+
+#     # If everything got filtered out
+#     if not candidates:
+#         # if debug:
+#         #     cv2.imshow("Hoop Detection", image)
+#         #     cv2.imshow("Hoop Mask", mask)
+#         #     cv2.waitKey(1)
+#         return None
+
+#     # ------------------------------------------
+#     # (5) Score candidates & pick the best hoop
+#     # ------------------------------------------
+#     max_area = max(c["area"] for c in candidates)
+#     for c in candidates:
+#         area_norm = c["area"] / max_area if max_area > 0 else 0.0
+#         c["score"] = (
+#             w_area  * area_norm +          # prefer bigger blobs (≈ closer hoops)
+#             w_circ  * c["circularity"] +   # prefer round shapes
+#             w_ring  * c["ring_score"] -    # prefer hollow (ring-like) blobs
+#             w_center* c["center_dist_norm"]# penalize distance from image center
+#         )
+
+#     best = max(candidates, key=lambda d: d["score"])
+#     cx, cy = best["cx"], best["cy"]
+#     best_contour = best["contour"]
+
+#     # -----------------------------------------
+#     # (6) Show / save visualization if requested
+#     # -----------------------------------------
+#     if debug or save_vision:
+#         vis = image.copy()
+
+#         # Draw every candidate thin blue (good to see alternatives)
+#         for c in candidates:
+#             cv2.drawContours(vis, [c["contour"]], -1, (255, 0, 0), 1)
+
+#         # Highlight the chosen one in green, mark center
+#         cv2.drawContours(vis, [best_contour], -1, (0, 255, 0), 2)
+#         cv2.circle(vis, (cx, cy), 6, (0, 255, 0), 2)
+#         cv2.drawMarker(vis, (cx, cy), (0, 255, 0), cv2.MARKER_CROSS, 10, 2)
+
+#         if debug:
+#             cv2.imshow("Hoop Detection", vis)
+#             # cv2.imshow("Hoop Mask", mask)
+#             cv2.waitKey(1)
+
+#         # if save_vision:
+#         #     import time
+#         #     t = int(time.time())
+#         #     script_dir = os.path.dirname(os.path.abspath(__file__))
+#         #     outdir = os.path.join(script_dir, f"vision_imgs_{uuid}")
+#         #     os.makedirs(outdir, exist_ok=True)
+#         #     cv2.imwrite(os.path.join(outdir, f"hoop_{t}.png"), vis)
+#         #     cv2.imwrite(os.path.join(outdir, f"mask_{t}.png"), mask)
+
+#     # Keep your original return contract: zone_empty is False when we detected something
+#     return cx, cy, dlz_empty, best_contour
+
+
+
+# # try:
+# #     import torch
+# #     TORCH_AVAILABLE = True
+# # except ImportError:
+# #     TORCH_AVAILABLE = False
+# #     warnings.warn("PyTorch not available. Using fallback detection method.")
+# # # --- Paste key helpers from Ellipse-YOLO (shortened) ---
+# # def make_red_mask(hsv_img,
+# #                   lower_red1=(0, 50, 50), upper_red1=(10, 255, 255),
+# #                   lower_red2=(170, 50, 50), upper_red2=(180, 255, 255)):
+# #     mask1 = cv2.inRange(hsv_img, lower_red1, upper_red1)
+# #     mask2 = cv2.inRange(hsv_img, lower_red2, upper_red2)
+# #     mask = cv2.bitwise_or(mask1, mask2)
+# #     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+# #     mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel, iterations=2)
+# #     mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=2)
+# #     return mask
+# # # --- import or define detect_hoops_ellipse_yolo and hough fallback ---
+# # from .ellipse_yolo_pipeline import detect_hoops_ellipse_yolo  # if separate file
+# # # If you keep this standalone, paste detect_hoops_ellipse_yolo() definition here.
+# # # =====================================================================
+# # # =====================================================================
+# # def find_hoop_ellipse_yolo(
+# #     image: np.ndarray,
+# #     lower_hoop1: np.ndarray = np.array([0, 50, 50]),
+# #     upper_hoop1: np.ndarray = np.array([10, 255, 255]),
+# #     lower_hoop2: np.ndarray = np.array([170, 50, 50]),
+# #     upper_hoop2: np.ndarray = np.array([180, 255, 255]),
+# #     uuid: str = "default",
+# #     debug: bool = False,
+# #     save_vision: bool = False,
+# #     use_model: bool = True,
+# #     model_path: Optional[str] = None,
+# #     use_red_mask: bool = True,
+# #     use_inner_edges: bool = True,
+# #     use_partial_circles: bool = True,
+# # ) -> Optional[Tuple[int, int, bool]]:
+# #     """
+# #     Find hoop center using Ellipse-YOLO (or fallback).
+# #     Returns (cx, cy, False) or None if not found.
+# #     """
+# #     # -------------------------------------------------------------
+# #     # (1) Convert to HSV and create mask (same as original find_hoop)
+# #     # -------------------------------------------------------------
+# #     hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+# #     mask = make_red_mask(hsv, lower_hoop1, upper_hoop1, lower_hoop2, upper_hoop2)
+# #     # -------------------------------------------------------------
+# #     # (2) Run Ellipse-YOLO detection (model or fallback automatically)
+# #     # -------------------------------------------------------------
+# #     result_img, detected_ellipses, nearest_idx, edge_img, _ = detect_hoops_ellipse_yolo(
+# #         image,
+# #         model_path=model_path,
+# #         use_model=use_model,
+# #         use_red_mask=use_red_mask,
+# #         lower_red1=tuple(lower_hoop1),
+# #         upper_red1=tuple(upper_hoop1),
+# #         lower_red2=tuple(lower_hoop2),
+# #         upper_red2=tuple(upper_hoop2),
+# #         use_inner_edges=use_inner_edges,
+# #         use_partial_circles=use_partial_circles,
+# #         draw_all_ellipses=False
+# #     )
+# #     # -------------------------------------------------------------
+# #     # (3) Handle no detections (identical return behavior)
+# #     # -------------------------------------------------------------
+# #     if not detected_ellipses or nearest_idx is None:
+# #         if debug:
+# #             cv2.imshow("Hoop Detection", image)
+# #             cv2.imshow("Hoop Mask", mask)
+# #             cv2.waitKey(1)
+# #         if save_vision:
+# #             os.makedirs(f"vision_imgs_{uuid}", exist_ok=True)
+# #             cv2.imwrite(f"vision_imgs_{uuid}/ellipse_none.png", image)
+# #             cv2.imwrite(f"vision_imgs_{uuid}/mask_none.png", mask)
+# #         return None
+# #     # -------------------------------------------------------------
+# #     # (4) Extract best ellipse (same order as original)
+# #     # -------------------------------------------------------------
+# #     best_ellipse = detected_ellipses[nearest_idx]
+# #     cx, cy = best_ellipse["center"]
+# #     # -------------------------------------------------------------
+# #     # (5) Visualization & saving (same order & style)
+# #     # -------------------------------------------------------------
+# #     if debug or save_vision:
+# #         vis = result_img.copy()
+# #         cv2.circle(vis, (cx, cy), 6, (0, 255, 0), 2)
+# #         cv2.drawMarker(vis, (cx, cy), (0, 255, 0), cv2.MARKER_CROSS, 10, 2)
+# #         if debug:
+# #             cv2.imshow("Hoop Detection", vis)
+# #             cv2.imshow("Inner Edges", edge_img)
+# #             cv2.waitKey(1)
+# #         if save_vision:
+# #             os.makedirs(f"vision_imgs_{uuid}", exist_ok=True)
+# #             cv2.imwrite(f"vision_imgs_{uuid}/ellipse_result.png", vis)
+# #             cv2.imwrite(f"vision_imgs_{uuid}/ellipse_edges.png", edge_img)
+# #     return int(cx), int(cy), False
 def find_hoop(
     image: np.ndarray,
     lower_hoop1: np.ndarray,
@@ -332,122 +632,85 @@ def find_hoop(
     w_circ: float = 1.5,      # weight: circularity (roundness)
     w_ring: float = 1.0,      # weight: ring-ness (hollow vs solid)
     w_center: float = 1.0     # penalty weight: distance from image center
-) -> Optional[Tuple[int, int, bool]]:
+) -> Optional[Tuple[int, int, bool, np.ndarray]]:
     """
-    Robust multi-hoop detector that selects the best candidate via a weighted score.
-
-    Pipeline:
-      1) Convert BGR -> HSV and threshold with two hue bands to cover red wrap-around
-      2) Morphological filtering to clean noise
-      3) Find *all* external contours (candidates)
-      4) For each candidate compute:
-            - area            (pixel area of contour)
-            - circularity     (4πA/P² ∈ [0,1], 1 = perfect circle)
-            - ring_score      (hollow-ness via erosion; 1 = very ring-like)
-            - center distance (normalized to [0,1] by image diagonal)
-      5) Score candidates: w_area*area_norm + w_circ*circularity + w_ring*ring_score - w_center*center_dist
-      6) Choose highest-scoring candidate and return its centroid (cx, cy)
-
-    Args:
-        image: BGR frame (H x W x 3) as np.uint8
-        lower_hoop1 / upper_hoop1: HSV bounds for red/orange band A (e.g. [0,120,80]..[10,255,255])
-        lower_hoop2 / upper_hoop2: HSV bounds for wrap-around band B (e.g. [170,120,80]..[180,255,255])
-        uuid: used only when saving debug imagery
-        debug: if True, show OpenCV windows with overlays
-        save_vision: if True, save annotated frame & mask beside this script
-        min_area: reject tiny contours (tune based on resolution)
-        w_area, w_circ, w_ring, w_center: scoring weights
+    Detect a colored hoop using dual HSV ranges (for red wrap-around), rank all
+    candidates by a weighted score, and return the best one.
 
     Returns:
-        (cx, cy, False) if at least one hoop-like blob is selected; None otherwise.
-        The third value keeps your original contract (zone_empty=False when detected).
+        None if nothing plausible is found.
+        Otherwise: (cx, cy, False, best_contour)
+            - cx, cy: integer pixel center of the chosen hoop
+            - False: 'dlz_empty' flag kept for backward compatibility (hoop found => not empty)
+            - best_contour: np.ndarray of shape [N,1,2] representing the hoop edge (for drawing)
     """
-    # -----------------------------
-    # (1) HSV + dual mask (red wrap)
-    # -----------------------------
+    # 1) HSV + dual mask (red wraps around 0/180)
     hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-
-    # Two masks because hue wraps at 0/180 (red sits at both ends)
     mask1 = cv2.inRange(hsv, lower_hoop1, upper_hoop1)
     mask2 = cv2.inRange(hsv, lower_hoop2, upper_hoop2)
     mask  = cv2.bitwise_or(mask1, mask2)
 
-    # --------------------------------------------
-    # (2) Morphology: remove speckle, fill pinholes
-    # --------------------------------------------
+    # 2) Morphology: denoise & close gaps
     kernel = np.ones((5, 5), np.uint8)
-    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN,  kernel)  # erode->dilate (removes small white noise)
-    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)  # dilate->erode (fills small black gaps)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN,  kernel)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
 
-    # --------------------------------
-    # (3) Contours = candidate regions
-    # --------------------------------
+    # 3) Find candidates
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
     if not contours:
-        # Optional visualization/saving when nothing found
-        # if debug:
-        #     cv2.imshow("Hoop Detection", image)
-        #     cv2.imshow("Hoop Mask", mask)
-        #     cv2.waitKey(1)
-        # if save_vision:
-        #     import time
-        #     t = int(time.time())
-        #     script_dir = os.path.dirname(os.path.abspath(__file__))
-        #     outdir = os.path.join(script_dir, f"vision_imgs_{uuid}")
-        #     os.makedirs(outdir, exist_ok=True)
-        #     cv2.imwrite(os.path.join(outdir, f"hoop_none_{t}.png"), image)
-        #     cv2.imwrite(os.path.join(outdir, f"mask_none_{t}.png"), mask)
+        # Optional debug/saving when none found
+        if debug:
+            cv2.imshow("Hoop Detection", image)
+            cv2.imshow("Hoop Mask", mask)
+            cv2.waitKey(1)
+        if save_vision:
+            import time
+            t = int(time.time())
+            path = os.path.expanduser(f"~/vision_imgs/{uuid}")
+            os.makedirs(path, exist_ok=True)
+            cv2.imwrite(os.path.join(path, f"hoop_none_{t}.png"), image)
+            cv2.imwrite(os.path.join(path, f"hoop_mask_none_{t}.png"), mask)
         return None
 
     H, W = image.shape[:2]
-    diag = float(np.hypot(W, H))  # used to normalize center distance
+    diag = float(np.hypot(W, H))
     candidates: List[Dict] = []
 
-    # ---------------------------------------------------
-    # (4) Measure each candidate to build ranking metrics
-    # ---------------------------------------------------
+    # 4) Measure and filter candidates
     for c in contours:
         area = cv2.contourArea(c)
         if area < min_area:
-            continue  # filter tiny noise
+            continue
 
-        # Centroid via moments. If m00==0, centroid is undefined.
         M = cv2.moments(c)
         if M["m00"] == 0:
             continue
         cx = float(M["m10"] / M["m00"])
         cy = float(M["m01"] / M["m00"])
 
-        # Circularity: 4πA/P^2, 1.0 is a perfect circle, near 0.0 is a very skinny shape.
         perim = cv2.arcLength(c, True)
         if perim <= 0:
             continue
         circularity = float(4.0 * np.pi * area / (perim * perim))
         circularity = max(0.0, min(1.0, circularity))
 
-        # Enclosing circle radius (for scale of erosion below)
+        # approximate “ring-ness”: ring loses less area under erosion
         (_, _), er = cv2.minEnclosingCircle(c)
         er = float(er)
+        solid = np.zeros((H, W), dtype=np.uint8)
+        cv2.drawContours(solid, [c], -1, 255, thickness=-1)
 
-        # Ring-ness (hollow score): fill contour -> erode -> compare area
-        # A ring loses less area under erosion than a solid disk of same outline.
-        single = np.zeros((H, W), dtype=np.uint8)
-        cv2.drawContours(single, [c], -1, 255, thickness=-1)  # filled blob
-
-        # Erode with kernel ~10% of enclosing radius (>=1 and odd size)
         k = max(1, int(er * 0.10))
         if k % 2 == 0:
             k += 1
         kern = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k))
-        eroded = cv2.erode(single, kern, iterations=1)
+        eroded = cv2.erode(solid, kern, iterations=1)
 
-        filled_area = float(np.count_nonzero(single)) + 1e-9  # avoid /0
+        filled_area = float(np.count_nonzero(solid)) + 1e-9
         eroded_area = float(np.count_nonzero(eroded))
-        ring_score = 1.0 - (eroded_area / filled_area)        # 0..1 (higher => more hollow)
+        ring_score = 1.0 - (eroded_area / filled_area)
         ring_score = max(0.0, min(1.0, ring_score))
 
-        # Distance from the image center (normalize by diagonal so it's 0..~0.5)
         dx = cx - (W * 0.5)
         dy = cy - (H * 0.5)
         center_dist_norm = float(np.hypot(dx, dy) / diag)
@@ -459,163 +722,78 @@ def find_hoop(
             "area": float(area),
             "circularity": circularity,
             "ring_score": ring_score,
-            "center_dist_norm": center_dist_norm
+            "center_dist_norm": center_dist_norm,
         })
 
-    # If everything got filtered out
     if not candidates:
-        # if debug:
-        #     cv2.imshow("Hoop Detection", image)
-        #     cv2.imshow("Hoop Mask", mask)
-        #     cv2.waitKey(1)
+        if debug:
+            cv2.imshow("Hoop Detection", image)
+            cv2.imshow("Hoop Mask", mask)
+            cv2.waitKey(1)
         return None
 
-    # ------------------------------------------
-    # (5) Score candidates & pick the best hoop
-    # ------------------------------------------
+    # 5) Score & select best
     max_area = max(c["area"] for c in candidates)
     for c in candidates:
         area_norm = c["area"] / max_area if max_area > 0 else 0.0
         c["score"] = (
-            w_area  * area_norm +          # prefer bigger blobs (≈ closer hoops)
-            w_circ  * c["circularity"] +   # prefer round shapes
-            w_ring  * c["ring_score"] -    # prefer hollow (ring-like) blobs
-            w_center* c["center_dist_norm"]# penalize distance from image center
+            w_area  * area_norm +
+            w_circ  * c["circularity"] +
+            w_ring  * c["ring_score"] -
+            w_center* c["center_dist_norm"]
         )
-
     best = max(candidates, key=lambda d: d["score"])
     cx, cy = best["cx"], best["cy"]
     best_contour = best["contour"]
 
-    # -----------------------------------------
-    # (6) Show / save visualization if requested
-    # -----------------------------------------
-    if debug or save_vision:
-        vis = image.copy()
+    # 6) ALWAYS Visualize - show window regardless of debug flag
+    vis = image.copy()
 
-        # Draw every candidate thin blue (good to see alternatives)
-        for c in candidates:
-            cv2.drawContours(vis, [c["contour"]], -1, (255, 0, 0), 1)
+    # Draw image center (yellow crosshair)
+    center_x, center_y = W // 2, H // 2
+    cv2.line(vis, (center_x - 30, center_y), (center_x + 30, center_y), (0, 255, 255), 2)
+    cv2.line(vis, (center_x, center_y - 30), (center_x, center_y + 30), (0, 255, 255), 2)
+    cv2.circle(vis, (center_x, center_y), 5, (0, 255, 255), -1)
 
-        # Highlight the chosen one in green, mark center
-        cv2.drawContours(vis, [best_contour], -1, (0, 255, 0), 2)
-        cv2.circle(vis, (cx, cy), 6, (0, 255, 0), 2)
-        cv2.drawMarker(vis, (cx, cy), (0, 255, 0), cv2.MARKER_CROSS, 10, 2)
+    # draw all candidates (thin blue)
+    for c in candidates:
+        cv2.drawContours(vis, [c["contour"]], -1, (255, 0, 0), 1)
 
-        if debug:
-            cv2.imshow("Hoop Detection", vis)
-            # cv2.imshow("Hoop Mask", mask)
-            cv2.waitKey(1)
+    # highlight best (green)
+    cv2.drawContours(vis, [best_contour], -1, (0, 255, 0), 2)
+    cv2.circle(vis, (cx, cy), 8, (0, 255, 0), -1)
+    cv2.drawMarker(vis, (cx, cy), (0, 255, 0), cv2.MARKER_CROSS, 20, 2)
 
-        # if save_vision:
-        #     import time
-        #     t = int(time.time())
-        #     script_dir = os.path.dirname(os.path.abspath(__file__))
-        #     outdir = os.path.join(script_dir, f"vision_imgs_{uuid}")
-        #     os.makedirs(outdir, exist_ok=True)
-        #     cv2.imwrite(os.path.join(outdir, f"hoop_{t}.png"), vis)
-        #     cv2.imwrite(os.path.join(outdir, f"mask_{t}.png"), mask)
+    # Draw line from center to detected point
+    cv2.line(vis, (center_x, center_y), (cx, cy), (0, 255, 0), 2)
 
-    # Keep your original return contract: zone_empty is False when we detected something
-    return cx, cy, False
+    # Calculate and display offset
+    offset_x = cx - center_x
+    offset_y = cy - center_y
 
+    # Add text overlay with coordinates
+    cv2.putText(vis, f"Image Center: ({center_x}, {center_y})", (10, 30),
+               cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+    cv2.putText(vis, f"Hoop Center: ({cx}, {cy})", (10, 60),
+               cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+    cv2.putText(vis, f"Offset: ({offset_x:+d}, {offset_y:+d}) px", (10, 90),
+               cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
 
-# try:
-#     import torch
-#     TORCH_AVAILABLE = True
-# except ImportError:
-#     TORCH_AVAILABLE = False
-#     warnings.warn("PyTorch not available. Using fallback detection method.")
-# # --- Paste key helpers from Ellipse-YOLO (shortened) ---
-# def make_red_mask(hsv_img,
-#                   lower_red1=(0, 50, 50), upper_red1=(10, 255, 255),
-#                   lower_red2=(170, 50, 50), upper_red2=(180, 255, 255)):
-#     mask1 = cv2.inRange(hsv_img, lower_red1, upper_red1)
-#     mask2 = cv2.inRange(hsv_img, lower_red2, upper_red2)
-#     mask = cv2.bitwise_or(mask1, mask2)
-#     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
-#     mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel, iterations=2)
-#     mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=2)
-#     return mask
-# # --- import or define detect_hoops_ellipse_yolo and hough fallback ---
-# from .ellipse_yolo_pipeline import detect_hoops_ellipse_yolo  # if separate file
-# # If you keep this standalone, paste detect_hoops_ellipse_yolo() definition here.
-# # =====================================================================
-# # =====================================================================
-# def find_hoop_ellipse_yolo(
-#     image: np.ndarray,
-#     lower_hoop1: np.ndarray = np.array([0, 50, 50]),
-#     upper_hoop1: np.ndarray = np.array([10, 255, 255]),
-#     lower_hoop2: np.ndarray = np.array([170, 50, 50]),
-#     upper_hoop2: np.ndarray = np.array([180, 255, 255]),
-#     uuid: str = "default",
-#     debug: bool = False,
-#     save_vision: bool = False,
-#     use_model: bool = True,
-#     model_path: Optional[str] = None,
-#     use_red_mask: bool = True,
-#     use_inner_edges: bool = True,
-#     use_partial_circles: bool = True,
-# ) -> Optional[Tuple[int, int, bool]]:
-#     """
-#     Find hoop center using Ellipse-YOLO (or fallback).
-#     Returns (cx, cy, False) or None if not found.
-#     """
-#     # -------------------------------------------------------------
-#     # (1) Convert to HSV and create mask (same as original find_hoop)
-#     # -------------------------------------------------------------
-#     hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-#     mask = make_red_mask(hsv, lower_hoop1, upper_hoop1, lower_hoop2, upper_hoop2)
-#     # -------------------------------------------------------------
-#     # (2) Run Ellipse-YOLO detection (model or fallback automatically)
-#     # -------------------------------------------------------------
-#     result_img, detected_ellipses, nearest_idx, edge_img, _ = detect_hoops_ellipse_yolo(
-#         image,
-#         model_path=model_path,
-#         use_model=use_model,
-#         use_red_mask=use_red_mask,
-#         lower_red1=tuple(lower_hoop1),
-#         upper_red1=tuple(upper_hoop1),
-#         lower_red2=tuple(lower_hoop2),
-#         upper_red2=tuple(upper_hoop2),
-#         use_inner_edges=use_inner_edges,
-#         use_partial_circles=use_partial_circles,
-#         draw_all_ellipses=False
-#     )
-#     # -------------------------------------------------------------
-#     # (3) Handle no detections (identical return behavior)
-#     # -------------------------------------------------------------
-#     if not detected_ellipses or nearest_idx is None:
-#         if debug:
-#             cv2.imshow("Hoop Detection", image)
-#             cv2.imshow("Hoop Mask", mask)
-#             cv2.waitKey(1)
-#         if save_vision:
-#             os.makedirs(f"vision_imgs_{uuid}", exist_ok=True)
-#             cv2.imwrite(f"vision_imgs_{uuid}/ellipse_none.png", image)
-#             cv2.imwrite(f"vision_imgs_{uuid}/mask_none.png", mask)
-#         return None
-#     # -------------------------------------------------------------
-#     # (4) Extract best ellipse (same order as original)
-#     # -------------------------------------------------------------
-#     best_ellipse = detected_ellipses[nearest_idx]
-#     cx, cy = best_ellipse["center"]
-#     # -------------------------------------------------------------
-#     # (5) Visualization & saving (same order & style)
-#     # -------------------------------------------------------------
-#     if debug or save_vision:
-#         vis = result_img.copy()
-#         cv2.circle(vis, (cx, cy), 6, (0, 255, 0), 2)
-#         cv2.drawMarker(vis, (cx, cy), (0, 255, 0), cv2.MARKER_CROSS, 10, 2)
-#         if debug:
-#             cv2.imshow("Hoop Detection", vis)
-#             cv2.imshow("Inner Edges", edge_img)
-#             cv2.waitKey(1)
-#         if save_vision:
-#             os.makedirs(f"vision_imgs_{uuid}", exist_ok=True)
-#             cv2.imwrite(f"vision_imgs_{uuid}/ellipse_result.png", vis)
-#             cv2.imwrite(f"vision_imgs_{uuid}/ellipse_edges.png", edge_img)
-#     return int(cx), int(cy), False
+    # ALWAYS show window for debugging
+    cv2.imshow("Hoop Detection", vis)
+    cv2.imshow("Hoop Mask", mask)
+    cv2.waitKey(1)
+
+    if save_vision:
+        import time
+        t = int(time.time())
+        path = os.path.expanduser(f"~/vision_imgs/{uuid}")
+        os.makedirs(path, exist_ok=True)
+        cv2.imwrite(os.path.join(path, f"hoop_{t}.png"), vis)
+        cv2.imwrite(os.path.join(path, f"hoop_mask_{t}.png"), mask)
+
+    # We found a hoop → dlz_empty=False (keeps your previous "third flag" convention)
+    return cx, cy, False, best_contour
 
 
 if __name__ == "__main__":
