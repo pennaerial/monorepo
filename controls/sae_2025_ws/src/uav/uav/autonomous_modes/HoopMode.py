@@ -2,8 +2,8 @@ import numpy as np
 from uav import UAV
 from uav.autonomous_modes import Mode
 from rclpy.node import Node
-from uav_interfaces.srv import PayloadTracking
-from uav.vision_nodes import PayloadTrackingNode
+from uav_interfaces.srv import HoopTracking 
+from uav.vision_nodes import HoopTrackingNode 
 from typing import Optional, Tuple
 import cv2
 
@@ -13,7 +13,7 @@ class HoopMode(Mode):
     attempting to find and look for hoops.
     """
 
-    def __init__(self, node: Node, uav: UAV, color: str = 'orange'):
+    def __init__(self, node: Node, uav: UAV, num_hoops: int):
         """
         Initialize the LowerPayload.
 
@@ -24,42 +24,47 @@ class HoopMode(Mode):
         """
         super().__init__(node, uav)
 
-        self.response = None
-        self.altitude_constant = 1
-        self.wait_time = 20_000         # delay in ms
-        self.done = False
-        self.color = color          # might be useful as a way to confirm
-        self.goal_pos = None
-        self.passed_hoops = []      # list of coordinates of all passed hoops
+        self.response = None 
+        self.altitude_constant: int = 1
+        self.done: bool = False
+        self.wait_time: float = 20.0 # delay in s
+        self.num_hoops: int = num_hoops
+        self.passed_hoops: list[tuple[float, float, float]] = []      # list of coordinates of all passed hoops
+        self.goal_pos: tuple[float, float, float] = None
+        self.rotation_vec: tuple[float, float, float] = None
+        self.success: bool = None
+
 
     def on_update(self, time_delta: float) -> None:
         """
         Periodic logic for lowering payload and handling obstacles.
         """
-        # If UAV is unstable, skip the update
-        if self.uav.roll > 0.1 or self.uav.pitch > 0.1:
-            self.log("Roll or pitch detected. Waiting for stabilization.")
-            return
+        request = HoopTracking.Request() # TODO: change this to new vision node
+
+        # fields: t_vec[3], r_vec[3], dlz_empty; returns None if no hoop
+        response = self.send_request(HoopTrackingNode, request)
         
-        request = PayloadTracking.Request() # TODO: change this to new vision node
-        request.altitude = -self.uav.get_local_position()[2]
-        request.yaw = float(self.uav.yaw)
-        response = self.send_request(PayloadTrackingNode, request)
+        # Time delta between takeoff and hoop mode running
+        if time_delta > 1:
+            time_delta = 0
         
-        # If no payload pose is received, exit early
+        # If no hoop detected, start counting down the wait time
         if response is None:
             direction = [0, 0, -self.altitude_constant] # start going upwards
             self.uav.publish_position_setpoint(direction, relative=True)
             self.wait_time -= time_delta
 
-            if self.wait_time <= 0: # if 20 seconds has elapsed with no response
+            if len(self.passed_hoops) >= self.num_hoops or self.wait_time <= 0: # if 20 seconds has elapsed with no response
                 self.done = True
+            self.log(f"Looking for hoop - waiting for {self.wait_time} more seconds")
             return
         
-        self.wait_time = 20_000
-        self.goal_pos = self.fetch_cv_coordinates()
+        self.wait_time = 20
+        self.goal_pos = response.t_vec
+        self.rotation_vec = response.r_vec
+        self.success = response.success
 
-        if self.goal_pos:
+        if self.success:
             self.uav.publish_position_setpoint(self.goal_pos)
             if self.uav.distance_to_waypoint('LOCAL', self.goal_pos) <= 0.05:
                 # why is there an "or True" here? what is dlz?
@@ -69,7 +74,7 @@ class HoopMode(Mode):
                     pass # TODO: Extend servo
             return
         
-        direction = [ -response.direction[1], response.direction[0], response.direction[2] ]
+        direction = [ -response.t_vec[1], response.t_vec[0], response.t_vec[2] ]
         
         camera_offsets = tuple(x / request.altitude for x in self.uav.camera_offsets) if request.altitude > 1 else self.uav.camera_offsets
         direction = [x + y for x, y in zip(direction, self.uav.uav_to_local(camera_offsets))]
@@ -77,9 +82,6 @@ class HoopMode(Mode):
         self.log(f"Direction: {direction}")
         self.uav.publish_position_setpoint(direction, relative=True)
     
-    def fetch_cv_coordinates(self) -> tuple[float, float, float] | None:
-        pass # TODO: implement call to cv once pushed
-
     def check_status(self) -> str:
         """
         Check the status of the payload lowering.

@@ -40,7 +40,9 @@ class LandingMode(Mode):
         
         # ask CV for landing pad detection (change this with exact names when i know them)
         altitude = -self.uav.get_local_position()[2]
+        
         request = Landing.Request()
+        request.color = self.color
         
         # if no pad detected, tilt and search
         response = self.send_request(LandingNode, request)

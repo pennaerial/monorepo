@@ -1,5 +1,5 @@
 # launch_params.yaml
-mission_name: mission
+mission_name: hoop_competition 
 uav_debug: false
 vision_debug: false
 sim: true
