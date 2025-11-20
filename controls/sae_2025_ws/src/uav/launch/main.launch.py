@@ -3,10 +3,7 @@ import os
 import re
 import platform
 from launch import LaunchDescription
-from launch.actions import ExecuteProcess, LogInfo, OpaqueFunction, RegisterEventHandler, DeclareLaunchArgument
-from launch.event_handlers import OnProcessIO, OnProcessStart
-from launch.events.process import ProcessIO
-from launch.substitutions import LaunchConfiguration
+from launch.actions import ExecuteProcess, LogInfo, TimerAction, OpaqueFunction
 from launch_ros.actions import Node
 from uav.utils import vehicle_map
 from launch.actions import IncludeLaunchDescription
@@ -161,7 +158,7 @@ def launch_setup(context, *args, **kwargs):
                 'sim.launch.py'
             )
         ),
-        launch_arguments={'model': model}.items()
+        launch_arguments={'model': model, 'px4_path': px4_path}.items()
     )
     
     px4_sitl = ExecuteProcess(
@@ -292,7 +289,7 @@ def launch_setup(context, *args, **kwargs):
         px4_sitl,
         LogInfo(msg="PX4 SITL started."),
         TimerAction(
-            period=15.0,
+            period=5.0,
             actions=[mission] if run_mission_bool else []
         )
     ]
