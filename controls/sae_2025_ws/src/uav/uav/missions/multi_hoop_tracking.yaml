@@ -1,0 +1,45 @@
+# Multi-Hoop Tracking Mission
+# 多圆环追踪任务 - 飞过多个红色圆环
+
+start:
+  class: "uav.autonomous_modes.NavGPSMode"
+  params:
+    coordinates: '[((0, 0, -2), 1, "LOCAL"),]'
+    margin: "0.1"
+  transitions:
+    complete: hoop1
+
+hoop1:
+  class: "uav.autonomous_modes.HoopMode"
+  params: {}
+  transitions:
+    complete: hoop2
+
+hoop2:
+  class: "uav.autonomous_modes.HoopMode"
+  params: {}
+  transitions:
+    complete: hoop3
+
+hoop3:
+  class: "uav.autonomous_modes.HoopMode"
+  params: {}
+  transitions:
+    complete: hoop4
+
+hoop4:
+  class: "uav.autonomous_modes.HoopMode"
+  params: {}
+  transitions:
+    complete: hoop5
+
+hoop5:
+  class: "uav.autonomous_modes.HoopMode"
+  params: {}
+  transitions:
+    complete: land
+
+land:
+  class: "uav.autonomous_modes.LandingMode"
+  params: {}
+  transitions: {}

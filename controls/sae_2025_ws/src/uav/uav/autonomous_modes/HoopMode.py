@@ -106,11 +106,11 @@ class HoopMode(Mode):
             return
 
         # Not centered yet - adjust position without moving forward
-        # Negate the direction because we want to move TOWARD the target, not in the direction OF the target
+        # The direction vector points FROM drone TO hoop, so we use it directly to move toward the hoop
         direction[0] = 0  # Zero out forward movement until centered
-        direction[1] = direction[1]  # Negate Y
-        direction[2] = direction[2]  # Negate Z
-        
+        direction[1] = direction[1]  
+        direction[2] = direction[2]  
+
         self.log(f"Centering - Publishing direction: {direction}")
         self.uav.publish_position_setpoint(direction, relative=True)
 
