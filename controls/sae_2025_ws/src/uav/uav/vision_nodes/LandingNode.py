@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 from uav.vision_nodes import VisionNode
 import rclpy
-from uav.cv.recogniseRectangle import recognise_rectangle
+from uav.cv.precogniseRectangle import recognise_rectangle
 from uav.cv.pose_estimate import estimate_hoop_pose_from_contour
 from uav_interfaces.srv import Landing
 from uav.utils import red, green, blue
@@ -14,11 +14,9 @@ class LandingNode(VisionNode):
 
     srv = Landing
 
-    def __init__(self, target_color: str = "red", display: bool = False):
+    def __init__(self, display: bool = False):
         super().__init__('landing_node', self.__class__.srv)
 
-        # target_color ∈ {"red", "green", "blue"}
-        self.target_color = target_color
         self.display = display
         self.color_map = {
             'red': red,
@@ -35,7 +33,7 @@ class LandingNode(VisionNode):
 
         frame = self.convert_image_msg_to_frame(image_msg)
 
-        contour = recognise_rectangle(frame, self.target_color)
+        contour = recognise_rectangle(frame, self.color_map[request.landing_color])
         if contour is None:
             return response
         # PnP pose estimation
@@ -52,14 +50,14 @@ class LandingNode(VisionNode):
         if self.display:
             debug_img = frame.copy()
             cv2.drawContours(debug_img, [contour], -1, (0, 255, 0), 2)
-            self.display_frame(debug_img, f"Landing: {self.target_color}")
+            self.display_frame(debug_img, f"Landing: {self.color_map[request.landing_color]}")
 
         return response
 
 
 def main():
     rclpy.init()
-    node = LandingNode(target_color="red", display=False)
+    node = LandingNode(display=False)
     try:
         rclpy.spin(node)
     except Exception as e:
