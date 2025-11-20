@@ -29,7 +29,7 @@ class UAV:
     Skeleton class for UAV control and interfacing with PX4 via ROS 2.
     """
 
-    def __init__(self, node: Node, takeoff_amount=5.0, DEBUG=False, camera_offsets=[0, 0, 0]):
+    def __init__(self, node: Node, takeoff_amount=1.0, DEBUG=False, camera_offsets=[0, 0, 0]):
 
         self.node = node
         self.DEBUG = DEBUG
@@ -471,7 +471,7 @@ class UAV:
         # Subscribers
         self.status_sub = self.node.create_subscription(
             VehicleStatus,
-            '/fmu/out/vehicle_status',
+            '/fmu/out/vehicle_status_v1',
             self._vehicle_status_callback,
             qos_profile
         )
