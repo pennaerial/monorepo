@@ -93,16 +93,17 @@ class LandingMode(Mode):
 
     def _search_for_pad(self) -> None:
         """
-        pitch forward and rotate slowly to search for landing pad.
-        """
-        
-        # pitch forward to look at ground and rotate slowly to scan the area
-        self.uav.publish_attitude_setpoint(
-            roll=0.0,
-            pitch=self.search_pitch,
-            yaw=self.uav.yaw + 0.05,  
-            thrust=0.5
-        )
+        Rotate in place by incrementing yaw angle.
+    """
+        # Get current position and increment yaw
+    current_pos = self.uav.get_local_position()
+    new_yaw = self.uav.yaw + 0.05
+    
+    self.uav.publish_position_setpoint(
+        [current_pos[0], current_pos[1], current_pos[2]],
+        yaw=new_yaw,
+        relative=False
+    )
 
     def _get_pitch_from_rotation(self, rvec: np.ndarray) -> float:
         """

@@ -1,0 +1,10 @@
+# Request: HoopContours message from CV node
+HoopContours contours
+float64 hoop_radius  # Radius of hoop in meters (0 to use node default)
+---
+# Response: pose estimation results
+bool success
+float64[3] rotation_vector  # rvec - rotation vector from camera to hoop
+float64[3] translation_vector  # tvec - translation vector from camera to hoop
+float64[3] camera_position  # camera position in hoop frame
+
