@@ -246,14 +246,21 @@ def find_hoop(image):
     mask = seg.apply(filtered)
     mask = post.apply(mask)
 
+    # scale = 0.5  # rescale display
+    # disp_frame = cv2.resize(mask, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
+    # cv2.imshow("Pipeline-Result", disp_frame)
+    # cv2.waitKey(1)
+
     # Find largest contour
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if not contours:
         return None
     largest = max(contours, key=cv2.contourArea)
 
-    # Convert contour format from (N,1,2) → (N,2)
-    # largest = largest.reshape(-1, 2).astype(float)
+    vis = image.copy()
+    cv2.drawContours(vis, [largest], -1, (0, 255, 0), 2)   # 绿色线
+    cv2.imshow("Detected Rectangle", vis)
+    cv2.waitKey(1)
 
     return largest
 
