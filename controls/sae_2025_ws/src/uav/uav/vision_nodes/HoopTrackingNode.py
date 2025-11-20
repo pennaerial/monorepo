@@ -15,6 +15,8 @@ class HoopTrackingNode(VisionNode):
     def __init__(self, display: bool = False):
         super().__init__('hoop_tracking', self.__class__.srv)
         
+        cv2.startWindowThread()
+        cv2.namedWindow("Bruh", cv2.WINDOW_NORMAL)
         self.display = display
         self.create_service(HoopTracking, self.service_name(), self.service_callback)
         

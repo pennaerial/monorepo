@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 from uav.vision_nodes import VisionNode
 import rclpy
-from uav.cv.precogniseRectangle import recognise_rectangle
+from uav.cv.recogniseRectangle import recognise_rectangle
 from uav.cv.pose_estimate import estimate_hoop_pose_from_contour
 from uav_interfaces.srv import Landing
 from uav.utils import red, green, blue

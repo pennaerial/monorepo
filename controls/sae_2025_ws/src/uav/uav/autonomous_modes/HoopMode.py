@@ -13,7 +13,7 @@ class HoopMode(Mode):
     attempting to find and look for hoops.
     """
 
-    def __init__(self, node: Node, uav: UAV, num_hoops: int):
+    def __init__(self, node: Node, uav: UAV, num_hoops: int = 1):
         """
         Initialize the LowerPayload.
 
@@ -43,15 +43,15 @@ class HoopMode(Mode):
 
         # fields: t_vec[3], r_vec[3], dlz_empty; returns None if no hoop
         response = self.send_request(HoopTrackingNode, request)
-        
+
         # Time delta between takeoff and hoop mode running
         if time_delta > 1:
             time_delta = 0
         
         # If no hoop detected, start counting down the wait time
-        if response is None:
-            direction = [0, 0, -self.altitude_constant] # start going upwards
-            self.uav.publish_position_setpoint(direction, relative=True)
+        if not response:
+            # direction = [0, 0, -self.altitude_constant] # start going upwards
+            # self.uav.publish_position_setpoint(direction, relative=True)
             self.wait_time -= time_delta
 
             if len(self.passed_hoops) >= self.num_hoops or self.wait_time <= 0: # if 20 seconds has elapsed with no response
@@ -60,24 +60,23 @@ class HoopMode(Mode):
             return
         
         self.wait_time = 20
+        self.success = response.success
         self.goal_pos = response.t_vec
         self.rotation_vec = response.r_vec
-        self.success = response.success
 
         if self.success:
             self.uav.publish_position_setpoint(self.goal_pos)
             if self.uav.distance_to_waypoint('LOCAL', self.goal_pos) <= 0.05:
-                # why is there an "or True" here? what is dlz?
-                if response.dlz_empty or True:
+                self.passed_hoops.append(self.goal_pos)
+                if len(self.passed_hoops) >= self.num_hoops:
                     self.done = True
-                else:
-                    pass # TODO: Extend servo
+                    return
             return
         
         direction = [ -response.t_vec[1], response.t_vec[0], response.t_vec[2] ]
         
-        camera_offsets = tuple(x / request.altitude for x in self.uav.camera_offsets) if request.altitude > 1 else self.uav.camera_offsets
-        direction = [x + y for x, y in zip(direction, self.uav.uav_to_local(camera_offsets))]
+        # camera_offsets = tuple(x / request.altitude for x in self.uav.camera_offsets) if request.altitude > 1 else self.uav.camera_offsets
+        # direction = [x + y for x, y in zip(direction, self.uav.uav_to_local(camera_offsets))]
 
         self.log(f"Direction: {direction}")
         self.uav.publish_position_setpoint(direction, relative=True)

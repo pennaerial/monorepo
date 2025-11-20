@@ -1,7 +1,7 @@
 start:
   class: uav.autonomous_modes.HoopMode
   params:
-    num_hoops: 8
+    num_hoops: "8"
   transitions:
     complete: land 
 
