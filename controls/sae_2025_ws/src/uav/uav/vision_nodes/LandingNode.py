@@ -5,6 +5,7 @@ import rclpy
 from uav.cv.recogniseRectangle import recognise_rectangle
 from uav.cv.pose_estimate import estimate_hoop_pose_from_contour
 from uav_interfaces.srv import Landing
+from uav.utils import red, green, blue
 
 class LandingNode(VisionNode):
     """
@@ -19,6 +20,11 @@ class LandingNode(VisionNode):
         # target_color ∈ {"red", "green", "blue"}
         self.target_color = target_color
         self.display = display
+        self.color_map = {
+            'red': red,
+            'green': green,
+            'blue': blue
+        }
 
         self.create_service(Landing, self.service_name(), self.service_callback)
 
