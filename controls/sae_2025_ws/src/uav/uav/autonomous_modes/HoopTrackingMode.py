@@ -27,16 +27,22 @@ class HoopTrackingMode(Mode):
         self.altitude_constant = 3
         self.done = False
         self.hoop_tolerance = hoop_tolerance
-        self.goal_pos = None
+        self.passing_through = False
+        self.forward_push_distance = 7.5  # required distance before we consider the hoop cleared
+        self.forward_push_step = 0.3      # meters per update while passing through
+        self.max_forward_push = 30.0       # safety cap
+        self.push_distance_accum = 0.0
+        self.no_hoop_frames = 0
+        self.required_no_hoop_frames = 5
 
     def on_update(self, time_delta: float) -> None:
         """
         Periodic logic for tracking and navigating through hoops.
         """
         # If UAV is unstable, skip the update
-        if self.uav.roll > 0.1 or self.uav.pitch > 0.1:
-            self.log("Roll or pitch detected. Waiting for stabilization.")
-            return
+        # if self.uav.roll > 0.1 or self.uav.pitch > 0.1:
+        #     self.log("Roll or pitch detected. Waiting for stabilization.")
+        #     return
           
         self.log("HoopTrackingMode: Requesting hoop detection...")
         
@@ -53,42 +59,76 @@ class HoopTrackingMode(Mode):
         
         self.log(f"HoopTrackingMode: Response received - detected={response.detected}, x={response.x}, y={response.y}")
 
-        # If we've already set a goal position (passed through hoop), hold position
-        if self.goal_pos:
-            self.uav.publish_position_setpoint(self.goal_pos)
-            if self.uav.distance_to_waypoint('LOCAL', self.goal_pos) <= 0.05:
-                self.done = True
+        align_vector, command_vector = self._compute_direction_vectors(response, request)
+
+        if self.passing_through:
+            self._continue_passing(response, command_vector)
             return
+
+        if request.altitude < self.hoop_tolerance and response.detected:
+            if (np.abs(align_vector[0]) < self.hoop_tolerance / 10 and
+                np.abs(align_vector[1]) < self.hoop_tolerance / 10):
+                self._start_passing_through()
+                self._continue_passing(response, command_vector)
+                return
+            else:
+                command_vector[2] = 0  # hold altitude when close
+
+        self.log(f"Direction: {command_vector}, Detected: {response.detected}")
+        self.uav.publish_position_setpoint(command_vector, relative=True)
+    
+    def _start_passing_through(self):
+        self.log("Hoop centered! Driving forward to clear it.")
+        self.passing_through = True
+        self.push_distance_accum = 0.0
+        self.no_hoop_frames = 0
+    
+    def _continue_passing(self, response: HoopTracking.Response, correction_vector):
+        self.log("Advancing through hoop...")
+        step = self.forward_push_step
+        self.push_distance_accum += step
+        command = list(correction_vector)
+        command[0] += step
+        self.uav.publish_position_setpoint(command, relative=True)
         
-        # Transform direction vector to UAV local frame
-        direction = [-response.direction[1], response.direction[0],
-                        response.direction[2] / self.altitude_constant]
+        if response.detected:
+            self.no_hoop_frames = 0
+        else:
+            self.no_hoop_frames += 1
         
-        # Apply camera offset transformation
+        hoop_cleared = (
+            self.push_distance_accum >= self.forward_push_distance and
+            self.no_hoop_frames >= self.required_no_hoop_frames
+        )
+        hit_safety_cap = self.push_distance_accum >= self.max_forward_push
+        
+        if hoop_cleared or hit_safety_cap:
+            if hit_safety_cap:
+                self.log("Reached forward push safety cap, assuming hoop cleared.")
+            else:
+                self.log("Hoop cleared (lost detection after pushing forward).")
+            self.passing_through = False
+            self.done = True
+
+    def _compute_direction_vectors(self, response: HoopTracking.Response, request: HoopTracking.Request):
+        direction = [
+            -response.direction[1],
+             response.direction[0],
+             response.direction[2] / self.altitude_constant,
+        ]
+
         camera_offsets = tuple(x / request.altitude for x in self.uav.camera_offsets) if request.altitude > 1 else self.uav.camera_offsets
         direction = [x + y for x, y in zip(direction, self.uav.uav_to_local(camera_offsets))]
 
-        # Altitude-based approach logic
-        if request.altitude < self.hoop_tolerance:
-            # If we're centered on the hoop, fly through it
-            if (np.abs(direction[0]) < self.hoop_tolerance / 10 and
-                np.abs(direction[1]) < self.hoop_tolerance / 10):
-                # Close enough - set goal to current position (stop and mark complete)
-                self.goal_pos = self.uav.get_local_position()
-                self.log("Hoop reached! Stopping.")
-                return
-            else:
-                # Align horizontally, don't change altitude
-                direction[2] = 0
-        
-        # If hoop not detected, try to search by moving forward slowly
+        align_vector = direction.copy()
+
         if not response.detected:
             self.log("No hoop detected. Searching...")
-            # Move forward slowly to search
-            direction = [0.5, 0, 0]  # Move forward in body frame
-        
-        self.log(f"Direction: {direction}, Detected: {response.detected}")
-        self.uav.publish_position_setpoint(direction, relative=True)
+            direction = [0.5, 0.0, 0.0]
+
+        step_gain = 0.3
+        command_vector = [d * step_gain for d in direction]
+        return align_vector, command_vector
     
     def check_status(self) -> str:
         """

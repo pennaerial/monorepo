@@ -184,6 +184,15 @@ class ModeManager(Node):
         else:
             if not self.uav.origin_set:
                 self.uav.set_origin()
+
+            # Wait for PX4 preflight checks to pass before arming / taking off.
+            if not self.uav.flight_check:
+                self.get_logger().info(
+                    f"Waiting for PX4 preflight checks... "
+                    f"nav_state={self.uav.nav_state}, arm_state={self.uav.arm_state}"
+                )
+                return
+
             if self.uav.arm_state != VehicleStatus.ARMING_STATE_ARMED:
                 if self.active_mode is not None and self.get_active_mode() == LandingMode and self.uav.nav_state != VehicleStatus.NAVIGATION_STATE_AUTO_LAND:
                     self.get_logger().info(f"Succesfully Landed UAV")

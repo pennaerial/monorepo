@@ -118,8 +118,15 @@ class VisionNode(Node):
             np.ndarray: The decoded image as a NumPy array.
         """
         if self.sim:
-            img_data = np.frombuffer(msg.data, dtype=np.uint8)
-            frame = img_data.reshape((msg.height, msg.width, 3))  # Assuming BGR8 encoding
+            # Gazebo / ros_gz_bridge images are typically 'rgb8' or 'rgba8'.
+            img = np.frombuffer(msg.data, dtype=np.uint8).reshape(
+                (msg.height, msg.width, int(len(msg.data) / (msg.height * msg.width)))
+            )
+            # If there's an alpha channel, drop it.
+            if img.shape[2] == 4:
+                img = img[:, :, :3]
+            # Convert from RGB to BGR for OpenCV display / processing.
+            frame = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
         else:
             frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
         return frame

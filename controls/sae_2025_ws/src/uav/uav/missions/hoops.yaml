@@ -1,4 +1,11 @@
 start:
+  class: uav.autonomous_modes.NavGPSMode
+  params:
+    coordinates: '[((3, -3, -1), 1, "LOCAL"),]'
+  transitions:
+    complete: hooptrack
+
+hooptrack:
   class: uav.autonomous_modes.HoopTrackingMode
   params:
     hoop_tolerance: '1.5'

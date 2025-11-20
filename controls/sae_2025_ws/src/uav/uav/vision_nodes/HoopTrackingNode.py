@@ -21,9 +21,11 @@ class HoopTrackingNode(VisionNode):
     def service_callback(self, request: HoopTracking.Request, 
                         response: HoopTracking.Response):
         """Process hoop tracking service request"""
-        image, camera_info = self.request_data(cam_image=True, cam_info=True)
-        image = self.convert_image_msg_to_frame(image)
-        image = rotate_image(image, -np.rad2deg(request.yaw))
+        image_msg, camera_info = self.request_data(cam_image=True, cam_info=True)
+        frame = self.convert_image_msg_to_frame(image_msg)
+
+        # Rotate image to compensate for vehicle yaw for detection.
+        image = rotate_image(frame, -np.rad2deg(request.yaw))
         
         # Get raw detection
         detection = find_hoop(image, self.uuid, self.debug, self.save_vision)
