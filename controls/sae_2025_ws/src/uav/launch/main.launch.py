@@ -3,7 +3,8 @@ import os
 import re
 import platform
 from launch import LaunchDescription
-from launch.actions import ExecuteProcess, LogInfo, TimerAction, OpaqueFunction
+from launch.actions import ExecuteProcess, LogInfo, TimerAction, OpaqueFunction, RegisterEventHandler
+from launch.event_handlers import OnProcessStart
 from launch_ros.actions import Node
 from uav.utils import vehicle_map
 from launch.actions import IncludeLaunchDescription
@@ -285,13 +286,12 @@ def launch_setup(context, *args, **kwargs):
         *vision_node_actions,
         LogInfo(msg="Vision nodes started."),
         middleware,
-        LogInfo(msg="Middleware started."),
-        px4_sitl,
-        LogInfo(msg="PX4 SITL started."),
-        TimerAction(
-            period=5.0,
-            actions=[mission] if run_mission_bool else []
-        )
+        RegisterEventHandler(
+            OnProcessStart(target_action=middleware, on_start=[LogInfo(msg="Middleware started."), px4_sitl])
+        ),
+        RegisterEventHandler(
+            OnProcessStart(target_action=px4_sitl, on_start=[LogInfo(msg="PX4 SITL started."), TimerAction(period=15.0, actions=[mission] if run_mission_bool else [])])
+        ),
     ]
 
 def generate_launch_description():
