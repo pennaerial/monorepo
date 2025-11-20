@@ -164,8 +164,8 @@ def launch_setup(context, *args, **kwargs):
     )
 
     topic_model_name = model[3:]
-    GZ_CAMERA_TOPIC = f'/world/custom/model/{topic_model_name}_0/link/camera_link/sensor/imager/image'
-    GZ_CAMERA_INFO_TOPIC = f'/world/custom/model/{topic_model_name}_0/link/camera_link/sensor/imager/camera_info'
+    GZ_CAMERA_TOPIC = f'/world/custom/model/{topic_model_name}_0/link/camera_link/sensor/camera/image'
+    GZ_CAMERA_INFO_TOPIC = f'/world/custom/model/{topic_model_name}_0/link/camera_link/sensor/camera/camera_info'
 
     gz_ros_bridge_camera = ExecuteProcess(
         cmd=['ros2', 'run', 'ros_gz_bridge', 'parameter_bridge',
