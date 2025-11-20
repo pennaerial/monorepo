@@ -134,9 +134,11 @@ class VisionNode(Node):
         if not self.use_service:
             response = CameraData.Response()
             if cam_image:
-                response.image = self.image
+                # ensure we never assign None to a ROS sub-message field
+                # (assign an empty Image() if no image has been received yet)
+                response.image = self.image if self.image is not None else Image()
             if cam_info:
-                response.camera_info = self.camera_info
+                response.camera_info = self.camera_info if self.camera_info is not None else CameraInfo()
         else:
             self.get_logger().info('Requesting camera data from service...')
             request = CameraData.Request()

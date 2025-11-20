@@ -150,6 +150,40 @@ class HoopCenterNode(VisionNode):
         """
         # Get image and camera info from VisionNode
         image_msg, camera_info = self.request_data(cam_image=True, cam_info=True)
+
+        # Check for missing data early to avoid exceptions (reshape/inv on empty data)
+        no_image = False
+        try:
+            no_image = (not hasattr(image_msg, 'data')) or (image_msg.data is None) or (len(image_msg.data) == 0) or (getattr(image_msg, 'height', 0) == 0) or (getattr(image_msg, 'width', 0) == 0)
+        except Exception:
+            no_image = True
+
+        no_cam = False
+        try:
+            k_list = list(getattr(camera_info, 'k', []))
+            no_cam = (not k_list) or (sum([abs(x) for x in k_list]) == 0)
+        except Exception:
+            no_cam = True
+
+        if no_image or no_cam:
+            # Log reason and return a zero vector so the controller doesn't move
+            if no_image and no_cam:
+                self.get_logger().warn('[HoopCenterNode] No image data and no camera info available. Returning zero direction.')
+            elif no_image:
+                self.get_logger().warn('[HoopCenterNode] No image data available. Returning zero direction.')
+            else:
+                self.get_logger().warn('[HoopCenterNode] No camera info available. Returning zero direction.')
+
+            response.x = 0.0
+            response.y = 0.0
+            response.direction = [0.0, 0.0, 0.0]
+            response.dlz_empty = True
+            response.is_line = False
+            response.is_partial = True
+            response.major_axis = 0.0
+            response.minor_axis = 0.0
+            return response
+
         frame_bgr = self.convert_image_msg_to_frame(image_msg)
 
         # Rotate image based on yaw (similar to payload)
@@ -180,8 +214,9 @@ class HoopCenterNode(VisionNode):
                 # Either way, direction is from used pixel
                 dir_vec = pixel_to_ray(used_x, used_y, K)
         else:
-            # No contour at all: ray from image center
-            dir_vec = pixel_to_ray(used_x, used_y, K)
+            # No hoop detected: log and return a zero direction so vehicle doesn't move
+            self.get_logger().info('[HoopCenterNode] No hoop detected in frame. Returning zero direction vector.')
+            dir_vec = np.array([0.0, 0.0, 0.0], dtype=np.float32)
 
         # Populate response
         response.x = float(used_x)
