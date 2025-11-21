@@ -13,7 +13,7 @@ class RingTraversalMode(Mode):
     def __init__(self, node: Node, uav: UAV, threshold: float = 0.1):
         super().__init__(node, uav)
         from std_msgs.msg import Float64MultiArray
-        self.threshold = threshold  # magnitude when considered centred
+        self.threshold = threshold  # magnitude when close enough
         self.latest_vec = None  # store last Float64MultiArray
 
         self.sub = node.create_subscription(
@@ -37,9 +37,9 @@ class RingTraversalMode(Mode):
         dir_x, dir_y, dir_z = self.latest_vec[2:5]
         vec = np.array([dir_x, dir_y, dir_z])
         mag = np.linalg.norm(vec)
-        if mag < self.threshold:
-            self.done = True
-            return
+        # if mag < self.threshold:
+        #     self.done = True
+        #     return
         # Scale to small step proportional to magnitude
         step = vec  # already unit-ish; UAV class caps velocity
         self.uav.publish_position_setpoint(step, relative=True)

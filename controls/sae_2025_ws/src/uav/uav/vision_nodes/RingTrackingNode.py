@@ -2,6 +2,7 @@
 import cv2
 import numpy as np
 from uav.cv.tracking import find_payload, compute_3d_vector
+from uav.cv.hoopDetectorAlgorithm import find_nearest_hoop_pose
 from uav.vision_nodes import VisionNode
 # from uav_interfaces.srv import PayloadTracking  # OLD: not using a custom service anymore
 from std_srvs.srv import Trigger
@@ -34,6 +35,7 @@ class RingTrackingNode(VisionNode):
         # self.kalman = cv2.KalmanFilter(4, 2)
         # self._setup_kalman_filter()
         
+        #fake to trick modemaanager
         from std_msgs.msg import Float64MultiArray  # moved here to avoid global import clutter
 
         self.trigger_srv = self.create_service(
@@ -68,6 +70,7 @@ class RingTrackingNode(VisionNode):
         image_msg, camera_info_msg = self.request_data(cam_image=True, cam_info=True)
 
         image = self.convert_image_msg_to_frame(image_msg)
+        # image = self.bridge.imgmsg_to_cv2(image_msg, desired_encoding='bgr8')
 
         # TODO: implement proper ring-detection; placeholder uses "pink" threshold
         # this outputs cx, cy, and dlz_empty
@@ -79,6 +82,8 @@ class RingTrackingNode(VisionNode):
             self.debug,
             self.save_vision
         )
+
+        
 
 
 ####### OLD PAYLOADTRACKING NODE CODE ##############
@@ -110,6 +115,7 @@ class RingTrackingNode(VisionNode):
         # return response
         if detection is None:
             # Publish constant dummy vector so downstream nodes see a steady stream
+            print("not detecting anyyyything")
             dummy = self.publish_msg_type()
             dummy.data = [0.0, 0.0, 5.0, 5.0, 0.0, 0.0]  # x,y,dir_x,dir_y,dir_z,flag
             self.ring_pub.publish(dummy)
@@ -130,7 +136,7 @@ class RingTrackingNode(VisionNode):
         self.ring_pub.publish(msg)
 
         # if self.display:
-        #     self.display_frame(image, self.node_name())
+        #     self.display_frame(image, self.node_name()) 
         self.display_frame(image, self.node_name())
 
 
