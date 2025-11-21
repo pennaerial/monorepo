@@ -14,6 +14,7 @@ class RingTrackingNode(VisionNode):
     """
     srv = Trigger # OLD: not using service anymore, instead using topic
 
+    #fake service to trick modemanager
     @staticmethod
     def service_name() -> str:
         # ModeManager calls vision_class.service_name()

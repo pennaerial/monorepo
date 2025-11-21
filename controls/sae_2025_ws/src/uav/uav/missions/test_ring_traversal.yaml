@@ -1,7 +1,7 @@
 start:
   class: uav.autonomous_modes.NavGPSMode
   params:
-    coordinates: '[((0, 0, -10), 1, "LOCAL"),]'
+    coordinates: '[((0, -2, -2), 1, "LOCAL"),]'
   transitions:
     complete: ring_traversal
 
