@@ -1,7 +1,6 @@
 import cv2
 import numpy as np
 
-# ========== Color Space ==========
 class ColorSpace:
     def __init__(self, mode="HSV"):
         self.mode = mode
@@ -18,8 +17,6 @@ class ColorSpace:
         # cv2.imshow(f"ColorSpace-{self.mode}", converted)
         return converted
 
-
-# ========== Pre Processing ==========
 class PreProcessing:
     def __init__(self, method="gaussian", kernel_size=5):
         self.method = method
@@ -79,7 +76,6 @@ def filter_red_orange(hsv_img):
 
     return mask
 
-# ========== Segmentation ==========
 class Segmentation:
     def __init__(self, method="threshold"):
         self.method = method
@@ -102,8 +98,6 @@ class Segmentation:
         # cv2.imshow(f"Segmentation-{self.method}", mask)
         return mask
     
-
-# ========== Post Processing ==========
 class PostProcessing:
     def __init__(self, kernel_open=7, kernel_close=5, area_ratio=0.01):
         # different kernels for open and close
@@ -121,178 +115,193 @@ class PostProcessing:
         # Contour Filtering
         contours, _ = cv2.findContours(mask_clean, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         mask_filtered = np.zeros_like(mask_clean)
+        valid_cnts = []
         for cnt in contours:
             if cv2.contourArea(cnt) >= self.area_ratio*h*w:
                 cv2.drawContours(mask_filtered, [cnt], -1, 255, -1)
+                valid_cnts.append(cnt)
 
         # Closing operation, smoothing the edge of the target and filling small holes
         mask_final = cv2.morphologyEx(mask_filtered, cv2.MORPH_CLOSE, self.kernel_close)
 
-        return mask_final
+        # Find the largest contour and fit an ellipse.
+        if len(valid_cnts) == 0:
+            return mask_final, None, None
+        max_cnt = max(valid_cnts, key=cv2.contourArea)
+        if len(max_cnt) < 5:
+            return mask_final, None, None
 
+        # Fit ellipse to the largest contour
+        ellipse = cv2.fitEllipse(max_cnt)
+        (ex, ey), (a, b), angle = ellipse
 
-# =============== Visualization ===============
+        # Generate ellipse contour points (needed for PnP)
+        ellipse_contour = []
+        for t in np.linspace(0, 2*np.pi, 200):
+            x = ex + (a/2)*np.cos(t)*np.cos(np.deg2rad(angle)) - (b/2)*np.sin(t)*np.sin(np.deg2rad(angle))
+            y = ey + (a/2)*np.cos(t)*np.sin(np.deg2rad(angle)) + (b/2)*np.sin(t)*np.cos(np.deg2rad(angle))
+            ellipse_contour.append((x, y))
+
+        return mask_final, ellipse_contour, ellipse
+
 class Visualization:
     def __init__(self):
-        # Camera intrinsics
-        self.fx = 2564.3186869
-        self.fy = 2569.70273111
-        self.cx = 0
-        self.cy = 0
-        self.radius_in = 10.0  # known radius in inches
+        pass
 
-    def apply(self, image, mask):
-        h, w = image.shape[:2]
+    def apply(self, image, ellipse_contour, ellipse_params):
         result = image.copy()
+        if ellipse_params is None:
+            return result
 
-        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        for cnt in contours:
-            cv2.drawContours(result, [cnt], -1, (0, 128, 255), 2)
-            M = cv2.moments(cnt)
-            if M["m00"] > 0:
-                cx_img = int(M["m10"] / M["m00"])
-                cy_img = int(M["m01"] / M["m00"])
-                cv2.circle(result, (cx_img, cy_img), 10, (255, 255, 255), -1)
+        (ex, ey), (a, b), angle = ellipse_params
 
-                # Estimate object size in pixels
-                (x, y), r_px = cv2.minEnclosingCircle(cnt)
-                if r_px > 1:  # avoid division by zero
-                    # Depth estimation
-                    Z = (self.fx * self.radius_in) / r_px
-                    X = (cx_img - self.cx) * Z / self.fx
-                    Y = (cy_img - self.cy) * Z / self.fy
-
-                    # --- Fit ellipse for rotation estimation ---
-                    if len(cnt) >= 5:
-                        ellipse = cv2.fitEllipse(cnt)
-                        (ex, ey), (a, b), angle = ellipse
-                        cv2.ellipse(result, ellipse, (0, 255, 0), 8)
-
-                        # Compute 4 boundary points on ellipse (up, right, down, left)
-                        pts = []
-                        for theta_deg in [0, 90, 180, 270]:
-                            t = np.deg2rad(theta_deg)
-                            x_ell = ex + (a/2) * np.cos(t) * np.cos(np.deg2rad(angle)) - (b/2) * np.sin(t) * np.sin(np.deg2rad(angle))
-                            y_ell = ey + (a/2) * np.cos(t) * np.sin(np.deg2rad(angle)) + (b/2) * np.sin(t) * np.cos(np.deg2rad(angle))
-                            pts.append((int(x_ell), int(y_ell)))
-                            cv2.circle(result, (int(x_ell), int(y_ell)), 10, (0, 255, 255), -1)
-
-                        # Estimate Z for each point (using local radius ~ distance to ellipse boundary)
-                        Z_vals = []
-                        for (px, py) in pts:
-                            r_local = np.sqrt((px - cx_img)**2 + (py - cy_img)**2)
-                            if r_local > 1:
-                                Z_i = (self.fx * self.radius_in) / r_local
-                            else:
-                                Z_i = Z
-                            Z_vals.append(Z_i)
-
-                        # Define Z order: [right, top, left, bottom]
-                        Z_right, Z_top, Z_left, Z_bottom = Z_vals[0], Z_vals[1], Z_vals[2], Z_vals[3]
-
-                        # Compute rotation (pitch, yaw)
-                        # pitch = np.degrees(np.arctan((Z_top - Z_bottom) / (2 * self.radius_in)))  # tilt around x-axis
-                        yaw = np.degrees(np.arctan((Z_left - Z_right) / (2 * self.radius_in)))   # tilt around y-axis
-
-                        # Ensure a >= b
-                        if b > a:
-                            a, b = b, a
-                        # Clamp ratio to [-1, 1] to avoid invalid arccos input
-                        ratio = np.clip(b / a, -1.0, 1.0)
-
-                        # Estimate tilt based on ellipse aspect ratio
-                        tilt_rad = np.arccos(ratio)
-                        pitch = np.degrees(tilt_rad)  # assume tilt around x-axis
-
-                        # Use ellipse rotation angle as yaw approximation
-                        # yaw = angle  # adjust sign depending on coordinate convention
-
-                        # cv2.putText(result, f"pitch: {pitch:.1f} deg", (cx_img - 180, cy_img + 160),
-                        #             cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255,255,255), 2)
-                        # cv2.putText(result, f"yaw: {yaw:.1f} deg", (cx_img - 180, cy_img + 200),
-                        #             cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255,255,255), 2)
-
-
-                    # Display 3D coordinates
-                    # coord_text = f"coords: [{X:.1f}, {Y:.1f}, {Z:.1f}]"
-                    # cv2.putText(result, coord_text,
-                    #             (cx_img - 200, cy_img + 140),
-                    #             cv2.FONT_HERSHEY_SIMPLEX, 1.0,
-                    #             (255, 255, 255), 2)
-                    coord_text = f"coords: [{X:.1f}, {Y:.1f}]"
-                    # cv2.putText(result, coord_text,
-                    #             (cx_img - 200, cy_img + 100),
-                    #             cv2.FONT_HERSHEY_SIMPLEX, 1.0,
-                    #             (255, 255, 255), 2)
+        cv2.ellipse(result, ellipse_params, (0, 255, 0), 8) # Draw ellipse
+        cv2.circle(result, (int(ex), int(ey)), 8, (255, 255, 255), -1) # Draw ellipse center
+        if ellipse_contour is not None:                     # Draw contour points       
+            for (x, y) in ellipse_contour:
+                cv2.circle(result, (int(x), int(y)), 2, (0, 255, 255), -1)
 
         return result
-    
 
-def find_hoop(image):
+
+def detect_contour(image):
     """
-    Detect hoop and return its largest contour (Nx2 array).
+    Detect hoop and return its largest contour.
     Returns:
-        np.ndarray: contour points (N, 2) if found
-        None: if nothing detected
+        ellipse_contour: np.ndarray (N, 1, 2) the largest contour points if found
+        ellipse_params: tuple ((center), (major, minor), angle) if found
     """
     # Initialize pipeline
     pre = PreProcessing(method="open_close", kernel_size=5)
     seg = Segmentation(method="threshold")
     post = PostProcessing(kernel_open=7, kernel_close=7, area_ratio=0.005)
-
-    hsv = ColorSpace(mode="HSV").apply(image)
-    hsv_pre = pre.apply(hsv)
-    filtered = filter_red_orange(hsv_pre)
-    mask = seg.apply(filtered)
-    mask = post.apply(mask)
-
-    # scale = 0.5  # rescale display
-    # disp_frame = cv2.resize(mask, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
-    # cv2.imshow("Pipeline-Result", disp_frame)
-    # cv2.waitKey(1)
-
-    # Find largest contour
-    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    if not contours:
-        return None
-    largest = max(contours, key=cv2.contourArea)
-
-    vis = image.copy()
-    cv2.drawContours(vis, [largest], -1, (0, 255, 0), 2)   # 绿色线
-    cv2.imshow("Detected Rectangle", vis)
-    cv2.waitKey(1)
-
-    return largest
-
-
-# ========== Image Pipeline ==========
-if __name__ == "__main__":
-    # Load image
-    image = cv2.imread("resources/Test5.png")
-
-    # Initialize pipeline modules
-    pre = PreProcessing(method="open_close", kernel_size=5)
-    seg = Segmentation(method="threshold")
-    post = PostProcessing(kernel_open=7, kernel_close=7, area_ratio=0.005)
     vis = Visualization()
 
-    # Color space conversion
+    # hoop detection pipeline
     hsv = ColorSpace(mode="HSV").apply(image)
-    # Pre prcessing
-    pre_hsv = pre.apply(hsv)
-    # Filter only red & orange
-    filtered_hsv = filter_red_orange(pre_hsv)
-
-    # Segmentation
+    hsv_pre = pre.apply(hsv)
+    filtered_hsv = filter_red_orange(hsv_pre) # Filter only red & orange
     mask_hsv = seg.apply(filtered_hsv)
+    mask_final, ellipse_contour, ellipse_params = post.apply(mask_hsv)
 
-    # Post processing and visualization
-    mask_post = post.apply(mask_hsv)
-    final_frame = vis.apply(image, mask_post)
+    # viaualization
+    out = vis.apply(image, ellipse_contour, ellipse_params)
+    scale = 1  # rescale display
+    disp_frame = cv2.resize(out, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
+    cv2.imshow("detect result", disp_frame)
+    cv2.waitKey(0)
 
-    scale = 0.5  # rescale display
-    disp_frame = cv2.resize(final_frame, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
-    cv2.imshow("Pipeline-Result", disp_frame)
-    cv2.imwrite("results/test_result5.png", final_frame)
+    return ellipse_contour, ellipse_params
+
+
+def estimate_pose_from_contour(
+    ellipse_contour: list,
+    ellipse_params: tuple,
+    camera_matrix: np.ndarray,
+    dist_coeffs: np.ndarray,
+    hoop_radius: float = 0.63825,
+    num_samples: int = 40,
+    reprojection_error: float = 3.0,
+    max_iterations: int = 100,
+    confidence: float = 0.99
+):
+    """
+    Args:
+        ellipse_contour: Contour points of the hoop in image space (numpy array of shape (N, 1, 2))
+        ellipse_params: Fitted ellipse parameters ((center), (major, minor), angle)
+        camera_matrix: Camera's intrinsic matrix (3x3 numpy array)
+        dist_coeffs: Camera's distortion coefficients (numpy array)
+        hoop_radius: Radius of the hoop in meters (default: 0.63825)
+        num_samples: Number of points to sample from fitted ellipse (default: 8)
+        reprojection_error: Maximum reprojection error threshold for RANSAC in pixels (default: 3.0)
+        max_iterations: Maximum iterations for RANSAC (default: 100)
+        confidence: Confidence level for RANSAC 0-1 (default: 0.99)
+        min_contour_area: Minimum contour area required (default: 100.0)
+    
+    Returns:
+        success: Boolean indicating if pose estimation was successful
+        rvec: Rotation vector from camera to hoop (3x1 numpy array) or None
+        tvec: Translation vector from camera to hoop (3x1 numpy array) or None
+        c_obj: Camera position in hoop coordinates (3x1 numpy array) or None
+        ellipse: Fitted ellipse parameters ((center), (major, minor), angle) or None
+    """
+
+    # Validate contour
+    if ellipse_contour is None or len(ellipse_contour) < num_samples:
+        return False, None, None, None
+
+    # Convert list to numpy
+    ellipse_contour = np.array(ellipse_contour, dtype=np.float32)
+
+    # Uniformly sample points from contour
+    idx = np.linspace(0, len(ellipse_contour)-1, num_samples).astype(int)
+    image_points = ellipse_contour[idx]   # [N,2]
+
+    # Build 3D circular model
+    thetas = np.linspace(0, 2*np.pi, num_samples, endpoint=False).astype(np.float32)
+    object_points = np.stack([
+        hoop_radius * np.cos(thetas),
+        hoop_radius * np.sin(thetas),
+        np.zeros_like(thetas)
+    ], axis=1)
+
+    # Solve PnP RANSAC
+    success, rvec, tvec, inliers = cv2.solvePnPRansac(
+        objectPoints=object_points,
+        imagePoints=image_points,
+        cameraMatrix=camera_matrix,
+        distCoeffs=dist_coeffs,
+        reprojectionError=reprojection_error,
+        iterationsCount=max_iterations,
+        confidence=confidence,
+        flags=cv2.SOLVEPNP_EPNP  # Efficient PnP solver
+    )
+
+    if not success:
+        return False, None, None, None
+
+    # Compute camera position in hoop frame
+    R, _ = cv2.Rodrigues(rvec)
+    c_obj = -R.T @ tvec
+
+    return True, rvec, tvec, c_obj
+
+def draw_reprojected_circle(image, rvec, tvec, camera_matrix, dist_coeffs, radius=0.63):
+    img = image.copy()
+
+    # Sample many 3D points on the hoop
+    thetas = np.linspace(0, 2*np.pi, 200)
+    circle_3d = np.vstack([
+        radius * np.cos(thetas),
+        radius * np.sin(thetas),
+        np.zeros_like(thetas)
+    ]).T.astype(np.float32)
+
+    # Project them into the image
+    proj, _ = cv2.projectPoints(circle_3d, rvec, tvec, camera_matrix, dist_coeffs)
+    proj = proj.reshape(-1, 2).astype(int)
+    for p in proj:  # Draw
+        cv2.circle(img, tuple(p), 1, (0, 255, 0), 8)
+
+    return img
+
+
+if __name__ == "__main__":
+    # Fake camera data used for testing
+    camera_matrix = np.array([
+        [1200.0,    0.0, 960.0],
+        [   0.0, 1200.0, 540.0],
+        [   0.0,    0.0,   1.0]
+    ], dtype=np.float32)
+    dist_coeffs = np.zeros(5, dtype=np.float32)
+
+    image = cv2.imread("image_files/image3.png")
+    ellipse_contour, ellipse_params = detect_contour(image)
+    success, rvec, tvec, c_obj = estimate_pose_from_contour(ellipse_contour, ellipse_params, camera_matrix, dist_coeffs)
+    print(rvec)
+    print(tvec)
+
+    img_reproj = draw_reprojected_circle(image, rvec, tvec, camera_matrix, dist_coeffs)
+    cv2.imshow("Reprojected circle", img_reproj)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
