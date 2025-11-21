@@ -13,10 +13,6 @@ class HoopTrackingNode(VisionNode):
     
     def __init__(self):
         super().__init__('hoop_tracking', self.__class__.srv)
-        
-        cv2.startWindowThread()
-        cv2.namedWindow("Bruh", cv2.WINDOW_NORMAL)
-
         self.create_service(HoopTracking, self.service_name(), self.service_callback)
         
     def service_callback(self, request, response):
@@ -32,7 +28,7 @@ class HoopTrackingNode(VisionNode):
         # Detect the largest contour
         ellipse_contour, ellipse_params = detect_contour(frame)
         # PnP pose estimation
-        success, rvec, tvec, c_obj, ellipse = estimate_pose_from_contour(
+        success, rvec, tvec, c_obj = estimate_pose_from_contour(
             ellipse_contour, 
             ellipse_params,
             camera_matrix = np.array(camera_info.k).reshape(3,3),

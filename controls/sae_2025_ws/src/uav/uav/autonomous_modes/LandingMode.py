@@ -42,7 +42,7 @@ class LandingMode(Mode):
         altitude = -self.uav.get_local_position()[2]
         
         request = Landing.Request()
-        request.color = self.color
+        request.landing_color = self.color
         
         # if no pad detected, tilt and search
         response = self.send_request(LandingNode, request)
@@ -94,16 +94,16 @@ class LandingMode(Mode):
     def _search_for_pad(self) -> None:
         """
         Rotate in place by incrementing yaw angle.
-    """
+        """
         # Get current position and increment yaw
-    current_pos = self.uav.get_local_position()
-    new_yaw = self.uav.yaw + 0.05
-    
-    self.uav.publish_position_setpoint(
-        [current_pos[0], current_pos[1], current_pos[2]],
-        yaw=new_yaw,
-        relative=False
-    )
+        current_pos = self.uav.get_local_position()
+        new_yaw = self.uav.yaw + 0.05
+        
+        self.uav.publish_position_setpoint(
+            [current_pos[0], current_pos[1], current_pos[2]],
+            yaw=new_yaw,
+            relative=False
+        )
 
     def _get_pitch_from_rotation(self, rvec: np.ndarray) -> float:
         """
