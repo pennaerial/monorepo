@@ -75,7 +75,7 @@ class HoopMode(Mode):
         # Try to get PnP-based vectors if available
         hoop_cam = hoop_body = hoop_local = None
         distance = None
-        if getattr(response, "has_pose", False):
+        if getattr(response, response.has_pose, False):
             hoop_cam, hoop_body, hoop_local, distance = self._get_hoop_vectors(response)
             self.log(
                 f"Hoop pose (PnP): cam={hoop_cam}, body={hoop_body}, "
