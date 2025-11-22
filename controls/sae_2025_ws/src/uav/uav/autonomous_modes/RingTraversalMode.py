@@ -2,6 +2,7 @@ import numpy as np
 from uav import UAV
 from uav.autonomous_modes import Mode
 from rclpy.node import Node
+import math
 # from uav_interfaces.srv import PayloadTracking
 from uav.vision_nodes import RingTrackingNode
 from typing import Optional, Tuple
@@ -39,22 +40,27 @@ class RingTraversalMode(Mode):
         dir_x, dir_y, dir_z = self.latest_vec[2:5]
 
         #STATE MACHINE LOGIC
+        self.log(f"State: {self.STATE}")
 
         
-        if self.STATE is 'lateral':
+        if self.STATE == 'lateral':
             #when aligned, move to forward state
             if dir_x < 0.01 and dir_z < 0.01:
                 self.STATE = 'forward'
             else:
-                vec = np.array([dir_x / 2.0, 0.0, dir_z / 2.0]).astype('float32')
+                vec = np.array([dir_x / 1.0, 0.0, dir_z / 1.0]).astype('float32')
+                self.uav.publish_velocity(vec)
+                return
             
-        if self.STATE is 'forward': 
-            if dir_z < 40:
+        if self.STATE == 'forward': 
+            if dir_y < 0.4:
                 self.STATE = 'bullrush'
             else:
                 vec = np.array([dir_x / 10.0, dir_y / 1.5, dir_z / 10.0]).astype('float32')
+                self.uav.publish_velocity(vec)
+                return
 
-        if self.STATE is 'bullrush':
+        if self.STATE == 'bullrush':
             # Initialize timer on first entry
             if self.bullrush_start_ns is None:
                 self.bullrush_start_ns = self.node.get_clock().now().nanoseconds
@@ -62,21 +68,22 @@ class RingTraversalMode(Mode):
             # Command constant forward velocity (Y axis 0.5 m/s per publish_velocity default)
             self.uav.publish_velocity([0.0, 0.5, 0.0])
             elapsed = (self.node.get_clock().now().nanoseconds - self.bullrush_start_ns) / 1e9
-            if elapsed >= 2.0:
+            if elapsed >= 3.0:
                 self.STATE = 'lateral'
                 self.bullrush_start_ns = None
                 self.log("BULLRUSH finished – switching back to LATERAL")
             # During bullrush we already commanded velocity; skip rest of on_update
         
+        return
 
-        self.log(f"State: {self.STATE}")
+        
         # vec = np.array([dir_x / 2.0 , dir_y / 5.0, dir_z / 2.0]).astype('float32')
         # mag = np.linalg.norm(vec)
         # if mag < self.threshold:
         #     self.done = True
         #     return
         # Scale to small step proportional to magnitude
-        step = vec # already unit-ish; UAV class caps velocity
+        # step = vec # already unit-ish; UAV class caps velocity
         # Use time-based movement helper to apply this velocity for a short time
         # Start the timed movement only if one is not already active.
         # if getattr(self, '_move_velocity', None) is None:
