@@ -120,6 +120,7 @@ class VisionNode(Node):
         if self.sim:
             img_data = np.frombuffer(msg.data, dtype=np.uint8)
             frame = img_data.reshape((msg.height, msg.width, 3))  # Assuming BGR8 encoding
+            frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
         else:
             frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
         return frame

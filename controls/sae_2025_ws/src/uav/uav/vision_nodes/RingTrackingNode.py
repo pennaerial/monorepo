@@ -83,6 +83,9 @@ class RingTrackingNode(VisionNode):
             self.save_vision
         )
 
+        #we should only need center_3d
+        # center_3d, normal_3d, ellipse, used_radius, intermediate_frames = find_nearest_hoop_pose(image, camera_info_msg.k, 0.5)
+
         
 
 
