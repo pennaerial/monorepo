@@ -7,6 +7,8 @@ from .courses.ascent import AscentCourse
 from .courses.descent import DescentCourse
 from .courses.slalom import SlalomCourse
 from .courses.straight import StraightCourse
+from .courses.bezier import BezierCourse
+
 
 def add_hoops(input_file, output_file, hoop_positions):
     # Expand ~, make absolute, and validate paths
@@ -96,5 +98,13 @@ def generate_world(gen_style, course_params):
                                max_dist=course_params.max_dist,
                                height=course_params.height,
                                spacing=course_params.spacing)
+    elif gen_style.lower() == "bezier":
+        course = BezierCourse(dlz=course_params.dlz,
+                            uav=course_params.uav,
+                            num_hoops=course_params.num_hoops,
+                            max_dist=course_params.max_dist,
+                            height=course_params.height,
+                            lateral_offset=course_params.lateral_offset)
         hoop_poses = course.generate_course()
+
     add_hoops(input_file=course_params.ip_file, output_file=course_params.op_file, hoop_positions=hoop_poses)

@@ -8,7 +8,7 @@ competition:
 
 # Course Configuration
 course:
-  type: "slalom"    # Options: "slalom", "ascent", "descent", "random"
+  type: "bezier"    # Options: "slalom", "ascent", "descent", "random"
   
   # Course-specific parameters
   slalom:
@@ -40,6 +40,15 @@ course:
     max_dist: 10          # Total course length ~10m
     height: 2.0           # All hoops at 2m height
     spacing: 2.0          # 2m between hoops
+  
+  bezier:
+    dlz: [10, 5, 0]        # Drop zone at origin
+    uav: [0, 0, 0]        # UAV starts at origin
+    num_hoops: 10          # 5 hoops in a line
+    max_dist: 1          # Total course length ~10m
+    lateral_offset: 4
+    height: 4
+
 
 # Simulation Configuration
 simulation:
