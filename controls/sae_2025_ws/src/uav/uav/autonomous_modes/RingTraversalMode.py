@@ -16,6 +16,7 @@ class RingTraversalMode(Mode):
         self.threshold = threshold  # magnitude when close enough
         self.latest_vec = None  # store last Float64MultiArray
         self.STATE = 'lateral'
+        self.bullrush_start_ns = None  # timer anchor for bullrush duration
 
         self.sub = node.create_subscription(
             Float64MultiArray,
@@ -48,7 +49,25 @@ class RingTraversalMode(Mode):
                 vec = np.array([dir_x / 2.0, 0.0, dir_z / 2.0]).astype('float32')
             
         if self.STATE is 'forward': 
-            vec = np.array([dir_x / 10.0, dir_y / 1.5, dir_z / 10.0]).astype('float32')
+            if dir_z < 40:
+                self.STATE = 'bullrush'
+            else:
+                vec = np.array([dir_x / 10.0, dir_y / 1.5, dir_z / 10.0]).astype('float32')
+
+        if self.STATE is 'bullrush':
+            # Initialize timer on first entry
+            if self.bullrush_start_ns is None:
+                self.bullrush_start_ns = self.node.get_clock().now().nanoseconds
+                self.log("Entering BULLRUSH: starting 2-second forward drive")
+            # Command constant forward velocity (Y axis 0.5 m/s per publish_velocity default)
+            self.uav.publish_velocity([0.0, 0.5, 0.0])
+            elapsed = (self.node.get_clock().now().nanoseconds - self.bullrush_start_ns) / 1e9
+            if elapsed >= 2.0:
+                self.STATE = 'lateral'
+                self.bullrush_start_ns = None
+                self.log("BULLRUSH finished – switching back to LATERAL")
+            # During bullrush we already commanded velocity; skip rest of on_update
+        
 
         self.log(f"State: {self.STATE}")
         # vec = np.array([dir_x / 2.0 , dir_y / 5.0, dir_z / 2.0]).astype('float32')
@@ -60,9 +79,9 @@ class RingTraversalMode(Mode):
         step = vec # already unit-ish; UAV class caps velocity
         # Use time-based movement helper to apply this velocity for a short time
         # Start the timed movement only if one is not already active.
-        if getattr(self, '_move_velocity', None) is None:
-            # adjust duration as needed (seconds)
-            self.move_for_duration(step, duration_s=0.2, rate_hz=10)
+        # if getattr(self, '_move_velocity', None) is None:
+        #     # adjust duration as needed (seconds)
+        #     self.move_for_duration(step, duration_s=0.2, rate_hz=10)
 
     def check_status(self):
         return 'complete' if getattr(self, 'done', False) else 'continue'
