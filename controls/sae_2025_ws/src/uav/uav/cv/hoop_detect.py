@@ -191,7 +191,7 @@ def detect_contour(image):
         ([0, 80, 80], [10, 255, 255]),
         ([170, 80, 80], [180, 255, 255]),
         ([10, 80, 80], [25, 255, 255]),
-        ([100, 80, 60], [130, 255, 255])      # <-- blue range
+        ([100, 80, 60], [130, 255, 255])
     ]
     filtered_hsv = filter_hsv_ranges(hsv, hsv_ranges)
 
@@ -306,13 +306,13 @@ def draw_reprojected_circle(image, rvec, tvec, camera_matrix, dist_coeffs, radiu
 if __name__ == "__main__":
     # Fake camera data used for testing
     camera_matrix = np.array([
-        [1200.0,    0.0, 960.0],
-        [   0.0, 1200.0, 540.0],
-        [   0.0,    0.0,   1.0]
+    [539.9363327026367,    0.0, 640.0],
+    [   0.0, 539.9363708496094, 480.0],
+    [   0.0,    0.0,   1.0]
     ], dtype=np.float32)
     dist_coeffs = np.zeros(5, dtype=np.float32)
 
-    image = cv2.imread("image_files/image3.png")
+    image = cv2.imread("image_files/image.png")
     ellipse_contour, ellipse_params = detect_contour(image)
     success, rvec, tvec, c_obj = estimate_pose_from_contour(ellipse_contour, ellipse_params, camera_matrix, dist_coeffs)
     print(rvec)
