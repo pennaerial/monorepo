@@ -2,19 +2,11 @@
 
 import rclpy
 from rclpy.node import Node
-from px4_msgs.msg import VehicleLocalPosition, VehicleAttitude
-from geometry_msgs.msg import Point
-from typing import Optional, Tuple, Dict, Any
-import threading
-import time
-import numpy as np
 import yaml
 import importlib
 import inspect
 import ast
 from rclpy.executors import MultiThreadedExecutor
-from sim.world_gen import WorldNode
-from sim.scoring import ScoringNode
 
 class SimOrchestrator(Node):
     """
@@ -23,8 +15,8 @@ class SimOrchestrator(Node):
     
     def __init__(self, yml_path):
         super().__init__('sim_orchestrator')
-        print("Orhc NODE!!!!!!!!!!!!!")
-        print(yml_path)
+        print("Orchestrator Node")
+        print(f"YAML path: {yml_path}")
         sim_params = self.load_yaml_to_dict(yml_path)
         world_params = sim_params['world']
         self.world_node = self.initialize_mode(world_params['class'], world_params['params'])
@@ -33,14 +25,14 @@ class SimOrchestrator(Node):
 
     
     def initialize_mode(self, node_path: str, params: dict) -> Node:
-        print(params)
+        print(f"SimOrchestrator Mode Parameters: {params}")
         module_name, class_name = node_path.rsplit('.', 1)
         module = importlib.import_module(module_name)
         node_class = getattr(module, class_name)
 
         signature = inspect.signature(node_class.__init__)
         args = {}
-        print(signature.parameters.items())
+        print(f"SimOrchestrator Mode Signature: {signature.parameters.items()}")
         for name, param in signature.parameters.items():
             if name == 'self':
                 continue
@@ -94,7 +86,7 @@ class SimOrchestrator(Node):
         Returns:
             dict: The yaml file as a dictionary.
         """
-        with open(filename, 'r') as file:
+        with open(filename, 'r', encoding='utf-8') as file:
             data = yaml.safe_load(file)
         return data
 
@@ -114,22 +106,3 @@ class SimOrchestrator(Node):
             self.world_node.destroy_node()
             self.scoring_node.destroy_node()
 
-
-
-# def main(args=None):
-#     """Test the SimBase class."""
-#     rclpy.init(args=args)
-    
-#     sim_base = SimOrchestrator()
-    
-#     try:
-#         rclpy.spin(sim_base)
-#     except KeyboardInterrupt:
-#         pass
-#     finally:
-#         sim_base.destroy_node()
-#         rclpy.shutdown()
-
-
-# if __name__ == '__main__':
-#     main()

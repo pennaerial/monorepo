@@ -2,9 +2,7 @@
 mission_name: test_straight_course
 uav_debug: false
 vision_debug: false
-sim: true
-sim_name: 'in_house'
-run_mission: true
+run_mission: false
 vehicle_type: 0 # 0 for quadrotor, 1 for tiltrotor VTOL, 2 for fixed-wing, 3 for standard VTOL
 save_vision: false
 servo_only: false
@@ -12,3 +10,8 @@ camera_offsets: [0, 0, 0] #Should denote the position of the camera relative to 
                               # In NED frame: x is forward, y is right, and z is down.
 
 sim: true
+sim_name: 'in_house'  # Options: "in_house", "iarc", "custom"
+# Simulation-specific parameters
+enable_scoring: true   # Enable scoring node
+generation_type: null  # TODO: Add generation type
+hardcode_path: false   # Hardcode PX4 path instead of searching
