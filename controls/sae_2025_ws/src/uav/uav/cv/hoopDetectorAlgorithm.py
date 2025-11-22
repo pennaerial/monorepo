@@ -302,6 +302,12 @@ def detect_ellipses_fast_tuned(frame_bgr, debug=False) -> Tuple[List, Dict[str, 
 # --- PnP with Multiple Sizes (Unchanged) ---
 def solve_ellipse_pnp_approx(K, ellipse, ring_radius_m) -> Optional[Tuple[np.ndarray, np.ndarray]]:
     """Simple PnP for single ring size."""
+    K = np.array([
+    [539.9363327,   0.0,          640.0],
+    [0.0,           539.9363708,  480.0],
+    [0.0,           0.0,            1.0]
+    ])
+
     fx, fy = K[0, 0], K[1, 1]
     cx0, cy0 = K[0, 2], K[1, 2]
     (cx, cy), (MA, ma), ang = ellipse
@@ -336,7 +342,6 @@ def find_nearest_hoop_pose(bgr_image, K, ring_radius_m):
     Main detection function that finds the nearest valid hoop pose.
     """
     ellipses, intermediate_frames = detect_ellipses_fast_tuned(bgr_image, debug=True)
-    
     if not ellipses:
         return None, intermediate_frames
     
@@ -346,7 +351,7 @@ def find_nearest_hoop_pose(bgr_image, K, ring_radius_m):
         radii_to_try = ring_radius_m
     else:
         radii_to_try = [ring_radius_m]
-    
+
     for ellipse in ellipses:
         for radius in radii_to_try:
             pose_result = solve_ellipse_pnp_approx(K, ellipse, radius)
@@ -359,6 +364,8 @@ def find_nearest_hoop_pose(bgr_image, K, ring_radius_m):
                     'ellipse': ellipse,
                     'used_radius': radius
                 })
+    
+
     
     if not hoop_candidates:
         return None, intermediate_frames
