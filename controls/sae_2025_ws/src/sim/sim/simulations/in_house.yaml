@@ -2,7 +2,7 @@
 world:
     class: sim.world_gen.HoopCourseNode
     params:
-      course: "bezier"
+      course: "ascent"
       dlz: '[10, 5, 0]'      # Drop zone coordinates [x, y, z]
       uav: '[0, 0, 0]'       # UAV starting position [x, y, z]
       num_hoops: 10          # Number of hoops to generate

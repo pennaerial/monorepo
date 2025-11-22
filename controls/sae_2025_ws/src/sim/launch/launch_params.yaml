@@ -1,3 +1,4 @@
 competition: "in_house"  # Options: "in_house", "iarc", "custom"
 enable_scoring: true   # Enable scoring node
 generation_type: None # TODO: Add generation type
+hardcode_path: false

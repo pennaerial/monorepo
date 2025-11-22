@@ -3,15 +3,18 @@ import rclpy
 import sys
 import os
 from sim.SimOrchestrator import SimOrchestrator
+import shutil
+from pathlib import Path
 
 def main():
     debug = sys.argv[1]
     yaml_file = sys.argv[2]
     competition = sys.argv[3]
-    import shutil
-    from pathlib import Path
 
     src_models_dir = os.path.join(os.getcwd(), "src", "sim", "sim", "world_gen", "models")
+    # Ensure output directory exists
+    os.makedirs(os.path.dirname(os.path.expanduser(f"~/.simulation-gazebo/worlds/{competition}.sdf")), exist_ok=True)
+
     dst_models_dir = os.path.expanduser("~/.simulation-gazebo/models")
 
     # Only copy if source exists and it's a directory

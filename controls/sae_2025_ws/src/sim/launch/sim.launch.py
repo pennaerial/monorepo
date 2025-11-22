@@ -1,46 +1,38 @@
 #!/usr/bin/env python3
 
 import os
-import yaml
+
 from launch import LaunchDescription
-from launch.actions import ExecuteProcess, LogInfo, RegisterEventHandler, OpaqueFunction, DeclareLaunchArgument
+from launch.actions import ExecuteProcess, LogInfo, RegisterEventHandler, OpaqueFunction, DeclareLaunchArgument, TimerAction
 from launch_ros.actions import Node
 from launch.substitutions import LaunchConfiguration
 from launch.event_handlers import OnProcessStart
 
 
-def load_launch_params():
-    """Load parameters from launch_params.yaml file."""
-    launch_file_dir = os.path.dirname(os.path.abspath(__file__))
-    params_file = os.path.join(launch_file_dir, 'launch_params.yaml')
-    
-    try:
-        with open(params_file, 'r') as f:
-            params = yaml.safe_load(f)
-        return params
-    except FileNotFoundError:
-        print(f"Warning: {params_file} not found")
-
-
 def launch_setup(context, *args, **kwargs):
     """Setup launch configuration."""
-    
-    # Load parameters from YAML file
-    params = load_launch_params()
+    # Get launch arguments
     model = LaunchConfiguration('model').perform(context)
     px4_path = LaunchConfiguration('px4_path').perform(context)
+    competition = LaunchConfiguration('competition').perform(context)
+    enable_scoring = LaunchConfiguration('enable_scoring').perform(context)
+    generation_type = LaunchConfiguration('generation_type').perform(context)
 
     if model is None or px4_path is None:
         raise RuntimeError("Model and PX4 path are required")
-
+    
+    # Expand user home directory path (e.g., ~/PX4-Autopilot -> /home/user/PX4-Autopilot)
+    px4_path = os.path.expanduser(px4_path)
+    
+    # Default competition if not provided
+    if competition is None or competition == '':
+        competition = 'in_house'
+    
     sae_ws_path = os.getcwd()
-    
-    YAML_PATH = os.path.join(sae_ws_path, 'src', 'sim', 'sim', 'simulations', f"{params['competition']}.yaml")
-    # Ensure output directory exists
-    os.makedirs(os.path.dirname(os.path.expanduser(f"~/.simulation-gazebo/worlds/{params['competition']}.sdf")), exist_ok=True)
-    
+    YAML_PATH = os.path.join(sae_ws_path, 'src', 'sim', 'sim', 'simulations', f"{competition}.yaml")
+        
     spawn_world = ExecuteProcess(
-        cmd=['python3', 'Tools/simulation/gz/simulation-gazebo', f"--world={params['competition']}"],
+        cmd=['python3', 'Tools/simulation/gz/simulation-gazebo', f"--world={competition}"],
         cwd=px4_path,
         output='screen',
         name='launch world'
@@ -51,7 +43,7 @@ def launch_setup(context, *args, **kwargs):
     sim = Node(
         package='sim',
         executable='simulation',
-        arguments=[uav_debug, YAML_PATH, params['competition']],
+        arguments=[uav_debug, YAML_PATH, competition],
         output='screen',
         emulate_tty=True,
         name='sim'
@@ -91,7 +83,7 @@ def launch_setup(context, *args, **kwargs):
     
     # Build and return the complete list of actions
     return [
-        LogInfo(msg=f"Launching {params['competition']} competition: with model {model}"),
+        LogInfo(msg=f"Launching {competition} competition: with model {model}"),
         spawn_world,
         RegisterEventHandler(
             OnProcessStart(target_action=spawn_world, on_start=[gz_ros_bridge_camera, gz_ros_bridge_camera_info, LogInfo(msg="World Launched.")])
@@ -105,5 +97,8 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument('model', default_value='gz_x500_mono_cam'),
         DeclareLaunchArgument('px4_path', default_value='~/PX4-Autopilot'),
+        DeclareLaunchArgument('competition', default_value='in_house', description='Competition name (e.g., in_house, iarc, custom)'),
+        DeclareLaunchArgument('enable_scoring', default_value='true', description='Enable scoring node'),
+        DeclareLaunchArgument('generation_type', default_value='', description='Generation type (optional)'),
         OpaqueFunction(function=launch_setup)
     ])
