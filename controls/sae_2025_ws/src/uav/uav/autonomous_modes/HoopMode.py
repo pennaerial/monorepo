@@ -65,7 +65,7 @@ class HoopMode(Mode):
             else:
                 # Keep moving forward
                 self.log("Mode 2: Publishing (0, 1, 0)")
-                self.uav.publish_position_setpoint((0, 1, 0), relative=True)
+                self.uav.publish_position_setpoint((0, 0.5, 0), relative=True)
             return
 
         if self.mode == 3:
@@ -108,9 +108,9 @@ class HoopMode(Mode):
 
         #edits 
 
-        direction[0] = -direction[0]/2  # Left / Right
+        direction[0] = -direction[0]/3  # Left / Right
         direction[1] = 0  # Forward  / Back
-        direction[2] = direction[2]/2 # Up / Down 
+        direction[2] = direction[2]/3 # Up / Down 
         
         # Not centered yet - adjust position without moving forward
         # The direction vector points FROM drone TO hoop, so we use it directly to move toward the hoop
