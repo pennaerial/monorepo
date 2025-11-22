@@ -116,30 +116,29 @@ class RingTrackingNode(VisionNode):
         
 
         #we should only need center_3d
-        result = find_nearest_hoop_pose(image, camera_info_msg.k, 1)
+        result = find_nearest_hoop_pose(image, camera_info_msg.k, 0.5)
 
 
 
         if len(result) == 2:
             self.display_frame(image, self.node_name())
 
-            # result_data, intermediate_frames = result
-            # result_data = None
-            print("not detecting")
+            result_data, intermediate_frames = result
+            result_data = None
+            print("not detecting anyyyything")
             dummy = self.publish_msg_type()
             dummy.data = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]  # x,y,dir_x,dir_y,dir_z,flag
             self.ring_pub.publish(dummy)
             return
         else:
             center_3d, normal_3d, ellipse, used_radius, annotated_frame = result
-            # result_data = (center_3d, normal_3d, ellipse, used_radius)
             self.display_frame(annotated_frame, self.node_name())
 
+            # result_data = (center_3d, normal_3d, ellipse, used_radius)
 
 
 
         if center_3d is not None:
-            print("center_found")
             dir_x, dir_z, dir_y = center_3d
 
             #need to flip direction of the z axis because in gazebo, up is negative z

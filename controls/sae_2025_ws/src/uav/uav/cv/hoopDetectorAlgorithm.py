@@ -48,7 +48,34 @@ def get_default_K(W=BASE_W, H=BASE_H, hfov_deg=HFOV_DEG_DEFAULT):
     cx, cy = W/2, H/2
     return np.array([[fx,0,cx],[0,fy,cy],[0,0,1]], np.float64)
 
-# --- Ellipse/Pose Drawing Helper (NEW) ---
+def draw_ellipse_on_frame(frame: np.ndarray, ellipse, color=(0, 255, 0), thickness: int = 2):
+    """Draws the given *ellipse* on a copy of *frame* and returns the annotated image.
+    
+    Parameters
+    ----------
+    frame : np.ndarray
+        Input BGR image.
+    ellipse : Tuple[((float,float), (float,float), float)]
+        OpenCV ellipse tuple as returned by cv2.fitEllipse.*
+    color : Tuple[int, int, int], optional
+        BGR color for drawing, by default green.
+    thickness : int, optional
+        Line thickness, by default 2.
+    
+    Returns
+    -------
+    np.ndarray
+        A copy of *frame* with the ellipse (and its center) drawn on it.
+    """
+    # Work on a copy so we don't mutate caller's frame in-place
+    annotated = frame.copy()
+    cv2.ellipse(annotated, ellipse, color, thickness, cv2.LINE_AA)
+    # Draw center point for clarity
+    (cx, cy), _axes, _angle = ellipse
+    cv2.circle(annotated, (int(round(cx)), int(round(cy))), 4, color, -1)
+    return annotated
+
+# --- Ellipse/Pose Drawing Helper (renamed old complex variant) ---
 def _draw_hoop_pose_on_frame(frame, K, center_3d, normal_3d, ellipse, color, text_info=None):
     """Internal helper to draw 2D ellipse, center, and projected normal."""
     # Draw ellipse
@@ -343,7 +370,7 @@ def find_nearest_hoop_pose(bgr_image, K, ring_radius_m):
     """
     ellipses, intermediate_frames = detect_ellipses_fast_tuned(bgr_image, debug=True)
     if not ellipses:
-        return None, draw_frame
+        return None, intermediate_frames
     
     hoop_candidates = []
     
@@ -376,20 +403,23 @@ def find_nearest_hoop_pose(bgr_image, K, ring_radius_m):
     # --- NEW: Draw the final selected hoop pose (including normal) onto the ellipse candidates frame ---
     draw_frame = intermediate_frames['04_Ellipse_Candidates']
     
-    # Draw the best candidate in a distinct color (e.g., Blue: 255, 0, 0 in BGR)
-    _draw_hoop_pose_on_frame(
-        draw_frame,
-        K,
-        nearest_hoop['center_3d'],
-        nearest_hoop['normal_3d'],
-        nearest_hoop['ellipse'],
-        color=(255, 0, 0), # Blue
-        text_info=[f"FINAL D:{nearest_hoop['depth']:.1f}", 
-                   f"N Z:{nearest_hoop['normal_3d'][2]:.2f}"]
-    )
+    # # Draw the best candidate in a distinct color (e.g., Blue: 255, 0, 0 in BGR)
+    # _draw_hoop_pose_on_frame(
+    #     draw_frame,
+    #     K,
+    #     nearest_hoop['center_3d'],
+    #     nearest_hoop['normal_3d'],
+    #     nearest_hoop['ellipse'],
+    #     color=(255, 0, 0), # Blue
+    #     text_info=[f"FINAL D:{nearest_hoop['depth']:.1f}", 
+    #                f"N Z:{nearest_hoop['normal_3d'][2]:.2f}"]
+    # )
+
+    annotated_frame = draw_ellipse_on_frame(draw_frame, nearest_hoop['ellipse'], color=(255, 0, 0))
+
     
     return (nearest_hoop['center_3d'], nearest_hoop['normal_3d'], 
-            nearest_hoop['ellipse'], nearest_hoop['used_radius'], draw_frame)
+            nearest_hoop['ellipse'], nearest_hoop['used_radius'], annotated_frame)
 
 # --- Visualization (Updated to use helper) ---
 def draw_hoop_pose_overlay(frame, K, center_3d, normal_3d, ellipse, used_radius=None):
