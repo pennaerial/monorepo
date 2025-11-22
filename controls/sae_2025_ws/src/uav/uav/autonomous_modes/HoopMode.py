@@ -90,7 +90,7 @@ class HoopMode(Mode):
         if self.state == "searching":
             self._handle_searching(response, time_delta)
         elif self.state == "centering":
-            self._handle_centering(response, time_delta)
+            self._handle_centering(response)
         elif self.state == "flying_through":
             self._handle_flying_through()
 
@@ -122,14 +122,17 @@ class HoopMode(Mode):
             self.state = "searching"
             self.wait_time = 20
             return
+        
+        self.log(self.hoop_position)
             
-        self.hoop_position = response.t_vec
-
         hoop_ned = np.array([
-            self.hoop_position[0],
             -self.hoop_position[1],
+            self.hoop_position[0],
             -self.hoop_position[2]
         ])
+
+        # -response.direction[1], response.direction[0],
+        #                 response.direction[2]
 
         centered_y = abs(hoop_ned[1]) <= self.center_threshold_y
         centered_z = abs(hoop_ned[2]) <= self.center_threshold_z
@@ -145,8 +148,9 @@ class HoopMode(Mode):
             hoop_ned[2]
         ])
 
-        self.log("centering - y offset: {hoop_ned[1]:.3f}, z offset: {hoop_ned[2]:.3f}")
+        # self.log("centering - y offset: {hoop_ned[1]:.3f}, z offset: {hoop_ned[2]:.3f}")
         self.uav.publish_position_setpoint(correction.tolist(), relative=True)
+        self.log(f"Centering hoop - y offset: {hoop_ned[1]:.3f}, z offset: {hoop_ned[2]:.3f}")
 
     def _handle_flying_through(self):
         "fly forward through the centered hoop"
@@ -158,7 +162,8 @@ class HoopMode(Mode):
         forward_distance = self.hoop_position[0] + 0.5  # added buffer of 0.5m but we can change if needed
 
         #moving forward to hoop center
-        direction = [forward_distance, 0.0, 0.0]
+        self.log("Flying through hoop")
+        direction = [0.0, forward_distance, -0.04]
         self.uav.publish_position_setpoint(direction, relative=True)
 
         if self.drone_position is not None:
@@ -185,8 +190,6 @@ class HoopMode(Mode):
                     self.hoop_position = None
                 return
         
-        self.log(f"Flying through hoop - distance to hoop center: {distance_to_hoop:.3f} m")
-
 
         ##self.wait_time = 20
 

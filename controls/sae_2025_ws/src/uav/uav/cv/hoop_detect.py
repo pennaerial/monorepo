@@ -312,7 +312,7 @@ if __name__ == "__main__":
     ], dtype=np.float32)
     dist_coeffs = np.zeros(5, dtype=np.float32)
 
-    image = cv2.imread("image_files/image.png")
+    image = cv2.imread("image_files/image3.png")
     ellipse_contour, ellipse_params = detect_contour(image)
     success, rvec, tvec, c_obj = estimate_pose_from_contour(ellipse_contour, ellipse_params, camera_matrix, dist_coeffs)
     print(rvec)
