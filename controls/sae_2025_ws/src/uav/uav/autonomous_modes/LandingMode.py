@@ -82,12 +82,12 @@ class LandingMode(Mode):
             ned_direction[2] = 0.3 * time_delta
         
         # keep pitch from rotation vector to keep pad in view
-        self.uav.publish_attitude_setpoint(
-            roll=0.0,
-            pitch=pitch_from_rvec,
-            yaw=self.uav.yaw,
-            thrust=0.5
-        )
+        # self.uav.publish_attitude_setpoint(
+        #     roll=0.0,
+        #     pitch=pitch_from_rvec,
+        #     yaw=self.uav.yaw,
+        #     thrust=0.5
+        # )
         
         self.uav.publish_position_setpoint(ned_direction, relative=True)
 
@@ -144,6 +144,6 @@ class LandingMode(Mode):
     def check_status(self) -> str:
         """Check status of landing."""
         if self.done:
-            return "landed"
+            return "terminate"
         else:
             return "continue"

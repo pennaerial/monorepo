@@ -25,14 +25,14 @@ class HoopMode(Mode):
         super().__init__(node, uav)
 
         self.response = None 
-        self.altitude_constant: int = 1
+        self.altitude_constant: float = 0.25
         self.done: bool = False
         self.wait_time: float = 20.0 # delay in s
         self.num_hoops: int = num_hoops
         self.passed_hoops: list[tuple[float, float, float]] = []      # list of coordinates of all passed hoops
-        self.goal_pos: tuple[float, float, float] = None
-        self.rotation_vec: tuple[float, float, float] = None
-        self.success: bool = None
+        self.goal_pos: tuple[float, float, float] = ()
+        self.rotation_vec: tuple[float, float, float] = () 
+        self.success: bool = False
 
 
     def on_update(self, time_delta: float) -> None:
@@ -49,9 +49,9 @@ class HoopMode(Mode):
             time_delta = 0
         
         # If no hoop detected, start counting down the wait time
-        if not response:
-            # direction = [0, 0, -self.altitude_constant] # start going upwards
-            # self.uav.publish_position_setpoint(direction, relative=True)
+        if not response and len(self.goal_pos) == 0:
+            direction = [0, 0, -self.altitude_constant] # start going upwards
+            self.uav.publish_position_setpoint(direction, relative=True)
             self.wait_time -= time_delta
 
             if len(self.passed_hoops) >= self.num_hoops or self.wait_time <= 0: # if 20 seconds has elapsed with no response
@@ -60,14 +60,18 @@ class HoopMode(Mode):
             return
         
         self.wait_time = 20
-        self.success = response.success
-        self.goal_pos = response.t_vec
-        self.rotation_vec = response.r_vec
+
+        # if no goal_pos
+        if len(self.goal_pos) == 0:
+            self.success = response.success
+            self.goal_pos = response.t_vec
+            self.rotation_vec = response.r_vec
 
         if self.success:
             self.uav.publish_position_setpoint(self.goal_pos)
             if self.uav.distance_to_waypoint('LOCAL', self.goal_pos) <= 0.05:
                 self.passed_hoops.append(self.goal_pos)
+                self.goal_pos = () 
                 if len(self.passed_hoops) >= self.num_hoops:
                     self.done = True
                     return
@@ -75,11 +79,12 @@ class HoopMode(Mode):
         
         direction = [ -response.t_vec[1], response.t_vec[0], response.t_vec[2] ]
         
-        # camera_offsets = tuple(x / request.altitude for x in self.uav.camera_offsets) if request.altitude > 1 else self.uav.camera_offsets
-        # direction = [x + y for x, y in zip(direction, self.uav.uav_to_local(camera_offsets))]
+        camera_offsets = self.uav.camera_offsets
+        direction = [x + y for x, y in zip(direction, self.uav.uav_to_local(camera_offsets))]
 
-        self.log(f"Direction: {direction}")
-        self.uav.publish_position_setpoint(direction, relative=True)
+
+        self.log(f"Direction: {self.goal_pos}")
+        self.uav.publish_position_setpoint(self.goal_pos, relative=True)
     
     def check_status(self) -> str:
         """
