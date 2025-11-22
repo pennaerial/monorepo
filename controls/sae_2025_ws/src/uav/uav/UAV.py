@@ -51,6 +51,7 @@ class UAV:
         self.component_id = 1
         
         self.max_acceleration = 0.001
+        self.max_velocity = 0.1  # <--- cap for commanded speed (m/s)
 
         self.camera_offsets = camera_offsets
         
@@ -181,7 +182,7 @@ class UAV:
             relative (bool): If True, the position is relative to the current local position.
         """
         x, y, z = coordinate
-        if relative:
+        if relative and self.local_position is not None:
             x += self.local_position.x
             y += self.local_position.y
             z += self.local_position.z
@@ -189,10 +190,30 @@ class UAV:
         msg.position = [float(x), float(y), float(z)]
         msg.yaw = self.calculate_yaw(x, y) if calculate_yaw else yaw if yaw else float(self.yaw)
         msg.timestamp = int(self.node.get_clock().now().nanoseconds / 1000)
-        norm_dir = np.array([x, y, z]) / np.linalg.norm(np.array([x, y, z]))
-        msg.velocity = [norm_dir[0] * self.max_acceleration, norm_dir[1] * self.max_acceleration, norm_dir[2] * self.max_acceleration]
+
+        # ---- Velocity capping ----
+        if self.local_position is not None:
+            dir_vec = np.array([
+                x - self.local_position.x,
+                y - self.local_position.y,
+                z - self.local_position.z
+            ], dtype=float)
+            dist = np.linalg.norm(dir_vec)
+            if dist > 1e-3:
+                norm_dir = dir_vec / dist
+                vel_vec = norm_dir * min(self.max_velocity, dist)  # cap speed
+            else:
+                vel_vec = np.zeros(3)
+        else:
+            # If we don't yet have a local position estimate, command zero velocity
+            vel_vec = np.zeros(3)
+
+        msg.velocity = vel_vec.tolist()
+        # Retain acceleration field for PX4 compatibility but fill with small values
+        msg.acceleration = [float('nan')] * 3
+
         self.trajectory_publisher.publish(msg)
-        self.node.get_logger().info(f"Publishing setpoint: pos={[x, y, z]}, yaw={msg.yaw:.2f}")
+        self.node.get_logger().info(f"Publishing setpoint: pos={[x, y, z]}, yaw={msg.yaw:.2f}, vel={vel_vec}")
         
     def calculate_yaw(self, x: float, y: float) -> float:
         """Calculate the yaw angle to point towards the next waypoint."""
