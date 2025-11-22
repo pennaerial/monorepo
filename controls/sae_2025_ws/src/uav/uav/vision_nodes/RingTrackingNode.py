@@ -69,6 +69,14 @@ class RingTrackingNode(VisionNode):
         # Acquire newest data via helper (now guaranteed to be non-None)
         image_msg, camera_info_msg = self.request_data(cam_image=True, cam_info=True)
 
+        # Sanity checks: ensure buffers are populated
+        if image_msg is None or len(image_msg.data) < 10:
+            self.get_logger().debug("RingTrackingNode: empty image_msg, skipping.")
+            return
+        if camera_info_msg is None or len(camera_info_msg.k) != 9:
+            self.get_logger().debug("RingTrackingNode: incomplete camera_info, skipping.")
+            return
+
         image = self.convert_image_msg_to_frame(image_msg)
         # image = self.bridge.imgmsg_to_cv2(image_msg, desired_encoding='bgr8')
 
@@ -127,7 +135,7 @@ class RingTrackingNode(VisionNode):
 
 
 
-        if center_3d != []:
+        if center_3d is not None:
             dir_x, dir_z, dir_y = center_3d
 
             #need to flip direction of the z axis because in gazebo, up is negative z
