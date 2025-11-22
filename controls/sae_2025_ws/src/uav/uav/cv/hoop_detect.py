@@ -163,6 +163,12 @@ class Visualization:
 
         return result
 
+def filter_hsv_ranges(hsv_img, ranges):
+    mask = np.zeros(hsv_img.shape[:2], dtype=np.uint8)
+    for (lower, upper) in ranges:
+        mask |= cv2.inRange(hsv_img, np.array(lower), np.array(upper))
+    return mask
+
 
 def detect_contour(image):
     """
@@ -180,8 +186,19 @@ def detect_contour(image):
     # hoop detection pipeline
     hsv = ColorSpace(mode="HSV").apply(image)
     hsv_pre = pre.apply(hsv)
-    filtered_hsv = filter_red_orange(hsv_pre) # Filter only red & orange
-    mask_hsv = seg.apply(filtered_hsv)
+    # include blue
+    hsv_ranges = [
+        ([0, 80, 80], [10, 255, 255]),
+        ([170, 80, 80], [180, 255, 255]),
+        ([10, 80, 80], [25, 255, 255]),
+        ([100, 80, 60], [130, 255, 255])      # <-- blue range
+    ]
+    filtered_hsv = filter_hsv_ranges(hsv, hsv_ranges)
+
+    mask_hsv = filtered_hsv  # do NOT threshold again
+
+    # filtered_hsv = filter_red_orange(hsv_pre) # Filter only red & orange
+    # mask_hsv = seg.apply(filtered_hsv)
     mask_final, ellipse_contour, ellipse_params = post.apply(mask_hsv)
 
     # viaualization
