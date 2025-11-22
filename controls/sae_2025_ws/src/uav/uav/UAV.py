@@ -50,7 +50,7 @@ class UAV:
         self.system_id = 1
         self.component_id = 1
         
-        self.max_acceleration = 0.01
+        self.max_acceleration = 0.001
 
         self.camera_offsets = camera_offsets
         

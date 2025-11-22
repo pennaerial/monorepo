@@ -125,7 +125,6 @@ class RingTrackingNode(VisionNode):
 
             result_data, intermediate_frames = result
             result_data = None
-            print("not detecting anyyyything")
             dummy = self.publish_msg_type()
             dummy.data = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]  # x,y,dir_x,dir_y,dir_z,flag
             self.ring_pub.publish(dummy)
@@ -142,13 +141,12 @@ class RingTrackingNode(VisionNode):
             dir_x, dir_z, dir_y = center_3d
 
             #need to flip direction of the z axis because in gazebo, up is negative z
-            dir_z = -dir_z
+            # dir_z = -dir_z
             good = self.publish_msg_type()
             good.data = [0.0, 0.0, dir_x, dir_y, dir_z, 0.0]  # x,y,dir_x,dir_y,dir_z,flag
             self.ring_pub.publish(good)
             return
         else:
-            print("not detecting anyyyything")
             dummy = self.publish_msg_type()
             dummy.data = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]  # x,y,dir_x,dir_y,dir_z,flag
             self.ring_pub.publish(dummy)
