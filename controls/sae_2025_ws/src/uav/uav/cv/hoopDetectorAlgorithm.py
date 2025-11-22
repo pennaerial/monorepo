@@ -343,7 +343,7 @@ def find_nearest_hoop_pose(bgr_image, K, ring_radius_m):
     """
     ellipses, intermediate_frames = detect_ellipses_fast_tuned(bgr_image, debug=True)
     if not ellipses:
-        return None, intermediate_frames
+        return None, draw_frame
     
     hoop_candidates = []
     
@@ -389,7 +389,7 @@ def find_nearest_hoop_pose(bgr_image, K, ring_radius_m):
     )
     
     return (nearest_hoop['center_3d'], nearest_hoop['normal_3d'], 
-            nearest_hoop['ellipse'], nearest_hoop['used_radius'], intermediate_frames)
+            nearest_hoop['ellipse'], nearest_hoop['used_radius'], draw_frame)
 
 # --- Visualization (Updated to use helper) ---
 def draw_hoop_pose_overlay(frame, K, center_3d, normal_3d, ellipse, used_radius=None):
