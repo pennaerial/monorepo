@@ -1,0 +1,29 @@
+# Vision-based waypoint collection mission
+# Detects hoops one at a time, navigates to each sequentially
+start:
+  class: "uav.autonomous_modes.HoopWaypointCollectionMode"
+  params:
+    initial_altitude: "2.0"       # Starting altitude (will be adjusted by vision)
+    waypoint_tolerance: "0.5"     # 0.5m tolerance for waypoint collection
+    min_hoops: "1"                # Collect exactly 1 hoop before navigating
+    max_hoops: "1"                # Only collect 1 hoop at a time
+    collection_timeout: "30.0"   # 30 second timeout per hoop detection
+    forward_speed: "1.0"          # Move forward at 1 m/s while collecting
+  transitions:
+    complete: navigate
+    error: land
+
+navigate:
+  class: "uav.autonomous_modes.NavGPSMode"
+  params:
+    coordinates: "[]"  # Empty - will be set dynamically by HoopWaypointCollectionMode
+    margin: "0.5"
+  transitions:
+    complete: start  # Loop back to detect next hoop
+    error: land
+
+land:
+  class: "uav.autonomous_modes.LandingMode"
+  params: {}
+  transitions: {}
+

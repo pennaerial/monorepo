@@ -1,0 +1,11 @@
+float64 altitude
+float64 yaw
+bool detect_all_hoops  # If true, return all hoops; if false, return closest
+---
+float64 x  # Pixel x coordinate of hoop center
+float64 y  # Pixel y coordinate of hoop center
+float64[3] direction  # 3D direction vector to hoop
+bool hoop_detected  # Whether a hoop was detected
+float64[] all_hoop_x  # All detected hoop x coordinates (if detect_all_hoops=true)
+float64[] all_hoop_y  # All detected hoop y coordinates (if detect_all_hoops=true)
+
