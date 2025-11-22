@@ -1,0 +1,12 @@
+float64 altitude     # Current UAV altitude (positive up, or use your existing convention)
+float64 yaw          # UAV yaw in radians (same as used in PayloadTracking)
+
+---
+float64 x            # Pixel x of the used center (image coords)
+float64 y            # Pixel y of the used center (image coords)
+float64[3] direction # 3D unit ray in camera frame (or scaled as you prefer)
+bool dlz_empty       # True if "danger/decision" zone is empty (no good hoop)
+bool is_line         # True if the hoop appears like a line (very oblique view)
+bool is_partial      # True if the hoop is only partially visible
+float64 major_axis   # Fitted ellipse major axis length in pixels
+float64 minor_axis   # Fitted ellipse minor axis length in pixels
