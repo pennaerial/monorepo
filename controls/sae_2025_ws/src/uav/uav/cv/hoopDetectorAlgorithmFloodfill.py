@@ -32,14 +32,29 @@ def apply_hsv_floodfill_mask(frame) -> Tuple[np.ndarray, np.ndarray]:
     """
     h, w = frame.shape[:2]
     
-    # 1. HSV Thresholding
+    # 1. HSV Thresholding (Orange OR very-dark pixels)
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-    lower = np.array([hue_min, sat_min, val_min])
-    upper = np.array([hue_max, sat_max, val_max])
-    mask = cv2.inRange(hsv, lower, upper)
-    
-    # 2. Morphological cleanup
+
+    # a) Standard orange/red range
+    lower_orange = np.array([hue_min, sat_min, val_min])
+    upper_orange = np.array([hue_max, sat_max, val_max])
+    orange_mask = cv2.inRange(hsv, lower_orange, upper_orange)
+
+    # b) Very dark ("black") range – any hue, low value
+    #    Keep this threshold conservative so that only true shadows / blades pass.
+    val_black_max: int = 50  # pixels darker than this are considered "black"
+    lower_black = np.array([0, 0, 0])
+    upper_black = np.array([180, 255, val_black_max])
+    black_mask = cv2.inRange(hsv, lower_black, upper_black)
+
+    # Combine both masks
+    mask = cv2.bitwise_or(orange_mask, black_mask)
+
+    # OPTIONAL: quick close to patch tiny gaps introduced by thresholding
     kernel = np.ones((morph_kernel_size, morph_kernel_size), np.uint8)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+    
+    # 2. Morphological cleanup (as before)
     mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
     mask = cv2.dilate(mask, kernel, iterations=1)
 
