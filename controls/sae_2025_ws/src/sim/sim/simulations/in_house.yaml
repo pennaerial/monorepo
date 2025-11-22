@@ -2,10 +2,10 @@
 world:
     class: sim.world_gen.HoopCourseNode
     params:
-      course: "bezier"
+      course: "coaster"
       dlz: '[25, 5, 0]'      # Drop zone coordinates [x, y, z]
       uav: '[0, 0, 0]'       # UAV starting position [x, y, z]
-      num_hoops: 20          # Number of hoops to generate
+      num_hoops: 10          # Number of hoops to generate
       max_dist: 10
       world_name: "src/sim/sim/world_gen/worlds/template.sdf"   # Gazebo world name
       output_file: "~/.simulation-gazebo/worlds/in_house_beans.sdf"
