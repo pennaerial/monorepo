@@ -72,16 +72,16 @@ class RingTrackingNode(VisionNode):
         image = self.convert_image_msg_to_frame(image_msg)
         # image = self.bridge.imgmsg_to_cv2(image_msg, desired_encoding='bgr8')
 
-        # TODO: implement proper ring-detection; placeholder uses "pink" threshold
-        # this outputs cx, cy, and dlz_empty
-        detection = find_payload(
-            image,
-            *pink,                      # low HSV bound
-            *self.color_map["pink"],   # high HSV bound
-            self.uuid,
-            self.debug,
-            self.save_vision
-        )
+        # # TODO: implement proper ring-detection; placeholder uses "pink" threshold
+        # # this outputs cx, cy, and dlz_empty
+        # detection = find_payload(
+        #     image,
+        #     *pink,                      # low HSV bound
+        #     *self.color_map["pink"],   # high HSV bound
+        #     self.uuid,
+        #     self.debug,
+        #     self.save_vision
+        # )
 
         
 
@@ -90,35 +90,41 @@ class RingTrackingNode(VisionNode):
 
 ####### OLD PAYLOADTRACKING NODE CODE ##############
 
-        dlz_empty = False
-        if detection is not None:
-            cx, cy, dlz_empty = detection
-            # Update Kalman filter with measurement
-            # measurement = np.array([[np.float32(cx)], [np.float32(cy)]])
-            # corrected_state = self.kalman.correct(measurement)
-            # x, y = corrected_state[0, 0], corrected_state[1, 0]
-            x, y = cx, cy
-        else:
-            # # Use prediction if no detection
-            # x, y = predicted_x, predicted_y
-            x, y = image.shape[:2]
-            x /= 2
-            y /= 2
+        # dlz_empty = False
+        # if detection is not None:
+        #     cx, cy, dlz_empty = detection
+        #     # Update Kalman filter with measurement
+        #     # measurement = np.array([[np.float32(cx)], [np.float32(cy)]])
+        #     # corrected_state = self.kalman.correct(measurement)
+        #     # x, y = corrected_state[0, 0], corrected_state[1, 0]
+        #     x, y = cx, cy
+        # else:
+        #     # # Use prediction if no detection
+        #     # x, y = predicted_x, predicted_y
+        #     x, y = image.shape[:2]
+        #     x /= 2
+        #     y /= 2
             
         
 
         #we should only need center_3d
         result = find_nearest_hoop_pose(image, camera_info_msg.k, 0.5)
 
+        self.display_frame(image, self.node_name())
+
+
         if len(result) == 2:
             result_data, intermediate_frames = result
             result_data = None
+            print("not detecting anyyyything")
+            dummy = self.publish_msg_type()
+            dummy.data = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]  # x,y,dir_x,dir_y,dir_z,flag
+            self.ring_pub.publish(dummy)
+            return
         else:
             center_3d, normal_3d, ellipse, used_radius, intermediate_frames = result
             # result_data = (center_3d, normal_3d, ellipse, used_radius)
-        
 
-        self.display_frame(image, self.node_name())
 
 
         if center_3d != []:
