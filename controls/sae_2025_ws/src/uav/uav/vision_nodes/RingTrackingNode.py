@@ -3,6 +3,7 @@ import cv2
 import numpy as np
 from uav.cv.tracking import find_payload, compute_3d_vector
 from uav.cv.hoopDetectorAlgorithm import find_nearest_hoop_pose
+from uav.cv.hoopDetectorAlgorithmFloodfill import detect
 from uav.vision_nodes import VisionNode
 # from uav_interfaces.srv import PayloadTracking  # OLD: not using a custom service anymore
 from std_srvs.srv import Trigger
@@ -81,107 +82,63 @@ class RingTrackingNode(VisionNode):
         image = self.convert_image_msg_to_frame(image_msg)
         # image = self.bridge.imgmsg_to_cv2(image_msg, desired_encoding='bgr8')
 
-        # # TODO: implement proper ring-detection; placeholder uses "pink" threshold
-        # # this outputs cx, cy, and dlz_empty
-        # detection = find_payload(
-        #     image,
-        #     *pink,                      # low HSV bound
-        #     *self.color_map["pink"],   # high HSV bound
-        #     self.uuid,
-        #     self.debug,
-        #     self.save_vision
-        # )
-
         
-
-        
-
-
-####### OLD PAYLOADTRACKING NODE CODE ##############
-
-        # dlz_empty = False
-        # if detection is not None:
-        #     cx, cy, dlz_empty = detection
-        #     # Update Kalman filter with measurement
-        #     # measurement = np.array([[np.float32(cx)], [np.float32(cy)]])
-        #     # corrected_state = self.kalman.correct(measurement)
-        #     # x, y = corrected_state[0, 0], corrected_state[1, 0]
-        #     x, y = cx, cy
-        # else:
-        #     # # Use prediction if no detection
-        #     # x, y = predicted_x, predicted_y
-        #     x, y = image.shape[:2]
-        #     x /= 2
-        #     y /= 2
-            
-        
-
-        #we should only need center_3d
-        result = find_nearest_hoop_pose(image, camera_info_msg.k, 0.5)
+        ###### CRAZY PRANAV ALGO #####
+        # result = detect(image, camera_info_msg.k, 0.5)
 
 
+        # if len(result) == 2:
+        #     self.display_frame(image, self.node_name())
 
-        if len(result) == 2:
-            self.display_frame(image, self.node_name())
-
-            result_data, intermediate_frames = result
-            result_data = None
-            print("not detecting anyyyything")
-            dummy = self.publish_msg_type()
-            dummy.data = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]  # x,y,dir_x,dir_y,dir_z,flag
-            self.ring_pub.publish(dummy)
-            return
-        else:
-            center_3d, normal_3d, ellipse, used_radius, annotated_frame = result
-            self.display_frame(annotated_frame, self.node_name())
-
-            # result_data = (center_3d, normal_3d, ellipse, used_radius)
-
-
-
-        if center_3d is not None:
-            dir_x, dir_z, dir_y = center_3d
-
-            dir_x = -dir_x
-
-            #need to flip direction of the z axis because in gazebo, up is negative z
-            # dir_z = -dir_z
-            good = self.publish_msg_type()
-            good.data = [0.0, 0.0, dir_x, dir_y, dir_z, 0.0]  # x,y,dir_x,dir_y,dir_z,flag
-            self.ring_pub.publish(good)
-            return
-        else:
-            dummy = self.publish_msg_type()
-            dummy.data = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]  # x,y,dir_x,dir_y,dir_z,flag
-            self.ring_pub.publish(dummy)
-            return
-
-        
-
-        # if detection is None:
-        #     # Publish constant dummy vector so downstream nodes see a steady stream
+        #     result_data, intermediate_frames = result
+        #     result_data = None
         #     print("not detecting anyyyything")
         #     dummy = self.publish_msg_type()
         #     dummy.data = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]  # x,y,dir_x,dir_y,dir_z,flag
         #     self.ring_pub.publish(dummy)
         #     return
+        # else:
+        #     center_3d, normal_3d, ellipse, used_radius, annotated_frame = result
+        #     self.display_frame(annotated_frame, self.node_name())
 
-        # cx, cy, dlz_empty = detection
+        #     # result_data = (center_3d, normal_3d, ellipse, used_radius)
 
-        # direction = compute_3d_vector(
-        #     cx,
-        #     cy,
-        #     np.array(camera_info_msg.k).reshape(3, 3),
-        #     0.0  # altitude not used for direction-only vector; adjust if needed
-        # )
 
-        # # Pack message: [x, y, dir_x, dir_y, dir_z, dlz_empty]
-        # msg = self.publish_msg_type()
-        # msg.data = [float(cx), float(cy)] + list(direction) + [1.0 if dlz_empty else 0.0]
-        # self.ring_pub.publish(msg)
 
-        # if self.display:
-        #     self.display_frame(image, self.node_name()) 
+        # if center_3d is not None:
+        #     dir_x, dir_z, dir_y = center_3d
+
+        #     dir_x = -dir_x
+
+        #     #need to flip direction of the z axis because in gazebo, up is negative z
+        #     # dir_z = -dir_z
+        #     good = self.publish_msg_type()
+        #     good.data = [0.0, 0.0, dir_x, dir_y, dir_z, 0.0]  # x,y,dir_x,dir_y,dir_z,flag
+        #     self.ring_pub.publish(good)
+        #     return
+        # else:
+        #     dummy = self.publish_msg_type()
+        #     dummy.data = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]  # x,y,dir_x,dir_y,dir_z,flag
+        #     self.ring_pub.publish(dummy)
+        #     return
+
+        
+        ###### NEW FLOODFILL ALGO ####
+        result = detect(image, camera_info_msg.k, 0.5)
+        if result is not None:
+            pose, debug_frame = result
+            self.display_frame(debug_frame, self.node_name())
+            dir_x, dir_z, dir_y = pose['x'], pose['y'], pose['z']
+            dir_x = -dir_x
+            nx, ny, nz = pose['nx'], pose['ny'], pose['nz']
+            self.ring_pub.publish(0.0, 0.0, dir_x, dir_y, dir_z, 0.0)
+            return
+        else:
+            print("not detecting anyyyything")
+            dummy = self.publish_msg_type()
+            dummy.data = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]  # x,y,dir_x,dir_y,dir_z,flag
+            self.ring_pub.publish(dummy)
+            return
 
 
         # ---------------------  LEGACY SERVICE CALLBACK (optional)  ---------------------
