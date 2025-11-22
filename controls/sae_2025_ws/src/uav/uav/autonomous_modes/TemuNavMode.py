@@ -26,16 +26,16 @@ class TemuNavMode(Mode):
             depth=1
         )
         self.subscription = self.node.create_subscription(
-            Vector3,
+            Float64MultiArray,
             '/hoop_directions',
             self.directions_callback,
             qos_profile
         )
 
-        self.x = 0.0
-        self.y = 0.0
-        self.z = 0.0 
-        self.vector_dist = 0.0
+        self.x = None
+        self.y = None
+        self.z = None
+        self.vector_dist = None
 
         self.state = 0
         self.state_name = {
@@ -54,7 +54,9 @@ class TemuNavMode(Mode):
         self.x = msg.data[0]
         self.y = msg.data[1]
         self.z = msg.data[2]
-        self.vector_dist = msg.data[3]
+
+        if msg.data[3] is not None:
+            self.vector_dist = msg.data[3]
     
     def on_update(self, time_delta: float) ->None:
         if self.uav.local_position is None:
@@ -74,9 +76,13 @@ class TemuNavMode(Mode):
             self.uav.publish_position_setpoint(point, relative=True)
         
             # check for switching conditions
-            thresh = np.clip(self.z / 100, 0.01, 0.05)
-            self.node.get_logger().info(f'ALIGN THRESHOLD: {float(thresh):.4f}')
-            if abs(self.x) <= thresh and abs(self.y) <= thresh:
+            # thresh = np.clip(self.z / 100, 0.01, 0.05)
+            vector_thresh = 15
+            # self.node.get_logger().info(f'ALIGN THRESHOLD: {float(thresh):.4f}')
+            self.node.get_logger().info(f'VECTOR_DIST: {float(self.vector_dist):.4f}')
+            # if abs(self.x) <= thresh and abs(self.y) <= thresh:
+            #     self.state = self.state_name['straight']
+            if self.vector_dist <= vector_thresh:
                 self.state = self.state_name['straight']
 
         elif self.state == self.state_name['straight']:

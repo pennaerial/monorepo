@@ -25,7 +25,7 @@ class TemuVisionNode(VisionNode):
         self.bridge = CvBridge()
         self.uav_local_position = None
 
-        self.hoop_directions_publisher = self.create_publisher(msg_type=Vector3, topic='/hoop_directions', qos_profile=10, )
+        self.hoop_directions_publisher = self.create_publisher(msg_type=Float64MultiArray, topic='/hoop_directions', qos_profile=10, )
 
         # add an empty service server for ModeManager
         self.create_service(self.srv, self.service_name(), self.service_callback)
@@ -57,7 +57,8 @@ class TemuVisionNode(VisionNode):
         z is forward backward relative to the drone
         '''
         msg = Float64MultiArray()
-        msg.data = [x, y, z, d]
+        data = list(map(float, [x, y, z, d]))
+        msg.data = data
         self.hoop_directions_publisher.publish(msg)
 
 
