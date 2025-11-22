@@ -264,7 +264,7 @@ class BezierCourse(CourseStyle):
     """
     Smooth cubic Bezier curve between UAV start and DLZ.
     P0 = UAV, P3 = DLZ
-    P1/P2 are along the line with lateral offsets to create an arc.
+    P1/P2 are along the line with randomized lateral offsets to create a more interesting arc.
     """
 
     def __init__(self,
@@ -272,10 +272,10 @@ class BezierCourse(CourseStyle):
                  uav: Tuple[float, float, float],
                  num_hoops: int,
                  max_dist: int,
-                 height: float = 2.0,
+                 height: float = 4.0,
                  lateral_offset: float = 4.0):
         super().__init__(dlz, uav, num_hoops, max_dist)
-        self.height = height
+        self.height = height                # used as vertical bump amplitude
         self.lateral_offset = lateral_offset
 
     def generate_course(self) -> List[Pose]:
@@ -301,19 +301,29 @@ class BezierCourse(CourseStyle):
         perp_y = dir_x
 
         # Bezier control points in XY
-        # P0 and P3 are UAV and DLZ
         P0x, P0y = x_uav, y_uav
         P3x, P3y = x_dlz, y_dlz
 
-        # Place P1 and P2 along the line with opposite lateral offsets
-        one_third = dist_xy / 3.0
-        two_third = 2.0 * dist_xy / 3.0
+        # --- Make control points more "interesting" ---
+        # Randomize how far along the line P1 and P2 are
+        one_third = dist_xy * r.uniform(0.20, 0.40)
+        two_third = dist_xy * r.uniform(0.60, 0.85)
 
-        P1x = P0x + dir_x * one_third  + perp_x * self.lateral_offset
-        P1y = P0y + dir_y * one_third  + perp_y * self.lateral_offset
+        # Base positions on the line
+        base1_x = P0x + dir_x * one_third
+        base1_y = P0y + dir_y * one_third
+        base2_x = P0x + dir_x * two_third
+        base2_y = P0y + dir_y * two_third
 
-        P2x = P0x + dir_x * two_third  - perp_x * self.lateral_offset
-        P2y = P0y + dir_y * two_third  - perp_y * self.lateral_offset
+        # Random lateral offsets (asymmetric, so the arc isn't perfectly mirrored)
+        lat1 = self.lateral_offset * r.uniform(0.6, 1.3)
+        lat2 = self.lateral_offset * r.uniform(-1.3, -0.6)  # opposite side
+
+        P1x = base1_x + perp_x * lat1
+        P1y = base1_y + perp_y * lat1
+
+        P2x = base2_x + perp_x * lat2
+        P2y = base2_y + perp_y * lat2
 
         # Helper: cubic Bezier in 2D
         def bezier_xy(t: float) -> Tuple[float, float]:
@@ -331,18 +341,23 @@ class BezierCourse(CourseStyle):
             y = 3 * mt * mt * (P1y - P0y) + 6 * mt * t * (P2y - P1y) + 3 * t * t * (P3y - P2y)
             return x, y
 
-        # Place hoops along t in (0, 1)
+        # --- Place hoops along t in (0, 1) ---
         for i in range(self.num_hoops):
             # keep hoops off the exact endpoints
             t = (i + 1) / (self.num_hoops + 1)
 
             x, y = bezier_xy(t)
 
-            # Smooth altitude: interpolate between UAV z and DLZ z
+            # Base linear z from UAV -> DLZ
             z_linear = z_uav + t * (z_dlz - z_uav)
-            # small noise
+
+            # Vertical "arch" plus small randomness
+            # sin(pi * t) gives a single hump peaking mid-course
+            z_bump = self.height * math.sin(math.pi * t*4)
             z_noise = r.uniform(-0.2, 0.2)
-            z = max(0.5, z_linear + z_noise)  # keep above ground a bit
+
+            z = z_linear + z_bump + z_noise
+            z = max(0.5, z)  # keep above ground a bit
 
             # Orientation from tangent of curve
             dx_dt, dy_dt = bezier_xy_deriv(t)
@@ -355,6 +370,325 @@ class BezierCourse(CourseStyle):
             hoops.append((x, y, z, 0.0, yaw_deg, 0.0))
 
         return hoops
+
+
+class SplineCourse(CourseStyle):
+    """
+    Smooth Catmull–Rom spline course between UAV and DLZ.
+    XY follows a spline through offset control points.
+    Z follows a strong vertical wave for more interesting climbs/descents.
+    """
+
+    def __init__(self,
+                 dlz: Tuple[float, float, float],
+                 uav: Tuple[float, float, float],
+                 num_hoops: int,
+                 max_dist: int,
+                 num_ctrl_points: int = 5,
+                 lateral_spread: float = 4.0,
+                 vertical_spread: float = 1.5,
+                 vertical_wave_amplitude: float = 3.0,
+                 vertical_waves: int = 2,
+                 min_height: float = 0.75):
+        super().__init__(dlz, uav, num_hoops, max_dist)
+        self.num_ctrl_points = max(4, num_ctrl_points)  # need at least 4
+        self.lateral_spread = lateral_spread
+        self.vertical_spread = vertical_spread
+        self.vertical_wave_amplitude = vertical_wave_amplitude
+        self.vertical_waves = max(1, vertical_waves)
+        self.min_height = min_height
+
+    def generate_course(self) -> List[Pose]:
+        hoops: List[Pose] = []
+        x_dlz, y_dlz, z_dlz = self.dlz
+        x_uav, y_uav, z_uav = self.uav
+
+        dx = x_dlz - x_uav
+        dy = y_dlz - y_uav
+        dz = z_dlz - z_uav
+
+        dist_xy = math.hypot(dx, dy)
+        dist_3d = math.sqrt(dx**2 + dy**2 + dz**2)
+        if dist_xy == 0 or dist_3d == 0:
+            raise ValueError("DLZ and UAV cannot be the same point.")
+
+        # Forward and perpendicular directions in XY
+        dir_x = dx / dist_xy
+        dir_y = dy / dist_xy
+        perp_x = -dir_y
+        perp_y = dir_x
+
+        # ---- Build control points (start + interior + end) in XY/Z ----
+        ctrl: List[Tuple[float, float, float]] = []
+        ctrl.append((x_uav, y_uav, z_uav))
+
+        num_interior = self.num_ctrl_points - 2
+        for k in range(1, num_interior + 1):
+            t = k / (num_interior + 1)
+
+            # Base point on straight line
+            base_x = x_uav + t * dx
+            base_y = y_uav + t * dy
+            base_z = z_uav + t * dz
+
+            # Alternate sides for lateral wiggle
+            side = 1 if k % 2 == 1 else -1
+            lateral = side * self.lateral_spread * r.uniform(0.5, 1.0)
+            vertical_noise = r.uniform(-self.vertical_spread, self.vertical_spread)
+
+            wx = base_x + perp_x * lateral
+            wy = base_y + perp_y * lateral
+            wz = max(self.min_height, base_z + vertical_noise)
+
+            ctrl.append((wx, wy, wz))
+
+        ctrl.append((x_dlz, y_dlz, z_dlz))
+
+        n = len(ctrl)
+        if n < 4:
+            # fallback: straight line if something weird happens
+            return StraightCourse(self.dlz, self.uav, self.num_hoops, self.max_dist).generate_course()
+
+        # ---- Chord lengths for approx arc-length param (for XY spline) ----
+        seg_lengths = []
+        cum_lengths = [0.0]
+        total_len = 0.0
+        for i in range(n - 1):
+            x0, y0, z0 = ctrl[i]
+            x1, y1, z1 = ctrl[i + 1]
+            L = math.sqrt((x1 - x0)**2 + (y1 - y0)**2 + (z1 - z0)**2)
+            seg_lengths.append(L)
+            total_len += L
+            cum_lengths.append(total_len)
+
+        # Extended control points for Catmull–Rom
+        P_full = [ctrl[0]] + ctrl + [ctrl[-1]]  # indices 0..n+1
+
+        def catmull_rom_point(i_seg: int, u: float) -> Tuple[float, float, float]:
+            """
+            Evaluate Catmull–Rom for segment between ctrl[i_seg] and ctrl[i_seg+1],
+            with local parameter u in [0, 1].
+            """
+            base = i_seg + 1  # shift because of leading duplicate
+            P0 = P_full[base - 1]
+            P1 = P_full[base]
+            P2 = P_full[base + 1]
+            P3 = P_full[base + 2]
+
+            x0, y0, z0 = P0
+            x1, y1, z1 = P1
+            x2, y2, z2 = P2
+            x3, y3, z3 = P3
+
+            u2 = u * u
+            u3 = u2 * u
+
+            def blend(p0, p1, p2, p3):
+                # Standard Catmull–Rom, tension = 0.5
+                return 0.5 * (
+                    (2.0 * p1) +
+                    (-p0 + p2) * u +
+                    (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * u2 +
+                    (-p0 + 3.0 * p1 - 3.0 * p2 + p3) * u3
+                )
+
+            x = blend(x0, x1, x2, x3)
+            y = blend(y0, y1, y2, y3)
+            z = blend(z0, z1, z2, z3)
+            return x, y, z
+
+        def catmull_rom_tangent_xy(i_seg: int, u: float) -> Tuple[float, float]:
+            """
+            Derivative of Catmull–Rom in XY only, for yaw.
+            """
+            base = i_seg + 1
+            P0 = P_full[base - 1]
+            P1 = P_full[base]
+            P2 = P_full[base + 1]
+            P3 = P_full[base + 2]
+
+            x0, y0, _ = P0
+            x1, y1, _ = P1
+            x2, y2, _ = P2
+            x3, y3, _ = P3
+
+            u2 = u * u
+
+            def blend_deriv(p0, p1, p2, p3):
+                return 0.5 * (
+                    (-p0 + p2) +
+                    2.0 * (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * u +
+                    3.0 * (-p0 + 3.0 * p1 - 3.0 * p2 + p3) * u2
+                )
+
+            dx_du = blend_deriv(x0, x1, x2, x3)
+            dy_du = blend_deriv(y0, y1, y2, y3)
+            return dx_du, dy_du
+
+        # ---- Place hoops along the path ----
+        for j in range(self.num_hoops):
+            # Global normalized param along path, for vertical wave
+            t_global = (j + 1) / (self.num_hoops + 1)
+
+            # Target arc length for this hoop
+            target_len = t_global * total_len
+
+            # Find segment in which this arc length lies
+            seg_idx = 0
+            for i in range(len(seg_lengths)):
+                if cum_lengths[i + 1] >= target_len:
+                    seg_idx = i
+                    break
+
+            seg_len = seg_lengths[seg_idx] if seg_lengths[seg_idx] > 1e-6 else 1e-6
+            seg_start = cum_lengths[seg_idx]
+            u = (target_len - seg_start) / seg_len
+            u = max(0.0, min(1.0, u))
+
+            # XY from spline
+            x, y, z_spline = catmull_rom_point(seg_idx, u)
+
+            # Base linear z from UAV -> DLZ
+            z_base = z_uav + t_global * dz
+
+            # Strong vertical wave on top of base z
+            angle = 2.0 * math.pi * self.vertical_waves * t_global
+            z_wave = self.vertical_wave_amplitude * math.sin(angle)
+
+            # Small additional noise to break perfect symmetry
+            z_noise = r.uniform(-self.vertical_spread, self.vertical_spread)
+
+            z = z_base + z_wave + z_noise
+            z = max(self.min_height, z)
+
+            # Orientation from spline tangent in XY
+            dx_du, dy_du = catmull_rom_tangent_xy(seg_idx, u)
+            if dx_du == 0.0 and dy_du == 0.0:
+                yaw_deg = 0.0
+            else:
+                yaw_deg = math.degrees(math.atan2(dy_du, dx_du))
+
+            # (roll, pitch, yaw): you’ve been using yaw in the middle slot
+            hoops.append((x, y, z, 0.0, yaw_deg, 0.0))
+
+        return hoops
+class RollerCoasterCourse(CourseStyle):
+    """
+    3D 'roller coaster' course:
+    - Follows the straight line from UAV to DLZ
+    - Adds smooth lateral + vertical waves in a local Frenet-like frame
+    """
+
+    def __init__(self,
+                 dlz: Tuple[float, float, float],
+                 uav: Tuple[float, float, float],
+                 num_hoops: int,
+                 max_dist: int,
+                 lateral_amp: float = 4.0,
+                 vertical_amp: float = 3.0,
+                 lateral_waves: int = 2,
+                 vertical_waves: int = 3,
+                 min_height: float = 0.75):
+        super().__init__(dlz, uav, num_hoops, max_dist)
+        self.lateral_amp = lateral_amp
+        self.vertical_amp = vertical_amp
+        self.lateral_waves = max(0, lateral_waves)
+        self.vertical_waves = max(1, vertical_waves)
+        self.min_height = min_height
+
+    def generate_course(self) -> List[Pose]:
+        hoops: List[Pose] = []
+
+        x_dlz, y_dlz, z_dlz = self.dlz
+        x_uav, y_uav, z_uav = self.uav
+
+        Dx = x_dlz - x_uav
+        Dy = y_dlz - y_uav
+        Dz = z_dlz - z_uav
+
+        dist = math.sqrt(Dx*Dx + Dy*Dy + Dz*Dz)
+        if dist == 0.0:
+            raise ValueError("DLZ and UAV cannot be the same point.")
+
+        # Tangent
+        Tx = Dx / dist
+        Ty = Dy / dist
+        Tz = Dz / dist
+
+        # Choose an up vector not parallel to T
+        upx, upy, upz = 0.0, 0.0, 1.0
+        dot_up_T = Tx*upx + Ty*upy + Tz*upz
+        if abs(dot_up_T) > 0.9:  # nearly parallel
+            upx, upy, upz = 0.0, 1.0, 0.0
+
+        # N = normalize(up × T)
+        Nx = upy*Tz - upz*Ty
+        Ny = upz*Tx - upx*Tz
+        Nz = upx*Ty - upy*Tx
+        n_norm = math.sqrt(Nx*Nx + Ny*Ny + Nz*Nz)
+        if n_norm < 1e-6:
+            # fallback: arbitrary perpendicular in XY
+            Nx, Ny, Nz = -Ty, Tx, 0.0
+            n_norm = math.sqrt(Nx*Nx + Ny*Ny + Nz*Nz)
+        Nx /= n_norm
+        Ny /= n_norm
+        Nz /= n_norm
+
+        # B = T × N
+        Bx = Ty*Nz - Tz*Ny
+        By = Tz*Nx - Tx*Nz
+        Bz = Tx*Ny - Ty*Nx
+
+        # Helper to compute position along track
+        def pos(s: float) -> Tuple[float, float, float]:
+            # Base along the line
+            base_x = x_uav + s * Dx
+            base_y = y_uav + s * Dy
+            base_z = z_uav + s * Dz
+
+            # Smooth lateral + vertical offsets
+            angle_lat = 2.0 * math.pi * self.lateral_waves * s if self.lateral_waves > 0 else 0.0
+            angle_vert = 2.0 * math.pi * self.vertical_waves * s
+
+            lat = self.lateral_amp * math.sin(angle_lat) if self.lateral_waves > 0 else 0.0
+            vert = self.vertical_amp * math.sin(angle_vert)
+
+            # Compose in local frame
+            x = base_x + lat * Nx + vert * Bx
+            y = base_y + lat * Ny + vert * By
+            z = base_z + lat * Nz + vert * Bz
+
+            # Keep above ground
+            if z < self.min_height:
+                z = self.min_height
+
+            return x, y, z
+
+        # Finite-diff derivative for yaw
+        def tangent_xy(s: float) -> Tuple[float, float]:
+            eps = 1e-3
+            s1 = max(0.0, min(1.0, s - eps))
+            s2 = max(0.0, min(1.0, s + eps))
+            x1, y1, _ = pos(s1)
+            x2, y2, _ = pos(s2)
+            return x2 - x1, y2 - y1
+
+        for i in range(self.num_hoops):
+            s = (i + 1) / (self.num_hoops + 1)  # (0,1)
+
+            x, y, z = pos(s)
+            vx, vy = tangent_xy(s)
+
+            if vx == 0.0 and vy == 0.0:
+                yaw_deg = 0.0
+            else:
+                yaw_deg = math.degrees(math.atan2(vy, vx))
+
+            # (roll, pitch, yaw): you've been using yaw in the middle slot
+            hoops.append((x, y, z, 0.0, yaw_deg, 0.0))
+
+        return hoops
+
 
 
 class HoopCourseNode(WorldNode):
@@ -520,7 +854,7 @@ class HoopCourseNode(WorldNode):
         out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     def generate_world(self):
-        courses = ['ascent', 'descent', 'slalom', 'bezier']
+        courses = ['ascent', 'descent', 'slalom', 'bezier', 'spline', 'coaster']
 
         if self.course.lower() == 'random':
             course_id = r.uniform(0, len(courses) - 1)
@@ -566,6 +900,33 @@ class HoopCourseNode(WorldNode):
                                   max_dist=self.max_dist,
                                   height=2.0,
                                   lateral_offset=4.0)
+            hoop_poses = course.generate_course()
+        elif self.course.lower() == "spline":
+            course = SplineCourse(
+                dlz=self.dlz,
+                uav=self.uav,
+                num_hoops=self.num_hoops,
+                max_dist=self.max_dist,
+                num_ctrl_points=50,
+                lateral_spread=4.0,
+                vertical_spread=0.5,          # just small noise
+                vertical_wave_amplitude=4.0,  # bigger = more up/down
+                vertical_waves=3,             # more waves along path
+                min_height=0.75,
+            )
+            hoop_poses = course.generate_course()
+        elif self.course.lower() == "coaster":
+            course = RollerCoasterCourse(
+                dlz=self.dlz,
+                uav=self.uav,
+                num_hoops=self.num_hoops,
+                max_dist=self.max_dist,
+                lateral_amp=4.0,
+                vertical_amp=3.0,
+                lateral_waves=2,
+                vertical_waves=3,
+                min_height=0.75,
+            )
             hoop_poses = course.generate_course()
         self.hoop_positions = hoop_poses
         self.add_hoops(input_file=self.world_name, output_file=self.output_file, hoop_positions=hoop_poses)

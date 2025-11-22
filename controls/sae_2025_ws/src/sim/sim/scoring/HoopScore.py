@@ -314,7 +314,6 @@ class HoopScoringNode(ScoringNode):
         y = float(msg.y)
         self.prev_position = self.uav_position
         self.uav_position = (x, y, z_up)
-        print(self.hoop_poses)
         current_time = time.time()
         self.position_history.append((x, y, z_up, current_time))
         
