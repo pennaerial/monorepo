@@ -72,7 +72,9 @@ class TemuNavMode(Mode):
             self.uav.publish_position_setpoint(point, relative=True)
         
             # check for switching conditions
-            if abs(self.x) <= 0.05 and abs(self.y) <= 0.05:
+            thresh = np.clip(self.z / 100, 0.01, 0.05)
+            self.node.get_logger().info(f'ALIGN THRESHOLD: {float(thresh):.4f}')
+            if abs(self.x) <= thresh and abs(self.y) <= thresh:
                 self.state = self.state_name['straight']
 
         elif self.state == self.state_name['straight']:
@@ -91,11 +93,12 @@ class TemuNavMode(Mode):
                 x_dist = abs(self.x)
                 y_dist = abs(self.y)
                 z_dist = abs(self.z)
-                self.node.get_logger().info(f'X: {x_dist:.4f} \n Y_DIST:{y_dist:.4f}')
+                self.node.get_logger().info(f'\nX_DIST: {x_dist:.4f} \n Y_DIST:{y_dist:.4f}')
                 
                 if x_dist >= 0.5 or y_dist >= 0.5:
                     self.state = self.state_name['in_buffer']
-                    buffer_distance = z_dist * self.buffer_ratio
+                    buffer_distance = np.clip(z_dist * self.buffer_ratio, 0.9, 2.0)
+                    self.node.get_logger().info(f'\nBUF_DIST: {z_dist * self.buffer_ratio:.4f} \nCLIPPED_BUF_DIST:{buffer_distance:.4f}')
                     time_elapsed = buffer_distance / self.straight_velocity
                     self.buffer_end = self.node.get_clock().now() + Duration(seconds=time_elapsed)
                     return 
