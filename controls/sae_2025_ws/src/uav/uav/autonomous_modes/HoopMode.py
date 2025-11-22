@@ -101,7 +101,7 @@ class HoopMode(Mode):
             np.abs(direction[2]) < threshold):
             # Centered! Fly forward through the hoop
             self.log(f"CENTERED! Publishing: (0, 1, 0)")
-            self.uav.publish_position_setpoint((0, 1, 0), relative=True)
+            self.uav.publish_position_setpoint((0, 0.5, 0), relative=True)
             self.mode = 1
             return
 
