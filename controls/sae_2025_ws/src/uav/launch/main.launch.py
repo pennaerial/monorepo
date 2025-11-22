@@ -209,7 +209,7 @@ def launch_setup(context, *args, **kwargs):
     )
     
     delayed_mission = TimerAction(
-        period=15.0,
+        period=5.0,
         actions=[mission] if run_mission_bool else []
     )
     

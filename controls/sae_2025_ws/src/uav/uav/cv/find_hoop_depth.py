@@ -107,10 +107,16 @@ def find_hoop_w_depth(
         if moments['m00'] != 0:
             Cx = int(moments['m10'] / moments['m00'])
             Cy = int(moments['m01'] / moments['m00'])
+                
+            # Try fitting ellipse to the convex hull of the contour for better robustness
+            hull = cv2.convexHull(contour)
+            if len(hull) < 5: # fitEllipse needs at least 5 points
+                print("Not enough points to fit ellipse")
+                continue
+            (xc, yc), (major, minor), angle_deg = cv2.fitEllipse(hull)
             if debug:
-                cv2.circle(img, (Cx, Cy), 4, (255, 255, 255), -1)
-                cv2.arrowedLine(img, (w//2, h//2), (Cx, Cy ), (255, 0, 0), 2, cv2.LINE_AA, 0, 0.1)
-            (xc, yc), (major, minor), angle_deg = cv2.fitEllipse(contour)
+                cv2.circle(img, (int(xc), int(yc)), 4, (255, 255, 255), -1)
+                cv2.arrowedLine(img, (w//2, h//2), (int(xc), int(yc) ), (255, 0, 0), 2, cv2.LINE_AA, 0, 0.1)
 
             a = major / 2
             b = minor / 2

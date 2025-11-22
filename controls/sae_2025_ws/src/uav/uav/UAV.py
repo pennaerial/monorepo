@@ -211,6 +211,19 @@ class UAV:
         yaw = np.arctan2(dy, dx)
         return yaw
     
+    def publish_velocity(self, velocity: list[3], yaw):
+        msg = TrajectorySetpoint()
+        msg.yaw = float(yaw)
+        msg.velocity = velocity
+
+        msg.position = [float('nan')] * 3
+        msg.acceleration = [float('nan')] * 3
+        msg.jerk = [float('nan')] * 3
+        msg.yawspeed = float('nan')
+
+        self.trajectory_publisher.publish(msg)
+        self.node.get_logger().info(f"Publishing velocity: {velocity} Yaw: {self.yaw:.2f}")
+    
     def publish_offboard_control_heartbeat_signal(self):
         """Publish the offboard control mode."""
         msg = OffboardControlMode()
