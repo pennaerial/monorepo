@@ -1,30 +1,60 @@
+# Mission for navigating through hoops and landing on colored landing pad
+# The landing pad color (red, green, or blue) should be specified before running
+
 start:
   class: uav.autonomous_modes.NavGPSMode
   params:
-    coordinates: '[((5, 10, -10), 1, "LOCAL"),]'
+    coordinates: '[((0, 0, -3), 1, "LOCAL"),]'  # Take off to 3m altitude
   transitions:
-    complete: dropoff
+    complete: hoop1
 
-dropoff:
-  class: uav.autonomous_modes.PayloadDropoffMode
+# Navigate through hoops using ring tracking
+hoop1:
+  class: uav.autonomous_modes.RingTraversalMode
   params:
-    offsets: '(0, 0, 0)'
+    threshold: 0.1
   transitions:
-    complete: pickup
+    complete: hoop2
 
-pickup:
-  class: uav.autonomous_modes.PayloadPickupMode
+hoop2:
+  class: uav.autonomous_modes.RingTraversalMode
   params:
-    color: 'blue'
+    threshold: 0.1
   transitions:
-    complete: return
+    complete: hoop3
 
-return:
+hoop3:
+  class: uav.autonomous_modes.RingTraversalMode
+  params:
+    threshold: 0.1
+  transitions:
+    complete: hoop4
+
+hoop4:
+  class: uav.autonomous_modes.RingTraversalMode
+  params:
+    threshold: 0.1
+  transitions:
+    complete: approach_landing_pad
+
+# Navigate to approximate landing pad area (adjust coordinates based on your course)
+approach_landing_pad:
   class: uav.autonomous_modes.NavGPSMode
   params:
-    coordinates: '[((0, 0, -5), 1, "LOCAL"),]'
+    coordinates: '[((10, 5, -2), 1, "LOCAL"),]'  # Navigate to landing pad area at 2m altitude
   transitions:
-    complete: land
+    complete: land_on_pad
 
-land:
+# Detect and land on the colored landing pad
+# Color parameter: 'red', 'green', or 'blue' (set before competition run)
+land_on_pad:
+  class: uav.autonomous_modes.LandingPadMode
+  params:
+    color: 'red'  # CHANGE THIS to 'red', 'green', or 'blue' before competition
+    approach_altitude: 3.0
+    landing_threshold: 0.15
+  transitions:
+    complete: end
+
+end:
   class: uav.autonomous_modes.LandingMode

@@ -201,6 +201,93 @@ def find_dlz(
     cv2.circle(vis_image, (cx, cy), 5, (0, 255, 0), -1)
     return cx, cy, vis_image
 
+def find_landing_pad(
+    image: np.ndarray,
+    color: str,
+    debug: bool = False
+) -> Optional[Tuple[int, int, float, np.ndarray]]:
+    """
+    Detect colored landing pad (rectangle) in image using color thresholding.
+    
+    Args:
+        image (np.ndarray): Input BGR image.
+        color (str): Color of landing pad ('red', 'green', or 'blue').
+        debug (bool): If True, return visualization image.
+    
+    Returns:
+        Optional[Tuple[int, int, float, np.ndarray]]: A tuple (cx, cy, area_ratio, vis_image)
+        if detection is successful; otherwise, None. area_ratio is the ratio of detected
+        area to image area, useful for determining distance.
+    """
+    from uav.utils import red, red2, green, blue
+    
+    hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    
+    # Get color ranges based on input
+    if color.lower() == 'red':
+        # Red wraps around in HSV, so we need two masks
+        lower1 = np.array(red[0])
+        upper1 = np.array(red[1])
+        lower2 = np.array(red2[0])
+        upper2 = np.array(red2[1])
+        mask1 = cv2.inRange(hsv_image, lower1, upper1)
+        mask2 = cv2.inRange(hsv_image, lower2, upper2)
+        color_mask = cv2.bitwise_or(mask1, mask2)
+    elif color.lower() == 'green':
+        lower = np.array(green[0])
+        upper = np.array(green[1])
+        color_mask = cv2.inRange(hsv_image, lower, upper)
+    elif color.lower() == 'blue':
+        lower = np.array(blue[0])
+        upper = np.array(blue[1])
+        color_mask = cv2.inRange(hsv_image, lower, upper)
+    else:
+        return None
+    
+    # Clean up the mask with morphological operations
+    kernel = np.ones((5, 5), np.uint8)
+    color_mask = cv2.morphologyEx(color_mask, cv2.MORPH_CLOSE, kernel)
+    color_mask = cv2.morphologyEx(color_mask, cv2.MORPH_OPEN, kernel)
+    
+    # Find contours
+    contours, _ = cv2.findContours(color_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    if not contours:
+        return None
+    
+    # Find the largest contour (assumed to be the landing pad)
+    largest_contour = max(contours, key=cv2.contourArea)
+    
+    # Calculate centroid
+    M = cv2.moments(largest_contour)
+    if M["m00"] == 0:
+        return None
+    
+    cx = int(M["m10"] / M["m00"])
+    cy = int(M["m01"] / M["m00"])
+    
+    # Calculate area ratio (useful for distance estimation)
+    contour_area = cv2.contourArea(largest_contour)
+    image_area = image.shape[0] * image.shape[1]
+    area_ratio = contour_area / image_area
+    
+    if not debug:
+        return cx, cy, area_ratio, None
+    
+    # Create visualization
+    vis_image = image.copy()
+    cv2.drawContours(vis_image, [largest_contour], -1, (0, 255, 0), 3)
+    cv2.circle(vis_image, (cx, cy), 5, (0, 0, 255), -1)
+    
+    # Draw bounding rectangle
+    x, y, w, h = cv2.boundingRect(largest_contour)
+    cv2.rectangle(vis_image, (x, y), (x + w, y + h), (255, 0, 0), 2)
+    
+    # Add text label
+    cv2.putText(vis_image, f"{color.upper()} Pad", (x, y - 10),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+    
+    return cx, cy, area_ratio, vis_image
+
 def compute_3d_vector(
     x: float, 
     y: float, 
