@@ -27,6 +27,14 @@ class HoopTrackingNode(VisionNode):
 
         # Detect the largest contour
         ellipse_contour, ellipse_params = detect_contour(frame)
+        
+        # Check if detection was successful
+        if ellipse_contour is None or ellipse_params is None:
+            response.success = False
+            response.r_vec = [0.0, 0.0, 0.0]
+            response.t_vec = [0.0, 0.0, 0.0]
+            return response
+        
         # PnP pose estimation
         success, rvec, tvec, c_obj = estimate_pose_from_contour(
             ellipse_contour, 

@@ -115,7 +115,7 @@ class HoopMode(Mode):
         
         self.log(f"Looking for hoop - waiting for {self.wait_time} more seconds")
         
-    def _handle_centering(self, response):
+    def _handle_centering(self, response, time_delta: float):
         "center the hoop in y and z and then move forward in x"
         if not response or not response.success:
             self.log("Lost hoop, switching to searching mode")
@@ -125,10 +125,13 @@ class HoopMode(Mode):
             
         self.hoop_position = response.t_vec
 
+        # Transform from camera frame to NED frame
+        # Camera frame: X=right, Y=down, Z=forward
+        # NED frame: X=forward (North), Y=right (East), Z=down
         hoop_ned = np.array([
-            self.hoop_position[0],
-            -self.hoop_position[1],
-            -self.hoop_position[2]
+            self.hoop_position[2],  # Z camera (forward) -> X NED (forward)
+            self.hoop_position[0],  # X camera (right) -> Y NED (right)
+            self.hoop_position[1]   # Y camera (down) -> Z NED (down)
         ])
 
         centered_y = abs(hoop_ned[1]) <= self.center_threshold_y
@@ -145,7 +148,7 @@ class HoopMode(Mode):
             hoop_ned[2]
         ])
 
-        self.log("centering - y offset: {hoop_ned[1]:.3f}, z offset: {hoop_ned[2]:.3f}")
+        self.log(f"centering - y offset: {hoop_ned[1]:.3f}, z offset: {hoop_ned[2]:.3f}")
         self.uav.publish_position_setpoint(correction.tolist(), relative=True)
 
     def _handle_flying_through(self):
@@ -155,7 +158,17 @@ class HoopMode(Mode):
             self.state = "searching"
             return
         
-        forward_distance = self.hoop_position[0] + 0.5  # added buffer of 0.5m but we can change if needed
+        # Transform hoop position to NED frame
+        # Camera frame: X=right, Y=down, Z=forward
+        # NED frame: X=forward (North), Y=right (East), Z=down
+        hoop_ned = np.array([
+            self.hoop_position[2],  # Z camera (forward) -> X NED (forward)
+            self.hoop_position[0],  # X camera (right) -> Y NED (right)
+            self.hoop_position[1]   # Y camera (down) -> Z NED (down)
+        ])
+        
+        # Fly forward to the hoop center (forward distance in NED X direction)
+        forward_distance = hoop_ned[0] + 0.5  # added buffer of 0.5m but we can change if needed
 
         #moving forward to hoop center
         direction = [forward_distance, 0.0, 0.0]
@@ -184,8 +197,10 @@ class HoopMode(Mode):
                     self.wait_time = 20
                     self.hoop_position = None
                 return
-        
-        self.log(f"Flying through hoop - distance to hoop center: {distance_to_hoop:.3f} m")
+            
+            self.log(f"Flying through hoop - distance to hoop center: {distance_to_hoop:.3f} m")
+        else:
+            self.log("Flying through hoop - waiting for drone position")
 
 
         ##self.wait_time = 20

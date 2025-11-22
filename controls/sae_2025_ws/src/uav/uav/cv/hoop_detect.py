@@ -184,12 +184,12 @@ def detect_contour(image):
     mask_hsv = seg.apply(filtered_hsv)
     mask_final, ellipse_contour, ellipse_params = post.apply(mask_hsv)
 
-    # viaualization
-    out = vis.apply(image, ellipse_contour, ellipse_params)
-    scale = 1  # rescale display
-    disp_frame = cv2.resize(out, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
-    cv2.imshow("detect result", disp_frame)
-    cv2.waitKey(0)
+    # visualization (commented out for production - uncomment for debugging)
+    # out = vis.apply(image, ellipse_contour, ellipse_params)
+    # scale = 1  # rescale display
+    # disp_frame = cv2.resize(out, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
+    # cv2.imshow("detect result", disp_frame)
+    # cv2.waitKey(1)  # Use waitKey(1) instead of waitKey(0) to avoid blocking
 
     return ellipse_contour, ellipse_params
 

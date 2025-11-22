@@ -3,7 +3,7 @@ import numpy as np
 from uav.vision_nodes import VisionNode
 import rclpy
 from uav.cv.recogniseRectangle import recognise_rectangle
-from uav.cv.pose_estimate import estimate_hoop_pose_from_contour
+from uav.cv.pose_estimate import estimate_rectangle_pose_from_contour
 from uav_interfaces.srv import Landing
 from uav.utils import red, green, blue
 
@@ -36,11 +36,13 @@ class LandingNode(VisionNode):
         contour = recognise_rectangle(frame, self.color_map[request.landing_color])
         if contour is None:
             return response
-        # PnP pose estimation
-        success, rvec, tvec, c_obj, ellipse = estimate_hoop_pose_from_contour(
+        # PnP pose estimation for rectangular landing pad
+        success, rvec, tvec, c_obj, rectangle = estimate_rectangle_pose_from_contour(
             contour,
             camera_matrix = np.array(camera_info.k).reshape(3,3),
-            dist_coeffs = np.array(camera_info.d)
+            dist_coeffs = np.array(camera_info.d),
+            rectangle_width=0.5,  # Adjust based on actual landing pad size
+            rectangle_height=0.5   # Adjust based on actual landing pad size
         )
 
         response.success = success
