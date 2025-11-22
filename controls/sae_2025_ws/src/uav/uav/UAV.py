@@ -70,6 +70,7 @@ class UAV:
         # Store current drone position
         self.global_position = None
         self.local_position = None
+        self.current_setpoint = None
     
     # -------------------------
     # Public commands
@@ -185,12 +186,18 @@ class UAV:
             x += self.local_position.x
             y += self.local_position.y
             z += self.local_position.z
+        
+        self.current_setpoint = (x, y, z)
+        
         msg = TrajectorySetpoint()
         msg.position = [float(x), float(y), float(z)]
         msg.yaw = self.calculate_yaw(x, y) if calculate_yaw else yaw if yaw else float(self.yaw)
         msg.timestamp = int(self.node.get_clock().now().nanoseconds / 1000)
         norm_dir = np.array([x, y, z]) / np.linalg.norm(np.array([x, y, z]))
-        msg.velocity = [norm_dir[0] * self.max_acceleration, norm_dir[1] * self.max_acceleration, norm_dir[2] * self.max_acceleration]
+        # msg.velocity = [norm_dir[0] * self.max_acceleration, norm_dir[1] * self.max_acceleration, norm_dir[2] * self.max_acceleration]
+        msg.velocity = [norm_dir[0] *0.01, norm_dir[1] * 0.001, norm_dir[2] * 0.01]
+        # msg.yaw = self.calculate_yaw(x*10, y) if calculate_yaw else yaw if yaw else float(self.yaw)
+
         self.trajectory_publisher.publish(msg)
         self.node.get_logger().info(f"Publishing setpoint: pos={[x, y, z]}, yaw={msg.yaw:.2f}")
         
@@ -321,7 +328,25 @@ class UAV:
         alt = alt0 - z  # because z is down in NED
         return (lat, lon, alt)
 
-    # def reached_position 
+    def reached_position(self, tolerance=0.1):
+        """
+        Check if the UAV has reached the current setpoint.
+        
+        Args:
+            tolerance (float): The distance tolerance in meters.
+            
+        Returns:
+            bool: True if the UAV is within the tolerance of the setpoint, False otherwise.
+        """
+        if self.current_setpoint is None or self.local_position is None:
+            return False
+        
+        dist = np.sqrt(
+            (self.local_position.x - self.current_setpoint[0]) ** 2 +
+            (self.local_position.y - self.current_setpoint[1]) ** 2 +
+            (self.local_position.z - self.current_setpoint[2]) ** 2
+        )
+        return dist < tolerance
 
     # -------------------------
     # Getters / data access

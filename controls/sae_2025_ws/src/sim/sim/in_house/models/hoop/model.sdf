@@ -25,7 +25,7 @@
         <geometry>
           <mesh>
             <uri>model://hoop/meshes/HoopSTL.stl</uri>
-            <scale> .005 .005 .005 </scale>
+            <scale> .000 .000 .000 </scale>
           </mesh>
         </geometry>
         <surface>

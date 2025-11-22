@@ -32,25 +32,30 @@ class TemuNavMode(Mode):
         self.y = 0.0
         self.z = 0.0 
         self.within_hoop = False
+        self.within_hoop_x = False
+        self.within_hoop_y = False
         self.set_once = None
         self.go_fwd = False
-    
+        self.target = (0.0, 0.0, 0.0), False
     def directions_callback(self, msg: Vector3) -> None:
         self.x = msg.x
         self.y = msg.y
         self.z = msg.z
+        self.target = (self.x, self.y, self.z), False
         # self.log(f"Received directions: x={self.x}, y={self.y}, z={self.z}") 
 
     def on_update(self, time_delta: float) ->None:
         if self.uav.local_position is None:
             self.log("Waiting for local position data...")
             return
-        uav_x_rel = self.z  # forward
-        uav_y_rel = self.x  # right
-        uav_z_rel = self.y  # down
-        uav_x_rel = self.z 
+        # uav_x_rel = self.z  # forward
+        # uav_y_rel = self.x  # right
+        # uav_z_rel = self.y  # down
+        # uav_x_rel = self.z 
 
-        
+        # goal reach check
+        # if self.uav.reached_position(tolerance=0.5):
+        #     self.log("Reached target position.")
         
         # if self.set_once is not None:
         #     self.node.get_logger().info("SET ONCE")
@@ -65,19 +70,44 @@ class TemuNavMode(Mode):
 
         
         if self.within_hoop:
-            scaling_factor_x = -0.5
-            scaling_factor_y = -0.5 # [-1, 1] -> [-0.5m, 0.5m]
+            scaling_factor_x = 0 #-0.5
+            scaling_factor_y = 0 #-0.5 # [-1, 1] -> [-0.5m, 0.5m]
+            scaling_factor_z = 0.5  # forward
+        elif self.within_hoop_x:
+            self.log("within x")
+            scaling_factor_x = 0 #-0.5
+            scaling_factor_y = -0.6 # [-1, 1] -> [-0.5m, 0.5m]
+            scaling_factor_z = 0.5  # forward
+        elif self.within_hoop_y:
+            self.log("within y")
+            scaling_factor_x = -0.6
+            scaling_factor_y = 0 # [-1, 1] -> [-0.5m, 0.5m]
             scaling_factor_z = 0.5  # forward
         else:
             scaling_factor_x = -1.0
             scaling_factor_y = -1.0 # [-1, 1] -> [-0.5m, 0.5m]
             scaling_factor_z = 0  # forward
-
-        if abs(self.x) <= 0.05 and abs(self.y) <= 0.05:
+        
+        threshold = 0.06
+        if abs(self.x) <= threshold and abs(self.y) <= threshold:
             self.within_hoop = True
-        elif abs(self.x) > 1.5 or abs(self.y) > 1.5:
-            self.timer = 1000000
-            # self.within_hoop = False
+        elif abs(self.x) <= threshold:
+            self.within_hoop_x = True
+        elif abs(self.y) <= threshold:
+            self.within_hoop_y = True
+        elif abs(self.x) > threshold and abs(self.y) > threshold:
+            self.within_hoop = False
+            self.within_hoop_x = False
+            self.within_hoop_y = False
+        elif abs(self.x) > threshold:  #or abs(self.y) > 1.5:
+            # self.timer = 1000000
+            self.within_hoop = False
+            self.within_hoop_x = False
+            # self.within_hoop_y = False
+        elif abs(self.y) > threshold:
+            self.within_hoop = False
+            # self.within_hoop_x = False
+            self.within_hoop_y = False
 
         # if self.z <= 1.0:
         #     x = float(self.uav.local_position.x)
