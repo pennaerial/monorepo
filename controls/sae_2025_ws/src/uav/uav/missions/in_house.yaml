@@ -1,0 +1,18 @@
+start:
+  class: uav.autonomous_modes.NavGPSMode
+  params:
+    offsets: '[(0, -5, 0)]'
+    speed: 1.0
+  transitions:
+    complete: forward
+
+forward:
+  class: uav.autonomous_modes.NavGPSMode
+  params:
+    offsets: '[(20, 0, 0)]'
+    speed: 2.0
+  transitions:
+    complete: land
+
+land:
+  class: uav.autonomous_modes.LandingMode
