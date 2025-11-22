@@ -51,7 +51,7 @@ class UAV:
         self.component_id = 1
         
         self.max_acceleration = 0.001
-        self.max_velocity = 0.1  # <--- cap for commanded speed (m/s)
+        self.max_velocity = 0.001  # <--- cap for commanded speed (m/s)
 
         self.camera_offsets = camera_offsets
         
@@ -199,18 +199,16 @@ class UAV:
                 z - self.local_position.z
             ], dtype=float)
             dist = np.linalg.norm(dir_vec)
-            if dist > 1e-3:
-                norm_dir = dir_vec / dist
-                vel_vec = norm_dir * min(self.max_velocity, dist)  # cap speed
-            else:
-                vel_vec = np.zeros(3)
+
+            norm_dir = dir_vec / 100
+            vel_vec = norm_dir * min(self.max_velocity, dist)
         else:
             # If we don't yet have a local position estimate, command zero velocity
             vel_vec = np.zeros(3)
 
         msg.velocity = vel_vec.tolist()
         # Retain acceleration field for PX4 compatibility but fill with small values
-        msg.acceleration = [float('nan')] * 3
+        msg.acceleration = [self.max_acceleration] * 3
 
         self.trajectory_publisher.publish(msg)
         self.node.get_logger().info(f"Publishing setpoint: pos={[x, y, z]}, yaw={msg.yaw:.2f}, vel={vel_vec}")
