@@ -3,6 +3,7 @@ from uav import UAV
 from uav.autonomous_modes import Mode
 from rclpy.node import Node
 from uav_interfaces.srv import HoopTracking 
+from uav_interfaces.msg import DroneState
 from uav.vision_nodes import HoopTrackingNode 
 from typing import Optional, Tuple
 import cv2
@@ -30,9 +31,47 @@ class HoopMode(Mode):
         self.wait_time: float = 20.0 # delay in s
         self.num_hoops: int = num_hoops
         self.passed_hoops: list[tuple[float, float, float]] = []      # list of coordinates of all passed hoops
-        self.goal_pos: tuple[float, float, float] = ()
+
+        self.hoop_detected: bool = False
+        self.hoop_position: Optional[np.ndarray] = None
+        
+        self.state: str = "searching" #should be either "searching", "centering", or "flying_through"
+
+        self.center_threshold_y: float = 0.1  #modify this if it doesn't work
+        self.center_threshold_z: float = 0.1  #modify this if it doesn't work
+        self.distance_threshold: float = 0.05  #distance to hoop center
+
+        self.drone_state: Optional[DroneState] = None
+        self.drone_position: Optional[np.ndarray] = None
+        self.drone_velocity: Optional[np.ndarray] = None
+
+        ##self.goal_pos: tuple[float, float, float] = ()
         self.rotation_vec: tuple[float, float, float] = () 
         self.success: bool = False
+
+        self.state_subscription = self.node.create_subscription(
+            DroneState,
+            '/drone_state',
+            self.state_callback,
+            10
+        )
+
+    def state_callback(self, msg: DroneState):
+        """
+        Callback function to update the drone's state.
+
+        Args:
+            msg (DroneState): The message containing the drone's state.
+        """
+        self.drone_state = msg
+        self.drone_position = np.array([
+            msg.position.x, 
+            msg.position.y, 
+            msg.position.z])
+        self.drone_velocity = np.array([
+            msg.velocity.x,
+            msg.velocity.y, 
+            msg.velocity.z])
 
 
     def on_update(self, time_delta: float) -> None:
@@ -48,43 +87,133 @@ class HoopMode(Mode):
         if time_delta > 1:
             time_delta = 0
         
-        # If no hoop detected, start counting down the wait time
-        if not response and len(self.goal_pos) == 0:
-            direction = [0, 0, -self.altitude_constant] # start going upwards
-            self.uav.publish_position_setpoint(direction, relative=True)
-            self.wait_time -= time_delta
+        if self.state == "searching":
+            self._handle_searching(response, time_delta)
+        elif self.state == "centering":
+            self._handle_centering(response, time_delta)
+        elif self.state == "flying_through":
+            self._handle_flying_through()
 
-            if len(self.passed_hoops) >= self.num_hoops or self.wait_time <= 0: # if 20 seconds has elapsed with no response
-                self.done = True
-            self.log(f"Looking for hoop - waiting for {self.wait_time} more seconds")
+    def _handle_searching(self, response, time_delta: float):
+        "fly upward to look for hoops"
+
+        if response and response.success:
+            self.state = "centering"
+            self.hoop_detected = True
+            self.hoop_position = response.t_vec
+            self.log("Hoop detected, switching to centering mode")
             return
         
-        self.wait_time = 20
+        direction = [0, 0, -self.altitude_constant] # start going upwards
+        self.uav.publish_position_setpoint(direction, relative=True)
+        self.wait_time -= time_delta
 
-        # if no goal_pos
-        if len(self.goal_pos) == 0:
-            self.success = response.success
-            self.goal_pos = response.t_vec
-            self.rotation_vec = response.r_vec
+        if len(self.passed_hoops) >= self.num_hoops or self.wait_time <= 0: # if 20 seconds has elapsed with no response
+            self.done = True
+            self.log("Search timeout or all hoops passed.")
+            return
+        
+        self.log(f"Looking for hoop - waiting for {self.wait_time} more seconds")
+        
+    def _handle_centering(self, response):
+        "center the hoop in y and z and then move forward in x"
+        if not response or not response.success:
+            self.log("Lost hoop, switching to searching mode")
+            self.state = "searching"
+            self.wait_time = 20
+            return
+            
+        self.hoop_position = response.t_vec
 
-        if self.success:
-            self.uav.publish_position_setpoint(self.goal_pos)
-            if self.uav.distance_to_waypoint('LOCAL', self.goal_pos) <= 0.05:
-                self.passed_hoops.append(self.goal_pos)
-                self.goal_pos = () 
+        hoop_ned = np.array([
+            self.hoop_position[0],
+            -self.hoop_position[1],
+            -self.hoop_position[2]
+        ])
+
+        centered_y = abs(hoop_ned[1]) <= self.center_threshold_y
+        centered_z = abs(hoop_ned[2]) <= self.center_threshold_z
+
+        if centered_y and centered_z:
+            self.state = "flying_through"
+            self.log("Hoop centered, switching to flying through mode")
+            return
+        
+        correction = np.array([
+            0.0,
+            hoop_ned[1],
+            hoop_ned[2]
+        ])
+
+        self.log("centering - y offset: {hoop_ned[1]:.3f}, z offset: {hoop_ned[2]:.3f}")
+        self.uav.publish_position_setpoint(correction.tolist(), relative=True)
+
+    def _handle_flying_through(self):
+        "fly forward through the centered hoop"
+        if self.hoop_position is None:
+            self.log("Lost hoop, switching to searching mode")
+            self.state = "searching"
+            return
+        
+        forward_distance = self.hoop_position[0] + 0.5  # added buffer of 0.5m but we can change if needed
+
+        #moving forward to hoop center
+        direction = [forward_distance, 0.0, 0.0]
+        self.uav.publish_position_setpoint(direction, relative=True)
+
+        if self.drone_position is not None:
+            distance_to_hoop = np.linalg.norm(self.drone_position - np.array([
+                self.drone_position[0] + forward_distance,
+                self.drone_position[1],
+                self.drone_position[2]
+            ]))
+
+            if distance_to_hoop <= self.distance_threshold:
+                self.log("Successfully flew through hoop")
+                self.passed_hoops.append((
+                    self.drone_position[0] + forward_distance,
+                    self.drone_position[1],
+                    self.drone_position[2]
+                ))
                 if len(self.passed_hoops) >= self.num_hoops:
                     self.done = True
+                    self.log("All hoops passed, mission complete")
                     return
-            return
+                else:
+                    self.state = "searching"
+                    self.wait_time = 20
+                    self.hoop_position = None
+                return
         
-        direction = [ -response.t_vec[1], response.t_vec[0], response.t_vec[2] ]
-        
-        camera_offsets = self.uav.camera_offsets
-        direction = [x + y for x, y in zip(direction, self.uav.uav_to_local(camera_offsets))]
+        self.log(f"Flying through hoop - distance to hoop center: {distance_to_hoop:.3f} m")
 
 
-        self.log(f"Direction: {self.goal_pos}")
-        self.uav.publish_position_setpoint(self.goal_pos, relative=True)
+        ##self.wait_time = 20
+
+        # if no goal_pos
+        ##if len(self.goal_pos) == 0:
+            ##self.success = response.success
+            ##self.goal_pos = response.t_vec
+           ## self.rotation_vec = response.r_vec
+
+        ##if self.success:
+           ## self.uav.publish_position_setpoint(self.goal_pos)
+           ## if self.uav.distance_to_waypoint('LOCAL', self.goal_pos) <= 0.05:
+           ##     self.passed_hoops.append(self.goal_pos)
+           ##     self.goal_pos = () 
+           ##     if len(self.passed_hoops) >= self.num_hoops:
+         ##           self.done = True
+           ##         return
+          ##  return
+        
+       ## direction = [ -response.t_vec[1], response.t_vec[0], response.t_vec[2] ]
+        
+       ## camera_offsets = self.uav.camera_offsets
+       ## direction = [x + y for x, y in zip(direction, self.uav.uav_to_local(camera_offsets))]
+
+
+       ## self.log(f"Direction: {self.goal_pos}")
+       ## self.uav.publish_position_setpoint(self.goal_pos, relative=True)#
     
     def check_status(self) -> str:
         """
