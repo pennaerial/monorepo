@@ -64,6 +64,7 @@ class RingTrackingNode(VisionNode):
         """Runs at 20 Hz; performs detection and publishes results."""
         # Ensure we have at least one image and camera_info before proceeding
         if self.image is None or self.camera_info is None:
+            print("RingTrackingNode: waiting for image/camera_info...")
             return  # wait until the bridge delivers first data
 
         # Acquire newest data via helper (now guaranteed to be non-None)
@@ -125,6 +126,7 @@ class RingTrackingNode(VisionNode):
 
             result_data, intermediate_frames = result
             result_data = None
+            print("not detecting anyyyything")
             dummy = self.publish_msg_type()
             dummy.data = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]  # x,y,dir_x,dir_y,dir_z,flag
             self.ring_pub.publish(dummy)
@@ -139,6 +141,8 @@ class RingTrackingNode(VisionNode):
 
         if center_3d is not None:
             dir_x, dir_z, dir_y = center_3d
+
+            dir_x = -dir_x
 
             #need to flip direction of the z axis because in gazebo, up is negative z
             # dir_z = -dir_z

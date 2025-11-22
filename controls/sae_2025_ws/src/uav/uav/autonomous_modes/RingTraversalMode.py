@@ -35,13 +35,13 @@ class RingTraversalMode(Mode):
         self.log("Shit is working")
         # Use dir vector for guidance
         dir_x, dir_y, dir_z = self.latest_vec[2:5]
-        vec = np.array([dir_x, dir_y, dir_z])
+        vec = np.array([dir_x, dir_y, dir_z]).astype('float32')
         mag = np.linalg.norm(vec)
         # if mag < self.threshold:
         #     self.done = True
         #     return
         # Scale to small step proportional to magnitude
-        step = vec  # already unit-ish; UAV class caps velocity
+        step = vec / 10.0  # already unit-ish; UAV class caps velocity
         # self.uav.publish_position_setpoint(step, relative=True)
         self.uav.publish_velocity(step)
 

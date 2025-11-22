@@ -248,19 +248,19 @@ def detect_ellipses_fast_tuned(frame_bgr, debug=False) -> Tuple[List, Dict[str, 
     for idx, c in enumerate(contours):
         area = cv2.contourArea(c)
         
-        # Filtering
-        if len(c) < MIN_CONTOUR_POINTS:
-            rejection_reasons['too_few_points'] += 1
-            continue
+        # # Filtering
+        # if len(c) < MIN_CONTOUR_POINTS:
+        #     rejection_reasons['too_few_points'] += 1
+        #     continue
             
-        if area < MIN_CONTOUR_AREA:
-            rejection_reasons['too_small'] += 1
-            continue
+        # if area < MIN_CONTOUR_AREA:
+        #     rejection_reasons['too_small'] += 1
+        #     continue
         
         points = c.squeeze()
-        if points.ndim != 2:
-            rejection_reasons['fit_failed'] += 1
-            continue
+        # if points.ndim != 2:
+        #     rejection_reasons['fit_failed'] += 1
+        #     continue
         
         # Sample points for visualization
         num_samples = min(20, len(points))
@@ -344,8 +344,8 @@ def solve_ellipse_pnp_approx(K, ellipse, ring_radius_m) -> Optional[Tuple[np.nda
         return None
     
     Z_c = fx * diameter_world / MA
-    if Z_c < 0.1 or Z_c > 50.0:  # Reasonable range
-        return None
+    # if Z_c < 0.1 or Z_c > 500.0:  # Reasonable range
+    #     return None
     
     X_c = (Z_c / fx) * (cx - cx0)
     Y_c = (Z_c / fy) * (cy - cy0)

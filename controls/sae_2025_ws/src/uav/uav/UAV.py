@@ -172,9 +172,18 @@ class UAV:
     def disable_servo(self):
         self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_DO_SET_ACTUATOR, params={'param1': 0.0})
 
-    def publish_velocity(self, velocity = [0, 0, 0]):
+    def publish_velocity(self, velocity = [0.0, 0.5, 0.0]):
         msg = TrajectorySetpoint()
-        msg.velocity = [0,0.5,0]
+        msg.yaw = math.pi/2
+        msg.position = [float('nan')] * 3  # NaN positions indicate velocity control
+
+        if velocity[0] == 0.0 and velocity[1] == 0.0 and velocity[2] == 0.0:
+            msg.velocity = [0.0, 0.5, 0.0]
+        else:
+            msg.velocity = velocity
+        msg.acceleration = [float('nan')] * 3  # Retain acceleration field for PX4 compatibility but fill with NaN
+        msg.jerk = [float('nan')] * 3   # Retain jerk field for PX4 compatibility but fill with NaN4
+        msg.yawspeed = float('nan')  # Retain yaw_rate field for PX4 compatibility but fill with NaN
         self.trajectory_publisher.publish(msg)
         self.node.get_logger().info(f"Publishing velocity: {msg.velocity}")
 
