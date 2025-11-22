@@ -45,7 +45,7 @@ class RingTraversalMode(Mode):
         
         if self.STATE == 'lateral':
             #when aligned, move to forward state
-            if dir_x < 0.01 and dir_z < 0.01:
+            if math.fabs(dir_x) < 0.01 and math.fabs(dir_z) < 0.01:
                 self.STATE = 'forward'
             else:
                 vec = np.array([dir_x / 1.0, 0.0, dir_z / 1.0]).astype('float32')
@@ -53,7 +53,7 @@ class RingTraversalMode(Mode):
                 return
             
         if self.STATE == 'forward': 
-            if dir_y < 0.4:
+            if math.fabs(dir_y) < 0.4:
                 self.STATE = 'bullrush'
             else:
                 vec = np.array([dir_x / 10.0, dir_y / 1.5, dir_z / 10.0]).astype('float32')
@@ -68,14 +68,12 @@ class RingTraversalMode(Mode):
             # Command constant forward velocity (Y axis 0.5 m/s per publish_velocity default)
             self.uav.publish_velocity([0.0, 0.5, 0.0])
             elapsed = (self.node.get_clock().now().nanoseconds - self.bullrush_start_ns) / 1e9
-            if elapsed >= 3.0:
+            if elapsed >= 3:
                 self.STATE = 'lateral'
                 self.bullrush_start_ns = None
                 self.log("BULLRUSH finished – switching back to LATERAL")
             # During bullrush we already commanded velocity; skip rest of on_update
         
-        return
-
         
         # vec = np.array([dir_x / 2.0 , dir_y / 5.0, dir_z / 2.0]).astype('float32')
         # mag = np.linalg.norm(vec)
