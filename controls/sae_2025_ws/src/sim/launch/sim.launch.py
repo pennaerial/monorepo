@@ -93,7 +93,7 @@ def get_default_params():
         'simulation': {
             'world_name': 'custom',
             'enable_scoring': True,
-            'uav_model': 'gz_x500_mono_cam_down',
+            'uav_model': 'gz_x500_mono_cam',
             'position_poll_rate': 10.0,
             'scoring_rate': 5.0,
             'scoring': {
@@ -177,7 +177,7 @@ def launch_setup(context, *args, **kwargs):
         des_start_height=course_params_dict.get('start_height'),
         spacing=course_params_dict.get('spacing'),
         # CHANGE HARDCODED PATH LATER, BASE ON PARAMs
-        ip_file="/home/avaniko/penn-air/monorepo/controls/sae_2025_ws/src/sim/sim/in_house/worlds/template.sdf", 
+        ip_file="/home/felicia/main_directory/monorepo/controls/sae_2025_ws/src/sim/sim/in_house/worlds/template.sdf", 
         op_file=os.path.expanduser(f"~/.simulation-gazebo/worlds/{world_name}.sdf")
     )
     
