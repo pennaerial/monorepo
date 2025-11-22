@@ -42,7 +42,8 @@ class RingTraversalMode(Mode):
         #     return
         # Scale to small step proportional to magnitude
         step = vec  # already unit-ish; UAV class caps velocity
-        self.uav.publish_position_setpoint(step, relative=True)
+        # self.uav.publish_position_setpoint(step, relative=True)
+        self.uav.publish_velocity(step)
 
     def check_status(self):
         return 'complete' if getattr(self, 'done', False) else 'continue'

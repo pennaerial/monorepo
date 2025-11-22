@@ -171,6 +171,13 @@ class UAV:
 
     def disable_servo(self):
         self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_DO_SET_ACTUATOR, params={'param1': 0.0})
+
+    def publish_velocity(self, velocity = [0, 0, 0]):
+        msg = TrajectorySetpoint()
+        msg.velocity = [0,0.5,0]
+        self.trajectory_publisher.publish(msg)
+        self.node.get_logger().info(f"Publishing velocity: {msg.velocity}")
+
     
     def publish_position_setpoint(self, coordinate, yaw=None, calculate_yaw=False, relative=False):
         """Publish the trajectory setpoint.
