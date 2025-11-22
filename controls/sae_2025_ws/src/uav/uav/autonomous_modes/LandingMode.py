@@ -34,7 +34,7 @@ class LandingMode(Mode):
         """
         # check if landed
         if self.landing_initiated:
-            if self.uav.vehicle_status != VehicleStatus.NAVIGATION_STATE_AUTO_LAND:
+            if self.uav.nav_state != VehicleStatus.NAVIGATION_STATE_AUTO_LAND:
                 self.done = True
             return
         

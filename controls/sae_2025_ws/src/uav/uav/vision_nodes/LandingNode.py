@@ -15,7 +15,7 @@ class LandingNode(VisionNode):
     srv = Landing
 
     def __init__(self, display: bool = False):
-        super().__init__('landing_node', self.__class__.srv)
+        super().__init__(self.__class__.srv, display=display)
 
         self.display = display
         self.color_map = {

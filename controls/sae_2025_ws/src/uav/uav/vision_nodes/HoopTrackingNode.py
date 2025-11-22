@@ -1,7 +1,6 @@
 # payload_tracking_node.py
 import cv2
 import numpy as np
-from uav.cv.tracking import rotate_image
 from uav.vision_nodes import VisionNode
 from uav.cv.hoop_detect import detect_contour, estimate_pose_from_contour
 import rclpy
@@ -12,7 +11,7 @@ class HoopTrackingNode(VisionNode):
     srv = HoopTracking
     
     def __init__(self):
-        super().__init__('hoop_tracking', self.__class__.srv)
+        super().__init__(self.__class__.srv)
         self.create_service(HoopTracking, self.service_name(), self.service_callback)
         
     def service_callback(self, request, response):
