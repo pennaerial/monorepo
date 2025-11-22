@@ -2,8 +2,8 @@
 world:
     class: sim.world_gen.HoopCourseNode
     params:
-      course: "coaster"
-      dlz: '[25, 5, 10]'      # Drop zone coordinates [x, y, z]
+      course: "bezier"
+      dlz: '[25, -2, 10]'      # Drop zone coordinates [x, y, z]
       uav: '[0, 0, 0]'       # UAV starting position [x, y, z]
       num_hoops: 15          # Number of hoops to generate
       max_dist: 10

@@ -43,64 +43,6 @@ def load_launch_params():
         return get_default_params()
 
 
-<<<<<<< HEAD
-=======
-def get_default_params():
-    """Default parameters if YAML file is not found."""
-    return {
-        'competition': {'type': 'in_house', 'name': 'slalom'},
-        'course': {
-            'type': 'slalom',
-            'slalom': {
-                'dlz': [10, 5, 0],
-                'uav': [0, 0, 0],
-                'num_hoops': 5,
-                'max_dist': 10,
-                'width': 3,
-                'height': 4
-            },
-            'ascent': {
-                'dlz': [10, 5, 0],
-                'uav': [0, 0, 0],
-                'num_hoops': 4,
-                'max_dist': 8,
-                'start_height': 2
-            },
-            'descent': {
-                'dlz': [10, 5, 0],
-                'uav': [0, 0, 0],
-                'num_hoops': 4,
-                'max_dist': 8,
-                'start_height': 2
-            }
-        },
-        'simulation': {
-            'world_name': 'custom',
-            'enable_scoring': True,
-            'uav_model': 'gz_x500_mono_cam',
-            'position_poll_rate': 10.0,
-            'scoring_rate': 5.0,
-            'scoring': {
-                'hoop_tolerance': 1.5,
-                'max_flight_time': 300,
-                'points_per_hoop': 10,
-            }
-        },
-        'ros2': {
-            'middleware_port': 8888,
-            'enable_camera_bridge': True,
-            'topics': {
-                'camera': '/camera',
-                'camera_info': '/camera_info',
-                'vehicle_position': '/fmu/out/vehicle_local_position',
-                'vehicle_attitude': '/fmu/out/vehicle_attitude',
-                'scoring_results': '/scoring/results'
-            }
-        }
-    }
-
-
->>>>>>> team/team2-rishabh
 def launch_setup(context, *args, **kwargs):
     """Setup launch configuration."""
     
@@ -141,7 +83,7 @@ def launch_setup(context, *args, **kwargs):
     
     # Define the Gazebo process
     print("start gazebo")
-    gazebo = ExecuteProcess(
+    gui = ExecuteProcess(
         cmd=['python3', 'Tools/simulation/gz/simulation-gazebo', f'--world={world_name}'],
         cwd=px4_path,
         output='screen',
@@ -224,13 +166,13 @@ def launch_setup(context, *args, **kwargs):
             OnProcessStart(target_action=sim, on_start=[TimerAction(
                     period=1.0,   # seconds; tweak this
                     actions=[
-                        gazebo,
+                        gui,
                         LogInfo(msg="Sim started, launching Gazebo after delay.")
                     ]
                 )])
         ),
         RegisterEventHandler(
-            OnProcessStart(target_action=gazebo, on_start=[ LogInfo(msg="Gazebo started.")])
+            OnProcessStart(target_action=gui, on_start=[ LogInfo(msg="Gazebo started.")])
         ),
         # RegisterEventHandler(
         #     OnProcessStart(target_action=px4_sitl, on_start=bridge_actions + [LogInfo(msg="PX4 SITL started.")])
