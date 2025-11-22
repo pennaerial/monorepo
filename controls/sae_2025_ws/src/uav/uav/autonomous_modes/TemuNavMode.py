@@ -3,6 +3,7 @@ from rclpy.node import Node
 from rclpy.duration import Duration
 from uav.UAV import UAV
 from geometry_msgs.msg import Vector3
+from std_msgs.msg import Float64MultiArray
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 from uav.vision_nodes import TemuVisionNode
 from px4_msgs.msg import TrajectorySetpoint
@@ -34,6 +35,7 @@ class TemuNavMode(Mode):
         self.x = 0.0
         self.y = 0.0
         self.z = 0.0 
+        self.vector_dist = 0.0
 
         self.state = 0
         self.state_name = {
@@ -48,12 +50,12 @@ class TemuNavMode(Mode):
         self.buffer_start = None
         self.buffer_end = None
 
-    def directions_callback(self, msg: Vector3) -> None:
-        self.x = msg.x
-        self.y = msg.y
-        self.z = msg.z
+    def directions_callback(self, msg: Float64MultiArray) -> None:
+        self.x = msg.data[0]
+        self.y = msg.data[1]
+        self.z = msg.data[2]
+        self.vector_dist = msg.data[3]
     
-
     def on_update(self, time_delta: float) ->None:
         if self.uav.local_position is None:
             self.log("Waiting for local position data...")

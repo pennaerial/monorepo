@@ -8,7 +8,7 @@ import rclpy
 from cv_bridge import CvBridge
 from uav.utils import pink, green, blue, yellow
 from geometry_msgs.msg import Vector3
-from std_msgs.msg import String
+from std_msgs.msg import String, Float64MultiArray
 
 from std_srvs.srv import Empty
 
@@ -41,25 +41,23 @@ class TemuVisionNode(VisionNode):
         # self.get_logger().info("Received image for hoop tracking.")
         self.sim = True
         image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
-        x, y, z, img = find_hoop_w_depth(image)
+        x, y, z, vector_dist, img = find_hoop_w_depth(image)
         self.display_frame(img, "result")
 
         if x is None or y is None or z is None:
             return
 
-        self.publish_directions(x, y, z)
+        self.publish_directions(x, y, z, vector_dist)
     
-    def publish_directions(self, x, y, z):
+    def publish_directions(self, x, y, z, d):
         '''
         NOTE: 
         x is left right relative to the drone
         y is top down relative to the drone
         z is forward backward relative to the drone
         '''
-        msg = Vector3() 
-        msg.x = float(x)
-        msg.y = float(y)
-        msg.z = float(z)
+        msg = Float64MultiArray()
+        msg.data = [x, y, z, d]
         self.hoop_directions_publisher.publish(msg)
 
 

@@ -102,6 +102,8 @@ def find_hoop_w_depth(
         if score > maxScore:
             selected_contours = [contour]
 
+    vector_dist = 0.0
+
     for contour in selected_contours:
         moments = cv2.moments(contour) #returns a dictionary of moments
         if moments['m00'] != 0:
@@ -117,6 +119,8 @@ def find_hoop_w_depth(
             if debug:
                 cv2.circle(img, (int(xc), int(yc)), 4, (255, 255, 255), -1)
                 cv2.arrowedLine(img, (w//2, h//2), (int(xc), int(yc) ), (255, 0, 0), 2, cv2.LINE_AA, 0, 0.1)
+
+            vector_dist = np.sqrt((xc - w//2) ** 2 + (yc - h//2) ** 2)
 
             a = major / 2
             b = minor / 2
@@ -158,6 +162,6 @@ def find_hoop_w_depth(
             z = truncateDec(tvec[2][0])
             if debug:
                 cv2.putText(img, f"Center@({x, y, z})", (Cx-20, Cy-10), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1, cv2.LINE_AA)
-            return x, y, z, img
-        return None, None, None, img
-    return None, None, None, img
+            return x, y, z, vector_dist, img
+        return None, None, None, vector_dist, img
+    return None, None, None, vector_dist, img
