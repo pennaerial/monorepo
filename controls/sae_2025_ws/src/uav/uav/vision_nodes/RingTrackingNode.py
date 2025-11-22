@@ -83,8 +83,7 @@ class RingTrackingNode(VisionNode):
             self.save_vision
         )
 
-        #we should only need center_3d
-        # center_3d, normal_3d, ellipse, used_radius, intermediate_frames = find_nearest_hoop_pose(image, camera_info_msg.k, 0.5)
+        
 
         
 
@@ -107,40 +106,57 @@ class RingTrackingNode(VisionNode):
             y /= 2
             
         
-        # # Compute 3D direction vector
-        # direction = compute_3d_vector(x, y, np.array(camera_info.k, ).reshape(3, 3), request.altitude)
-            
-        # # Populate response
-        # response.x = float(x)
-        # response.y = float(y)
-        # response.direction = direction
-        # response.dlz_empty = dlz_empty
-        # return response
-        if detection is None:
-            # Publish constant dummy vector so downstream nodes see a steady stream
+
+        #we should only need center_3d
+        center_3d, normal_3d, ellipse, used_radius, intermediate_frames = find_nearest_hoop_pose(image, camera_info_msg.k, 0.5)
+
+        
+
+        self.display_frame(image, self.node_name())
+
+
+        if center_3d != []:
+            dir_x, dir_z, dir_y = center_3d
+
+            #need to flip direction of the z axis because in gazebo, up is negative z
+            dir_z = -dir_z
+            good = self.publish_msg_type()
+            good.data = [0.0, 0.0, dir_x, dir_y, dir_z, 0.0]  # x,y,dir_x,dir_y,dir_z,flag
+            self.ring_pub.publish(good)
+            return
+        else:
             print("not detecting anyyyything")
             dummy = self.publish_msg_type()
-            dummy.data = [0.0, 0.0, 5.0, 5.0, 0.0, 0.0]  # x,y,dir_x,dir_y,dir_z,flag
+            dummy.data = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]  # x,y,dir_x,dir_y,dir_z,flag
             self.ring_pub.publish(dummy)
             return
 
-        cx, cy, dlz_empty = detection
+        
 
-        direction = compute_3d_vector(
-            cx,
-            cy,
-            np.array(camera_info_msg.k).reshape(3, 3),
-            0.0  # altitude not used for direction-only vector; adjust if needed
-        )
+        # if detection is None:
+        #     # Publish constant dummy vector so downstream nodes see a steady stream
+        #     print("not detecting anyyyything")
+        #     dummy = self.publish_msg_type()
+        #     dummy.data = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]  # x,y,dir_x,dir_y,dir_z,flag
+        #     self.ring_pub.publish(dummy)
+        #     return
 
-        # Pack message: [x, y, dir_x, dir_y, dir_z, dlz_empty]
-        msg = self.publish_msg_type()
-        msg.data = [float(cx), float(cy)] + list(direction) + [1.0 if dlz_empty else 0.0]
-        self.ring_pub.publish(msg)
+        # cx, cy, dlz_empty = detection
+
+        # direction = compute_3d_vector(
+        #     cx,
+        #     cy,
+        #     np.array(camera_info_msg.k).reshape(3, 3),
+        #     0.0  # altitude not used for direction-only vector; adjust if needed
+        # )
+
+        # # Pack message: [x, y, dir_x, dir_y, dir_z, dlz_empty]
+        # msg = self.publish_msg_type()
+        # msg.data = [float(cx), float(cy)] + list(direction) + [1.0 if dlz_empty else 0.0]
+        # self.ring_pub.publish(msg)
 
         # if self.display:
         #     self.display_frame(image, self.node_name()) 
-        self.display_frame(image, self.node_name())
 
 
         # ---------------------  LEGACY SERVICE CALLBACK (optional)  ---------------------
