@@ -8,13 +8,13 @@ competition:
 
 # Course Configuration
 course:
-  type: "slalom"    # Options: "slalom", "ascent", "descent", "random"
+  type: "descent"    # Options: "slalom", "ascent", "descent", "random"
   
   # Course-specific parameters
   slalom:
     dlz: [10, 5, 0]      # Drop zone coordinates [x, y, z]
     uav: [0, 0, 0]       # UAV starting position [x, y, z]
-    num_hoops: 8         # Number of hoops to generate
+    num_hoops: 5          # Number of hoops to generate
     max_dist: 10         # Maximum distance between hoops
     width: 3             # Hoop width
     height: 4            # Hoop height
