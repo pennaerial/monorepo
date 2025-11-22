@@ -15,6 +15,7 @@ class RingTraversalMode(Mode):
         from std_msgs.msg import Float64MultiArray
         self.threshold = threshold  # magnitude when close enough
         self.latest_vec = None  # store last Float64MultiArray
+        self.STATE = 'lateral'
 
         self.sub = node.create_subscription(
             Float64MultiArray,
@@ -35,15 +36,33 @@ class RingTraversalMode(Mode):
         self.log("Shit is working")
         # Use dir vector for guidance
         dir_x, dir_y, dir_z = self.latest_vec[2:5]
-        vec = np.array([dir_x, dir_y, dir_z]).astype('float32')
-        mag = np.linalg.norm(vec)
+
+        #STATE MACHINE LOGIC
+
+        
+        if self.STATE is 'lateral':
+            #when aligned, move to forward state
+            if dir_x < 0.01 and dir_z < 0.01:
+                self.STATE = 'forward'
+            else:
+                vec = np.array([dir_x / 2.0, 0.0, dir_z / 2.0]).astype('float32')
+            
+        if self.STATE is 'forward': 
+            vec = np.array([dir_x / 10.0, dir_y / 1.5, dir_z / 10.0]).astype('float32')
+
+        self.log(f"State: {self.STATE}")
+        # vec = np.array([dir_x / 2.0 , dir_y / 5.0, dir_z / 2.0]).astype('float32')
+        # mag = np.linalg.norm(vec)
         # if mag < self.threshold:
         #     self.done = True
         #     return
         # Scale to small step proportional to magnitude
-        step = vec / 10.0  # already unit-ish; UAV class caps velocity
-        # self.uav.publish_position_setpoint(step, relative=True)
-        self.uav.publish_velocity(step)
+        step = vec # already unit-ish; UAV class caps velocity
+        # Use time-based movement helper to apply this velocity for a short time
+        # Start the timed movement only if one is not already active.
+        if getattr(self, '_move_velocity', None) is None:
+            # adjust duration as needed (seconds)
+            self.move_for_duration(step, duration_s=0.2, rate_hz=10)
 
     def check_status(self):
         return 'complete' if getattr(self, 'done', False) else 'continue'

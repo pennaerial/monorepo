@@ -64,8 +64,11 @@ class RingTrackingNode(VisionNode):
     def timer_callback(self):
         """Runs at 20 Hz; performs detection and publishes results."""
         # Ensure we have at least one image and camera_info before proceeding
-        if self.image is None or self.camera_info is None:
-            print("RingTrackingNode: waiting for image/camera_info...")
+        if self.image is None:
+            print("RingTrackingNode: waiting for image...")
+            return
+        if self.camera_info is None:
+            print("RingTrackingNode: waiting for camera_info...")
             return  # wait until the bridge delivers first data
 
         # Acquire newest data via helper (now guaranteed to be non-None)
@@ -84,7 +87,7 @@ class RingTrackingNode(VisionNode):
 
         
         ###### CRAZY PRANAV ALGO #####
-        # result = detect(image, camera_info_msg.k, 0.5)
+        # result = find_nearest_hoop_pose(image, camera_info_msg.k, 0.5)
 
 
         # if len(result) == 2:
@@ -124,21 +127,24 @@ class RingTrackingNode(VisionNode):
 
         
         ###### NEW FLOODFILL ALGO ####
-        result = detect(image, camera_info_msg.k, 0.5)
-        if result is not None:
-            pose, debug_frame = result
+        pose, debug_frame = detect(image, camera_info_msg.k)
+
+        if pose is not None:
+            # We have a valid detection
             self.display_frame(debug_frame, self.node_name())
             dir_x, dir_z, dir_y = pose['x'], pose['y'], pose['z']
             dir_x = -dir_x
             nx, ny, nz = pose['nx'], pose['ny'], pose['nz']
-            self.ring_pub.publish(0.0, 0.0, dir_x, dir_y, dir_z, 0.0)
-            return
+            good = self.publish_msg_type()
+            good.data = [0.0, 0.0, dir_x, dir_y, dir_z, 0.0]  # x,y,dir_x,dir_y,dir_z,flag
+            self.ring_pub.publish(good)
         else:
+            # No hoop detected this frame
             print("not detecting anyyyything")
+            self.display_frame(image, self.node_name())
             dummy = self.publish_msg_type()
             dummy.data = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]  # x,y,dir_x,dir_y,dir_z,flag
             self.ring_pub.publish(dummy)
-            return
 
 
         # ---------------------  LEGACY SERVICE CALLBACK (optional)  ---------------------

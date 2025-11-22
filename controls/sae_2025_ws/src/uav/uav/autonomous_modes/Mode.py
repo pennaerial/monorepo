@@ -24,6 +24,7 @@ class Mode(ABC):
         self.uav: UAV = uav
         self.vision_clients = {}
         self.sent_request = False
+        
 
     def on_enter(self) -> None:
         """

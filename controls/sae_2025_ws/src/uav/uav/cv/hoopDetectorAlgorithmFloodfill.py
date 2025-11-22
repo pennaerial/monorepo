@@ -4,29 +4,29 @@ import math
 from dataclasses import dataclass
 from typing import Optional, Tuple, List
 
-@dataclass
-class HoopConfig:
-    # HSV Thresholds (Orange/Red)
-    hue_min: int = 0
-    hue_max: int = 25
-    sat_min: int = 120
-    sat_max: int = 255
-    val_min: int = 60
-    val_max: int = 255
-    
-    # Floodfill & Morphology
-    morph_kernel_size: int = 3
-    contour_thickness: int = 15  # Thickness to separate inner hole from outer noise
-    min_hole_area: int = 100     # Minimum area to consider a "hole"
-    
-    # RANSAC
-    ransac_iterations: int = 40
-    ransac_threshold: float = 5.0
-    
-    # Physical Dimensions
-    ring_radius: float = 0.1778  # Meters (7 inches)
 
-def apply_hsv_floodfill_mask(frame, cfg: HoopConfig) -> Tuple[np.ndarray, np.ndarray]:
+# HSV Thresholds (Orange/Red)
+hue_min: int = 0
+hue_max: int = 25
+sat_min: int = 120
+sat_max: int = 255
+val_min: int = 60
+val_max: int = 255
+
+# Floodfill & Morphology
+morph_kernel_size: int = 3
+contour_thickness: int = 15  # Thickness to separate inner hole from outer noise
+min_hole_area: int = 100     # Minimum area to consider a "hole"
+
+# RANSAC
+ransac_iterations: int = 40
+ransac_threshold: float = 5.0
+
+# Physical Dimensions
+ring_radius: float = 0.1778  # Meters (7 inches)
+
+
+def apply_hsv_floodfill_mask(frame) -> Tuple[np.ndarray, np.ndarray]:
     """
     Generates a binary mask of the 'inner holes' using the floodfill method.
     """
@@ -34,12 +34,12 @@ def apply_hsv_floodfill_mask(frame, cfg: HoopConfig) -> Tuple[np.ndarray, np.nda
     
     # 1. HSV Thresholding
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-    lower = np.array([cfg.hue_min, cfg.sat_min, cfg.val_min])
-    upper = np.array([cfg.hue_max, cfg.sat_max, cfg.val_max])
+    lower = np.array([hue_min, sat_min, val_min])
+    upper = np.array([hue_max, sat_max, val_max])
     mask = cv2.inRange(hsv, lower, upper)
     
     # 2. Morphological cleanup
-    kernel = np.ones((cfg.morph_kernel_size, cfg.morph_kernel_size), np.uint8)
+    kernel = np.ones((morph_kernel_size, morph_kernel_size), np.uint8)
     mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
     mask = cv2.dilate(mask, kernel, iterations=1)
 
@@ -49,7 +49,9 @@ def apply_hsv_floodfill_mask(frame, cfg: HoopConfig) -> Tuple[np.ndarray, np.nda
     flood_fill_img = mask.copy()
     
     # Start points: Top-Left, Top-Right, Bot-Left, Bot-Right
+    # seeds = [(0, h - 1), (w - 1, h - 1)]
     seeds = [(0, 0), (w - 1, 0), (0, h - 1), (w - 1, h - 1)]
+
     
     for seed in seeds:
         # Fill background with 128 (gray)
@@ -70,7 +72,7 @@ def apply_hsv_floodfill_mask(frame, cfg: HoopConfig) -> Tuple[np.ndarray, np.nda
     holes_mask[flood_fill_img == 0] = 255 # The untouched zeros are the holes
     
     # To separate "peanut" shapes, we erode the holes (equivalent to thickening the hoop walls)
-    erode_kernel = np.ones((cfg.contour_thickness, cfg.contour_thickness), np.uint8)
+    erode_kernel = np.ones((contour_thickness, contour_thickness), np.uint8)
     holes_mask = cv2.erode(holes_mask, erode_kernel, iterations=1)
     
     return holes_mask, mask # Return hole mask and original hoop mask for debug
@@ -181,7 +183,7 @@ def solve_pnp_hoop(ellipse, K, ring_radius):
     
     return pos, normal
 
-def detect(frame, K, cfg: HoopConfig):
+def detect(frame, K):
     """
     Main entry point.
     Returns: (pose_dict, debug_frames_dict)
@@ -192,7 +194,7 @@ def detect(frame, K, cfg: HoopConfig):
     [0.0,           539.9363708,  480.0],
     [0.0,           0.0,            1.0]
     ])
-    holes_mask, raw_mask = apply_hsv_floodfill_mask(frame, cfg)
+    holes_mask, raw_mask = apply_hsv_floodfill_mask(frame)
     
     # Find largest contour in the holes mask
     contours, _ = cv2.findContours(holes_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -207,13 +209,13 @@ def detect(frame, K, cfg: HoopConfig):
         contours = sorted(contours, key=cv2.contourArea, reverse=True)
         largest = contours[0]
         
-        if cv2.contourArea(largest) > cfg.min_hole_area:
+        if cv2.contourArea(largest) > min_hole_area:
             # Fit Ellipse (RANSAC/Standard)
-            best_ellipse = fit_ellipse_ransac(largest, cfg.ransac_iterations)
+            best_ellipse = fit_ellipse_ransac(largest, ransac_iterations)
             
-            if best_ellipse:
+            if best_ellipse is not None:
                 cv2.ellipse(debug_frame, best_ellipse, (0, 255, 0), 2)
-                pos, norm = solve_pnp_hoop(best_ellipse, K, cfg.ring_radius)
+                pos, norm = solve_pnp_hoop(best_ellipse, K, ring_radius)
                 
                 if pos is not None:
                     pose = {

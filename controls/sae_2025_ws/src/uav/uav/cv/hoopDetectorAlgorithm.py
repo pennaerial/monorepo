@@ -26,15 +26,16 @@ VAL_LOW = 50
 VAL_HIGH = 255
 
 # --- Ellipse Detection Parameters ---
-MIN_CONTOUR_POINTS = 30
-MIN_CONTOUR_AREA = 25
+MIN_CONTOUR_POINTS = 10
+MIN_CONTOUR_AREA = 50
+MAX_CONTOUR_AREA = 100000
 MIN_AXIS_LENGTH = 5
-MAX_AXIS_LENGTH = 1500
-ELLIPSE_FIT_ERROR_THRESHOLD = 10.0
-RANSAC_ITERATIONS = 300
-RANSAC_MIN_POINTS = 5
+MAX_AXIS_LENGTH = 5000
+ELLIPSE_FIT_ERROR_THRESHOLD = 5.0
+RANSAC_ITERATIONS = 500
+RANSAC_MIN_POINTS = 4
 RANSAC_SAMPLE_POINTS = 10
-RANSAC_INLIER_THRESHOLD = 7.0
+RANSAC_INLIER_THRESHOLD = 15.0
 
 # --- HoopTrackerState Class REMOVED as requested ---
 
@@ -236,6 +237,7 @@ def detect_ellipses_fast_tuned(frame_bgr, debug=False) -> Tuple[List, Dict[str, 
     ellipses = []
     rejection_reasons = {
         'too_small': 0,
+        'too_big': 0,
         'too_few_points': 0,
         'fit_failed': 0,
         'bad_axes': 0,
@@ -255,6 +257,10 @@ def detect_ellipses_fast_tuned(frame_bgr, debug=False) -> Tuple[List, Dict[str, 
             
         # if area < MIN_CONTOUR_AREA:
         #     rejection_reasons['too_small'] += 1
+        #     continue
+            
+        # if area > MAX_CONTOUR_AREA:
+        #     rejection_reasons['too_big'] += 1
         #     continue
         
         points = c.squeeze()
@@ -281,15 +287,15 @@ def detect_ellipses_fast_tuned(frame_bgr, debug=False) -> Tuple[List, Dict[str, 
         
         (cx, cy), (MA, ma), ang = ellipse
         
-        # Check axes
-        if MA < MIN_AXIS_LENGTH or ma < MIN_AXIS_LENGTH:
-            rejection_reasons['bad_axes'] += 1
-            cv2.ellipse(overlay_candidates, ellipse, (0, 128, 255), 1, cv2.LINE_AA)
-            continue
+        # # Check axes
+        # if MA < MIN_AXIS_LENGTH or ma < MIN_AXIS_LENGTH:
+        #     rejection_reasons['bad_axes'] += 1
+        #     cv2.ellipse(overlay_candidates, ellipse, (0, 128, 255), 1, cv2.LINE_AA)
+        #     continue
             
-        if MA > MAX_AXIS_LENGTH or ma > MAX_AXIS_LENGTH:
-            rejection_reasons['bad_axes'] += 1
-            continue
+        # if MA > MAX_AXIS_LENGTH or ma > MAX_AXIS_LENGTH:
+        #     rejection_reasons['bad_axes'] += 1
+        #     continue
             
         # Check error
         if error > ELLIPSE_FIT_ERROR_THRESHOLD:
@@ -329,6 +335,9 @@ def detect_ellipses_fast_tuned(frame_bgr, debug=False) -> Tuple[List, Dict[str, 
 # --- PnP with Multiple Sizes (Unchanged) ---
 def solve_ellipse_pnp_approx(K, ellipse, ring_radius_m) -> Optional[Tuple[np.ndarray, np.ndarray]]:
     """Simple PnP for single ring size."""
+    if ellipse is None:
+        return None
+    
     K = np.array([
     [539.9363327,   0.0,          640.0],
     [0.0,           539.9363708,  480.0],
