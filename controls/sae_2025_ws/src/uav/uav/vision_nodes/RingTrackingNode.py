@@ -31,6 +31,10 @@ class RingTrackingNode(VisionNode):
             'blue': blue,
             'yellow': yellow
         }
+
+        self.latest_dir_x = 0.0
+        self.latest_dir_y = 0.0 
+        self.latest_dir_z = 0.0
         
         # Initialize Kalman filter
         # self.kalman = cv2.KalmanFilter(4, 2)
@@ -134,6 +138,7 @@ class RingTrackingNode(VisionNode):
             self.display_frame(debug_frame, self.node_name())
             dir_x, dir_z, dir_y = pose['x'], pose['y'], pose['z']
             dir_x = -dir_x
+            self.latest_dir_x, self.latest_dir_y, self.latest_dir_z = dir_x, dir_y, dir_z
             nx, ny, nz = pose['nx'], pose['ny'], pose['nz']
             good = self.publish_msg_type()
             good.data = [0.0, 0.0, dir_x, dir_y, dir_z, 0.0]  # x,y,dir_x,dir_y,dir_z,flag
@@ -143,7 +148,7 @@ class RingTrackingNode(VisionNode):
             print("not detecting anyyyything")
             self.display_frame(image, self.node_name())
             dummy = self.publish_msg_type()
-            dummy.data = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]  # x,y,dir_x,dir_y,dir_z,flag
+            dummy.data = [0.0, 0.0, self.latest_dir_x, self.latest_dir_y, self.latest_dir_z, 0.0]  # x,y,dir_x,dir_y,dir_z,flag
             self.ring_pub.publish(dummy)
 
 
