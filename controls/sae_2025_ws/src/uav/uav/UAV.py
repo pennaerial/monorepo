@@ -21,6 +21,7 @@ import numpy as np
 import math
 from collections import deque
 from std_msgs.msg import Bool
+from uav_interfaces.msg import UAVState
 from uav.px4_modes import PX4CustomMainMode, PX4CustomSubModeAuto
 from uav.utils import R_earth
 
@@ -34,7 +35,6 @@ class UAV:
         self.node = node
         self.DEBUG = DEBUG
         self.node.get_logger().info(f"Initializing UAV with DEBUG={DEBUG}")
-        self.vision_clients = {}
 
         # Initialize necessary parameters to handle PX4 flight failures
         self.flight_check = False
@@ -423,6 +423,13 @@ class UAV:
         self.pitch = np.arcsin(2.0 * (w * y - z * x))
         self.yaw = np.arctan2(2.0 * (w * z + x * y),
                             1.0 - 2.0 * (y**2 + z**2))
+        
+        # Publish UAV state for vision nodes
+        if self.local_position is not None:
+            uav_state_msg = UAVState()
+            uav_state_msg.altitude = -self.local_position.z
+            uav_state_msg.yaw = float(self.yaw)
+            self.uav_state_publisher.publish(uav_state_msg)
 
     def _global_position_callback(self, msg: VehicleGlobalPosition):
         self.node.destroy_subscription(self.vehicle_gps_sub) # vehicle_gps_sub is available faster but more coarse
@@ -466,6 +473,9 @@ class UAV:
         )
         self.target_position_publisher = self.node.create_publisher(
             VehicleLocalPosition, '/fmu/in/target_position', 10
+        )
+        self.uav_state_publisher = self.node.create_publisher(
+            UAVState, '/uav_state', 10
         )
 
         # Subscribers

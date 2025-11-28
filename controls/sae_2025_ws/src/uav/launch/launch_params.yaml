@@ -1,5 +1,5 @@
 # launch_params.yaml
-mission_name: test_straight_course
+mission_name: in_house_comp_hoop
 uav_debug: false
 vision_debug: false
 sim: true
