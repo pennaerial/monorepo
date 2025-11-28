@@ -32,6 +32,7 @@ def launch_setup(context, *args, **kwargs):
     # Convert boolean to string if needed
     enable_scoring = str(enable_scoring_val).lower() if isinstance(enable_scoring_val, bool) else str(enable_scoring_val)
     generation_type = str(params.get('generation_type', '')) if params.get('generation_type') is not None else ''
+    platform = str(params.get('platform', ''))
     
     # Convert debug and simulation flags to booleans.
     vision_debug_bool = vision_debug.lower() == 'true'
@@ -119,7 +120,8 @@ def launch_setup(context, *args, **kwargs):
             'px4_path': px4_path,
             'competition': sim_name,
             'enable_scoring': enable_scoring,
-            'generation_type': generation_type
+            'generation_type': generation_type,
+            'platform': platform
         }
         
         sim = IncludeLaunchDescription(

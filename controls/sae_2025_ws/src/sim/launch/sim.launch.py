@@ -17,6 +17,11 @@ def launch_setup(context, *args, **kwargs):
     competition = LaunchConfiguration('competition').perform(context)
     enable_scoring = LaunchConfiguration('enable_scoring').perform(context)
     generation_type = LaunchConfiguration('generation_type').perform(context)
+    platform = LaunchConfiguration('platform').perform(context)
+
+    print(f'PLATFORM: {platform}')
+    if not platform:
+        raise RuntimeError("The 'platform' argument is required (x86 or arm).")
 
     if model is None or px4_path is None:
         raise RuntimeError("Model and PX4 path are required")
@@ -50,8 +55,11 @@ def launch_setup(context, *args, **kwargs):
     )
 
     topic_model_name = model[3:] # remove 'gz_' prefix
-    GZ_CAMERA_TOPIC = f'/world/custom/model/{topic_model_name}_0/link/camera_link/sensor/camera/image'
-    GZ_CAMERA_INFO_TOPIC = f'/world/custom/model/{topic_model_name}_0/link/camera_link/sensor/camera/camera_info'
+
+    camera_topic_name = 'imager' if platform == 'x86' else 'camera'  #windows -> 'imager'   mac -> 'camera'
+    GZ_CAMERA_TOPIC = f'/world/custom/model/{topic_model_name}_0/link/camera_link/sensor/{camera_topic_name}/image'
+    GZ_CAMERA_INFO_TOPIC = f'/world/custom/model/{topic_model_name}_0/link/camera_link/sensor/{camera_topic_name}/camera_info'
+
 
     gz_ros_bridge_camera = Node(
         package='ros_gz_bridge',
@@ -100,5 +108,6 @@ def generate_launch_description():
         DeclareLaunchArgument('competition', default_value='in_house', description='Competition name (e.g., in_house, iarc, custom)'),
         DeclareLaunchArgument('enable_scoring', default_value='true', description='Enable scoring node'),
         DeclareLaunchArgument('generation_type', default_value='', description='Generation type (optional)'),
+        DeclareLaunchArgument('platform', description='Target platform (x86 or arm)'),
         OpaqueFunction(function=launch_setup)
     ])
