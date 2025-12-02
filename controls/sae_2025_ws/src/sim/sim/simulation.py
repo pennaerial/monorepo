@@ -9,8 +9,10 @@ from pathlib import Path
 def main():
     competition = sys.argv[1]
     competition_course = sys.argv[2]
-    use_scoring = sys.argv[3]
+    use_scoring_str = sys.argv[3]
+    use_scoring = use_scoring_str.lower() == 'true'
 
+    print(f"Launching simulation with competition: {competition}, competition course: {competition_course}, use scoring: {use_scoring}")
     src_models_dir = os.path.join(os.getcwd(), "src", "sim", "sim", "world_gen", "models")
     # Ensure output directory exists
     os.makedirs(os.path.dirname(os.path.expanduser(f"~/.simulation-gazebo/worlds/{competition}.sdf")), exist_ok=True)

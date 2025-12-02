@@ -30,6 +30,7 @@ class SimOrchestrator(Node):
             world_params["class"], world_params["params"]
         )
         
+        self.scoring_node = None
         if use_scoring:
             scoring_params = sim_params["scoring"]
             self.scoring_node = self.initialize_mode(
@@ -106,7 +107,9 @@ class SimOrchestrator(Node):
         executor = MultiThreadedExecutor()
         executor.add_node(self)
         executor.add_node(self.world_node)
-        executor.add_node(self.scoring_node)
+
+        if self.scoring_node is not None:
+            executor.add_node(self.scoring_node)
 
         try:
             executor.spin()
@@ -116,4 +119,5 @@ class SimOrchestrator(Node):
             self.get_logger().info("Shutting down orchestrator and child nodes")
             self.destroy_node()
             self.world_node.destroy_node()
-            self.scoring_node.destroy_node()
+            if self.scoring_node is not None:
+                self.scoring_node.destroy_node()

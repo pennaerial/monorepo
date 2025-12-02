@@ -393,7 +393,7 @@ class HoopCourseNode(WorldNode):
         return response
 
 
-    def add_hoops(self, input_file, output_file, hoop_positions):
+    def add_hoops(self, input_file, output_file):
         # Expand ~, make absolute, and validate paths
         in_path = Path(input_file).expanduser().resolve()
         out_path = Path(output_file).expanduser().resolve()
@@ -420,7 +420,7 @@ class HoopCourseNode(WorldNode):
             raise RuntimeError("No <world> tag found in the SDF!")
 
         # Add new hoops with given positions
-        for i, pos in enumerate(hoop_positions, start=1):
+        for i, pos in enumerate(self.hoop_positions, start=1):
             inc = ET.Element("include")
             x, y, z, roll, pitch, yaw = pos
             z = 1 if z < 1 else z
@@ -431,12 +431,12 @@ class HoopCourseNode(WorldNode):
         
        
         # Use last two hoops to define the approach direction
-        if len(hoop_positions) >= 2:
-            (prev_x, prev_y, _prev_z, *_), (end_x, end_y, end_z, *_) = hoop_positions[-2], hoop_positions[-1]
+        if len(self.hoop_positions) >= 2:
+            (prev_x, prev_y, _prev_z, *_), (end_x, end_y, end_z, *_) = self.hoop_positions[-2], self.hoop_positions[-1]
         else:
             # Fallback: only one hoop; use UAV->hoop direction
             start_x, start_y, _ = self.uav
-            end_x, end_y, end_z, *_, = hoop_positions[-1]
+            end_x, end_y, end_z, *_, = self.hoop_positions[-1]
             prev_x, prev_y = start_x, start_y
 
         # Direction vector in XY from previous hoop to final hoop
@@ -567,6 +567,6 @@ class HoopCourseNode(WorldNode):
             raise ValueError(f"Invalid course: {self.course}")
             
         self.hoop_positions = course.generate_course()
-        self.add_hoops(input_file=self.world_name, output_file=self.output_file, hoop_positions=hoop_poses)
+        self.add_hoops(input_file=self.world_name, output_file=self.output_file)
 
 
