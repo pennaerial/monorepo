@@ -22,6 +22,10 @@ def find_folder(folder_name, search_path):
     return None
 
 def find_folder_with_heuristic(folder_name, home_dir, keywords=('penn', 'air')):
+    # First, directly check if home_dir itself is the folder we're looking for
+    if os.path.basename(os.path.normpath(home_dir)) == folder_name:
+        return os.path.abspath(home_dir)
+        
     immediate_dirs = [d for d in os.listdir(home_dir) if os.path.isdir(os.path.join(home_dir, d))]
     if folder_name in immediate_dirs:
         return os.path.join(home_dir, folder_name)

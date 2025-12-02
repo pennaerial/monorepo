@@ -7,9 +7,9 @@ import shutil
 from pathlib import Path
 
 def main():
-    debug = sys.argv[1]
-    yaml_file = sys.argv[2]
-    competition = sys.argv[3]
+    competition = sys.argv[1]
+    competition_course = sys.argv[2]
+    use_scoring = sys.argv[3]
 
     src_models_dir = os.path.join(os.getcwd(), "src", "sim", "sim", "world_gen", "models")
     # Ensure output directory exists
@@ -31,9 +31,8 @@ def main():
             else:
                 shutil.copy2(s, d)
 
-    DEBUG = debug.lower() == 'true'
     rclpy.init()
-    sim_node = SimOrchestrator(yaml_file)
+    sim_node = SimOrchestrator(competition, competition_course, use_scoring)
     sim_node.spin()
     sim_node.destroy_node()
     rclpy.shutdown()

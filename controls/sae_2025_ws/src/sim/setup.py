@@ -26,7 +26,6 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'scoring_node = sim.in_house.scoring_node:main',
             'simulation = sim.simulation:main',
         ],
     },

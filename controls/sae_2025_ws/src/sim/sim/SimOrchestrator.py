@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+import os
 import rclpy
 from rclpy.node import Node
 import yaml
@@ -8,25 +8,37 @@ import inspect
 import ast
 from rclpy.executors import MultiThreadedExecutor
 
+
 class SimOrchestrator(Node):
     """
     Base simulation class providing UAV position tracking and competition management.
     """
-    
-    def __init__(self, yml_path):
-        super().__init__('sim_orchestrator')
-        print("Orchestrator Node")
-        print(f"YAML path: {yml_path}")
-        sim_params = self.load_yaml_to_dict(yml_path)
-        world_params = sim_params['world']
-        self.world_node = self.initialize_mode(world_params['class'], world_params['params'])
-        scoring_params = sim_params['scoring']
-        self.scoring_node = self.initialize_mode(scoring_params['class'], scoring_params['params'])
 
-    
+    def __init__(self, competition: str, competition_course: str, use_scoring: bool):
+        super().__init__("sim_orchestrator")
+        print("Orchestrator Node")
+        print(f"Competition: {competition}")
+        print(f"Competition course: {competition_course}")
+        print(f"Use scoring: {use_scoring}")
+        sim_params = self.load_yaml_to_dict(
+            os.path.join(
+                os.getcwd(), "src", "sim", "sim", "simulations", f"{competition}.yaml"
+            )
+        )
+        world_params = sim_params["world"]
+        self.world_node = self.initialize_mode(
+            world_params["class"], world_params["params"]
+        )
+        
+        if use_scoring:
+            scoring_params = sim_params["scoring"]
+            self.scoring_node = self.initialize_mode(
+                scoring_params["class"], scoring_params["params"]
+            )
+
     def initialize_mode(self, node_path: str, params: dict) -> Node:
         print(f"SimOrchestrator Mode Parameters: {params}")
-        module_name, class_name = node_path.rsplit('.', 1)
+        module_name, class_name = node_path.rsplit(".", 1)
         module = importlib.import_module(module_name)
         node_class = getattr(module, class_name)
 
@@ -34,7 +46,7 @@ class SimOrchestrator(Node):
         args = {}
         print(f"SimOrchestrator Mode Signature: {signature.parameters.items()}")
         for name, param in signature.parameters.items():
-            if name == 'self':
+            if name == "self":
                 continue
 
             # Get a value for this parameter, or default, or error
@@ -54,7 +66,7 @@ class SimOrchestrator(Node):
             if (
                 isinstance(param_value, str)
                 and param.annotation not in (str, inspect.Parameter.empty)
-                and name not in ('node')   # your custom bypasses
+                and name not in ("node")  # your custom bypasses
             ):
                 try:
                     param_value = ast.literal_eval(param_value)
@@ -66,7 +78,7 @@ class SimOrchestrator(Node):
 
             # Optional: convert lists to tuples for Tuple[...] annotations
             if (
-                hasattr(param.annotation, '__origin__')
+                hasattr(param.annotation, "__origin__")
                 and param.annotation.__origin__ is tuple
                 and isinstance(param_value, list)
             ):
@@ -86,7 +98,7 @@ class SimOrchestrator(Node):
         Returns:
             dict: The yaml file as a dictionary.
         """
-        with open(filename, 'r', encoding='utf-8') as file:
+        with open(filename, "r", encoding="utf-8") as file:
             data = yaml.safe_load(file)
         return data
 
@@ -105,4 +117,3 @@ class SimOrchestrator(Node):
             self.destroy_node()
             self.world_node.destroy_node()
             self.scoring_node.destroy_node()
-

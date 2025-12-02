@@ -521,10 +521,11 @@ class HoopCourseNode(WorldNode):
 
     def generate_world(self):
         courses = ['ascent', 'descent', 'slalom', 'bezier']
+        course = None
 
         if self.course.lower() == 'random':
             course_id = r.uniform(0, len(courses) - 1)
-            self.course = courses[course_id]
+            course = courses[course_id]
             
         if self.course.lower() == "previous":
             return
@@ -535,14 +536,12 @@ class HoopCourseNode(WorldNode):
                                 num_hoops=self.num_hoops, 
                                 max_dist=self.max_dist, 
                                 start_height=2)
-            hoop_poses = course.generate_course()
         elif self.course.lower() == "descent":
             course = DescentCourse(dlz=self.dlz, 
                                 uav=self.uav, 
                                 num_hoops=self.num_hoops, 
                                 max_dist=self.max_dist, 
                                 start_height=4)
-            hoop_poses = course.generate_course()
         elif self.course.lower() == "slalom":
             course = SlalomCourse(dlz=self.dlz, 
                                 uav=self.uav, 
@@ -550,7 +549,6 @@ class HoopCourseNode(WorldNode):
                                 max_dist=self.max_dist,
                                 width=4,
                                 height=2)
-            hoop_poses = course.generate_course()
         elif self.course.lower() == "straight":
             course = StraightCourse(dlz=self.dlz, 
                                 uav=self.uav, 
@@ -558,7 +556,6 @@ class HoopCourseNode(WorldNode):
                                 max_dist=self.max_dist,
                                 height=2,
                                 spacing=2)
-            hoop_poses = course.generate_course()
         elif self.course.lower() == "bezier":
             course = BezierCourse(dlz=self.dlz,
                                   uav=self.uav,
@@ -566,8 +563,10 @@ class HoopCourseNode(WorldNode):
                                   max_dist=self.max_dist,
                                   height=2.0,
                                   lateral_offset=4.0)
-            hoop_poses = course.generate_course()
-        self.hoop_positions = hoop_poses
+        else:
+            raise ValueError(f"Invalid course: {self.course}")
+            
+        self.hoop_positions = course.generate_course()
         self.add_hoops(input_file=self.world_name, output_file=self.output_file, hoop_positions=hoop_poses)
 
 

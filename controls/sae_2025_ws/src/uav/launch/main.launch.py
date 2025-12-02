@@ -3,8 +3,9 @@ import os
 import re
 
 from launch import LaunchDescription
-from launch.actions import ExecuteProcess, LogInfo, TimerAction, OpaqueFunction, RegisterEventHandler
+from launch.actions import ExecuteProcess, LogInfo, TimerAction, OpaqueFunction, RegisterEventHandler, DeclareLaunchArgument
 from launch.event_handlers import OnProcessStart
+from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from uav.utils import vehicle_map, find_folder_with_heuristic, load_launch_parameters, extract_vision_nodes
 from launch.actions import IncludeLaunchDescription
@@ -23,17 +24,7 @@ def launch_setup(context, *args, **kwargs):
     save_vision = str(params.get('save_vision', 'false'))
     camera_offsets = params.get('camera_offsets', [0, 0, 0])
     servo_only = str(params.get('servo_only', 'false'))
-    hardcode_path_str = str(params.get('hardcode_path', 'false'))
-    hardcode_path = hardcode_path_str.lower() == 'true'  # Convert to boolean
-    
-    # Get simulation-specific parameters
-    sim_name = params.get('sim_name', 'in_house')
-    enable_scoring_val = params.get('enable_scoring', True)
-    # Convert boolean to string if needed
-    enable_scoring = str(enable_scoring_val).lower() if isinstance(enable_scoring_val, bool) else str(enable_scoring_val)
-    generation_type = str(params.get('generation_type', '')) if params.get('generation_type') is not None else ''
-    platform = str(params.get('platform', ''))
-    
+
     # Convert debug and simulation flags to booleans.
     vision_debug_bool = vision_debug.lower() == 'true'
     sim_bool = sim_bool.lower() == 'true'
@@ -76,10 +67,6 @@ def launch_setup(context, *args, **kwargs):
             name='cam2image'
         ))
     
-    # Find required paths.
-    px4_path = (find_folder_with_heuristic('PX4-Autopilot', os.path.expanduser('~'))
-                if not hardcode_path else os.path.expanduser('~/PX4-Autopilot'))
-    
     # Define the middleware process.
     middleware = ExecuteProcess(
         cmd=['MicroXRCEAgent', 'udp4', '-p', '8888'] if sim_bool else ['MicroXRCEAgent', 'serial', '--dev', '/dev/serial0', '-b', '921600'],
@@ -114,14 +101,13 @@ def launch_setup(context, *args, **kwargs):
 
     # Now, construct the actions list in a single step, depending on sim_bool
     if sim_bool:
+        # Find required paths.
+        px4_path = os.path.expanduser(find_folder_with_heuristic('PX4-Autopilot', LaunchConfiguration('px4_path').perform(context)))
+
         # Prepare sim launch arguments with all simulation parameters
         sim_launch_args = {
             'model': model,
             'px4_path': px4_path,
-            'competition': sim_name,
-            'enable_scoring': enable_scoring,
-            'generation_type': generation_type,
-            'platform': platform
         }
         
         sim = IncludeLaunchDescription(
@@ -173,5 +159,6 @@ def launch_setup(context, *args, **kwargs):
 
 def generate_launch_description():
     return LaunchDescription([
+        DeclareLaunchArgument('px4_path', default_value='~/PX4-Autopilot'),
         OpaqueFunction(function=launch_setup)
     ])
