@@ -14,6 +14,7 @@ from ament_index_python.packages import get_package_share_directory
 
 def launch_setup(context, *args, **kwargs):
     # Load launch parameters from the YAML file.
+    print("Loading launch parameters...")
     params = load_launch_parameters()
     mission_name = params.get('mission_name', 'basic')
     uav_debug = str(params.get('uav_debug', 'false'))
@@ -34,6 +35,7 @@ def launch_setup(context, *args, **kwargs):
     # Build the mission YAML file path using the mission name.
     YAML_PATH = os.path.join(os.getcwd(), 'src', 'uav', 'uav', 'missions', f"{mission_name}.yaml")
     
+    print("Building vision node actions...")
     # Build vision node actions.
     vision_nodes = []
     vision_node_actions = [Node(
@@ -101,8 +103,10 @@ def launch_setup(context, *args, **kwargs):
 
     # Now, construct the actions list in a single step, depending on sim_bool
     if sim_bool:
+        print("Building simulation launch actions...")
+
         # Find required paths.
-        px4_path = os.path.expanduser(find_folder_with_heuristic('PX4-Autopilot', LaunchConfiguration('px4_path').perform(context)))
+        px4_path = find_folder_with_heuristic('PX4-Autopilot', os.path.expanduser(LaunchConfiguration('px4_path').perform(context)))
 
         # Prepare sim launch arguments with all simulation parameters
         sim_launch_args = {
@@ -110,6 +114,7 @@ def launch_setup(context, *args, **kwargs):
             'px4_path': px4_path,
         }
         
+        print("Including simulation launch description...")
         sim = IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 os.path.join(
@@ -120,6 +125,8 @@ def launch_setup(context, *args, **kwargs):
             ),
             launch_arguments=sim_launch_args.items()
         )
+
+        print("Starting PX4 SITL...")
         px4_sitl = ExecuteProcess(
             cmd=['bash', '-c', f'PX4_GZ_STANDALONE=1 PX4_SYS_AUTOSTART={autostart} PX4_SIM_MODEL={model} ./build/px4_sitl_default/bin/px4'],
             cwd=px4_path,

@@ -58,13 +58,10 @@ def launch_setup(context, *args, **kwargs):
     else:
         raise ValueError(f"Invalid competition course: {competition_course}")
 
+    use_scoring = params.get("scoring", "false")
+
     model = LaunchConfiguration("model").perform(context)
     px4_path = LaunchConfiguration("px4_path").perform(context)
-    use_scoring = LaunchConfiguration("use_scoring").perform(context)
-    if use_scoring == "true":
-        use_scoring = True
-    else:
-        use_scoring = False
 
     if "win" in sys_platform:
         platform = "x86"
@@ -89,6 +86,7 @@ def launch_setup(context, *args, **kwargs):
         name="launch world",
     )
 
+    print("Defining simulation process...")
     # Define the simulation process
     sim = Node(
         package="sim",
@@ -128,6 +126,8 @@ def launch_setup(context, *args, **kwargs):
         name="gz_ros_bridge_camera_info",
         cwd=sae_ws_path,
     )
+
+    print("Building simulation launch actions...")
 
     # Build and return the complete list of actions
     return [
