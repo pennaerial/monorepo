@@ -306,11 +306,16 @@ def launch_setup(context, *args, **kwargs):
         camera_topic = ros_params['topics']['camera']
         camera_info_topic = ros_params['topics']['camera_info']
         
+        # Strip gz_ prefix from model name for topic if present
+        topic_model_name = sim_params["uav_model"]
+        if topic_model_name.startswith('gz_'):
+            topic_model_name = topic_model_name[3:]
+
         print("start gz_ros_bridge_camera")
         gz_ros_bridge_camera = ExecuteProcess(
             cmd=['ros2', 'run', 'ros_gz_bridge', 'parameter_bridge',
-                f'/world/{world_name}/model/{sim_params["uav_model"]}_0/link/camera_link/sensor/camera/image@sensor_msgs/msg/Image[gz.msgs.Image',
-                '--ros-args', '--remap', f'/world/{world_name}/model/{sim_params["uav_model"]}_0/link/camera_link/sensor/camera/image:={camera_topic}'],
+                f'/world/{world_name}/model/{topic_model_name}_0/link/camera_link/sensor/camera/image@sensor_msgs/msg/Image[gz.msgs.Image',
+                '--ros-args', '--remap', f'/world/{world_name}/model/{topic_model_name}_0/link/camera_link/sensor/camera/image:={camera_topic}'],
             output='screen',
             cwd=sae_ws_path,
             name='gz_ros_bridge_camera'
@@ -318,8 +323,8 @@ def launch_setup(context, *args, **kwargs):
         
         gz_ros_bridge_camera_info = ExecuteProcess(
             cmd=['ros2', 'run', 'ros_gz_bridge', 'parameter_bridge',
-                f'/world/{world_name}/model/{sim_params["uav_model"]}_0/link/camera_link/sensor/camera/camera_info@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo',
-                '--ros-args', '--remap', f'/world/{world_name}/model/{sim_params["uav_model"]}_0/link/camera_link/sensor/camera/camera_info:={camera_info_topic}'],
+                f'/world/{world_name}/model/{topic_model_name}_0/link/camera_link/sensor/camera/camera_info@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo',
+                '--ros-args', '--remap', f'/world/{world_name}/model/{topic_model_name}_0/link/camera_link/sensor/camera/camera_info:={camera_info_topic}'],
             output='screen',
             cwd=sae_ws_path,
             name='gz_ros_bridge_camera_info'

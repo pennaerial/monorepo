@@ -164,26 +164,8 @@ def launch_setup(context, *args, **kwargs):
     )
 
     topic_model_name = model[3:]
-    GZ_CAMERA_TOPIC = f'/world/custom/model/{topic_model_name}_0/link/camera_link/sensor/camera/image'
-    GZ_CAMERA_INFO_TOPIC = f'/world/custom/model/{topic_model_name}_0/link/camera_link/sensor/camera/camera_info'
 
-    gz_ros_bridge_camera = ExecuteProcess(
-        cmd=['ros2', 'run', 'ros_gz_bridge', 'parameter_bridge',
-            # Use the EXACT topic name from gz topic -l
-            f'{GZ_CAMERA_TOPIC}@sensor_msgs/msg/Image[gz.msgs.Image',
-            '--ros-args', '--remap', f'{GZ_CAMERA_TOPIC}:=/camera'],
-        output='screen',
-        cwd=sae_ws_path,
-        name='gz_ros_bridge_camera'
-    )
-    gz_ros_bridge_camera_info = ExecuteProcess(
-        cmd=['ros2', 'run', 'ros_gz_bridge', 'parameter_bridge',
-            f'{GZ_CAMERA_INFO_TOPIC}@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo',
-            '--ros-args', '--remap', f'{GZ_CAMERA_INFO_TOPIC}:=/camera_info'],
-        output='screen',
-        cwd=sae_ws_path,
-        name='gz_ros_bridge_camera_info'
-    )
+
     
     # Define the mission process.
     camera_offsets_str = ','.join(str(offset) for offset in camera_offsets)
@@ -211,13 +193,7 @@ def launch_setup(context, *args, **kwargs):
             OnProcessStart(target_action=gazebo, on_start=[px4_sitl, LogInfo(msg="Gazebo started.")])
         ),
         RegisterEventHandler(
-            OnProcessStart(target_action=px4_sitl, on_start=[gz_ros_bridge_camera, LogInfo(msg="PX4 SITL started.")])
-        ),
-        RegisterEventHandler(
-            OnProcessStart(target_action=gz_ros_bridge_camera, on_start=[gz_ros_bridge_camera_info, LogInfo(msg="gz_ros_bridge_camera started.")])
-        ),
-        RegisterEventHandler(
-            OnProcessStart(target_action=gz_ros_bridge_camera_info, on_start=[delayed_mission, LogInfo(msg="gz_ros_bridge_camera_info started.")])
+            OnProcessStart(target_action=px4_sitl, on_start=[delayed_mission, LogInfo(msg="PX4 SITL started.")])
         ),
     ]
 
