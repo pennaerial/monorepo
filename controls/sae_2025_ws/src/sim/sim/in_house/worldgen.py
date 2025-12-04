@@ -32,6 +32,10 @@ def add_hoops(input_file, output_file, hoop_positions):
     if world is None:
         raise RuntimeError("No <world> tag found in the SDF!")
 
+    # Update world name to match output filename (without extension)
+    world_name = out_path.stem
+    world.set("name", world_name)
+
     # Add new hoops with given positions
     for i, pos in enumerate(hoop_positions, start=1):
         x, y, z, roll, pitch, yaw = pos
