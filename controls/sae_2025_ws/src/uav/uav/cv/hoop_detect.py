@@ -205,8 +205,8 @@ def detect_contour(image):
     out = vis.apply(image, ellipse_contour, ellipse_params)
     scale = 1  # rescale display
     disp_frame = cv2.resize(out, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
-    cv2.imshow("detect result", disp_frame)
-    cv2.waitKey(0)
+    # cv2.imshow("detect result", disp_frame)
+    # cv2.waitKey(0)
 
     return ellipse_contour, ellipse_params
 

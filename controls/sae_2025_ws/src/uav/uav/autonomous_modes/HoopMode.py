@@ -29,6 +29,7 @@ class HoopMode(Mode):
         self.altitude_constant: float = 0.25
         self.done: bool = False
         self.wait_time: float = 20.0 # delay in s
+        self.center_wait_time = 0.25
         self.num_hoops: int = num_hoops
         self.passed_hoops: list[tuple[float, float, float]] = []      # list of coordinates of all passed hoops
 
@@ -78,29 +79,32 @@ class HoopMode(Mode):
         """
         Periodic logic for lowering payload and handling obstacles.
         """
-        request = HoopTracking.Request() # TODO: change this to new vision node
+        self.log("Response: " + str(self.response))
+        if not self.response or self.center_wait_time < 0 or (self.response and not self.response.success):
+            self.center_wait_time = 0.50
+            request = HoopTracking.Request() # TODO: change this to new vision node
+            self.response = self.send_request(HoopTrackingNode, request)
 
         # fields: t_vec[3], r_vec[3], dlz_empty; returns None if no hoop
-        response = self.send_request(HoopTrackingNode, request)
 
         # Time delta between takeoff and hoop mode running
-        if time_delta > 1:
-            time_delta = 0
-        
-        if self.state == "searching":
-            self._handle_searching(response, time_delta)
-        elif self.state == "centering":
-            self._handle_centering(response)
-        elif self.state == "flying_through":
-            self._handle_flying_through()
+        if self.response:
+            if time_delta > 1:
+                time_delta = 0
+            if self.state == "searching":
+                self._handle_searching(time_delta)
+            elif self.state == "centering":
+                self._handle_centering(time_delta)
+            elif self.state == "flying_through":
+                self._handle_flying_through()
 
-    def _handle_searching(self, response, time_delta: float):
+    def _handle_searching(self, time_delta: float):
         "fly upward to look for hoops"
 
-        if response and response.success:
+        if self.response and self.response.success:
             self.state = "centering"
             self.hoop_detected = True
-            self.hoop_position = response.t_vec
+            self.hoop_position = self.response.t_vec
             self.log("Hoop detected, switching to centering mode")
             return
         
@@ -115,9 +119,10 @@ class HoopMode(Mode):
         
         self.log(f"Looking for hoop - waiting for {self.wait_time} more seconds")
         
-    def _handle_centering(self, response):
+    def _handle_centering(self, time_delta: float):
         "center the hoop in y and z and then move forward in x"
-        if not response or not response.success:
+        self.center_wait_time -= time_delta
+        if not self.response or not self.response.success:
             self.log("Lost hoop, switching to searching mode")
             self.state = "searching"
             self.wait_time = 20
@@ -126,9 +131,9 @@ class HoopMode(Mode):
         self.log(self.hoop_position)
             
         hoop_ned = np.array([
-            -self.hoop_position[1],
-            self.hoop_position[0],
-            -self.hoop_position[2]
+            -self.hoop_position[2],
+            self.hoop_position[1],
+            -self.hoop_position[0]
         ])
 
         # -response.direction[1], response.direction[0],
