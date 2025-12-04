@@ -17,6 +17,7 @@ from launch.substitutions import LaunchConfiguration
 from launch.event_handlers import OnProcessStart
 
 from sys import platform as sys_platform
+import platform
 
 
 def load_sim_launch_parameters():
@@ -63,12 +64,14 @@ def launch_setup(context, *args, **kwargs):
     model = LaunchConfiguration("model").perform(context)
     px4_path = LaunchConfiguration("px4_path").perform(context)
 
-    if "win" in sys_platform:
-        platform = "x86"
-    elif sys_platform == "linux":
-        platform = "arm"
+    arch = platform.machine().lower()
+    if arch in ("x86_64", "amd64", "i386", "i686"):
+        platform_type = "x86"
+    elif arch in ("arm64", "aarch64", "armv7l", "arm"):
+        platform_type = "arm"
     else:
-        raise ValueError(f"Invalid platform: {sys_platform}")
+        raise ValueError(f"Unknown architecture: {arch}")
+    print(f'Using platform: {platform_type}')
 
     if model is None or px4_path is None:
         raise RuntimeError("Model and PX4 path are required")
@@ -100,7 +103,7 @@ def launch_setup(context, *args, **kwargs):
     topic_model_name = model[3:]  # remove 'gz_' prefix
 
     camera_topic_name = (
-        "imager" if platform == "x86" else "camera"
+        "imager" if platform_type == "x86" else "camera"
     )  # windows -> 'imager'   mac -> 'camera'
     GZ_CAMERA_TOPIC = f"/world/custom/model/{topic_model_name}_0/link/camera_link/sensor/{camera_topic_name}/image"
     GZ_CAMERA_INFO_TOPIC = f"/world/custom/model/{topic_model_name}_0/link/camera_link/sensor/{camera_topic_name}/camera_info"
