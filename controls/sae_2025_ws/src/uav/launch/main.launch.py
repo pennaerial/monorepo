@@ -198,7 +198,7 @@ def launch_setup(context, *args, **kwargs):
     )
 
     delayed_bridge = TimerAction(
-        period=5.0,
+        period=15.0,
         actions=[gz_ros_bridge_camera]
     )
     
