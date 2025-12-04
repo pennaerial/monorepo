@@ -38,8 +38,8 @@ class HoopMode(Mode):
         
         self.state: str = "searching" #should be either "searching", "centering", or "flying_through"
 
-        self.center_threshold_y: float = 0.1  #modify this if it doesn't work
-        self.center_threshold_z: float = 0.1  #modify this if it doesn't work
+        self.center_threshold_y: float = 0.2  #modify this if it doesn't work
+        self.center_threshold_z: float = 0.2  #modify this if it doesn't work
         self.distance_threshold: float = 0.05  #distance to hoop center
 
         self.drone_state: Optional[DroneState] = None
@@ -132,8 +132,8 @@ class HoopMode(Mode):
             
         hoop_ned = np.array([
             -self.hoop_position[2],
-            self.hoop_position[1],
-            -self.hoop_position[0]
+            self.hoop_position[0],
+            self.hoop_position[1]
         ])
 
         # -response.direction[1], response.direction[0],
