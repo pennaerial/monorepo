@@ -4,11 +4,14 @@ from sim.world_gen import WorldNode
 from xml.dom import minidom
 from pathlib import Path
 from abc import ABC, abstractmethod
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 from sim_interfaces.srv import HoopList
 from sim.world_gen import WorldNode
 import math
+import rclpy
+import sys
 from sim_interfaces.msg import HoopPose
+import json
 
 Pose = Tuple[float, float, float, float, float, float]
 
@@ -227,7 +230,6 @@ class StraightCourse(CourseStyle):
         """
         hoops = []
         x_dlz, y_dlz, z_dlz = self.dlz
-        print(self.uav)
         x_uav, y_uav, z_uav = self.uav
         
         # Calculate total course length
@@ -359,24 +361,41 @@ class BezierCourse(CourseStyle):
 
 class HoopCourseNode(WorldNode):
     """
-    ROS node for generating hoop course for in house comp.
+    World generation node for in_house competition.
+    Generates a hoop course with various course styles (ascent, descent, slalom, etc.).
     """
 
-    def __init__(self, course: str, dlz: Tuple[float, float, float],
+    def __init__(self,
+                 course: str,
+                 dlz: Tuple[float, float, float],
                  uav: Tuple[float, float, float],
                  num_hoops: int,
                  max_dist: int,
-                 world_name: str, output_file: str):
-        super().__init__()
+                 world_name: str,
+                 output_filename: Optional[str] = None):
+        """
+        Initialize the hoop course world generator.
+        
+        Args:
+            course: Course style ("ascent", "descent", "slalom", "bezier", "straight", "random", "previous")
+            dlz: Drop zone coordinates [x, y, z]
+            uav: UAV starting position [x, y, z]
+            num_hoops: Number of hoops to generate
+            max_dist: Maximum distance parameter for course generation
+            world_name: Path to template world SDF file
+            output_filename: Optional output filename (defaults to competition name)
+        """
+        super().__init__(competition_name="in_house", output_filename=output_filename)
         self.course = course
         self.dlz = dlz
         self.uav = uav
         self.num_hoops = num_hoops
         self.max_dist = max_dist
         self.world_name = world_name
-        self.output_file = output_file
-        print("WORLD GENERATION NODE")
+        self.hoop_positions: List[Pose] = []
         self.generate_world()
+        
+        # Create service for providing hoop positions
         self.srv = self.create_service(HoopList, "list_hoops", self.hoop_list_req)
     
     def hoop_list_req(self, request, response):
@@ -397,17 +416,25 @@ class HoopCourseNode(WorldNode):
         # Expand ~, make absolute, and validate paths
         in_path = Path(input_file).expanduser().resolve()
         out_path = Path(output_file).expanduser().resolve()
-        print(in_path)
-        print(out_path)
+        self.get_logger().debug(f"Input world file: {in_path}")
+        self.get_logger().debug(f"Output world file: {out_path}")
         if not in_path.exists():
             raise FileNotFoundError(
                 f"Input SDF not found: {in_path}\nCWD: {Path.cwd().resolve()}"
             )
-        out_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+        except OSError as e:
+            raise OSError(f"Failed to create output directory {out_path.parent}: {e}")
 
         # Parse
-        tree = ET.parse(str(in_path))  # str() for safety on older libs
-        root = tree.getroot()
+        try:
+            tree = ET.parse(str(in_path))  # str() for safety on older libs
+            root = tree.getroot()
+        except ET.ParseError as e:
+            raise ValueError(f"Failed to parse XML file {in_path}: {e}")
+        except Exception as e:
+            raise RuntimeError(f"Error reading SDF file {in_path}: {e}")
 
         # handle namespace if present (root.tag may be like "{...}sdf")
         ns = ""
@@ -514,59 +541,82 @@ class HoopCourseNode(WorldNode):
         strip_whitespace(root)
 
         # Pretty print and write
-        rough_bytes = ET.tostring(root, encoding="utf-8")
-        pretty = minidom.parseString(rough_bytes.decode("utf-8")).toprettyxml(indent="  ")
-        lines = [ln for ln in pretty.splitlines() if ln.strip() != ""]
-        out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        try:
+            rough_bytes = ET.tostring(root, encoding="utf-8")
+            pretty = minidom.parseString(rough_bytes.decode("utf-8")).toprettyxml(indent="  ")
+            lines = [ln for ln in pretty.splitlines() if ln.strip() != ""]
+            out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            self.get_logger().info(f"Successfully generated world file: {out_path}")
+        except Exception as e:
+            raise RuntimeError(f"Failed to write output world file {out_path}: {e}")
 
-    def generate_world(self):
+    def generate_world(self) -> None:
+        """
+        Generate the world file with hoops and DLZs.
+        
+        Implements the abstract method from WorldNode.
+        """
         courses = ['ascent', 'descent', 'slalom', 'bezier']
         course = None
 
-        if self.course.lower() == 'random':
-            course_id = r.uniform(0, len(courses) - 1)
-            course = courses[course_id]
-            
-        if self.course.lower() == "previous":
-            return
+        try:
+            if self.course.lower() == 'random':
+                course_id = int(r.uniform(0, len(courses)))
+                course = courses[course_id]
+                
+            if self.course.lower() == "previous":
+                self.get_logger().info("Using previous world configuration")
+                return
 
-        elif self.course.lower() == "ascent":
-            course = AscentCourse(dlz=self.dlz, 
-                                uav=self.uav, 
-                                num_hoops=self.num_hoops, 
-                                max_dist=self.max_dist, 
-                                start_height=2)
-        elif self.course.lower() == "descent":
-            course = DescentCourse(dlz=self.dlz, 
-                                uav=self.uav, 
-                                num_hoops=self.num_hoops, 
-                                max_dist=self.max_dist, 
-                                start_height=4)
-        elif self.course.lower() == "slalom":
-            course = SlalomCourse(dlz=self.dlz, 
-                                uav=self.uav, 
-                                num_hoops=self.num_hoops, 
-                                max_dist=self.max_dist,
-                                width=4,
-                                height=2)
-        elif self.course.lower() == "straight":
-            course = StraightCourse(dlz=self.dlz, 
-                                uav=self.uav, 
-                                num_hoops=self.num_hoops, 
-                                max_dist=self.max_dist,
-                                height=2,
-                                spacing=2)
-        elif self.course.lower() == "bezier":
-            course = BezierCourse(dlz=self.dlz,
-                                  uav=self.uav,
-                                  num_hoops=self.num_hoops,
-                                  max_dist=self.max_dist,
-                                  height=2.0,
-                                  lateral_offset=4.0)
-        else:
-            raise ValueError(f"Invalid course: {self.course}")
-            
-        self.hoop_positions = course.generate_course()
-        self.add_hoops(input_file=self.world_name, output_file=self.output_file)
+            elif self.course.lower() == "ascent":
+                course = AscentCourse(dlz=self.dlz, 
+                                    uav=self.uav, 
+                                    num_hoops=self.num_hoops, 
+                                    max_dist=self.max_dist, 
+                                    start_height=2)
+            elif self.course.lower() == "descent":
+                course = DescentCourse(dlz=self.dlz, 
+                                    uav=self.uav, 
+                                    num_hoops=self.num_hoops, 
+                                    max_dist=self.max_dist, 
+                                    start_height=4)
+            elif self.course.lower() == "slalom":
+                course = SlalomCourse(dlz=self.dlz, 
+                                    uav=self.uav, 
+                                    num_hoops=self.num_hoops, 
+                                    max_dist=self.max_dist,
+                                    width=4,
+                                    height=2)
+            elif self.course.lower() == "straight":
+                course = StraightCourse(dlz=self.dlz, 
+                                    uav=self.uav, 
+                                    num_hoops=self.num_hoops, 
+                                    max_dist=self.max_dist,
+                                    height=2,
+                                    spacing=2)
+            elif self.course.lower() == "bezier":
+                course = BezierCourse(dlz=self.dlz,
+                                      uav=self.uav,
+                                      num_hoops=self.num_hoops,
+                                      max_dist=self.max_dist,
+                                      height=2.0,
+                                      lateral_offset=4.0)
+            else:
+                raise ValueError(f"Invalid course: {self.course}")
+                
+            self.hoop_positions = course.generate_course()
+            self.get_logger().info(f"Generated {len(self.hoop_positions)} hoops for {self.course} course")
+            self.add_hoops(input_file=self.world_name, output_file=str(self.output_path))
+        except Exception as e:
+            self.get_logger().error(f"Failed to generate world: {e}")
+            raise
 
+def main(args=None):
+    rclpy.init(args=args)
+    node = HoopCourseNode(**json.loads(sys.argv[1]))
+    try:    
+        rclpy.spin(node)
+    except Exception as e:
+        print(e)
+    rclpy.shutdown()
 
