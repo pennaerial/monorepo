@@ -31,7 +31,6 @@ setup(
         # Launch files
         (os.path.join('share', package_name, 'launch'), glob('launch/*.launch.py')),
         (os.path.join('share', package_name, 'launch'), glob('launch/*.yaml')),
-        (os.path.join('share', package_name, 'worlds'), glob('sim/world_gen/worlds/*.sdf')),
 
         # Worlds and simulations
         (os.path.join('share', package_name, 'worlds'), glob('sim/world_gen/worlds/*.sdf')),
@@ -49,7 +48,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'simulation = sim.simulation:main',
+            'hoop_course = sim.world_gen.HoopCourse:main',
+            'hoop_score = sim.scoring.HoopScore:main',
         ],
     },
 )

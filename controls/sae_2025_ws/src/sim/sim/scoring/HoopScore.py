@@ -18,14 +18,21 @@ class HoopScoringNode(ScoringNode):
     Tracks UAV position and scores hoop passages using directional detection.
     """
     
-    def __init__(self):
-        super().__init__()
+    def __init__(self, 
+                 hoop_tolerance: float = 1.5,
+                 landing_bonus: float = 5.0,
+                 landing_tolerance: float = 2.0,
+                 landing_altitude_max: float = 0.4):
+        """
+        Initialize the hoop scoring node.
         
-        # Declare parameters
-        self.declare_parameter('hoop_tolerance', 1.5) 
-        self.declare_parameter('competition_type', 'in_house')
-        self.declare_parameter('competition_name', 'test')
-        self.declare_parameter('course_type', 'straight')
+        Args:
+            hoop_tolerance: Distance tolerance for hoop passage (meters)
+            landing_bonus: Points awarded for landing bonus
+            landing_tolerance: Distance tolerance for landing (meters)
+            landing_altitude_max: Maximum altitude to be considered "landed" (meters)
+        """
+        super().__init__(competition_name="in_house")
         
         # Store parameters
         self.hoop_tolerance = hoop_tolerance
@@ -69,8 +76,7 @@ class HoopScoringNode(ScoringNode):
         # Timer for score updating
         self.create_timer(0.1, self.update_scoring)  # 10Hz
         
-        # self.load_hoop_positions()
-        # self.get_logger().info("Scoring node initialized.")
+        # Service client for getting hoop positions
         self.hoop_client = self.create_client(HoopList, "list_hoops")
         self.hoops_loaded = False
         self.create_timer(0.5, self._try_request_hoops)

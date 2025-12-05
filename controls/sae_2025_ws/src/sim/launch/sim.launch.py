@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 
 import os
-import yaml
-
+import launch
 from launch import LaunchDescription
 from launch.actions import (
     ExecuteProcess,
@@ -10,59 +9,155 @@ from launch.actions import (
     RegisterEventHandler,
     OpaqueFunction,
     DeclareLaunchArgument,
-    TimerAction,
 )
-from launch_ros.actions import Node
+import logging
 from launch.substitutions import LaunchConfiguration
 from launch.event_handlers import OnProcessStart
-
-from sys import platform as sys_platform
+from launch_ros.actions import Node
+from sim.utils import find_package_resource, copy_models_to_gazebo, load_yaml_to_dict, build_node_arguments, camel_to_snake
 import platform
-
+import importlib
+from pathlib import Path
+from sim.constants import (
+    Competition, 
+    COMPETITION_NAMES, 
+    DEFAULT_COMPETITION,
+    DEFAULT_USE_SCORING
+)
+import json
 
 def load_sim_launch_parameters():
     """Load simulation launch parameters from YAML."""
-    params_file = os.path.join(
-        os.getcwd(), "src", "sim", "launch", "launch_params.yaml"
+    # Try source location first (for development - no rebuild needed)
+    source_paths = [
+        Path(__file__).parent / 'launch_params.yaml',
+        Path(os.getcwd()) / 'src' / 'sim' / 'launch' / 'launch_params.yaml',
+    ]
+    
+    for path in source_paths:
+        if path.exists():
+            return load_yaml_to_dict(path)
+    
+    # Fallback to installed location (for production/deployed packages)
+    try:
+        from ament_index_python.packages import get_package_share_directory
+        package_share = Path(get_package_share_directory('sim'))
+        installed_params = package_share / 'launch' / 'launch_params.yaml'
+        if installed_params.exists():
+            return load_yaml_to_dict(installed_params)
+    except Exception:
+        pass
+    
+    # If not found, raise error
+    raise FileNotFoundError(
+        f"Launch params file not found. Checked source paths: {source_paths} "
+        f"and installed location."
     )
-    with open(params_file, "r", encoding="utf-8") as f:
-        return yaml.safe_load(f)
 
+def load_sim_parameters(competition: str, logger: logging.Logger) -> str:
+    """
+    Find simulation configuration file, checking source location first (for development),
+    then falling back to installed location.
+    
+    Args:
+        competition: Competition name (e.g., 'in_house')
+        
+    Returns:
+        Path to the simulation config file (as string)
+        
+    Raises:
+        FileNotFoundError: If config file cannot be found
+    """
+    config_filename = f"{competition}.yaml"
+    config_path = find_package_resource(
+        relative_path=f"simulations/{config_filename}",
+        package_name='sim',
+        resource_type='file',
+        logger=logger,
+        base_file=Path(__file__)
+    )
+    return load_yaml_to_dict(config_path), config_path
+
+def initialize_mode(logger: logging.Logger, node_path: str, params: dict) -> Node:
+    """
+    Initialize a node from a class path and parameters.
+    
+    Args:
+        node_path: Dot-separated path to the node class (e.g., 'sim.world_gen.HoopCourseNode')
+        params: Dictionary of parameters to pass to the node constructor
+        
+    Returns:
+        Initialized node instance
+        
+    Raises:
+        ValueError: If node_path is invalid or parameters are missing/invalid
+        ImportError: If the module cannot be imported
+        AttributeError: If the class is not found in the module
+    """
+    logger.debug(f"Initializing mode: {node_path} with params: {params}")
+    
+    # Parse node path
+    try:
+        module_name, class_name = node_path.rsplit(".", 1)
+    except ValueError:
+        raise ValueError(f"Invalid node path format: '{node_path}'. Expected 'module.ClassName'")
+    
+    # Import module
+    try:
+        module = importlib.import_module(module_name)
+    except ImportError as e:
+        raise ImportError(f"Failed to import module '{module_name}': {e}")
+    
+    # Get class
+    if not hasattr(module, class_name):
+        raise AttributeError(f"Class '{class_name}' not found in module '{module_name}'")
+    
+    node_class = getattr(module, class_name)
+    
+    # Build arguments from parameters
+    try:
+        args = build_node_arguments(node_class, params)
+        logger.debug(f"Initializing {class_name} with args: {list(args.keys())}")
+    except ValueError as e:
+        raise ValueError(f"Failed to build arguments for {node_path}: {e}")
+    
+    # Instantiate node
+    try:
+        return node_class(**args)
+    except Exception as e:
+        logger.error(f"Failed to initialize {node_path} with args {args}: {e}")
+        raise
 
 def launch_setup(context, *args, **kwargs):
     """Setup launch configuration."""
+
+    logger = launch.logging.get_logger('sim.launch')
+    
     # Get launch arguments
-    params = load_sim_launch_parameters()
-    competition = params.get("competition", 0)
-    if competition == 0:
-        competition = "in_house"
-    elif competition == 1:
-        competition = "iarc"
-    elif competition == 2:
-        competition = "custom"
-    else:
-        raise ValueError(f"Invalid competition: {competition}")
+    try:
+        params = load_sim_launch_parameters()
+    except Exception as e:
+        raise RuntimeError(f"Failed to load launch parameters: {e}")
+    
+    # Map competition numbers to names
+    competition_num = params.get("competition", DEFAULT_COMPETITION.value)
+    try:
+        competition_type = Competition(competition_num)
+        competition = COMPETITION_NAMES[competition_type]
+    except (ValueError, KeyError):
+        valid_values = [e.value for e in Competition]
+        raise ValueError(
+            f"Invalid competition: {competition_num}. Must be one of {valid_values}"
+        )
 
-    competition_course = params.get("competition_course", 0)
-    if competition_course == 0:
-        competition_course = "ascent"
-    elif competition_course == 1:
-        competition_course = "descent"
-    elif competition_course == 2:
-        competition_course = "slalom"
-    elif competition_course == 3:
-        competition_course = "bezier"
-    elif competition_course == 4:
-        competition_course = "random"
-    elif competition_course == 5:
-        competition_course = "previous"
-    else:
-        raise ValueError(f"Invalid competition course: {competition_course}")
+    scoring_param = params.get("scoring", DEFAULT_USE_SCORING)
 
-    use_scoring = params.get("scoring", "false")
+    if isinstance(scoring_param, str):
+        use_scoring = scoring_param.lower() == 'true'
+    else:
+        use_scoring = bool(scoring_param)
 
     model = LaunchConfiguration("model").perform(context)
-    px4_path = LaunchConfiguration("px4_path").perform(context)
 
     arch = platform.machine().lower()
     if arch in ("x86_64", "amd64", "i386", "i686"):
@@ -71,12 +166,25 @@ def launch_setup(context, *args, **kwargs):
         platform_type = "arm"
     else:
         raise ValueError(f"Unknown architecture: {arch}")
-    print(f'Using platform: {platform_type}')
 
-    if model is None or px4_path is None:
+    px4_path_raw = LaunchConfiguration("px4_path").perform(context)
+
+    if model is None or px4_path_raw is None:
         raise RuntimeError("Model and PX4 path are required")
+    
+    px4_path = os.path.expanduser(px4_path_raw)
 
     sae_ws_path = os.path.expanduser(os.getcwd())
+
+    download_gz_models = ExecuteProcess(
+        cmd=[
+            "python3",
+            "Tools/simulation/gz/simulation-gazebo --dryrun",
+        ],
+        cwd=px4_path,
+        output="screen",
+        name="download_gz_models",
+    )
 
     spawn_world = ExecuteProcess(
         cmd=[
@@ -86,18 +194,7 @@ def launch_setup(context, *args, **kwargs):
         ],
         cwd=px4_path,
         output="screen",
-        name="launch world",
-    )
-
-    print("Defining simulation process...")
-    # Define the simulation process
-    sim = Node(
-        package="sim",
-        executable="simulation",
-        arguments=[competition, competition_course, use_scoring],
-        output="screen",
-        emulate_tty=True,
-        name="sim",
+        name="spawn_world",
     )
 
     topic_model_name = model[3:]  # remove 'gz_' prefix
@@ -130,25 +227,70 @@ def launch_setup(context, *args, **kwargs):
         cwd=sae_ws_path,
     )
 
-    print("Building simulation launch actions...")
+    sim_params, sim_config_path = load_sim_parameters(competition, logger)
+
+    if "world" not in sim_params:
+        raise ValueError(f"Missing 'world' section in simulation config: {sim_config_path}")
+    
+    world_params = sim_params["world"].copy()
+    
+    # Initialize world node - it will generate the world file automatically
+    world = Node(
+        package="sim",
+        executable=camel_to_snake(world_params["name"]),
+        arguments=[json.dumps(world_params["params"])],
+        output="screen",
+        name=world_params["name"],
+        cwd=sae_ws_path,
+    )
+
+    # Initialize scoring node if requested
+    scoring = None
+    if use_scoring:
+        if "scoring" not in sim_params:
+            logger.warning(f"Scoring requested but no 'scoring' section in sim config: {sim_config_path}")
+        else:
+            scoring = Node(
+                package="sim",
+                executable=camel_to_snake(sim_params["scoring"]["name"]),
+                arguments=[sim_params["scoring"]["params"]],
+                output="screen",
+                name=sim_params["scoring"]["name"],
+                cwd=sae_ws_path,
+            )
 
     # Build and return the complete list of actions
-    return [
-        spawn_world,
+    actions = [
+        download_gz_models,
+        RegisterEventHandler(
+            OnProcessStart(
+                target_action=download_gz_models,
+                on_start=[LogInfo(msg="Gazebo models downloaded."), spawn_world],
+            )
+        ),
         RegisterEventHandler(
             OnProcessStart(
                 target_action=spawn_world,
                 on_start=[
+                    LogInfo(msg="World Launched."),
                     gz_ros_bridge_camera,
                     gz_ros_bridge_camera_info,
-                    LogInfo(msg="World Launched."),
                 ],
             )
         ),
         RegisterEventHandler(
             OnProcessStart(
                 target_action=gz_ros_bridge_camera,
-                on_start=[sim, LogInfo(msg="Bridge camera topics started.")],
+                on_start=[
+                    action for action in [LogInfo(msg="Bridge camera topics started."), scoring, world]
+                    if action is not None
+                ],
+            )
+        ),
+        RegisterEventHandler(
+            OnProcessStart(
+                target_action=world,
+                on_start=[LogInfo(msg="World node started.")],
             )
         ),
     ]

@@ -1,3 +1,2 @@
 competition: 0 # 0 for in_house, 1 for iarc, 2 for custom
-competition_course: 0 # 0: ascent, 1: descent, 2: slalom, 3: bezier, 4: random, 5: previous
 use_scoring: false

@@ -1,6 +1,7 @@
 import os
 import re
 import yaml
+from pathlib import Path
 
 R_earth = 6378137.0  # Earth's radius in meters (WGS84)
 
@@ -21,19 +22,39 @@ def find_folder(folder_name, search_path):
             return os.path.join(root, folder_name)
     return None
 
-def find_folder_with_heuristic(folder_name, home_dir, keywords=('penn', 'air')):
-    # First, directly check if home_dir itself is the folder we're looking for
+def find_folder_with_heuristic(folder_name, home_dir=None, keywords=('penn', 'air')):
+    # Normalize home_dir
+    if home_dir is None:
+        home_dir = str(Path.home())
+    home_dir = os.path.abspath(os.path.expanduser(str(home_dir)))
+
+    # 1) If home_dir itself is the folder, return it
     if os.path.basename(os.path.normpath(home_dir)) == folder_name:
-        return os.path.abspath(home_dir)
-        
-    immediate_dirs = [d for d in os.listdir(home_dir) if os.path.isdir(os.path.join(home_dir, d))]
-    if folder_name in immediate_dirs:
-        return os.path.join(home_dir, folder_name)
+        return home_dir
+
+    # 2) Look at immediate subdirectories
+    try:
+        immediate_dirs = [
+            d for d in os.listdir(home_dir)
+            if os.path.isdir(os.path.join(home_dir, d))
+        ]
+    except FileNotFoundError:
+        # home_dir doesn't exist
+        return None
+
+    # 2a) Prefer keyword-matching subdirs (e.g. "pennair")
     for d in immediate_dirs:
         if any(kw.lower() in d.lower() for kw in keywords):
-            result = find_folder(folder_name, os.path.join(home_dir, d))
+            candidate_root = os.path.join(home_dir, d)
+            result = find_folder(folder_name, candidate_root)
             if result:
                 return result
+
+    # 2b) If it's directly under home_dir, use that
+    if folder_name in immediate_dirs:
+        return os.path.join(home_dir, folder_name)
+
+    # 3) Fallback: search entire home_dir
     return find_folder(folder_name, home_dir)
 
 def extract_vision_nodes(yaml_path):
