@@ -265,14 +265,14 @@ def launch_setup(context, *args, **kwargs):
         RegisterEventHandler(
             OnProcessStart(
                 target_action=download_gz_models,
-                on_start=[LogInfo(msg="Gazebo models downloaded."), spawn_world],
+                on_start=[LogInfo(msg="Gazebo models downloaded."), world],
             )
         ),
         RegisterEventHandler(
             OnProcessStart(
-                target_action=spawn_world,
+                target_action=world,
                 on_start=[
-                    LogInfo(msg="World Launched."),
+                    LogInfo(msg="World node started."),
                     gz_ros_bridge_camera,
                     gz_ros_bridge_camera_info,
                 ],
@@ -282,15 +282,15 @@ def launch_setup(context, *args, **kwargs):
             OnProcessStart(
                 target_action=gz_ros_bridge_camera,
                 on_start=[
-                    action for action in [LogInfo(msg="Bridge camera topics started."), scoring, world]
+                    action for action in [LogInfo(msg="Bridge camera topics started."), scoring, spawn_world]
                     if action is not None
                 ],
             )
         ),
         RegisterEventHandler(
             OnProcessStart(
-                target_action=world,
-                on_start=[LogInfo(msg="World node started.")],
+                target_action=spawn_world,
+                on_start=[LogInfo(msg="World spawned.")],
             )
         ),
     ]
