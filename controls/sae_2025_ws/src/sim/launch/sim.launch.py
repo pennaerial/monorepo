@@ -275,7 +275,7 @@ def launch_setup(context, *args, **kwargs):
                 on_stderr=lambda event: (
                     [spawn_world, LogInfo(msg="Simulation world node started.")] if b"Successfully generated world file:" in event.text else None
                 )
-        )
+            )
         ),
         RegisterEventHandler(
             OnProcessStart(

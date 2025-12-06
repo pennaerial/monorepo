@@ -4,7 +4,8 @@ import re
 
 from launch import LaunchDescription
 from launch.actions import ExecuteProcess, LogInfo, TimerAction, OpaqueFunction, RegisterEventHandler, DeclareLaunchArgument
-from launch.event_handlers import OnProcessStart
+from launch.event_handlers import OnProcessExit, OnProcessIO
+from launch.events.process import ProcessIO
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from uav.utils import vehicle_map, find_folder_with_heuristic, load_launch_parameters, extract_vision_nodes
@@ -100,7 +101,27 @@ def launch_setup(context, *args, **kwargs):
         emulate_tty=True,
         name='mission'
     )
+    mission_ready_flags = {"uav": False, "middleware": False}
+    def make_io_handler(trigger_text={"uav": "INFO  [commander] Ready for takeoff!", "middleware": "INFO  [uxrce_dds_client] time sync converged"}):
+        def handler(event: ProcessIO):
+            print("testing asdf")
+            text = event.text.decode() if isinstance(event.text, bytes) else event.text
+            print(text, trigger_text)
+            print("[commander] Ready for takeoff!" in text)
+            # only react if our magic string is in this line
+            
+            if text.strip() in trigger_text.values():
+                print(f"label {text} triggered")
+                mission_ready_flags[text] = True
 
+                # Only when BOTH are ready do we launch spawn_world
+                if all(mission_ready_flags.values()):
+                    return [
+                        LogInfo(msg="[launcher] Both processes ready, starting mission"),
+                        mission,
+                    ]
+            return None
+        return handler
     # Now, construct the actions list in a single step, depending on sim_bool
     if sim_bool:
         print("Building simulation launch actions...")
@@ -135,15 +156,17 @@ def launch_setup(context, *args, **kwargs):
         )
         actions = [
             sim,
-            LogInfo(msg="Gazebo started."),
-            *vision_node_actions,
-            LogInfo(msg="Vision nodes started."),
-            middleware,
             RegisterEventHandler(
-                OnProcessStart(target_action=middleware, on_start=[LogInfo(msg="Middleware started."), px4_sitl])
+                    OnProcessIO(on_stderr=lambda event: (
+                        [LogInfo(msg="Gazebo process started.."), px4_sitl, *vision_node_actions, middleware] if b"Successfully generated world file:" in event.text else None
+                    )
+                )
             ),
             RegisterEventHandler(
-                OnProcessStart(target_action=px4_sitl, on_start=[LogInfo(msg="PX4 SITL started."), TimerAction(period=15.0, actions=[mission] if run_mission_bool else [])])
+                OnProcessIO(
+                    target_action=px4_sitl,
+                    on_stdout=make_io_handler(),
+                )
             ),
         ]
     else:
@@ -152,16 +175,17 @@ def launch_setup(context, *args, **kwargs):
             *vision_node_actions,
             LogInfo(msg="Vision nodes started."),
             middleware,
-            RegisterEventHandler(
-                OnProcessStart(
-                    target_action=middleware,
-                    on_start=[
-                        LogInfo(msg="Hardware middleware ready."),
-                        TimerAction(period=5.0, actions=[mission] if run_mission_bool else [])
-                    ]
-                )
-            ),
         ]
+    if run_mission_bool:
+        actions.append(
+                RegisterEventHandler(
+                    OnProcessIO(
+                        target_action=middleware,
+                        on_stdout=make_io_handler(),
+                    )
+                )
+            )
+    
     return actions
 
 def generate_launch_description():
