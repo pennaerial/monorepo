@@ -185,7 +185,7 @@ class UAV:
         msg.jerk = [float('nan')] * 3   # Retain jerk field for PX4 compatibility but fill with NaN4
         msg.yawspeed = float('nan')  # Retain yaw_rate field for PX4 compatibility but fill with NaN
         self.trajectory_publisher.publish(msg)
-        self.node.get_logger().info(f"Publishing velocity: {msg.velocity}")
+        self.node.get_logger().info(f"Publishing velocity: {msg.velocity} ; Yaw: {msg.yaw}")
 
     
     def publish_position_setpoint(self, coordinate, yaw=None, calculate_yaw=False, relative=False):

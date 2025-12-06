@@ -45,7 +45,7 @@ class RingTraversalMode(Mode):
         
         if self.STATE == 'lateral':
             #when aligned, move to forward state
-            if math.fabs(dir_x) < 0.02 and math.fabs(dir_z) < 0.02:
+            if math.fabs(dir_x) < 0.04 and math.fabs(dir_z) < 0.04: #working with 0.02
                 self.STATE = 'forward'
             else:
                 vec = np.array([dir_x / 1.0, 0.0, dir_z / 1.0]).astype('float32')
