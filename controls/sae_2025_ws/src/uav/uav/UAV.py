@@ -506,7 +506,7 @@ class UAV:
         # Subscribers
         self.status_sub = self.node.create_subscription(
             VehicleStatus,
-            '/fmu/out/vehicle_status',
+            '/fmu/out/vehicle_status_v1',
             self._vehicle_status_callback,
             qos_profile
         )

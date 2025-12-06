@@ -1,365 +1,318 @@
 #!/usr/bin/env python3
 
 import os
-import yaml
+import launch
 from launch import LaunchDescription
-from launch.actions import ExecuteProcess, LogInfo, RegisterEventHandler, TimerAction, OpaqueFunction
+from launch.actions import (
+    ExecuteProcess,
+    LogInfo,
+    RegisterEventHandler,
+    OpaqueFunction,
+    DeclareLaunchArgument,
+)
+import logging
+from launch.substitutions import LaunchConfiguration
 from launch.event_handlers import OnProcessStart
 from launch_ros.actions import Node
-from sim.in_house.worldgen import generate_world
+from sim.utils import find_package_resource, copy_models_to_gazebo, load_yaml_to_dict, build_node_arguments, camel_to_snake
+import platform
+import importlib
+from pathlib import Path
+from sim.constants import (
+    Competition, 
+    COMPETITION_NAMES, 
+    DEFAULT_COMPETITION,
+    DEFAULT_USE_SCORING
+)
+import json
 
-
-class CourseParams:
-    """Data class to hold course parameters for worldgen.py"""
-    def __init__(self, dlz, uav, num_hoops, max_dist, width=None, height=None, 
-                 asc_start_height=None, des_start_height=None, spacing=None, ip_file=None, op_file=None):
-        self.dlz = dlz
-        self.uav = uav
-        self.num_hoops = num_hoops
-        self.max_dist = max_dist
-        self.width = width
-        self.height = height
-        self.asc_start_height = asc_start_height
-        self.des_start_height = des_start_height
-        self.spacing = spacing
-        self.ip_file = ip_file
-        self.op_file = op_file
-
-
-def find_folder_with_heuristic(folder_name, home_dir, keywords=('penn', 'air')):
-    """Find folder using heuristic search."""
-    immediate_dirs = [d for d in os.listdir(home_dir) if os.path.isdir(os.path.join(home_dir, d))]
-    if folder_name in immediate_dirs:
-        return os.path.join(home_dir, folder_name)
-    for d in immediate_dirs:
-        if any(kw.lower() in d.lower() for kw in keywords):
-            result = find_folder(folder_name, os.path.join(home_dir, d))
-            if result:
-                return result
-    return find_folder(folder_name, home_dir)
-
-
-def find_folder(folder_name, search_path):
-    """Find folder recursively."""
-    for root, dirs, files in os.walk(search_path):
-        if folder_name in dirs:
-            return os.path.join(root, folder_name)
-    return None
-
-
-def load_launch_params():
-    """Load parameters from launch_params.yaml file."""
-    launch_file_dir = os.path.dirname(os.path.abspath(__file__))
-    params_file = os.path.join(launch_file_dir, 'launch_params.yaml')
+def load_sim_launch_parameters():
+    """Load simulation launch parameters from YAML."""
+    # Try source location first (for development - no rebuild needed)
+    source_paths = [
+        Path(__file__).parent / 'launch_params.yaml',
+        Path(os.getcwd()) / 'src' / 'sim' / 'launch' / 'launch_params.yaml',
+    ]
     
+    for path in source_paths:
+        if path.exists():
+            return load_yaml_to_dict(path)
+    
+    # Fallback to installed location (for production/deployed packages)
     try:
-        with open(params_file, 'r') as f:
-            params = yaml.safe_load(f)
-        return params
-    except FileNotFoundError:
-        print(f"Warning: {params_file} not found, using default parameters")
-        return get_default_params()
+        from ament_index_python.packages import get_package_share_directory
+        package_share = Path(get_package_share_directory('sim'))
+        installed_params = package_share / 'launch' / 'launch_params.yaml'
+        if installed_params.exists():
+            return load_yaml_to_dict(installed_params)
+    except Exception:
+        pass
+    
+    # If not found, raise error
+    raise FileNotFoundError(
+        f"Launch params file not found. Checked source paths: {source_paths} "
+        f"and installed location."
+    )
 
+def load_sim_parameters(competition: str, logger: logging.Logger) -> str:
+    """
+    Find simulation configuration file, checking source location first (for development),
+    then falling back to installed location.
+    
+    Args:
+        competition: Competition name (e.g., 'in_house')
+        
+    Returns:
+        Path to the simulation config file (as string)
+        
+    Raises:
+        FileNotFoundError: If config file cannot be found
+    """
+    config_filename = f"{competition}.yaml"
+    config_path = find_package_resource(
+        relative_path=f"simulations/{config_filename}",
+        package_name='sim',
+        resource_type='file',
+        logger=logger,
+        base_file=Path(__file__)
+    )
+    return load_yaml_to_dict(config_path), config_path
 
-def get_default_params():
-    """Default parameters if YAML file is not found."""
-    return {
-        'competition': {'type': 'in_house', 'name': 'slalom'},
-        'course': {
-            'type': 'slalom',
-            'slalom': {
-                'dlz': [10, 5, 0],
-                'uav': [0, 0, 0],
-                'num_hoops': 5,
-                'max_dist': 10,
-                'width': 3,
-                'height': 4
-            },
-            'ascent': {
-                'dlz': [10, 5, 0],
-                'uav': [0, 0, 0],
-                'num_hoops': 4,
-                'max_dist': 8,
-                'start_height': 2
-            },
-            'descent': {
-                'dlz': [10, 5, 0],
-                'uav': [0, 0, 0],
-                'num_hoops': 4,
-                'max_dist': 8,
-                'start_height': 2
-            }
-        },
-        'simulation': {
-            'world_name': 'custom',
-            'enable_scoring': True,
-            'uav_model': 'gz_x500_mono_cam',
-            'position_poll_rate': 10.0,
-            'scoring_rate': 5.0,
-            'scoring': {
-                'hoop_tolerance': 1.5,
-                'max_flight_time': 300,
-                'points_per_hoop': 10,
-            }
-        },
-        'ros2': {
-            'middleware_port': 8888,
-            'enable_camera_bridge': True,
-            'topics': {
-                'camera': '/camera',
-                'camera_info': '/camera_info',
-                'vehicle_position': '/fmu/out/vehicle_local_position',
-                'vehicle_attitude': '/fmu/out/vehicle_attitude',
-                'scoring_results': '/scoring/results'
-            }
-        }
-    }
-
+def initialize_mode(logger: logging.Logger, node_path: str, params: dict) -> Node:
+    """
+    Initialize a node from a class path and parameters.
+    
+    Args:
+        node_path: Dot-separated path to the node class (e.g., 'sim.world_gen.HoopCourseNode')
+        params: Dictionary of parameters to pass to the node constructor
+        
+    Returns:
+        Initialized node instance
+        
+    Raises:
+        ValueError: If node_path is invalid or parameters are missing/invalid
+        ImportError: If the module cannot be imported
+        AttributeError: If the class is not found in the module
+    """
+    logger.debug(f"Initializing mode: {node_path} with params: {params}")
+    
+    # Parse node path
+    try:
+        module_name, class_name = node_path.rsplit(".", 1)
+    except ValueError:
+        raise ValueError(f"Invalid node path format: '{node_path}'. Expected 'module.ClassName'")
+    
+    # Import module
+    try:
+        module = importlib.import_module(module_name)
+    except ImportError as e:
+        raise ImportError(f"Failed to import module '{module_name}': {e}")
+    
+    # Get class
+    if not hasattr(module, class_name):
+        raise AttributeError(f"Class '{class_name}' not found in module '{module_name}'")
+    
+    node_class = getattr(module, class_name)
+    
+    # Build arguments from parameters
+    try:
+        args = build_node_arguments(node_class, params)
+        logger.debug(f"Initializing {class_name} with args: {list(args.keys())}")
+    except ValueError as e:
+        raise ValueError(f"Failed to build arguments for {node_path}: {e}")
+    
+    # Instantiate node
+    try:
+        return node_class(**args)
+    except Exception as e:
+        logger.error(f"Failed to initialize {node_path} with args {args}: {e}")
+        raise
 
 def launch_setup(context, *args, **kwargs):
     """Setup launch configuration."""
-    
-    # Load parameters from YAML file
-    params = load_launch_params()
-    
-    # Use YAML values directly
-    competition_type = params['competition']['type']
-    course_type = params['course']['type']
-    enable_scoring = params['simulation'].get('enable_scoring', True)
-    enable_camera_bridge = params['ros2'].get('enable_camera_bridge', True)
-    num_hoops = params['course'][course_type]['num_hoops']
-    max_dist = params['course'][course_type]['max_dist']
-    
-    # Extract course parameters
-    course_params_raw = params['course'][course_type].copy()
-    course_params_raw['num_hoops'] = num_hoops
-    course_params_raw['max_dist'] = max_dist
-    
-    # Convert lists to tuples for compatibility
-    course_params_dict = {
-        'dlz': tuple(course_params_raw['dlz']),
-        'uav': tuple(course_params_raw['uav']),
-        'num_hoops': course_params_raw['num_hoops'],
-        'max_dist': course_params_raw['max_dist']
-    }
-    
-    # Add course-specific parameters
-    if course_type == 'slalom':
-        course_params_dict['width'] = course_params_raw['width']
-        course_params_dict['height'] = course_params_raw['height']
-    elif course_type in ['ascent', 'descent']:
-        course_params_dict['start_height'] = course_params_raw['start_height']
-    elif course_type == 'straight':
-        course_params_dict['height'] = course_params_raw['height']
-        course_params_dict['spacing'] = course_params_raw['spacing']
-    
-    # Extract simulation parameters
-    sim_params = params['simulation']
-    ros_params = params['ros2']
-    
-    print(f"Launching {params['competition']['type']} competition: {params['competition']['name']}")
-    print(f"Course type: {course_type}")
-    print(f"Course parameters: {course_params_dict}")
-    
-    # Generate world file using worldgen.py
-    world_name = f"{params['competition']['type']}_{params['competition']['name']}"
-    
-    # Create CourseParams object for worldgen.py
-    course_params_obj = CourseParams(
-        dlz=course_params_dict['dlz'],
-        uav=course_params_dict['uav'],
-        num_hoops=course_params_dict['num_hoops'],
-        max_dist=course_params_dict['max_dist'],
-        width=course_params_dict.get('width'),
-        height=course_params_dict.get('height'),
-        asc_start_height=course_params_dict.get('start_height'),
-        des_start_height=course_params_dict.get('start_height'),
-        spacing=course_params_dict.get('spacing'),
-        ip_file=os.path.join(os.path.dirname(__file__), '..', '..', '..', 'share', 'sim', 'worlds', 'template.sdf'),
-        op_file=os.path.expanduser(f"~/.simulation-gazebo/worlds/{world_name}.sdf")
-    )
-    
-    # Ensure output directory exists
-    os.makedirs(os.path.dirname(course_params_obj.op_file), exist_ok=True)
-    
-    # Generate world using existing worldgen.py
-    try:
-        generate_world(course_type, course_params_obj)
-        print(f"Generated world file: {course_params_obj.op_file}")
 
-        # Create the course object (same logic as in generate_world function)
-        if course_type == 'straight':
-            from sim.in_house.courses.straight import StraightCourse
-            course = StraightCourse(
-                dlz=course_params_dict['dlz'],
-                uav=course_params_dict['uav'], 
-                num_hoops=course_params_dict['num_hoops'],
-                max_dist=course_params_dict['max_dist'],
-                height=course_params_dict['height'],
-                spacing=course_params_dict['spacing']
-            )
-        elif course_type == 'slalom':
-            from sim.in_house.courses.slalom import SlalomCourse
-            course = SlalomCourse(
-                dlz=course_params_dict['dlz'],
-                uav=course_params_dict['uav'], 
-                num_hoops=course_params_dict['num_hoops'],
-                max_dist=course_params_dict['max_dist'],
-                width=course_params_dict['width'],
-                height=course_params_dict['height']
-            )
-        elif course_type == 'ascent':
-            from sim.in_house.courses.ascent import AscentCourse
-            course = AscentCourse(
-                dlz=course_params_dict['dlz'],
-                uav=course_params_dict['uav'], 
-                num_hoops=course_params_dict['num_hoops'],
-                max_dist=course_params_dict['max_dist'],
-                start_height=course_params_dict.get('start_height', 2.0)
-            )
-        elif course_type == 'descent':
-            from sim.in_house.courses.descent import DescentCourse
-            course = DescentCourse(
-                dlz=course_params_dict['dlz'],
-                uav=course_params_dict['uav'], 
-                num_hoops=course_params_dict['num_hoops'],
-                max_dist=course_params_dict['max_dist'],
-                start_height=course_params_dict.get('start_height', 2.0)
-            )
-        else:
-            raise ValueError(f"Unknown course type: {course_type}")
-        
-        # Get the hoop poses that were generated by the world generation
-        hoop_poses = course.generate_course()  # This returns List[Pose] with 6 values each
-        
-        # Convert to flat list for ROS2 parameter
-        hoop_positions = []
-        for pose in hoop_poses:
-            hoop_positions.extend(pose)  # This will give [x, y, z, roll, pitch, yaw, ...]
-            
-        print(f"Retrieved {len(hoop_poses)} hoop poses from world generation")
-        
+    logger = launch.logging.get_logger('sim.launch')
+    
+    # Get launch arguments
+    try:
+        params = load_sim_launch_parameters()
     except Exception as e:
-        print(f"Error generating world: {e}")
-        raise
+        raise RuntimeError(f"Failed to load launch parameters: {e}")
     
-    # Find required paths
-    px4_path = find_folder_with_heuristic('PX4-Autopilot', os.path.expanduser('~'))
-    if not px4_path:
-        raise RuntimeError("PX4-Autopilot directory not found")
+    # Map competition numbers to names
+    competition_num = params.get("competition", DEFAULT_COMPETITION.value)
+    try:
+        competition_type = Competition(competition_num)
+        competition = COMPETITION_NAMES[competition_type]
+    except (ValueError, KeyError):
+        valid_values = [e.value for e in Competition]
+        raise ValueError(
+            f"Invalid competition: {competition_num}. Must be one of {valid_values}"
+        )
+
+    scoring_param = params.get("scoring", DEFAULT_USE_SCORING)
+
+    if isinstance(scoring_param, str):
+        use_scoring = scoring_param.lower() == 'true'
+    else:
+        use_scoring = bool(scoring_param)
+
+    model = LaunchConfiguration("model").perform(context)
+
+    arch = platform.machine().lower()
+    if arch in ("x86_64", "amd64", "i386", "i686"):
+        platform_type = "x86"
+    elif arch in ("arm64", "aarch64", "armv7l", "arm"):
+        platform_type = "arm"
+    else:
+        raise ValueError(f"Unknown architecture: {arch}")
+
+    px4_path_raw = LaunchConfiguration("px4_path").perform(context)
+
+    if model is None or px4_path_raw is None:
+        raise RuntimeError("Model and PX4 path are required")
     
-    sae_ws_path = os.getcwd()
-    
-    # Define the middleware process
-    print("start middleware")
-    middleware = ExecuteProcess(
-        cmd=['MicroXRCEAgent', 'udp4', '-p', str(ros_params['middleware_port'])],
-        output='screen',
-        name='middleware'
-    )
-    
-    # Define the Gazebo process
-    print("start gazebo")
-    gazebo = ExecuteProcess(
-        cmd=['python3', 'Tools/simulation/gz/simulation-gazebo', f'--world={world_name}'],
+    px4_path = os.path.expanduser(px4_path_raw)
+
+    sae_ws_path = os.path.expanduser(os.getcwd())
+
+    download_gz_models = ExecuteProcess(
+        cmd=[
+            "python3",
+            "Tools/simulation/gz/simulation-gazebo --dryrun",
+        ],
         cwd=px4_path,
-        output='screen',
-        name='gazebo'
+        output="screen",
+        name="download_gz_models",
     )
-    
-    # Define the PX4 SITL process
-    print("start px4_sitl")
-    px4_sitl = ExecuteProcess(
-        cmd=['bash', '-c', f'PX4_GZ_STANDALONE=1 PX4_SYS_AUTOSTART=4001 PX4_SIM_MODEL={sim_params["uav_model"]} PX4_GZ_WORLD={world_name} ./build/px4_sitl_default/bin/px4'],
+
+    spawn_world = ExecuteProcess(
+        cmd=[
+            "python3",
+            "Tools/simulation/gz/simulation-gazebo",
+            f"--world={competition}",
+        ],
         cwd=px4_path,
-        output='screen',
-        name='px4_sitl'
+        output="screen",
+        name="spawn_world",
     )
+
+    topic_model_name = model[3:]  # remove 'gz_' prefix
+
+    camera_topic_name = (
+        "imager" if platform_type == "x86" else "camera"
+    )  # windows -> 'imager'   mac -> 'camera'
+    GZ_CAMERA_TOPIC = f"/world/custom/model/{topic_model_name}_0/link/camera_link/sensor/{camera_topic_name}/image"
+    GZ_CAMERA_INFO_TOPIC = f"/world/custom/model/{topic_model_name}_0/link/camera_link/sensor/{camera_topic_name}/camera_info"
+
+    gz_ros_bridge_camera = Node(
+        package="ros_gz_bridge",
+        executable="parameter_bridge",
+        arguments=[f"{GZ_CAMERA_TOPIC}@sensor_msgs/msg/Image[gz.msgs.Image"],
+        remappings=[(GZ_CAMERA_TOPIC, "/camera")],
+        output="screen",
+        name="gz_ros_bridge_camera",
+        cwd=sae_ws_path,
+    )
+
+    gz_ros_bridge_camera_info = Node(
+        package="ros_gz_bridge",
+        executable="parameter_bridge",
+        arguments=[
+            f"{GZ_CAMERA_INFO_TOPIC}@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo"
+        ],
+        remappings=[(GZ_CAMERA_INFO_TOPIC, "/camera_info")],
+        output="screen",
+        name="gz_ros_bridge_camera_info",
+        cwd=sae_ws_path,
+    )
+
+    sim_params, sim_config_path = load_sim_parameters(competition, logger)
+
+    if "world" not in sim_params:
+        raise ValueError(f"Missing 'world' section in simulation config: {sim_config_path}")
     
+    world_params = sim_params["world"].copy()
     
-    # Define the scoring node (only if enabled)
-    scoring_node = None
-    if sim_params.get('enable_scoring', True):
-        scoring_node = Node(
-            package='sim',
-            executable='scoring_node',
-            name='scoring_node',
-            output='screen',
-            parameters=[{
-                'competition_type': params['competition']['type'],
-                'competition_name': params['competition']['name'],
-                'course_type': course_type,
-                'hoop_positions': str(hoop_positions),  # Add hoop positions as string
-                'position_poll_rate': sim_params.get('position_poll_rate', 10.0),
-                'scoring_rate': sim_params.get('scoring_rate', 5.0),
-                'hoop_tolerance': sim_params.get('scoring', {}).get('hoop_tolerance', 1.0),
-                'max_flight_time': sim_params.get('scoring', {}).get('max_flight_time', 300),
-                'points_per_hoop': sim_params.get('scoring', {}).get('points_per_hoop', 10)
-            }]
-        )
-    
-    # Define the ROS-Gazebo bridge for camera topics (only if enabled)
-    gz_ros_bridge_camera = None
-    gz_ros_bridge_camera_info = None
-    
-    if ros_params.get('enable_camera_bridge', True):
-        camera_topic = ros_params['topics']['camera']
-        camera_info_topic = ros_params['topics']['camera_info']
-        
-        print("start gz_ros_bridge_camera")
-        gz_ros_bridge_camera = ExecuteProcess(
-            cmd=['ros2', 'run', 'ros_gz_bridge', 'parameter_bridge',
-                f'/world/{world_name}/model/{sim_params["uav_model"]}_0/link/camera_link/sensor/imager/image@sensor_msgs/msg/Image[gz.msgs.Image',
-                '--ros-args', '--remap', f'/world/{world_name}/model/{sim_params["uav_model"]}_0/link/camera_link/sensor/imager/image:={camera_topic}'],
-            output='screen',
-            cwd=sae_ws_path,
-            name='gz_ros_bridge_camera'
-        )
-        
-        gz_ros_bridge_camera_info = ExecuteProcess(
-            cmd=['ros2', 'run', 'ros_gz_bridge', 'parameter_bridge',
-                f'/world/{world_name}/model/{sim_params["uav_model"]}_0/link/camera_link/sensor/imager/camera_info@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo',
-                '--ros-args', '--remap', f'/world/{world_name}/model/{sim_params["uav_model"]}_0/link/camera_link/sensor/imager/camera_info:={camera_info_topic}'],
-            output='screen',
-            cwd=sae_ws_path,
-            name='gz_ros_bridge_camera_info'
-        )
-    
-    # Delayed scoring node start (only if scoring is enabled)
-    delayed_scoring = None
-    if scoring_node is not None:
-        delayed_scoring = TimerAction(
-            period=10.0,
-            actions=[scoring_node]
-        )
-    
-    # Build action list based on enabled features
-    bridge_actions = []
-    # if gz_ros_bridge_camera is not None:
-    #     bridge_actions.append(gz_ros_bridge_camera)
-    # if gz_ros_bridge_camera_info is not None:
-    #     bridge_actions.append(gz_ros_bridge_camera_info)
-    
-    # Add delayed scoring if enabled
-    if delayed_scoring is not None:
-        bridge_actions.append(delayed_scoring)
-    
+    # Initialize world node - it will generate the world file automatically
+    world = Node(
+        package="sim",
+        executable=camel_to_snake(world_params["name"]),
+        arguments=[json.dumps(world_params["params"])],
+        output="screen",
+        name=world_params["name"],
+        cwd=sae_ws_path,
+    )
+
+    # Initialize scoring node if requested
+    scoring = None
+    if use_scoring:
+        if "scoring" not in sim_params:
+            logger.warning(f"Scoring requested but no 'scoring' section in sim config: {sim_config_path}")
+        else:
+            scoring = Node(
+                package="sim",
+                executable=camel_to_snake(sim_params["scoring"]["name"]),
+                arguments=[sim_params["scoring"]["params"]],
+                output="screen",
+                name=sim_params["scoring"]["name"],
+                cwd=sae_ws_path,
+            )
+
     # Build and return the complete list of actions
-    return [
-        middleware,
+    actions = [
+        download_gz_models,
         RegisterEventHandler(
-            OnProcessStart(target_action=middleware, on_start=[gazebo, LogInfo(msg="Middleware started.")])
+            OnProcessStart(
+                target_action=download_gz_models,
+                on_start=[LogInfo(msg="Gazebo models downloaded."), world],
+            )
         ),
         RegisterEventHandler(
-            OnProcessStart(target_action=gazebo, on_start=[px4_sitl, LogInfo(msg="Gazebo started.")])
+            OnProcessStart(
+                target_action=world,
+                on_start=[
+                    LogInfo(msg="World node started."),
+                    gz_ros_bridge_camera,
+                    gz_ros_bridge_camera_info,
+                ],
+            )
         ),
         RegisterEventHandler(
-            OnProcessStart(target_action=px4_sitl, on_start=bridge_actions + [LogInfo(msg="PX4 SITL started.")])
+            OnProcessStart(
+                target_action=gz_ros_bridge_camera,
+                on_start=[
+                    action for action in [LogInfo(msg="Bridge camera topics started."), scoring, spawn_world]
+                    if action is not None
+                ],
+            )
+        ),
+        RegisterEventHandler(
+            OnProcessStart(
+                target_action=spawn_world,
+                on_start=[LogInfo(msg="World spawned.")],
+            )
         ),
     ]
+    
+    if scoring:
+        actions.append(
+            RegisterEventHandler(
+                OnProcessStart(
+                    target_action=scoring,
+                    on_start=[LogInfo(msg="Scoring node started.")],
+                )
+            )
+        )
+    
+    return actions
 
 
 def generate_launch_description():
-    return LaunchDescription([
-        OpaqueFunction(function=launch_setup)
-    ])
+    return LaunchDescription(
+        [
+            DeclareLaunchArgument("model", default_value="gz_x500_mono_cam"),
+            DeclareLaunchArgument("px4_path", default_value="~/PX4-Autopilot"),
+            OpaqueFunction(function=launch_setup),
+        ]
+    )
