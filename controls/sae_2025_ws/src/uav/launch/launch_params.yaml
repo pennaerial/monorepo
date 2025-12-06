@@ -1,23 +1,12 @@
-# # launch_params.yaml
-# mission_name: test_straight_course
-# uav_debug: false
-# vision_debug: false
-# sim: true
-# run_mission: true
-# vehicle_type: 0 # 0 for quadrotor, 1 for tiltrotor VTOL, 2 for fixed-wing, 3 for standard VTOL
-# save_vision: false
-# servo_only: false
-# camera_offsets: [0, 0, 0] #Should denote the position of the camera relative to the payload mechanism, in meters
-#                               # In NED frame: x is forward, y is right, and z is down.
+# launch_params.yaml
+mission_name: temu_mission1
+uav_debug: false
+vision_debug: false
+run_mission: true
+vehicle_type: 0 # 0 for quadrotor, 1 for tiltrotor VTOL, 2 for fixed-wing, 3 for standard VTOL
+save_vision: false
+servo_only: false
+camera_offsets: [0, 0, 0] #Should denote the position of the camera relative to the payload mechanism, in meters
+                              # In NED frame: x is forward, y is right, and z is down.
 
-# src/uav/launch/launch_params.yaml
-mission_name: 'temu_mission1'
-
-sim: 'true'
-
-uav_debug: 'true'
-vision_debug: 'true'
-vehicle_type: 0 # 0 = quadcopter
-save_vision: 'false'
-camera_offsets: [0, 0, 0]
-servo_only: 'false'
+sim: true

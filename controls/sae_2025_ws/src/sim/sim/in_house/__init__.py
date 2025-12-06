@@ -1,1 +1,0 @@
-# In-house competition package

@@ -1,0 +1,22 @@
+# Simulation Configuration
+world:
+  name: HoopCourse
+  params:
+    course: "ascent" 
+    dlz: [10, 5, 0]     # Drop zone coordinates [x, y, z]
+    uav: [0, 0, 0]       # UAV starting position [x, y, z]
+    num_hoops: 2          # Number of hoops to generate
+    height: 5
+    max_dist: 1
+    world_name: "src/sim/sim/world_gen/worlds/template.sdf"   # Gazebo world template
+    # output_filename is optional - defaults to competition name
+
+  
+# Scoring parameters
+scoring:
+  name: HoopScore
+  params:
+    hoop_tolerance: 1.5       # meters - Distance tolerance for hoop passage
+    landing_bonus: 5.0        # Points awarded for landing bonus
+    landing_tolerance: 2.0    # meters - Distance tolerance for landing
+    landing_altitude_max: 0.4 # meters - Maximum altitude to be considered "landed"

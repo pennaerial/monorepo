@@ -65,19 +65,23 @@ class TemuNavMode(Mode):
 
         self.node.get_logger().info(f"STATE: {self.state}")
         if self.state == self.state_name['align']:
-            scaling_factor_x = -0.5
-            scaling_factor_y = -0.5
+            # scaling_factor_x = -0.5
+            # scaling_factor_y = -0.5
+
+            scaling_factor_x = -0.3
+            scaling_factor_y = -0.3
 
             point = (
                 self.x * scaling_factor_x,  # X 
                 0.0, # Y 
                 self.y * scaling_factor_y  # Z 
             )
-            self.uav.publish_position_setpoint(point, relative=True)
+            # self.uav.publish_position_setpoint(point, relative=True)
+            self.uav.publish_velocity(point, yaw=math.pi/2)
         
             # check for switching conditions
             # thresh = np.clip(self.z / 100, 0.01, 0.05)
-            vector_thresh = 15
+            vector_thresh = 10
             # self.node.get_logger().info(f'ALIGN THRESHOLD: {float(thresh):.4f}')
             self.node.get_logger().info(f'VECTOR_DIST: {float(self.vector_dist):.4f}')
             # if abs(self.x) <= thresh and abs(self.y) <= thresh:
@@ -86,8 +90,8 @@ class TemuNavMode(Mode):
                 self.state = self.state_name['straight']
 
         elif self.state == self.state_name['straight']:
-            scaling_factor_x = -0.3
-            scaling_factor_y = -0.3
+            scaling_factor_x = -1.0
+            scaling_factor_y = -1.0
 
             velocity = (
                 self.x * scaling_factor_x,

@@ -41,7 +41,7 @@ class TemuVisionNode(VisionNode):
         # self.get_logger().info("Received image for hoop tracking.")
         self.sim = True
         image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
-        x, y, z, vector_dist, img = find_hoop_w_depth(image)
+        x, y, z, vector_dist, img = find_hoop_w_depth(image, debug=True)
         self.display_frame(img, "result")
 
         if x is None or y is None or z is None:
