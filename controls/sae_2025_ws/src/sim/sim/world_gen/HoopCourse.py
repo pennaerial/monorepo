@@ -419,18 +419,7 @@ class HoopCourseNode(WorldNode):
         # Expand ~, make absolute, and validate paths
         in_path = Path(input_file).expanduser().resolve()
         out_path = Path(output_file).expanduser().resolve()
-        out_dir = out_path.parent
-        import time
-
-        max_wait_time = 30  # seconds
-        poll_interval = 0.2  # seconds
-        waited = 0
-        while not out_dir.exists():
-            time.sleep(poll_interval)
-            waited += poll_interval
-            if waited >= max_wait_time:
-                raise TimeoutError(f"Output world file {out_path} was not created after {max_wait_time} seconds.")
-
+        
         self.get_logger().debug(f"Input world file: {in_path}")
         self.get_logger().debug(f"Output world file: {out_path}")
         if not in_path.exists():

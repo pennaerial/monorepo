@@ -12,7 +12,7 @@ from launch.actions import (
 )
 import logging
 from launch.substitutions import LaunchConfiguration
-from launch.event_handlers import OnProcessStart
+from launch.event_handlers import OnProcessStart, OnProcessExit, OnProcessIO
 from launch_ros.actions import Node
 from sim.utils import find_package_resource, copy_models_to_gazebo, load_yaml_to_dict, build_node_arguments, camel_to_snake
 import platform
@@ -179,7 +179,8 @@ def launch_setup(context, *args, **kwargs):
     download_gz_models = ExecuteProcess(
         cmd=[
             "python3",
-            "Tools/simulation/gz/simulation-gazebo --dryrun",
+            "Tools/simulation/gz/simulation-gazebo",
+            "--dryrun",
         ],
         cwd=px4_path,
         output="screen",
@@ -263,36 +264,44 @@ def launch_setup(context, *args, **kwargs):
     actions = [
         download_gz_models,
         RegisterEventHandler(
-            OnProcessStart(
+            OnProcessExit(
                 target_action=download_gz_models,
-                on_start=[LogInfo(msg="Gazebo models downloaded."), world],
+                on_exit=[LogInfo(msg="Gazebo models downloaded."), world],
             )
         ),
         RegisterEventHandler(
-            OnProcessStart(
+            OnProcessIO(
                 target_action=world,
+                on_stderr=lambda event: (
+                    [spawn_world, LogInfo(msg="Simulation world node started.")] if b"Successfully generated world file:" in event.text else None
+                )
+        )
+        ),
+        RegisterEventHandler(
+            OnProcessStart(
+                target_action=spawn_world,
                 on_start=[
-                    LogInfo(msg="World node started."),
-                    gz_ros_bridge_camera,
-                    gz_ros_bridge_camera_info,
+                    action for action in [
+                        LogInfo(msg="Gazebo process started."),
+                        gz_ros_bridge_camera,
+                        gz_ros_bridge_camera_info,
+                        scoring
+                    ] if action is not None
                 ],
             )
         ),
         RegisterEventHandler(
             OnProcessStart(
                 target_action=gz_ros_bridge_camera,
-                on_start=[
-                    action for action in [LogInfo(msg="Bridge camera topics started."), scoring, spawn_world]
-                    if action is not None
-                ],
+                on_start=LogInfo(msg="Bridge camera topic started.")
             )
         ),
         RegisterEventHandler(
             OnProcessStart(
-                target_action=spawn_world,
-                on_start=[LogInfo(msg="World spawned.")],
+                target_action=gz_ros_bridge_camera_info,
+                on_start=LogInfo(msg="Bridge camera info topic started.")
             )
-        ),
+        )
     ]
     
     if scoring:

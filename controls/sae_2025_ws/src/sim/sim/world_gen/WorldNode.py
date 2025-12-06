@@ -65,20 +65,7 @@ class WorldNode(Node, ABC):
             # Ensure output directory exists
             output_world_dir = Path.home() / '.simulation-gazebo' / 'worlds'
             output_world_dir.mkdir(parents=True, exist_ok=True)
-            
             dst_models_dir = Path.home() / '.simulation-gazebo' / 'models'
-            
-            # Copy models
-            import time
-
-            max_wait_time = 30  # seconds
-            poll_interval = 0.2  # seconds
-            waited = 0
-            while not dst_models_dir.exists():
-                time.sleep(poll_interval)
-                waited += poll_interval
-                if waited >= max_wait_time:
-                    raise TimeoutError(f"Gazebo models directory {dst_models_dir} was not created after {max_wait_time} seconds.")
 
             copy_models_to_gazebo(src_models_dir, dst_models_dir)
         except Exception as e:
