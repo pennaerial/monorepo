@@ -44,9 +44,9 @@ class WorldNode(Node, ABC):
         self.output_path = self.output_dir / output_filename
         
         self.get_logger().info(f"Initializing world node for competition: {competition_name}")
-        self.get_logger().info(f"Output world file: {self.output_path}")
         
         self.setup_gazebo_models(self.get_logger())
+        self.get_logger().info(f"Wrote world file to: {self.output_path}")
 
     def setup_gazebo_models(self, logger: logging.Logger) -> None:
         """

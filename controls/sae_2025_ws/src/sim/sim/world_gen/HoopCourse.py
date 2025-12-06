@@ -22,12 +22,13 @@ class CourseStyle(ABC):
                  dlz: Tuple[float, float, float],
                  uav: Tuple[float, float, float],
                  num_hoops: int,
-                 max_dist: int
+                 max_dist: int,
+                 height: int
                 ):
         self.dlz = dlz
         self.uav = uav
         self.num_hoops = num_hoops
-
+        self.height = height
         # max_dist represents max distance we want next step for hoop in our course
         self.max_dist = max_dist
 
@@ -44,7 +45,7 @@ class AscentCourse(CourseStyle):
                  max_dist: int,
                  start_height: int
                  ):
-        super().__init__(dlz, uav, num_hoops, max_dist)
+        super().__init__(dlz, uav, num_hoops, max_dist, start_height)
         self.start_height = start_height
 
     def generate_course(self) -> List[Pose]:
@@ -97,7 +98,7 @@ class DescentCourse(CourseStyle):
                  max_dist: int,
                  start_height: int
                  ):
-        super().__init__(dlz, uav, num_hoops, max_dist)
+        super().__init__(dlz, uav, num_hoops, max_dist, start_height)
         self.start_height = start_height
 
     def generate_course(self) -> List[Pose]:
@@ -151,7 +152,7 @@ class SlalomCourse(CourseStyle):
                  width: int,
                  height: int
                  ):
-        super().__init__(dlz, uav, num_hoops, max_dist)
+        super().__init__(dlz, uav, num_hoops, max_dist, height)
         self.width = width
         self.height = height
 
@@ -213,7 +214,7 @@ class StraightCourse(CourseStyle):
                  spacing: float = 2.0
                 ):
         # Call parent initializer
-        super().__init__(dlz, uav, num_hoops, max_dist)
+        super().__init__(dlz, uav, num_hoops, max_dist, height)
         
         # Height of all hoops (same for straight course)
         self.height = height
@@ -276,7 +277,7 @@ class BezierCourse(CourseStyle):
                  max_dist: int,
                  height: float = 2.0,
                  lateral_offset: float = 4.0):
-        super().__init__(dlz, uav, num_hoops, max_dist)
+        super().__init__(dlz, uav, num_hoops, max_dist, height)
         self.height = height
         self.lateral_offset = lateral_offset
 
@@ -372,6 +373,7 @@ class HoopCourseNode(WorldNode):
                  num_hoops: int,
                  max_dist: int,
                  world_name: str,
+                 height: int,
                  output_filename: Optional[str] = None):
         """
         Initialize the hoop course world generator.
@@ -392,6 +394,7 @@ class HoopCourseNode(WorldNode):
         self.num_hoops = num_hoops
         self.max_dist = max_dist
         self.world_name = world_name
+        self.height = height
         self.hoop_positions: List[Pose] = []
         self.generate_world()
         
@@ -416,6 +419,18 @@ class HoopCourseNode(WorldNode):
         # Expand ~, make absolute, and validate paths
         in_path = Path(input_file).expanduser().resolve()
         out_path = Path(output_file).expanduser().resolve()
+        out_dir = out_path.parent
+        import time
+
+        max_wait_time = 30  # seconds
+        poll_interval = 0.2  # seconds
+        waited = 0
+        while not out_dir.exists():
+            time.sleep(poll_interval)
+            waited += poll_interval
+            if waited >= max_wait_time:
+                raise TimeoutError(f"Output world file {out_path} was not created after {max_wait_time} seconds.")
+
         self.get_logger().debug(f"Input world file: {in_path}")
         self.get_logger().debug(f"Output world file: {out_path}")
         if not in_path.exists():
@@ -573,33 +588,33 @@ class HoopCourseNode(WorldNode):
                                     uav=self.uav, 
                                     num_hoops=self.num_hoops, 
                                     max_dist=self.max_dist, 
-                                    start_height=2)
+                                    start_height=self.height)
             elif self.course.lower() == "descent":
                 course = DescentCourse(dlz=self.dlz, 
                                     uav=self.uav, 
                                     num_hoops=self.num_hoops, 
                                     max_dist=self.max_dist, 
-                                    start_height=4)
+                                    start_height=self.height)
             elif self.course.lower() == "slalom":
                 course = SlalomCourse(dlz=self.dlz, 
                                     uav=self.uav, 
                                     num_hoops=self.num_hoops, 
                                     max_dist=self.max_dist,
                                     width=4,
-                                    height=2)
+                                    height=self.height)
             elif self.course.lower() == "straight":
                 course = StraightCourse(dlz=self.dlz, 
                                     uav=self.uav, 
                                     num_hoops=self.num_hoops, 
                                     max_dist=self.max_dist,
-                                    height=2,
+                                    height=self.height,
                                     spacing=2)
             elif self.course.lower() == "bezier":
                 course = BezierCourse(dlz=self.dlz,
                                       uav=self.uav,
                                       num_hoops=self.num_hoops,
                                       max_dist=self.max_dist,
-                                      height=2.0,
+                                      height=self.height,
                                       lateral_offset=4.0)
             else:
                 raise ValueError(f"Invalid course: {self.course}")
