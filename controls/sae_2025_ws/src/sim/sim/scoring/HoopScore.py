@@ -14,29 +14,35 @@ from sim.scoring import ScoringNode
 
 class HoopScoringNode(ScoringNode):
     """
-    ROS2 node for in-house competition scoring.
+    Scoring node for in-house competition.
     Tracks UAV position and scores hoop passages using directional detection.
     """
     
-    def __init__(self):
-        super().__init__()
+    def __init__(self, 
+                 hoop_tolerance: float = 1.5,
+                 landing_bonus: float = 5.0,
+                 landing_tolerance: float = 2.0,
+                 landing_altitude_max: float = 0.4):
+        """
+        Initialize the hoop scoring node.
         
-        # Declare parameters
-        self.declare_parameter('hoop_tolerance', 1.5) 
-        self.declare_parameter('competition_type', 'in_house')
-        self.declare_parameter('competition_name', 'test')
-        self.declare_parameter('course_type', 'straight')
+        Args:
+            hoop_tolerance: Distance tolerance for hoop passage (meters)
+            landing_bonus: Points awarded for landing bonus
+            landing_tolerance: Distance tolerance for landing (meters)
+            landing_altitude_max: Maximum altitude to be considered "landed" (meters)
+        """
+        super().__init__(competition_name="in_house")
         
-        # landing bonus parameters
-        self.declare_parameter('landing_bonus', 5.0)  
-        self.declare_parameter('landing_tolerance', 2.0) 
-        self.declare_parameter('landing_altitude_max', 0.4)  
-
+        # Store parameters
+        self.hoop_tolerance = hoop_tolerance
+        self.landing_bonus = landing_bonus
+        self.landing_tolerance = landing_tolerance
+        self.landing_altitude_max = landing_altitude_max
         
         # Course data
         self.hoop_poses: List[Tuple[float, float, float, float, float, float]] = []
         self.passed_hoops: List[bool] = []
-        self.current_score = 0.0
         self.start_time = time.time()
         
         # UAV tracking
@@ -50,12 +56,10 @@ class HoopScoringNode(ScoringNode):
         self.landed_at_origin = False
         self.landing_bonus_awarded = False
         
-        # Publishers
-        self.score_publisher = self.create_publisher(Float32, '/scoring/results', 10)
-        self.status_publisher = self.create_publisher(String, '/scoring/status', 10)
-        self.drone_publisher = self.create_publisher(Float32MultiArray, '/scoring/drone_position', 10)
+        # Additional publisher for drone position
+        self.drone_publisher = self.create_publisher(Float32MultiArray, '/scoring/in_house/drone_position', 10)
         
-        # Subscriber
+        # Subscriber for UAV position
         qos = QoSProfile(
             reliability=QoSReliabilityPolicy.BEST_EFFORT,
             history=QoSHistoryPolicy.KEEP_LAST,
@@ -72,8 +76,7 @@ class HoopScoringNode(ScoringNode):
         # Timer for score updating
         self.create_timer(0.1, self.update_scoring)  # 10Hz
         
-        # self.load_hoop_positions()
-        # self.get_logger().info("Scoring node initialized.")
+        # Service client for getting hoop positions
         self.hoop_client = self.create_client(HoopList, "list_hoops")
         self.hoops_loaded = False
         self.create_timer(0.5, self._try_request_hoops)
@@ -165,8 +168,12 @@ class HoopScoringNode(ScoringNode):
         self.drone_last_side = [0] * len(hoop_poses)
         self.get_logger().info(f"Course set with {len(hoop_poses)} hoops")
 
-    def update_scoring(self):
-        """Check if drone passes through any hoop using directional detection. (COMPLETELY REWRITTEN)"""
+    def update_scoring(self) -> None:
+        """
+        Check if drone passes through any hoop using directional detection.
+        
+        Implements the abstract method from ScoringNode.
+        """
         if not self.uav_position or not self.hoop_poses:
             return
         
@@ -178,8 +185,8 @@ class HoopScoringNode(ScoringNode):
                 
             hoop_x, hoop_y, hoop_z, roll, pitch, yaw = hoop
             
-            # Get hoop radius from parameters
-            hoop_radius = self.get_parameter('hoop_tolerance').get_parameter_value().double_value
+            # Use hoop tolerance from initialization
+            hoop_radius = self.hoop_tolerance
             
             # NEW: Transform drone position to hoop local frame
             drone_pos_in_hoop = self._world_to_hoop_local(
@@ -202,18 +209,13 @@ class HoopScoringNode(ScoringNode):
                     # Drone passed through the hoop!
                     self.passed_hoops[i] = True
                     curr = time.time()
-                    #time decay
-                    self.current_score += 10 * (0.99 ** (curr - self.start_time))
+                    # Time decay scoring
+                    points = 10 * (0.99 ** (curr - self.start_time))
+                    self.current_score += points
                     
-                    # Publish status message (SAME AS BEFORE)
-                    status_msg = String()
-                    status_msg.data = f"Hoop {i+1} passed! Score: {self.current_score}"
-                    self.status_publisher.publish(status_msg)
-                    
-                    # Publish score update (SAME AS BEFORE)
-                    score_msg = Float32()
-                    score_msg.data = float(self.current_score)
-                    self.score_publisher.publish(score_msg)
+                    # Publish status and score
+                    self.publish_status(f"Hoop {i+1} passed! Score: {self.current_score}")
+                    self.publish_score()
                     
                     # Log the achievement
                     self.get_logger().info(f"🎯 HOOP {i+1} PASSED THROUGH! Score: {self.current_score}")
@@ -241,35 +243,24 @@ class HoopScoringNode(ScoringNode):
         if not all_hoops_passed:
             return
         
-        # Get landing parameters
-        landing_tolerance = self.get_parameter('landing_tolerance').get_parameter_value().double_value
-        landing_altitude_max = self.get_parameter('landing_altitude_max').get_parameter_value().double_value
-        
         # Check if drone is near origin and low enough to be considered "landed"
         distance_from_origin = math.sqrt(x*x + y*y)
-        is_near_origin = distance_from_origin <= landing_tolerance
-        is_low_enough = z <= landing_altitude_max
+        is_near_origin = distance_from_origin <= self.landing_tolerance
+        is_low_enough = z <= self.landing_altitude_max
         
         if is_near_origin and is_low_enough:
             self.landed_at_origin = True
             self.landing_bonus_awarded = True
             
             # Award landing bonus
-            landing_bonus = self.get_parameter('landing_bonus').get_parameter_value().double_value
-            self.current_score += landing_bonus
+            self.current_score += self.landing_bonus
             
-            # Publish status
-            status_msg = String()
-            status_msg.data = f"🏁 LANDING BONUS! +{landing_bonus} points! Total: {self.current_score:.1f}"
-            self.status_publisher.publish(status_msg)
-            
-            # Publish score update
-            score_msg = Float32()
-            score_msg.data = float(self.current_score)
-            self.score_publisher.publish(score_msg)
+            # Publish status and score
+            self.publish_status(f"🏁 LANDING BONUS! +{self.landing_bonus} points! Total: {self.current_score:.1f}")
+            self.publish_score()
             
             # Log achievement
-            self.get_logger().info(f"🏁 LANDING BONUS AWARDED! +{landing_bonus} points at origin (0,0)")
+            self.get_logger().info(f"🏁 LANDING BONUS AWARDED! +{self.landing_bonus} points at origin (0,0)")
             self.get_logger().info(f"Final Score: {self.current_score:.1f}")
     def _world_to_hoop_local(self, 
                             world_pos: Tuple[float, float, float], 

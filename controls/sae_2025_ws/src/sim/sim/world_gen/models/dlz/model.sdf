@@ -1,0 +1,23 @@
+<?xml version="1.0" ?>
+<sdf version="1.4">
+  <model name="dlz">
+  <static>true</static>
+    <link name="dlz_link">
+      <inertial>
+        <mass>2</mass>
+      </inertial>
+      <visual name="visual">
+      <pose> 3.8 1.2 .1 1.5708 0 0 </pose>
+        <geometry>
+          <mesh>
+            <uri>model://dlz/meshes/dlz.STL</uri>
+            <scale> .001 .001 .001 </scale>
+          </mesh>
+        </geometry>
+        <material>
+          <diffuse>1 0 1 1</diffuse> <!-- Pink color -->
+      </material>
+      </visual>
+    </link>
+  </model>
+</sdf>
