@@ -100,6 +100,7 @@ def launch_setup(context, *args, **kwargs):
         name='mission'
     )
     mission_ready_flags = {"uav": False, "middleware": False}
+    mission_started = {"value": False}  # mutable so inner functions can modify
     def make_io_handler(process_name):
         trigger = "INFO  [commander] Ready for takeoff!" if process_name == "uav" else "INFO  [uxrce_dds_client] time sync converged" if process_name == "middleware" else None
         if trigger is None:
@@ -112,7 +113,8 @@ def launch_setup(context, *args, **kwargs):
             if trigger in text:
                 mission_ready_flags[process_name] = True
                 # Only when BOTH are ready do we launch spawn_world
-                if all(mission_ready_flags.values()):
+                if not mission_started["value"] and all(mission_ready_flags.values()):
+                    mission_started["value"] = True
                     return [
                         LogInfo(msg="[launcher] Both processes ready, starting mission"),
                         mission,
