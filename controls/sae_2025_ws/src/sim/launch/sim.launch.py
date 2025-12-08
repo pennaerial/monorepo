@@ -278,16 +278,16 @@ def launch_setup(context, *args, **kwargs):
             )
         ),
         RegisterEventHandler(
-            OnProcessStart(
+            OnProcessIO(
                 target_action=spawn_world,
-                on_start=[
+                on_stderr=lambda event: (
                     action for action in [
                         LogInfo(msg="Gazebo process started."),
                         gz_ros_bridge_camera,
                         gz_ros_bridge_camera_info,
                         scoring
                     ] if action is not None
-                ],
+                ) if b"INFO  [init] Gazebo world is ready" in event.text else None,
             )
         ),
         RegisterEventHandler(
