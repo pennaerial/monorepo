@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 import os
 import re
-
+import platform
 from launch import LaunchDescription
-from launch.actions import ExecuteProcess, LogInfo, TimerAction, OpaqueFunction, RegisterEventHandler, DeclareLaunchArgument
-from launch.event_handlers import OnProcessStart
+from launch.actions import ExecuteProcess, LogInfo, OpaqueFunction, RegisterEventHandler, DeclareLaunchArgument
+from launch.event_handlers import OnProcessIO, OnProcessStart
+from launch.events.process import ProcessIO
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from uav.utils import vehicle_map, find_folder_with_heuristic, load_launch_parameters, extract_vision_nodes
@@ -14,7 +15,6 @@ from ament_index_python.packages import get_package_share_directory
 
 def launch_setup(context, *args, **kwargs):
     # Load launch parameters from the YAML file.
-    print("Loading launch parameters...")
     params = load_launch_parameters()
     mission_name = params.get('mission_name', 'basic')
     uav_debug = str(params.get('uav_debug', 'false'))
@@ -35,7 +35,6 @@ def launch_setup(context, *args, **kwargs):
     # Build the mission YAML file path using the mission name.
     YAML_PATH = os.path.join(os.getcwd(), 'src', 'uav', 'uav', 'missions', f"{mission_name}.yaml")
     
-    print("Building vision node actions...")
     # Build vision node actions.
     vision_nodes = []
     vision_node_actions = [Node(
@@ -92,6 +91,47 @@ def launch_setup(context, *args, **kwargs):
     else:
         raise ValueError(f"Invalid vehicle type: {vehicle_type}")
 
+    
+    topic_model_name = model[3:]  # remove 'gz_' prefix
+
+    arch = platform.machine().lower()
+    if arch in ("x86_64", "amd64", "i386", "i686"):
+        platform_type = "x86"
+    elif arch in ("arm64", "aarch64", "armv7l", "arm"):
+        platform_type = "arm"
+    else:
+        raise ValueError(f"Unknown architecture: {arch}")
+
+    camera_topic_name = (
+        "imager" if platform_type == "x86" else "camera"
+    )  # windows -> 'imager'   mac -> 'camera'
+    GZ_CAMERA_TOPIC = f"/world/custom/model/{topic_model_name}_0/link/camera_link/sensor/{camera_topic_name}/image"
+    GZ_CAMERA_INFO_TOPIC = f"/world/custom/model/{topic_model_name}_0/link/camera_link/sensor/{camera_topic_name}/camera_info"
+
+    sae_ws_path = os.path.expanduser(os.getcwd())
+    
+    gz_ros_bridge_camera = Node(
+        package="ros_gz_bridge",
+        executable="parameter_bridge",
+        arguments=[f"{GZ_CAMERA_TOPIC}@sensor_msgs/msg/Image[gz.msgs.Image"],
+        remappings=[(GZ_CAMERA_TOPIC, "/camera")],
+        output="screen",
+        name="gz_ros_bridge_camera",
+        cwd=sae_ws_path,
+    )
+
+    gz_ros_bridge_camera_info = Node(
+        package="ros_gz_bridge",
+        executable="parameter_bridge",
+        arguments=[
+            f"{GZ_CAMERA_INFO_TOPIC}@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo"
+        ],
+        remappings=[(GZ_CAMERA_INFO_TOPIC, "/camera_info")],
+        output="screen",
+        name="gz_ros_bridge_camera_info",
+        cwd=sae_ws_path,
+    )
+
     camera_offsets_str = ','.join(str(offset) for offset in camera_offsets)
     mission_cmd = ['ros2', 'run', 'uav', 'mission', uav_debug, YAML_PATH, servo_only, camera_offsets_str, ','.join(vision_nodes)]
     mission = ExecuteProcess(
@@ -100,21 +140,38 @@ def launch_setup(context, *args, **kwargs):
         emulate_tty=True,
         name='mission'
     )
-
+    mission_ready_flags = {"uav": False, "middleware": False}
+    mission_started = {"value": False}  # mutable so inner functions can modify
+    def make_io_handler(process_name):
+        trigger = "INFO  [commander] Ready for takeoff!" if process_name == "uav" else "INFO  [uxrce_dds_client] time sync converged" if process_name == "middleware" else None
+        if trigger is None:
+            raise ValueError(f"Invalid process name: {process_name}")
+        def clean_text(text):
+            ansi_escape = re.compile(r'\x1b\[[0-9;]*m') # remove ANSI escape codes that give color in terminal
+            return ansi_escape.sub('', text).strip()
+        def handler(event: ProcessIO):
+            text = clean_text(event.text.decode() if isinstance(event.text, bytes) else event.text)
+            if trigger in text:
+                mission_ready_flags[process_name] = True
+                # Only when BOTH are ready do we launch spawn_world
+                if not mission_started["value"] and all(mission_ready_flags.values()):
+                    mission_started["value"] = True
+                    return [
+                        LogInfo(msg="[launcher] Both processes ready, starting mission"),
+                        mission,
+                    ]
+            return None
+        return handler
     # Now, construct the actions list in a single step, depending on sim_bool
     if sim_bool:
-        print("Building simulation launch actions...")
-
         # Find required paths.
         px4_path = find_folder_with_heuristic('PX4-Autopilot', os.path.expanduser(LaunchConfiguration('px4_path').perform(context)))
 
         # Prepare sim launch arguments with all simulation parameters
         sim_launch_args = {
-            'model': model,
             'px4_path': px4_path,
         }
         
-        print("Including simulation launch description...")
         sim = IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 os.path.join(
@@ -126,7 +183,6 @@ def launch_setup(context, *args, **kwargs):
             launch_arguments=sim_launch_args.items()
         )
 
-        print("Starting PX4 SITL...")
         px4_sitl = ExecuteProcess(
             cmd=['bash', '-c', f'PX4_GZ_STANDALONE=1 PX4_SYS_AUTOSTART={autostart} PX4_SIM_MODEL={model} ./build/px4_sitl_default/bin/px4'],
             cwd=px4_path,
@@ -135,15 +191,37 @@ def launch_setup(context, *args, **kwargs):
         )
         actions = [
             sim,
-            LogInfo(msg="Gazebo started."),
-            *vision_node_actions,
-            LogInfo(msg="Vision nodes started."),
-            middleware,
             RegisterEventHandler(
-                OnProcessStart(target_action=middleware, on_start=[LogInfo(msg="Middleware started."), px4_sitl])
+                    OnProcessIO(on_stderr=lambda event: (
+                        [LogInfo(msg="Gazebo process started."), px4_sitl, *vision_node_actions, middleware] if b"Successfully generated world file:" in event.text else None
+                    )
+                )
             ),
             RegisterEventHandler(
-                OnProcessStart(target_action=px4_sitl, on_start=[LogInfo(msg="PX4 SITL started."), TimerAction(period=15.0, actions=[mission] if run_mission_bool else [])])
+                OnProcessIO(
+                    target_action=px4_sitl,
+                    on_stdout=lambda event: (
+                        [LogInfo(msg="PX4 SITL started."), gz_ros_bridge_camera, gz_ros_bridge_camera_info] if b"INFO  [init] Spawning model" in event.text else None
+                    )
+                )
+            ),
+            RegisterEventHandler(
+                OnProcessStart(
+                    target_action=gz_ros_bridge_camera,
+                    on_start=LogInfo(msg="Bridge camera topic started.")
+                )
+            ),
+            RegisterEventHandler(
+                OnProcessStart(
+                    target_action=gz_ros_bridge_camera_info,
+                    on_start=LogInfo(msg="Bridge camera info topic started.")
+                )
+            ),
+            RegisterEventHandler(
+                OnProcessIO(
+                    target_action=px4_sitl,
+                    on_stdout=make_io_handler("uav"),
+                )
             ),
         ]
     else:
@@ -152,16 +230,17 @@ def launch_setup(context, *args, **kwargs):
             *vision_node_actions,
             LogInfo(msg="Vision nodes started."),
             middleware,
-            RegisterEventHandler(
-                OnProcessStart(
-                    target_action=middleware,
-                    on_start=[
-                        LogInfo(msg="Hardware middleware ready."),
-                        TimerAction(period=5.0, actions=[mission] if run_mission_bool else [])
-                    ]
-                )
-            ),
         ]
+    if run_mission_bool:
+        actions.append(
+                RegisterEventHandler(
+                    OnProcessIO(
+                        target_action=px4_sitl,
+                        on_stdout=make_io_handler("middleware"),
+                    )
+                )
+            )
+    
     return actions
 
 def generate_launch_description():
