@@ -14,8 +14,7 @@ import logging
 from launch.substitutions import LaunchConfiguration
 from launch.event_handlers import OnProcessStart, OnProcessExit, OnProcessIO
 from launch_ros.actions import Node
-from sim.utils import find_package_resource, copy_models_to_gazebo, load_yaml_to_dict, build_node_arguments, camel_to_snake
-import platform
+from sim.utils import find_package_resource, load_yaml_to_dict, build_node_arguments, camel_to_snake
 import importlib
 from pathlib import Path
 from sim.constants import (
@@ -157,20 +156,11 @@ def launch_setup(context, *args, **kwargs):
     else:
         use_scoring = bool(scoring_param)
 
-    model = LaunchConfiguration("model").perform(context)
-
-    arch = platform.machine().lower()
-    if arch in ("x86_64", "amd64", "i386", "i686"):
-        platform_type = "x86"
-    elif arch in ("arm64", "aarch64", "armv7l", "arm"):
-        platform_type = "arm"
-    else:
-        raise ValueError(f"Unknown architecture: {arch}")
 
     px4_path_raw = LaunchConfiguration("px4_path").perform(context)
 
-    if model is None or px4_path_raw is None:
-        raise RuntimeError("Model and PX4 path are required")
+    if px4_path_raw is None:
+        raise RuntimeError("PX4 path is required")
     
     px4_path = os.path.expanduser(px4_path_raw)
 
@@ -196,36 +186,6 @@ def launch_setup(context, *args, **kwargs):
         cwd=px4_path,
         output="screen",
         name="spawn_world",
-    )
-
-    topic_model_name = model[3:]  # remove 'gz_' prefix
-
-    camera_topic_name = (
-        "imager" if platform_type == "x86" else "camera"
-    )  # windows -> 'imager'   mac -> 'camera'
-    GZ_CAMERA_TOPIC = f"/world/custom/model/{topic_model_name}_0/link/camera_link/sensor/{camera_topic_name}/image"
-    GZ_CAMERA_INFO_TOPIC = f"/world/custom/model/{topic_model_name}_0/link/camera_link/sensor/{camera_topic_name}/camera_info"
-
-    gz_ros_bridge_camera = Node(
-        package="ros_gz_bridge",
-        executable="parameter_bridge",
-        arguments=[f"{GZ_CAMERA_TOPIC}@sensor_msgs/msg/Image[gz.msgs.Image"],
-        remappings=[(GZ_CAMERA_TOPIC, "/camera")],
-        output="screen",
-        name="gz_ros_bridge_camera",
-        cwd=sae_ws_path,
-    )
-
-    gz_ros_bridge_camera_info = Node(
-        package="ros_gz_bridge",
-        executable="parameter_bridge",
-        arguments=[
-            f"{GZ_CAMERA_INFO_TOPIC}@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo"
-        ],
-        remappings=[(GZ_CAMERA_INFO_TOPIC, "/camera_info")],
-        output="screen",
-        name="gz_ros_bridge_camera_info",
-        cwd=sae_ws_path,
     )
 
     sim_params, sim_config_path = load_sim_parameters(competition, logger)
@@ -273,33 +233,8 @@ def launch_setup(context, *args, **kwargs):
             OnProcessIO(
                 target_action=world,
                 on_stderr=lambda event: (
-                    [spawn_world, LogInfo(msg="Simulation world node started.")] if b"Successfully generated world file:" in event.text else None
+                    [spawn_world, LogInfo(msg="Simulation world node started."), scoring] if b"Successfully generated world file:" in event.text else None
                 )
-            )
-        ),
-        RegisterEventHandler(
-            OnProcessIO(
-                target_action=spawn_world,
-                on_stderr=lambda event: (
-                    action for action in [
-                        LogInfo(msg="Gazebo process started."),
-                        gz_ros_bridge_camera,
-                        gz_ros_bridge_camera_info,
-                        scoring
-                    ] if action is not None
-                ) if b"INFO  [init] Gazebo world is ready" in event.text else None,
-            )
-        ),
-        RegisterEventHandler(
-            OnProcessStart(
-                target_action=gz_ros_bridge_camera,
-                on_start=LogInfo(msg="Bridge camera topic started.")
-            )
-        ),
-        RegisterEventHandler(
-            OnProcessStart(
-                target_action=gz_ros_bridge_camera_info,
-                on_start=LogInfo(msg="Bridge camera info topic started.")
             )
         )
     ]
@@ -320,7 +255,6 @@ def launch_setup(context, *args, **kwargs):
 def generate_launch_description():
     return LaunchDescription(
         [
-            DeclareLaunchArgument("model", default_value="gz_x500_mono_cam"),
             DeclareLaunchArgument("px4_path", default_value="~/PX4-Autopilot"),
             OpaqueFunction(function=launch_setup),
         ]

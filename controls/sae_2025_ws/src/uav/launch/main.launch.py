@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 import os
 import re
-
+import platform
 from launch import LaunchDescription
-from launch.actions import ExecuteProcess, LogInfo, TimerAction, OpaqueFunction, RegisterEventHandler, DeclareLaunchArgument
-from launch.event_handlers import OnProcessExit, OnProcessIO
+from launch.actions import ExecuteProcess, LogInfo, OpaqueFunction, RegisterEventHandler, DeclareLaunchArgument
+from launch.event_handlers import OnProcessIO, OnProcessStart
 from launch.events.process import ProcessIO
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
@@ -91,6 +91,47 @@ def launch_setup(context, *args, **kwargs):
     else:
         raise ValueError(f"Invalid vehicle type: {vehicle_type}")
 
+    
+    topic_model_name = model[3:]  # remove 'gz_' prefix
+
+    arch = platform.machine().lower()
+    if arch in ("x86_64", "amd64", "i386", "i686"):
+        platform_type = "x86"
+    elif arch in ("arm64", "aarch64", "armv7l", "arm"):
+        platform_type = "arm"
+    else:
+        raise ValueError(f"Unknown architecture: {arch}")
+
+    camera_topic_name = (
+        "imager" if platform_type == "x86" else "camera"
+    )  # windows -> 'imager'   mac -> 'camera'
+    GZ_CAMERA_TOPIC = f"/world/custom/model/{topic_model_name}_0/link/camera_link/sensor/{camera_topic_name}/image"
+    GZ_CAMERA_INFO_TOPIC = f"/world/custom/model/{topic_model_name}_0/link/camera_link/sensor/{camera_topic_name}/camera_info"
+
+    sae_ws_path = os.path.expanduser(os.getcwd())
+    
+    gz_ros_bridge_camera = Node(
+        package="ros_gz_bridge",
+        executable="parameter_bridge",
+        arguments=[f"{GZ_CAMERA_TOPIC}@sensor_msgs/msg/Image[gz.msgs.Image"],
+        remappings=[(GZ_CAMERA_TOPIC, "/camera")],
+        output="screen",
+        name="gz_ros_bridge_camera",
+        cwd=sae_ws_path,
+    )
+
+    gz_ros_bridge_camera_info = Node(
+        package="ros_gz_bridge",
+        executable="parameter_bridge",
+        arguments=[
+            f"{GZ_CAMERA_INFO_TOPIC}@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo"
+        ],
+        remappings=[(GZ_CAMERA_INFO_TOPIC, "/camera_info")],
+        output="screen",
+        name="gz_ros_bridge_camera_info",
+        cwd=sae_ws_path,
+    )
+
     camera_offsets_str = ','.join(str(offset) for offset in camera_offsets)
     mission_cmd = ['ros2', 'run', 'uav', 'mission', uav_debug, YAML_PATH, servo_only, camera_offsets_str, ','.join(vision_nodes)]
     mission = ExecuteProcess(
@@ -128,7 +169,6 @@ def launch_setup(context, *args, **kwargs):
 
         # Prepare sim launch arguments with all simulation parameters
         sim_launch_args = {
-            'model': model,
             'px4_path': px4_path,
         }
         
@@ -153,8 +193,28 @@ def launch_setup(context, *args, **kwargs):
             sim,
             RegisterEventHandler(
                     OnProcessIO(on_stderr=lambda event: (
-                        [LogInfo(msg="Gazebo process started.."), px4_sitl, *vision_node_actions, middleware] if b"Successfully generated world file:" in event.text else None
+                        [LogInfo(msg="Gazebo process started."), px4_sitl, *vision_node_actions, middleware] if b"Successfully generated world file:" in event.text else None
                     )
+                )
+            ),
+            RegisterEventHandler(
+                OnProcessIO(
+                    target_action=px4_sitl,
+                    on_stdout=lambda event: (
+                        [LogInfo(msg="PX4 SITL started."), gz_ros_bridge_camera, gz_ros_bridge_camera_info] if b"INFO  [init] Spawning model" in event.text else None
+                    )
+                )
+            ),
+            RegisterEventHandler(
+                OnProcessStart(
+                    target_action=gz_ros_bridge_camera,
+                    on_start=LogInfo(msg="Bridge camera topic started.")
+                )
+            ),
+            RegisterEventHandler(
+                OnProcessStart(
+                    target_action=gz_ros_bridge_camera_info,
+                    on_start=LogInfo(msg="Bridge camera info topic started.")
                 )
             ),
             RegisterEventHandler(
