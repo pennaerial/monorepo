@@ -54,6 +54,11 @@ class UAV:
 
         self.camera_offsets = camera_offsets
         
+        # Initialize VTOL state tracking (only used for VTOL vehicles)
+        self.is_vtol = False  # Set from VehicleStatus message
+        self.vehicle_type = None  # For VTOL: 'MC' or 'FW' from VtolVehicleStatus; None for non-VTOL
+        self.vtol_vehicle_status = None
+        
         # Set up Subscribers/Publishers to communicate with aircraft
         self._initialize_publishers_and_subscribers()
 
@@ -156,6 +161,9 @@ class UAV:
             vtol_state (str): The desired VTOL state ('MC' or 'FW').
             immediate (bool): If True, the transition should be immediate.
         """
+        if not self.is_vtol:
+            self.node.get_logger().warn("vtol_transition_to called on non-VTOL vehicle. Ignoring.")
+            return
         assert vtol_state in ['MC', 'FW'], "VTOL state must be 'MC' or 'FW'."
         state = VtolVehicleStatus.VEHICLE_VTOL_STATE_MC if vtol_state == 'MC' else VtolVehicleStatus.VEHICLE_VTOL_STATE_FW
         immediate = 1 if immediate else 0
@@ -185,6 +193,7 @@ class UAV:
             x += self.local_position.x
             y += self.local_position.y
             z += self.local_position.z
+        
         msg = TrajectorySetpoint()
         msg.position = [float(x), float(y), float(z)]
         msg.yaw = self.calculate_yaw(x, y) if calculate_yaw else yaw if yaw else float(self.yaw)
@@ -399,8 +408,6 @@ class UAV:
         self.is_vtol = msg.is_vtol
         self.system_id = msg.system_id
         self.component_id = msg.component_id
-        if msg.is_vtol:
-            self.vehicle_type = 'MC' if msg.vehicle_type == 0 else 'FW'
         self.failsafe = self.failsafe_px4 or self.failsafe_trigger
         if self.DEBUG:
             self.node.get_logger().info(f"Nav State: {self.nav_state}, Arm State: {self.arm_state}, Failsafe: {self.failsafe_px4}, Flight Check: {self.flight_check}")
@@ -441,6 +448,34 @@ class UAV:
             self.node.get_logger().info(f"Local start position: {self.local_origin}")
             self.node.get_logger().info(f"GPS start position: {self.GPS_origin}")
         self.local_position = msg
+
+    def _vtol_vehicle_status_callback(self, msg: VtolVehicleStatus):
+        """
+        Callback for VTOL vehicle status updates.
+        Updates vehicle_type based on the actual VTOL state.
+        Only processes messages if the vehicle is VTOL-capable.
+        """
+        # Only process VTOL status if this is a VTOL vehicle
+        # (is_vtol is set from VehicleStatus callback)
+        if not self.is_vtol:
+            return
+        
+        self.vtol_vehicle_status = msg
+        if msg.vehicle_vtol_state == VtolVehicleStatus.VEHICLE_VTOL_STATE_MC:
+            self.vehicle_type = 'MC'
+        elif msg.vehicle_vtol_state == VtolVehicleStatus.VEHICLE_VTOL_STATE_FW:
+            self.vehicle_type = 'FW'
+        # During transitions, maintain the current state (don't change vehicle_type)
+        # VEHICLE_VTOL_STATE_TRANSITION_TO_FW = 1 (still in MC mode)
+        # VEHICLE_VTOL_STATE_TRANSITION_TO_MC = 2 (still in FW mode)
+        elif msg.vehicle_vtol_state == VtolVehicleStatus.VEHICLE_VTOL_STATE_TRANSITION_TO_FW:
+            # Transitioning to FW, but still in MC mode
+            if self.vehicle_type is None:
+                self.vehicle_type = 'MC'
+        elif msg.vehicle_vtol_state == VtolVehicleStatus.VEHICLE_VTOL_STATE_TRANSITION_TO_MC:
+            # Transitioning to MC, but still in FW mode
+            if self.vehicle_type is None:
+                self.vehicle_type = 'FW'
 
     def _initialize_publishers_and_subscribers(self):
         """
@@ -509,6 +544,15 @@ class UAV:
             Bool, 
             '/failsafe_trigger', 
             self._failsafe_callback, 
+            qos_profile
+        )
+        
+        # Subscribe to VTOL vehicle status for proper VTOL state tracking
+        # (Subscription is created for all vehicles, but callback only processes if is_vtol is True)
+        self.vtol_vehicle_status_sub = self.node.create_subscription(
+            VtolVehicleStatus,
+            '/fmu/out/vtol_vehicle_status',
+            self._vtol_vehicle_status_callback,
             qos_profile
         )
 

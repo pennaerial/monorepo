@@ -179,7 +179,8 @@ def launch_setup(context, *args, **kwargs):
     download_gz_models = ExecuteProcess(
         cmd=[
             "python3",
-            "Tools/simulation/gz/simulation-gazebo --dryrun",
+            "Tools/simulation/gz/simulation-gazebo",
+            "--dryrun",
         ],
         cwd=px4_path,
         output="screen",

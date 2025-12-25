@@ -89,6 +89,9 @@ def launch_setup(context, *args, **kwargs):
     elif vehicle_type == 'standard_vtol':
         autostart = 4004
         model = 'gz_standard_vtol'
+    elif vehicle_type == 'quadtailsitter':
+        autostart = 4018
+        model = 'gz_quadtailsitter'
     else:
         raise ValueError(f"Invalid vehicle type: {vehicle_type}")
 
