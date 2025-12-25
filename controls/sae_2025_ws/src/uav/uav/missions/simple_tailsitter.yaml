@@ -23,7 +23,7 @@ transition_to_fw:
 fly_straight:
   class: uav.autonomous_modes.NavGPSMode
   params:
-    coordinates: '[((5, 0, -10), 0, "LOCAL")]'
+    coordinates: '[((500, -500, -50), 0, "LOCAL")]'
     margin: "3.0"
   transitions:
     complete: transition_to_mc

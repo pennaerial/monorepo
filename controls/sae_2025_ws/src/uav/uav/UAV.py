@@ -51,6 +51,7 @@ class UAV:
         self.component_id = 1
         
         self.max_acceleration = 0.01
+        self.default_velocity = 5.0  # Default velocity in m/s for trajectory setpoints
 
         self.camera_offsets = camera_offsets
         
@@ -179,7 +180,7 @@ class UAV:
     def disable_servo(self):
         self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_DO_SET_ACTUATOR, params={'param1': 0.0})
     
-    def publish_position_setpoint(self, coordinate, yaw=None, calculate_yaw=False, relative=False):
+    def publish_position_setpoint(self, coordinate, yaw=None, calculate_yaw=False, relative=False, velocity_override=None):
         """Publish the trajectory setpoint.
         
         Args:
@@ -187,6 +188,7 @@ class UAV:
             yaw (float): Yaw angle in radians (optional).
             calculate_yaw (bool): Calculate yaw angle based on the next waypoint.
             relative (bool): If True, the position is relative to the current local position.
+            velocity_override (tuple): Optional (vx, vy, vz) to override velocity calculation.
         """
         x, y, z = coordinate
         if relative:
@@ -196,12 +198,79 @@ class UAV:
         
         msg = TrajectorySetpoint()
         msg.position = [float(x), float(y), float(z)]
-        msg.yaw = self.calculate_yaw(x, y) if calculate_yaw else yaw if yaw else float(self.yaw)
         msg.timestamp = int(self.node.get_clock().now().nanoseconds / 1000)
-        norm_dir = np.array([x, y, z]) / np.linalg.norm(np.array([x, y, z]))
-        msg.velocity = [norm_dir[0] * self.max_acceleration, norm_dir[1] * self.max_acceleration, norm_dir[2] * self.max_acceleration]
+        
+        # Calculate yaw to point toward target (important for fixed-wing navigation)
+        if self.local_position:
+            # Always calculate yaw toward target unless explicitly overridden
+            if yaw is not None:
+                msg.yaw = float(yaw)
+            else:
+                msg.yaw = float(self.calculate_yaw(x, y))
+        else:
+            msg.yaw = float(self.yaw) if self.yaw else 0.0
+        
+        # Calculate velocity from current position to target position
+        if velocity_override is not None:
+            # Use provided velocity override
+            msg.velocity = [float(velocity_override[0]), float(velocity_override[1]), float(velocity_override[2])]
+        elif self.local_position:
+            dx = x - self.local_position.x
+            dy = y - self.local_position.y
+            dz = z - self.local_position.z
+            dist = np.sqrt(dx**2 + dy**2 + dz**2)
+            
+            # For fixed-wing mode, always maintain forward velocity (critical for lift)
+            is_fw_mode = self.is_vtol and self.vehicle_type == 'FW'
+            
+            if dist > 0.1:  # Normal case: target is far enough away
+                norm_dir = np.array([dx, dy, dz]) / dist
+                msg.velocity = [float(norm_dir[0] * self.default_velocity), 
+                               float(norm_dir[1] * self.default_velocity), 
+                               float(norm_dir[2] * self.default_velocity)]
+            elif is_fw_mode:
+                # Fixed-wing: maintain forward velocity even if target is close
+                # Use current yaw direction to maintain forward flight
+                if self.yaw is not None:
+                    msg.velocity = [float(np.cos(self.yaw) * self.default_velocity),
+                                   float(np.sin(self.yaw) * self.default_velocity),
+                                   0.0]  # Maintain altitude
+                else:
+                    # Fallback: use direction to target even if close
+                    if dist > 0.01:  # Avoid division by zero
+                        norm_dir = np.array([dx, dy, dz]) / dist
+                        msg.velocity = [float(norm_dir[0] * self.default_velocity), 
+                                       float(norm_dir[1] * self.default_velocity), 
+                                       float(norm_dir[2] * self.default_velocity)]
+                    else:
+                        # Last resort: forward in x direction
+                        msg.velocity = [float(self.default_velocity), 0.0, 0.0]
+            else:
+                # Multicopter: can hover (zero velocity is OK)
+                msg.velocity = [0.0, 0.0, 0.0]
+        else:
+            # Fallback if no local position available (shouldn't happen in normal operation)
+            norm_dir = np.array([x, y, z])
+            norm = np.linalg.norm(norm_dir)
+            if norm > 0.1:
+                norm_dir = norm_dir / norm
+                msg.velocity = [float(norm_dir[0] * self.default_velocity), 
+                               float(norm_dir[1] * self.default_velocity), 
+                               float(norm_dir[2] * self.default_velocity)]
+            else:
+                # Check if FW mode to maintain forward velocity
+                is_fw_mode = self.is_vtol and self.vehicle_type == 'FW'
+                if is_fw_mode and self.yaw is not None:
+                    msg.velocity = [float(np.cos(self.yaw) * self.default_velocity),
+                                   float(np.sin(self.yaw) * self.default_velocity),
+                                   0.0]
+                else:
+                    msg.velocity = [0.0, 0.0, 0.0]
+        
         self.trajectory_publisher.publish(msg)
-        self.node.get_logger().info(f"Publishing setpoint: pos={[x, y, z]}, yaw={msg.yaw:.2f}")
+        # Log with 2 decimal places for concise output
+        vel_str = f"[{msg.velocity[0]:.2f}, {msg.velocity[1]:.2f}, {msg.velocity[2]:.2f}]"
+        self.node.get_logger().info(f"Setpoint: pos=({x:.2f}, {y:.2f}, {z:.2f}), yaw={msg.yaw:.2f}, vel={vel_str}")
         
     def calculate_yaw(self, x: float, y: float) -> float:
         """Calculate the yaw angle to point towards the next waypoint."""
@@ -217,7 +286,7 @@ class UAV:
         """Publish the offboard control mode."""
         msg = OffboardControlMode()
         msg.position = True
-        msg.velocity = False
+        msg.velocity = True  # Enable velocity control for trajectory setpoints
         msg.acceleration = False
         msg.attitude = False
         msg.body_rate = False
@@ -277,31 +346,31 @@ class UAV:
         return (x, y, z)
     
     def uav_to_local(self, point, relative=False):
-            """
-            Converts a point in the UAV's local frame to the global frame.
-            
-            :param point: A tuple (point_x, point_y, point_z) in the UAV's local frame.
-            :param relative: If True, the point is relative to the current local position.
-            :return: A tuple (goal_x, goal_y, goal_z) representing the point in the global frame.
-            """
-            current_pos = self.get_local_position()
-            point_x, point_y, point_z = point
+        """
+        Converts a point in the UAV's local frame to the global frame.
+        
+        :param point: A tuple (point_x, point_y, point_z) in the UAV's local frame.
+        :param relative: If True, the point is relative to the current local position.
+        :return: A tuple (goal_x, goal_y, goal_z) representing the point in the global frame.
+        """
+        current_pos = self.get_local_position()
+        point_x, point_y, point_z = point
 
-            # Rotate the x and y points according to the UAV's yaw angle.
-            rotated_point_x = point_x * math.cos(self.yaw) - point_y * math.sin(self.yaw)
-            rotated_point_y = point_x * math.sin(self.yaw) + point_y * math.cos(self.yaw)
+        # Rotate the x and y points according to the UAV's yaw angle.
+        rotated_point_x = point_x * math.cos(self.yaw) - point_y * math.sin(self.yaw)
+        rotated_point_y = point_x * math.sin(self.yaw) + point_y * math.cos(self.yaw)
 
-            # The z-point remains unchanged.
-            if relative:
-                point = (
-                    current_pos[0] + rotated_point_x,
-                    current_pos[1] + rotated_point_y,
-                    current_pos[2] + point_z
-                )
-            else:
-                point = (rotated_point_x, rotated_point_y, point_z)
+        # The z-point remains unchanged.
+        if relative:
+            point = (
+                current_pos[0] + rotated_point_x,
+                current_pos[1] + rotated_point_y,
+                current_pos[2] + point_z
+            )
+        else:
+            point = (rotated_point_x, rotated_point_y, point_z)
 
-            return point
+        return point
     
     def local_to_gps(self, local_pos):
         """
@@ -445,8 +514,8 @@ class UAV:
         if not self.local_origin:
             self.local_origin = (msg.x, msg.y, msg.z)
             self.GPS_origin = (msg.ref_lat, msg.ref_lon, msg.ref_alt)
-            self.node.get_logger().info(f"Local start position: {self.local_origin}")
-            self.node.get_logger().info(f"GPS start position: {self.GPS_origin}")
+            self.node.get_logger().info(f"ORIGIN SET - Local: ({msg.x:.2f}, {msg.y:.2f}, {msg.z:.2f}) | "
+                                       f"GPS: lat={msg.ref_lat:.6f}, lon={msg.ref_lon:.6f}, alt={msg.ref_alt:.2f}m")
         self.local_position = msg
 
     def _vtol_vehicle_status_callback(self, msg: VtolVehicleStatus):
