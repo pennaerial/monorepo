@@ -35,11 +35,21 @@ class NavGPSMode(Mode):
         dist = 0
         if self.index != -1:
             dist = self.uav.distance_to_waypoint(self.coordinate_system, self.goal)
-            self.log(f"Distance to waypoint: {dist}, current position: {self.uav.get_local_position()}")
+            curr_pos = self.uav.get_local_position()
+            curr_gps = self.uav.get_gps()
             
-        if dist >= self.margin:
-            self.uav.publish_position_setpoint(self.target) # PX4 expects stream of setpoints
-        elif self.goal is None or dist < self.margin:
+            # Log with 2 decimal places for concise output
+            if curr_pos:
+                self.log(f"Dist: {dist:.2f}m | Curr LOCAL: ({curr_pos[0]:.2f}, {curr_pos[1]:.2f}, {curr_pos[2]:.2f}) | "
+                        f"Target {self.coordinate_system}: {self.goal} | Target LOCAL: ({self.target[0]:.2f}, {self.target[1]:.2f}, {self.target[2]:.2f})")
+            if curr_gps:
+                self.log(f"GPS: lat={curr_gps[0]:.2f}, lon={curr_gps[1]:.2f}, alt={curr_gps[2]:.2f}m")
+        
+        # Always publish setpoints to maintain offboard connection (PX4 requires continuous stream)
+        if self.target is not None:
+            self.uav.publish_position_setpoint(self.target)
+            
+        if self.goal is None or dist < self.margin:
             if self.index == -1 or self.wait_time <= 0:
                 self.index += 1
                 if self.index >= len(self.coordinates):
@@ -47,10 +57,10 @@ class NavGPSMode(Mode):
                     return
                 self.goal, self.wait_time, self.coordinate_system = self.coordinates[self.index]
                 self.target = self.get_local_target()
-                self.uav.publish_position_setpoint(self.target)
+                self.log(f"New waypoint: {self.coordinate_system} {self.goal} -> LOCAL target: ({self.target[0]:.2f}, {self.target[1]:.2f}, {self.target[2]:.2f})")
             else:
                 self.wait_time -= time_delta
-                self.log(f"Holding - waiting for {self.wait_time} more seconds")
+                self.log(f"Holding - waiting {self.wait_time:.2f}s")
 
     def get_local_target(self) -> tuple[float, float, float]:
         """
@@ -60,9 +70,15 @@ class NavGPSMode(Mode):
             tuple[float, float, float]: The local target of the UAV.
         """
         if self.coordinate_system == "GPS":
-            return self.uav.gps_to_local(self.goal)
+            local_target = self.uav.gps_to_local(self.goal)
+            self.log(f"GPS {self.goal} -> LOCAL {local_target}")
+            return local_target
         elif self.coordinate_system == "LOCAL":
-            return tuple(float(x) for x in self.goal)
+            # LOCAL coordinates are already in NED frame relative to origin
+            local_target = tuple(float(x) for x in self.goal)
+            if self.uav.local_origin:
+                self.log(f"LOCAL waypoint {self.goal} -> LOCAL target {local_target} (origin: {self.uav.local_origin})")
+            return local_target
         else: 
             raise ValueError(f"Invalid coordinate system {self.coordinate_system}")
 
