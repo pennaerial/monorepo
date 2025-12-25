@@ -23,6 +23,10 @@ class NavGPSMode(Mode):
         self.goal = None
         self.margin = margin
         self.index = -1
+        self.coordinate_system = None
+        self.target = None
+        self.wait_time = 0.0
+        self._last_log_time = 0.0
 
     def on_update(self, time_delta: float) -> None:
         """
@@ -39,6 +43,7 @@ class NavGPSMode(Mode):
             if self.index == -1 or self.wait_time <= 0:
                 self.index += 1
                 if self.index >= len(self.coordinates):
+                    self.log("All waypoints completed")
                     return
                 self.goal, self.wait_time, self.coordinate_system = self.coordinates[self.index]
                 self.target = self.get_local_target()

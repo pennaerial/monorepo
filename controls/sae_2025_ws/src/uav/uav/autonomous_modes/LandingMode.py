@@ -32,7 +32,8 @@ class LandingMode(Mode):
         Returns:
             str: The status of the mode.
         """
-        if self.uav.vehicle_status == VehicleStatus.NAVIGATION_STATE_AUTO_LAND:
+
+        if self.uav.nav_state == VehicleStatus.NAVIGATION_STATE_AUTO_LAND:
             return "continue"
         else:
             return "terminate"

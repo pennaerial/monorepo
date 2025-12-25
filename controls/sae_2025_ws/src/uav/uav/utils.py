@@ -9,7 +9,7 @@ pink = ((140, 120, 120), (175, 255, 255))
 green = ((30, 110, 20), (40, 255, 255))
 blue = ((85, 120, 60), (140, 255, 255))
 yellow = ((10, 100, 100), (30, 255, 255))
-vehicle_map = ['quadcopter', 'tiltrotor_vtol', 'fixed_wing', 'standard_vtol']
+vehicle_map = ['quadcopter', 'tiltrotor_vtol', 'fixed_wing', 'standard_vtol', 'quadtailsitter']
 
 def camel_to_snake(name):
     # Convert CamelCase to snake_case.
