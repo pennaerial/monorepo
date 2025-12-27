@@ -71,13 +71,18 @@ class TemuNavMode(Mode):
             scaling_factor_x = -0.3
             scaling_factor_y = -0.3
 
-            point = (
-                self.x * scaling_factor_x,  # X 
+            x = self.x * scaling_factor_x
+            x = max(x, 0.1) if x >= 0 else max(x, -0.1)
+            z = self.y * scaling_factor_y
+            z = max(z, 0.1) if z >= 0 else max(z, -0.1)
+            #TODO: USE IF STATEMENTS            
+            velocity = (
+                x,
                 0.0, # Y 
-                self.y * scaling_factor_y  # Z 
+                z
             )
             # self.uav.publish_position_setpoint(point, relative=True)
-            self.uav.publish_velocity(point, yaw=math.pi/2)
+            self.uav.publish_velocity(velocity, yaw=math.pi/2)
         
             # check for switching conditions
             # thresh = np.clip(self.z / 100, 0.01, 0.05)
