@@ -268,9 +268,6 @@ class UAV:
                     msg.velocity = [0.0, 0.0, 0.0]
         
         self.trajectory_publisher.publish(msg)
-        # Log with 2 decimal places for concise output
-        vel_str = f"[{msg.velocity[0]:.2f}, {msg.velocity[1]:.2f}, {msg.velocity[2]:.2f}]"
-        self.node.get_logger().info(f"Setpoint: pos=({x:.2f}, {y:.2f}, {z:.2f}), yaw={msg.yaw:.2f}, vel={vel_str}")
         
     def calculate_yaw(self, x: float, y: float) -> float:
         """Calculate the yaw angle to point towards the next waypoint."""

@@ -1,9 +1,9 @@
 # launch_params.yaml
-mission_name: simple_tailsitter
+mission_name: basic_waypoints
 uav_debug: false
 vision_debug: false
 run_mission: true
-vehicle_type: 4 # 0 for quadrotor, 1 for tiltrotor VTOL, 2 for fixed-wing, 3 for standard VTOL, 4 for quadtailsitter
+vehicle_type: 0 # 0 for quadrotor, 1 for tiltrotor VTOL, 2 for fixed-wing, 3 for standard VTOL, 4 for quadtailsitter
 save_vision: false
 servo_only: false
 camera_offsets: [0, 0, 0] #Should denote the position of the camera relative to the payload mechanism, in meters
