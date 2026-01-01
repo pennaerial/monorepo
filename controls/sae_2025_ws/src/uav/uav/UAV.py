@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 from rclpy.node import Node
 from px4_msgs.msg import (
     OffboardControlMode,
@@ -23,9 +24,10 @@ from std_msgs.msg import Bool
 from uav.px4_modes import PX4CustomMainMode, PX4CustomSubModeAuto
 from uav.utils import R_earth
 
-class UAV:
+class UAV(ABC):
     """
-    Skeleton class for UAV control and interfacing with PX4 via ROS 2.
+    Abstract base class for UAV control and interfacing with PX4 via ROS 2.
+    Subclasses: VTOL, Multicopter
     """
 
     def __init__(self, node: Node, takeoff_amount=5.0, DEBUG=False, camera_offsets=[0, 0, 0]):
@@ -53,12 +55,7 @@ class UAV:
         self.default_velocity = 5.0  # Default velocity in m/s for trajectory setpoints
 
         self.camera_offsets = camera_offsets
-        
-        # Initialize VTOL state tracking (only used for VTOL vehicles)
-        self.is_vtol = False  # Set from VehicleStatus message
-        self.vehicle_type = None  # For VTOL: 'MC' or 'FW' from VtolVehicleStatus; None for non-VTOL
-        self.vtol_vehicle_status = None
-        
+
         # Set up Subscribers/Publishers to communicate with aircraft
         self._initialize_publishers_and_subscribers()
 
@@ -154,24 +151,6 @@ class UAV:
         self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_NAV_LAND)
         self.node.get_logger().info("Landing command sent.")
 
-    def vtol_transition_to(self, vtol_state, immediate=False):
-        """
-        Command a VTOL transition. 
-        Following https://mavlink.io/en/messages/common.html#MAV_CMD_DO_VTOL_TRANSITION
-
-        Args:
-            vtol_state (str): The desired VTOL state ('MC' or 'FW').
-            immediate (bool): If True, the transition should be immediate.
-        """
-        if not self.is_vtol:
-            self.node.get_logger().warn("vtol_transition_to called on non-VTOL vehicle. Ignoring.")
-            return
-        assert vtol_state in ['MC', 'FW'], "VTOL state must be 'MC' or 'FW'."
-        state = VtolVehicleStatus.VEHICLE_VTOL_STATE_MC if vtol_state == 'MC' else VtolVehicleStatus.VEHICLE_VTOL_STATE_FW
-        immediate = 1 if immediate else 0
-        self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_DO_VTOL_TRANSITION, params={'param1': float(state), 'param2': float(immediate)})
-        self.node.get_logger().info(f"VTOL transition command sent: {state}. Transitioning to {vtol_state} mode.")
-
     def drop_payload(self):
         self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_DO_SET_ACTUATOR, params={'param1': -1.0})
 
@@ -204,44 +183,10 @@ class UAV:
             msg.yaw = float(self.yaw)
         else:
             msg.yaw = float(self.calculate_yaw(x, y))
-        
-        # Calculate velocity from current position to target position
-        is_fw_mode = self.is_vtol and self.vehicle_type == 'FW'
 
-        if self.local_position:
-            # Normal case: calculate velocity based on distance to target
-            dx = x - self.local_position.x
-            dy = y - self.local_position.y
-            dz = z - self.local_position.z
-            dist = np.sqrt(dx**2 + dy**2 + dz**2)
+        # Delegate velocity calculation to subclass (VTOL or Multicopter)
+        msg.velocity = self._calculate_velocity((x, y, z), lock_yaw)
 
-            if is_fw_mode:
-                # Fixed-wing: always maintain forward velocity (critical for lift)
-                msg.velocity = self._get_fw_forward_velocity()
-            elif dist > 0.01:
-                # Multicopter: use proportional control to prevent oscillation
-                direction = np.array([dx, dy, dz]) / dist
-                msg.velocity = self._calculate_proportional_velocity(direction, dist)
-            else:
-                # At target: hover
-                msg.velocity = [0.0, 0.0, 0.0]
-        else:
-            # Fallback: no local position yet (e.g., during startup)
-            # Use absolute target position as direction estimate
-            direction_est = np.array([x, y, z])
-            dist_est = np.linalg.norm(direction_est)
-
-            if is_fw_mode:
-                # FW mode: maintain forward velocity
-                msg.velocity = self._get_fw_forward_velocity()
-            elif dist_est > 0.01:
-                # MC mode: use proportional control with estimated distance
-                direction = direction_est / dist_est
-                msg.velocity = self._calculate_proportional_velocity(direction, dist_est)
-            else:
-                # At origin: hover
-                msg.velocity = [0.0, 0.0, 0.0]
-        
         self.trajectory_publisher.publish(msg)
         
     def calculate_yaw(self, x: float, y: float) -> float:
@@ -262,51 +207,20 @@ class UAV:
         yaw = np.arctan2(dy, dx)
         return yaw
 
-    def _get_fw_forward_velocity(self):
+    @abstractmethod
+    def _calculate_velocity(self, target_pos: tuple, lock_yaw: bool) -> list:
         """
-        Get forward velocity vector for FW mode to maintain lift.
-
-        Returns:
-            list: [vx, vy, vz] velocity vector in m/s
-        """
-        if self.yaw is not None:
-            return [float(np.cos(self.yaw) * self.default_velocity),
-                    float(np.sin(self.yaw) * self.default_velocity),
-                    0.0]
-        # Last resort: forward in X direction
-        self.node.get_logger().warn("FW mode: Using fallback velocity (X-axis forward) - yaw not available")
-        return [float(self.default_velocity), 0.0, 0.0]
-
-    def _calculate_proportional_velocity(self, direction: np.ndarray, distance: float):
-        """
-        Calculate velocity using proportional control to prevent oscillation.
-        Velocity smoothly decreases as distance to target decreases.
+        Calculate velocity vector for trajectory setpoint.
+        Must be implemented by subclasses (VTOL, Multicopter).
 
         Args:
-            direction (np.ndarray): Unit direction vector [dx, dy, dz]
-            distance (float): Distance to target in meters
+            target_pos: (x, y, z) target position in local frame
+            lock_yaw: Whether yaw is locked (hovering)
 
         Returns:
-            list: [vx, vy, vz] velocity vector in m/s
+            [vx, vy, vz] velocity list in m/s
         """
-        # Proportional control with lenient thresholds to reduce oscillation
-        # Full speed above 10m, proportional between 10m-2m, slow below 2m
-        if distance > 10.0:
-            target_speed = self.default_velocity
-        elif distance > 2.0:
-            # Smooth deceleration from 10m to 2m
-            # At 10m: 5 m/s, at 2m: 1 m/s
-            target_speed = max(1.0, self.default_velocity * (distance / 10.0))
-        elif distance > 0.1:
-            # Close to target: gentle approach to prevent overshoot
-            target_speed = 0.8
-        else:
-            # Very close: hover
-            return [0.0, 0.0, 0.0]
-
-        return [float(direction[0] * target_speed),
-                float(direction[1] * target_speed),
-                float(direction[2] * target_speed)]
+        pass
 
     def publish_offboard_control_heartbeat_signal(self):
         """Publish the offboard control mode."""
@@ -507,7 +421,6 @@ class UAV:
         self.arm_state = msg.arming_state
         self.failsafe_px4 = msg.failsafe
         self.flight_check = msg.pre_flight_checks_pass
-        self.is_vtol = msg.is_vtol
         self.system_id = msg.system_id
         self.component_id = msg.component_id
         self.failsafe = self.failsafe_px4 or self.failsafe_trigger
@@ -548,34 +461,6 @@ class UAV:
             self.gps_origin = (msg.ref_lat, msg.ref_lon, msg.ref_alt)
             self.node.get_logger().info(f"ORIGIN SET - GPS: lat={msg.ref_lat:.6f}, lon={msg.ref_lon:.6f}, alt={msg.ref_alt:.2f}m")
         self.local_position = msg
-
-    def _vtol_vehicle_status_callback(self, msg: VtolVehicleStatus):
-        """
-        Callback for VTOL vehicle status updates.
-        Updates vehicle_type based on the actual VTOL state.
-        Only processes messages if the vehicle is VTOL-capable.
-        """
-        # Only process VTOL status if this is a VTOL vehicle
-        # (is_vtol is set from VehicleStatus callback)
-        if not self.is_vtol:
-            return
-        
-        self.vtol_vehicle_status = msg
-        if msg.vehicle_vtol_state == VtolVehicleStatus.VEHICLE_VTOL_STATE_MC:
-            self.vehicle_type = 'MC'
-        elif msg.vehicle_vtol_state == VtolVehicleStatus.VEHICLE_VTOL_STATE_FW:
-            self.vehicle_type = 'FW'
-        # During transitions, maintain the current state (don't change vehicle_type)
-        # VEHICLE_VTOL_STATE_TRANSITION_TO_FW = 1 (still in MC mode)
-        # VEHICLE_VTOL_STATE_TRANSITION_TO_MC = 2 (still in FW mode)
-        elif msg.vehicle_vtol_state == VtolVehicleStatus.VEHICLE_VTOL_STATE_TRANSITION_TO_FW:
-            # Transitioning to FW, but still in MC mode
-            if self.vehicle_type is None:
-                self.vehicle_type = 'MC'
-        elif msg.vehicle_vtol_state == VtolVehicleStatus.VEHICLE_VTOL_STATE_TRANSITION_TO_MC:
-            # Transitioning to MC, but still in FW mode
-            if self.vehicle_type is None:
-                self.vehicle_type = 'FW'
 
     def _initialize_publishers_and_subscribers(self):
         """
@@ -641,72 +526,9 @@ class UAV:
         )
         
         self.failsafe_trigger_subscriber = self.node.create_subscription(
-            Bool, 
-            '/failsafe_trigger', 
-            self._failsafe_callback, 
+            Bool,
+            '/failsafe_trigger',
+            self._failsafe_callback,
             qos_profile
         )
         
-        # Subscribe to VTOL vehicle status for proper VTOL state tracking
-        # (Subscription is created for all vehicles, but callback only processes if is_vtol is True)
-        self.vtol_vehicle_status_sub = self.node.create_subscription(
-            VtolVehicleStatus,
-            '/fmu/out/vtol_vehicle_status',
-            self._vtol_vehicle_status_callback,
-            qos_profile
-        )
-
-    # def set_velocity(self, vx: float, vy: float, vz: float, yaw_rate: float):
-    #     """
-    #     Set velocity commands for offboard control (local frame).
-    #     Only valid if the vehicle is in OFFBOARD mode.
-    #     """
-    #     trajectory = TrajectorySetpoint()
-    #     trajectory.timestamp = int(Clock().now().nanoseconds / 1000)
-    #     trajectory.velocity = [vx, vy, vz]
-    #     trajectory.yawspeed = yaw_rate
-    #     # Mark position and acceleration as NaN if you only want to control velocity
-    #     trajectory.position = [float('nan'), float('nan'), float('nan')] 
-    #     trajectory.acceleration = [float('nan')] * 3  
-    #     trajectory.yaw = float('nan') 
-
-    #     self.trajectory_publisher.publish(trajectory)
-    #     self.node.get_logger().debug(
-    #         f"Velocity command sent: vx={vx}, vy={vy}, vz={vz}, yaw_rate={yaw_rate}"
-    #     )
-
-    # def set_target_position(self, pos: tuple[float , float, float]):
-    #     """
-    #     Set the target local position for offboard control.
-    #     Typically used with local-position offboard setpoints (X,Y,Z).
-    #     """
-    #     x, y, z = pos
-    #     position = VehicleLocalPosition()
-    #     position.timestamp = int(Clock().now().nanoseconds / 1000)
-    #     position.x = x
-    #     position.y = y
-    #     position.z = z
-    #     self.target_position_publisher.publish(position)
-    #     self.node.get_logger().debug(f"Target position set: x={x}, y={y}, z={z}")
-
-        # def get_quaternion(self):
-    #     if self.vehicle_attitude:
-    #         return {
-    #             "q": self.vehicle_attitude.q,
-    #             "delta_q": self.vehicle_attitude.delta_q_reset
-    #         }
-    #     else:
-    #         self.node.get_logger().warn("No quaternion data available.")
-    #         return None
-
-    # def get_state(self):
-    #     # Example placeholder; if you want real nav_state or arm_state,
-    #     # retrieve them from self.vehicle_status
-    #     if self.vehicle_status:
-    #         return {
-    #             "nav_state": self.vehicle_status.nav_state,
-    #             "arm_state": self.vehicle_status.arm_state
-    #         }
-    #     else:
-    #         self.node.get_logger().warn("No state data available.")
-    #         return None
