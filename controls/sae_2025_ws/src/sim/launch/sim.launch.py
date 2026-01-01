@@ -45,7 +45,7 @@ def load_sim_launch_parameters():
         installed_params = package_share / 'launch' / 'launch_params.yaml'
         if installed_params.exists():
             return load_yaml_to_dict(installed_params)
-    except Exception:
+    except Exception as e:
         pass
     
     # If not found, raise error

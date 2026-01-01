@@ -2,7 +2,8 @@ start:
   class: uav.autonomous_modes.NavGPSMode
   params:
     coordinates: '[((50, 50, -10), 5, "LOCAL"), 
-                   ((75, -25, -20), 3, "LOCAL")]'
+                   ((75, -25, -20), 3, "LOCAL"),
+                   ((0, 0, -10), 5, "LOCAL")]'
   transitions:
     complete: land
 
