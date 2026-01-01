@@ -1,6 +1,6 @@
 import rclpy
 from rclpy.node import Node
-from uav.UAV import UAV
+from uav import Multicopter
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
 from px4_msgs.msg import (
     OffboardControlMode,
@@ -20,7 +20,7 @@ class OffboardControl(Node):
     def __init__(self) -> None:
         super().__init__('offboard_control_waypoint_navigation')
 
-        self.uav = UAV(self)
+        self.uav = Multicopter(self)
         self.timer = self.create_timer(0.1, self.timer_callback)
         self.mission_completed = False
         self.waypoints = []
