@@ -185,10 +185,21 @@ class ModeManager(Node):
             if not self.uav.origin_set:
                 self.uav.set_origin()
             if self.uav.arm_state != VehicleStatus.ARMING_STATE_ARMED:
+                # Successfully landed - terminate mission
                 if self.active_mode is not None and self.get_active_mode() == LandingMode and self.uav.nav_state != VehicleStatus.NAVIGATION_STATE_AUTO_LAND:
-                    self.get_logger().info(f"Succesfully Landed UAV")
+                    self.get_logger().info(f"Successfully Landed UAV")
                     self.get_logger().info(f"Finishing Mission")
                     self.destroy_node()
+                    return
+
+                # If we attempted takeoff but became disarmed (not during landing), something went wrong
+                # Terminate instead of cycling
+                if self.uav.attempted_takeoff and self.active_mode is not None:
+                    self.get_logger().error(f"UAV disarmed unexpectedly after takeoff attempt. Terminating to prevent infinite cycle.")
+                    self.get_logger().error(f"This usually indicates preflight check failures or PX4 safety triggers.")
+                    self.destroy_node()
+                    return
+
                 self.uav.arm()
                 self.get_logger().info(f"Arming UAV")
                 self.start_time = current_time

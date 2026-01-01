@@ -11,13 +11,14 @@ class TransitionMode(Mode):
         """
         Initialize the Transition Mode
 
-        Args: 
+        Args:
             node (Node): The ROS2 node
             uav (UAV): The UAV object
             to_mode (str): The mode to transition to (MC or FW)
         """
         super().__init__(node, uav)
         self.to_mode = to_mode
+        self.transition_commanded = False  # Track if transition command has been sent
 
     def on_update(self, time_delta: float):
         """
@@ -31,13 +32,17 @@ class TransitionMode(Mode):
             # Still need to publish setpoints to maintain offboard connection
             if self.uav.local_position:
                 self.uav.publish_position_setpoint(
-                    (self.uav.local_position.x, self.uav.local_position.y, self.uav.local_position.z)   
+                    (self.uav.local_position.x, self.uav.local_position.y, self.uav.local_position.z),
+                    lock_yaw=True
                 )
             return
             
         if self.uav.vehicle_type != self.to_mode:
-            self.log(f"Transitioning from {self.uav.vehicle_type} to {self.to_mode}")
-            self.uav.vtol_transition_to(self.to_mode)
+            # Send transition command only once
+            if not self.transition_commanded:
+                self.log(f"Transitioning from {self.uav.vehicle_type} to {self.to_mode}")
+                self.uav.vtol_transition_to(self.to_mode)
+                self.transition_commanded = True
             
             # During transition, publish appropriate setpoints
             if self.uav.local_position:
@@ -55,13 +60,17 @@ class TransitionMode(Mode):
                         self.uav.publish_position_setpoint(target_pos)
                     else:
                         # Fallback: use current position (publish_position_setpoint will handle FW velocity)
+                        # Lock yaw to prevent spinning during transition
                         self.uav.publish_position_setpoint(
-                            (self.uav.local_position.x, self.uav.local_position.y, self.uav.local_position.z)   
+                            (self.uav.local_position.x, self.uav.local_position.y, self.uav.local_position.z),
+                            lock_yaw=True
                         )
                 else:
                     # For FW->MC transition: hover at current position (MC can hover)
+                    # Lock yaw to prevent spinning during transition
                     self.uav.publish_position_setpoint(
-                        (self.uav.local_position.x, self.uav.local_position.y, self.uav.local_position.z)   
+                        (self.uav.local_position.x, self.uav.local_position.y, self.uav.local_position.z),
+                        lock_yaw=True
                     )
         else:
             self.log(f"Already in {self.to_mode} mode")
@@ -78,8 +87,10 @@ class TransitionMode(Mode):
                     self.uav.publish_position_setpoint(target_pos)
                 else:
                     # MC mode or no yaw: maintain current position
+                    # Lock yaw to prevent spinning
                     self.uav.publish_position_setpoint(
-                        (self.uav.local_position.x, self.uav.local_position.y, self.uav.local_position.z)   
+                        (self.uav.local_position.x, self.uav.local_position.y, self.uav.local_position.z),
+                        lock_yaw=True
                     )
     
     def check_status(self):

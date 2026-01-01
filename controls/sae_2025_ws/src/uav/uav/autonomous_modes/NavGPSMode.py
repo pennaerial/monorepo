@@ -35,10 +35,20 @@ class NavGPSMode(Mode):
         dist = 0
         if self.index != -1:
             dist = self.uav.distance_to_waypoint(self.coordinate_system, self.goal)
-        
+
+        # Determine if we're waiting at a waypoint (lock yaw to prevent spinning)
+        at_waypoint = (self.index != -1 and dist < self.margin)
+        waiting = at_waypoint and self.wait_time > 0
+
         # Always publish setpoints to maintain offboard connection (PX4 requires continuous stream)
         if self.target is not None:
-            self.uav.publish_position_setpoint(self.target)
+            self.uav.publish_position_setpoint(self.target, lock_yaw=waiting)
+        elif self.uav.local_position:
+            # Fallback: maintain current position until first waypoint is set
+            self.uav.publish_position_setpoint(
+                (self.uav.local_position.x, self.uav.local_position.y, self.uav.local_position.z),
+                lock_yaw=True
+            )
         
         # Consolidated debug output - single line with all information
         if self.index != -1 and self.target is not None:
@@ -68,7 +78,10 @@ class NavGPSMode(Mode):
                     return
                 self.goal, self.wait_time, self.coordinate_system = self.coordinates[self.index]
                 self.target = self.get_local_target()
+                self.log(f"Moving to waypoint {self.index+1}/{len(self.coordinates)}: {self.goal} (wait time: {self.wait_time}s)")
             else:
+                # Waiting at waypoint
+                self.log(f"Waiting at waypoint {self.index+1}/{len(self.coordinates)} - {self.wait_time:.1f}s remaining")
                 self.wait_time -= time_delta
 
     def get_local_target(self) -> tuple[float, float, float]:
