@@ -184,7 +184,7 @@ def launch_setup(context, *args, **kwargs):
         )
 
         px4_sitl = ExecuteProcess(
-            cmd=['bash', '-c', f'PX4_GZ_STANDALONE=1 PX4_SYS_AUTOSTART={autostart} PX4_SIM_MODEL={model} ./build/px4_sitl_default/bin/px4'],
+            cmd=['bash', '-c', f'sleep 3 && PX4_GZ_STANDALONE=1 PX4_SYS_AUTOSTART={autostart} PX4_SIM_MODEL={model} PX4_GZ_WORLD=custom ./build/px4_sitl_default/bin/px4'],
             cwd=px4_path,
             output='screen',
             name='px4_sitl'
@@ -192,7 +192,7 @@ def launch_setup(context, *args, **kwargs):
         actions = [
             sim,
             RegisterEventHandler(
-                    OnProcessIO(on_stderr=lambda event: (
+                    OnProcessIO(on_stdout=lambda event: (
                         [LogInfo(msg="Gazebo process started."), px4_sitl, *vision_node_actions, middleware] if b"Successfully generated world file:" in event.text else None
                     )
                 )
