@@ -14,6 +14,7 @@ from abc import ABC, abstractmethod
 from rclpy.node import Node
 from sim.utils import camel_to_snake, find_package_resource, copy_models_to_gazebo
 import logging
+import random
 
 class WorldNode(Node, ABC):
     """
@@ -24,16 +25,21 @@ class WorldNode(Node, ABC):
     - get_world_path(): Return the path to the generated world file
     """
 
-    def __init__(self, competition_name: str, output_filename: Optional[str] = None):
+    def __init__(self, competition_name: str, output_filename: Optional[str] = None, seed: Optional[int] = None):
         """
         Initialize the WorldNode.
-        
+
         Args:
             competition_name: Name of the competition (e.g., 'in_house')
             output_filename: Optional custom output filename. If None, uses {competition_name}.sdf
+            seed: Optional random seed for reproducible world generation. If None, uses unseeded RNG.
         """
         super().__init__(self.__class__.__name__)
         self.competition_name = competition_name
+
+        # Initialize local RNG instance (isolated from global random state)
+        self.rng = random.Random(seed)
+        self.get_logger().info(f"Initialized world RNG with seed: {seed if seed is not None else 'unseeded'}")
         
         # Determine output path
         if output_filename is None:
