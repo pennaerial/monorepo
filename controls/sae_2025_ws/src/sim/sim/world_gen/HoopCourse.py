@@ -554,10 +554,19 @@ class HoopCourseNode(WorldNode):
         except Exception as e:
             raise RuntimeError(f"Failed to write output world file {out_path}: {e}")
 
+    def get_required_models(self) -> list[str]:
+        """
+        Return the list of models required for the hoop course competition.
+
+        Returns:
+            List of model names: hoop, dlz (base), dlz_red, dlz_green, dlz_blue, payload
+        """
+        return ['hoop', 'dlz', 'dlz_red', 'dlz_green', 'dlz_blue', 'payload']
+
     def generate_world(self) -> None:
         """
         Generate the world file with hoops and DLZs.
-        
+
         Implements the abstract method from WorldNode.
         """
         courses = ['ascent', 'descent', 'slalom', 'bezier']

@@ -197,35 +197,52 @@ def find_package_resource(
     )
 
 
-def copy_models_to_gazebo(src_models_dir: Path, dst_models_dir: Path) -> None:
+def copy_models_to_gazebo(src_models_dir: Path, dst_models_dir: Path, models: Optional[list[str]] = None) -> None:
     """
     Copy model files from source to Gazebo models directory.
-    
+
+    Note: PX4 vehicle models are copied separately by the UAV launch system,
+    which clears the directory first.
+
     Args:
-        src_models_dir: Source models directory
+        src_models_dir: Source models directory (sim package models)
         dst_models_dir: Destination models directory (Gazebo models path)
-        
+        models: Optional list of specific sim model names to copy. If None, copies all models.
+
     Raises:
         OSError: If copy operations fail
+        FileNotFoundError: If a specified model doesn't exist
     """
     if not src_models_dir.exists():
         raise FileNotFoundError(f"Source models directory does not exist: {src_models_dir}")
-    
+
     if not src_models_dir.is_dir():
         raise ValueError(f"Source path is not a directory: {src_models_dir}")
-    
-    # Create destination directory if it doesn't exist
+
+    # Create destination directory if needed
     try:
         dst_models_dir.mkdir(parents=True, exist_ok=True)
     except OSError as e:
         raise OSError(f"Failed to create destination directory {dst_models_dir}: {e}")
-    
-    # Copy all content from src_models_dir to dst_models_dir, merging contents
+
+    # Determine which models to copy
+    if models is None:
+        # Copy all models
+        items_to_copy = list(src_models_dir.iterdir())
+    else:
+        # Copy only specified models
+        items_to_copy = []
+        for model_name in models:
+            model_path = src_models_dir / model_name
+            if not model_path.exists():
+                raise FileNotFoundError(f"Required model '{model_name}' not found in {src_models_dir}")
+            items_to_copy.append(model_path)
+
+    # Copy the selected sim models
     try:
-        for item in src_models_dir.iterdir():
-            src_item = src_models_dir / item.name
-            dst_item = dst_models_dir / item.name
-            
+        for src_item in items_to_copy:
+            dst_item = dst_models_dir / src_item.name
+
             if src_item.is_dir():
                 # Copytree with dirs_exist_ok=True to allow merging/updating
                 shutil.copytree(src_item, dst_item, dirs_exist_ok=True)

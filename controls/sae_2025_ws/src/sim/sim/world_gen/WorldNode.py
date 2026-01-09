@@ -52,6 +52,7 @@ class WorldNode(Node, ABC):
         """
         Setup Gazebo models by copying from package to user's Gazebo models directory.
         This ensures models are available to Gazebo at runtime.
+        Only copies models required for this competition.
         """
         try:
             src_models_dir = find_package_resource(
@@ -61,13 +62,17 @@ class WorldNode(Node, ABC):
                 logger=logger,
                 base_file=Path(__file__)
             )
-            
+
             # Ensure output directory exists
             output_world_dir = Path.home() / '.simulation-gazebo' / 'worlds'
             output_world_dir.mkdir(parents=True, exist_ok=True)
             dst_models_dir = Path.home() / '.simulation-gazebo' / 'models'
 
-            copy_models_to_gazebo(src_models_dir, dst_models_dir)
+            # Get list of required models for this competition
+            required_models = self.get_required_models()
+            logger.info(f"Copying {len(required_models)} required models: {required_models}")
+
+            copy_models_to_gazebo(src_models_dir, dst_models_dir, models=required_models)
         except Exception as e:
             logger.warning(f"Model setup failed (continuing anyway): {e}")
 
@@ -75,11 +80,24 @@ class WorldNode(Node, ABC):
     def generate_world(self) -> None:
         """
         Generate the world file and write it to self.output_path.
-        
+
         This method should:
         1. Generate world geometry/obstacles based on competition parameters
         2. Write the SDF world file to self.output_path
         3. Store any world metadata needed for services/topics
+        """
+        pass
+
+    @abstractmethod
+    def get_required_models(self) -> list[str]:
+        """
+        Return a list of model names required for this competition.
+
+        This method should return the names of all models that need to be
+        copied to the Gazebo models directory for this world to function.
+
+        Returns:
+            List of model directory names (e.g., ['hoop', 'dlz_red', 'payload'])
         """
         pass
 

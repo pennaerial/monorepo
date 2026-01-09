@@ -8,7 +8,7 @@ from launch.event_handlers import OnProcessIO, OnProcessStart
 from launch.events.process import ProcessIO
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
-from uav.utils import vehicle_map, find_folder_with_heuristic, load_launch_parameters, extract_vision_nodes
+from uav.utils import vehicle_map, find_folder_with_heuristic, load_launch_parameters, extract_vision_nodes, copy_px4_models
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from ament_index_python.packages import get_package_share_directory
@@ -166,6 +166,9 @@ def launch_setup(context, *args, **kwargs):
     if sim_bool:
         # Find required paths.
         px4_path = find_folder_with_heuristic('PX4-Autopilot', os.path.expanduser(LaunchConfiguration('px4_path').perform(context)))
+
+        # Copy required PX4 model for the vehicle (with dependencies)
+        copy_px4_models(px4_path, [topic_model_name])
 
         # Prepare sim launch arguments with all simulation parameters
         sim_launch_args = {
