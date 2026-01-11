@@ -1,6 +1,8 @@
 import os
 import re
 import yaml
+import glob
+from enum import IntEnum
 from pathlib import Path
 
 R_earth = 6378137.0  # Earth's radius in meters (WGS84)
@@ -9,7 +11,16 @@ pink = ((140, 120, 120), (175, 255, 255))
 green = ((30, 110, 20), (40, 255, 255))
 blue = ((85, 120, 60), (140, 255, 255))
 yellow = ((10, 100, 100), (30, 255, 255))
-vehicle_map = ['quadcopter', 'tiltrotor_vtol', 'fixed_wing', 'standard_vtol', 'quadtailsitter']
+vehicle_id_dict = {'quadcopter': 4001, 'tiltrotor_vtol': 4020, 'fixed_wing': 4003,
+                   'standard_vtol': 4004, 'quadtailsitter': 4018}
+
+class Vehicle(IntEnum):
+   """Vehicle class enumeration."""
+   MULTICOPTER = 0
+   PLANE = 1
+   VTOL = 2
+   OTHER = 3
+   UNKNOWN = 5
 
 def camel_to_snake(name):
     # Convert CamelCase to snake_case.
@@ -89,6 +100,45 @@ def extract_vision_nodes(yaml_path):
             except Exception as e:
                 print(f"Error processing {file_path}: {e}")
     return vision_nodes
+
+def get_airframe_details(px4_path, airframe_id):
+    """
+    Parses PX4 airframe files to find vehicle type and model name from an ID.
+    Returns: (vehicle_class, model_name)
+    Example: (4001) -> ('multicopter', 'x500')
+    """
+    # 1. Locate the Airframe File
+    # PX4 stores these in ROMFS/px4fmu_common/init.d-posix/airframes
+    # Filenames format: "4001_gz_x500" (ID_NAME)
+    airframes_dir = os.path.join(px4_path, 'ROMFS', 'px4fmu_common', 'init.d-posix', 'airframes')
+    
+    # Find any file starting with the ID
+    matches = glob.glob(os.path.join(airframes_dir, f"{airframe_id}_*"))
+    
+    if not matches:
+        print(f"Warning: Airframe ID {airframe_id} not found in {airframes_dir}")
+        return Vehicle.UNKNOWN, 'error'
+
+    # 2. Extract Model Name from Filename
+    filename = os.path.basename(matches[0])
+    # Ex. "4001_gz_x500" --> "x500"
+    model_name = "_".join(filename.split('_')[1:]) 
+
+    # 3. Parse File Content for Vehicle Class
+    vehicle_class = 'unknown'
+    with open(matches[0], 'r') as f:
+        content = f.read()
+        
+        if 'rc.mc_defaults' in content:
+            vehicle_class = Vehicle.MULTICOPTER
+        elif 'rc.fw_defaults' in content:
+            vehicle_class = Vehicle.PLANE
+        elif 'rc.vtol_defaults' in content:
+            vehicle_class = Vehicle.VTOL
+        else:
+            vehicle_class = Vehicle.OTHER
+
+    return vehicle_class, model_name
 
 def load_launch_parameters():
     params_file = os.path.join(os.getcwd(), 'src', 'uav', 'launch', 'launch_params.yaml')

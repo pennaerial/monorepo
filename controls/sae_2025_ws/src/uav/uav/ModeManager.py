@@ -8,6 +8,7 @@ import yaml
 import importlib
 import inspect
 import ast
+from uav.utils import Vehicle
 from px4_msgs.msg import VehicleStatus
 
 VISION_NODE_PATH = 'uav.vision_nodes'
