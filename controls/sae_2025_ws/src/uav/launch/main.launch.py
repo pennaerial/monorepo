@@ -7,7 +7,7 @@ from launch.actions import ExecuteProcess, LogInfo, TimerAction, OpaqueFunction,
 from launch.event_handlers import OnProcessStart
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
-from uav.utils import vehicle_id_dict, Vehicle, get_airframe_details, find_folder_with_heuristic, load_launch_parameters, extract_vision_nodes
+from uav.utils import vehicle_id_dict, Vehicle, model_has_camera, get_airframe_details, find_folder_with_heuristic, load_launch_parameters, extract_vision_nodes
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from ament_index_python.packages import get_package_share_directory
@@ -99,6 +99,8 @@ def launch_setup(context, *args, **kwargs):
         vehicle_class, model_name = get_airframe_details(px4_path, airframe_id)
         autostart = int(airframe_id)
         model = params.get('custom_airframe_model') or model_name
+        if not model_has_camera(px4_path, model[3:]):  # remove 'gz_' prefix for model check
+            raise ValueError(f"The selected airframe ID {airframe_id} ({model}) does not have a camera sensor configured. Please choose a different airframe or add a camera to the model.")
         print(f"Simulation mode: Launching a {vehicle_class.name} with airframe ID {airframe_id}, using model {model}")
     else:
         # In hardware mode, trust any PX4 supported airframe ID and use specified vehicle class

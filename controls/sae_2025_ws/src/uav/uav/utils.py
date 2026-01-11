@@ -4,6 +4,7 @@ import yaml
 import glob
 from enum import IntEnum
 from pathlib import Path
+import xml.etree.ElementTree as ET
 
 R_earth = 6378137.0  # Earth's radius in meters (WGS84)
 
@@ -11,7 +12,7 @@ pink = ((140, 120, 120), (175, 255, 255))
 green = ((30, 110, 20), (40, 255, 255))
 blue = ((85, 120, 60), (140, 255, 255))
 yellow = ((10, 100, 100), (30, 255, 255))
-vehicle_id_dict = {'quadcopter': 4001, 'tiltrotor_vtol': 4020, 'fixed_wing': 4003,
+vehicle_id_dict = {'quadcopter': 4010, 'tiltrotor_vtol': 4020, 'fixed_wing': 4003,
                    'standard_vtol': 4004, 'quadtailsitter': 4018}
 
 class Vehicle(IntEnum):
@@ -139,6 +140,59 @@ def get_airframe_details(px4_path, airframe_id):
             vehicle_class = Vehicle.OTHER
 
     return vehicle_class, model_name
+
+def model_has_camera(px4_path, model_name, scanned_models=None):
+    """
+    Recursively checks an SDF model and its included dependencies for a camera sensor.
+    """
+    if scanned_models is None:
+        scanned_models = set()
+    
+    # Prevent infinite loops (circular dependencies)
+    if model_name in scanned_models:
+        return False
+    scanned_models.add(model_name)
+
+    # 1. Resolve the model path
+    # Standard PX4 Gz models location
+    models_dir = os.path.join(px4_path, 'Tools', 'simulation', 'gz', 'models')
+    sdf_path = os.path.join(models_dir, model_name, 'model.sdf')
+    
+    if not os.path.exists(sdf_path):
+        print(f"Model {model_name} not found in PX4 models directory.")
+        # If model not in PX4, check custom workspace path
+        # Update this to the correct custom path once decided
+        custom_path = os.path.join(os.getcwd(), 'src', 'uav', 'models', model_name, 'model.sdf')
+        if os.path.exists(custom_path):
+            sdf_path = custom_path
+        else:
+            print(f"Model {model_name} not found in custom models directory.")
+            return False
+
+    try:
+        tree = ET.parse(sdf_path)
+        root = tree.getroot()
+        
+        # 2. Check for direct sensor definition
+        for sensor in root.findall(".//sensor"):
+            if sensor.get('type') in ['camera', 'depth', 'imager']:
+                return True
+
+        # 3. Check included models
+        for include in root.findall(".//include"):
+            uri = include.find("uri")
+            if uri is not None and uri.text:
+                # URI format is usually "model://model_name"
+                included_model_name = uri.text.replace("model://", "").strip()
+                print(f"Checking included model: {included_model_name}")
+                # Check the included model
+                if model_has_camera(px4_path, included_model_name, scanned_models):
+                    return True
+
+    except ET.ParseError:
+        print(f"Error parsing SDF for {model_name}")
+        
+    return False
 
 def load_launch_parameters():
     params_file = os.path.join(os.getcwd(), 'src', 'uav', 'launch', 'launch_params.yaml')
