@@ -166,17 +166,6 @@ def launch_setup(context, *args, **kwargs):
 
     sae_ws_path = os.path.expanduser(os.getcwd())
 
-    download_gz_models = ExecuteProcess(
-        cmd=[
-            "python3",
-            "Tools/simulation/gz/simulation-gazebo",
-            "--dryrun",
-        ],
-        cwd=px4_path,
-        output="screen",
-        name="download_gz_models",
-    )
-
     spawn_world = ExecuteProcess(
         cmd=[
             "python3",
@@ -192,10 +181,11 @@ def launch_setup(context, *args, **kwargs):
 
     if "world" not in sim_params:
         raise ValueError(f"Missing 'world' section in simulation config: {sim_config_path}")
-    
+
     world_params = sim_params["world"].copy()
-    
-    # Initialize world node - it will generate the world file automatically
+    world_params["params"]["competition_name"] = competition
+
+    # Initialize world node - it will generate the world file and copy sim models
     world = Node(
         package="sim",
         executable=camel_to_snake(world_params["name"]),
@@ -221,19 +211,17 @@ def launch_setup(context, *args, **kwargs):
             )
 
     # Build and return the complete list of actions
+    # Model copying flow:
+    # 1. UAV launch clears models dir and copies PX4 vehicle models + dependencies
+    # 2. WorldNode generates world file and auto-detects/copies sim models (merges with PX4 models)
+    # 3. spawn_world starts Gazebo with the generated world and all models
     actions = [
-        download_gz_models,
-        RegisterEventHandler(
-            OnProcessExit(
-                target_action=download_gz_models,
-                on_exit=[LogInfo(msg="Gazebo models downloaded."), world],
-            )
-        ),
+        world,
         RegisterEventHandler(
             OnProcessIO(
                 target_action=world,
                 on_stderr=lambda event: (
-                    [spawn_world, LogInfo(msg="Simulation world node started."), scoring] if b"Successfully generated world file:" in event.text else None
+                    [spawn_world, LogInfo(msg="World generated, starting Gazebo."), scoring] if b"World file ready at:" in event.text else None
                 )
             )
         )

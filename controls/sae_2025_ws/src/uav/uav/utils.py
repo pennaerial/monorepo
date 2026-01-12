@@ -117,9 +117,11 @@ def _get_model_dependencies(model_path: Path) -> list[str]:
     try:
         with open(model_sdf, 'r') as f:
             content = f.read()
-            # Find all <uri>model_name</uri> and <uri>model://model_name</uri> patterns
-            uri_patterns = re.findall(r'<uri>(?:model://)?([^</>]+)</uri>', content)
-            dependencies.extend(uri_patterns)
+            # Find all model:// references (handles both model://name and model://name/path/to/file)
+            # Also find plain model references like <uri>model_name</uri>
+            model_uris = re.findall(r'model://([^/<>]+)', content)
+            plain_uris = re.findall(r'<uri>(?!model://)([^</>]+)</uri>', content)
+            dependencies.extend(model_uris + plain_uris)
     except Exception as e:
         print(f"Warning: Could not parse {model_sdf}: {e}")
 
@@ -127,8 +129,13 @@ def _get_model_dependencies(model_path: Path) -> list[str]:
 
 def copy_px4_models(px4_path: str, models: list[str]) -> None:
     """
-    Copy required PX4 models from PX4-Autopilot to Gazebo models directory.
-    Clears the destination directory first and recursively copies model dependencies.
+    Copy required PX4 vehicle models from PX4-Autopilot to Gazebo models directory.
+
+    Clears ~/.simulation-gazebo/models/ first to ensure a clean state,
+    then recursively copies the specified models and all their dependencies.
+
+    This is called before sim.launch starts, setting up the base PX4 models that
+    will later be merged with sim models (hoop, dlz, etc.) by WorldNode.
 
     Args:
         px4_path: Path to PX4-Autopilot directory

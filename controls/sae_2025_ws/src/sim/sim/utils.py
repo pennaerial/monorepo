@@ -197,16 +197,84 @@ def find_package_resource(
     )
 
 
+def _get_model_dependencies(model_path: Path) -> list[str]:
+    """
+    Parse model.sdf to find model:// dependencies.
+
+    Args:
+        model_path: Path to the model directory
+
+    Returns:
+        List of model names that this model depends on
+    """
+    dependencies = []
+    model_sdf = model_path / 'model.sdf'
+
+    if not model_sdf.exists():
+        return dependencies
+
+    try:
+        with open(model_sdf, 'r') as f:
+            content = f.read()
+            # Find all model:// references (handles both model://name and model://name/path/to/file)
+            uri_patterns = re.findall(r'model://([^/<>]+)', content)
+            dependencies.extend(uri_patterns)
+    except Exception:
+        # Silently ignore parse errors for dependency detection
+        pass
+
+    return dependencies
+
+def _copy_model_with_dependencies(
+    src_models_dir: Path,
+    dst_models_dir: Path,
+    model_name: str,
+    copied_models: set[str]
+) -> None:
+    """
+    Recursively copy a model and its dependencies.
+
+    Args:
+        src_models_dir: Source models directory
+        dst_models_dir: Destination models directory
+        model_name: Name of model to copy
+        copied_models: Set of already-copied model names (modified in-place)
+    """
+    # Skip if already copied
+    if model_name in copied_models:
+        return
+
+    src_model = src_models_dir / model_name
+    if not src_model.exists():
+        # Model might be a built-in Gazebo model or PX4 model, skip
+        return
+
+    # Copy the model
+    dst_model = dst_models_dir / model_name
+    if src_model.is_dir():
+        shutil.copytree(src_model, dst_model, dirs_exist_ok=True)
+
+    copied_models.add(model_name)
+
+    # Recursively copy dependencies
+    dependencies = _get_model_dependencies(src_model)
+    for dep in dependencies:
+        _copy_model_with_dependencies(src_models_dir, dst_models_dir, dep, copied_models)
+
 def copy_models_to_gazebo(src_models_dir: Path, dst_models_dir: Path, models: Optional[list[str]] = None) -> None:
     """
-    Copy model files from source to Gazebo models directory.
+    Copy sim model files to Gazebo models directory.
 
-    Note: PX4 vehicle models are copied separately by the UAV launch system,
-    which clears the directory first.
+    This function merges sim models (hoop, dlz, payload, etc.) with existing PX4 models
+    using dirs_exist_ok=True. It should be called *after* PX4 vehicle models are copied.
+
+    Model copying flow:
+    1. UAV launch: copy_px4_models() clears ~/.simulation-gazebo/models/ and copies PX4 vehicle models
+    2. WorldNode: This function merges sim models with existing PX4 models (dirs_exist_ok=True)
 
     Args:
         src_models_dir: Source models directory (sim package models)
-        dst_models_dir: Destination models directory (Gazebo models path)
+        dst_models_dir: Destination models directory (~/.simulation-gazebo/models)
         models: Optional list of specific sim model names to copy. If None, copies all models.
 
     Raises:
@@ -225,31 +293,62 @@ def copy_models_to_gazebo(src_models_dir: Path, dst_models_dir: Path, models: Op
     except OSError as e:
         raise OSError(f"Failed to create destination directory {dst_models_dir}: {e}")
 
+    # Track which models have been copied to avoid duplicates
+    copied_models = set()
+
     # Determine which models to copy
     if models is None:
-        # Copy all models
-        items_to_copy = list(src_models_dir.iterdir())
+        # Copy all models in the directory
+        models_to_copy = [item.name for item in src_models_dir.iterdir() if item.is_dir()]
     else:
-        # Copy only specified models
-        items_to_copy = []
-        for model_name in models:
-            model_path = src_models_dir / model_name
-            if not model_path.exists():
-                raise FileNotFoundError(f"Required model '{model_name}' not found in {src_models_dir}")
-            items_to_copy.append(model_path)
+        models_to_copy = models
 
-    # Copy the selected sim models
+    # Copy each model with dependencies
     try:
-        for src_item in items_to_copy:
-            dst_item = dst_models_dir / src_item.name
-
-            if src_item.is_dir():
-                # Copytree with dirs_exist_ok=True to allow merging/updating
-                shutil.copytree(src_item, dst_item, dirs_exist_ok=True)
-            elif src_item.is_file():
-                shutil.copy2(src_item, dst_item)
+        for model_name in models_to_copy:
+            _copy_model_with_dependencies(src_models_dir, dst_models_dir, model_name, copied_models)
     except (OSError, shutil.Error) as e:
         raise OSError(f"Failed to copy models from {src_models_dir} to {dst_models_dir}: {e}")
+
+def extract_models_from_sdf(sdf_path: Path) -> list[str]:
+    """
+    Parse an SDF file and extract all model:// URI references.
+
+    This function scans an SDF world file for <uri>model://...</uri> tags
+    and returns a list of unique model names that need to be copied to
+    the Gazebo models directory.
+
+    Args:
+        sdf_path: Path to the SDF world file
+
+    Returns:
+        List of unique model names referenced in the world file.
+        Returns empty list if file doesn't exist or parsing fails.
+
+    Example:
+        For <uri>model://hoop</uri>, returns ['hoop']
+        For <uri>model://dlz_red</uri>, returns ['dlz_red']
+    """
+    import xml.etree.ElementTree as ET
+
+    if not sdf_path.exists():
+        return []
+
+    try:
+        tree = ET.parse(str(sdf_path))
+        root = tree.getroot()
+
+        models = set()
+        # Find all <uri> elements containing model:// references
+        for uri_elem in root.iter('uri'):
+            if uri_elem.text and uri_elem.text.startswith('model://'):
+                model_name = uri_elem.text.replace('model://', '').strip()
+                models.add(model_name)
+
+        return sorted(list(models))
+    except ET.ParseError as e:
+        # Log parse error but don't crash - just return empty list
+        return []
 
 def camel_to_snake(name: str) -> str:
     """Convert CamelCase to snake_case."""

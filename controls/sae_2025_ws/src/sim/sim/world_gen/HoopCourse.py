@@ -367,27 +367,28 @@ class HoopCourseNode(WorldNode):
     """
 
     def __init__(self,
+                 competition_name: str,
                  course: str,
                  dlz: Tuple[float, float, float],
                  uav: Tuple[float, float, float],
                  num_hoops: int,
                  max_dist: int,
                  world_name: str,
-                 height: int,
-                 output_filename: Optional[str] = None):
+                 height: int):
         """
         Initialize the hoop course world generator.
-        
+
         Args:
+            competition_name: Competition name (e.g., 'in_house')
             course: Course style ("ascent", "descent", "slalom", "bezier", "straight", "random", "previous")
             dlz: Drop zone coordinates [x, y, z]
             uav: UAV starting position [x, y, z]
             num_hoops: Number of hoops to generate
             max_dist: Maximum distance parameter for course generation
             world_name: Path to template world SDF file
-            output_filename: Optional output filename (defaults to competition name)
+            height: Height parameter for course generation
         """
-        super().__init__(competition_name="in_house", output_filename=output_filename)
+        # Store parameters
         self.course = course
         self.dlz = dlz
         self.uav = uav
@@ -396,8 +397,13 @@ class HoopCourseNode(WorldNode):
         self.world_name = world_name
         self.height = height
         self.hoop_positions: List[Pose] = []
-        self.generate_world()
-        
+
+        # Validate parameters before proceeding
+        self._validate_parameters()
+
+        # Parent calls generate_world() and setup_gazebo_models()
+        super().__init__(competition_name=competition_name)
+
         # Create service for providing hoop positions
         self.srv = self.create_service(HoopList, "list_hoops", self.hoop_list_req)
     
@@ -414,14 +420,86 @@ class HoopCourseNode(WorldNode):
             response.hoop_positions.append(hp)
         return response
 
+    def _validate_parameters(self):
+        """Validate constructor parameters."""
+        valid_courses = ['ascent', 'descent', 'slalom', 'bezier', 'straight', 'random', 'previous']
+        if self.course.lower() not in valid_courses:
+            raise ValueError(
+                f"Invalid course type: '{self.course}'. "
+                f"Must be one of {valid_courses}"
+            )
+
+        # Validate numeric parameters
+        if self.num_hoops < 1:
+            raise ValueError(f"num_hoops must be >= 1, got {self.num_hoops}")
+
+        if self.num_hoops > 100:
+            self.get_logger().warning(f"num_hoops={self.num_hoops} is very large, may cause performance issues")
+
+        if self.height < 0:
+            raise ValueError(f"height must be >= 0, got {self.height}")
+
+        if self.max_dist < 0:
+            raise ValueError(f"max_dist must be >= 0, got {self.max_dist}")
+
+        # Validate coordinates
+        if not (isinstance(self.dlz, (list, tuple)) and len(self.dlz) == 3):
+            raise ValueError(f"dlz must be a list/tuple of 3 numbers, got {self.dlz}")
+
+        if not (isinstance(self.uav, (list, tuple)) and len(self.uav) == 3):
+            raise ValueError(f"uav must be a list/tuple of 3 numbers, got {self.uav}")
+
+        # Check if UAV and DLZ are the same (for courses that need them different)
+        if self.course.lower() not in ['previous', 'straight']:
+            if tuple(self.uav) == tuple(self.dlz):
+                raise ValueError("UAV and DLZ coordinates cannot be identical for this course type")
+
+    def _extract_hoops_from_world(self, world_path: Path) -> List[Pose]:
+        """Extract hoop positions from existing world SDF file."""
+        tree = ET.parse(str(world_path))
+        root = tree.getroot()
+
+        hoops = []
+        # Handle namespace if present
+        ns = ""
+        if root.tag.startswith("{"):
+            ns = root.tag.split("}")[0] + "}"
+
+        # Find world element
+        world = root.find(f"{ns}world") or root.find("world") or root.find(".//world")
+        if world is None:
+            return hoops
+
+        # Extract all hoop includes
+        for include in world.iter('include'):
+            uri_elem = include.find('uri')
+            if uri_elem is not None and uri_elem.text == 'model://hoop':
+                pose_elem = include.find('pose')
+                if pose_elem is not None:
+                    # Parse "x y z roll pitch yaw" format
+                    values = [float(v) for v in pose_elem.text.split()]
+                    if len(values) == 6:
+                        hoops.append(tuple(values))
+
+        return hoops
 
     def add_hoops(self, input_file, output_file):
-        # Expand ~, make absolute, and validate paths
-        in_path = Path(input_file).expanduser().resolve()
+        # Resolve template path using find_package_resource
+        if not Path(input_file).is_absolute():
+            # Template path is relative to package root, resolve it
+            from sim.utils import find_package_resource
+            in_path = find_package_resource(
+                relative_path=input_file,
+                package_name='sim',
+                resource_type='file',
+                logger=self.get_logger(),
+                base_file=Path(__file__)
+            )
+        else:
+            # Already absolute (backward compatibility)
+            in_path = Path(input_file).expanduser().resolve()
+
         out_path = Path(output_file).expanduser().resolve()
-        
-        self.get_logger().debug(f"Input world file: {in_path}")
-        self.get_logger().debug(f"Output world file: {out_path}")
         if not in_path.exists():
             raise FileNotFoundError(
                 f"Input SDF not found: {in_path}\nCWD: {Path.cwd().resolve()}"
@@ -554,21 +632,8 @@ class HoopCourseNode(WorldNode):
         except Exception as e:
             raise RuntimeError(f"Failed to write output world file {out_path}: {e}")
 
-    def get_required_models(self) -> list[str]:
-        """
-        Return the list of models required for the hoop course competition.
-
-        Returns:
-            List of model names: hoop, dlz (base), dlz_red, dlz_green, dlz_blue, payload
-        """
-        return ['hoop', 'dlz', 'dlz_red', 'dlz_green', 'dlz_blue', 'payload']
-
     def generate_world(self) -> None:
-        """
-        Generate the world file with hoops and DLZs.
-
-        Implements the abstract method from WorldNode.
-        """
+        """Generate the world file with hoops and DLZs."""
         courses = ['ascent', 'descent', 'slalom', 'bezier']
         course = None
 
@@ -576,34 +641,39 @@ class HoopCourseNode(WorldNode):
             if self.course.lower() == 'random':
                 course_id = int(r.uniform(0, len(courses)))
                 course = courses[course_id]
-                
+
             if self.course.lower() == "previous":
-                self.get_logger().info("Using previous world configuration")
-                return
+                if self.output_path.exists():
+                    self.hoop_positions = self._extract_hoops_from_world(self.output_path)
+                    self.get_logger().info(f"Reusing previous world with {len(self.hoop_positions)} hoops")
+                    return
+                else:
+                    self.get_logger().warning("Previous world not found, using straight course")
+                    self.course = "straight"
 
             elif self.course.lower() == "ascent":
-                course = AscentCourse(dlz=self.dlz, 
-                                    uav=self.uav, 
-                                    num_hoops=self.num_hoops, 
-                                    max_dist=self.max_dist, 
+                course = AscentCourse(dlz=self.dlz,
+                                    uav=self.uav,
+                                    num_hoops=self.num_hoops,
+                                    max_dist=self.max_dist,
                                     start_height=self.height)
             elif self.course.lower() == "descent":
-                course = DescentCourse(dlz=self.dlz, 
-                                    uav=self.uav, 
-                                    num_hoops=self.num_hoops, 
-                                    max_dist=self.max_dist, 
+                course = DescentCourse(dlz=self.dlz,
+                                    uav=self.uav,
+                                    num_hoops=self.num_hoops,
+                                    max_dist=self.max_dist,
                                     start_height=self.height)
             elif self.course.lower() == "slalom":
-                course = SlalomCourse(dlz=self.dlz, 
-                                    uav=self.uav, 
-                                    num_hoops=self.num_hoops, 
+                course = SlalomCourse(dlz=self.dlz,
+                                    uav=self.uav,
+                                    num_hoops=self.num_hoops,
                                     max_dist=self.max_dist,
                                     width=4,
                                     height=self.height)
             elif self.course.lower() == "straight":
-                course = StraightCourse(dlz=self.dlz, 
-                                    uav=self.uav, 
-                                    num_hoops=self.num_hoops, 
+                course = StraightCourse(dlz=self.dlz,
+                                    uav=self.uav,
+                                    num_hoops=self.num_hoops,
                                     max_dist=self.max_dist,
                                     height=self.height,
                                     spacing=2)
@@ -616,7 +686,7 @@ class HoopCourseNode(WorldNode):
                                       lateral_offset=4.0)
             else:
                 raise ValueError(f"Invalid course: {self.course}")
-                
+
             self.hoop_positions = course.generate_course()
             self.get_logger().info(f"Generated {len(self.hoop_positions)} hoops for {self.course} course")
             self.add_hoops(input_file=self.world_name, output_file=str(self.output_path))
