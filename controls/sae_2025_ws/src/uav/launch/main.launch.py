@@ -11,12 +11,11 @@ from launch_ros.actions import Node
 from uav.utils import vehicle_map, find_folder_with_heuristic, load_launch_parameters, extract_vision_nodes
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.logging import get_logger
 from ament_index_python.packages import get_package_share_directory
+from launch.logging import get_logger
 
 def launch_setup(context, *args, **kwargs):
-    logger =  get_logger('main.launch')
-    
+    logger = get_logger('main.launch')
     # Load launch parameters from the YAML file.
     params = load_launch_parameters()
     mission_name = params.get('mission_name', 'basic')
@@ -95,7 +94,7 @@ def launch_setup(context, *args, **kwargs):
         raise ValueError(f"Invalid vehicle type: {vehicle_type}")
 
     
-    topic_model_name = model[3:]  # remove 'gz_' prefix
+    gz_camera_topic_model = model[3:]  # remove 'gz_' prefix
 
     arch = platform.machine().lower()
     if arch in ("x86_64", "amd64", "i386", "i686"):
@@ -107,8 +106,8 @@ def launch_setup(context, *args, **kwargs):
 
     logger.debug(f"Running Architecture: {arch}")
 
-    GZ_CAMERA_TOPIC = f"/world/custom/model/{topic_model_name}_0/link/camera_link/sensor/camera/image"
-    GZ_CAMERA_INFO_TOPIC = f"/world/custom/model/{topic_model_name}_0/link/camera_link/sensor/camera/camera_info"
+    GZ_CAMERA_TOPIC = f"/world/custom/model/{gz_camera_topic_model}_0/link/camera_link/sensor/camera/image"
+    GZ_CAMERA_INFO_TOPIC = f"/world/custom/model/{gz_camera_topic_model}_0/link/camera_link/sensor/camera/camera_info"
 
     sae_ws_path = os.path.expanduser(os.getcwd())
     
@@ -172,6 +171,7 @@ def launch_setup(context, *args, **kwargs):
         # Prepare sim launch arguments with all simulation parameters
         sim_launch_args = {
             'px4_path': px4_path,
+            'gz_camera_topic_model': gz_camera_topic_model
         }
         
         sim = IncludeLaunchDescription(
@@ -199,26 +199,7 @@ def launch_setup(context, *args, **kwargs):
                     )
                 )
             ),
-            RegisterEventHandler(
-                OnProcessIO(
-                    target_action=px4_sitl,
-                    on_stdout=lambda event: (
-                        [LogInfo(msg="PX4 SITL started."), gz_ros_bridge_camera, gz_ros_bridge_camera_info] if b"INFO  [init] Spawning model" in event.text else None
-                    )
-                )
-            ),
-            RegisterEventHandler(
-                OnProcessStart(
-                    target_action=gz_ros_bridge_camera,
-                    on_start=LogInfo(msg="Bridge camera topic started.")
-                )
-            ),
-            RegisterEventHandler(
-                OnProcessStart(
-                    target_action=gz_ros_bridge_camera_info,
-                    on_start=LogInfo(msg="Bridge camera info topic started.")
-                )
-            ),
+            
             RegisterEventHandler(
                 OnProcessIO(
                     target_action=px4_sitl,
