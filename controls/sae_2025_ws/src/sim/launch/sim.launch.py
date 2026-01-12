@@ -148,6 +148,7 @@ def launch_setup(context, *args, **kwargs):
         raise ValueError(
             f"Invalid competition: {competition_num}. Must be one of {valid_values}"
         )
+    logger.info(f"Running Competition: {competition}")
 
     scoring_param = params.get("scoring", DEFAULT_USE_SCORING)
 
@@ -196,8 +197,7 @@ def launch_setup(context, *args, **kwargs):
     world_params = sim_params["world"].copy()
     
     # Initialize world node - it will generate the world file automatically
-    world = Node(
-        package="sim",
+    world = Node( package="sim",
         executable=camel_to_snake(world_params["name"]),
         arguments=[json.dumps(world_params["params"])],
         output="screen",

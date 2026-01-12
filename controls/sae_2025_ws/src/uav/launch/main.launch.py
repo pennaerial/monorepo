@@ -12,8 +12,10 @@ from uav.utils import vehicle_map, find_folder_with_heuristic, load_launch_param
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from ament_index_python.packages import get_package_share_directory
+from launch.logging import get_logger
 
 def launch_setup(context, *args, **kwargs):
+    logger = get_logger('main.launch')
     # Load launch parameters from the YAML file.
     params = load_launch_parameters()
     mission_name = params.get('mission_name', 'basic')
@@ -92,7 +94,7 @@ def launch_setup(context, *args, **kwargs):
         raise ValueError(f"Invalid vehicle type: {vehicle_type}")
 
     
-    topic_model_name = model[3:]  # remove 'gz_' prefix
+    gz_camera_topic_model = model[3:]  # remove 'gz_' prefix
 
     arch = platform.machine().lower()
     if arch in ("x86_64", "amd64", "i386", "i686"):
@@ -102,11 +104,13 @@ def launch_setup(context, *args, **kwargs):
     else:
         raise ValueError(f"Unknown architecture: {arch}")
 
-    camera_topic_name = (
-        "imager" if platform_type == "x86" else "camera"
-    )  # windows -> 'imager'   mac -> 'camera'
-    GZ_CAMERA_TOPIC = f"/world/custom/model/{topic_model_name}_0/link/camera_link/sensor/{camera_topic_name}/image"
-    GZ_CAMERA_INFO_TOPIC = f"/world/custom/model/{topic_model_name}_0/link/camera_link/sensor/{camera_topic_name}/camera_info"
+    # camera_topic_name = (
+    #     "imager" if platform_type == "x86" else "camera"
+    # )  # windows -> 'imager'   mac -> 'camera'
+    logger.info(f"Using architecture: {platform_type}")
+    gz_camera_topic_sensor = "camera"
+    GZ_CAMERA_TOPIC = f"/world/custom/model/{gz_camera_topic_model}_0/link/camera_link/sensor/{gz_camera_topic_sensor}/image"
+    GZ_CAMERA_INFO_TOPIC = f"/world/custom/model/{gz_camera_topic_model}_0/link/camera_link/sensor/{gz_camera_topic_sensor}/camera_info"
 
     sae_ws_path = os.path.expanduser(os.getcwd())
     
@@ -170,6 +174,7 @@ def launch_setup(context, *args, **kwargs):
         # Prepare sim launch arguments with all simulation parameters
         sim_launch_args = {
             'px4_path': px4_path,
+            'gz_camera_topic_model': gz
         }
         
         sim = IncludeLaunchDescription(
