@@ -98,7 +98,7 @@ def launch_setup(context, *args, **kwargs):
         px4_path = find_folder_with_heuristic('PX4-Autopilot', os.path.expanduser(LaunchConfiguration('px4_path').perform(context)))
         vehicle_class, model_name = get_airframe_details(px4_path, airframe_id)
         autostart = int(airframe_id)
-        model = params.get('custom_airframe_model') or model_name
+        model = custom_airframe_model or model_name
         if not model_has_camera(px4_path, model[3:]):  # remove 'gz_' prefix for model check
             raise ValueError(f"The selected airframe ID {airframe_id} ({model}) does not have a camera sensor configured. Please choose a different airframe or add a camera to the model.")
         print(f"Simulation mode: Launching a {vehicle_class.name} with airframe ID {airframe_id}, using model {model}")

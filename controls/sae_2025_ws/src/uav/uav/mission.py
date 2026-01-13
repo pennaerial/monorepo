@@ -28,10 +28,7 @@ def main():
     servo_only = servo_only.lower() == 'true'
     DEBUG = debug.lower() == 'true'
     rclpy.init()
-    if vehicle_class == Vehicle.VTOL:
-        is_vtol = True
-    else:
-        is_vtol = False
+    is_vtol = (vehicle_class == Vehicle.VTOL)
     mission_node = ModeManager(yaml_file, vision_nodes, camera_offsets, DEBUG=DEBUG, servo_only=servo_only, is_vtol=is_vtol)
     rclpy.spin(mission_node)
     rclpy.shutdown()

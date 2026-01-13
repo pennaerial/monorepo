@@ -21,7 +21,7 @@ class Vehicle(IntEnum):
    PLANE = 1
    VTOL = 2
    OTHER = 3
-   UNKNOWN = 5
+   UNKNOWN = 4
 
 def camel_to_snake(name):
     # Convert CamelCase to snake_case.
@@ -106,7 +106,7 @@ def get_airframe_details(px4_path, airframe_id):
     """
     Parses PX4 airframe files to find vehicle type and model name from an ID.
     Returns: (vehicle_class, model_name)
-    Example: (4001) -> ('multicopter', 'x500')
+    Example: (4001) -> (Vehicle.MULTICOPTER, 'x500')
     """
     # 1. Locate the Airframe File
     # PX4 stores these in ROMFS/px4fmu_common/init.d-posix/airframes
@@ -118,7 +118,7 @@ def get_airframe_details(px4_path, airframe_id):
     
     if not matches:
         print(f"Warning: Airframe ID {airframe_id} not found in {airframes_dir}")
-        return Vehicle.UNKNOWN, 'error'
+        return Vehicle.UNKNOWN, 'gz_ERROR'
 
     # 2. Extract Model Name from Filename
     filename = os.path.basename(matches[0])
@@ -126,7 +126,6 @@ def get_airframe_details(px4_path, airframe_id):
     model_name = "_".join(filename.split('_')[1:]) 
 
     # 3. Parse File Content for Vehicle Class
-    vehicle_class = 'unknown'
     with open(matches[0], 'r') as f:
         content = f.read()
         
