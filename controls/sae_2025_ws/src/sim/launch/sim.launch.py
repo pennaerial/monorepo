@@ -189,6 +189,16 @@ def launch_setup(context, *args, **kwargs):
         name="spawn_world",
     )
 
+    gz_ros_bridge_create = Node(
+        package="ros_gz_bridge",
+        executable="parameter_bridge",
+        arguments=[f"/world/{competition}/create@ros_gz_interfaces/srv/SpawnEntity"],
+        remappings=[],
+        output="screen",
+        name="gz_ros_bridge_create",
+        cwd=sae_ws_path,
+    )
+
     sim_params, sim_config_path = load_sim_parameters(competition, logger)
 
     if "world" not in sim_params:
@@ -201,7 +211,7 @@ def launch_setup(context, *args, **kwargs):
         executable=camel_to_snake(world_params["name"]),
         arguments=[json.dumps(world_params["params"])],
         output="screen",
-        name=world_params["name"],
+        name=camel_to_snake(world_params["name"]),
         cwd=sae_ws_path,
     )
 
@@ -235,6 +245,15 @@ def launch_setup(context, *args, **kwargs):
                 on_stderr=lambda event: (
                     [spawn_world, LogInfo(msg="Simulation world node started."), scoring] if b"Successfully generated world file:" in event.text else None
                 )
+            )
+        ),
+        RegisterEventHandler(
+            OnProcessStart(
+                target_action=spawn_world,
+                on_start=[
+                    LogInfo(msg="spawn_world started, creating gz_ros_bridge_create"),
+                    gz_ros_bridge_create,
+                ],
             )
         )
     ]
