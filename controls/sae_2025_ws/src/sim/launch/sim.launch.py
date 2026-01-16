@@ -4,6 +4,7 @@ import os
 import launch
 from launch import LaunchDescription
 from launch.actions import (
+    TimerAction,
     ExecuteProcess,
     LogInfo,
     RegisterEventHandler,
@@ -207,12 +208,20 @@ def launch_setup(context, *args, **kwargs):
     world_params = sim_params["world"].copy()
     
     # Initialize world node - it will generate the world file automatically
+    world_node_name = camel_to_snake(world_params["name"])
     world = Node( package="sim",
         executable=camel_to_snake(world_params["name"]),
         arguments=[json.dumps(world_params["params"])],
         output="screen",
-        name=camel_to_snake(world_params["name"]),
+        name=world_node_name,
         cwd=sae_ws_path,
+    )
+
+    trigger_world_gen = ExecuteProcess(
+        cmd=["ros2", "service", "call", f"/{world_node_name}/trigger_world_gen", "std_srvs/srv/Trigger"],
+        cwd=sae_ws_path,
+        output="screen",
+        name="trigger_world_gen"
     )
 
     # Initialize scoring node if requested
@@ -253,6 +262,13 @@ def launch_setup(context, *args, **kwargs):
                 on_start=[
                     LogInfo(msg="spawn_world started, creating gz_ros_bridge_create"),
                     gz_ros_bridge_create,
+                    TimerAction(
+                        period=2.0,
+                        actions=[
+                            trigger_world_gen, 
+                            LogInfo(msg="World Gen Triggered after 2 Seconds")
+                        ],
+                    ),
                 ],
             )
         )
