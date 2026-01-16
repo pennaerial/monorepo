@@ -106,32 +106,7 @@ def launch_setup(context, *args, **kwargs):
 
     logger.debug(f"Running Architecture: {arch}")
 
-    GZ_CAMERA_TOPIC = f"/world/custom/model/{gz_camera_topic_model}_0/link/camera_link/sensor/camera/image"
-    GZ_CAMERA_INFO_TOPIC = f"/world/custom/model/{gz_camera_topic_model}_0/link/camera_link/sensor/camera/camera_info"
-
     sae_ws_path = os.path.expanduser(os.getcwd())
-    
-    gz_ros_bridge_camera = Node(
-        package="ros_gz_bridge",
-        executable="parameter_bridge",
-        arguments=[f"{GZ_CAMERA_TOPIC}@sensor_msgs/msg/Image[gz.msgs.Image"],
-        remappings=[(GZ_CAMERA_TOPIC, "/camera")],
-        output="screen",
-        name="gz_ros_bridge_camera",
-        cwd=sae_ws_path,
-    )
-
-    gz_ros_bridge_camera_info = Node(
-        package="ros_gz_bridge",
-        executable="parameter_bridge",
-        arguments=[
-            f"{GZ_CAMERA_INFO_TOPIC}@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo"
-        ],
-        remappings=[(GZ_CAMERA_INFO_TOPIC, "/camera_info")],
-        output="screen",
-        name="gz_ros_bridge_camera_info",
-        cwd=sae_ws_path,
-    )
 
     camera_offsets_str = ','.join(str(offset) for offset in camera_offsets)
     mission_cmd = ['ros2', 'run', 'uav', 'mission', uav_debug, YAML_PATH, servo_only, camera_offsets_str, ','.join(vision_nodes)]
