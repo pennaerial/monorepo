@@ -27,7 +27,6 @@ class WorldNode(Node, ABC):
     def __init__(self):
         """
         Initialize the WorldNode.
-        Subclass must call generate_world(output_dir) after initialization.
         """
         super().__init__(self.__class__.__name__)
 

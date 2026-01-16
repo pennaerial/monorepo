@@ -220,24 +220,20 @@ def launch_setup(context, *args, **kwargs):
             base_file=Path(__file__)
         )
 
-        # Find all .sdf world files
-        world_files = list(worlds_dir.glob('*.sdf'))
-        if not world_files:
-            logger.warning(f"No world files found in {worlds_dir}")
+        # Extract models from the generated world file
+        world_file = worlds_dir / f"{world_file_name}.sdf"
+        if not world_file.exists():
+            logger.warning(f"World file not found: {world_file}")
         else:
-            # Extract models from all world files
-            all_required_models = set()
-            for world_file in world_files:
-                models = extract_models_from_sdf(world_file)
-                all_required_models.update(models)
-                logger.info(f"Found {len(models)} sim models in {world_file.name}: {models}")
+            models = extract_models_from_sdf(world_file)
+            logger.info(f"Found {len(models)} sim models in {world_file.name}: {models}")
 
-            if all_required_models:
-                logger.info(f"Copying {len(all_required_models)} sim models: {sorted(all_required_models)}")
+            if models:
+                logger.info(f"Copying {len(models)} sim models: {sorted(models)}")
                 dst_models_dir = Path.home() / '.simulation-gazebo' / 'models'
-                copy_models_to_gazebo(src_models_dir, dst_models_dir, models=list(all_required_models))
+                copy_models_to_gazebo(src_models_dir, dst_models_dir, models=list(models))
             else:
-                logger.warning("No sim models detected in world files")
+                logger.warning("No sim models detected in world file")
     except Exception as e:
         logger.error(f"Failed to copy sim models: {e}")
         raise
