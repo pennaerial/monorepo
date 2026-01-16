@@ -104,13 +104,10 @@ def launch_setup(context, *args, **kwargs):
     else:
         raise ValueError(f"Unknown architecture: {arch}")
 
-    # camera_topic_name = (
-    #     "imager" if platform_type == "x86" else "camera"
-    # )  # windows -> 'imager'   mac -> 'camera'
-    logger.info(f"Using architecture: {platform_type}")
-    gz_camera_topic_sensor = "camera"
-    GZ_CAMERA_TOPIC = f"/world/custom/model/{gz_camera_topic_model}_0/link/camera_link/sensor/{gz_camera_topic_sensor}/image"
-    GZ_CAMERA_INFO_TOPIC = f"/world/custom/model/{gz_camera_topic_model}_0/link/camera_link/sensor/{gz_camera_topic_sensor}/camera_info"
+    logger.debug(f"Running Architecture: {arch}")
+
+    GZ_CAMERA_TOPIC = f"/world/custom/model/{gz_camera_topic_model}_0/link/camera_link/sensor/camera/image"
+    GZ_CAMERA_INFO_TOPIC = f"/world/custom/model/{gz_camera_topic_model}_0/link/camera_link/sensor/camera/camera_info"
 
     sae_ws_path = os.path.expanduser(os.getcwd())
     
@@ -174,7 +171,6 @@ def launch_setup(context, *args, **kwargs):
         # Prepare sim launch arguments with all simulation parameters
         sim_launch_args = {
             'px4_path': px4_path,
-            'gz_camera_topic_model': gz
         }
         
         sim = IncludeLaunchDescription(
