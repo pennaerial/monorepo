@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
+import json
 import rclpy
-from rclpy.node import Node
 from px4_msgs.msg import VehicleLocalPosition
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy, QoSDurabilityPolicy
 from std_msgs.msg import Float32, String, Float32MultiArray
@@ -9,6 +9,7 @@ from geometry_msgs.msg import Point
 from typing import List, Tuple, Optional, Dict, Any
 import math
 import time
+import sys
 from sim_interfaces.srv import HoopList
 from sim.scoring import ScoringNode
 
@@ -316,10 +317,9 @@ class HoopScoringNode(ScoringNode):
         self.drone_publisher.publish(drone_position)
    
 def main(args=None):
-    """Main function for scoring node. (SAME AS BEFORE)"""
     rclpy.init(args=args)
     
-    scoring_node = ScoringNode()
+    scoring_node = HoopScoringNode(**json.loads(sys.argv[1]))
     
     try:
         rclpy.spin(scoring_node)

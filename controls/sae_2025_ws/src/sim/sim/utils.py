@@ -6,11 +6,13 @@ Utility functions for the sim package.
 import ast
 import inspect
 import os
+import re
 import shutil
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
+
 import yaml
-import re
 
 def load_yaml_to_dict(params_file: Path) -> dict:
     """Load and validate YAML file."""
@@ -219,6 +221,9 @@ def _get_model_dependencies(model_path: Path) -> list[str]:
             # Find all model:// references (handles both model://name and model://name/path/to/file)
             uri_patterns = re.findall(r'model://([^/<>]+)', content)
             dependencies.extend(uri_patterns)
+            # Also find plain <uri>model_name</uri> without model:// prefix (used by PX4 models)
+            plain_uri_patterns = re.findall(r'<uri>([a-zA-Z0-9_-]+)</uri>', content)
+            dependencies.extend(plain_uri_patterns)
     except Exception:
         # Silently ignore parse errors for dependency detection
         pass
@@ -265,21 +270,10 @@ def copy_models_to_gazebo(src_models_dir: Path, dst_models_dir: Path, models: Op
     """
     Copy sim model files to Gazebo models directory.
 
-    This function merges sim models (hoop, dlz, payload, etc.) with existing PX4 models
-    using dirs_exist_ok=True. It should be called *after* PX4 vehicle models are copied.
-
-    Model copying flow:
-    1. UAV launch: copy_px4_models() clears ~/.simulation-gazebo/models/ and copies PX4 vehicle models
-    2. WorldNode: This function merges sim models with existing PX4 models (dirs_exist_ok=True)
-
     Args:
         src_models_dir: Source models directory (sim package models)
         dst_models_dir: Destination models directory (~/.simulation-gazebo/models)
         models: Optional list of specific sim model names to copy. If None, copies all models.
-
-    Raises:
-        OSError: If copy operations fail
-        FileNotFoundError: If a specified model doesn't exist
     """
     if not src_models_dir.exists():
         raise FileNotFoundError(f"Source models directory does not exist: {src_models_dir}")
@@ -329,8 +323,6 @@ def extract_models_from_sdf(sdf_path: Path) -> list[str]:
         For <uri>model://hoop</uri>, returns ['hoop']
         For <uri>model://dlz_red</uri>, returns ['dlz_red']
     """
-    import xml.etree.ElementTree as ET
-
     if not sdf_path.exists():
         return []
 
@@ -349,6 +341,59 @@ def extract_models_from_sdf(sdf_path: Path) -> list[str]:
     except ET.ParseError as e:
         # Log parse error but don't crash - just return empty list
         return []
+
+def copy_px4_models(px4_path: str, models: list[str]) -> None:
+    """
+    Copy required PX4 vehicle models from PX4-Autopilot to Gazebo models directory.
+
+    Clears ~/.simulation-gazebo/models/ first to ensure a clean state,
+    then recursively copies the specified models and all their dependencies.
+
+    This is called before sim.launch starts, setting up the base PX4 models that
+    will later be merged with sim models (hoop, dlz, etc.) by WorldNode.
+
+    Args:
+        px4_path: Path to PX4-Autopilot directory
+        models: List of model names to copy (e.g., ['x500_mono_cam'])
+    """
+    px4_models_dir = Path(px4_path) / 'Tools' / 'simulation' / 'gz' / 'models'
+    dst_models_dir = Path.home() / '.simulation-gazebo' / 'models'
+
+    # Clear destination directory first to ensure clean state
+    if dst_models_dir.exists():
+        shutil.rmtree(dst_models_dir)
+
+    # Create destination directory
+    dst_models_dir.mkdir(parents=True, exist_ok=True)
+
+    # Track models to copy and already copied to avoid duplicates
+    models_to_copy = set(models)
+    copied_models = set()
+
+    while models_to_copy:
+        model_name = models_to_copy.pop()
+
+        if model_name in copied_models:
+            continue
+
+        src_model = px4_models_dir / model_name
+        dst_model = dst_models_dir / model_name
+
+        if not src_model.exists():
+            print(f"Warning: PX4 model '{model_name}' not found in {px4_models_dir}")
+            continue
+
+        # Copy the model
+        if src_model.is_dir():
+            shutil.copytree(src_model, dst_model)
+            copied_models.add(model_name)
+            print(f"Copied PX4 model: {model_name}")
+
+            # Find and queue dependencies
+            dependencies = _get_model_dependencies(src_model)
+            for dep in dependencies:
+                if dep not in copied_models:
+                    models_to_copy.add(dep)
 
 def camel_to_snake(name: str) -> str:
     """Convert CamelCase to snake_case."""

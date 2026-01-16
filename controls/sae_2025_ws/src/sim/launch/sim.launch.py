@@ -1,29 +1,36 @@
 #!/usr/bin/env python3
 
+import importlib
+import json
+import logging
 import os
+import shutil
+from pathlib import Path
+
 import launch
 from launch import LaunchDescription
 from launch.actions import (
-    ExecuteProcess,
-    LogInfo,
-    RegisterEventHandler,
-    OpaqueFunction,
     DeclareLaunchArgument,
+    ExecuteProcess,
+    OpaqueFunction,
 )
-import logging
 from launch.substitutions import LaunchConfiguration
-from launch.event_handlers import OnProcessStart, OnProcessExit, OnProcessIO
 from launch_ros.actions import Node
-from sim.utils import find_package_resource, load_yaml_to_dict, build_node_arguments, camel_to_snake
-import importlib
-from pathlib import Path
+
 from sim.constants import (
-    Competition, 
-    COMPETITION_NAMES, 
+    Competition,
+    COMPETITION_NAMES,
     DEFAULT_COMPETITION,
-    DEFAULT_USE_SCORING
+    DEFAULT_USE_SCORING,
 )
-import json
+from sim.utils import (
+    build_node_arguments,
+    copy_models_to_gazebo,
+    copy_px4_models,
+    extract_models_from_sdf,
+    find_package_resource,
+    load_yaml_to_dict,
+)
 
 def load_sim_launch_parameters():
     """Load simulation launch parameters from YAML."""
@@ -37,15 +44,11 @@ def load_sim_launch_parameters():
         if path.exists():
             return load_yaml_to_dict(path)
     
-    # Fallback to installed location (for production/deployed packages)
-    try:
-        from ament_index_python.packages import get_package_share_directory
-        package_share = Path(get_package_share_directory('sim'))
-        installed_params = package_share / 'launch' / 'launch_params.yaml'
-        if installed_params.exists():
-            return load_yaml_to_dict(installed_params)
-    except Exception:
-        pass
+    from ament_index_python.packages import get_package_share_directory
+    package_share = Path(get_package_share_directory('sim'))
+    installed_params = package_share / 'launch' / 'launch_params.yaml'
+    if installed_params.exists():
+        return load_yaml_to_dict(installed_params)
     
     # If not found, raise error
     raise FileNotFoundError(
@@ -60,12 +63,10 @@ def load_sim_parameters(competition: str, logger: logging.Logger) -> str:
     
     Args:
         competition: Competition name (e.g., 'in_house')
+        logger: Logger object
         
     Returns:
         Path to the simulation config file (as string)
-        
-    Raises:
-        FileNotFoundError: If config file cannot be found
     """
     config_filename = f"{competition}.yaml"
     config_path = find_package_resource(
@@ -87,11 +88,6 @@ def initialize_mode(logger: logging.Logger, node_path: str, params: dict) -> Nod
         
     Returns:
         Initialized node instance
-        
-    Raises:
-        ValueError: If node_path is invalid or parameters are missing/invalid
-        ImportError: If the module cannot be imported
-        AttributeError: If the class is not found in the module
     """
     logger.debug(f"Initializing mode: {node_path} with params: {params}")
     
@@ -149,7 +145,7 @@ def launch_setup(context, *args, **kwargs):
             f"Invalid competition: {competition_num}. Must be one of {valid_values}"
         )
 
-    scoring_param = params.get("scoring", DEFAULT_USE_SCORING)
+    scoring_param = params.get("use_scoring", DEFAULT_USE_SCORING)
 
     if isinstance(scoring_param, str):
         use_scoring = scoring_param.lower() == 'true'
@@ -158,42 +154,122 @@ def launch_setup(context, *args, **kwargs):
 
 
     px4_path_raw = LaunchConfiguration("px4_path").perform(context)
+    vehicle_model = LaunchConfiguration("vehicle_model").perform(context)
 
     if px4_path_raw is None:
         raise RuntimeError("PX4 path is required")
-    
-    px4_path = os.path.expanduser(px4_path_raw)
 
+    px4_path = os.path.expanduser(px4_path_raw)
     sae_ws_path = os.path.expanduser(os.getcwd())
 
-    spawn_world = ExecuteProcess(
-        cmd=[
-            "python3",
-            "Tools/simulation/gz/simulation-gazebo",
-            f"--world={competition}",
-        ],
-        cwd=px4_path,
-        output="screen",
-        name="spawn_world",
-    )
+    # Clear both models and worlds directories for clean state
+    models_dir = Path.home() / '.simulation-gazebo' / 'models'
+    worlds_dir = Path.home() / '.simulation-gazebo' / 'worlds'
+
+    if models_dir.exists():
+        shutil.rmtree(models_dir)
+        logger.info(f"Cleared models directory: {models_dir}")
+
+    if worlds_dir.exists():
+        shutil.rmtree(worlds_dir)
+        logger.info(f"Cleared worlds directory: {worlds_dir}")
+
+    # Copy PX4 models
+    logger.info(f"Copying PX4 vehicle model: {vehicle_model}")
+    copy_px4_models(px4_path, [vehicle_model])
 
     sim_params, sim_config_path = load_sim_parameters(competition, logger)
 
     if "world" not in sim_params:
         raise ValueError(f"Missing 'world' section in simulation config: {sim_config_path}")
 
-    world_params = sim_params["world"].copy()
-    world_params["params"]["competition_name"] = competition
+    world_params = sim_params["world"]
 
-    # Initialize world node - it will generate the world file and copy sim models
+    # Infer world class name from competition name (convert snake_case to PascalCase)
+    world_class_name = ''.join(word.capitalize() for word in competition.split('_'))
+    world_file_name = competition
+
+    # Generate world file
+    logger.info(f"Generating world file for competition: {competition}")
+    try:
+        module_name = f"sim.world_gen.{world_class_name}"
+        world_module = importlib.import_module(module_name)
+        world_generator_class = getattr(world_module, world_class_name)
+
+        # Create generator instance
+        world_generator = world_generator_class(**world_params)
+
+        # Call generate_world with output directory
+        world_generator.generate_world(worlds_dir)
+
+        # Store hoop positions for passing to node
+        hoop_positions = world_generator.hoop_positions
+        logger.info(f"World file generated successfully with {len(hoop_positions)} hoops")
+    except Exception as e:
+        logger.error(f"Failed to generate world file: {e}")
+        raise
+
+    # Copy sim models after world generation
+    logger.info("Copying sim models...")
+    try:
+        src_models_dir = find_package_resource(
+            relative_path='world_gen/models',
+            package_name='sim',
+            resource_type='directory',
+            logger=logger,
+            base_file=Path(__file__)
+        )
+
+        # Find all .sdf world files
+        world_files = list(worlds_dir.glob('*.sdf'))
+        if not world_files:
+            logger.warning(f"No world files found in {worlds_dir}")
+        else:
+            # Extract models from all world files
+            all_required_models = set()
+            for world_file in world_files:
+                models = extract_models_from_sdf(world_file)
+                all_required_models.update(models)
+                logger.info(f"Found {len(models)} sim models in {world_file.name}: {models}")
+
+            if all_required_models:
+                logger.info(f"Copying {len(all_required_models)} sim models: {sorted(all_required_models)}")
+                dst_models_dir = Path.home() / '.simulation-gazebo' / 'models'
+                copy_models_to_gazebo(src_models_dir, dst_models_dir, models=list(all_required_models))
+            else:
+                logger.warning("No sim models detected in world files")
+    except Exception as e:
+        logger.error(f"Failed to copy sim models: {e}")
+        raise
+
+    spawn_world = ExecuteProcess(
+        cmd=[
+            "python3",
+            "Tools/simulation/gz/simulation-gazebo",
+            f"--world={world_file_name}",
+        ],
+        cwd=px4_path,
+        output="screen",
+        name="spawn_world",
+    )
+
+    # Start world node for services (like hoop list)
+    # Pass hoop_positions directly to avoid regenerating
+    world_node_params = {'hoop_positions': hoop_positions}
+
     world = Node(
         package="sim",
-        executable=camel_to_snake(world_params["name"]),
-        arguments=[json.dumps(world_params["params"])],
+        executable=competition,
+        arguments=[json.dumps(world_node_params)],
         output="screen",
-        name=world_params["name"],
+        name=world_class_name,
         cwd=sae_ws_path,
     )
+
+    actions = [
+        spawn_world,
+        world,
+    ]
 
     # Initialize scoring node if requested
     scoring = None
@@ -203,39 +279,14 @@ def launch_setup(context, *args, **kwargs):
         else:
             scoring = Node(
                 package="sim",
-                executable=camel_to_snake(sim_params["scoring"]["name"]),
-                arguments=[sim_params["scoring"]["params"]],
+                executable="hoop_scoring_node",
+                arguments=[json.dumps(sim_params["scoring"])],
                 output="screen",
-                name=sim_params["scoring"]["name"],
+                name="HoopScoringNode",
                 cwd=sae_ws_path,
             )
 
-    # Build and return the complete list of actions
-    # Model copying flow:
-    # 1. UAV launch clears models dir and copies PX4 vehicle models + dependencies
-    # 2. WorldNode generates world file and auto-detects/copies sim models (merges with PX4 models)
-    # 3. spawn_world starts Gazebo with the generated world and all models
-    actions = [
-        world,
-        RegisterEventHandler(
-            OnProcessIO(
-                target_action=world,
-                on_stderr=lambda event: (
-                    [spawn_world, LogInfo(msg="World generated, starting Gazebo."), scoring] if b"World file ready at:" in event.text else None
-                )
-            )
-        )
-    ]
-    
-    if scoring:
-        actions.append(
-            RegisterEventHandler(
-                OnProcessStart(
-                    target_action=scoring,
-                    on_start=[LogInfo(msg="Scoring node started.")],
-                )
-            )
-        )
+            actions.append(scoring)
     
     return actions
 
@@ -244,6 +295,7 @@ def generate_launch_description():
     return LaunchDescription(
         [
             DeclareLaunchArgument("px4_path", default_value="~/PX4-Autopilot"),
+            DeclareLaunchArgument("vehicle_model", default_value="x500_mono_cam"),
             OpaqueFunction(function=launch_setup),
         ]
     )

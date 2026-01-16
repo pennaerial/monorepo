@@ -1,8 +1,9 @@
 import os
 import re
-import yaml
 import shutil
 from pathlib import Path
+
+import yaml
 
 R_earth = 6378137.0  # Earth's radius in meters (WGS84)
 
@@ -106,8 +107,6 @@ def _get_model_dependencies(model_path: Path) -> list[str]:
     Returns:
         List of model names that this model depends on
     """
-    import re
-
     dependencies = []
     model_sdf = model_path / 'model.sdf'
 
