@@ -1,12 +1,14 @@
 import random
 import xml.etree.ElementTree as ET
 from sim.world_gen import WorldNode
+from sim.world_gen.entity import Entity
 from xml.dom import minidom
 from pathlib import Path
 from abc import ABC, abstractmethod
 from typing import List, Tuple, Optional
 from sim_interfaces.srv import HoopList
 from sim.world_gen import WorldNode
+from ros_gz_interfaces.srv import SpawnEntity
 import math
 import rclpy
 import sys
@@ -405,8 +407,10 @@ class HoopCourseNode(WorldNode):
         self.max_dist = max_dist
         self.world_name = world_name
         self.height = height
-        self.hoop_positions: List[Pose] = []
-        self.generate_world()
+        self.hoops: List[Entity] = []
+        self.instantiate_static_world(template_world_path=world_name)
+        # self.generate_world()
+
         
         # Create service for providing hoop positions
         self.srv = self.create_service(HoopList, "list_hoops", self.hoop_list_req)
@@ -425,59 +429,63 @@ class HoopCourseNode(WorldNode):
         return response
 
 
-    def add_hoops(self, input_file, output_file):
+    def add_hoops(self, hoops: List[Entity]):
+        if len(hoops) == 0:
+            raise RuntimeError("hoops is empty! Need hoops to create dlzs")
+        model_base_path = "~/.simulation-gazebo/models"
         # Expand ~, make absolute, and validate paths
-        in_path = Path(input_file).expanduser().resolve()
-        out_path = Path(output_file).expanduser().resolve()
+        # in_path = Path(input_file).expanduser().resolve()
+        # out_path = Path(output_file).expanduser().resolve()
         
-        self.get_logger().debug(f"Input world file: {in_path}")
-        self.get_logger().debug(f"Output world file: {out_path}")
-        if not in_path.exists():
-            raise FileNotFoundError(
-                f"Input SDF not found: {in_path}\nCWD: {Path.cwd().resolve()}"
-            )
-        try:
-            out_path.parent.mkdir(parents=True, exist_ok=True)
-        except OSError as e:
-            raise OSError(f"Failed to create output directory {out_path.parent}: {e}")
+        # self.get_logger().debug(f"Input world file: {in_path}")
+        # self.get_logger().debug(f"Output world file: {out_path}")
+        # if not in_path.exists():
+        #     raise FileNotFoundError(
+        #         f"Input SDF not found: {in_path}\nCWD: {Path.cwd().resolve()}"
+        #     )
+        # try:
+        #     out_path.parent.mkdir(parents=True, exist_ok=True)
+        # except OSError as e:
+        #     raise OSError(f"Failed to create output directory {out_path.parent}: {e}")
 
-        # Parse
-        try:
-            tree = ET.parse(str(in_path))  # str() for safety on older libs
-            root = tree.getroot()
-        except ET.ParseError as e:
-            raise ValueError(f"Failed to parse XML file {in_path}: {e}")
-        except Exception as e:
-            raise RuntimeError(f"Error reading SDF file {in_path}: {e}")
+        # # Parse
+        # try:
+        #     tree = ET.parse(str(in_path))  # str() for safety on older libs
+        #     root = tree.getroot()
+        # except ET.ParseError as e:
+        #     raise ValueError(f"Failed to parse XML file {in_path}: {e}")
+        # except Exception as e:
+        #     raise RuntimeError(f"Error reading SDF file {in_path}: {e}")
 
-        # handle namespace if present (root.tag may be like "{...}sdf")
-        ns = ""
-        if root.tag.startswith("{"):
-            ns = root.tag.split("}")[0] + "}"
+        # # handle namespace if present (root.tag may be like "{...}sdf")
+        # ns = ""
+        # if root.tag.startswith("{"):
+        #     ns = root.tag.split("}")[0] + "}"
 
-        # try to find <world> with/without namespace
-        world = root.find(f"{ns}world") or root.find("world") or root.find(".//world")
-        if world is None:
-            raise RuntimeError("No <world> tag found in the SDF!")
+        # # try to find <world> with/without namespace
+        # world = root.find(f"{ns}world") or root.find("world") or root.find(".//world")
+        # if world is None:
+        #     raise RuntimeError("No <world> tag found in the SDF!")
 
         # Add new hoops with given positions
-        for i, pos in enumerate(self.hoop_positions, start=1):
-            inc = ET.Element("include")
-            x, y, z, roll, pitch, yaw = pos
-            z = 1 if z < 1 else z
-            ET.SubElement(inc, "uri").text = "model://hoop"
-            ET.SubElement(inc, "pose").text = f"{x} {y} {z} {roll} {pitch} {yaw}"
-            ET.SubElement(inc, "name").text = f"hoop_{i}"
-            world.append(inc)
+
+        # for i, pos in enumerate(self.hoop_positions, start=1):
+            # inc = ET.Element("include")
+            # x, y, z, roll, pitch, yaw = pos
+            # z = 1 if z < 1 else z
+            # ET.SubElement(inc, "uri").text = "model://hoop"
+            # ET.SubElement(inc, "pose").text = f"{x} {y} {z} {roll} {pitch} {yaw}"
+            # ET.SubElement(inc, "name").text = f"hoop_{i}"
+            # world.append(inc)
         
        
         # Use last two hoops to define the approach direction
-        if len(self.hoop_positions) >= 2:
-            (prev_x, prev_y, _prev_z, *_), (end_x, end_y, end_z, *_) = self.hoop_positions[-2], self.hoop_positions[-1]
+        if len(hoops) >= 2:
+            (prev_x, prev_y, _prev_z, *_), (end_x, end_y, end_z, *_) = hoops[-2].to_pose(), hoops[-1].to_pose()
         else:
             # Fallback: only one hoop; use UAV->hoop direction
             start_x, start_y, _ = self.uav
-            end_x, end_y, end_z, *_, = self.hoop_positions[-1]
+            end_x, end_y, end_z, *_, = hoops[-1].to_pose()
             prev_x, prev_y = start_x, start_y
 
         # Direction vector in XY from previous hoop to final hoop
@@ -517,6 +525,7 @@ class HoopCourseNode(WorldNode):
             ("blue",  "0 0 1 1"),
         ]
 
+        dlz_entities: List[Entity] = []
         for i in range(num_dlz):
             offset = (i - (num_dlz - 1) / 2.0) * spacing  # -s, 0, +s
             dlz_x = center_x + offset * perp_x
@@ -524,45 +533,55 @@ class HoopCourseNode(WorldNode):
 
             color_name, rgba = colors[i]
 
-            dlz_inc = ET.Element("include")
-            ET.SubElement(dlz_inc, "uri").text = "model://dlz_" + color_name
-            ET.SubElement(dlz_inc, "name").text = f"dlz_{i+1}"
-            ET.SubElement(dlz_inc, "pose").text = f"{dlz_x} {dlz_y} {dlz_z} {roll} {pitch} {yaw}"
+            # dlz_inc = ET.Element("include")
+            # ET.SubElement(dlz_inc, "uri").text = "model://dlz_" + color_name
+            # ET.SubElement(dlz_inc, "name").text = f"dlz_{i+1}"
+            # ET.SubElement(dlz_inc, "pose").text = f"{dlz_x} {dlz_y} {dlz_z} {roll} {pitch} {yaw}"
+            dlz_entities.append(
+                Entity(
+                    name=f"dlz_{i+1}",
+                    path_to_sdf=f"{model_base_path}/dlz_{color_name}/model.sdf",
+                    position=(dlz_x, dlz_y, dlz_z),
+                    rpy=(roll, pitch, yaw),
+                    world=self.competition_name
+                )
+            )
 
             # --- Material override ---
             # This forces all visuals of the included model to use the chosen color
-            model_override = ET.SubElement(dlz_inc, "model")
-            link_override = ET.SubElement(model_override, "link", {"name": "link"})  # assumes main link is "link"
-            visual_override = ET.SubElement(link_override, "visual", {"name": "visual"})
-            material = ET.SubElement(visual_override, "material")
-            # ambient = ET.SubElement(material, "ambient")
-            diffuse = ET.SubElement(material, "diffuse")
+            # model_override = ET.SubElement(dlz_inc, "model")
+            # link_override = ET.SubElement(model_override, "link", {"name": "link"})  # assumes main link is "link"
+            # visual_override = ET.SubElement(link_override, "visual", {"name": "visual"})
+            # material = ET.SubElement(visual_override, "material")
+            # # ambient = ET.SubElement(material, "ambient")
+            # diffuse = ET.SubElement(material, "diffuse")
 
-            # ambient.text = rgba
-            diffuse.text = rgba
+            # # ambient.text = rgba
+            # diffuse.text = rgba
 
-            world.append(dlz_inc)
+            # world.append(dlz_inc)
 
 
-        # --- remove whitespace-only text/tail nodes to avoid minidom producing extra blank lines ---
-        def strip_whitespace(elem):
-            if elem.text is not None and elem.text.strip() == "":
-                elem.text = None
-            for child in list(elem):
-                strip_whitespace(child)
-                if child.tail is not None and child.tail.strip() == "":
-                    child.tail = None
-        strip_whitespace(root)
+        # # --- remove whitespace-only text/tail nodes to avoid minidom producing extra blank lines ---
+        # def strip_whitespace(elem):
+        #     if elem.text is not None and elem.text.strip() == "":
+        #         elem.text = None
+        #     for child in list(elem):
+        #         strip_whitespace(child)
+        #         if child.tail is not None and child.tail.strip() == "":
+        #             child.tail = None
+        # strip_whitespace(root)
 
-        # Pretty print and write
-        try:
-            rough_bytes = ET.tostring(root, encoding="utf-8")
-            pretty = minidom.parseString(rough_bytes.decode("utf-8")).toprettyxml(indent="  ")
-            lines = [ln for ln in pretty.splitlines() if ln.strip() != ""]
-            out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-            self.get_logger().info(f"Successfully generated world file: {out_path}")
-        except Exception as e:
-            raise RuntimeError(f"Failed to write output world file {out_path}: {e}")
+        # # Pretty print and write
+        # try:
+        #     rough_bytes = ET.tostring(root, encoding="utf-8")
+        #     pretty = minidom.parseString(rough_bytes.decode("utf-8")).toprettyxml(indent="  ")
+        #     lines = [ln for ln in pretty.splitlines() if ln.strip() != ""]
+        #     out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        #     self.get_logger().info(f"Successfully generated world file: {out_path}")
+        # except Exception as e:
+        #     raise RuntimeError(f"Failed to write output world file {out_path}: {e}")
+        return dlz_entities
 
     def generate_world(self) -> None:
         """
@@ -623,12 +642,31 @@ class HoopCourseNode(WorldNode):
             else:
                 raise ValueError(f"Invalid course: {self.course}")
                 
-            self.hoop_positions = course.generate_course()
-            self.get_logger().info(f"Generated {len(self.hoop_positions)} hoops for {self.course} course")
-            self.add_hoops(input_file=self.world_name, output_file=str(self.output_path))
+            hoop_positions = course.generate_course()
+            for idx, (x, y, z, roll, pitch, yaw) in enumerate(hoop_positions, start=1):
+                hoop_entity = Entity(
+                    name=f"hoop_{idx}",
+                    path_to_sdf="~/.simulation-gazebo/models/hoop/model.sdf",
+                    position=(x, y, z),
+                    rpy=(roll, pitch, yaw),
+                    world=self.competition_name
+                )
+                self.hoops.append(hoop_entity)
+                req = SpawnEntity.Request()
+                req.entity_factory = hoop_entity.to_entity_factory_msg()
+                self.spawn_entity_client.call_async(req)
+
+            self.dlz_entities = self.add_hoops(self.hoops)
+            for idx, dlz_ent in enumerate(self.dlz_entities, start=1):
+                req = SpawnEntity.Request()
+                req.entity_factory = dlz_ent.to_entity_factory_msg()
+                self.spawn_entity_client.call_async(req)
+            
+            self.get_logger().info(f"Generated {len(self.hoops)} hoops for {self.course} course")
         except Exception as e:
             self.get_logger().error(f"Failed to generate world: {e}")
             raise
+        return True
 
 def main(args=None):
     rclpy.init(args=args)
