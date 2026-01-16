@@ -417,7 +417,8 @@ class HoopCourseNode(WorldNode):
     
     def hoop_list_req(self, request, response):
         response.hoop_positions = []
-        for (x, y, z, roll, pitch, yaw) in self.hoop_positions:
+        for hoop in self.hoops:
+            (x, y, z, roll, pitch, yaw) = hoop.to_pose()
             hp = HoopPose()
             hp.x = float(x)
             hp.y = float(y)
@@ -428,56 +429,11 @@ class HoopCourseNode(WorldNode):
             response.hoop_positions.append(hp)
         return response
 
-
-    def add_hoops(self, hoops: List[Entity]):
+    # Use hoop orientation to center DLZs
+    def create_dlzs_from_hoops(self, hoops: List[Entity]) -> List[Entity]:
         if len(hoops) == 0:
             raise RuntimeError("hoops is empty! Need hoops to create dlzs")
         model_base_path = "~/.simulation-gazebo/models"
-        # Expand ~, make absolute, and validate paths
-        # in_path = Path(input_file).expanduser().resolve()
-        # out_path = Path(output_file).expanduser().resolve()
-        
-        # self.get_logger().debug(f"Input world file: {in_path}")
-        # self.get_logger().debug(f"Output world file: {out_path}")
-        # if not in_path.exists():
-        #     raise FileNotFoundError(
-        #         f"Input SDF not found: {in_path}\nCWD: {Path.cwd().resolve()}"
-        #     )
-        # try:
-        #     out_path.parent.mkdir(parents=True, exist_ok=True)
-        # except OSError as e:
-        #     raise OSError(f"Failed to create output directory {out_path.parent}: {e}")
-
-        # # Parse
-        # try:
-        #     tree = ET.parse(str(in_path))  # str() for safety on older libs
-        #     root = tree.getroot()
-        # except ET.ParseError as e:
-        #     raise ValueError(f"Failed to parse XML file {in_path}: {e}")
-        # except Exception as e:
-        #     raise RuntimeError(f"Error reading SDF file {in_path}: {e}")
-
-        # # handle namespace if present (root.tag may be like "{...}sdf")
-        # ns = ""
-        # if root.tag.startswith("{"):
-        #     ns = root.tag.split("}")[0] + "}"
-
-        # # try to find <world> with/without namespace
-        # world = root.find(f"{ns}world") or root.find("world") or root.find(".//world")
-        # if world is None:
-        #     raise RuntimeError("No <world> tag found in the SDF!")
-
-        # Add new hoops with given positions
-
-        # for i, pos in enumerate(self.hoop_positions, start=1):
-            # inc = ET.Element("include")
-            # x, y, z, roll, pitch, yaw = pos
-            # z = 1 if z < 1 else z
-            # ET.SubElement(inc, "uri").text = "model://hoop"
-            # ET.SubElement(inc, "pose").text = f"{x} {y} {z} {roll} {pitch} {yaw}"
-            # ET.SubElement(inc, "name").text = f"hoop_{i}"
-            # world.append(inc)
-        
        
         # Use last two hoops to define the approach direction
         if len(hoops) >= 2:
@@ -518,7 +474,7 @@ class HoopCourseNode(WorldNode):
         yaw = math.atan2(dir_y, dir_x)
         roll = 0.0
         pitch = 0.0
-# Colors for 3 DLZs
+        # Colors for 3 DLZs
         colors = [
             ("red",   "1 0 0 1"),
             ("green", "0 1 0 1"),
@@ -533,10 +489,6 @@ class HoopCourseNode(WorldNode):
 
             color_name, rgba = colors[i]
 
-            # dlz_inc = ET.Element("include")
-            # ET.SubElement(dlz_inc, "uri").text = "model://dlz_" + color_name
-            # ET.SubElement(dlz_inc, "name").text = f"dlz_{i+1}"
-            # ET.SubElement(dlz_inc, "pose").text = f"{dlz_x} {dlz_y} {dlz_z} {roll} {pitch} {yaw}"
             dlz_entities.append(
                 Entity(
                     name=f"dlz_{i+1}",
@@ -546,41 +498,6 @@ class HoopCourseNode(WorldNode):
                     world=self.competition_name
                 )
             )
-
-            # --- Material override ---
-            # This forces all visuals of the included model to use the chosen color
-            # model_override = ET.SubElement(dlz_inc, "model")
-            # link_override = ET.SubElement(model_override, "link", {"name": "link"})  # assumes main link is "link"
-            # visual_override = ET.SubElement(link_override, "visual", {"name": "visual"})
-            # material = ET.SubElement(visual_override, "material")
-            # # ambient = ET.SubElement(material, "ambient")
-            # diffuse = ET.SubElement(material, "diffuse")
-
-            # # ambient.text = rgba
-            # diffuse.text = rgba
-
-            # world.append(dlz_inc)
-
-
-        # # --- remove whitespace-only text/tail nodes to avoid minidom producing extra blank lines ---
-        # def strip_whitespace(elem):
-        #     if elem.text is not None and elem.text.strip() == "":
-        #         elem.text = None
-        #     for child in list(elem):
-        #         strip_whitespace(child)
-        #         if child.tail is not None and child.tail.strip() == "":
-        #             child.tail = None
-        # strip_whitespace(root)
-
-        # # Pretty print and write
-        # try:
-        #     rough_bytes = ET.tostring(root, encoding="utf-8")
-        #     pretty = minidom.parseString(rough_bytes.decode("utf-8")).toprettyxml(indent="  ")
-        #     lines = [ln for ln in pretty.splitlines() if ln.strip() != ""]
-        #     out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-        #     self.get_logger().info(f"Successfully generated world file: {out_path}")
-        # except Exception as e:
-        #     raise RuntimeError(f"Failed to write output world file {out_path}: {e}")
         return dlz_entities
 
     def generate_world(self) -> None:
@@ -644,6 +561,7 @@ class HoopCourseNode(WorldNode):
                 
             hoop_positions = course.generate_course()
             for idx, (x, y, z, roll, pitch, yaw) in enumerate(hoop_positions, start=1):
+                z = 1 if z < 1 else z
                 hoop_entity = Entity(
                     name=f"hoop_{idx}",
                     path_to_sdf="~/.simulation-gazebo/models/hoop/model.sdf",
@@ -656,7 +574,7 @@ class HoopCourseNode(WorldNode):
                 req.entity_factory = hoop_entity.to_entity_factory_msg()
                 self.spawn_entity_client.call_async(req)
 
-            self.dlz_entities = self.add_hoops(self.hoops)
+            self.dlz_entities = self.create_dlzs_from_hoops(self.hoops)
             for idx, dlz_ent in enumerate(self.dlz_entities, start=1):
                 req = SpawnEntity.Request()
                 req.entity_factory = dlz_ent.to_entity_factory_msg()
@@ -665,7 +583,7 @@ class HoopCourseNode(WorldNode):
             self.get_logger().info(f"Generated {len(self.hoops)} hoops for {self.course} course")
         except Exception as e:
             self.get_logger().error(f"Failed to generate world: {e}")
-            raise
+            return False
         return True
 
 def main(args=None):
