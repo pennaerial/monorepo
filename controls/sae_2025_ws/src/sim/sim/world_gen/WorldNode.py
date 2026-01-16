@@ -16,6 +16,8 @@ from sim.utils import camel_to_snake, find_package_resource, copy_models_to_gaze
 import xml.etree.ElementTree as ET
 import logging
 import random
+from std_srvs.srv import Trigger
+from ros_gz_interfaces.srv import SpawnEntity
 
 class WorldNode(Node, ABC):
     """
@@ -52,6 +54,8 @@ class WorldNode(Node, ABC):
         
         self.get_logger().info(f"Initializing world node for competition: {competition_name}")
         self.setup_gazebo_models(self.get_logger())
+        self.trigger_srv = self.create_service(Trigger, f"/{self.get_name()}/trigger_world_gen", self.trigger_world_gen_req)
+        self.spawn_entity_client = self.create_client(SpawnEntity, f"/world/{competition_name}/create")
 
     def setup_gazebo_models(self, logger: logging.Logger) -> None:
         """
@@ -133,9 +137,16 @@ class WorldNode(Node, ABC):
 
         except Exception as e:
             raise RuntimeError(f"Failed to write output SDF to {out_path}: {e}")
+    
+    def trigger_world_gen_req(self, request, response):
+        self.get_logger().info("Starting Dynamic World Generation!")
+        response.success = self.generate_world()
+        response.message = "World generation successful" if response.success else "World generation failed"
+        return response
+        
 
     @abstractmethod
-    def generate_world(self) -> None:
+    def generate_world(self) -> bool:
         """
         Generate the world file and write it to self.output_path.
         
@@ -143,8 +154,11 @@ class WorldNode(Node, ABC):
         1. Generate world geometry/obstacles based on competition parameters
         2. Write the SDF world file to self.output_path
         3. Store any world metadata needed for services/topics
+
+        return True if dynamic generation is successful, False otherwise
         """
-        pass
+        return True
+
 
     def get_world_path(self) -> Path:
         """
