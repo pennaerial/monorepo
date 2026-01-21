@@ -11,9 +11,12 @@ from launch_ros.actions import Node
 from uav.utils import vehicle_map, find_folder_with_heuristic, load_launch_parameters, extract_vision_nodes
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.logging import get_logger
 from ament_index_python.packages import get_package_share_directory
 
 def launch_setup(context, *args, **kwargs):
+    logger =  get_logger('main.launch')
+    
     # Load launch parameters from the YAML file.
     print("Loading launch parameters...")
     params = load_launch_parameters()
@@ -107,11 +110,10 @@ def launch_setup(context, *args, **kwargs):
     else:
         raise ValueError(f"Unknown architecture: {arch}")
 
-    camera_topic_name = (
-        "imager" if platform_type == "x86" else "camera"
-    )  # windows -> 'imager'   mac -> 'camera'
-    GZ_CAMERA_TOPIC = f"/world/custom/model/{topic_model_name}_0/link/camera_link/sensor/{camera_topic_name}/image"
-    GZ_CAMERA_INFO_TOPIC = f"/world/custom/model/{topic_model_name}_0/link/camera_link/sensor/{camera_topic_name}/camera_info"
+    logger.debug(f"Running Architecture: {arch}")
+
+    GZ_CAMERA_TOPIC = f"/world/custom/model/{topic_model_name}_0/link/camera_link/sensor/camera/image"
+    GZ_CAMERA_INFO_TOPIC = f"/world/custom/model/{topic_model_name}_0/link/camera_link/sensor/camera/camera_info"
 
     sae_ws_path = os.path.expanduser(os.getcwd())
     
