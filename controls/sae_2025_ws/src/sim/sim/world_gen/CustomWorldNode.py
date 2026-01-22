@@ -1,5 +1,5 @@
 from sim.world_gen import WorldNode
-from sim.world_gen.Entity import Entity
+from sim.world_gen.entity import Entity
 from typing import Optional
 import rclpy
 from std_srvs.srv import Trigger
@@ -22,7 +22,8 @@ class CustomWorldNode(WorldNode):
             name="hoop0", 
             path_to_sdf="~/.simulation-gazebo/models/hoop/model.sdf",
             position=(1.834552454198608, 0.917276227099304, 1.7590638244162955),
-            rpy=(0.0, 26.56505117707799, 0.0)
+            rpy=(0.0, 26.56505117707799, 0.0),
+            world=self.world_name
         )
         req = SpawnEntity.Request()
         req.entity_factory = hoop.to_entity_factory_msg()
