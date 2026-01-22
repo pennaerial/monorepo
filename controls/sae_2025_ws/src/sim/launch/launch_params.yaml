@@ -1,2 +1,2 @@
-competition: 2 # 0 for in_house, 1 for iarc, 2 for custom
+competition: 0 # 0 for in_house, 1 for iarc, 2 for custom
 use_scoring: false
