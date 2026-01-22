@@ -48,8 +48,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'hoop_course = sim.world_gen.HoopCourse:main',
-            'hoop_score = sim.scoring.HoopScore:main',
+            'in_house = sim.world_gen.InHouse:main',
+            'hoop_scoring_node = sim.scoring.HoopScoringNode:main',
         ],
     },
 )

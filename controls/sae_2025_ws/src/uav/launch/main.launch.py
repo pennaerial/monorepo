@@ -1,11 +1,21 @@
 #!/usr/bin/env python3
 import os
-import re
 import platform
+import re
+
+from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import ExecuteProcess, LogInfo, OpaqueFunction, RegisterEventHandler, DeclareLaunchArgument
+from launch.actions import (
+    DeclareLaunchArgument,
+    ExecuteProcess,
+    IncludeLaunchDescription,
+    LogInfo,
+    OpaqueFunction,
+    RegisterEventHandler,
+)
 from launch.event_handlers import OnProcessIO, OnProcessStart
 from launch.events.process import ProcessIO
+from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from uav.utils import vehicle_map, find_folder_with_heuristic, load_launch_parameters, extract_vision_nodes
@@ -170,8 +180,10 @@ def launch_setup(context, *args, **kwargs):
         px4_path = find_folder_with_heuristic('PX4-Autopilot', os.path.expanduser(LaunchConfiguration('px4_path').perform(context)))
 
         # Prepare sim launch arguments with all simulation parameters
+        # Model copying is now handled by sim.launch.py
         sim_launch_args = {
             'px4_path': px4_path,
+            'vehicle_model': topic_model_name,
         }
         
         sim = IncludeLaunchDescription(
@@ -195,7 +207,7 @@ def launch_setup(context, *args, **kwargs):
             sim,
             RegisterEventHandler(
                     OnProcessIO(on_stderr=lambda event: (
-                        [LogInfo(msg="Gazebo process started."), px4_sitl, *vision_node_actions, middleware] if b"Successfully generated world file:" in event.text else None
+                        [LogInfo(msg="World node ready, starting PX4 SITL."), px4_sitl, *vision_node_actions, middleware] if b"World node ready" in event.text else None
                     )
                 )
             ),

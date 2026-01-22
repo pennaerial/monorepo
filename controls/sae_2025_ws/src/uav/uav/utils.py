@@ -1,7 +1,9 @@
 import os
 import re
-import yaml
+import shutil
 from pathlib import Path
+
+import yaml
 
 R_earth = 6378137.0  # Earth's radius in meters (WGS84)
 
@@ -94,3 +96,85 @@ def load_launch_parameters():
     params_file = os.path.join(os.getcwd(), 'src', 'uav', 'launch', 'launch_params.yaml')
     with open(params_file, 'r', encoding='utf-8') as f:
         return yaml.safe_load(f)
+
+def _get_model_dependencies(model_path: Path) -> list[str]:
+    """
+    Parse model.sdf to find dependencies (included models).
+
+    Args:
+        model_path: Path to the model directory
+
+    Returns:
+        List of model names that this model depends on
+    """
+    dependencies = []
+    model_sdf = model_path / 'model.sdf'
+
+    if not model_sdf.exists():
+        return dependencies
+
+    try:
+        with open(model_sdf, 'r') as f:
+            content = f.read()
+            # Find all model:// references (handles both model://name and model://name/path/to/file)
+            # Also find plain model references like <uri>model_name</uri>
+            model_uris = re.findall(r'model://([^/<>]+)', content)
+            plain_uris = re.findall(r'<uri>(?!model://)([^</>]+)</uri>', content)
+            dependencies.extend(model_uris + plain_uris)
+    except Exception as e:
+        print(f"Warning: Could not parse {model_sdf}: {e}")
+
+    return dependencies
+
+def copy_px4_models(px4_path: str, models: list[str]) -> None:
+    """
+    Copy required PX4 vehicle models from PX4-Autopilot to Gazebo models directory.
+
+    Clears ~/.simulation-gazebo/models/ first to ensure a clean state,
+    then recursively copies the specified models and all their dependencies.
+
+    This is called before sim.launch starts, setting up the base PX4 models that
+    will later be merged with sim models (hoop, dlz, etc.) by WorldNode.
+
+    Args:
+        px4_path: Path to PX4-Autopilot directory
+        models: List of model names to copy (e.g., ['x500_mono_cam'])
+    """
+    px4_models_dir = Path(px4_path) / 'Tools' / 'simulation' / 'gz' / 'models'
+    dst_models_dir = Path.home() / '.simulation-gazebo' / 'models'
+
+    # Clear destination directory first to ensure clean state
+    if dst_models_dir.exists():
+        shutil.rmtree(dst_models_dir)
+
+    # Create destination directory
+    dst_models_dir.mkdir(parents=True, exist_ok=True)
+
+    # Track models to copy and already copied to avoid duplicates
+    models_to_copy = set(models)
+    copied_models = set()
+
+    while models_to_copy:
+        model_name = models_to_copy.pop()
+
+        if model_name in copied_models:
+            continue
+
+        src_model = px4_models_dir / model_name
+        dst_model = dst_models_dir / model_name
+
+        if not src_model.exists():
+            print(f"Warning: PX4 model '{model_name}' not found in {px4_models_dir}")
+            continue
+
+        # Copy the model
+        if src_model.is_dir():
+            shutil.copytree(src_model, dst_model)
+            copied_models.add(model_name)
+            print(f"Copied PX4 model: {model_name}")
+
+            # Find and queue dependencies
+            dependencies = _get_model_dependencies(src_model)
+            for dep in dependencies:
+                if dep not in copied_models:
+                    models_to_copy.add(dep)
