@@ -574,6 +574,7 @@ class HoopCourseNode(WorldNode):
                 req.entity_factory = hoop_entity.to_entity_factory_msg()
                 self.spawn_entity_client.call_async(req)
 
+
             self.dlz_entities = self.create_dlzs_from_hoops(self.hoops)
             for idx, dlz_ent in enumerate(self.dlz_entities, start=1):
                 req = SpawnEntity.Request()

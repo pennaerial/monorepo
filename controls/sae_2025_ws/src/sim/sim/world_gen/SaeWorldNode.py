@@ -22,19 +22,10 @@ class SaeWorldNode(WorldNode):
         #Store entities to be spawned
         entities: List[Entity] = []
 
-        hoop = Entity(
-            name="hoop0", 
-            path_to_sdf="~/.simulation-gazebo/models/hoop/model.sdf",
-            position=(1.834552454198608, 0.917276227099304, 1.7590638244162955),
-            rpy=(0.0, 26.56505117707799, 0.0),
-            world=self.world_name
-        )
-        entities.append(hoop)
-
         dlz = Entity(
             name="dlz",
             path_to_sdf="~/.simulation-gazebo/models/dlz/model.sdf",
-            position=(0.0, 0.0, 0.0),
+            position=(30.0, -20.0, 0.0),
             rpy=(0.0, 0.0, 0.0),
             world=self.competition_name
         )
