@@ -14,11 +14,13 @@ on:
 
 env:
   ROS_DISTRO: humble
+  GZ_VERSION: harmonic
 
 jobs:
   build:
-    name: Build ROS 2 Workspace (ARM64 via QEMU)
-    runs-on: ubuntu-22.04
+    name: Build ROS 2 Workspace (ARM64)
+    # ARM64 runner - compatible with Raspberry Pi
+    runs-on: ubuntu-22.04-arm
     
     steps:
       - name: Checkout repository
@@ -26,13 +28,40 @@ jobs:
         with:
           submodules: recursive
       
-      - name: Set up QEMU for ARM64 emulation
-        uses: docker/setup-qemu-action@v3
+      - name: Setup ROS 2 Humble
+        uses: ros-tooling/setup-ros@v0.7
         with:
-          platforms: arm64
+          required-ros-distributions: humble
       
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            python3-colcon-common-extensions \
+            python3-rosdep \
+            python3-vcstool \
+            ros-humble-cv-bridge \
+            python3-opencv \
+            libgflags-dev \
+            ros-humble-gps-msgs \
+            ros-humble-vision-msgs
+          
+          # Initialize rosdep if needed
+          sudo rosdep init || true
+          rosdep update
+      
+      - name: Install workspace dependencies via rosdep
+        working-directory: controls/sae_2025_ws
+        run: |
+          source /opt/ros/humble/setup.bash
+          rosdep install -r --from-paths src -i -y --rosdistro humble || true
+      
+      - name: Build workspace
+        working-directory: controls/sae_2025_ws
+        run: |
+          source /opt/ros/humble/setup.bash
+          export GZ_VERSION=harmonic
+          colcon build --symlink-install
       
       - name: Get short SHA
         id: sha
@@ -42,39 +71,12 @@ jobs:
         id: info
         run: |
           echo "timestamp=$(date -u +%Y%m%d-%H%M%S)" >> $GITHUB_OUTPUT
-      
-      - name: Build ARM64 Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./controls/sae_2025_ws
-          file: ./controls/sae_2025_ws/Dockerfile.build
-          platforms: linux/arm64
-          push: false
-          load: true
-          tags: ros2-build:arm64
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-      
-      - name: Extract build artifacts from container
-        working-directory: controls/sae_2025_ws
-        run: |
-          # Create output directory
-          mkdir -p deploy-out
-          
-          # Run container to copy out the deploy directory
-          docker run --rm --platform linux/arm64 \
-            -v $PWD/deploy-out:/deploy-out \
-            ros2-build:arm64
-          
-          # Move to expected location
-          mv deploy-out/deploy deploy || mv deploy-out deploy
-          
-          ls -la deploy/
+          echo "full_sha=${{ github.sha }}" >> $GITHUB_OUTPUT
       
       - name: Create build metadata
         working-directory: controls/sae_2025_ws
         run: |
-          cat > deploy/install/BUILD_INFO.txt << EOF
+          cat > install/BUILD_INFO.txt << EOF
           Build Information
           =================
           Commit SHA: ${{ github.sha }}
@@ -83,23 +85,45 @@ jobs:
           Branch: ${{ github.ref_name }}
           ROS Distro: humble
           Target Architecture: arm64 (Raspberry Pi compatible)
-          Build Method: Docker + QEMU cross-compilation
           
           Deployment Instructions:
           1. Extract to your Raspberry Pi
           2. cd to the extracted directory
-          3. Source: source /opt/ros/humble/setup.bash && source install/setup.bash
+          3. Source the setup: source install/setup.bash
           4. Run: ros2 launch uav main.launch.py
           
           Environment Overrides:
           - UAV_SIM=false (already set in hardware config)
           - UAV_MISSION=mission_name
           - UAV_DEBUG=true/false
+          - UAV_LAUNCH_PARAMS=/path/to/custom/params.yaml
           EOF
+      
+      - name: Prepare runtime files
+        working-directory: controls/sae_2025_ws
+        run: |
+          # Create deployment directory structure
+          mkdir -p deploy
+          
+          # Copy install directory (built artifacts)
+          cp -r install deploy/
+          
+          # Copy source files needed at runtime
+          mkdir -p deploy/src/uav
+          cp -r src/uav/launch deploy/src/uav/
+          cp -r src/uav/uav/missions deploy/src/uav/uav/ 2>/dev/null || mkdir -p deploy/src/uav/uav/missions
+          cp -r src/uav/uav/autonomous_modes deploy/src/uav/uav/
+          
+          # Copy hardware config as the default
+          cp src/uav/launch/launch_params_hardware.yaml deploy/launch_params.yaml
+          
+          # Copy deploy script
+          cp scripts/deploy.sh deploy/ 2>/dev/null || true
       
       - name: Package build artifacts
         working-directory: controls/sae_2025_ws
         run: |
+          # Create a tarball of the deploy directory
           cd deploy
           tar -czvf ../ros2-build-${{ steps.sha.outputs.short_sha }}.tar.gz .
       
@@ -122,7 +146,6 @@ jobs:
             **Commit:** ${{ github.sha }}
             **Built:** ${{ steps.info.outputs.timestamp }}
             **Branch:** ${{ github.ref_name }}
-            **Method:** Docker + QEMU cross-compilation
             
             ### Quick Deploy to Raspberry Pi
             
@@ -153,3 +176,4 @@ jobs:
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
