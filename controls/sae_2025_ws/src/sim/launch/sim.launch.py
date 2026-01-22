@@ -194,7 +194,8 @@ def launch_setup(context, *args, **kwargs):
     try:
         module_name = f"sim.world_gen.{world_class_name}"
         world_module = importlib.import_module(module_name)
-        world_generator_class = getattr(world_module, world_class_name)
+        generator_class_name = f"{world_class_name}Generator"
+        world_generator_class = getattr(world_module, generator_class_name)
 
         # Create generator instance
         world_generator = world_generator_class(**world_params)

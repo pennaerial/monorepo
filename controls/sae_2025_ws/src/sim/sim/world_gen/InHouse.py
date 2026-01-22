@@ -10,10 +10,11 @@ from typing import List, Tuple
 from xml.dom import minidom
 
 import rclpy
-from rclpy.node import Node
 from sim_interfaces.msg import HoopPose
 from sim_interfaces.srv import HoopList
 from sim.utils import find_package_resource
+from sim.world_gen.WorldGenerator import WorldGenerator
+from sim.world_gen.WorldNode import WorldNode
 
 Pose = Tuple[float, float, float, float, float, float]
 
@@ -288,13 +289,13 @@ class BezierCourse(CourseStyle):
         return hoops
 
 
-class InHouse:
+class InHouseGenerator(WorldGenerator):
     """
     World generator for in_house competition.
 
     Generates a hoop course with various course styles and writes the world file.
     After generation, hoop_positions contains the generated positions which can
-    be passed to InHouseNode.
+    be passed to InHouseNode via create_node().
     """
 
     COURSES = ['ascent', 'descent', 'slalom', 'bezier', 'straight']
@@ -317,6 +318,10 @@ class InHouse:
 
         self.world_name = "world_gen/worlds/in_house.sdf"
         self._validate_parameters()
+
+    def create_node(self) -> 'InHouseNode':
+        """Create and return the InHouseNode with hoop positions from generation."""
+        return InHouseNode(hoop_positions=self.hoop_positions)
 
     def get_logger(self):
         return self._logger
@@ -466,16 +471,16 @@ class InHouse:
         self._logger.info(f"Generated world file: {output_path}")
 
 
-class InHouseNode(Node):
+class InHouseNode(WorldNode):
     """
     ROS node for in_house competition.
 
-    Receives hoop positions from InHouse (via launch file) and provides
-    the list_hoops service for querying hoop positions.
+    Created by InHouseGenerator.create_node() with hoop positions from generation.
+    Provides the list_hoops service for querying hoop positions.
     """
 
     def __init__(self, hoop_positions: List[Pose]):
-        super().__init__("InHouseNode")
+        super().__init__()
 
         self.hoop_positions = hoop_positions
 
