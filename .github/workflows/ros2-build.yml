@@ -13,7 +13,6 @@ on:
   workflow_dispatch:  # Manual trigger
 
 env:
-  ROS_DISTRO: humble
   GZ_VERSION: harmonic
 
 jobs:
@@ -22,44 +21,44 @@ jobs:
     # ARM64 runner - compatible with Raspberry Pi
     runs-on: ubuntu-22.04-arm
     
+    # Use official ROS 2 Docker image - skips ROS installation (~5 min faster)
+    container:
+      image: ros:humble-ros-base
+    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           submodules: recursive
       
-      - name: Setup ROS 2 Humble
-        uses: ros-tooling/setup-ros@v0.7
-        with:
-          required-ros-distributions: humble
-      
-      - name: Install dependencies
+      - name: Install build dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
+          apt-get update
+          apt-get install -y --no-install-recommends \
             python3-colcon-common-extensions \
             python3-rosdep \
-            python3-vcstool \
-            ros-humble-cv-bridge \
+            python3-pip \
             python3-opencv \
             libgflags-dev \
+            ros-humble-cv-bridge \
             ros-humble-gps-msgs \
-            ros-humble-vision-msgs
+            ros-humble-vision-msgs \
+            git
           
-          # Initialize rosdep if needed
-          sudo rosdep init || true
-          rosdep update
+          # Initialize rosdep
+          rosdep init 2>/dev/null || true
+          rosdep update --rosdistro humble
       
       - name: Install workspace dependencies via rosdep
         working-directory: controls/sae_2025_ws
         run: |
-          source /opt/ros/humble/setup.bash
+          . /opt/ros/humble/setup.sh
           rosdep install -r --from-paths src -i -y --rosdistro humble || true
       
       - name: Build workspace
         working-directory: controls/sae_2025_ws
         run: |
-          source /opt/ros/humble/setup.bash
+          . /opt/ros/humble/setup.sh
           export GZ_VERSION=harmonic
           colcon build --symlink-install
       
