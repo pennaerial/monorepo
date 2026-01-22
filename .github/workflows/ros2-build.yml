@@ -4,6 +4,7 @@ on:
   push:
     branches: [main, master, integration]
     paths:
+      - '.github/workflows/ros2-build.yml'
       - 'controls/sae_2025_ws/**'
   pull_request:
     branches: [main, master]
