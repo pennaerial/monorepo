@@ -91,6 +91,39 @@ def extract_vision_nodes(yaml_path):
     return vision_nodes
 
 def load_launch_parameters():
-    params_file = os.path.join(os.getcwd(), 'src', 'uav', 'launch', 'launch_params.yaml')
+    """
+    Load launch parameters from YAML file.
+    
+    Supports multiple config sources (in priority order):
+    1. UAV_LAUNCH_PARAMS env var pointing to a custom YAML file
+    2. ./launch_params.yaml in current directory (local override)
+    3. Default: src/uav/launch/launch_params.yaml
+    
+    Individual params can also be overridden via env vars:
+    - UAV_SIM=false  (overrides sim parameter)
+    - UAV_MISSION=my_mission  (overrides mission_name)
+    """
+    # Check for custom config file via env var
+    if os.environ.get('UAV_LAUNCH_PARAMS'):
+        params_file = os.environ['UAV_LAUNCH_PARAMS']
+    # Check for local override in current directory
+    elif os.path.exists('launch_params.yaml'):
+        params_file = 'launch_params.yaml'
+    # Default to source tree location
+    else:
+        params_file = os.path.join(os.getcwd(), 'src', 'uav', 'launch', 'launch_params.yaml')
+    
     with open(params_file, 'r', encoding='utf-8') as f:
-        return yaml.safe_load(f)
+        params = yaml.safe_load(f)
+    
+    # Allow env var overrides for common parameters
+    if os.environ.get('UAV_SIM') is not None:
+        params['sim'] = os.environ['UAV_SIM'].lower() in ('true', '1', 'yes')
+    if os.environ.get('UAV_MISSION'):
+        params['mission_name'] = os.environ['UAV_MISSION']
+    if os.environ.get('UAV_DEBUG'):
+        params['uav_debug'] = os.environ['UAV_DEBUG'].lower() in ('true', '1', 'yes')
+    if os.environ.get('UAV_VISION_DEBUG'):
+        params['vision_debug'] = os.environ['UAV_VISION_DEBUG'].lower() in ('true', '1', 'yes')
+    
+    return params
