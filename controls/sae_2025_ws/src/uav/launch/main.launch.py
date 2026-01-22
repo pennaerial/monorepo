@@ -13,8 +13,10 @@ from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from ament_index_python.packages import get_package_share_directory
 from launch.logging import get_logger
+from launch.logging import get_logger
 
 def launch_setup(context, *args, **kwargs):
+    logger = get_logger('main.launch')
     logger = get_logger('main.launch')
     # Load launch parameters from the YAML file.
     params = load_launch_parameters()
@@ -95,6 +97,7 @@ def launch_setup(context, *args, **kwargs):
 
     
     gz_camera_topic_model = model[3:]  # remove 'gz_' prefix
+    gz_camera_topic_model = model[3:]  # remove 'gz_' prefix
 
     arch = platform.machine().lower()
     if arch in ("x86_64", "amd64", "i386", "i686"):
@@ -146,6 +149,7 @@ def launch_setup(context, *args, **kwargs):
         # Prepare sim launch arguments with all simulation parameters
         sim_launch_args = {
             'px4_path': px4_path,
+            'gz_camera_topic_model': gz_camera_topic_model
             'gz_camera_topic_model': gz_camera_topic_model
         }
         
