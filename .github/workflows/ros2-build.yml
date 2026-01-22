@@ -12,9 +12,6 @@ on:
       - 'controls/sae_2025_ws/**'
   workflow_dispatch:  # Manual trigger
 
-env:
-  GZ_VERSION: harmonic
-
 jobs:
   build:
     name: Build ROS 2 Workspace (ARM64)
@@ -59,8 +56,9 @@ jobs:
         working-directory: controls/sae_2025_ws
         run: |
           . /opt/ros/humble/setup.sh
-          export GZ_VERSION=harmonic
-          colcon build --symlink-install
+          # Skip simulation packages - not needed on real hardware (Pi)
+          colcon build --symlink-install \
+            --packages-skip ros_gz ros_gz_sim ros_gz_interfaces ros_gz_bridge sim
       
       - name: Get short SHA
         id: sha
