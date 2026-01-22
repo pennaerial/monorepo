@@ -200,6 +200,33 @@ def launch_setup(context, *args, **kwargs):
         cwd=sae_ws_path,
     )
 
+    gz_camera_topic_model = LaunchConfiguration("gz_camera_topic_model").perform(context)
+
+    GZ_CAMERA_TOPIC = f"/world/{competition}/model/{gz_camera_topic_model}_0/link/camera_link/sensor/camera/image"
+    GZ_CAMERA_INFO_TOPIC = f"/world/{competition}/model/{gz_camera_topic_model}_0/link/camera_link/sensor/camera/camera_info"
+
+    gz_ros_bridge_camera = Node(
+        package="ros_gz_bridge",
+        executable="parameter_bridge",
+        arguments=[f"{GZ_CAMERA_TOPIC}@sensor_msgs/msg/Image[gz.msgs.Image"],
+        remappings=[(GZ_CAMERA_TOPIC, "/camera")],
+        output="screen",
+        name="gz_ros_bridge_camera",
+        cwd=sae_ws_path,
+    )
+
+    gz_ros_bridge_camera_info = Node(
+        package="ros_gz_bridge",
+        executable="parameter_bridge",
+        arguments=[
+            f"{GZ_CAMERA_INFO_TOPIC}@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo"
+        ],
+        remappings=[(GZ_CAMERA_INFO_TOPIC, "/camera_info")],
+        output="screen",
+        name="gz_ros_bridge_camera_info",
+        cwd=sae_ws_path,
+    )
+
     sim_params, sim_config_path = load_sim_parameters(competition, logger)
 
     if "world" not in sim_params:
@@ -260,15 +287,19 @@ def launch_setup(context, *args, **kwargs):
             OnProcessStart(
                 target_action=spawn_world,
                 on_start=[
-                    LogInfo(msg="spawn_world started, creating gz_ros_bridge_create"),
+                    LogInfo(msg="spawn_world started, creating bridges"),
                     gz_ros_bridge_create,
-                    TimerAction(
-                        period=2.0,
-                        actions=[
-                            trigger_world_gen, 
-                            LogInfo(msg="World Gen Triggered after 2 Seconds")
-                        ],
-                    ),
+                    gz_ros_bridge_camera,
+                    gz_ros_bridge_camera_info,
+                ],
+            )
+        ),
+        RegisterEventHandler(
+            OnProcessStart(
+                target_action=gz_ros_bridge_create,
+                on_start=[
+                    trigger_world_gen, 
+                    LogInfo(msg="World generation triggered")
                 ],
             )
         )
@@ -291,6 +322,7 @@ def generate_launch_description():
     return LaunchDescription(
         [
             DeclareLaunchArgument("px4_path", default_value="~/PX4-Autopilot"),
+            DeclareLaunchArgument("gz_camera_topic_model", default_value="x500_mono_cam"),
             OpaqueFunction(function=launch_setup),
         ]
     )

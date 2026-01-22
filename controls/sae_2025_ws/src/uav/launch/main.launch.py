@@ -171,6 +171,7 @@ def launch_setup(context, *args, **kwargs):
         # Prepare sim launch arguments with all simulation parameters
         sim_launch_args = {
             'px4_path': px4_path,
+            'gz_camera_topic_model': gz_camera_topic_model
         }
         
         sim = IncludeLaunchDescription(
@@ -198,26 +199,26 @@ def launch_setup(context, *args, **kwargs):
                     )
                 )
             ),
-            RegisterEventHandler(
-                OnProcessIO(
-                    target_action=px4_sitl,
-                    on_stdout=lambda event: (
-                        [LogInfo(msg="PX4 SITL started."), gz_ros_bridge_camera, gz_ros_bridge_camera_info] if b"INFO  [init] Spawning model" in event.text else None
-                    )
-                )
-            ),
-            RegisterEventHandler(
-                OnProcessStart(
-                    target_action=gz_ros_bridge_camera,
-                    on_start=LogInfo(msg="Bridge camera topic started.")
-                )
-            ),
-            RegisterEventHandler(
-                OnProcessStart(
-                    target_action=gz_ros_bridge_camera_info,
-                    on_start=LogInfo(msg="Bridge camera info topic started.")
-                )
-            ),
+            # RegisterEventHandler(
+            #     OnProcessIO(
+            #         target_action=px4_sitl,
+            #         on_stdout=lambda event: (
+            #             [LogInfo(msg="PX4 SITL started."), gz_ros_bridge_camera, gz_ros_bridge_camera_info] if b"INFO  [init] Spawning model" in event.text else None
+            #         )
+            #     )
+            # ),
+            # RegisterEventHandler(
+            #     OnProcessStart(
+            #         target_action=gz_ros_bridge_camera,
+            #         on_start=LogInfo(msg="Bridge camera topic started.")
+            #     )
+            # ),
+            # RegisterEventHandler(
+            #     OnProcessStart(
+            #         target_action=gz_ros_bridge_camera_info,
+            #         on_start=LogInfo(msg="Bridge camera info topic started.")
+            #     )
+            # ),
             RegisterEventHandler(
                 OnProcessIO(
                     target_action=px4_sitl,
