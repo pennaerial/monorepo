@@ -14,6 +14,23 @@ blue = ((85, 120, 60), (140, 255, 255))
 yellow = ((10, 100, 100), (30, 255, 255))
 vehicle_id_dict = {'quadcopter': 4010, 'tiltrotor_vtol': 4020, 'fixed_wing': 4003,
                    'standard_vtol': 4004, 'quadtailsitter': 4018}
+'''
+Airframe IDs
+All PX4 supported IDs can be found here: https://docs.px4.io/main/en/airframes/airframe_reference
+However, IDs available for simulation can be found in PX4-Autopilot/ROMFS/px4fmu_common/init.d-posix/airframes
+'''
+vehicle_camera_map = {
+    # Standard PX4 Sim Models (Update mapping as needed)
+    'gz_x500': False,
+    'gz_x500_mono_cam': True,    
+    'gz_x500_mono_cam_down': True,  
+    'gz_x500_depth': True,       
+    'gz_standard_vtol': False,
+    'gz_tiltrotor': False,
+    'gz_rc_cessna': False,
+
+    # Custom/Team Models (Add custom model names below)
+}
 
 class Vehicle(IntEnum):
    """Vehicle class enumeration."""
@@ -139,59 +156,6 @@ def get_airframe_details(px4_path, airframe_id):
             vehicle_class = Vehicle.OTHER
 
     return vehicle_class, model_name
-
-def model_has_camera(px4_path, model_name, scanned_models=None):
-    """
-    Recursively checks an SDF model and its included dependencies for a camera sensor.
-    """
-    if scanned_models is None:
-        scanned_models = set()
-    
-    # Prevent infinite loops (circular dependencies)
-    if model_name in scanned_models:
-        return False
-    scanned_models.add(model_name)
-
-    # 1. Resolve the model path
-    # Standard PX4 Gz models location
-    models_dir = os.path.join(px4_path, 'Tools', 'simulation', 'gz', 'models')
-    sdf_path = os.path.join(models_dir, model_name, 'model.sdf')
-    
-    if not os.path.exists(sdf_path):
-        print(f"Model {model_name} not found in PX4 models directory.")
-        # If model not in PX4, check custom workspace path
-        # Update this to the correct custom path once decided
-        custom_path = os.path.join(os.getcwd(), 'src', 'uav', 'models', model_name, 'model.sdf')
-        if os.path.exists(custom_path):
-            sdf_path = custom_path
-        else:
-            print(f"Model {model_name} not found in custom models directory.")
-            return False
-
-    try:
-        tree = ET.parse(sdf_path)
-        root = tree.getroot()
-        
-        # 2. Check for direct sensor definition
-        for sensor in root.findall(".//sensor"):
-            if sensor.get('type') in ['camera', 'depth', 'imager']:
-                return True
-
-        # 3. Check included models
-        for include in root.findall(".//include"):
-            uri = include.find("uri")
-            if uri is not None and uri.text:
-                # URI format is usually "model://model_name"
-                included_model_name = uri.text.replace("model://", "").strip()
-                print(f"Checking included model: {included_model_name}")
-                # Check the included model
-                if model_has_camera(px4_path, included_model_name, scanned_models):
-                    return True
-
-    except ET.ParseError:
-        print(f"Error parsing SDF for {model_name}")
-        
-    return False
 
 def load_launch_parameters():
     params_file = os.path.join(os.getcwd(), 'src', 'uav', 'launch', 'launch_params.yaml')
