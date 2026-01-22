@@ -16,11 +16,6 @@ from ament_index_python.packages import get_package_share_directory
 
 def launch_setup(context, *args, **kwargs):
     logger =  get_logger('main.launch')
-
-    vehicle_id = int(LaunchConfiguration('vehicle_id').perform(context))
-    start_middleware = LaunchConfiguration('start_middleware').perform(context).lower() == 'true'
-    start_sim = LaunchConfiguration('start_sim').perform(context).lower() == 'true'
-    start_vision = LaunchConfiguration('start_vision').perform(context).lower() == 'true'
     
     # Load launch parameters from the YAML file.
     params = load_launch_parameters()
@@ -45,28 +40,25 @@ def launch_setup(context, *args, **kwargs):
     
     # Build vision node actions.
     vision_nodes = []
-    vision_node_actions = []
-    if start_vision:
-        vision_node_actions = [Node(
-            package='uav',
-            executable='camera',
-            name=f'camera_{vehicle_id}',
-            output='screen'
-        )]
+    vision_node_actions = [Node(
+        package='uav',
+        executable='camera',
+        name='camera',
+        output='screen'
+    )]
 
     for node in extract_vision_nodes(YAML_PATH):
         vision_nodes.append(node)
         # Convert CamelCase node names to snake_case executable names.
         s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', node)
         exe_name = re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
-        if start_vision:
-            vision_node_actions.append(Node(
-                package='uav',
-                executable=exe_name,
-                name=f"{exe_name}_{vehicle_id}",
-                output='screen',
-                parameters=[{'debug': vision_debug_bool, 'sim': sim_bool, 'save_vision': save_vision_bool}],
-            ))
+        vision_node_actions.append(Node(
+            package='uav',
+            executable=exe_name,
+            name=exe_name,
+            output='screen',
+            parameters=[{'debug': vision_debug_bool, 'sim': sim_bool, 'save_vision': save_vision_bool}],
+        ))
     
     # Clear vision node actions if none are found.
     if len(vision_nodes) == 0:
@@ -115,23 +107,18 @@ def launch_setup(context, *args, **kwargs):
 
     logger.debug(f"Running Architecture: {arch}")
 
-    model_name = f"{topic_model_name}_{vehicle_id}"
-
-    GZ_CAMERA_TOPIC = f"/world/custom/model/{model_name}/link/camera_link/sensor/camera/image"
-    GZ_CAMERA_INFO_TOPIC = f"/world/custom/model/{model_name}/link/camera_link/sensor/camera/camera_info"
+    GZ_CAMERA_TOPIC = f"/world/custom/model/{topic_model_name}_0/link/camera_link/sensor/camera/image"
+    GZ_CAMERA_INFO_TOPIC = f"/world/custom/model/{topic_model_name}_0/link/camera_link/sensor/camera/camera_info"
 
     sae_ws_path = os.path.expanduser(os.getcwd())
     
-    ros_camera_topic = "/camera" if vehicle_id == 0 else f"/camera{vehicle_id}"
-    ros_camera_info_topic = "/camera_info" if vehicle_id == 0 else f"/camera_info{vehicle_id}"
-
     gz_ros_bridge_camera = Node(
         package="ros_gz_bridge",
         executable="parameter_bridge",
         arguments=[f"{GZ_CAMERA_TOPIC}@sensor_msgs/msg/Image[gz.msgs.Image"],
-        remappings=[(GZ_CAMERA_TOPIC, ros_camera_topic)],
+        remappings=[(GZ_CAMERA_TOPIC, "/camera")],
         output="screen",
-        name=f"gz_ros_bridge_camera_{vehicle_id}",
+        name="gz_ros_bridge_camera",
         cwd=sae_ws_path,
     )
 
@@ -141,9 +128,9 @@ def launch_setup(context, *args, **kwargs):
         arguments=[
             f"{GZ_CAMERA_INFO_TOPIC}@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo"
         ],
-        remappings=[(GZ_CAMERA_INFO_TOPIC, ros_camera_info_topic)],
+        remappings=[(GZ_CAMERA_INFO_TOPIC, "/camera_info")],
         output="screen",
-        name=f"gz_ros_bridge_camera_info_{vehicle_id}",
+        name="gz_ros_bridge_camera_info",
         cwd=sae_ws_path,
     )
 
@@ -187,49 +174,31 @@ def launch_setup(context, *args, **kwargs):
             'px4_path': px4_path,
         }
         
-        sim = None
-        if start_sim:
-            sim = IncludeLaunchDescription(
-                PythonLaunchDescriptionSource(
-                    os.path.join(
-                        get_package_share_directory('sim'),
-                        'launch',
-                        'sim.launch.py'
-                    )
-                ),
-                launch_arguments=sim_launch_args.items()
-            )
-        if vehicle_id == 0:
-            standalone_cmd =""
-            gz_model_pose_cmd = ""
-        else:
-            standalone_cmd = "PX4_GZ_STANDALONE=1"
-            gz_model_pose_cmd = f"PX4_GZ_MODEL_POSE=\"0, {vehicle_id}\""
+        sim = IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(
+                    get_package_share_directory('sim'),
+                    'launch',
+                    'sim.launch.py'
+                )
+            ),
+            launch_arguments=sim_launch_args.items()
+        )
+
         px4_sitl = ExecuteProcess(
-            cmd=['bash', '-c', f'{standalone_cmd} PX4_SYS_AUTOSTART={autostart} PX4_SIM_MODEL={model} {gz_model_pose_cmd} ./build/px4_sitl_default/bin/px4 -i {vehicle_id}'],
+            cmd=['bash', '-c', f'PX4_GZ_STANDALONE=1 PX4_SYS_AUTOSTART={autostart} PX4_SIM_MODEL={model} ./build/px4_sitl_default/bin/px4'],
             cwd=px4_path,
             output='screen',
-            name=f'px4_sitl_{vehicle_id}'
+            name='px4_sitl'
         )
-        startup_actions = [px4_sitl, *vision_node_actions]
-        if start_middleware:
-            startup_actions.append(middleware)
-
-        actions = []
-        if start_sim:
-            actions.extend([
-                sim,
-                RegisterEventHandler(
-                        OnProcessIO(on_stderr=lambda event: (
-                            [LogInfo(msg="Gazebo process started."), *startup_actions] if b"Successfully generated world file:" in event.text else None
-                        )
+        actions = [
+            sim,
+            RegisterEventHandler(
+                    OnProcessIO(on_stderr=lambda event: (
+                        [LogInfo(msg="Gazebo process started."), px4_sitl, *vision_node_actions, middleware] if b"Successfully generated world file:" in event.text else None
                     )
-                ),
-            ])
-        else:
-            actions.extend(startup_actions)
-
-        actions.extend([
+                )
+            ),
             RegisterEventHandler(
                 OnProcessIO(
                     target_action=px4_sitl,
@@ -256,7 +225,7 @@ def launch_setup(context, *args, **kwargs):
                     on_stdout=make_io_handler("uav"),
                 )
             ),
-        ])
+        ]
     else:
         # Hardware mode: start mission after middleware is ready
         actions = [
@@ -265,26 +234,19 @@ def launch_setup(context, *args, **kwargs):
             middleware,
         ]
     if run_mission_bool:
-        if start_middleware:
-            actions.append(
+        actions.append(
                 RegisterEventHandler(
                     OnProcessIO(
-                        target_action=middleware,
+                        target_action=px4_sitl,
                         on_stdout=make_io_handler("middleware"),
                     )
                 )
             )
-        else:
-            actions.append(mission)
     
     return actions
 
 def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument('px4_path', default_value='~/Tools-users/PX4-Autopilot'),
-        DeclareLaunchArgument('vehicle_id', default_value='0'),
-        DeclareLaunchArgument('start_sim', default_value='true'),
-        DeclareLaunchArgument('start_middleware', default_value='true'),
-        DeclareLaunchArgument('start_vision', default_value='true'),
         OpaqueFunction(function=launch_setup)
     ])
