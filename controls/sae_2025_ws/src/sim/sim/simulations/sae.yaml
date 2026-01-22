@@ -1,0 +1,4 @@
+world:
+  name: SaeWorldNode
+  params:
+    world_name: "src/sim/sim/world_gen/worlds/template.sdf"   # Gazebo world template
