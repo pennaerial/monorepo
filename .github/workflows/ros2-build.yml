@@ -19,7 +19,7 @@ jobs:
   build:
     name: Build ROS 2 Workspace (ARM64)
     # ARM64 runner - compatible with Raspberry Pi
-    runs-on: ubuntu-22.04-arm64
+    runs-on: ubuntu-22.04-arm
     
     steps:
       - name: Checkout repository
