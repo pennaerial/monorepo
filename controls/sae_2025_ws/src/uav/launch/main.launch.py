@@ -150,7 +150,6 @@ def launch_setup(context, *args, **kwargs):
         sim_launch_args = {
             'px4_path': px4_path,
             'gz_camera_topic_model': gz_camera_topic_model
-            'gz_camera_topic_model': gz_camera_topic_model
         }
         
         sim = IncludeLaunchDescription(
