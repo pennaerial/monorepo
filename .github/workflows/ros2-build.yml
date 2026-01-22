@@ -50,20 +50,18 @@ jobs:
         working-directory: controls/sae_2025_ws
         run: |
           . /opt/ros/humble/setup.sh
-          # Only install deps for packages we're building (skip sim/gazebo packages)
+          # Only install deps for hardware packages (skip sim/gazebo)
           rosdep install -r -i -y --rosdistro humble \
-            --from-paths src/uav src/uav_interfaces src/px4_msgs src/actuator_msgs src/sim_interfaces \
+            --from-paths src/uav src/uav_interfaces src/px4_msgs src/actuator_msgs \
             --skip-keys "gz-math7 gz-sim8 gz-transport13 gz-msgs10 gz-plugin2" || true
       
       - name: Build workspace
         working-directory: controls/sae_2025_ws
         run: |
           . /opt/ros/humble/setup.sh
-          # Skip simulation packages - not needed on real hardware (Pi)
-          # This includes ros_gz_* (new naming) and ros_ign_* (legacy naming)
+          # Only build hardware packages - skip all simulation/gazebo packages
           colcon build --symlink-install \
-            --packages-skip-regex 'ros_gz.*' 'ros_ign.*' \
-            --packages-skip sim
+            --packages-up-to uav uav_interfaces px4_msgs actuator_msgs
       
       - name: Get short SHA
         id: sha
