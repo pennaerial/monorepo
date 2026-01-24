@@ -409,7 +409,6 @@ class HoopCourseNode(WorldNode):
         self.height = height
         self.hoops: List[Entity] = []
         self.instantiate_static_world(template_world_path=world_name)
-        # self.generate_world()
 
         
         # Create service for providing hoop positions
