@@ -1,0 +1,16 @@
+# launch_params_hardware.yaml
+# Configuration for running on real hardware (Raspberry Pi)
+# Copy this to launch_params.yaml or set UAV_LAUNCH_PARAMS env var
+
+mission_name: basic
+uav_debug: false
+vision_debug: false
+run_mission: true
+vehicle_type: 0  # 0 for quadrotor, 1 for tiltrotor VTOL, 2 for fixed-wing, 3 for standard VTOL
+save_vision: false
+servo_only: false
+camera_offsets: [0, 0, 0]  # Position of camera relative to payload mechanism, in meters (NED frame)
+
+# IMPORTANT: Set to false for real hardware
+sim: false
+
