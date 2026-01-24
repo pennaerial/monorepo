@@ -37,7 +37,6 @@ function App() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
-    setResult({ loading: true })
 
     // Convert params object to command line arguments
     const paramsString = `mission_name:=${params.mission_name} uav_debug:=${params.uav_debug} vision_debug:=${params.vision_debug} run_mission:=${params.run_mission} vehicle_type:=${params.vehicle_type} save_vision:=${params.save_vision} servo_only:=${params.servo_only} camera_offsets:=[${params.camera_offsets}] sim:=${params.sim}`
@@ -173,9 +172,9 @@ function App() {
         </button>
       </form>
 
-      {result && (
-        <div className={`result ${result.loading ? '' : result.success ? 'success' : 'error'}`}>
-          {result.loading ? (
+      {(loading || result) && (
+        <div className={`result ${loading ? '' : result.success ? 'success' : 'error'}`}>
+          {loading ? (
             'Launching...'
           ) : result.success ? (
             `✓ Success!\n\n${result.output}`

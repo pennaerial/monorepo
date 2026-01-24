@@ -1,7 +1,14 @@
 #!/bin/bash
 
-COMMIT_HASH=$1
-shift
+ssh xxxxx
+cd /.......
 
-ORIGINAL_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-git checkout $COMMIT_HASH
+git pull origin main
+
+gh run download --name my-built-artifact --dir ./dist --overwrite
+
+## Use the built obj 
+chmod +x ./dist/my-program
+sudo systemctl restart my-app.service
+
+echo "Deployment complete!"
