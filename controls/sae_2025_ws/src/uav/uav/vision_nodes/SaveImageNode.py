@@ -32,7 +32,7 @@ class SaveImageNode(VisionNode):
         self.get_logger().info("Empty service called (placeholder).")
         return response
     def image_callback(self, msg):
-        if(time.time() - self.time_elapsed > 5):
+        if(time.time() - self.time_elapsed > 2):
             self.time_elapsed = time.time()
             self.get_logger().info("Received image for save")
             image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
