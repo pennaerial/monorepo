@@ -73,6 +73,7 @@ class UAV(ABC):
         # Store current drone position
         self.global_position = None
         self.local_position = None
+        self.local_origin = None
     
     # -------------------------
     # Public commands
@@ -487,9 +488,9 @@ class UAV(ABC):
     def _vehicle_local_position_callback(self, msg: VehicleLocalPosition):
         if not self.local_origin:
             self.local_origin = (msg.x, msg.y, msg.z)
-            self.GPS_origin = (msg.ref_lat, msg.ref_lon, msg.ref_alt)
+            self.gps_origin = (msg.ref_lat, msg.ref_lon, msg.ref_alt)
             self.node.get_logger().info(f"Local start position: {self.local_origin}")
-            self.node.get_logger().info(f"GPS start position: {self.GPS_origin}")
+            self.node.get_logger().info(f"GPS start position: {self.gps_origin}")
         self.local_position = msg
 
     def _initialize_publishers_and_subscribers(self):
