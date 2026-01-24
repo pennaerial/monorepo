@@ -2,7 +2,7 @@ from typing import List
 from uav.autonomous_modes import Mode
 from rclpy.node import Node
 from uav import UAV
-from uav.vision_nodes.SaveImageNode import SaveImageNode
+from uav.vision_nodes import SaveImageNode
 class SaveImageMode(Mode):
     """
     A mode for navigating to a GPS coordinate
