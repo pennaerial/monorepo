@@ -21,7 +21,7 @@ def launch_setup(context, *args, **kwargs):
     vision_debug = str(params.get('vision_debug', 'false'))
     sim_bool = str(params.get('sim', 'false'))
     run_mission = str(params.get('run_mission', 'true'))
-
+    require_camera = str(params.get('require_camera', 'true'))
     '''
     Airframe ID handling
     All PX4 supported IDs can be found here: https://docs.px4.io/main/en/airframes/airframe_reference
@@ -101,7 +101,7 @@ def launch_setup(context, *args, **kwargs):
         vehicle_class, model_name = get_airframe_details(px4_path, airframe_id)
         autostart = int(airframe_id)
         model = custom_airframe_model or model_name
-        if not vehicle_camera_map.get(model, False):  # Remove 'gz_' prefix for model check
+        if (not vehicle_camera_map.get(model, False)) and require_camera.lower() == 'true':  # Remove 'gz_' prefix for model check
             raise ValueError(f"The selected airframe ID {airframe_id} ({model}) does not have a camera sensor configured. Please choose a different airframe or add a camera to the model.")
         print(f"Simulation mode: Launching a {vehicle_class.name} with airframe ID {airframe_id}, using model {model}")
     else:
