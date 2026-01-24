@@ -46,6 +46,26 @@ def launch_setup(context, *args, **kwargs):
         name='camera',
         output='screen'
     )]
+    
+    # Add video stream node if enabled
+    enable_video_stream = params.get('enable_video_stream', False)
+    if enable_video_stream:
+        qgc_ip = params.get('qgc_ip', '127.0.0.1')
+        qgc_video_port = params.get('qgc_video_port', 5600)
+        vision_node_actions.append(Node(
+            package='uav',
+            executable='video_stream',
+            name='video_stream',
+            output='screen',
+            parameters=[{
+                'qgc_ip': qgc_ip,
+                'qgc_port': qgc_video_port,
+                'width': 640,
+                'height': 480,
+                'framerate': 30,
+                'bitrate': 800
+            }]
+        ))
 
     for node in extract_vision_nodes(YAML_PATH):
         vision_nodes.append(node)
