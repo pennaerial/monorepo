@@ -151,8 +151,8 @@ class WorldNode(Node, ABC):
         Generate the world file and write it to self.output_path.
         
         This method should:
-        1. Generate world geometry/obstacles based on competition parameters
-        2. Write the SDF world file to self.output_path
+        1. Generate world entities/obstacles based on competition parameters as Entity objects
+        2. Dynamically load in the entities through the ros_gz entity create bridge
         3. Store any world metadata needed for services/topics
 
         return True if dynamic generation is successful, False otherwise
