@@ -28,7 +28,7 @@ function App() {
       .then(data => {
         setCommits(data.commits)
         if (data.commits.length > 0) {
-          setSelectedCommit(data.commits[0])
+          setSelectedCommit(data.commits[0].hash)
         }
       })
       .catch(err => console.error('Failed to load commits:', err))
@@ -72,9 +72,22 @@ function App() {
           {commits.length === 0 ? (
             <option value="">Loading commits...</option>
           ) : (
-            commits.map(commit => (
-              <option key={commit} value={commit}>{commit}</option>
-            ))
+            <>
+              <optgroup label="🟢 main branch">
+                {commits.filter(c => c.branch === 'main').map(commit => (
+                  <option key={commit.hash} value={commit.hash}>
+                    {commit.hash}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="🟡 integration branch">
+                {commits.filter(c => c.branch === 'integration').map(commit => (
+                  <option key={commit.hash} value={commit.hash}>
+                    {commit.hash}
+                  </option>
+                ))}
+              </optgroup>
+            </>
           )}
         </select>
 

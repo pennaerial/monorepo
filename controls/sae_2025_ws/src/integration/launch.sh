@@ -1,14 +1,13 @@
 #!/bin/bash
 
-ssh xxxxx
-cd /.......
+# Get commit hash from first argument
+COMMIT_HASH="$1"
+SHORT_SHA=$(echo "$COMMIT_HASH" | cut -c1-7)
+echo "SHORT_SHA: $SHORT_SHA"
 
-git pull origin main
+# ssh xxxxx
+# cd /.......
 
-gh run download --name my-built-artifact --dir ./dist --overwrite
+# git pull origin main
 
-## Use the built obj 
-chmod +x ./dist/my-program
-sudo systemctl restart my-app.service
-
-echo "Deployment complete!"
+gh run download --name "ros2-build-${SHORT_SHA}" --dir ./dist

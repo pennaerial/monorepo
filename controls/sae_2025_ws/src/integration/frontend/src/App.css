@@ -46,6 +46,17 @@ select, input[type="text"] {
   font-family: monospace;
 }
 
+select option {
+  padding: 8px;
+}
+
+select optgroup {
+  font-weight: 600;
+  font-style: normal;
+  color: #333;
+  background: #f8f8f8;
+}
+
 .checkbox-group {
   display: grid;
   grid-template-columns: 1fr 1fr;
