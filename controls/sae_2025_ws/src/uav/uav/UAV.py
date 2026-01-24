@@ -102,13 +102,12 @@ class UAV(ABC):
         if coordinate_system == 'GPS':
             curr_gps = self.get_gps()
             return self.gps_distance_3d(waypoint[0], waypoint[1], waypoint[2], curr_gps[0], curr_gps[1], curr_gps[2])
-        
-        # LOCAL
-        return np.sqrt(
-            (self.local_position.x - waypoint[0]) ** 2 +
-            (self.local_position.y - waypoint[1]) ** 2 +
-            (self.local_position.z - waypoint[2]) ** 2
-        )
+        elif coordinate_system == 'LOCAL':
+            return np.sqrt(
+                (self.local_position.x - waypoint[0]) ** 2 +
+                (self.local_position.y - waypoint[1]) ** 2 +
+                (self.local_position.z - waypoint[2]) ** 2
+            )
 
     def hover(self):
         self._send_vehicle_command(
@@ -306,15 +305,13 @@ class UAV(ABC):
 
         # The z-point remains unchanged.
         if relative:
-            point = (
+            return (
                 current_pos[0] + rotated_point_x,
                 current_pos[1] + rotated_point_y,
                 current_pos[2] + point_z
             )
         else:
-            point = (rotated_point_x, rotated_point_y, point_z)
-
-        return point
+            return (rotated_point_x, rotated_point_y, point_z)
     
     def local_to_gps(self, local_pos):
         """
@@ -333,18 +330,18 @@ class UAV(ABC):
         if self.gps_origin is None:
             self.node.get_logger().error("gps_origin not set. Cannot convert local to GPS coordinates.")
             return None
-        
-        x, y, z = local_pos
-        lat0, lon0, alt0 = self.gps_origin
+        else:
+            x, y, z = local_pos
+            lat0, lon0, alt0 = self.gps_origin
 
-        # Convert displacements from meters to degrees
-        dlat = (x / R_earth) * (180.0 / math.pi)
-        dlon = (y / (R_earth * math.cos(math.radians(lat0)))) * (180.0 / math.pi)
-        
-        lat = lat0 + dlat
-        lon = lon0 + dlon
-        alt = alt0 - z  # because z is down in NED
-        return (lat, lon, alt)
+            # Convert displacements from meters to degrees
+            dlat = (x / R_earth) * (180.0 / math.pi)
+            dlon = (y / (R_earth * math.cos(math.radians(lat0)))) * (180.0 / math.pi)
+            
+            lat = lat0 + dlat
+            lon = lon0 + dlon
+            alt = alt0 - z  # because z is down in NED
+            return (lat, lon, alt)
 
     # def reached_position 
 
@@ -355,23 +352,54 @@ class UAV(ABC):
         if not self.global_position:
             self.node.get_logger().warn("No GPS data available.")
             return None
-        
-        return (
-            self.global_position.lat,
-            self.global_position.lon,
-            self.global_position.alt
-        )
+        else:
+            return (
+                self.global_position.lat,
+                self.global_position.lon,
+                self.global_position.alt
+            )
         
     def get_local_position(self):
         if not self.local_position:
             self.node.get_logger().warn("No local position data available.")
             return None
+        else:
+            return (
+                self.local_position.x,
+                self.local_position.y,
+                self.local_position.z
+            )
+    
+    def _calculate_proportional_velocity(self, direction: np.ndarray, distance: float) -> list:
+        """
+        Calculate velocity using proportional control to prevent oscillation.
+        Velocity smoothly decreases as distance to target decreases.
 
-        return (
-            self.local_position.x,
-            self.local_position.y,
-            self.local_position.z
-        )
+        Args:
+            direction (np.ndarray): Unit direction vector [dx, dy, dz]
+            distance (float): Distance to target in meters
+
+        Returns:
+            list: [vx, vy, vz] velocity vector in m/s
+        """
+        # Proportional control with lenient thresholds to reduce oscillation
+        # Full speed above 10m, proportional between 10m-2m, slow below 2m
+        if distance > 10.0:
+            target_speed = self.default_velocity
+        elif distance > 2.0:
+            # Smooth deceleration from 10m to 2m
+            # At 10m: 5 m/s, at 2m: 1 m/s
+            target_speed = max(1.0, self.default_velocity * (distance / 10.0))
+        elif distance > 0.1:
+            # Close to target: gentle approach to prevent overshoot
+            target_speed = 0.8
+        else:
+            # Very close: hover
+            return [0.0, 0.0, 0.0]
+
+        return [float(direction[0] * target_speed),
+                float(direction[1] * target_speed),
+                float(direction[2] * target_speed)]
         
     # -------------------------
     # Internal helper methods

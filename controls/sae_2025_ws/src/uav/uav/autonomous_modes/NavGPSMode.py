@@ -26,7 +26,6 @@ class NavGPSMode(Mode):
         self.coordinate_system = None
         self.target = None
         self.wait_time = 0.0
-        self._last_log_time = 0.0
 
     def on_update(self, time_delta: float) -> None:
         """
