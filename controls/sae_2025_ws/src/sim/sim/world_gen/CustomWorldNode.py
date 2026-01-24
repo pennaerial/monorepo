@@ -11,11 +11,11 @@ import json
 class CustomWorldNode(WorldNode):
 
     def __init__(self, 
-                 world_name: str,
+                 template_world: str,
                  output_filename: Optional[str] = None, seed: Optional[int] = None):
         super().__init__(competition_name="custom", output_filename=output_filename, seed=seed)
-        self.world_name = world_name
-        self.instantiate_static_world(template_world_path=world_name)
+        self.world_name = template_world
+        self.instantiate_static_world(template_world_path=template_world)
     
     def generate_world(self):
         hoop = Entity(

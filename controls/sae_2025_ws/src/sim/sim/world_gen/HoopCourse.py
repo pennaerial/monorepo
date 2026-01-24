@@ -382,7 +382,7 @@ class HoopCourseNode(WorldNode):
                  uav: Tuple[float, float, float],
                  num_hoops: int,
                  max_dist: int,
-                 world_name: str,
+                 template_world: str,
                  height: int,
                  output_filename: Optional[str] = None,
                  seed: Optional[int] = None):
@@ -405,10 +405,10 @@ class HoopCourseNode(WorldNode):
         self.uav = uav
         self.num_hoops = num_hoops
         self.max_dist = max_dist
-        self.world_name = world_name
+        self.template_world = template_world
         self.height = height
         self.hoops: List[Entity] = []
-        self.instantiate_static_world(template_world_path=world_name)
+        self.instantiate_static_world(template_world_path=template_world)
 
         
         # Create service for providing hoop positions
