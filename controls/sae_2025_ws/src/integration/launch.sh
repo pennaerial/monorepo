@@ -5,9 +5,12 @@ COMMIT_HASH="$1"
 SHORT_SHA=$(echo "$COMMIT_HASH" | cut -c1-7)
 echo "SHORT_SHA: $SHORT_SHA"
 
-# ssh xxxxx
-# cd /.......
+ssh user@remote-host << EOF
+  cd /path/to/deploy
+  gh run download --name "ros2-build-${SHORT_SHA}" --dir ./dist
 
-# git pull origin main
+  cd ./dist
+  tar -xzf ros2-build-${SHORT_SHA}.tar.gz
 
-gh run download --name "ros2-build-${SHORT_SHA}" --dir ./dist
+  echo "Deployment complete!"
+EOF
