@@ -47,12 +47,13 @@ def launch_setup(context, *args, **kwargs):
         output='screen'
     )]
     
-    # Add video stream node if enabled
+    # Video stream node configuration (will be started separately after camera bridge)
     enable_video_stream = params.get('enable_video_stream', False)
+    video_stream_node = None
     if enable_video_stream:
         qgc_ip = params.get('qgc_ip', '127.0.0.1')
         qgc_video_port = params.get('qgc_video_port', 5600)
-        vision_node_actions.append(Node(
+        video_stream_node = Node(
             package='uav',
             executable='video_stream',
             name='video_stream',
@@ -65,7 +66,7 @@ def launch_setup(context, *args, **kwargs):
                 'framerate': 30,
                 'bitrate': 800
             }]
-        ))
+        )
 
     for node in extract_vision_nodes(YAML_PATH):
         vision_nodes.append(node)
@@ -236,7 +237,7 @@ def launch_setup(context, *args, **kwargs):
             RegisterEventHandler(
                 OnProcessStart(
                     target_action=gz_ros_bridge_camera_info,
-                    on_start=LogInfo(msg="Bridge camera info topic started.")
+                    on_start=[LogInfo(msg="Bridge camera info topic started.")] + ([video_stream_node] if video_stream_node else [])
                 )
             ),
             RegisterEventHandler(
