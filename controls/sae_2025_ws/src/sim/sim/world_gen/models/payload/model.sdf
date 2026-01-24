@@ -1,23 +1,71 @@
 <?xml version="1.0" ?>
-<sdf version="1.4">
-  <model name="payload">
-  <static>true</static>
+<sdf version="1.9">
+  <model name="payload_box">
+    <static>false</static>
+
     <link name="payload_link">
+
+      <!-- Inertial properties -->
       <inertial>
-        <mass>2</mass>
+        <mass>0.3</mass>
+        <pose>0.03008 0 0 0 0 0</pose> <!-- COM shifted toward front -->
+
+        <inertia>
+          <!-- Box inertia tensor -->
+          <ixx>0.00063</ixx>
+          <iyy>0.00055</iyy>
+          <izz>0.00042</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
       </inertial>
-      <visual name="visual">
-      <pose> 5 0 .1 1.5708 0 0 </pose>
+
+      <!-- Collision -->
+      <collision name="collision">
         <geometry>
-          <mesh>
-            <uri>model://payload/meshes/payload.STL</uri>
-            <scale> .001 .001 .001 </scale>
-          </mesh>
+          <box>
+            <size>0.12033 0.13 0.0582</size>
+          </box>
+        </geometry>
+      </collision>
+
+      <!-- Visual -->
+      <visual name="visual">
+        <geometry>
+          <box>
+            <size>0.12033 0.13 0.0582</size>
+          </box>
         </geometry>
         <material>
-          <diffuse>1 1 0 1</diffuse> <!-- Pink color -->
-      </material>
+          <ambient>0.2 0.2 0.2 1</ambient>
+          <diffuse>0.6 0.6 0.6 1</diffuse>
+        </material>
+      </visual>
+
+      <visual name="origin_marker">
+        <geometry>
+          <sphere>
+            <radius>0.005</radius>
+          </sphere>
+        </geometry>
+        <material>
+          <diffuse>1 0 0 1</diffuse>
+        </material>
       </visual>
     </link>
+
+    <!-- ================= CAMERA MODEL ================= -->
+    <include merge="true">
+      <uri>model://mono_cam</uri>
+      <pose>0.058 0 0.025 0 0 0</pose>
+    </include>
+
+    <!-- ================= CAMERA ATTACHMENT ================= -->
+    <joint name="payload_camera_joint" type="fixed">
+      <parent>payload_link</parent>
+      <child>camera_link</child>
+    </joint>
+
   </model>
 </sdf>
