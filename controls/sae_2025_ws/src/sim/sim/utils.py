@@ -235,5 +235,6 @@ def copy_models_to_gazebo(src_models_dir: Path, dst_models_dir: Path) -> None:
         raise OSError(f"Failed to copy models from {src_models_dir} to {dst_models_dir}: {e}")
 
 def camel_to_snake(name: str) -> str:
-    """Convert CamelCase to snake_case."""
-    return re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name).lower()
+    s1 = re.sub(r'(.)([A-Z][a-z]+)', r'\1_\2', name)
+    s2 = re.sub(r'([a-z0-9])([A-Z])', r'\1_\2', s1)
+    return s2.lower()
