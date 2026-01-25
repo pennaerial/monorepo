@@ -198,6 +198,18 @@ def launch_setup(context, *args, **kwargs):
         name="spawn_world",
     )
 
+
+    # spawn_world = ExecuteProcess(
+    #     cmd=[
+    #         "python3",
+    #         "Tools/simulation/gz/simulation-gazebo",
+    #         f"--world=default",
+    #     ],
+    #     cwd=px4_path,
+    #     output="screen",
+    #     name="spawn_world",
+    # )
+
     topic_model_name = model[3:]  # remove 'gz_' prefix
 
     camera_topic_name = (

@@ -203,7 +203,7 @@ class ModeManager(Node):
                 # Terminate instead of cycling
                 if self.uav.attempted_takeoff and self.active_mode is not None:
                     self.get_logger().error(f"UAV disarmed unexpectedly after takeoff attempt. Terminating to prevent infinite cycle.")
-                    self.get_logger().error(f"This usually indicates preflight check failures or PX4 safety triggers.")
+                    self.get_logger().error(f"This usually indicates preflight check failures or PX4 safety triggers\nACTIVE MODE:{self.active_mode}")
                     self.destroy_node()
                     return
 
@@ -212,11 +212,27 @@ class ModeManager(Node):
                 self.start_time = current_time
             if self.uav.local_position is None or self.uav.global_position is None: # Need to wait for the uav to be ready
                 return
+            # old code
+            # if not self.uav.attempted_takeoff:
+            #     self.uav.takeoff()
+            #     self.get_logger().info("Attempting takeoff")
+            #     self.start_time = current_time # Reset the start time because we will starting publishing heartbeat
+            #     return
             if not self.uav.attempted_takeoff:
-                self.uav.takeoff()
-                self.get_logger().info("Attempting takeoff")
-                self.start_time = current_time # Reset the start time because we will starting publishing heartbeat
-                return
+                if isinstance(self.uav, VTOL):
+                    done = self.uav.fixed_wing_takeoff()
+                    self.get_logger().info("Attempting VTOL fixed-wing takeoff")
+                    if not done:
+                        self.get_logger().info("VTOL takeoff in progress...")
+                        return
+                else:
+                    self.get_logger().info("Attempting vertical takeoff")
+                    self.uav.takeoff()
+                    self.start_time = current_time # Reset the start time because we will starting publishing heartbeat
+                    return
+            #end of changes
+
+
             self.uav.publish_offboard_control_heartbeat_signal()
             if self.uav.nav_state == VehicleStatus.NAVIGATION_STATE_AUTO_TAKEOFF:
                 self.get_logger().info("Taking off")

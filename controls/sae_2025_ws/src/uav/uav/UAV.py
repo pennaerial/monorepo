@@ -365,7 +365,12 @@ class UAV(ABC):
     def get_local_position(self):
         if not self.local_position:
             self.node.get_logger().warn("No local position data available.")
-            return None
+            l = VehicleLocalPosition()
+            l.x = 0.0
+            l.y = 0.0
+            l.z = 0.0
+            self.local_position = l
+            # return None
 
         return (
             self.local_position.x,
@@ -460,7 +465,7 @@ class UAV(ABC):
         if not self.gps_origin:
             self.gps_origin = (msg.ref_lat, msg.ref_lon, msg.ref_alt)
             self.node.get_logger().info(f"ORIGIN SET - GPS: lat={msg.ref_lat:.6f}, lon={msg.ref_lon:.6f}, alt={msg.ref_alt:.2f}m")
-        self.local_position = msg
+        self.local_position = msg   
 
     def _initialize_publishers_and_subscribers(self):
         """

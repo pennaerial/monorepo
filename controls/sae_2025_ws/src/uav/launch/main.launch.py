@@ -99,6 +99,17 @@ def launch_setup(context, *args, **kwargs):
         # In simulation mode, determine vehicle class and model from airframe ID
         px4_path = find_folder_with_heuristic('PX4-Autopilot', os.path.expanduser(LaunchConfiguration('px4_path').perform(context)))
         vehicle_class, model_name = get_airframe_details(px4_path, airframe_id)
+        print(f"VEHICLE CLASS IS: " + vehicle_class.name)
+        print(" ")
+        print(" ")
+        print(" ")
+        print(" ")
+        print(" ")
+        print(" ")
+        print(" ")
+        print(" ")
+        print(" ")
+        print(" ")
         autostart = int(airframe_id)
         model = custom_airframe_model or model_name
         if not vehicle_camera_map.get(model, False):  # Remove 'gz_' prefix for model check
@@ -159,6 +170,7 @@ def launch_setup(context, *args, **kwargs):
 
     camera_offsets_str = ','.join(str(offset) for offset in camera_offsets)
     mission_cmd = ['ros2', 'run', 'uav', 'mission', uav_debug, YAML_PATH, servo_only, camera_offsets_str, vehicle_class.name, ','.join(vision_nodes)]
+    print(mission_cmd)
     mission = ExecuteProcess(
         cmd=mission_cmd,
         output='screen',
@@ -188,11 +200,24 @@ def launch_setup(context, *args, **kwargs):
 
         print("Starting PX4 SITL...")
         px4_sitl = ExecuteProcess(
-            cmd=['bash', '-c', f'PX4_GZ_STANDALONE=1 PX4_SYS_AUTOSTART={autostart} PX4_SIM_MODEL={model} ./build/px4_sitl_default/bin/px4'],
+            cmd=['bash', '-c', f'PX4_GZ_WORLD=custom PX4_GZ_STANDALONE=1 PX4_SYS_AUTOSTART={autostart} PX4_SIM_MODEL={model} ./build/px4_sitl_default/bin/px4'],
             cwd=px4_path,
             output='screen',
             name='px4_sitl'
         )
+        # px4_sitl = ExecuteProcess(
+        #     cmd=['bash', '-c', f'make px4_sitl gz_standard_vtol_inhouse'],
+        #     cwd=px4_path,
+        #     output='screen',
+        #     name='px4_sitl'
+        # )
+
+        # px4_sitl = ExecuteProcess(
+        #     cmd=['ls'],
+        #     cwd=px4_path,
+        #     output='screen',
+        #     name='px4_sitl'
+        # )
         actions = [
             sim,
             LogInfo(msg="Gazebo started."),
