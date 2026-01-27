@@ -127,7 +127,7 @@ def launch_setup(context, *args, **kwargs):
     )
     
     # Now, construct the actions list in a single step, depending on sim_bool
-    if sim_bool
+    if sim_bool:
         # Prepare sim launch arguments with all simulation parameters
         sim_launch_args = {
             'px4_path': px4_path,

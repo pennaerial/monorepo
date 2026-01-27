@@ -51,6 +51,7 @@ class UAV(ABC):
         self.component_id = 1
         
         self.max_acceleration = 0.01
+        self.default_velocity = 5.0
 
         self.camera_offsets = camera_offsets
         
@@ -443,11 +444,8 @@ class UAV(ABC):
         self.arm_state = msg.arming_state
         self.failsafe_px4 = msg.failsafe
         self.flight_check = msg.pre_flight_checks_pass
-        self.is_vtol = msg.is_vtol
         self.system_id = msg.system_id
         self.component_id = msg.component_id
-        if msg.is_vtol:
-            self.vehicle_type = 'MC' if msg.vehicle_type == 0 else 'FW'
         self.failsafe = self.failsafe_px4 or self.failsafe_trigger
         if self.DEBUG:
             self.node.get_logger().info(f"Nav State: {self.nav_state}, Arm State: {self.arm_state}, Failsafe: {self.failsafe_px4}, Flight Check: {self.flight_check}")
