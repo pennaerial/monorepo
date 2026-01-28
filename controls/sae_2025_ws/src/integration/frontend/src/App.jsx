@@ -4,6 +4,9 @@ import './App.css'
 function App() {
   const [commits, setCommits] = useState([])
   const [selectedCommit, setSelectedCommit] = useState('')
+  const [inputValue, setInputValue] = useState('')
+  const [showDropdown, setShowDropdown] = useState(false)
+  const [target, setTarget] = useState('')
   const [params, setParams] = useState({
     mission_name: 'test_straight_course',
     uav_debug: false,
@@ -28,11 +31,46 @@ function App() {
       .then(data => {
         setCommits(data.commits)
         if (data.commits.length > 0) {
-          setSelectedCommit(data.commits[0].hash)
+          const firstCommit = data.commits[0].hash
+          setSelectedCommit(firstCommit)
+          setInputValue(firstCommit)
         }
       })
       .catch(err => console.error('Failed to load commits:', err))
   }, [])
+
+  // Filter commits based on input
+  const filteredCommits = commits.filter(commit => 
+    commit.hash.toLowerCase().includes(inputValue.toLowerCase()) ||
+    commit.branch.toLowerCase().includes(inputValue.toLowerCase())
+  )
+
+  // Group by branch
+  const commitsByBranch = filteredCommits.reduce((acc, commit) => {
+    if (!acc[commit.branch]) acc[commit.branch] = []
+    acc[commit.branch].push(commit)
+    return acc
+  }, {})
+
+  // Handle selecting a commit from dropdown
+  const selectCommit = (commit) => {
+    setSelectedCommit(commit.hash)
+    setInputValue(commit.hash)
+    setShowDropdown(false)
+  }
+
+  // Handle input change
+  const handleInputChange = (e) => {
+    const value = e.target.value
+    setInputValue(value)
+    setShowDropdown(true)
+    
+    // If user types an exact match, auto-select it
+    const exactMatch = commits.find(c => c.hash === value)
+    if (exactMatch) {
+      setSelectedCommit(value)
+    }
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -43,6 +81,7 @@ function App() {
 
     const formData = new FormData()
     formData.append('commit', selectedCommit)
+    formData.append('target', target)
     formData.append('params', paramsString)
 
     try {
@@ -60,70 +99,117 @@ function App() {
   }
 
   return (
-    <div className="container">
-      <form onSubmit={handleSubmit}>
-        <label htmlFor="commit">Select Commit Hash:</label>
-        <select
-          id="commit"
-          value={selectedCommit}
-          onChange={(e) => setSelectedCommit(e.target.value)}
-          required
-        >
-          {commits.length === 0 ? (
-            <option value="">Loading commits...</option>
-          ) : (
-            <>
-              <optgroup label="🟢 main branch">
-                {commits.filter(c => c.branch === 'main').map(commit => (
-                  <option key={commit.hash} value={commit.hash}>
-                    {commit.hash}
-                  </option>
-                ))}
-              </optgroup>
-              <optgroup label="🟡 integration branch">
-                {commits.filter(c => c.branch === 'integration').map(commit => (
-                  <option key={commit.hash} value={commit.hash}>
-                    {commit.hash}
-                  </option>
-                ))}
-              </optgroup>
-            </>
-          )}
-        </select>
+    <div className="app">
+      <div className="container">
+        <form onSubmit={handleSubmit}>
+          <div className="section">
+            <label className="section-label">Select Commit</label>
+            <div className="autocomplete-wrapper">
+              <div className="autocomplete-input-wrapper">
+                <input
+                  type="text"
+                  placeholder="Search commits or branches..."
+                  value={inputValue}
+                  onChange={handleInputChange}
+                  onFocus={() => setShowDropdown(true)}
+                  onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+                  className="autocomplete-input"
+                  required
+                />
+                {inputValue && (
+                  <button 
+                    type="button" 
+                    className="clear-btn"
+                    onClick={() => {
+                      setInputValue('')
+                      setSelectedCommit('')
+                      setShowDropdown(true)
+                    }}
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
 
-        <div className="params-section">
-          <h3>Launch Parameters:</h3>
+              {showDropdown && (
+                <div className="autocomplete-dropdown">
+                  {commits.length === 0 ? (
+                    <div className="dropdown-empty">Loading commits...</div>
+                  ) : filteredCommits.length === 0 ? (
+                    <div className="dropdown-empty">No matches found</div>
+                  ) : (
+                    <>
+                      {Object.entries(commitsByBranch).map(([branch, branchCommits]) => (
+                        <div key={branch} className="dropdown-group">
+                          <div className="dropdown-branch">{branch}</div>
+                          {branchCommits.map(commit => (
+                            <div
+                              key={commit.hash}
+                              className={`dropdown-item ${selectedCommit === commit.hash ? 'selected' : ''}`}
+                              onClick={() => selectCommit(commit)}
+                            >
+                              <span className="commit-hash">{commit.hash}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ))}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
 
-          <label htmlFor="mission_name">Mission Name:</label>
-          <input
-            type="text"
-            id="mission_name"
-            value={params.mission_name}
-            onChange={(e) => handleParamChange('mission_name', e.target.value)}
-          />
+          <div className="section">
+            <label className="section-label">Deploy Target</label>
+            <input
+              type="text"
+              placeholder="e.g., pi@192.168.1.50 (leave empty for local)"
+              value={target}
+              onChange={(e) => setTarget(e.target.value)}
+              className="target-input"
+            />
+          </div>
 
-          <label htmlFor="vehicle_type">Vehicle Type:</label>
-          <select
-            id="vehicle_type"
-            value={params.vehicle_type}
-            onChange={(e) => handleParamChange('vehicle_type', parseInt(e.target.value))}
-          >
-            <option value={0}>0</option>
-            <option value={1}>1</option>
-            <option value={2}>2</option>
-            <option value={3}>3</option>
-          </select>
+          <div className="section">
+            <label className="section-label">Launch Parameters</label>
+            <div className="params-grid">
+              <div className="param-field">
+                      <label htmlFor="mission_name">Mission Name</label>
+                <input
+                  type="text"
+                  id="mission_name"
+                  value={params.mission_name}
+                  onChange={(e) => handleParamChange('mission_name', e.target.value)}
+                />
+              </div>
 
-          <label htmlFor="camera_offsets">Camera Offsets (x, y, z in meters):</label>
-          <input
-            type="text"
-            id="camera_offsets"
-            value={params.camera_offsets}
-            onChange={(e) => handleParamChange('camera_offsets', e.target.value)}
-            placeholder="0, 0, 0"
-          />
+              <div className="param-field">
+                <label htmlFor="vehicle_type">Vehicle Type</label>
+                <select
+                  id="vehicle_type"
+                  value={params.vehicle_type}
+                  onChange={(e) => handleParamChange('vehicle_type', parseInt(e.target.value))}
+                >
+                  <option value={0}>Type 0</option>
+                  <option value={1}>Type 1</option>
+                  <option value={2}>Type 2</option>
+                  <option value={3}>Type 3</option>
+                </select>
+              </div>
 
-          <div className="checkbox-group">
+              <div className="param-field full-width">
+                <label htmlFor="camera_offsets">Camera Offsets (x, y, z meters)</label>
+                <input
+                  type="text"
+                  id="camera_offsets"
+                  value={params.camera_offsets}
+                  onChange={(e) => handleParamChange('camera_offsets', e.target.value)}
+                  placeholder="0, 0, 0"
+                />
+              </div>
+
+              <div className="checkbox-group">
             <label className="checkbox-label">
               <input
                 type="checkbox"
@@ -177,25 +263,28 @@ function App() {
               />
               Simulation Mode
             </label>
+              </div>
+            </div>
           </div>
-        </div>
 
-        <button type="submit" className="launch-btn" disabled={loading}>
-          {loading ? 'LAUNCHING...' : 'LAUNCH'}
-        </button>
-      </form>
+          <button type="submit" className="launch-btn" disabled={loading}>
+            {loading ? 'Launching...' : 'Launch'}
+          </button>
+        </form>
 
-      {(loading || result) && (
-        <div className={`result ${loading ? '' : result.success ? 'success' : 'error'}`}>
-          {loading ? (
-            'Launching...'
-          ) : result.success ? (
-            `✓ Success!\n\n${result.output}`
-          ) : (
-            `✗ Error\n\n${result.error}`
-          )}
-        </div>
-      )}
+        {(loading || result) && (
+          <div className={`result ${loading ? 'loading' : result.success ? 'success' : 'error'}`}>
+            <div className="result-header">
+              {loading ? 'Launching...' : result.success ? 'Success' : 'Error'}
+            </div>
+            {!loading && (
+              <div className="result-content">
+                {result.success ? result.output : result.error}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

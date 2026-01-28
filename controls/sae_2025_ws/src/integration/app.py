@@ -30,61 +30,80 @@ def get_git_root():
 REPO_PATH = get_git_root()
 APP_PATH = os.path.join(REPO_PATH, "controls/sae_2025_ws/src/integration")
 
-def get_git_commits(branch, limit=5):
-    """Fetch recent git commits from a specific branch"""
-    # Try both local and remote branch references
-    for branch_ref in [f"origin/{branch}", branch]:
-        try:
-            result = subprocess.run(
-                ["git", "log", branch_ref, f"--max-count={limit}", "--pretty=format:%h (%s)"],
-                cwd=REPO_PATH,
-                capture_output=True,
-                text=True,
-                check=True
-            )
-            commits = result.stdout.strip().split("\n") if result.stdout.strip() else []
-            return [{"hash": commit, "branch": branch} for commit in commits]
-        except subprocess.CalledProcessError as e:
-            print(f"Failed to get commits from {branch_ref}: {e.stderr if hasattr(e, 'stderr') else str(e)}")
-            continue
-    return []
-
 @app.get("/api/commits")
 async def get_commits():
-    """API endpoint to fetch git commits from main and integration branches"""
-    main_commits = get_git_commits("main", limit=5)
-    integration_commits = get_git_commits("integration", limit=5)
-
-    return {"commits": main_commits + integration_commits}
+    """API endpoint to fetch recent commits from all branches"""
+    try:
+        # Get 50 most recent commits from all branches with branch decoration
+        result = subprocess.run(
+            ["git", "log", "--all", "--max-count=50", "--pretty=format:%h (%s)|%D"],
+            cwd=REPO_PATH,
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        
+        commits = []
+        for line in result.stdout.strip().split("\n"):
+            if not line:
+                continue
+            
+            parts = line.split("|")
+            commit_hash = parts[0]
+            refs = parts[1] if len(parts) > 1 else ""
+            
+            # Extract branch name from refs
+            branch = "unknown"
+            if refs:
+                for ref in refs.split(","):
+                    ref = ref.strip()
+                    if ref.startswith("origin/") and "HEAD" not in ref:
+                        branch = ref.replace("origin/", "")
+                        break
+            
+            commits.append({"hash": commit_hash, "branch": branch})
+        
+        return {"commits": commits}
+    except subprocess.CalledProcessError:
+        return {"commits": []}
 
 @app.post("/api/launch")
-async def launch(commit: str = Form(...), params: str = Form("")):
-    """Execute the bash script with selected commit and parameters"""
+async def launch(commit: str = Form(...), params: str = Form(""), target: str = Form("")):
+    """Execute push-deploy.sh with selected commit hash"""
     try:
+        # Extract short commit hash (first 7 characters)
         commit_hash = commit.split()[0]
-        script_path = os.path.join(APP_PATH, "launch.sh")
+        short_sha = commit_hash[:7]
+        
+        # Path to push-deploy.sh
+        script_path = os.path.join(REPO_PATH, "controls/sae_2025_ws/scripts/push-deploy.sh")
 
-        command = [script_path, commit_hash] + params.split()
+        # Build command: push-deploy.sh --build <sha> <target>
+        command = [script_path, "--build", short_sha]
+        
+        # Add target if provided (e.g., "pi@192.168.1.50")
+        if target:
+            command.append(target)
 
         result = subprocess.run(
             command,
             cwd=REPO_PATH,
             capture_output=True,
             text=True,
-            timeout=300
+            timeout=600  # 10 minutes for deployment
         )
 
         output = result.stdout + result.stderr
 
         if result.returncode == 0:
-            return {"success": True, "output": output or "Script executed successfully!"}
+            return {"success": True, "output": output or "Deployment completed successfully!"}
         else:
-            return {"success": False, "error": f"Script failed with exit code {result.returncode}\n\n{output}"}
+            return {"success": False, "error": f"Deployment failed with exit code {result.returncode}\n\n{output}"}
 
     except FileNotFoundError:
-        return {"success": False, "error": f"Script not found: {script_path}\n\nPlease create your launch.sh script"}
+        return {"success": False, "error": f"Script not found: {script_path}\n\nMake sure push-deploy.sh exists"}
     except subprocess.TimeoutExpired:
-        return {"success": False, "error": "Script execution timed out (>5 minutes)"}
+        return {"success": False, "error": "Deployment timed out (>10 minutes)"}
     except Exception as e:
         return {"success": False, "error": f"Unexpected error: {str(e)}"}
 
