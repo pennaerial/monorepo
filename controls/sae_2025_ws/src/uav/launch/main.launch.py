@@ -3,7 +3,8 @@ import os
 import re
 from launch import LaunchDescription
 from launch.actions import ExecuteProcess, LogInfo, OpaqueFunction, RegisterEventHandler, DeclareLaunchArgument
-from launch.event_handlers import OnProcessStart
+from launch.event_handlers import OnProcessStart, OnProcessIO
+from launch.events.process import ProcessIO
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from uav.utils import vehicle_id_dict, vehicle_camera_map, Vehicle, get_airframe_details, find_folder_with_heuristic, load_launch_parameters, extract_vision_nodes
@@ -22,7 +23,7 @@ def launch_setup(context, *args, **kwargs):
     vision_debug = str(params.get('vision_debug', 'false'))
     sim_bool = str(params.get('sim', 'false'))
     run_mission = str(params.get('run_mission', 'true'))
-    require_camera = str(params.get('require_camera', 'true'))
+    use_camera = str(params.get('use_camera', 'true'))
     '''
     Airframe ID handling
     All PX4 supported IDs can be found here: https://docs.px4.io/main/en/airframes/airframe_reference
@@ -101,7 +102,7 @@ def launch_setup(context, *args, **kwargs):
         vehicle_class, model_name = get_airframe_details(px4_path, airframe_id)
         autostart = int(airframe_id)
         model = custom_airframe_model or model_name
-        if (not vehicle_camera_map.get(model, False)) and require_camera.lower() == 'true':  # Remove 'gz_' prefix for model check
+        if (not vehicle_camera_map.get(model, False)) and use_camera.lower() == 'true': 
             raise ValueError(f"The selected airframe ID {airframe_id} ({model}) does not have a camera sensor configured. Please choose a different airframe or add a camera to the model.")
         print(f"Simulation mode: Launching a {vehicle_class.name} with airframe ID {airframe_id}, using model {model}")
     else:
@@ -125,6 +126,29 @@ def launch_setup(context, *args, **kwargs):
         emulate_tty=True,
         name='mission'
     )
+
+    mission_ready_flags = {"uav": False, "middleware": False}
+    mission_started = {"value": False}  # mutable so inner functions can modify
+    def make_io_handler(process_name):
+        trigger = "INFO  [commander] Ready for takeoff!" if process_name == "uav" else "INFO  [uxrce_dds_client] time sync converged" if process_name == "middleware" else None
+        if trigger is None:
+            raise ValueError(f"Invalid process name: {process_name}")
+        def clean_text(text):
+            ansi_escape = re.compile(r'\x1b\[[0-9;]*m') # remove ANSI escape codes that give color in terminal
+            return ansi_escape.sub('', text).strip()
+        def handler(event: ProcessIO):
+            text = clean_text(event.text.decode() if isinstance(event.text, bytes) else event.text)
+            if trigger in text:
+                mission_ready_flags[process_name] = True
+                # Only when BOTH are ready do we launch spawn_world
+                if not mission_started["value"] and all(mission_ready_flags.values()):
+                    mission_started["value"] = True
+                    return [
+                        LogInfo(msg="[launcher] Both processes ready, starting mission"),
+                        mission,
+                    ]
+            return None
+        return handler
     
     # Now, construct the actions list in a single step, depending on sim_bool
     if sim_bool:
@@ -151,19 +175,21 @@ def launch_setup(context, *args, **kwargs):
             output='screen',
             name='px4_sitl'
         )
-
         actions = [
             sim,
-            LogInfo(msg="Gazebo started."),
-            *vision_node_actions,
-            LogInfo(msg="Vision nodes started."),
-            middleware,
             RegisterEventHandler(
-                OnProcessStart(target_action=middleware, on_start=[LogInfo(msg="Middleware started."), px4_sitl])
+                    OnProcessIO(on_stderr=lambda event: (
+                        [LogInfo(msg="Gazebo process started."), px4_sitl, *vision_node_actions, middleware] if b"Successfully generated world file:" in event.text else None
+                    )
+                )
             ),
+            
             RegisterEventHandler(
-                OnProcessStart(target_action=px4_sitl, on_start=[LogInfo(msg="PX4 SITL started."), TimerAction(period=15.0, actions=[mission] if run_mission_bool else [])])
-            )
+                OnProcessIO(
+                    target_action=px4_sitl,
+                    on_stdout=make_io_handler("uav"),
+                )
+            ),
         ]
     else:
         # Hardware mode: start mission after middleware is ready
@@ -171,17 +197,17 @@ def launch_setup(context, *args, **kwargs):
             *vision_node_actions,
             LogInfo(msg="Vision nodes started."),
             middleware,
-            RegisterEventHandler(
-                OnProcessStart(
-                    target_action=middleware,
-                    on_start=[
-                        LogInfo(msg="Hardware middleware ready."),
-                        TimerAction(period=5.0, actions=[mission] if run_mission_bool else [])
-                    ]
+        ]
+    if run_mission_bool:
+        actions.append(
+                RegisterEventHandler(
+                    OnProcessIO(
+                        target_action=px4_sitl,
+                        on_stdout=make_io_handler("middleware"),
+                    )
                 )
             )
-        ]
-
+    
     return actions
 
 def generate_launch_description():
