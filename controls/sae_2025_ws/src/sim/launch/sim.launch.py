@@ -25,7 +25,6 @@ from sim.constants import (
     DEFAULT_USE_SCORING
 )
 import json
-import platform
 
 def load_sim_launch_parameters():
     """Load simulation launch parameters from YAML."""
@@ -152,6 +151,14 @@ def launch_setup(context, *args, **kwargs):
         )
     logger.info(f"Running Competition: {competition}")
 
+    scoring_param = params.get("scoring", DEFAULT_USE_SCORING)
+
+    if isinstance(scoring_param, str):
+        use_scoring = scoring_param.lower() == 'true'
+    else:
+        use_scoring = bool(scoring_param)
+
+
     px4_path_raw = LaunchConfiguration("px4_path").perform(context)
 
     if px4_path_raw is None:
@@ -183,12 +190,6 @@ def launch_setup(context, *args, **kwargs):
         name="spawn_world",
     )
 
-
-    gz_camera_topic_model = LaunchConfiguration("gz_camera_topic_model").perform(context)
-
-    GZ_CAMERA_TOPIC = f"/world/{competition}/model/{gz_camera_topic_model}_0/link/camera_link/sensor/camera/image"
-    GZ_CAMERA_INFO_TOPIC = f"/world/{competition}/model/{gz_camera_topic_model}_0/link/camera_link/sensor/camera/camera_info"
-
     gz_ros_bridge_create = Node(
         package="ros_gz_bridge",
         executable="parameter_bridge",
@@ -198,6 +199,11 @@ def launch_setup(context, *args, **kwargs):
         name="gz_ros_bridge_create",
         cwd=sae_ws_path,
     )
+
+    gz_camera_topic_model = LaunchConfiguration("gz_camera_topic_model").perform(context)
+
+    GZ_CAMERA_TOPIC = f"/world/{competition}/model/{gz_camera_topic_model}_0/link/camera_link/sensor/camera/image"
+    GZ_CAMERA_INFO_TOPIC = f"/world/{competition}/model/{gz_camera_topic_model}_0/link/camera_link/sensor/camera/camera_info"
 
     gz_ros_bridge_camera = Node(
         package="ros_gz_bridge",
@@ -238,13 +244,12 @@ def launch_setup(context, *args, **kwargs):
         cwd=sae_ws_path,
     )
 
-    scoring_param = params.get("use_scoring", DEFAULT_USE_SCORING)
-
-    if isinstance(scoring_param, str):
-        use_scoring = scoring_param.lower() == 'true'
-    else:
-        use_scoring = bool(scoring_param)
-    
+    trigger_world_gen = ExecuteProcess(
+        cmd=["ros2", "service", "call", f"/{world_node_name}/trigger_world_gen", "std_srvs/srv/Trigger"],
+        cwd=sae_ws_path,
+        output="screen",
+        name="trigger_world_gen"
+    )
 
     # Initialize scoring node if requested
     scoring = None
@@ -265,17 +270,27 @@ def launch_setup(context, *args, **kwargs):
     actions = [
         download_gz_models,
         RegisterEventHandler(
-            OnProcessStart(
+            OnProcessExit(
                 target_action=download_gz_models,
-                on_start=[LogInfo(msg="Gazebo models downloaded."), world],
+                on_exit=[LogInfo(msg="Gazebo models downloaded."), world],
+            )
+        ),
+        RegisterEventHandler(
+            OnProcessIO(
+                target_action=world,
+                on_stderr=lambda event: (
+                    [spawn_world, LogInfo(msg="Simulation world node started."), scoring] if b"Successfully generated world file:" in event.text else None
+                )
             )
         ),
         RegisterEventHandler(
             OnProcessStart(
-                target_action=world,
+                target_action=spawn_world,
                 on_start=[
-                    LogInfo(msg="Simulation world node started."),
+                    LogInfo(msg="spawn_world started, creating bridges"),
                     gz_ros_bridge_create,
+                    gz_ros_bridge_camera,
+                    gz_ros_bridge_camera_info,
                 ],
             )
         ),
@@ -283,35 +298,13 @@ def launch_setup(context, *args, **kwargs):
             OnProcessStart(
                 target_action=gz_ros_bridge_create,
                 on_start=[
-                    LogInfo(msg="Entity spawn bridge started."),
-                    spawn_world,
-                ],
-            )
-        ),
-        RegisterEventHandler(
-            OnProcessStart(
-                target_action=spawn_world,
-                on_start=[
-                    action for action in [
-                        LogInfo(msg="World spawned"),
-                        gz_ros_bridge_camera,
-                        gz_ros_bridge_camera_info,
-                        scoring
-                    ]
-                    if action is not None
-                ],
-            )
-        ),
-        RegisterEventHandler(
-            OnProcessStart(
-                target_action=gz_ros_bridge_camera,
-                on_start=[
-                    LogInfo(msg="Bridge camera topics started."),
+                    trigger_world_gen, 
+                    LogInfo(msg="World generation triggered")
                 ],
             )
         )
     ]
-
+    
     if scoring:
         actions.append(
             RegisterEventHandler(
@@ -329,7 +322,7 @@ def generate_launch_description():
     return LaunchDescription(
         [
             DeclareLaunchArgument("px4_path", default_value="~/PX4-Autopilot"),
-            DeclareLaunchArgument("gz_camera_topic_model", default_value="gz_x500_mono_cam"),
+            DeclareLaunchArgument("gz_camera_topic_model", default_value="x500_mono_cam"),
             OpaqueFunction(function=launch_setup),
         ]
     )
