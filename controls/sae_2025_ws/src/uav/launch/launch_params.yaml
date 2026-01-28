@@ -6,6 +6,7 @@ run_mission: true
 airframe: standard_vtol  # Enter a preset below or a valid airframe ID (integer), either custom or from PX4
                           #quadcopter, tiltrotor_vtol, fixed_wing, standard_vtol, quadtailsitter
                           #Other useful IDs: 4014 for mono cam down
+horizontal_takeoff: false # Only used for standard_vtol airframe
 vehicle_class: auto #auto, or for hardware: multicopter, plane, vtol, other
 custom_airframe_model: '' #Leave blank if using default PX4 model or enter file name of custom model
 save_vision: false
