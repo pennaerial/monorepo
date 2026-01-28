@@ -17,6 +17,7 @@ def main():
             camera_offsets = [0, 0, 0]
         vehicle_class = Vehicle[sys.argv[5].upper()]
         vision_nodes = sys.argv[6]
+        horizontal_takeoff = sys.argv[7]
     else:
         cwd = os.getcwd() # default
         yaml_file = f'{cwd}/src/uav/uav/missions/basic.yaml'
@@ -26,10 +27,15 @@ def main():
         servo_only = 'false'
         vehicle_class = Vehicle.MULTICOPTER
     servo_only = servo_only.lower() == 'true'
+    horizontal_takeoff = horizontal_takeoff.lower() == 'true'
     DEBUG = debug.lower() == 'true'
     rclpy.init()
     is_vtol = (vehicle_class == Vehicle.VTOL)
-    mission_node = ModeManager(yaml_file, vision_nodes, camera_offsets, DEBUG=DEBUG, servo_only=servo_only, is_vtol=is_vtol)
+
+    if is_vtol is False:
+        horizontal_takeoff = False  # Only relevant for VTOL
+
+    mission_node = ModeManager(yaml_file, vision_nodes, camera_offsets, DEBUG=DEBUG, servo_only=servo_only, is_vtol=is_vtol, horizontal_takeoff=horizontal_takeoff)
     rclpy.spin(mission_node)
     rclpy.shutdown()
 
