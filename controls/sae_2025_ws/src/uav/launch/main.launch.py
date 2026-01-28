@@ -40,6 +40,7 @@ def launch_setup(context, *args, **kwargs):
 
     vehicle_class = params.get('vehicle_class', 'auto')
     custom_airframe_model = params.get('custom_airframe_model', '')
+    horizontal_takeoff = str(params.get('horizontal_takeoff', 'false'))
     save_vision = str(params.get('save_vision', 'false'))
     camera_offsets = params.get('camera_offsets', [0, 0, 0])
     servo_only = str(params.get('servo_only', 'false'))
@@ -99,17 +100,6 @@ def launch_setup(context, *args, **kwargs):
         # In simulation mode, determine vehicle class and model from airframe ID
         px4_path = find_folder_with_heuristic('PX4-Autopilot', os.path.expanduser(LaunchConfiguration('px4_path').perform(context)))
         vehicle_class, model_name = get_airframe_details(px4_path, airframe_id)
-        print(f"VEHICLE CLASS IS: " + vehicle_class.name)
-        print(" ")
-        print(" ")
-        print(" ")
-        print(" ")
-        print(" ")
-        print(" ")
-        print(" ")
-        print(" ")
-        print(" ")
-        print(" ")
         autostart = int(airframe_id)
         model = custom_airframe_model or model_name
         if not vehicle_camera_map.get(model, False):  # Remove 'gz_' prefix for model check
@@ -169,7 +159,7 @@ def launch_setup(context, *args, **kwargs):
     )
 
     camera_offsets_str = ','.join(str(offset) for offset in camera_offsets)
-    mission_cmd = ['ros2', 'run', 'uav', 'mission', uav_debug, YAML_PATH, servo_only, camera_offsets_str, vehicle_class.name, ','.join(vision_nodes)]
+    mission_cmd = ['ros2', 'run', 'uav', 'mission', uav_debug, YAML_PATH, servo_only, camera_offsets_str, vehicle_class.name, ','.join(vision_nodes), horizontal_takeoff]
     print(mission_cmd)
     mission = ExecuteProcess(
         cmd=mission_cmd,
@@ -205,6 +195,8 @@ def launch_setup(context, *args, **kwargs):
             output='screen',
             name='px4_sitl'
         )
+
+        # Testing with make px4_sitl instead of standalone
         # px4_sitl = ExecuteProcess(
         #     cmd=['bash', '-c', f'make px4_sitl gz_standard_vtol_inhouse'],
         #     cwd=px4_path,
@@ -218,6 +210,7 @@ def launch_setup(context, *args, **kwargs):
         #     output='screen',
         #     name='px4_sitl'
         # )
+        
         actions = [
             sim,
             LogInfo(msg="Gazebo started."),
