@@ -17,7 +17,7 @@ class ModeManager(Node):
     """
     A ROS 2 node for managing UAV modes and mission logic.
     """
-    def __init__(self, mode_map: str, vision_nodes: str, camera_offsets, DEBUG=False, servo_only=False, is_vtol=False) -> None:
+    def __init__(self, mode_map: str, vision_nodes: str, camera_offsets, DEBUG=False, servo_only=False, is_vtol=False, horizontal_takeoff=False) -> None:
         super().__init__('mission_node')
         self.timer = self.create_timer(0.1, self.spin_once)
         self.modes = {}
@@ -36,6 +36,7 @@ class ModeManager(Node):
         self.setup_vision(vision_nodes)
         self.setup_modes(mode_map)
         self.servo_only = servo_only
+        self.horizontal_takeoff = horizontal_takeoff
     
     def get_active_mode(self) -> Mode:
         """
@@ -212,25 +213,21 @@ class ModeManager(Node):
                 self.start_time = current_time
             if self.uav.local_position is None or self.uav.global_position is None: # Need to wait for the uav to be ready
                 return
-            # old code
-            # if not self.uav.attempted_takeoff:
-            #     self.uav.takeoff()
-            #     self.get_logger().info("Attempting takeoff")
-            #     self.start_time = current_time # Reset the start time because we will starting publishing heartbeat
-            #     return
+
+            # Takeoff logic
             if not self.uav.attempted_takeoff:
-                if isinstance(self.uav, VTOL):
-                    done = self.uav.fixed_wing_takeoff()
+                if isinstance(self.uav, VTOL) and self.horizontal_takeoff: # VTOL fixed-wing takeoff
                     self.get_logger().info("Attempting VTOL fixed-wing takeoff")
-                    if not done:
+                    takeoff_done = self.uav.fixed_wing_takeoff()
+                    self.start_time = current_time # Reset the start time because we will starting publishing heartbeat
+                    if not takeoff_done:
                         self.get_logger().info("VTOL takeoff in progress...")
                         return
-                else:
+                else: # Multicopter or VTOL vertical takeoff
                     self.get_logger().info("Attempting vertical takeoff")
                     self.uav.takeoff()
                     self.start_time = current_time # Reset the start time because we will starting publishing heartbeat
                     return
-            #end of changes
 
 
             self.uav.publish_offboard_control_heartbeat_signal()
