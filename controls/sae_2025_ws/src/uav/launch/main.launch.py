@@ -40,7 +40,6 @@ def launch_setup(context, *args, **kwargs):
         except KeyError:
             raise ValueError(f"Unknown airframe name: {airframe_id}")
 
-    vehicle_class = params.get('vehicle_class', 'auto')
     custom_airframe_model = params.get('custom_airframe_model', '')
     save_vision = str(params.get('save_vision', 'false'))
     camera_offsets = params.get('camera_offsets', [0, 0, 0])
@@ -96,27 +95,13 @@ def launch_setup(context, *args, **kwargs):
     )
 
     # Define the PX4 SITL model, autostart, and vehicle class
-    if sim_bool:
-        # In simulation mode, determine vehicle class and model from airframe ID
-        px4_path = find_folder_with_heuristic('PX4-Autopilot', os.path.expanduser(LaunchConfiguration('px4_path').perform(context)))
-        vehicle_class, model_name = get_airframe_details(px4_path, airframe_id)
-        autostart = int(airframe_id)
-        model = custom_airframe_model or model_name
-        if (not vehicle_camera_map.get(model, False)) and use_camera.lower() == 'true': 
-            raise ValueError(f"The selected airframe ID {airframe_id} ({model}) does not have a camera sensor configured. Please choose a different airframe or add a camera to the model.")
-        print(f"Simulation mode: Launching a {vehicle_class.name} with airframe ID {airframe_id}, using model {model}")
-    else:
-        # In hardware mode, trust any PX4 supported airframe ID and use specified vehicle class
-        model = "gz_x500"  # Use default model for hardware mode
-        autostart = int(airframe_id)
-        if vehicle_class == 'auto':
-            raise ValueError("In hardware mode, please specify vehicle_class in launch_params.yaml")
-        else:
-            try:
-                vehicle_class = Vehicle[vehicle_class.upper()]
-            except KeyError:
-                raise ValueError(f"Invalid vehicle_class: {vehicle_class}")
-        print(f"Hardware mode: Launching a {vehicle_class.name} with airframe ID {airframe_id}")
+    px4_path = find_folder_with_heuristic('PX4-Autopilot', os.path.expanduser(LaunchConfiguration('px4_path').perform(context)))
+    vehicle_class, model_name = get_airframe_details(px4_path, airframe_id)
+    autostart = int(airframe_id)
+    model = custom_airframe_model or model_name
+    if (not vehicle_camera_map.get(model, False)) and use_camera.lower() == 'true': 
+        raise ValueError(f"The selected airframe ID {airframe_id} ({model}) does not have a camera sensor configured. Please choose a different airframe or add a camera to the model.")
+    print(f"Launching a {vehicle_class.name} with airframe ID {airframe_id}, using model {model}")
 
     camera_offsets_str = ','.join(str(offset) for offset in camera_offsets)
     mission_cmd = ['ros2', 'run', 'uav', 'mission', uav_debug, YAML_PATH, servo_only, camera_offsets_str, vehicle_class.name, ','.join(vision_nodes)]

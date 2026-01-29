@@ -17,7 +17,7 @@ class ModeManager(Node):
     """
     A ROS 2 node for managing UAV modes and mission logic.
     """
-    def __init__(self, mode_map: str, vision_nodes: str, camera_offsets, DEBUG=False, servo_only=False, is_vtol=False) -> None:
+    def __init__(self, mode_map: str, vision_nodes: str, camera_offsets, DEBUG=False, servo_only=False, vehicle_class=Vehicle.MULTICOPTER) -> None:
         super().__init__('mission_node')
         self.timer = self.create_timer(0.1, self.spin_once)
         self.modes = {}
@@ -26,7 +26,7 @@ class ModeManager(Node):
         self.last_update_time = time()
         self.start_time = self.last_update_time
         # Instantiate appropriate UAV subclass based on vehicle type
-        if is_vtol:
+        if vehicle_class == Vehicle.VTOL:
             self.uav = VTOL(self, DEBUG=DEBUG, camera_offsets=camera_offsets)
         else:
             self.uav = Multicopter(self, DEBUG=DEBUG, camera_offsets=camera_offsets)
