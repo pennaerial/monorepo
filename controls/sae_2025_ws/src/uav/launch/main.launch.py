@@ -2,7 +2,7 @@
 import os
 import re
 from launch import LaunchDescription
-from launch.actions import ExecuteProcess, LogInfo, OpaqueFunction, RegisterEventHandler, DeclareLaunchArgument
+from launch.actions import ExecuteProcess, LogInfo, OpaqueFunction, RegisterEventHandler, DeclareLaunchArgument, TimerAction
 from launch.event_handlers import OnProcessStart, OnProcessIO
 from launch.events.process import ProcessIO
 from launch.substitutions import LaunchConfiguration
@@ -198,6 +198,10 @@ def launch_setup(context, *args, **kwargs):
                     on_stdout=make_io_handler("uav"),
                 )
             ),
+
+            # RegisterEventHandler(
+            #     OnProcessStart(target_action=px4_sitl, on_start=[LogInfo(msg="PX4 SITL started."), TimerAction(period=15.0, actions=[mission] if run_mission_bool else [])])
+            # ),
         ]
     else:
         # Hardware mode: start mission after middleware is ready
