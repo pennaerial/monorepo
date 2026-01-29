@@ -25,10 +25,10 @@ vehicle_camera_map = {
     'gz_x500_mono_cam': True,    
     'gz_x500_mono_cam_down': True,  
     'gz_x500_depth': True,       
-    'gz_standard_vtol': True,
+    'gz_standard_vtol': False,
     'gz_tiltrotor': False,
     'gz_rc_cessna': False,
-    'gz_quadtailsitter': True,
+    'gz_quadtailsitter': False,
 
     # Custom/Team Models (Add custom model names below)
 }

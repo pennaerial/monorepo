@@ -1,18 +1,21 @@
 #!/usr/bin/env python3
 import os
 import re
-import platform
 from launch import LaunchDescription
-from launch.actions import ExecuteProcess, LogInfo, TimerAction, OpaqueFunction, RegisterEventHandler, DeclareLaunchArgument
-from launch.event_handlers import OnProcessStart
+from launch.actions import ExecuteProcess, LogInfo, OpaqueFunction, RegisterEventHandler, DeclareLaunchArgument
+from launch.event_handlers import OnProcessStart, OnProcessIO
+from launch.events.process import ProcessIO
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from uav.utils import vehicle_id_dict, vehicle_camera_map, Vehicle, get_airframe_details, find_folder_with_heuristic, load_launch_parameters, extract_vision_nodes
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from ament_index_python.packages import get_package_share_directory
+from launch.logging import get_logger
 
 def launch_setup(context, *args, **kwargs):
+    logger = get_logger('main.launch')
+    logger.info("Loading launch parameters...")
     # Load launch parameters from the YAML file.
     print("Loading launch parameters...")
     params = load_launch_parameters()
@@ -21,7 +24,7 @@ def launch_setup(context, *args, **kwargs):
     vision_debug = str(params.get('vision_debug', 'false'))
     sim_bool = str(params.get('sim', 'false'))
     run_mission = str(params.get('run_mission', 'true'))
-
+    use_camera = str(params.get('use_camera', 'true'))
     '''
     Airframe ID handling
     All PX4 supported IDs can be found here: https://docs.px4.io/main/en/airframes/airframe_reference
@@ -38,7 +41,6 @@ def launch_setup(context, *args, **kwargs):
         except KeyError:
             raise ValueError(f"Unknown airframe name: {airframe_id}")
 
-    vehicle_class = params.get('vehicle_class', 'auto')
     custom_airframe_model = params.get('custom_airframe_model', '')
     horizontal_takeoff = str(params.get('horizontal_takeoff', 'false'))
     save_vision = str(params.get('save_vision', 'false'))
@@ -96,71 +98,16 @@ def launch_setup(context, *args, **kwargs):
     )
 
     # Define the PX4 SITL model, autostart, and vehicle class
-    if sim_bool:
-        # In simulation mode, determine vehicle class and model from airframe ID
-        px4_path = find_folder_with_heuristic('PX4-Autopilot', os.path.expanduser(LaunchConfiguration('px4_path').perform(context)))
-        vehicle_class, model_name = get_airframe_details(px4_path, airframe_id)
-        autostart = int(airframe_id)
-        model = custom_airframe_model or model_name
-        if not vehicle_camera_map.get(model, False):  # Remove 'gz_' prefix for model check
-            raise ValueError(f"The selected airframe ID {airframe_id} ({model}) does not have a camera sensor configured. Please choose a different airframe or add a camera to the model.")
-        print(f"Simulation mode: Launching a {vehicle_class.name} with airframe ID {airframe_id}, using model {model}")
-    else:
-        # In hardware mode, trust any PX4 supported airframe ID and use specified vehicle class
-        model = "gz_x500"  # Use default model for hardware mode
-        autostart = int(airframe_id)
-        if vehicle_class == 'auto':
-            raise ValueError("In hardware mode, please specify vehicle_class in launch_params.yaml")
-        else:
-            try:
-                vehicle_class = Vehicle[vehicle_class.upper()]
-            except KeyError:
-                raise ValueError(f"Invalid vehicle_class: {vehicle_class}")
-        print(f"Hardware mode: Launching a {vehicle_class.name} with airframe ID {airframe_id}")
-    
-    topic_model_name = model[3:]  # remove 'gz_' prefix
-
-    arch = platform.machine().lower()
-    if arch in ("x86_64", "amd64", "i386", "i686"):
-        platform_type = "x86"
-    elif arch in ("arm64", "aarch64", "armv7l", "arm"):
-        platform_type = "arm"
-    else:
-        raise ValueError(f"Unknown architecture: {arch}")
-
-    camera_topic_name = (
-        "imager" if platform_type == "x86" else "camera"
-    )  # windows -> 'imager'   mac -> 'camera'
-    GZ_CAMERA_TOPIC = f"/world/custom/model/{topic_model_name}_0/link/camera_link/sensor/{camera_topic_name}/image"
-    GZ_CAMERA_INFO_TOPIC = f"/world/custom/model/{topic_model_name}_0/link/camera_link/sensor/{camera_topic_name}/camera_info"
-
-    sae_ws_path = os.path.expanduser(os.getcwd())
-    
-    gz_ros_bridge_camera = Node(
-        package="ros_gz_bridge",
-        executable="parameter_bridge",
-        arguments=[f"{GZ_CAMERA_TOPIC}@sensor_msgs/msg/Image[gz.msgs.Image"],
-        remappings=[(GZ_CAMERA_TOPIC, "/camera")],
-        output="screen",
-        name="gz_ros_bridge_camera",
-        cwd=sae_ws_path,
-    )
-
-    gz_ros_bridge_camera_info = Node(
-        package="ros_gz_bridge",
-        executable="parameter_bridge",
-        arguments=[
-            f"{GZ_CAMERA_INFO_TOPIC}@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo"
-        ],
-        remappings=[(GZ_CAMERA_INFO_TOPIC, "/camera_info")],
-        output="screen",
-        name="gz_ros_bridge_camera_info",
-        cwd=sae_ws_path,
-    )
+    px4_path = find_folder_with_heuristic('PX4-Autopilot', os.path.expanduser(LaunchConfiguration('px4_path').perform(context)))
+    vehicle_class, model_name = get_airframe_details(px4_path, airframe_id)
+    autostart = int(airframe_id)
+    model = custom_airframe_model or model_name
+    if (not vehicle_camera_map.get(model, False)) and use_camera.lower() == 'true': 
+        raise ValueError(f"The selected airframe ID {airframe_id} ({model}) does not have a camera sensor configured. Please choose a different airframe or add a camera to the model.")
+    print(f"Launching a {vehicle_class.name} with airframe ID {airframe_id}, using model {model}")
 
     camera_offsets_str = ','.join(str(offset) for offset in camera_offsets)
     mission_cmd = ['ros2', 'run', 'uav', 'mission', uav_debug, YAML_PATH, servo_only, camera_offsets_str, vehicle_class.name, ','.join(vision_nodes), horizontal_takeoff]
-    print(mission_cmd)
     mission = ExecuteProcess(
         cmd=mission_cmd,
         output='screen',
@@ -168,12 +115,36 @@ def launch_setup(context, *args, **kwargs):
         name='mission'
     )
 
+    mission_ready_flags = {"uav": False, "middleware": False}
+    mission_started = {"value": False}  # mutable so inner functions can modify
+    def make_io_handler(process_name):
+        trigger = "INFO  [commander] Ready for takeoff!" if process_name == "uav" else "INFO  [uxrce_dds_client] time sync converged" if process_name == "middleware" else None
+        if trigger is None:
+            raise ValueError(f"Invalid process name: {process_name}")
+        def clean_text(text):
+            ansi_escape = re.compile(r'\x1b\[[0-9;]*m') # remove ANSI escape codes that give color in terminal
+            return ansi_escape.sub('', text).strip()
+        def handler(event: ProcessIO):
+            text = clean_text(event.text.decode() if isinstance(event.text, bytes) else event.text)
+            if trigger in text:
+                mission_ready_flags[process_name] = True
+                # Only when BOTH are ready do we launch spawn_world
+                if not mission_started["value"] and all(mission_ready_flags.values()):
+                    mission_started["value"] = True
+                    return [
+                        LogInfo(msg="[launcher] Both processes ready, starting mission"),
+                        mission,
+                    ]
+            return None
+        return handler
+    
     # Now, construct the actions list in a single step, depending on sim_bool
     if sim_bool:
         # Prepare sim launch arguments with all simulation parameters
         sim_launch_args = {
             'model': model,
             'px4_path': px4_path,
+            'model': model
         }
         
         print("Including simulation launch description...")
@@ -220,8 +191,12 @@ def launch_setup(context, *args, **kwargs):
             RegisterEventHandler(
                 OnProcessStart(target_action=middleware, on_start=[LogInfo(msg="Middleware started."), px4_sitl])
             ),
+            
             RegisterEventHandler(
-                OnProcessStart(target_action=px4_sitl, on_start=[LogInfo(msg="PX4 SITL started."), TimerAction(period=15.0, actions=[mission] if run_mission_bool else [])])
+                OnProcessIO(
+                    target_action=px4_sitl,
+                    on_stdout=make_io_handler("uav"),
+                )
             ),
         ]
     else:

@@ -30,12 +30,8 @@ def main():
     horizontal_takeoff = horizontal_takeoff.lower() == 'true'
     DEBUG = debug.lower() == 'true'
     rclpy.init()
-    is_vtol = (vehicle_class == Vehicle.VTOL)
 
-    if is_vtol is False:
-        horizontal_takeoff = False  # Only relevant for VTOL
-
-    mission_node = ModeManager(yaml_file, vision_nodes, camera_offsets, DEBUG=DEBUG, servo_only=servo_only, is_vtol=is_vtol, horizontal_takeoff=horizontal_takeoff)
+    mission_node = ModeManager(yaml_file, vision_nodes, camera_offsets, DEBUG=DEBUG, servo_only=servo_only, vehicle_class=vehicle_class, horizontal_takeoff=horizontal_takeoff)
     rclpy.spin(mission_node)
     rclpy.shutdown()
 

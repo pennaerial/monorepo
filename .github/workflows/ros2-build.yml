@@ -1,0 +1,183 @@
+name: ROS 2 Build for Raspberry Pi
+
+on:
+  push:
+    branches: [main, master, integration]
+    paths:
+      - '.github/workflows/ros2-build.yml'
+      - 'controls/sae_2025_ws/**'
+  pull_request:
+    branches: [main, master]
+    paths:
+      - 'controls/sae_2025_ws/**'
+  workflow_dispatch:  # Manual trigger
+
+jobs:
+  build:
+    name: Build ROS 2 Workspace (ARM64)
+    # ARM64 runner - compatible with Raspberry Pi
+    runs-on: ubuntu-22.04-arm
+
+    # Use official ROS 2 Docker image - skips ROS installation (~5 min faster)
+    container:
+      image: ros:humble-ros-base
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            python3-colcon-common-extensions \
+            python3-rosdep \
+            python3-pip \
+            python3-opencv \
+            libgflags-dev \
+            ros-humble-cv-bridge \
+            ros-humble-gps-msgs \
+            ros-humble-vision-msgs \
+            git
+
+          # Initialize rosdep
+          rosdep init 2>/dev/null || true
+          rosdep update --rosdistro humble
+
+      - name: Install workspace dependencies via rosdep
+        working-directory: controls/sae_2025_ws
+        run: |
+          . /opt/ros/humble/setup.sh
+          # Only install deps for hardware packages (skip sim/gazebo)
+          rosdep install -r -i -y --rosdistro humble \
+            --from-paths src/uav src/uav_interfaces src/px4_msgs src/actuator_msgs \
+            --skip-keys "gz-math7 gz-sim8 gz-transport13 gz-msgs10 gz-plugin2" || true
+
+      - name: Build workspace
+        working-directory: controls/sae_2025_ws
+        run: |
+          . /opt/ros/humble/setup.sh
+          # Only build hardware packages - skip all simulation/gazebo packages
+          colcon build --symlink-install \
+            --packages-up-to uav uav_interfaces px4_msgs actuator_msgs
+
+      - name: Get short SHA
+        id: sha
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE" || true
+          SHORT_SHA=$(git rev-parse --short HEAD 2>/dev/null || echo "${GITHUB_SHA:0:7}")
+          echo "short_sha=$SHORT_SHA" >> $GITHUB_OUTPUT
+          echo "Extracted SHA: $SHORT_SHA"
+          
+      - name: Get build info
+        id: info
+        run: |
+          echo "timestamp=$(date -u +%Y%m%d-%H%M%S)" >> $GITHUB_OUTPUT
+          echo "full_sha=${{ github.sha }}" >> $GITHUB_OUTPUT
+
+      - name: Create build metadata
+        working-directory: controls/sae_2025_ws
+        run: |
+          cat > install/BUILD_INFO.txt << EOF
+          Build Information
+          =================
+          Commit SHA: ${{ github.sha }}
+          Short SHA: ${{ steps.sha.outputs.short_sha }}
+          Build Time: ${{ steps.info.outputs.timestamp }}
+          Branch: ${{ github.ref_name }}
+          ROS Distro: humble
+          Target Architecture: arm64 (Raspberry Pi compatible)
+
+          Deployment Instructions:
+          1. Extract to your Raspberry Pi
+          2. cd to the extracted directory
+          3. Source the setup: source install/setup.bash
+          4. Run: ros2 launch uav main.launch.py
+
+          Environment Overrides:
+          - UAV_SIM=false (already set in hardware config)
+          - UAV_MISSION=mission_name
+          - UAV_DEBUG=true/false
+          - UAV_LAUNCH_PARAMS=/path/to/custom/params.yaml
+          EOF
+
+      - name: Prepare runtime files
+        working-directory: controls/sae_2025_ws
+        run: |
+          # Create deployment directory structure
+          mkdir -p deploy
+
+          # Copy install directory (built artifacts)
+          cp -r install deploy/
+
+          # Copy source files needed at runtime
+          mkdir -p deploy/src/uav
+          cp -r src/uav/launch deploy/src/uav/
+          cp -r src/uav/uav/missions deploy/src/uav/uav/ 2>/dev/null || mkdir -p deploy/src/uav/uav/missions
+          cp -r src/uav/uav/autonomous_modes deploy/src/uav/uav/
+
+          # Copy hardware config as the default
+          cp src/uav/launch/launch_params_hardware.yaml deploy/launch_params.yaml
+
+          # Copy deploy script
+          cp scripts/deploy.sh deploy/ 2>/dev/null || true
+
+      - name: Package build artifacts
+        working-directory: controls/sae_2025_ws
+        run: |
+          # Create a tarball of the deploy directory
+          cd deploy
+          tar -czvf ../ros2-build-${{ steps.sha.outputs.short_sha }}.tar.gz .
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ros2-build-${{ steps.sha.outputs.short_sha }}
+          path: controls/sae_2025_ws/ros2-build-${{ steps.sha.outputs.short_sha }}.tar.gz
+          retention-days: 30
+
+      - name: Create GitHub Release (on main/master push)
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: build-${{ steps.sha.outputs.short_sha }}
+          name: ROS 2 Build ${{ steps.sha.outputs.short_sha }}
+          body: |
+            ## ROS 2 Build for Raspberry Pi (ARM64)
+
+            **Commit:** ${{ github.sha }}
+            **Built:** ${{ steps.info.outputs.timestamp }}
+            **Branch:** ${{ github.ref_name }}
+
+            ### Quick Deploy to Raspberry Pi
+
+            ```bash
+            # Download and extract
+            mkdir -p ~/uav_ws && cd ~/uav_ws
+            wget https://github.com/${{ github.repository }}/releases/download/build-${{ steps.sha.outputs.short_sha }}/ros2-build-${{ steps.sha.outputs.short_sha }}.tar.gz
+            tar -xzvf ros2-build-${{ steps.sha.outputs.short_sha }}.tar.gz
+            rm ros2-build-${{ steps.sha.outputs.short_sha }}.tar.gz
+
+            # Source ROS 2 and the workspace
+            source /opt/ros/humble/setup.bash
+            source install/setup.bash
+
+            # Run (sim=false is already set in launch_params.yaml)
+            ros2 launch uav main.launch.py
+            ```
+
+            ### Configuration
+
+            Edit `launch_params.yaml` to customize mission, vehicle type, etc.
+            Or use environment variables:
+            ```bash
+            UAV_MISSION=my_mission ros2 launch uav main.launch.py
+            ```
+          files: controls/sae_2025_ws/ros2-build-${{ steps.sha.outputs.short_sha }}.tar.gz
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

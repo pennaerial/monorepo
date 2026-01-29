@@ -92,7 +92,6 @@ class VTOL(UAV):
         """
         Command a VTOL transition.
         Following https://mavlink.io/en/messages/common.html#MAV_CMD_DO_VTOL_TRANSITION
-
         Args:
             vtol_state (str): The desired VTOL state ('MC' or 'FW').
             immediate (bool): If True, the transition should be immediate.
@@ -106,11 +105,9 @@ class VTOL(UAV):
     def _calculate_velocity(self, target_pos: tuple, lock_yaw: bool) -> list:
         """
         Calculate velocity switching between FW (forward velocity) and MC (proportional) modes.
-
         Args:
             target_pos: (x, y, z) target position in local frame
             lock_yaw: Whether yaw is locked (hovering)
-
         Returns:
             [vx, vy, vz] velocity list in m/s
         """
@@ -125,29 +122,21 @@ class VTOL(UAV):
                 # Fallback during startup
                 direction_est = np.array(target_pos)
                 dist_est = np.linalg.norm(direction_est)
-                if dist_est > 0.01:
-                    direction = direction_est / dist_est
-                    return self._calculate_proportional_velocity(direction, dist_est)
-                else:
-                    return [0.0, 0.0, 0.0]
+                direction = direction_est / dist_est
+                return self._calculate_proportional_velocity(direction, dist_est)
+            else:
+                # Normal case: calculate from current position
+                dx = target_pos[0] - self.local_position.x
+                dy = target_pos[1] - self.local_position.y
+                dz = target_pos[2] - self.local_position.z
+                dist = np.sqrt(dx**2 + dy**2 + dz**2)
 
-            # Normal case: calculate from current position
-            dx = target_pos[0] - self.local_position.x
-            dy = target_pos[1] - self.local_position.y
-            dz = target_pos[2] - self.local_position.z
-            dist = np.sqrt(dx**2 + dy**2 + dz**2)
-
-            if dist > 0.01:
                 direction = np.array([dx, dy, dz]) / dist
                 return self._calculate_proportional_velocity(direction, dist)
-            else:
-                # At target: hover
-                return [0.0, 0.0, 0.0]
 
     def _get_fw_forward_velocity(self):
         """
         Get forward velocity vector for FW mode to maintain lift.
-
         Returns:
             list: [vx, vy, vz] velocity vector in m/s
         """
@@ -155,40 +144,10 @@ class VTOL(UAV):
             return [float(np.cos(self.yaw) * self.default_velocity),
                     float(np.sin(self.yaw) * self.default_velocity),
                     0.0]
-        # Last resort: forward in X direction
-        self.node.get_logger().warn("FW mode: Using fallback velocity (X-axis forward) - yaw not available")
-        return [float(self.default_velocity), 0.0, 0.0]
-
-    def _calculate_proportional_velocity(self, direction: np.ndarray, distance: float) -> list:
-        """
-        Calculate velocity using proportional control to prevent oscillation.
-        Used in MC mode. Same implementation as Multicopter class.
-
-        Args:
-            direction (np.ndarray): Unit direction vector [dx, dy, dz]
-            distance (float): Distance to target in meters
-
-        Returns:
-            list: [vx, vy, vz] velocity vector in m/s
-        """
-        # Proportional control with lenient thresholds to reduce oscillation
-        # Full speed above 10m, proportional between 10m-2m, slow below 2m
-        if distance > 10.0:
-            target_speed = self.default_velocity
-        elif distance > 2.0:
-            # Smooth deceleration from 10m to 2m
-            # At 10m: 5 m/s, at 2m: 1 m/s
-            target_speed = max(1.0, self.default_velocity * (distance / 10.0))
-        elif distance > 0.1:
-            # Close to target: gentle approach to prevent overshoot
-            target_speed = 0.8
         else:
-            # Very close: hover
-            return [0.0, 0.0, 0.0]
-
-        return [float(direction[0] * target_speed),
-                float(direction[1] * target_speed),
-                float(direction[2] * target_speed)]
+            # Last resort: forward in X direction
+            self.node.get_logger().warn("FW mode: Using fallback velocity (X-axis forward) - yaw not available")
+            return [float(self.default_velocity), 0.0, 0.0]
 
     def _vtol_vehicle_status_callback(self, msg: VtolVehicleStatus):
         """

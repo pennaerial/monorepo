@@ -4,6 +4,7 @@ from rclpy.node import Node
 from time import time
 from uav import VTOL, Multicopter
 from uav.autonomous_modes import Mode, LandingMode
+from uav.utils import Vehicle
 import yaml
 import importlib
 import inspect
@@ -17,7 +18,7 @@ class ModeManager(Node):
     """
     A ROS 2 node for managing UAV modes and mission logic.
     """
-    def __init__(self, mode_map: str, vision_nodes: str, camera_offsets, DEBUG=False, servo_only=False, is_vtol=False, horizontal_takeoff=False) -> None:
+    def __init__(self, mode_map: str, vision_nodes: str, camera_offsets, DEBUG=False, servo_only=False, vehicle_class=Vehicle.MULTICOPTER, horizontal_takeoff=False) -> None:
         super().__init__('mission_node')
         self.timer = self.create_timer(0.1, self.spin_once)
         self.modes = {}
@@ -25,13 +26,11 @@ class ModeManager(Node):
         self.active_mode = None
         self.last_update_time = time()
         self.start_time = self.last_update_time
-
         # Instantiate appropriate UAV subclass based on vehicle type
-        if is_vtol:
+        if vehicle_class == Vehicle.VTOL:
             self.uav = VTOL(self, DEBUG=DEBUG, camera_offsets=camera_offsets)
         else:
             self.uav = Multicopter(self, DEBUG=DEBUG, camera_offsets=camera_offsets)
-
         self.get_logger().info("Mission Node has started!")
         self.setup_vision(vision_nodes)
         self.setup_modes(mode_map)
@@ -204,7 +203,7 @@ class ModeManager(Node):
                 # Terminate instead of cycling
                 if self.uav.attempted_takeoff and self.active_mode is not None:
                     self.get_logger().error(f"UAV disarmed unexpectedly after takeoff attempt. Terminating to prevent infinite cycle.")
-                    self.get_logger().error(f"This usually indicates preflight check failures or PX4 safety triggers\nACTIVE MODE:{self.active_mode}")
+                    self.get_logger().error(f"This usually indicates preflight check failures or PX4 safety triggers.")
                     self.destroy_node()
                     return
 

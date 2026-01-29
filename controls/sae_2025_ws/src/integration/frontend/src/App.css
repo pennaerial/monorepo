@@ -1,0 +1,143 @@
+.container {
+  max-width: 700px;
+  margin: 0 auto;
+  background: #f5f5f5;
+  border-radius: 8px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.params-section {
+  margin-top: 20px;
+  padding: 16px;
+  background: #fff;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+}
+
+.params-section h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 16px 0;
+  color: #333;
+}
+
+label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 6px;
+  margin-top: 12px;
+  color: #333;
+}
+
+label:first-of-type {
+  margin-top: 0;
+}
+
+select, input[type="text"] {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 14px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background: white;
+  margin-bottom: 12px;
+  font-family: monospace;
+}
+
+select option {
+  padding: 8px;
+}
+
+select optgroup {
+  font-weight: 600;
+  font-style: normal;
+  color: #333;
+  background: #f8f8f8;
+}
+
+.checkbox-group {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #eee;
+}
+
+.checkbox-label {
+  display: flex !important;
+  align-items: center;
+  font-size: 14px !important;
+  font-weight: normal !important;
+  margin: 0 !important;
+  cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: auto;
+  margin-right: 8px;
+  margin-bottom: 0;
+  cursor: pointer;
+}
+
+select {
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23333' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 36px;
+}
+
+#commit {
+  margin-bottom: 0;
+}
+
+.launch-btn {
+  width: 100%;
+  padding: 14px;
+  font-size: 18px;
+  font-weight: 600;
+  color: white;
+  background: #007AFF;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  letter-spacing: 1px;
+  transition: background 0.2s;
+  margin-top: 24px;
+}
+
+.launch-btn:hover {
+  background: #0051D5;
+}
+
+.launch-btn:active {
+  background: #003DA6;
+}
+
+.launch-btn:disabled {
+  background: #999;
+  cursor: not-allowed;
+}
+
+.result {
+  margin-top: 20px;
+  padding: 12px;
+  background: white;
+  border-radius: 6px;
+  border-left: 3px solid #007AFF;
+  white-space: pre-wrap;
+  font-family: monospace;
+  font-size: 12px;
+}
+
+.result.success {
+  border-left-color: #34C759;
+}
+
+.result.error {
+  border-left-color: #FF3B30;
+}

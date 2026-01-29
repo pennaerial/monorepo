@@ -52,7 +52,7 @@ class UAV(ABC):
         self.component_id = 1
         
         self.max_acceleration = 0.01
-        self.default_velocity = 5.0  # Default velocity in m/s for trajectory setpoints
+        self.default_velocity = 5.0
 
         self.camera_offsets = camera_offsets
 
@@ -68,6 +68,7 @@ class UAV(ABC):
         self.attempted_takeoff = False
 
         # Initialize drone position
+        self.local_origin = None
         self.gps_origin = None
 
         # Store current drone position
@@ -115,6 +116,7 @@ class UAV(ABC):
             VehicleCommand.VEHICLE_CMD_DO_SET_MODE,
             params={'param1': 1.0, 'param2': PX4CustomMainMode.AUTO.value, 'param3': PX4CustomSubModeAuto.LOITER.value}
         )
+
     def disarm(self):
         """Send a disarm command to the UAV."""
         self._send_vehicle_command(
@@ -195,15 +197,12 @@ class UAV(ABC):
         dx = x - self.local_position.x
         dy = y - self.local_position.y
 
-        # Distance to target (2D horizontal distance)
-        dist_2d = np.sqrt(dx**2 + dy**2)
-
         # If very close to target (hovering), maintain current yaw to prevent spinning
         # caused by noisy position estimates when dx/dy are near zero
-        if dist_2d < 3.0 and self.yaw is not None:
+        if np.linalg.norm([dx, dy]) < 3.0 and self.yaw is not None:
             return self.yaw
-
-        # Calculate yaw angle towards target
+        
+        # Calculate yaw angle
         yaw = np.arctan2(dy, dx)
         return yaw
 
@@ -221,7 +220,7 @@ class UAV(ABC):
             [vx, vy, vz] velocity list in m/s
         """
         pass
-
+    
     def publish_offboard_control_heartbeat_signal(self):
         """Publish the offboard control mode."""
         msg = OffboardControlMode()
@@ -306,15 +305,13 @@ class UAV(ABC):
 
         # The z-point remains unchanged.
         if relative:
-            point = (
+            return (
                 current_pos[0] + rotated_point_x,
                 current_pos[1] + rotated_point_y,
                 current_pos[2] + point_z
             )
         else:
-            point = (rotated_point_x, rotated_point_y, point_z)
-
-        return point
+            return (rotated_point_x, rotated_point_y, point_z)
     
     def local_to_gps(self, local_pos):
         """
@@ -333,20 +330,18 @@ class UAV(ABC):
         if self.gps_origin is None:
             self.node.get_logger().error("gps_origin not set. Cannot convert local to GPS coordinates.")
             return None
-        
-        x, y, z = local_pos
-        lat0, lon0, alt0 = self.gps_origin
+        else:
+            x, y, z = local_pos
+            lat0, lon0, alt0 = self.gps_origin
 
-        # Convert displacements from meters to degrees
-        dlat = (x / R_earth) * (180.0 / math.pi)
-        dlon = (y / (R_earth * math.cos(math.radians(lat0)))) * (180.0 / math.pi)
-        
-        lat = lat0 + dlat
-        lon = lon0 + dlon
-        alt = alt0 - z  # because z is down in NED
-        return (lat, lon, alt)
-
-    # def reached_position 
+            # Convert displacements from meters to degrees
+            dlat = (x / R_earth) * (180.0 / math.pi)
+            dlon = (y / (R_earth * math.cos(math.radians(lat0)))) * (180.0 / math.pi)
+            
+            lat = lat0 + dlat
+            lon = lon0 + dlon
+            alt = alt0 - z  # because z is down in NED
+            return (lat, lon, alt)
 
     # -------------------------
     # Getters / data access
@@ -372,12 +367,37 @@ class UAV(ABC):
             self.local_position = l
             # return None
 
-        return (
-            self.local_position.x,
-            self.local_position.y,
-            self.local_position.z
-        )
-        
+    def _calculate_proportional_velocity(self, direction: np.ndarray, distance: float) -> list:
+        """
+        Calculate velocity using proportional control to prevent oscillation.
+        Velocity smoothly decreases as distance to target decreases.
+
+        Args:
+            direction (np.ndarray): Unit direction vector [dx, dy, dz]
+            distance (float): Distance to target in meters
+
+        Returns:
+            list: [vx, vy, vz] velocity vector in m/s
+        """
+        # Proportional control with lenient thresholds to reduce oscillation
+        # Full speed above 10m, proportional between 10m-2m, slow below 2m
+        if distance > 10.0:
+            target_speed = self.default_velocity
+        elif distance > 2.0:
+            # Smooth deceleration from 10m to 2m
+            # At 10m: 5 m/s, at 2m: 1 m/s
+            target_speed = max(1.0, self.default_velocity * (distance / 10.0))
+        elif distance > 0.1:
+            # Close to target: gentle approach to prevent overshoot
+            target_speed = 0.8
+        else:
+            # Very close: hover
+            return [0.0, 0.0, 0.0]
+
+        return [float(direction[0] * target_speed),
+                float(direction[1] * target_speed),
+                float(direction[2] * target_speed)]
+
     # -------------------------
     # Internal helper methods
     # -------------------------
@@ -462,10 +482,12 @@ class UAV(ABC):
         self.global_position.alt = msg.altitude_msl_m
         
     def _vehicle_local_position_callback(self, msg: VehicleLocalPosition):
-        if not self.gps_origin:
+        if not self.local_origin:
+            self.local_origin = (msg.x, msg.y, msg.z)
             self.gps_origin = (msg.ref_lat, msg.ref_lon, msg.ref_alt)
-            self.node.get_logger().info(f"ORIGIN SET - GPS: lat={msg.ref_lat:.6f}, lon={msg.ref_lon:.6f}, alt={msg.ref_alt:.2f}m")
-        self.local_position = msg   
+            self.node.get_logger().info(f"Local start position: {self.local_origin}")
+            self.node.get_logger().info(f"GPS start position: {self.gps_origin}")
+        self.local_position = msg
 
     def _initialize_publishers_and_subscribers(self):
         """
@@ -536,4 +558,3 @@ class UAV(ABC):
             self._failsafe_callback,
             qos_profile
         )
-        

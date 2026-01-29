@@ -28,11 +28,9 @@ class Multicopter(UAV):
     def _calculate_velocity(self, target_pos: tuple, lock_yaw: bool) -> list:
         """
         Calculate velocity using proportional control to prevent oscillation.
-
         Args:
             target_pos: (x, y, z) target position in local frame
             lock_yaw: Whether yaw is locked (hovering)
-
         Returns:
             [vx, vy, vz] velocity list in m/s
         """
@@ -58,34 +56,3 @@ class Multicopter(UAV):
         else:
             # At target: hover
             return [0.0, 0.0, 0.0]
-
-    def _calculate_proportional_velocity(self, direction: np.ndarray, distance: float) -> list:
-        """
-        Calculate velocity using proportional control to prevent oscillation.
-        Velocity smoothly decreases as distance to target decreases.
-
-        Args:
-            direction (np.ndarray): Unit direction vector [dx, dy, dz]
-            distance (float): Distance to target in meters
-
-        Returns:
-            list: [vx, vy, vz] velocity vector in m/s
-        """
-        # Proportional control with lenient thresholds to reduce oscillation
-        # Full speed above 10m, proportional between 10m-2m, slow below 2m
-        if distance > 10.0:
-            target_speed = self.default_velocity
-        elif distance > 2.0:
-            # Smooth deceleration from 10m to 2m
-            # At 10m: 5 m/s, at 2m: 1 m/s
-            target_speed = max(1.0, self.default_velocity * (distance / 10.0))
-        elif distance > 0.1:
-            # Close to target: gentle approach to prevent overshoot
-            target_speed = 0.8
-        else:
-            # Very close: hover
-            return [0.0, 0.0, 0.0]
-
-        return [float(direction[0] * target_speed),
-                float(direction[1] * target_speed),
-                float(direction[2] * target_speed)]

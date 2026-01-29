@@ -4,6 +4,7 @@ import os
 import launch
 from launch import LaunchDescription
 from launch.actions import (
+    TimerAction,
     ExecuteProcess,
     LogInfo,
     RegisterEventHandler,
@@ -149,6 +150,7 @@ def launch_setup(context, *args, **kwargs):
         raise ValueError(
             f"Invalid competition: {competition_num}. Must be one of {valid_values}"
         )
+    logger.info(f"Running Competition: {competition}")
 
     scoring_param = params.get("scoring", DEFAULT_USE_SCORING)
 
@@ -198,25 +200,20 @@ def launch_setup(context, *args, **kwargs):
         name="spawn_world",
     )
 
+    gz_ros_bridge_create = Node(
+        package="ros_gz_bridge",
+        executable="parameter_bridge",
+        arguments=[f"/world/{competition}/create@ros_gz_interfaces/srv/SpawnEntity"],
+        remappings=[],
+        output="screen",
+        name="gz_ros_bridge_create",
+        cwd=sae_ws_path,
+    )
 
-    # spawn_world = ExecuteProcess(
-    #     cmd=[
-    #         "python3",
-    #         "Tools/simulation/gz/simulation-gazebo",
-    #         f"--world=default",
-    #     ],
-    #     cwd=px4_path,
-    #     output="screen",
-    #     name="spawn_world",
-    # )
+    gz_camera_topic_model = LaunchConfiguration("gz_camera_topic_model").perform(context)
 
-    topic_model_name = model[3:]  # remove 'gz_' prefix
-
-    camera_topic_name = (
-        "imager" if platform_type == "x86" else "camera"
-    )  # windows -> 'imager'   mac -> 'camera'
-    GZ_CAMERA_TOPIC = f"/world/custom/model/{topic_model_name}_0/link/camera_link/sensor/{camera_topic_name}/image"
-    GZ_CAMERA_INFO_TOPIC = f"/world/custom/model/{topic_model_name}_0/link/camera_link/sensor/{camera_topic_name}/camera_info"
+    GZ_CAMERA_TOPIC = f"/world/{competition}/model/{gz_camera_topic_model}_0/link/camera_link/sensor/camera/image"
+    GZ_CAMERA_INFO_TOPIC = f"/world/{competition}/model/{gz_camera_topic_model}_0/link/camera_link/sensor/camera/camera_info"
 
     gz_ros_bridge_camera = Node(
         package="ros_gz_bridge",
@@ -248,13 +245,20 @@ def launch_setup(context, *args, **kwargs):
     world_params = sim_params["world"].copy()
     
     # Initialize world node - it will generate the world file automatically
-    world = Node(
-        package="sim",
+    world_node_name = camel_to_snake(world_params["name"])
+    world = Node( package="sim",
         executable=camel_to_snake(world_params["name"]),
         arguments=[json.dumps(world_params["params"])],
         output="screen",
-        name=world_params["name"],
+        name=world_node_name,
         cwd=sae_ws_path,
+    )
+
+    trigger_world_gen = ExecuteProcess(
+        cmd=["ros2", "service", "call", f"/{world_node_name}/trigger_world_gen", "std_srvs/srv/Trigger"],
+        cwd=sae_ws_path,
+        output="screen",
+        name="trigger_world_gen"
     )
 
     # Initialize scoring node if requested
@@ -293,19 +297,24 @@ def launch_setup(context, *args, **kwargs):
         ),
         RegisterEventHandler(
             OnProcessStart(
-                target_action=gz_ros_bridge_camera,
+                target_action=spawn_world,
                 on_start=[
-                    action for action in [LogInfo(msg="Bridge camera topics started."), scoring, spawn_world]
-                    if action is not None
+                    LogInfo(msg="spawn_world started, creating bridges"),
+                    gz_ros_bridge_create,
+                    gz_ros_bridge_camera,
+                    gz_ros_bridge_camera_info,
                 ],
             )
         ),
         RegisterEventHandler(
             OnProcessStart(
-                target_action=spawn_world,
-                on_start=[LogInfo(msg="World spawned.")],
+                target_action=gz_ros_bridge_create,
+                on_start=[
+                    trigger_world_gen, 
+                    LogInfo(msg="World generation triggered")
+                ],
             )
-        ),
+        )
     ]
     
     if scoring:
@@ -326,6 +335,7 @@ def generate_launch_description():
         [
             DeclareLaunchArgument("model", default_value="gz_x500_mono_cam"),
             DeclareLaunchArgument("px4_path", default_value="~/PX4-Autopilot"),
+            DeclareLaunchArgument("gz_camera_topic_model", default_value="x500_mono_cam"),
             OpaqueFunction(function=launch_setup),
         ]
     )
