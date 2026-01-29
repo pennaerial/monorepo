@@ -39,6 +39,7 @@ setup(
             'camera = uav.CameraNode:main',
             'test_flight = uav.test_flight:main',
             'vtol_testing = uav.vtol_testing:main',
+            'p2p_comm_test = uav.autonomous_modes.p2p_comm_test:main',
         ],
     },
 )

@@ -1,2 +1,5 @@
+# start:
+#   class: uav.autonomous_modes.LandingMode
 start:
-  class: uav.autonomous_modes.LandingMode
+  class: uav.autonomous_modes.p2pMode
+  
