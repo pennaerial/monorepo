@@ -1,23 +1,21 @@
 #!/usr/bin/env python3
 import os
 import re
-import platform
 from launch import LaunchDescription
 from launch.actions import ExecuteProcess, LogInfo, OpaqueFunction, RegisterEventHandler, DeclareLaunchArgument
-from launch.event_handlers import OnProcessIO, OnProcessStart
+from launch.event_handlers import OnProcessStart, OnProcessIO
 from launch.events.process import ProcessIO
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
-from uav.utils import vehicle_map, find_folder_with_heuristic, load_launch_parameters, extract_vision_nodes
+from uav.utils import vehicle_id_dict, vehicle_camera_map, Vehicle, get_airframe_details, find_folder_with_heuristic, load_launch_parameters, extract_vision_nodes
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from ament_index_python.packages import get_package_share_directory
 from launch.logging import get_logger
-from launch.logging import get_logger
 
 def launch_setup(context, *args, **kwargs):
     logger = get_logger('main.launch')
-    logger = get_logger('main.launch')
+    logger.info("Loading launch parameters...")
     # Load launch parameters from the YAML file.
     params = load_launch_parameters()
     mission_name = params.get('mission_name', 'basic')
@@ -25,7 +23,24 @@ def launch_setup(context, *args, **kwargs):
     vision_debug = str(params.get('vision_debug', 'false'))
     sim_bool = str(params.get('sim', 'false'))
     run_mission = str(params.get('run_mission', 'true'))
-    vehicle_type = vehicle_map[params.get('vehicle_type', 0)]
+    use_camera = str(params.get('use_camera', 'true'))
+    '''
+    Airframe ID handling
+    All PX4 supported IDs can be found here: https://docs.px4.io/main/en/airframes/airframe_reference
+    However, IDs available for simulation can be found in PX4-Autopilot/ROMFS/px4fmu_common/init.d-posix/airframes
+    '''
+    airframe_id = params.get('airframe', 'quadcopter')
+    try:
+        # If an airframe ID is provided directly, use it
+        airframe_id = int(airframe_id) 
+    except ValueError:
+        try:
+            # Otherwise, map preset vehicle name to airframe ID
+            airframe_id = vehicle_id_dict[airframe_id] 
+        except KeyError:
+            raise ValueError(f"Unknown airframe name: {airframe_id}")
+
+    custom_airframe_model = params.get('custom_airframe_model', '')
     save_vision = str(params.get('save_vision', 'false'))
     camera_offsets = params.get('camera_offsets', [0, 0, 0])
     servo_only = str(params.get('servo_only', 'false'))
@@ -78,47 +93,25 @@ def launch_setup(context, *args, **kwargs):
         output='screen',
         name='middleware'
     )
-    
-    # Define the PX4 SITL model and autostart
-    if vehicle_type == 'quadcopter':
-        autostart = 4001
-        model = 'gz_x500_mono_cam' # append '_down' for down-facing camera
-    elif vehicle_type == 'tiltrotor_vtol':
-        autostart = 4020
-        model = 'gz_tiltrotor'
-    elif vehicle_type == 'fixed_wing':
-        autostart = 4003
-        model = 'gz_rc_cessna'
-    elif vehicle_type == 'standard_vtol':
-        autostart = 4004
-        model = 'gz_standard_vtol'
-    else:
-        raise ValueError(f"Invalid vehicle type: {vehicle_type}")
 
-    
-    gz_camera_topic_model = model[3:]  # remove 'gz_' prefix
-    gz_camera_topic_model = model[3:]  # remove 'gz_' prefix
-
-    arch = platform.machine().lower()
-    if arch in ("x86_64", "amd64", "i386", "i686"):
-        platform_type = "x86"
-    elif arch in ("arm64", "aarch64", "armv7l", "arm"):
-        platform_type = "arm"
-    else:
-        raise ValueError(f"Unknown architecture: {arch}")
-
-    logger.debug(f"Running Architecture: {arch}")
-
-    sae_ws_path = os.path.expanduser(os.getcwd())
+    # Define the PX4 SITL model, autostart, and vehicle class
+    px4_path = find_folder_with_heuristic('PX4-Autopilot', os.path.expanduser(LaunchConfiguration('px4_path').perform(context)))
+    vehicle_class, model_name = get_airframe_details(px4_path, airframe_id)
+    autostart = int(airframe_id)
+    model = custom_airframe_model or model_name
+    if (not vehicle_camera_map.get(model, False)) and use_camera.lower() == 'true': 
+        raise ValueError(f"The selected airframe ID {airframe_id} ({model}) does not have a camera sensor configured. Please choose a different airframe or add a camera to the model.")
+    print(f"Launching a {vehicle_class.name} with airframe ID {airframe_id}, using model {model}")
 
     camera_offsets_str = ','.join(str(offset) for offset in camera_offsets)
-    mission_cmd = ['ros2', 'run', 'uav', 'mission', uav_debug, YAML_PATH, servo_only, camera_offsets_str, ','.join(vision_nodes)]
+    mission_cmd = ['ros2', 'run', 'uav', 'mission', uav_debug, YAML_PATH, servo_only, camera_offsets_str, vehicle_class.name, ','.join(vision_nodes)]
     mission = ExecuteProcess(
         cmd=mission_cmd,
         output='screen',
         emulate_tty=True,
         name='mission'
     )
+
     mission_ready_flags = {"uav": False, "middleware": False}
     mission_started = {"value": False}  # mutable so inner functions can modify
     def make_io_handler(process_name):
@@ -141,15 +134,13 @@ def launch_setup(context, *args, **kwargs):
                     ]
             return None
         return handler
+    
     # Now, construct the actions list in a single step, depending on sim_bool
     if sim_bool:
-        # Find required paths.
-        px4_path = find_folder_with_heuristic('PX4-Autopilot', os.path.expanduser(LaunchConfiguration('px4_path').perform(context)))
-
         # Prepare sim launch arguments with all simulation parameters
         sim_launch_args = {
             'px4_path': px4_path,
-            'gz_camera_topic_model': gz_camera_topic_model
+            'model': model
         }
         
         sim = IncludeLaunchDescription(
