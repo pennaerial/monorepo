@@ -13,10 +13,9 @@ from launch.actions import (
 )
 import logging
 from launch.substitutions import LaunchConfiguration
-from launch.event_handlers import OnProcessStart
+from launch.event_handlers import OnProcessStart, OnProcessExit, OnProcessIO
 from launch_ros.actions import Node
-from sim.utils import find_package_resource, copy_models_to_gazebo, load_yaml_to_dict, build_node_arguments, camel_to_snake
-import platform
+from sim.utils import find_package_resource, load_yaml_to_dict, build_node_arguments, camel_to_snake
 import importlib
 from pathlib import Path
 from sim.constants import (
@@ -46,7 +45,7 @@ def load_sim_launch_parameters():
         installed_params = package_share / 'launch' / 'launch_params.yaml'
         if installed_params.exists():
             return load_yaml_to_dict(installed_params)
-    except Exception as e:
+    except Exception:
         pass
     
     # If not found, raise error
@@ -159,20 +158,11 @@ def launch_setup(context, *args, **kwargs):
     else:
         use_scoring = bool(scoring_param)
 
-    model = LaunchConfiguration("model").perform(context)
-
-    arch = platform.machine().lower()
-    if arch in ("x86_64", "amd64", "i386", "i686"):
-        platform_type = "x86"
-    elif arch in ("arm64", "aarch64", "armv7l", "arm"):
-        platform_type = "arm"
-    else:
-        raise ValueError(f"Unknown architecture: {arch}")
 
     px4_path_raw = LaunchConfiguration("px4_path").perform(context)
 
-    if model is None or px4_path_raw is None:
-        raise RuntimeError("Model and PX4 path are required")
+    if px4_path_raw is None:
+        raise RuntimeError("PX4 path is required")
     
     px4_path = os.path.expanduser(px4_path_raw)
 
@@ -280,19 +270,17 @@ def launch_setup(context, *args, **kwargs):
     actions = [
         download_gz_models,
         RegisterEventHandler(
-            OnProcessStart(
+            OnProcessExit(
                 target_action=download_gz_models,
-                on_start=[LogInfo(msg="Gazebo models downloaded."), world],
+                on_exit=[LogInfo(msg="Gazebo models downloaded."), world],
             )
         ),
         RegisterEventHandler(
-            OnProcessStart(
+            OnProcessIO(
                 target_action=world,
-                on_start=[
-                    LogInfo(msg="World node started."),
-                    gz_ros_bridge_camera,
-                    gz_ros_bridge_camera_info,
-                ],
+                on_stderr=lambda event: (
+                    [spawn_world, LogInfo(msg="Simulation world node started."), scoring] if b"Successfully generated world file:" in event.text else None
+                )
             )
         ),
         RegisterEventHandler(
@@ -333,7 +321,6 @@ def launch_setup(context, *args, **kwargs):
 def generate_launch_description():
     return LaunchDescription(
         [
-            DeclareLaunchArgument("model", default_value="gz_x500_mono_cam"),
             DeclareLaunchArgument("px4_path", default_value="~/PX4-Autopilot"),
             DeclareLaunchArgument("gz_camera_topic_model", default_value="x500_mono_cam"),
             OpaqueFunction(function=launch_setup),

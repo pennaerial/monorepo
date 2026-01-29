@@ -144,7 +144,6 @@ def launch_setup(context, *args, **kwargs):
         sim_launch_args = {
             'model': model,
             'px4_path': px4_path,
-            'model': model
         }
         
         print("Including simulation launch description...")
@@ -161,7 +160,7 @@ def launch_setup(context, *args, **kwargs):
 
         print("Starting PX4 SITL...")
         px4_sitl = ExecuteProcess(
-            cmd=['bash', '-c', f'PX4_GZ_WORLD=custom PX4_GZ_STANDALONE=1 PX4_SYS_AUTOSTART={autostart} PX4_SIM_MODEL={model} ./build/px4_sitl_default/bin/px4'],
+            cmd=['bash', '-c', f'PX4_GZ_WORLD=in_house PX4_GZ_STANDALONE=1 PX4_SYS_AUTOSTART={autostart} PX4_SIM_MODEL={model} ./build/px4_sitl_default/bin/px4'],
             cwd=px4_path,
             output='screen',
             name='px4_sitl'
@@ -198,10 +197,6 @@ def launch_setup(context, *args, **kwargs):
                     on_stdout=make_io_handler("uav"),
                 )
             ),
-
-            # RegisterEventHandler(
-            #     OnProcessStart(target_action=px4_sitl, on_start=[LogInfo(msg="PX4 SITL started."), TimerAction(period=15.0, actions=[mission] if run_mission_bool else [])])
-            # ),
         ]
     else:
         # Hardware mode: start mission after middleware is ready
@@ -209,16 +204,16 @@ def launch_setup(context, *args, **kwargs):
             *vision_node_actions,
             LogInfo(msg="Vision nodes started."),
             middleware,
-            RegisterEventHandler(
-                OnProcessStart(
-                    target_action=middleware,
-                    on_start=[
-                        LogInfo(msg="Hardware middleware ready."),
-                        TimerAction(period=5.0, actions=[mission] if run_mission_bool else [])
-                    ]
-                )
-            ),
         ]
+    if run_mission_bool:
+        actions.append(
+                RegisterEventHandler(
+                    OnProcessIO(
+                        target_action=px4_sitl,
+                        on_stdout=make_io_handler("middleware"),
+                    )
+                )
+            )
     return actions
 
 def generate_launch_description():
