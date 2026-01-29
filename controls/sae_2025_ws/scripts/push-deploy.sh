@@ -16,6 +16,18 @@
 
 set -e
 
+# Check if sshpass is needed and available
+if [ -n "$SSHPASS" ]; then
+    if ! command -v sshpass &> /dev/null; then
+        echo "ERROR: sshpass is not installed but password authentication is requested"
+        echo ""
+        echo "Install sshpass:"
+        echo "  macOS:  brew install sshpass"
+        echo "  Linux:  sudo apt install sshpass"
+        exit 1
+    fi
+fi
+
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -48,6 +60,24 @@ detect_repo() {
         echo "${BASH_REMATCH[1]}"
     else
         error "Could not detect GITHUB_REPO. Set it manually: export GITHUB_REPO=org/repo"
+    fi
+}
+
+# SSH command prefix (with or without sshpass)
+ssh_cmd() {
+    if [ -n "$SSHPASS" ]; then
+        echo "sshpass -e ssh"
+    else
+        echo "ssh"
+    fi
+}
+
+# SCP command prefix (with or without sshpass)
+scp_cmd() {
+    if [ -n "$SSHPASS" ]; then
+        echo "sshpass -e scp"
+    else
+        echo "scp"
     fi
 }
 
@@ -112,21 +142,21 @@ deploy_to_pi() {
     
     # Check connectivity
     info "Checking connection..."
-    if ! ssh $(ssh_opts) "$target" "echo 'Connected'" 2>/dev/null; then
+    if ! $(ssh_cmd) $(ssh_opts) "$target" "echo 'Connected'" 2>/dev/null; then
         error "Cannot connect to $target"
     fi
     
     # Create remote directory
     info "Preparing remote directory..."
-    ssh $(ssh_opts) "$target" "mkdir -p $REMOTE_DIR"
+    $(ssh_cmd) $(ssh_opts) "$target" "mkdir -p $REMOTE_DIR"
     
     # Copy tarball
     info "Copying build artifact..."
-    scp $(ssh_opts) "$tarball" "$target:$REMOTE_DIR/$filename"
+    $(scp_cmd) $(ssh_opts) "$tarball" "$target:$REMOTE_DIR/$filename"
     
     # Extract and set up on remote
     info "Extracting and configuring..."
-    ssh $(ssh_opts) "$target" bash << REMOTE_SCRIPT
+    $(ssh_cmd) $(ssh_opts) "$target" bash << REMOTE_SCRIPT
 set -e
 cd $REMOTE_DIR
 

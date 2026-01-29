@@ -7,6 +7,7 @@ function App() {
   const [inputValue, setInputValue] = useState('')
   const [showDropdown, setShowDropdown] = useState(false)
   const [target, setTarget] = useState('')
+  const [password, setPassword] = useState('')
   const [params, setParams] = useState({
     mission_name: 'test_straight_course',
     uav_debug: false,
@@ -82,6 +83,7 @@ function App() {
     const formData = new FormData()
     formData.append('commit', selectedCommit)
     formData.append('target', target)
+    formData.append('password', password)
     formData.append('params', paramsString)
 
     try {
@@ -164,9 +166,20 @@ function App() {
             <label className="section-label">Deploy Target</label>
             <input
               type="text"
-              placeholder="e.g., pi@192.168.1.50 (leave empty for local)"
+              placeholder="e.g., pi@192.168.1.50"
               value={target}
               onChange={(e) => setTarget(e.target.value)}
+              className="target-input"
+            />
+          </div>
+
+          <div className="section">
+            <label className="section-label">SSH Password</label>
+            <input
+              type="password"
+              placeholder="Enter SSH password for target"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               className="target-input"
             />
           </div>

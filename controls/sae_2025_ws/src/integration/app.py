@@ -68,7 +68,7 @@ async def get_commits():
         return {"commits": []}
 
 @app.post("/api/launch")
-async def launch(commit: str = Form(...), params: str = Form(""), target: str = Form("")):
+async def launch(commit: str = Form(...), params: str = Form(""), target: str = Form(""), password: str = Form("")):
     """Execute push-deploy.sh with selected commit hash"""
     try:
         # Extract short commit hash (first 7 characters)
@@ -85,9 +85,15 @@ async def launch(commit: str = Form(...), params: str = Form(""), target: str = 
         if target:
             command.append(target)
 
+        # Set up environment with password if provided
+        env = os.environ.copy()
+        if password:
+            env["SSHPASS"] = password
+
         result = subprocess.run(
             command,
             cwd=REPO_PATH,
+            env=env,
             capture_output=True,
             text=True,
             timeout=600  # 10 minutes for deployment
