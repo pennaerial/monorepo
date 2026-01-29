@@ -23,7 +23,7 @@ class VTOL(UAV):
         """VTOL aircraft can transition between MC and FW modes."""
         return True
 
-    def fixed_wing_takeoff(self, pitch_deg: float = 10.0, timeout_s: float = 8.0):
+    def fixed_wing_takeoff(self):
         """
         Simple horizontal VTOL takeoff:
           1) request transition to FW
@@ -63,12 +63,11 @@ class VTOL(UAV):
             lon = self.global_position.lon
             alt = self.global_position.alt
             self.node.get_logger().info(f"Current GPS: {lat}, {lon}, {alt}")
-            # takeoff_gps = (lat + 3 * self.takeoff_amount, lon + 3.3 * self.takeoff_amount, alt + self.takeoff_amount)
-            takeoff_gps = (lat, lon - 3.3 * self.takeoff_amount, alt + 10 * self.takeoff_amount)
+            
+            # Right now is hard coded to take off east but should be modified based on yaw
+            takeoff_gps = (lat, lon + self.takeoff_amount, alt + 5 * self.takeoff_amount)
 
-            self.node.get_logger().info("=============================================================")
-            self.node.get_logger().info(f"FW takeoff GPS: {takeoff_gps[0]}, {takeoff_gps[1]}, {takeoff_gps[2]}")
-
+            self.node.get_logger().info(f"Takeoff Destination GPS: {takeoff_gps[0]}, {takeoff_gps[1]}, {takeoff_gps[2]}")
 
             self._send_vehicle_command(
                 VehicleCommand.VEHICLE_CMD_NAV_TAKEOFF,
@@ -77,9 +76,9 @@ class VTOL(UAV):
                     "param2": float('nan'), # Unused
                     "param3": float('nan'), # Unused
                     "param4": float('nan'), # Yaw angle
-                    "param5": lat, #Latitude (used to be takeoff_gps[0])
-                    "param6": lon + self.takeoff_amount, #Longitude
-                    "param7": alt + 2 * self.takeoff_amount, #Altitude
+                    "param5": takeoff_gps[0], #Latitude
+                    "param6": takeoff_gps[1], #Longitude
+                    "param7": takeoff_gps[2], #Altitude
                 },
             )
             self.node.get_logger().info("FW takeoff Step 3: NAV_TAKEOFF sent.")
