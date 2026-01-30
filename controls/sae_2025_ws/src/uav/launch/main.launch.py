@@ -178,30 +178,13 @@ def launch_setup(context, *args, **kwargs):
             output='screen',
             name='px4_sitl'
         )
-
-        # Testing with make px4_sitl instead of standalone
-        # px4_sitl = ExecuteProcess(
-        #     cmd=['bash', '-c', f'make px4_sitl gz_standard_vtol_inhouse'],
-        #     cwd=px4_path,
-        #     output='screen',
-        #     name='px4_sitl'
-        # )
-
-        # px4_sitl = ExecuteProcess(
-        #     cmd=['ls'],
-        #     cwd=px4_path,
-        #     output='screen',
-        #     name='px4_sitl'
-        # )
-        
         actions = [
             sim,
-            LogInfo(msg="Gazebo started."),
-            *vision_node_actions,
-            LogInfo(msg="Vision nodes started."),
-            middleware,
             RegisterEventHandler(
-                OnProcessStart(target_action=middleware, on_start=[LogInfo(msg="Middleware started."), px4_sitl])
+                    OnProcessIO(on_stderr=lambda event: (
+                        [LogInfo(msg="Gazebo process started."), px4_sitl, *vision_node_actions, middleware] if b"Successfully generated world file:" in event.text else None
+                    )
+                )
             ),
             
             RegisterEventHandler(
