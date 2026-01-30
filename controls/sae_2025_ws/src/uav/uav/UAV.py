@@ -103,13 +103,12 @@ class UAV(ABC):
         if coordinate_system == 'GPS':
             curr_gps = self.get_gps()
             return self.gps_distance_3d(waypoint[0], waypoint[1], waypoint[2], curr_gps[0], curr_gps[1], curr_gps[2])
-        
-        # LOCAL
-        return np.sqrt(
-            (self.local_position.x - waypoint[0]) ** 2 +
-            (self.local_position.y - waypoint[1]) ** 2 +
-            (self.local_position.z - waypoint[2]) ** 2
-        )
+        elif coordinate_system == 'LOCAL':
+            return np.sqrt(
+                (self.local_position.x - waypoint[0]) ** 2 +
+                (self.local_position.y - waypoint[1]) ** 2 +
+                (self.local_position.z - waypoint[2]) ** 2
+            )
 
     def hover(self):
         self._send_vehicle_command(
@@ -347,25 +346,31 @@ class UAV(ABC):
     # Getters / data access
     # -------------------------
     def get_gps(self):
-        if not self.global_position:
+        if self.global_position:
+            return (
+                self.global_position.lat,
+                self.global_position.lon,
+                self.global_position.alt
+            )
+        else:
             self.node.get_logger().warn("No GPS data available.")
             return None
-        
-        return (
-            self.global_position.lat,
-            self.global_position.lon,
-            self.global_position.alt
-        )
-        
+    
     def get_local_position(self):
-        if not self.local_position:
+        if self.local_position:
+            return (
+                self.local_position.x,
+                self.local_position.y,
+                self.local_position.z
+            )
+        else:
             self.node.get_logger().warn("No local position data available.")
             l = VehicleLocalPosition()
             l.x = 0.0
             l.y = 0.0
             l.z = 0.0
             self.local_position = l
-            # return None
+            return (0.0, 0.0, 0.0)
 
     def _calculate_proportional_velocity(self, direction: np.ndarray, distance: float) -> list:
         """
