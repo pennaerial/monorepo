@@ -2,7 +2,7 @@
 # Configuration for running on real hardware (Raspberry Pi)
 # Copy this to launch_params.yaml or set UAV_LAUNCH_PARAMS env var
 
-mission_name: basic
+mission_name: basic_waypoints
 uav_debug: false
 vision_debug: false
 run_mission: true
