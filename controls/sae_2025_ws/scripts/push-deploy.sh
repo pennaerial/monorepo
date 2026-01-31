@@ -180,8 +180,8 @@ SCRIPT_DIR="\$(cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)"
 cd "\$SCRIPT_DIR"
 source /opt/ros/humble/setup.bash
 source install/setup.bash
-export UAV_SIM=false
-echo "ROS 2 workspace activated (sim=false)"
+# Note: UAV_SIM and other parameters should be set via environment variables before launching
+echo "ROS 2 workspace activated"
 EOF
 chmod +x activate.sh
 

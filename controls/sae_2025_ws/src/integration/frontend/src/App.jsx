@@ -9,15 +9,17 @@ function App() {
   const [target, setTarget] = useState('')
   const [password, setPassword] = useState('')
   const [params, setParams] = useState({
-    mission_name: 'test_straight_course',
+    mission_name: 'basic',
     uav_debug: false,
     vision_debug: false,
     run_mission: true,
     vehicle_type: 0,
     save_vision: false,
     servo_only: false,
-    camera_offsets: '0, 0, 0',
-    sim: true
+    camera_offset_x: 0,
+    camera_offset_y: 0,
+    camera_offset_z: 0,
+    sim: false  // Set to false for hardware deployment
   })
   const [result, setResult] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -41,7 +43,7 @@ function App() {
   }, [])
 
   // Filter commits based on input
-  const filteredCommits = commits.filter(commit => 
+  const filteredCommits = commits.filter(commit =>
     commit.hash.toLowerCase().includes(inputValue.toLowerCase()) ||
     commit.branch.toLowerCase().includes(inputValue.toLowerCase())
   )
@@ -65,7 +67,7 @@ function App() {
     const value = e.target.value
     setInputValue(value)
     setShowDropdown(true)
-    
+
     // If user types an exact match, auto-select it
     const exactMatch = commits.find(c => c.hash === value)
     if (exactMatch) {
@@ -78,7 +80,9 @@ function App() {
     setLoading(true)
 
     // Convert params object to command line arguments
-    const paramsString = `mission_name:=${params.mission_name} uav_debug:=${params.uav_debug} vision_debug:=${params.vision_debug} run_mission:=${params.run_mission} vehicle_type:=${params.vehicle_type} save_vision:=${params.save_vision} servo_only:=${params.servo_only} camera_offsets:=[${params.camera_offsets}] sim:=${params.sim}`
+    // Combine camera offsets into comma-separated format
+    const cameraOffsets = `${params.camera_offset_x},${params.camera_offset_y},${params.camera_offset_z}`
+    const paramsString = `mission_name:=${params.mission_name} uav_debug:=${params.uav_debug} vision_debug:=${params.vision_debug} run_mission:=${params.run_mission} vehicle_type:=${params.vehicle_type} save_vision:=${params.save_vision} servo_only:=${params.servo_only} camera_offsets:=${cameraOffsets} sim:=${params.sim}`
 
     const formData = new FormData()
     formData.append('commit', selectedCommit)
@@ -119,8 +123,8 @@ function App() {
                   required
                 />
                 {inputValue && (
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     className="clear-btn"
                     onClick={() => {
                       setInputValue('')
@@ -188,7 +192,7 @@ function App() {
             <label className="section-label">Launch Parameters</label>
             <div className="params-grid">
               <div className="param-field">
-                      <label htmlFor="mission_name">Mission Name</label>
+                <label htmlFor="mission_name">Mission Name</label>
                 <input
                   type="text"
                   id="mission_name"
@@ -211,71 +215,111 @@ function App() {
                 </select>
               </div>
 
-              <div className="param-field full-width">
-                <label htmlFor="camera_offsets">Camera Offsets (x, y, z meters)</label>
+              <div className="param-field">
+                <label htmlFor="camera_offset_x">Camera Offset X (meters)</label>
                 <input
                   type="text"
-                  id="camera_offsets"
-                  value={params.camera_offsets}
-                  onChange={(e) => handleParamChange('camera_offsets', e.target.value)}
-                  placeholder="0, 0, 0"
+                  id="camera_offset_x"
+                  value={params.camera_offset_x}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    if (val === '' || val === '-' || !isNaN(parseFloat(val))) {
+                      handleParamChange('camera_offset_x', val === '' ? 0 : (val === '-' ? '-' : parseFloat(val)))
+                    }
+                  }}
+                  onFocus={(e) => e.target.select()}
+                  placeholder="0"
+                />
+              </div>
+
+              <div className="param-field">
+                <label htmlFor="camera_offset_y">Camera Offset Y (meters)</label>
+                <input
+                  type="text"
+                  id="camera_offset_y"
+                  value={params.camera_offset_y}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    if (val === '' || val === '-' || !isNaN(parseFloat(val))) {
+                      handleParamChange('camera_offset_y', val === '' ? 0 : (val === '-' ? '-' : parseFloat(val)))
+                    }
+                  }}
+                  onFocus={(e) => e.target.select()}
+                  placeholder="0"
+                />
+              </div>
+
+              <div className="param-field">
+                <label htmlFor="camera_offset_z">Camera Offset Z (meters)</label>
+                <input
+                  type="text"
+                  id="camera_offset_z"
+                  value={params.camera_offset_z}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    if (val === '' || val === '-' || !isNaN(parseFloat(val))) {
+                      handleParamChange('camera_offset_z', val === '' ? 0 : (val === '-' ? '-' : parseFloat(val)))
+                    }
+                  }}
+                  onFocus={(e) => e.target.select()}
+                  placeholder="0"
                 />
               </div>
 
               <div className="checkbox-group">
-            <label className="checkbox-label">
-              <input
-                type="checkbox"
-                checked={params.uav_debug}
-                onChange={(e) => handleParamChange('uav_debug', e.target.checked)}
-              />
-              UAV Debug
-            </label>
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={params.uav_debug}
+                    onChange={(e) => handleParamChange('uav_debug', e.target.checked)}
+                  />
+                  UAV Debug
+                </label>
 
-            <label className="checkbox-label">
-              <input
-                type="checkbox"
-                checked={params.vision_debug}
-                onChange={(e) => handleParamChange('vision_debug', e.target.checked)}
-              />
-              Vision Debug
-            </label>
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={params.vision_debug}
+                    onChange={(e) => handleParamChange('vision_debug', e.target.checked)}
+                  />
+                  Vision Debug
+                </label>
 
-            <label className="checkbox-label">
-              <input
-                type="checkbox"
-                checked={params.run_mission}
-                onChange={(e) => handleParamChange('run_mission', e.target.checked)}
-              />
-              Run Mission
-            </label>
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={params.run_mission}
+                    onChange={(e) => handleParamChange('run_mission', e.target.checked)}
+                  />
+                  Run Mission
+                </label>
 
-            <label className="checkbox-label">
-              <input
-                type="checkbox"
-                checked={params.save_vision}
-                onChange={(e) => handleParamChange('save_vision', e.target.checked)}
-              />
-              Save Vision
-            </label>
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={params.save_vision}
+                    onChange={(e) => handleParamChange('save_vision', e.target.checked)}
+                  />
+                  Save Vision
+                </label>
 
-            <label className="checkbox-label">
-              <input
-                type="checkbox"
-                checked={params.servo_only}
-                onChange={(e) => handleParamChange('servo_only', e.target.checked)}
-              />
-              Servo Only
-            </label>
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={params.servo_only}
+                    onChange={(e) => handleParamChange('servo_only', e.target.checked)}
+                  />
+                  Servo Only
+                </label>
 
-            <label className="checkbox-label">
-              <input
-                type="checkbox"
-                checked={params.sim}
-                onChange={(e) => handleParamChange('sim', e.target.checked)}
-              />
-              Simulation Mode
-            </label>
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={params.sim}
+                    onChange={(e) => handleParamChange('sim', e.target.checked)}
+                  />
+                  Simulation Mode
+                </label>
               </div>
             </div>
           </div>

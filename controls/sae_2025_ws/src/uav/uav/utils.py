@@ -100,8 +100,15 @@ def load_launch_parameters():
     3. Default: src/uav/launch/launch_params.yaml
     
     Individual params can also be overridden via env vars:
-    - UAV_SIM=false  (overrides sim parameter)
     - UAV_MISSION=my_mission  (overrides mission_name)
+    - UAV_SIM=false  (overrides sim parameter)
+    - UAV_DEBUG=true  (overrides uav_debug)
+    - UAV_VISION_DEBUG=true  (overrides vision_debug)
+    - UAV_RUN_MISSION=true  (overrides run_mission)
+    - UAV_VEHICLE_TYPE=0  (overrides vehicle_type: 0=quadrotor, 1=tiltrotor, 2=fixed-wing, 3=standard VTOL)
+    - UAV_SAVE_VISION=false  (overrides save_vision)
+    - UAV_SERVO_ONLY=false  (overrides servo_only)
+    - UAV_CAMERA_OFFSETS=0,0,0  (overrides camera_offsets)
     """
     # Check for custom config file via env var
     if os.environ.get('UAV_LAUNCH_PARAMS'):
@@ -116,7 +123,7 @@ def load_launch_parameters():
     with open(params_file, 'r', encoding='utf-8') as f:
         params = yaml.safe_load(f)
     
-    # Allow env var overrides for common parameters
+    # Allow env var overrides for all parameters
     if os.environ.get('UAV_SIM') is not None:
         params['sim'] = os.environ['UAV_SIM'].lower() in ('true', '1', 'yes')
     if os.environ.get('UAV_MISSION'):
@@ -125,5 +132,17 @@ def load_launch_parameters():
         params['uav_debug'] = os.environ['UAV_DEBUG'].lower() in ('true', '1', 'yes')
     if os.environ.get('UAV_VISION_DEBUG'):
         params['vision_debug'] = os.environ['UAV_VISION_DEBUG'].lower() in ('true', '1', 'yes')
+    if os.environ.get('UAV_RUN_MISSION'):
+        params['run_mission'] = os.environ['UAV_RUN_MISSION'].lower() in ('true', '1', 'yes')
+    if os.environ.get('UAV_VEHICLE_TYPE'):
+        params['vehicle_type'] = int(os.environ['UAV_VEHICLE_TYPE'])
+    if os.environ.get('UAV_SAVE_VISION'):
+        params['save_vision'] = os.environ['UAV_SAVE_VISION'].lower() in ('true', '1', 'yes')
+    if os.environ.get('UAV_SERVO_ONLY'):
+        params['servo_only'] = os.environ['UAV_SERVO_ONLY'].lower() in ('true', '1', 'yes')
+    if os.environ.get('UAV_CAMERA_OFFSETS'):
+        # Parse comma-separated values: "0,0,0" -> [0, 0, 0]
+        offsets_str = os.environ['UAV_CAMERA_OFFSETS'].strip()
+        params['camera_offsets'] = [float(x.strip()) for x in offsets_str.split(',')]
     
     return params
