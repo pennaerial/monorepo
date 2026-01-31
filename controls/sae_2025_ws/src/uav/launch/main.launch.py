@@ -50,42 +50,45 @@ def launch_setup(context, *args, **kwargs):
     sim_bool = sim_bool.lower() == 'true'
     run_mission_bool = run_mission.lower() == 'true'
     save_vision_bool = save_vision.lower() == 'true'
+    use_camera_bool = use_camera.lower() == 'true'
     
     # Build the mission YAML file path using the mission name.
     YAML_PATH = os.path.join(os.getcwd(), 'src', 'uav', 'uav', 'missions', f"{mission_name}.yaml")
     
     # Build vision node actions.
     vision_nodes = []
-    vision_node_actions = [Node(
-        package='uav',
-        executable='camera',
-        name='camera',
-        output='screen'
-    )]
-
-    for node in extract_vision_nodes(YAML_PATH):
-        vision_nodes.append(node)
-        # Convert CamelCase node names to snake_case executable names.
-        s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', node)
-        exe_name = re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
+    vision_node_actions = []
+    if use_camera_bool:
         vision_node_actions.append(Node(
             package='uav',
-            executable=exe_name,
-            name=exe_name,
-            output='screen',
-            parameters=[{'debug': vision_debug_bool, 'sim': sim_bool, 'save_vision': save_vision_bool}],
+            executable='camera',
+            name='camera',
+            output='screen'
         ))
+
+        for node in extract_vision_nodes(YAML_PATH):
+            vision_nodes.append(node)
+            # Convert CamelCase node names to snake_case executable names.
+            s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', node)
+            exe_name = re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
+            vision_node_actions.append(Node(
+                package='uav',
+                executable=exe_name,
+                name=exe_name,
+                output='screen',
+                parameters=[{'debug': vision_debug_bool, 'sim': sim_bool, 'save_vision': save_vision_bool}],
+            ))
+        
+        # Clear vision node actions if none are found.
+        if len(vision_nodes) == 0:
+            vision_node_actions = []
     
-    # Clear vision node actions if none are found.
-    if len(vision_nodes) == 0:
-        vision_node_actions = []
-    
-    if not sim_bool:
-        vision_node_actions.insert(0, ExecuteProcess(
-            cmd=['ros2', 'run', 'v4l2_camera', 'v4l2_camera_node', '--ros-args', '-p', 'image_size:=[640,480]', '--ros-args', '--remap', '/image_raw:=/camera'],
-            output='screen',
-            name='cam2image'
-        ))
+        if not sim_bool:
+            vision_node_actions.insert(0, ExecuteProcess(
+                cmd=['ros2', 'run', 'v4l2_camera', 'v4l2_camera_node', '--ros-args', '-p', 'image_size:=[640,480]', '--ros-args', '--remap', '/image_raw:=/camera'],
+                output='screen',
+                name='cam2image'
+            ))
     
     # Define the middleware process.
     middleware = ExecuteProcess(
@@ -99,7 +102,7 @@ def launch_setup(context, *args, **kwargs):
     vehicle_class, model_name = get_airframe_details(px4_path, airframe_id)
     autostart = int(airframe_id)
     model = custom_airframe_model or model_name
-    if (not vehicle_camera_map.get(model, False)) and use_camera.lower() == 'true': 
+    if (not vehicle_camera_map.get(model, False)) and use_camera_bool: 
         raise ValueError(f"The selected airframe ID {airframe_id} ({model}) does not have a camera sensor configured. Please choose a different airframe or add a camera to the model.")
     print(f"Launching a {vehicle_class.name} with airframe ID {airframe_id}, using model {model}")
 
@@ -112,10 +115,12 @@ def launch_setup(context, *args, **kwargs):
         name='mission'
     )
 
-    mission_ready_flags = {"uav": False, "middleware": False}
+    mission_ready_flags = {"uav": not sim_bool, "middleware": False} # we don't run uav (px4_sitl) in hardware mode
     mission_started = {"value": False}  # mutable so inner functions can modify
     def make_io_handler(process_name):
         trigger = "INFO  [commander] Ready for takeoff!" if process_name == "uav" else "INFO  [uxrce_dds_client] time sync converged" if process_name == "middleware" else None
+        if not sim_bool:
+            trigger = "session established" # we don't run uav (px4_sitl) in hardware mode and middleware has different stdout
         if trigger is None:
             raise ValueError(f"Invalid process name: {process_name}")
         def clean_text(text):
@@ -129,7 +134,7 @@ def launch_setup(context, *args, **kwargs):
                 if not mission_started["value"] and all(mission_ready_flags.values()):
                     mission_started["value"] = True
                     return [
-                        LogInfo(msg="[launcher] Both processes ready, starting mission"),
+                        LogInfo(msg="[launcher] Processes ready, starting mission"),
                         mission,
                     ]
             return None
@@ -183,7 +188,7 @@ def launch_setup(context, *args, **kwargs):
             LogInfo(msg="Vision nodes started."),
             middleware,
         ]
-    if run_mission_bool:
+    if run_mission_bool and sim_bool:
         actions.append(
                 RegisterEventHandler(
                     OnProcessIO(
