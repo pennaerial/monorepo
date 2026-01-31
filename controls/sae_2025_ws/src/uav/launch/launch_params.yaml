@@ -1,5 +1,5 @@
 # launch_params.yaml
-mission_name: basic_waypoints
+mission_name: test_takeoff
 uav_debug: false
 vision_debug: false
 run_mission: true

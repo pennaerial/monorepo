@@ -65,7 +65,7 @@ class VTOL(UAV):
             self.node.get_logger().info(f"Current GPS: {lat}, {lon}, {alt}")
             
             # Right now is hard coded to take off east but should be modified based on yaw
-            takeoff_gps = (lat, lon + 0.0025, alt + self.takeoff_amount)
+            takeoff_gps = (lat, lon + 0.004, alt + self.takeoff_amount)
 
             self.node.get_logger().info(f"Takeoff Destination GPS: {takeoff_gps[0]}, {takeoff_gps[1]}, {takeoff_gps[2]}")
 
