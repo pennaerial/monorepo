@@ -44,7 +44,6 @@ def launch_setup(context, *args, **kwargs):
             raise ValueError(f"Unknown airframe name: {airframe_id}")
 
     custom_airframe_model = params.get('custom_airframe_model', '')
-    horizontal_takeoff = str(params.get('horizontal_takeoff', 'false'))
     save_vision = str(params.get('save_vision', 'false'))
     camera_offsets = params.get('camera_offsets', [0, 0, 0])
     servo_only = str(params.get('servo_only', 'false'))
@@ -109,7 +108,7 @@ def launch_setup(context, *args, **kwargs):
     print(f"Launching a {vehicle_class.name} with airframe ID {airframe_id}, using model {model}")
 
     camera_offsets_str = ','.join(str(offset) for offset in camera_offsets)
-    mission_cmd = ['ros2', 'run', 'uav', 'mission', uav_debug, YAML_PATH, servo_only, camera_offsets_str, vehicle_class.name, ','.join(vision_nodes), horizontal_takeoff]
+    mission_cmd = ['ros2', 'run', 'uav', 'mission', uav_debug, YAML_PATH, servo_only, camera_offsets_str, vehicle_class.name, ','.join(vision_nodes)]
     mission = ExecuteProcess(
         cmd=mission_cmd,
         output='screen',
