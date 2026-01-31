@@ -60,7 +60,8 @@ jobs:
         run: |
           . /opt/ros/humble/setup.sh
           # Only build hardware packages - skip all simulation/gazebo packages
-          colcon build --symlink-install \
+          # Note: NOT using --symlink-install so artifacts are portable
+          colcon build \
             --packages-up-to uav uav_interfaces px4_msgs actuator_msgs
 
       - name: Get short SHA
