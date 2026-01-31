@@ -18,7 +18,7 @@ class ModeManager(Node):
     """
     A ROS 2 node for managing UAV modes and mission logic.
     """
-    def __init__(self, mode_map: str, vision_nodes: str, camera_offsets, DEBUG=False, servo_only=False, vehicle_class=Vehicle.MULTICOPTER, horizontal_takeoff=False) -> None:
+    def __init__(self, mode_map: str, vision_nodes: str, camera_offsets, DEBUG=False, servo_only=False, vehicle_class=Vehicle.MULTICOPTER) -> None:
         super().__init__('mission_node')
         self.timer = self.create_timer(0.1, self.spin_once)
         self.modes = {}
@@ -35,7 +35,6 @@ class ModeManager(Node):
         self.setup_vision(vision_nodes)
         self.setup_modes(mode_map)
         self.servo_only = servo_only
-        self.horizontal_takeoff = horizontal_takeoff
     
     def get_active_mode(self) -> Mode:
         """
@@ -210,58 +209,44 @@ class ModeManager(Node):
                 self.uav.arm()
                 self.get_logger().info(f"Arming UAV")
                 self.start_time = current_time
-            if self.uav.local_position is None or self.uav.global_position is None: # Need to wait for the uav to be ready
-                return
+                return  # Wait for arm to complete
 
-            # Takeoff logic
-            if not self.uav.attempted_takeoff:
-                if isinstance(self.uav, VTOL) and self.horizontal_takeoff: # VTOL fixed-wing takeoff
-                    self.get_logger().info("Attempting VTOL fixed-wing takeoff")
-                    takeoff_done = self.uav.fixed_wing_takeoff()
-                    self.start_time = current_time # Reset the start time because we will starting publishing heartbeat
-                    if not takeoff_done:
-                        self.get_logger().info("VTOL takeoff in progress...")
-                        return
-                else: # Multicopter or VTOL vertical takeoff
-                    self.get_logger().info("Attempting vertical takeoff")
-                    self.uav.takeoff()
-                    self.start_time = current_time # Reset the start time because we will starting publishing heartbeat
+            if self.uav.local_position is None or self.uav.global_position is None:
+                return  # Wait for position data
+
+            # Start mission - TakeoffMode handles takeoff, heartbeat, and offboard engagement
+            if self.active_mode is None:
+                self.switch_mode('start')
+
+            # Run active mode
+            if self.active_mode:
+                time_delta = current_time - self.last_update_time
+                self.last_update_time = current_time
+                try:
+                    self.get_active_mode().update(time_delta)
+                except Exception as e:
+                    self.get_logger().error(f"Error in mode {self.active_mode}: {e}")
+                    self.uav.failsafe = True
                     return
-
-
-            self.uav.publish_offboard_control_heartbeat_signal()
-            if self.uav.nav_state == VehicleStatus.NAVIGATION_STATE_AUTO_TAKEOFF:
-                self.get_logger().info("Taking off")
-            elif current_time - self.start_time < 1:
-                return
-            elif self.uav.nav_state == VehicleStatus.NAVIGATION_STATE_AUTO_LOITER:
-                self.get_logger().info("Takeoff Complete. Engaging Offboard Mode")
-                self.uav.engage_offboard_mode()
-            elif self.uav.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
-                # Start the mission
-                if self.active_mode is None:
-                    self.switch_mode('start')
-                if self.active_mode and self.uav.flight_check:
-                    time_delta = current_time - self.last_update_time
-                    self.last_update_time = current_time
-                    try:
-                        self.get_active_mode().update(time_delta)
-                    except Exception as e:
-                        self.get_logger().error(f"Error in mode {self.active_mode}: {e}")
-                        self.uav.failsafe = True
-                        return
-                    state = self.get_active_mode().check_status()
-                    if state == 'error':
-                        self.get_logger().error(f"Error in mode {self.active_mode}. Switching to failsafe.")
-                        self.uav.failsafe = True
-                    elif state == 'terminate':
-                        self.get_logger().info(f"Mission has completed.")
-                        self.destroy_node()
-                    elif state != 'continue':
-                        self.switch_mode(self.transition(state))
-            elif self.uav.nav_state == VehicleStatus.NAVIGATION_STATE_AUTO_LAND: # nav_state will/should change when LandingMode is spun
+                state = self.get_active_mode().check_status()
+                if state == 'error':
+                    self.get_logger().error(f"Error in mode {self.active_mode}. Switching to failsafe.")
+                    self.uav.failsafe = True
+                elif state == 'terminate':
+                    self.get_logger().info(f"Mission has completed.")
+                    self.destroy_node()
+                elif state != 'continue':
+                    self.switch_mode(self.transition(state))
+            
+            if self.uav.nav_state == VehicleStatus.NAVIGATION_STATE_AUTO_LAND: # nav_state will/should change when LandingMode is spun
                 self.get_logger().info("Landing")
-            else:
+
+            if self.uav.nav_state not in ( # nav_state should be one of these modes when the mode is active
+                VehicleStatus.NAVIGATION_STATE_OFFBOARD,
+                VehicleStatus.NAVIGATION_STATE_AUTO_TAKEOFF,
+                VehicleStatus.NAVIGATION_STATE_AUTO_LOITER,
+                VehicleStatus.NAVIGATION_STATE_AUTO_LAND
+            ):
                 self.get_logger().info(f"Self.nav_state: {self.uav.nav_state}")
     def spin(self):
         """
