@@ -1,0 +1,42 @@
+# PID Tuning Mission for Ziegler-Nichols Method
+#
+# This mission navigates to the DLZ area and activates DLZ landing mode
+# with configurable PID gains for tuning.
+#
+# To use: Set mission_name: mission_pid_tuning in launch_params.yaml
+# Then modify pid_gains_xy below for each test run.
+
+start:
+  class: uav.autonomous_modes.NavGPSMode
+  params:
+    # Navigate to 3m altitude above spawn point (DLZ is at spawn)
+    # Offset slightly to create initial error for PID testing
+    coordinates: '[((1.5, 0, -3), 1, "LOCAL"),]'
+  transitions:
+    complete: pid_test
+
+pid_test:
+  class: uav.autonomous_modes.DLZLandingMode
+  params:
+    # ============================================
+    # MODIFY THESE GAINS FOR EACH TUNING ITERATION
+    # ============================================
+    # Step 1: Start with P-only control
+    #   pid_gains_xy: '(0.1, 0.0, 0.0)'
+    # Step 2: Increase Kp until sustained oscillation
+    #   pid_gains_xy: '(0.2, 0.0, 0.0)'
+    #   pid_gains_xy: '(0.3, 0.0, 0.0)'
+    #   ... etc
+    # Step 3: Once you find Ku and Tu, calculate final gains
+    pid_gains_xy: '(3.5, 0.0, 0.0)'
+    centering_threshold: '0.15'
+    detection_timeout: '10.0'
+    use_auto_land: 'False'
+    # Zero descent rates for PID tuning - isolate horizontal response
+    descent_rates: "{'approach': 0.0, 'align': 0.0, 'descend': 0.0, 'final': 0.0}"
+  transitions:
+    complete: land
+    error: land
+
+land:
+  class: uav.autonomous_modes.LandingMode

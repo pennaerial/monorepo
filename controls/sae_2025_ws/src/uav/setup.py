@@ -39,6 +39,7 @@ setup(
             'camera = uav.CameraNode:main',
             'test_flight = uav.test_flight:main',
             'vtol_testing = uav.vtol_testing:main',
+            'test_pid_tuning = uav.test_pid_tuning:main',
         ],
     },
 )

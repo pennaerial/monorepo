@@ -485,7 +485,7 @@ class UAV:
 
         self.global_position_sub = self.node.create_subscription(
             VehicleGlobalPosition,
-            'fmu/out/vehicle_global_position',
+            '/fmu/out/vehicle_global_position',
             self._global_position_callback,
             qos_profile
         )

@@ -87,10 +87,10 @@ class DLZLandingMode(Mode):
 
     # Default descent rates for each phase (m/s)
     DEFAULT_DESCENT_RATES = {
-        'approach': 2.0,   # Fast descent while far
-        'align': 1.0,      # Moderate, focusing on centering
-        'descend': 0.5,    # Careful descent
-        'final': 0.3       # Slow final approach
+        'approach': 4.0,   # Fast descent while far
+        'align': 3.0,      # Moderate, focusing on centering
+        'descend': 2.5,    # Careful descent
+        'final': 2.0       # Slow final approach
     }
 
     # Phase altitude thresholds (meters)
@@ -107,7 +107,7 @@ class DLZLandingMode(Mode):
         self,
         node: Node,
         uav: UAV,
-        pid_gains_xy: Tuple[float, float, float] = (0.5, 0.01, 0.1),
+        pid_gains_xy: Tuple[float, float, float] = (0.1, 0.0, 0.0),
         descent_rates: Optional[Dict[str, float]] = None,
         centering_threshold: float = 0.15,
         detection_timeout: float = 2.0,
