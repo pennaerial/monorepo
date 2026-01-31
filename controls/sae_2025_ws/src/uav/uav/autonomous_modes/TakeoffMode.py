@@ -52,9 +52,6 @@ class TakeoffMode(Mode):
                 self.log("Attempting vertical takeoff")
                 self.uav.takeoff()
 
-        # Publish heartbeat for offboard handoff
-        self.uav.publish_offboard_control_heartbeat_signal()
-
         # When in AUTO_LOITER, engage offboard mode
         if self.uav.nav_state == VehicleStatus.NAVIGATION_STATE_AUTO_LOITER:
             self.log("Takeoff complete. Engaging offboard mode.")

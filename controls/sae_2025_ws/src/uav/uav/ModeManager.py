@@ -213,6 +213,8 @@ class ModeManager(Node):
 
             if self.uav.local_position is None or self.uav.global_position is None:
                 return  # Wait for position data
+            
+            self.uav.publish_offboard_control_heartbeat_signal()
 
             # Start mission - TakeoffMode handles takeoff, heartbeat, and offboard engagement
             if self.active_mode is None:
