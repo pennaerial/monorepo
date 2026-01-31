@@ -87,10 +87,10 @@ class DLZLandingMode(Mode):
 
     # Default descent rates for each phase (m/s)
     DEFAULT_DESCENT_RATES = {
-        'approach': 1.0,   # Fast descent while far
-        'align': 0.3,      # Slow, focusing on centering
-        'descend': 0.2,    # Careful descent
-        'final': 0.1       # Very slow final approach
+        'approach': 2.0,   # Fast descent while far
+        'align': 1.0,      # Moderate, focusing on centering
+        'descend': 0.5,    # Careful descent
+        'final': 0.3       # Slow final approach
     }
 
     # Phase altitude thresholds (meters)
@@ -259,7 +259,8 @@ class DLZLandingMode(Mode):
         if is_centered:
             descent_rate = self.descent_rates.get(self.phase.value, 0.0)
         else:
-            descent_rate = 0.0  # Hold altitude until centered
+            # Still descend slowly even when not centered (half rate)
+            descent_rate = self.descent_rates.get(self.phase.value, 0.0) * 0.5
 
         # Compute position setpoint
         # Scale PID outputs for reasonable movement (clamp to prevent large jumps)

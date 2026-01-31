@@ -82,7 +82,7 @@ def launch_setup(context, *args, **kwargs):
     # Define the PX4 SITL model and autostart
     if vehicle_type == 'quadcopter':
         autostart = 4001
-        model = 'gz_x500_mono_cam' # append '_down' for down-facing camera
+        model = 'gz_x500_mono_cam_down' # down-facing camera for DLZ detection
     elif vehicle_type == 'tiltrotor_vtol':
         autostart = 4020
         model = 'gz_tiltrotor'

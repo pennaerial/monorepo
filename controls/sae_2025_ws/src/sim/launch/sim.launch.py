@@ -322,7 +322,7 @@ def generate_launch_description():
     return LaunchDescription(
         [
             DeclareLaunchArgument("px4_path", default_value="~/PX4-Autopilot"),
-            DeclareLaunchArgument("gz_camera_topic_model", default_value="x500_mono_cam"),
+            DeclareLaunchArgument("gz_camera_topic_model", default_value="x500_mono_cam_down"),
             OpaqueFunction(function=launch_setup),
         ]
     )
