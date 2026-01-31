@@ -365,12 +365,7 @@ class UAV(ABC):
             )
         else:
             self.node.get_logger().warn("No local position data available.")
-            l = VehicleLocalPosition()
-            l.x = 0.0
-            l.y = 0.0
-            l.z = 0.0
-            self.local_position = l
-            return (0.0, 0.0, 0.0)
+            return None
 
     def _calculate_proportional_velocity(self, direction: np.ndarray, distance: float) -> list:
         """
@@ -552,7 +547,7 @@ class UAV(ABC):
         
         self.vehicle_local_position_subscriber = self.node.create_subscription(
             VehicleLocalPosition, 
-            '/fmu/out/vehicle_local_position', 
+            '/fmu/out/vehicle_local_position_v1', 
             self._vehicle_local_position_callback, 
             qos_profile
         )
