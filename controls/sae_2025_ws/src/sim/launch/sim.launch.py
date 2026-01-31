@@ -200,10 +200,10 @@ def launch_setup(context, *args, **kwargs):
         cwd=sae_ws_path,
     )
 
-    gz_camera_topic_model = LaunchConfiguration("gz_camera_topic_model").perform(context)
+    model = LaunchConfiguration("model").perform(context)
 
-    GZ_CAMERA_TOPIC = f"/world/{competition}/model/{gz_camera_topic_model}_0/link/camera_link/sensor/camera/image"
-    GZ_CAMERA_INFO_TOPIC = f"/world/{competition}/model/{gz_camera_topic_model}_0/link/camera_link/sensor/camera/camera_info"
+    GZ_CAMERA_TOPIC = f"/world/{competition}/model/{model[3:]}_0/link/camera_link/sensor/camera/image"
+    GZ_CAMERA_INFO_TOPIC = f"/world/{competition}/model/{model[3:]}_0/link/camera_link/sensor/camera/camera_info"
 
     gz_ros_bridge_camera = Node(
         package="ros_gz_bridge",
@@ -322,7 +322,7 @@ def generate_launch_description():
     return LaunchDescription(
         [
             DeclareLaunchArgument("px4_path", default_value="~/PX4-Autopilot"),
-            DeclareLaunchArgument("gz_camera_topic_model", default_value="x500_mono_cam"),
+            DeclareLaunchArgument("model", default_value="gz_x500_mono_cam"),
             OpaqueFunction(function=launch_setup),
         ]
     )
