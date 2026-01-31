@@ -1,9 +1,10 @@
 <?xml version="1.0" ?>
 <sdf version="1.9">
   <model name="payload_box">
+    <pose>0 0 0.2 0 0 0</pose>
     <static>false</static>
 
-    <link name="payload_link">
+    <link name="base_link">
 
       <!-- Inertial properties -->
       <inertial>
@@ -25,7 +26,7 @@
       <collision name="collision">
         <geometry>
           <box>
-            <size>0.12033 0.13 0.0582</size>
+            <size>0.12033 0.13 0.025</size>
           </box>
         </geometry>
       </collision>
@@ -55,6 +56,61 @@
       </visual>
     </link>
 
+    <link name="left_wheel">
+      <pose>0.065 0.06 0 0 1.5708 1.5707</pose> <!-- rotate cylinder -->
+      <inertial>
+        <mass>0.3</mass>
+        <inertia>
+          <ixx>0.01</ixx>
+          <iyy>0.01</iyy>
+          <izz>0.01</izz>
+        </inertia>
+      </inertial>
+
+      <collision name="collision">
+        <geometry>
+          <cylinder>
+            <radius> 0.01611839 </radius>
+            <length>0.01338964</length>
+          </cylinder>
+        </geometry>
+        <surface>
+          <friction>
+            <ode>
+              <mu>1.0</mu>
+              <mu2>1.0</mu2>
+            </ode>
+          </friction>
+        </surface>
+      </collision>
+
+      <visual name="wheel_visual">
+        <geometry>
+          <mesh>
+            <uri>model://payload/meshes/polulu_wheel.stl</uri>
+          </mesh>
+        </geometry>
+
+        <material>
+          <ambient>0.2 0.2 0.2 1</ambient>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+          <specular>0.2 0.2 0.2 1</specular>
+        </material>
+      </visual>
+    </link>
+
+    <joint name="left_wheel_joint" type="revolute">
+      <parent>base_link</parent>
+      <child>left_wheel</child>
+      <axis>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1e16</lower>
+          <upper>1e16</upper>
+        </limit>
+      </axis>
+    </joint>
+
     <!-- ================= CAMERA MODEL ================= -->
     <include merge="true">
       <uri>model://mono_cam</uri>
@@ -63,7 +119,7 @@
 
     <!-- ================= CAMERA ATTACHMENT ================= -->
     <joint name="payload_camera_joint" type="fixed">
-      <parent>payload_link</parent>
+      <parent>base_link</parent>
       <child>camera_link</child>
     </joint>
 
