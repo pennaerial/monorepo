@@ -417,13 +417,13 @@ class UAV(ABC):
         msg = VehicleCommand()
 
         # Fill in parameters
-        msg.param1 = params.get('param1', 0.0)
-        msg.param2 = params.get('param2', 0.0)
-        msg.param3 = params.get('param3', 0.0)
-        msg.param4 = params.get('param4', 0.0)
-        msg.param5 = params.get('param5', 0.0)
-        msg.param6 = params.get('param6', 0.0)
-        msg.param7 = params.get('param7', 0.0)
+        msg.param1 = params.get('param1', float('nan'))
+        msg.param2 = params.get('param2', float('nan')) 
+        msg.param3 = params.get('param3', float('nan'))
+        msg.param4 = params.get('param4', float('nan'))
+        msg.param5 = params.get('param5', float('nan'))
+        msg.param6 = params.get('param6', float('nan'))
+        msg.param7 = params.get('param7', float('nan'))
 
         msg.command = command
 
