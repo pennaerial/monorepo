@@ -1,5 +1,5 @@
 # launch_params.yaml
-mission_name: test_straight_course
+mission_name: mission_dlz
 uav_debug: false
 vision_debug: false
 run_mission: true

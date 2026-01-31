@@ -1,0 +1,30 @@
+start:
+  class: uav.autonomous_modes.NavGPSMode
+  params:
+    coordinates: '[((5, 10, -10), 1, "LOCAL"),]'
+  transitions:
+    complete: dlz_land
+
+dlz_land:
+  class: uav.autonomous_modes.DLZLandingMode
+  params:
+    pid_gains_xy: '(0.5, 0.01, 0.1)'
+    centering_threshold: '0.15'
+    detection_timeout: '2.0'
+    use_auto_land: 'True'
+  transitions:
+    complete: return
+    error: failsafe
+
+return:
+  class: uav.autonomous_modes.NavGPSMode
+  params:
+    coordinates: '[((0, 0, -5), 1, "LOCAL"),]'
+  transitions:
+    complete: land
+
+land:
+  class: uav.autonomous_modes.LandingMode
+
+failsafe:
+  class: uav.autonomous_modes.LandingMode
