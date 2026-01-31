@@ -18,9 +18,9 @@ class CustomWorldNode(WorldNode):
     
     def generate_world(self):
         dlz = Entity(
-            name="dlz_pink_8x8",
-            path_to_sdf="~/.simulation-gazebo/models/dlz_pink_8x8/model.sdf",
-            position=(5.0, 10.0, 0.0),
+            name="dlz",
+            path_to_sdf="~/.simulation-gazebo/models/dlz/model.sdf",
+            position=(-5.0, 0.0, 0.0),
             rpy=(0.0, 0.0, 0.0),
             world="custom"
         )
