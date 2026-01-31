@@ -1,0 +1,24 @@
+<?xml version="1.0" ?>
+<sdf version="1.4">
+  <model name="dlz_pink_8x8">
+    <static>true</static>
+    <link name="dlz_link">
+      <inertial>
+        <mass>2</mass>
+      </inertial>
+      <visual name="visual">
+        <pose>0 0 0.01 1.5708 0 0</pose>
+        <geometry>
+          <mesh>
+            <uri>model://dlz/meshes/dlz.STL</uri>
+            <!-- Scale: 8.0m / 2438.40 mesh units = 0.003281 -->
+            <scale>0.003281 0.003281 0.003281</scale>
+          </mesh>
+        </geometry>
+        <material>
+          <diffuse>1 0 1 1</diffuse>
+        </material>
+      </visual>
+    </link>
+  </model>
+</sdf>
