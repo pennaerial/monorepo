@@ -12,6 +12,7 @@
 #   GITHUB_REPO     - Repository (default: auto-detect from git remote)
 #   REMOTE_DIR      - Install directory on Pi (default: ~/uav_ws)
 #   SSH_KEY         - Path to SSH key (optional)
+#   SSH_PASS        - SSH password (optional, requires sshpass)
 #
 
 set -e
@@ -29,9 +30,10 @@ error() { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
 step() { echo -e "${BLUE}[STEP]${NC} $1"; }
 
 # Configuration
-REMOTE_DIR="${REMOTE_DIR:-~/uav_ws}"
+REMOTE_DIR="${REMOTE_DIR:-/home/penn/monorepo/controls/sae_2025_ws}"
 BUILD_SHA=""
 LOCAL_FILE=""
+SSH_PASS="${SSH_PASS:-}"
 TARGETS=()
 
 # Auto-detect GitHub repo from git remote
@@ -58,6 +60,24 @@ ssh_opts() {
         opts="$opts -i $SSH_KEY"
     fi
     echo "$opts"
+}
+
+# Wrap ssh command with sshpass if password is set
+run_ssh() {
+    if [ -n "$SSH_PASS" ]; then
+        sshpass -p "$SSH_PASS" ssh $(ssh_opts) "$@"
+    else
+        ssh $(ssh_opts) "$@"
+    fi
+}
+
+# Wrap scp command with sshpass if password is set
+run_scp() {
+    if [ -n "$SSH_PASS" ]; then
+        sshpass -p "$SSH_PASS" scp $(ssh_opts) "$@"
+    else
+        scp $(ssh_opts) "$@"
+    fi
 }
 
 # List available builds
@@ -112,21 +132,21 @@ deploy_to_pi() {
     
     # Check connectivity
     info "Checking connection..."
-    if ! ssh $(ssh_opts) "$target" "echo 'Connected'" 2>/dev/null; then
+    if ! run_ssh "$target" "echo 'Connected'" 2>/dev/null; then
         error "Cannot connect to $target"
     fi
     
     # Create remote directory
     info "Preparing remote directory..."
-    ssh $(ssh_opts) "$target" "mkdir -p $REMOTE_DIR"
+    run_ssh "$target" "mkdir -p $REMOTE_DIR"
     
     # Copy tarball
     info "Copying build artifact..."
-    scp $(ssh_opts) "$tarball" "$target:$REMOTE_DIR/$filename"
+    run_scp "$tarball" "$target:$REMOTE_DIR/$filename"
     
     # Extract and set up on remote
     info "Extracting and configuring..."
-    ssh $(ssh_opts) "$target" bash << REMOTE_SCRIPT
+    run_ssh "$target" bash << REMOTE_SCRIPT
 set -e
 cd $REMOTE_DIR
 
@@ -188,6 +208,10 @@ parse_args() {
                 LOCAL_FILE="$2"
                 shift 2
                 ;;
+            --password|-p)
+                SSH_PASS="$2"
+                shift 2
+                ;;
             --help|-h)
                 echo "Usage: $0 [OPTIONS] TARGET [TARGET...]"
                 echo ""
@@ -197,6 +221,7 @@ parse_args() {
                 echo "  --list, -l              List available builds"
                 echo "  --build, -b SHA         Deploy specific build by short SHA"
                 echo "  --local, -f FILE        Deploy a local .tar.gz file"
+                echo "  --password, -p PASS     SSH password (requires sshpass)"
                 echo "  --help, -h              Show this help"
                 echo ""
                 echo "Examples:"
@@ -204,10 +229,11 @@ parse_args() {
                 echo "  $0 pi@drone1 pi@drone2                # Latest to multiple Pis"  
                 echo "  $0 --build abc123f pi@drone           # Specific build"
                 echo "  $0 --local ./my-build.tar.gz pi@drone # Local file"
+                echo "  $0 -p 123 penn@172.20.10.2            # With password"
                 echo ""
                 echo "Environment:"
                 echo "  GITHUB_REPO   Repository (auto-detected from git)"
-                echo "  REMOTE_DIR    Install path on Pi (default: ~/uav_ws)"
+                echo "  REMOTE_DIR    Install path on Pi (default: /home/penn/monorepo/controls/sae_2025_ws)"
                 echo "  SSH_KEY       Path to SSH key file"
                 exit 0
                 ;;
