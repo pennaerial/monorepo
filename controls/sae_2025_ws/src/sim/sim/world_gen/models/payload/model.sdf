@@ -67,5 +67,11 @@
       <child>camera_link</child>
     </joint>
 
+    <plugin
+      filename="gz-sim-velocity-control-system"
+      name="gz::sim::systems::VelocityControl">
+    </plugin>
+
+
   </model>
 </sdf>
