@@ -15,4 +15,4 @@ servo_only: false
 camera_offsets: [0, 0, 0] # Should denote the position of the camera relative to the payload mechanism, in meters
                           # In NED frame: x is forward, y is right, and z is down.
 
-sim: true
+sim: false
