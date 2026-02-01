@@ -15,9 +15,6 @@ class PayloadController: public rclcpp::Node {
         rclcpp::Subscription<payload_interfaces::msg::DriveCommand>::SharedPtr drive_subscriber_;
         std::shared_ptr<ControllerBackend> controller_backend_;
         void drive_callback(const payload_interfaces::msg::DriveCommand::SharedPtr msg);
-
-        
-
 };
 
 #endif
