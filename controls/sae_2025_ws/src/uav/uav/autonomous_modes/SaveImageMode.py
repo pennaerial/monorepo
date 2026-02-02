@@ -1,3 +1,4 @@
+import math
 from typing import List
 from uav.autonomous_modes import Mode
 from rclpy.node import Node
@@ -23,7 +24,12 @@ class SaveImageMode(Mode):
         self.coordinates = coordinates
         self.goal = None
         self.margin = margin
+        self.circle_time = 5
+        self.circle_pause_time = 2
+        self.circle_radius = 0
+        self.is_circling = False
         self.index = -1
+        self.angle = 0
 
     def on_update(self, time_delta: float) -> None:
         """
@@ -34,9 +40,10 @@ class SaveImageMode(Mode):
             dist = self.uav.distance_to_waypoint(self.coordinate_system, self.goal)
             self.log(f"Distance to waypoint: {dist}, current position: {self.uav.get_local_position()}")
             
-        if dist >= self.margin:
+        if dist >= self.margin and not self.is_circling:
             self.uav.publish_position_setpoint(self.target) # PX4 expects stream of setpoints
-        elif self.goal is None or dist < self.margin:
+            self.circle_radius = -self.target[2] / 3
+        elif self.goal is None or dist < self.margin + self.circle_radius:
             if self.index == -1 or self.wait_time <= 0:
                 self.index += 1
                 if self.index >= len(self.coordinates):
@@ -45,8 +52,36 @@ class SaveImageMode(Mode):
                 self.target = self.get_local_target()
                 self.uav.publish_position_setpoint(self.target)
             else:
-                self.wait_time -= time_delta
-                self.log(f"Holding - waiting for {self.wait_time} more seconds")
+                if self.circle_time >= 0:
+                    self.is_circling = True
+                    circle_target = list(self.target)
+                    angle_in_radians = self.angle * math.pi / 180
+                    circle_target[0] += self.circle_radius * math.cos(angle_in_radians)
+                    circle_target[1] += self.circle_radius * math.sin(angle_in_radians)
+
+                    self.uav.publish_position_setpoint(tuple(circle_target))
+
+                    if self.circle_pause_time > 0:
+                        self.circle_pause_time -= time_delta
+                        self.log(f"Angle: {self.angle}")
+                        self.log(f"Pausing to take photos for: {self.circle_pause_time} more seconds")
+                        return
+
+                    self.circle_time -= time_delta
+                    self.angle += 5
+
+                    if self.angle % 15 == 0:
+                        self.circle_pause_time = 2
+                    else:
+                        # self.log(f"Angle: {self.angle}")
+                        self.log(f"Holding - circling for {self.circle_time} more seconds")
+
+                elif self.wait_time >= 0:
+                    self.wait_time -= time_delta
+                    # self.log(f"Holding - waiting for {self.wait_time} more seconds")
+                else:
+                    self.circle_time = 5
+                    self.is_circling = False
 
     def get_local_target(self) -> tuple[float, float, float]:
         """
