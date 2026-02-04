@@ -6,6 +6,8 @@
 #include "payload/payload_parameters.hpp"
 #include "payload/controller.hpp"
 #include "payload/sim_controller.hpp"
+#include "sensor_msgs/msg/image.hpp"
+#include "sensor_msgs/msg/camera_info.hpp"
 #include <string>
 
 
@@ -16,11 +18,13 @@ class Payload: public rclcpp::Node {
     private:
         std::string payload_name_;
         rclcpp::Subscription<payload_interfaces::msg::DriveCommand>::SharedPtr ros_drive_subscriber_;
+        rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr ros_camera_publisher_;
+        rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr ros_camera_info_publisher_;
+
         std::shared_ptr<Controller> controller_;
 
         std::shared_ptr<payload::ParamListener> payload_params_listener_;
         payload::Params payload_params_;
-
 
         void drive_callback(const payload_interfaces::msg::DriveCommand::SharedPtr msg);
 
