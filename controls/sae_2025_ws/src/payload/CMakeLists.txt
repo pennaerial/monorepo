@@ -12,6 +12,8 @@ find_package(payload_interfaces REQUIRED)
 find_package(gz-transport13 REQUIRED)
 find_package(gz-msgs10 REQUIRED)
 find_package(generate_parameter_library REQUIRED)
+find_package(ros_gz_bridge REQUIRED)
+find_package(sensor_msgs REQUIRED)
 
 include_directories(include)
 
@@ -36,6 +38,8 @@ add_executable(payload
 ament_target_dependencies(payload
   rclcpp 
   payload_interfaces
+  ros_gz_bridge
+  sensor_msgs
 )
 
 target_link_libraries(payload

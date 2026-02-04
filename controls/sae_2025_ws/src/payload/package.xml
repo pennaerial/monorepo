@@ -9,11 +9,20 @@
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
-  <test_depend>ament_lint_auto</test_depend>
-  <test_depend>ament_lint_common</test_depend>
+  <depend>rclcpp</depend>
+  <depend>sensor_msgs</depend>
+  <depend>payload_interfaces</depend>
   <depend>generate_parameter_library</depend>
+  <depend>ros_gz_bridge</depend>
+  
+  <build_depend>gz-transport13</build_depend>
+  <build_depend>gz-msgs10</build_depend>
 
   <exec_depend>ros2launch</exec_depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
   <export>
     <build_type>ament_cmake</build_type>
   </export>
