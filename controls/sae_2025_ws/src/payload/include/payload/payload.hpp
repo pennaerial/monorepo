@@ -3,6 +3,7 @@
 
 #include <rclcpp/rclcpp.hpp>
 #include "payload_interfaces/msg/drive_command.hpp"
+#include "payload/payload_parameters.hpp"
 #include "payload/controller.hpp"
 #include <string>
 
@@ -13,8 +14,14 @@ class Payload: public rclcpp::Node {
     private:
         std::string payload_name_;
         rclcpp::Subscription<payload_interfaces::msg::DriveCommand>::SharedPtr drive_subscriber_;
-        std::shared_ptr<Controller> controller_backend_;
+        std::shared_ptr<Controller> controller_;
+
+        std::shared_ptr<payload::ParamListener> payload_params_listener_;
+        payload::Params payload_params_;
+
+
         void drive_callback(const payload_interfaces::msg::DriveCommand::SharedPtr msg);
+
 };
 
 #endif
