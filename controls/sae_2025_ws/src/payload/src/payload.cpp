@@ -1,7 +1,7 @@
 #include "payload/payload.hpp"
 
 Payload::Payload(const std::string& payload_name)
-: rclcpp::Node(payload_name + "_controller") {
+: rclcpp::Node(payload_name) {
     payload_name_ = payload_name;
 
     payload_params_listener_ = std::make_shared<payload::ParamListener>(this);
