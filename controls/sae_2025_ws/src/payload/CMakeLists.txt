@@ -11,8 +11,18 @@ find_package(rclcpp REQUIRED)
 find_package(payload_interfaces REQUIRED)
 find_package(gz-transport13 REQUIRED)
 find_package(gz-msgs10 REQUIRED)
+find_package(generate_parameter_library REQUIRED)
 
 include_directories(include)
+
+
+#Generate Parameter Library
+generate_parameter_library(
+  payload_parameters
+  config/payload_params.schema.yaml
+)
+
+
 
 #payload executable
 add_executable(payload
@@ -31,6 +41,7 @@ ament_target_dependencies(payload
 target_link_libraries(payload
   gz-transport13::gz-transport13
   gz-msgs10::gz-msgs10
+  payload_parameters
 )
 
 install(TARGETS

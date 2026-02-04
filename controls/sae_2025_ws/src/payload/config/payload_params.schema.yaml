@@ -1,0 +1,7 @@
+payload:
+  controller:
+    type: string
+    default_value: "sim"
+    description: "Controller type"
+    validation:
+      one_of<>: [["sim", "gpio"]]
