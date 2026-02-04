@@ -6,7 +6,6 @@ Payload::Payload(const std::string& payload_name)
 
     payload_params_listener_ = std::make_shared<payload::ParamListener>(this);
     payload_params_ = payload_params_listener_->get_params();
-    RCLCPP_INFO(this->get_logger(), payload_params_.controller.c_str());
 
     std::string ros_drive_topic = "/" + payload_name_ + "/cmd_drive";
     ros_drive_subscriber_ = this->create_subscription<payload_interfaces::msg::DriveCommand>(

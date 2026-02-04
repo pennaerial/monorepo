@@ -32,7 +32,7 @@ class CustomWorldNode(WorldNode):
         payload_1 = Entity(
             name="payload_1", 
             path_to_sdf="~/.simulation-gazebo/models/payload/model.sdf",
-            position=(0.3, 0, 0.5),
+            position=(0.8, 0.8, 0.5),
             rpy=(0.0, 0.0, 0.0),
             world=self.world_name
         )
