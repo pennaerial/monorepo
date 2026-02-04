@@ -9,25 +9,32 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(payload_interfaces REQUIRED)
+find_package(gz-transport13 REQUIRED)
+find_package(gz-msgs10 REQUIRED)
 
 include_directories(include)
 
-#payload_controller executable
-add_executable(payload_controller 
-  src/payload_controller.cpp
-  src/gpio_backend.cpp
-  src/sim_backend.cpp
+#payload executable
+add_executable(payload
+  src/payload.cpp
+  src/gpio_controller.cpp
+  src/sim_controller.cpp
   src/main.cpp
 )
 
 #link dependencies
-ament_target_dependencies(payload_controller 
+ament_target_dependencies(payload
   rclcpp 
   payload_interfaces
 )
 
+target_link_libraries(payload
+  gz-transport13::gz-transport13
+  gz-msgs10::gz-msgs10
+)
+
 install(TARGETS
-  payload_controller
+  payload
   DESTINATION lib/${PROJECT_NAME}
 )
 

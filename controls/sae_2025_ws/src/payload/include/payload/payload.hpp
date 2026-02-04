@@ -1,19 +1,19 @@
-#ifndef PAYLOAD_CONTROLLER_HPP
-#define PAYLOAD_CONTROLLER_HPP
+#ifndef PAYLOAD_HPP
+#define PAYLOAD_HPP
 
 #include <rclcpp/rclcpp.hpp>
 #include "payload_interfaces/msg/drive_command.hpp"
-#include "payload/controller_backend.hpp"
+#include "payload/controller.hpp"
 #include <string>
 
-class PayloadController: public rclcpp::Node {
+class Payload: public rclcpp::Node {
     public:
-        PayloadController(const std::string& payload_name);
+        Payload(const std::string& payload_name);
 
     private:
         std::string payload_name_;
         rclcpp::Subscription<payload_interfaces::msg::DriveCommand>::SharedPtr drive_subscriber_;
-        std::shared_ptr<ControllerBackend> controller_backend_;
+        std::shared_ptr<Controller> controller_backend_;
         void drive_callback(const payload_interfaces::msg::DriveCommand::SharedPtr msg);
 };
 
