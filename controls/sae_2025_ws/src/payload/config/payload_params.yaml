@@ -3,3 +3,7 @@
 /**:
   ros__parameters:
     controller: "sim" # sim or gpio
+
+
+    sim:
+      world_name: "custom"
