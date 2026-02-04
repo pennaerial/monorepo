@@ -5,7 +5,7 @@
 int main(int argc, char **argv){
     rclcpp::init(argc, argv);
 
-    auto node = std::make_shared<Payload>("payload_0");
+    auto node = std::make_shared<Payload>("payload_main");
     rclcpp::spin(node);
     rclcpp::shutdown();
 

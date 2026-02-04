@@ -5,7 +5,9 @@
 #include "payload_interfaces/msg/drive_command.hpp"
 #include "payload/payload_parameters.hpp"
 #include "payload/controller.hpp"
+#include "payload/sim_controller.hpp"
 #include <string>
+
 
 class Payload: public rclcpp::Node {
     public:
@@ -13,7 +15,7 @@ class Payload: public rclcpp::Node {
 
     private:
         std::string payload_name_;
-        rclcpp::Subscription<payload_interfaces::msg::DriveCommand>::SharedPtr drive_subscriber_;
+        rclcpp::Subscription<payload_interfaces::msg::DriveCommand>::SharedPtr ros_drive_subscriber_;
         std::shared_ptr<Controller> controller_;
 
         std::shared_ptr<payload::ParamListener> payload_params_listener_;
