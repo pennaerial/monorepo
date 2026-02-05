@@ -188,12 +188,13 @@ def launch_setup(context, *args, **kwargs):
             LogInfo(msg="Vision nodes started."),
             middleware,
         ]
-    if run_mission_bool and sim_bool:
+    if run_mission_bool:
         actions.append(
                 RegisterEventHandler(
                     OnProcessIO(
-                        target_action=px4_sitl,
+                        target_action=middleware,
                         on_stdout=make_io_handler("middleware"),
+                        on_stderr=make_io_handler("middleware"),
                     )
                 )
             )
