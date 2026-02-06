@@ -68,18 +68,19 @@ class VTOL(UAV):
             takeoff_gps = (lat, lon + 0.004, alt + self.takeoff_amount)
 
             self.node.get_logger().info(f"Takeoff Destination GPS: {takeoff_gps[0]}, {takeoff_gps[1]}, {takeoff_gps[2]}")
+            # self.node.get_logger().info(f"Takeoff Destination GPS: Auto Calculated")
 
             self._send_vehicle_command(
                 VehicleCommand.VEHICLE_CMD_NAV_TAKEOFF,
-                # params={
-                #     "param1": float('nan'), # fw_tko_pitch min (minimum pitch during takeoff)
-                #     "param2": float('nan'), # Unused
-                #     "param3": float('nan'), # Unused
-                #     "param4": float('nan'), # Yaw angle
-                #     "param5": takeoff_gps[0], #Latitude (in GPS coords)
-                #     "param6": takeoff_gps[1], #Longitude (in GPS coords)
-                #     "param7": takeoff_gps[2], #Altitude (in meters)
-                # },
+                params={
+                    "param1": float('nan'), # fw_tko_pitch min (minimum pitch during takeoff)
+                    "param2": float('nan'), # Unused
+                    "param3": float('nan'), # Unused
+                    "param4": float('nan'), # Yaw angle
+                    "param5": takeoff_gps[0], #Latitude (in GPS coords)
+                    "param6": takeoff_gps[1], #Longitude (in GPS coords)
+                    "param7": takeoff_gps[2], #Altitude (in meters)
+                },
             )
             self.node.get_logger().info("FW takeoff Step 3: NAV_TAKEOFF sent.")
             # Optional: leave stage as-is so we don't resend

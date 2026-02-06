@@ -15,7 +15,7 @@ transition_to_mc:
 GPS:
   class: uav.autonomous_modes.NavGPSMode
   params:
-    coordinates: '[((0, 50, -20), 2, "LOCAL")]'
+    coordinates: '[((0, 10, -10), 2, "LOCAL")]'
   transitions:
     complete: land
 
