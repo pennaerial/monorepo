@@ -130,7 +130,7 @@ def launch_setup(context, *args, **kwargs):
             text = clean_text(event.text.decode() if isinstance(event.text, bytes) else event.text)
             if trigger in text:
                 mission_ready_flags[process_name] = True
-                # Only when BOTH are ready do we launch spawn_world
+                print((not mission_started["value"]), mission_ready_flags.values())
                 if not mission_started["value"] and all(mission_ready_flags.values()):
                     mission_started["value"] = True
                     return [
@@ -178,6 +178,12 @@ def launch_setup(context, *args, **kwargs):
                 OnProcessIO(
                     target_action=px4_sitl,
                     on_stdout=make_io_handler("uav"),
+                )
+            ),
+            RegisterEventHandler(
+                OnProcessIO(
+                    target_action=px4_sitl,
+                    on_stdout=make_io_handler("middleware"),
                 )
             ),
         ]
