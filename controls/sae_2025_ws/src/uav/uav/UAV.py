@@ -184,7 +184,7 @@ class UAV(ABC):
             msg.yaw = float(self.calculate_yaw(x, y))
 
         # Delegate velocity calculation to subclass (VTOL or Multicopter)
-        msg.velocity = self._calculate_velocity((x, y, z), lock_yaw)
+        # msg.velocity = self._calculate_velocity((x, y, z), lock_yaw)
 
         self.trajectory_publisher.publish(msg)
         

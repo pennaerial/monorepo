@@ -32,6 +32,8 @@ class NavGPSMode(Mode):
         Periodic logic for setting gps coord.
         """
         dist = 0
+
+        self.node.get_logger().info(f"INDEX: {self.index}")
         if self.index != -1:
             dist = self.uav.distance_to_waypoint(self.coordinate_system, self.goal)
 
@@ -43,6 +45,7 @@ class NavGPSMode(Mode):
         if self.target is not None:
             self.uav.publish_position_setpoint(self.target, lock_yaw=waiting)
         elif self.uav.local_position:
+            self.node.get_logger().info(f"WAYPOINT NOT SET, PUBLISHING TO CURRENT POSITION:  TARGET IS NONE: {self.target}")
             # Fallback: maintain current position until first waypoint is set
             self.uav.publish_position_setpoint(
                 (self.uav.local_position.x, self.uav.local_position.y, self.uav.local_position.z),
@@ -53,6 +56,12 @@ class NavGPSMode(Mode):
         if self.index != -1 and self.target is not None:
             curr_pos = self.uav.get_local_position()
             curr_gps = self.uav.get_gps()
+
+            if not curr_pos:
+                self.node.get_logger().info(f"CURR_POS NOT VALID: {curr_pos}")
+            if not curr_gps:
+                self.node.get_logger().info(f"CURR_GPS NOT VALID: {curr_gps}")
+
             yaw = self.uav.yaw if self.uav.yaw is not None else (self.uav.local_position.heading if self.uav.local_position else 0.0)
             vel = (self.uav.local_position.vx, self.uav.local_position.vy, self.uav.local_position.vz) if self.uav.local_position else (0.0, 0.0, 0.0)
             
