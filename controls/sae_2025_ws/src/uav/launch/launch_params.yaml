@@ -1,9 +1,9 @@
 # launch_params.yaml
-mission_name: basic_waypoints
+mission_name: straight_waypoints
 uav_debug: false
 vision_debug: false
 run_mission: true
-airframe: standard_vtol # Enter a preset below or a valid airframe ID (integer), either custom or from PX4
+airframe: 4001 # Enter a preset below or a valid airframe ID (integer), either custom or from PX4
                      # quadcopter, tiltrotor_vtol, fixed_wing, standard_vtol, quadtailsitter
                      # Other useful IDs: 4014 for mono cam down
                      # IDs available for simulation can be found in PX4-Autopilot/ROMFS/px4fmu_common/init.d-posix/airframes
