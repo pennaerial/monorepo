@@ -2,7 +2,7 @@ name: ROS 2 Build for Raspberry Pi
 
 on:
   push:
-    branches: [main, master, integration]
+    branches: [main, master, integration, do-not-test-pennair-at-4am]
     paths:
       - '.github/workflows/ros2-build.yml'
       - 'controls/sae_2025_ws/**'
