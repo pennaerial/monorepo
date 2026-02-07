@@ -1,16 +1,20 @@
 #!/bin/bash
+# launch.sh — Start the SAE Deploy Dashboard
+#
+# Usage: ./launch.sh
+#
+# Just needs `uv` installed: curl -LsSf https://astral.sh/uv/install.sh | sh
+#
+# Environment variables (optional):
+#   INSTALL_DIR       Build install directory (default: ~/ros2_ws)
+#   GITHUB_REPO       GitHub repo for build downloads (default: auto-detect)
+#   HOTSPOT_CON_NAME  NetworkManager hotspot connection name (default: Hotspot)
+#
 
-# Get commit hash from first argument
-COMMIT_HASH="$1"
-SHORT_SHA=$(echo "$COMMIT_HASH" | cut -c1-7)
-echo "SHORT_SHA: $SHORT_SHA"
+set -e
 
-ssh user@remote-host << EOF
-  cd /path/to/deploy
-  gh run download --name "ros2-build-${SHORT_SHA}" --dir ./dist
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
 
-  cd ./dist
-  tar -xzf ros2-build-${SHORT_SHA}.tar.gz
-
-  echo "Deployment complete!"
-EOF
+echo "Starting SAE Deploy Dashboard on http://0.0.0.0:8080"
+uv run app.py
