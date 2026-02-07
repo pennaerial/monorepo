@@ -8,7 +8,7 @@ airframe: quadcopter # Enter a preset below or a valid airframe ID (integer), ei
                      # Other useful IDs: 4014 for mono cam down
                      # IDs available for simulation can be found in PX4-Autopilot/ROMFS/px4fmu_common/init.d-posix/airframes
                      # These IDs load an airframe file and the corresponding model file in PX4-Autopilot/Tools/simulation/gz/models
-use_camera: false
+use_camera: true
 custom_airframe_model: '' # Leave blank if using default PX4 model or enter file name of custom model
 save_vision: true
 servo_only: false

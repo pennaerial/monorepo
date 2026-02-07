@@ -134,6 +134,13 @@ You might run into the following issues during the build process. Here are solut
    ```bash
    pip install numpy==1.21.5
    ```
+
+7. **Missing `generate_parameter_library`:**
+
+    ```bash
+    sudo apt install ros-humble-generate-parameter-library
+    ```
+
 ---
 
 ## Launching Components

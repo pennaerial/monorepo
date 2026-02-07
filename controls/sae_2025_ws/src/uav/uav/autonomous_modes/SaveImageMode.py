@@ -39,7 +39,7 @@ class SaveImageMode(Mode):
         dist = 0
         if self.index != -1:
             dist = self.uav.distance_to_waypoint(self.coordinate_system, self.goal)
-            self.log(f"Distance to waypoint: {dist}, current position: {self.uav.get_local_position()}")
+            # self.log(f"Distance to waypoint: {dist}, current position: {self.uav.get_local_position()}")
             
         if dist >= self.margin and not self.is_circling:
             self.uav.publish_position_setpoint(self.target) # PX4 expects stream of setpoints
@@ -64,8 +64,8 @@ class SaveImageMode(Mode):
 
                     if self.circle_pause_time > 0:
                         self.circle_pause_time -= time_delta
-                        self.log(f"Angle: {self.angle}")
-                        self.log(f"Pausing to take photos for: {self.circle_pause_time} more seconds")
+                        # self.log(f"Angle: {self.angle}")
+                        # self.log(f"Pausing to take photos for: {self.circle_pause_time} more seconds")
                         return
 
                     self.circle_cycle -= 1
@@ -74,8 +74,9 @@ class SaveImageMode(Mode):
                     if self.angle % 15 == 0:
                         self.circle_pause_time = 2
                     else:
+                        pass
                         # self.log(f"Angle: {self.angle}")
-                        self.log(f"Holding - circling for {self.circle_cycle} more cycles.")
+                        # self.log(f"Holding - circling for {self.circle_cycle} more cycles.")
 
                 elif self.wait_time >= 0:
                     self.wait_time -= time_delta
