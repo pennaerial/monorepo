@@ -31,6 +31,16 @@ class UAV:
         self.takeoff_gps = None
 
         self.node = node
+        self.vehicle_id = int(getattr(node, 'vehicle_id', 0))
+
+        self._px4_prefix = '' if self.vehicle_id == 0 else f"/px4_{self.vehicle_id}"
+
+        def _topic(path: str) -> str:
+            if not path.startswith('/'):
+                path = '/' + path
+            return f"{self._px4_prefix}{path}"
+
+        self._px4_topic = _topic
 
         # Initialize necessary parameters to handle PX4 flight failures
         self.flight_check = False
@@ -468,49 +478,49 @@ class UAV:
 
         # Publishers
         self.offboard_mode_publisher = self.node.create_publisher(
-            OffboardControlMode, '/fmu/in/offboard_control_mode', 10
+            OffboardControlMode, self._px4_topic('/fmu/in/offboard_control_mode'), 10
         )
         self.trajectory_publisher = self.node.create_publisher(
-            TrajectorySetpoint, '/fmu/in/trajectory_setpoint', 10
+            TrajectorySetpoint, self._px4_topic('/fmu/in/trajectory_setpoint'), 10
         )
         self.vehicle_command_publisher = self.node.create_publisher(
-            VehicleCommand, '/fmu/in/vehicle_command', 10
+            VehicleCommand, self._px4_topic('/fmu/in/vehicle_command'), 10
         )
         self.target_position_publisher = self.node.create_publisher(
-            VehicleLocalPosition, '/fmu/in/target_position', 10
+            VehicleLocalPosition, self._px4_topic('/fmu/in/target_position'), 10
         )
 
         # Subscribers
         self.status_sub = self.node.create_subscription(
             VehicleStatus,
-            '/fmu/out/vehicle_status',
+            self._px4_topic('/fmu/out/vehicle_status'),
             self._vehicle_status_callback,
             qos_profile
         )
         
         self.attitude_sub = self.node.create_subscription(
             VehicleAttitude,
-            '/fmu/out/vehicle_attitude',
+            self._px4_topic('/fmu/out/vehicle_attitude'),
             self._attitude_callback,
             qos_profile
         )
 
         self.global_position_sub = self.node.create_subscription(
             VehicleGlobalPosition,
-            'fmu/out/vehicle_global_position',
+            self._px4_topic('/fmu/out/vehicle_global_position'),
             self._global_position_callback,
             qos_profile
         )
 
         self.vehicle_gps_sub = self.node.create_subscription(
             SensorGps,
-            '/fmu/out/vehicle_gps_position',
+            self._px4_topic('/fmu/out/vehicle_gps_position'),
             self._vehicle_gps_callback,
             qos_profile
         )
 
         self.vehicle_local_position_subscriber = self.node.create_subscription(
-            VehicleLocalPosition, '/fmu/out/vehicle_local_position', self._vehicle_local_position_callback, qos_profile)
+            VehicleLocalPosition, self._px4_topic('/fmu/out/vehicle_local_position'), self._vehicle_local_position_callback, qos_profile)
 
 
     # def set_velocity(self, vx: float, vy: float, vz: float, yaw_rate: float):

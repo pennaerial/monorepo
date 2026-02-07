@@ -1,0 +1,39 @@
+start:
+  class: uav.autonomous_modes.iarc_SafetestModes.SafeTestWaitMode
+  params:
+    hover_alt_m: 6.0
+    home_xy_spacing_m: 2.0
+  transitions:
+    launch: armtakeoff
+
+armtakeoff:
+  class: uav.autonomous_modes.iarc_SafetestModes.SafeTestArmTakeoffMode
+  params:
+    hover_alt_m: 6.0
+    home_xy_spacing_m: 2.0
+  transitions:
+    hover: hover
+    land: land
+
+hover:
+  class: uav.autonomous_modes.iarc_SafetestModes.SafeHoverMode
+  params:
+    hover_alt_m: 6.0
+    home_xy_spacing_m: 2.0
+  transitions:
+    orbit: orbit
+    land: land
+
+orbit:
+  class: uav.autonomous_modes.iarc_SafetestModes.SafeOrbitMode
+  params:
+    radius_m: 5.0
+    omega_rad_s: 0.6
+    target_revs: 10
+  transitions:
+    land: land
+
+land:
+  class: uav.autonomous_modes.iarc_SafetestModes.SafeLandMode
+  params:
+    return_tolerance_m: 1.0

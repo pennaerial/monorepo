@@ -9,6 +9,7 @@ import importlib
 import inspect
 import ast
 from px4_msgs.msg import VehicleStatus
+from std_msgs.msg import String
 
 VISION_NODE_PATH = 'uav.vision_nodes'
 
@@ -16,8 +17,9 @@ class ModeManager(Node):
     """
     A ROS 2 node for managing UAV modes and mission logic.
     """
-    def __init__(self, mode_map: str, vision_nodes: str, camera_offsets, DEBUG=False, servo_only=False) -> None:
-        super().__init__('mission_node')
+    def __init__(self, mode_map: str, vision_nodes: str, camera_offsets, DEBUG=False, servo_only=False, safe_test=False, vehicle_id: int = 0) -> None:
+        self.vehicle_id = int(vehicle_id)
+        super().__init__(f'mission_node_{self.vehicle_id}')
         self.timer = self.create_timer(0.1, self.spin_once)
         self.modes = {}
         self.transitions = {}
@@ -29,6 +31,29 @@ class ModeManager(Node):
         self.setup_vision(vision_nodes)
         self.setup_modes(mode_map)
         self.servo_only = servo_only
+        self.safe_test = safe_test
+
+        # safe_test command/status IO (used by uav.autonomous_modes.iarc_SafetestModes)
+        if self.safe_test:
+            if not hasattr(self, '_safe_test_cmd'):
+                self._safe_test_cmd = None
+                self._safe_test_cmd_time = 0.0
+
+            cmd_topic = f'/safe_test/vehicle_{self.vehicle_id}/command'
+            status_topic = f'/safe_test/vehicle_{self.vehicle_id}/status'
+
+            if not hasattr(self, '_safe_test_status_pub'):
+                self._safe_test_status_pub = self.create_publisher(String, status_topic, 10)
+
+            if not hasattr(self, '_safe_test_cmd_sub'):
+                def _cb(msg: String) -> None:
+                    cmd = (msg.data or '').strip().lower()
+                    if not cmd:
+                        return
+                    self._safe_test_cmd = cmd
+                    self._safe_test_cmd_time = time()
+
+                self._safe_test_cmd_sub = self.create_subscription(String, cmd_topic, _cb, 10)
     
     def get_active_mode(self) -> Mode:
         """
@@ -181,6 +206,34 @@ class ModeManager(Node):
                     self.destroy_node()
                 elif state != 'continue':
                     self.switch_mode(self.transition(state))
+        elif self.safe_test:
+            # safe_test runs the Mode graph without the normal flight-state gating.
+            # The modes themselves are expected to react to /safe_test/vehicle_<id>/command.
+            if not self.uav.origin_set:
+                self.uav.set_origin()
+
+            if self.active_mode is None:
+                self.switch_mode('start')
+
+            time_delta = current_time - self.last_update_time
+            self.last_update_time = current_time
+
+            try:
+                self.get_active_mode().update(time_delta)
+            except Exception as e:
+                self.get_logger().error(f"Error in mode {self.active_mode}: {e}")
+                self.uav.failsafe = True
+                return
+
+            state = self.get_active_mode().check_status()
+            if state == 'error':
+                self.get_logger().error(f"Error in mode {self.active_mode}. Switching to failsafe.")
+                self.uav.failsafe = True
+            elif state == 'terminate':
+                self.get_logger().info("Mission has completed.")
+                self.destroy_node()
+            elif state != 'continue':
+                self.switch_mode(self.transition(state))
         else:
             if not self.uav.origin_set:
                 self.uav.set_origin()
