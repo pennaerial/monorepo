@@ -2,6 +2,7 @@ from .Mode import Mode # make sure to import the parent class FIRST (to avoid ci
 from .LandingMode import LandingMode
 from .PayloadDropoffMode import PayloadDropoffMode
 from .PayloadPickupMode import PayloadPickupMode
+from .PayloadEdgeNavigationMode import PayloadEdgeNavigationMode
 from .NavGPSMode import NavGPSMode
 from .TransitionMode import TransitionMode
 from .ServoDropoffMode import ServoDropoffMode
