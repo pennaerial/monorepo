@@ -1,0 +1,13 @@
+payload:
+  controller:
+    type: string
+    default_value: "sim"
+    description: "Controller type"
+    validation:
+      one_of<>: [["sim", "gpio"]]
+  
+  sim:
+    world_name:
+      type: string 
+      default_value: "sae"
+      description: "Simulation World name"
