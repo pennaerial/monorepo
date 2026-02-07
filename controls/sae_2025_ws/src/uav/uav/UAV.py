@@ -24,6 +24,16 @@ from std_msgs.msg import Bool
 from uav.px4_modes import PX4CustomMainMode, PX4CustomSubModeAuto
 from uav.utils import R_earth
 
+# Map nav_state value -> name for readable logging
+_NAV_STATE_NAMES = {
+    getattr(VehicleStatus, a): a
+    for a in dir(VehicleStatus)
+    if a.startswith('NAVIGATION_STATE_') and isinstance(getattr(VehicleStatus, a), (int, float))
+}
+
+def get_nav_state_str(val):
+    return _NAV_STATE_NAMES.get(val, str(val))
+
 class UAV(ABC):
     """
     Abstract base class for UAV control and interfacing with PX4 via ROS 2.
@@ -442,6 +452,8 @@ class UAV(ABC):
     # -------------------------
     def _vehicle_status_callback(self, msg: VehicleStatus):
         self.vehicle_status = msg
+        if self.nav_state != msg.nav_state:
+            self.node.get_logger().info(f"Nav state changed from {get_nav_state_str(self.nav_state)} to {get_nav_state_str(msg.nav_state)}")
         self.nav_state = msg.nav_state
         self.arm_state = msg.arming_state
         self.failsafe_px4 = msg.failsafe

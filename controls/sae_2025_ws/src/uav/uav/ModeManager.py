@@ -242,14 +242,8 @@ class ModeManager(Node):
             
             if self.uav.nav_state == VehicleStatus.NAVIGATION_STATE_AUTO_LAND: # nav_state will/should change when LandingMode is spun
                 self.get_logger().info("Landing")
+            
 
-            if self.uav.nav_state not in ( # nav_state should be one of these modes when the mode is active
-                VehicleStatus.NAVIGATION_STATE_OFFBOARD,
-                VehicleStatus.NAVIGATION_STATE_AUTO_TAKEOFF,
-                VehicleStatus.NAVIGATION_STATE_AUTO_LOITER,
-                VehicleStatus.NAVIGATION_STATE_AUTO_LAND
-            ):
-                self.get_logger().info(f"Self.nav_state: {self.uav.nav_state}")
     def spin(self):
         """
         Run the mission node loop.
