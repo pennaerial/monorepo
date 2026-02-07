@@ -81,7 +81,7 @@ class WorldNode(Node, ABC):
         except Exception as e:
             logger.warning(f"Model setup failed (continuing anyway): {e}")
     
-    def instantiate_static_world(self, template_world_path: str) -> None:
+    def instantiate_static_world(self, template_world_path: str, friction: float = None) -> None:
         """
         Prepare the template world with the correct competition name prior to dynamic generation.
         Writes the XML to self.output_path.
@@ -127,7 +127,12 @@ class WorldNode(Node, ABC):
         world.set("name", new_name)
         if old_name != new_name:
             self.get_logger().info(f"World name changed: {old_name} to {new_name}")
-        
+
+        if friction is not None:
+            self.set_friction(world, friction)
+        else:
+            self.get_logger().info("No friction provided. Friction is defaulted to 0.6 in template.sdf")
+
         try:
             tree.write(
                 str(out_path),
@@ -169,6 +174,54 @@ class WorldNode(Node, ABC):
             Path to the world SDF file
         """
         return self.output_path
+
+    def set_friction(self, world: ET.Element, friction: float) -> None:
+        """
+        Set the friction of the ground plane in the world.
+        """
+        ns = ""
+        # Find <model name="ground_plane"> element
+        ground_plane_model = None
+        xpaths = [f"{ns}model", "model", ".//model"]
+        found = False
+        for xpath in xpaths:
+            for model in world.findall(xpath):
+                if model.get("name") == "ground_plane":
+                    ground_plane_model = model
+                    self.get_logger().info(f"Found <model name='ground_plane'> at {xpath}")
+                    found = True
+                    break
+            if found:
+                break
+
+        if ground_plane_model is None:
+            self.get_logger().warn("No <model name='ground_plane'> found to update friction. Defaulting to 0.6.")
+
+        if ground_plane_model is not None:
+            # Traverse the tree to find <ode>
+            try:
+                link = ground_plane_model.find(f"{ns}link") or ground_plane_model.find("link") or ground_plane_model.find(".//link")
+                if link is not None:
+                    collision = link.find(f"{ns}collision") or link.find("collision") or link.find(".//collision")
+                    if collision is not None:
+                        surface = collision.find(f"{ns}surface") or collision.find("surface") or collision.find(".//surface")
+                        if surface is not None:
+                            friction_elem = surface.find(f"{ns}friction") or surface.find("friction") or surface.find(".//friction")
+                            if friction_elem is not None:
+                                ode = friction_elem.find(f"{ns}ode") or friction_elem.find("ode") or friction_elem.find(".//ode")
+                                if ode is not None:
+                                    mu = ode.find(f"{ns}mu") or ode.find("mu") or ode.find(".//mu")
+                                    mu2 = ode.find(f"{ns}mu2") or ode.find("mu2") or ode.find(".//mu2")
+                                    # only update if friction is provided. Otherwise, defaults to 0.6 in template.sdf
+                                    if mu is not None:
+                                        mu.text = str(friction)
+                                    if mu2 is not None:
+                                        mu2.text = str(friction)
+                                    self.get_logger().info(f"Successfully updated <mu> and <mu2> in ground_plane friction to {friction}")
+            except Exception as e:
+                self.get_logger().warn(f"Couldn't update <mu>/<mu2> in ground_plane: {e}")
+        else:
+            self.get_logger().warn("No <model name='ground_plane'> found to update <mu>/<mu2>")
 
     @classmethod
     def node_name(cls) -> str:
