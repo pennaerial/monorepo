@@ -1,0 +1,19 @@
+start:
+  class: uav.autonomous_modes.NavGPSMode
+  params:
+    coordinates: '[((0, 0, -5), 2, "LOCAL"),]'
+  transitions:
+    complete: payload_navigate
+
+payload_navigate:
+  class: uav.autonomous_modes.PayloadEdgeNavigationMode
+  params:
+    payload_name: 'payload_0'
+    edge_threshold: '0.15'
+    linear_velocity: '0.3'
+  transitions:
+    complete: land
+    error: land
+
+land:
+  class: uav.autonomous_modes.LandingMode

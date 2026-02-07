@@ -4,6 +4,9 @@ from .Mode import (
 from .LandingMode import LandingMode as LandingMode
 from .PayloadDropoffMode import PayloadDropoffMode as PayloadDropoffMode
 from .PayloadPickupMode import PayloadPickupMode as PayloadPickupMode
+from .PayloadEdgeNavigationMode import (
+    PayloadEdgeNavigationMode as PayloadEdgeNavigationMode,
+)
 from .NavGPSMode import NavGPSMode as NavGPSMode
 from .TransitionMode import TransitionMode as TransitionMode
 from .ServoDropoffMode import ServoDropoffMode as ServoDropoffMode

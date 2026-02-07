@@ -9,7 +9,11 @@ from launch.actions import (
     RegisterEventHandler,
     OpaqueFunction,
     DeclareLaunchArgument,
+    IncludeLaunchDescription,
+    TimerAction,
 )
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+from ament_index_python.packages import get_package_share_directory
 import logging
 from launch.substitutions import LaunchConfiguration
 from launch.event_handlers import OnProcessStart, OnProcessExit, OnProcessIO
@@ -245,6 +249,14 @@ def launch_setup(context, *args, **kwargs):
         name="trigger_world_gen",
     )
 
+    # Launch payload node for ground robot control
+    payload_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(get_package_share_directory('payload'), 'launch', 'payload.launch.py')
+        ),
+        launch_arguments={'payload_name': 'payload_0'}.items()
+    )
+
     # Initialize scoring node if requested
     scoring = None
     if use_scoring:
@@ -299,7 +311,11 @@ def launch_setup(context, *args, **kwargs):
         RegisterEventHandler(
             OnProcessStart(
                 target_action=gz_ros_bridge_create,
-                on_start=[trigger_world_gen, LogInfo(msg="World generation triggered")],
+                on_start=[
+                    trigger_world_gen,
+                    LogInfo(msg="World generation triggered"),
+                    TimerAction(period=3.0, actions=[payload_launch, LogInfo(msg="Payload node launched")])
+                ],
             )
         ),
     ]
