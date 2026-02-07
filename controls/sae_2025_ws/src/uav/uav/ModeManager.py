@@ -210,8 +210,10 @@ class ModeManager(Node):
             if self.uav.local_position is None or self.uav.global_position is None: # Need to wait for the uav to be ready
                 return
             if not self.uav.attempted_takeoff:
-                self.uav.takeoff()
-                self.get_logger().info("Attempting takeoff")
+                # self.uav.takeoff()
+                self.uav.nav_state = VehicleStatus.NAVIGATION_STATE_AUTO_LOITER
+                self.uav.attempted_takeoff = True
+                self.get_logger().info("Changing status to loiter")
                 self.start_time = current_time # Reset the start time because we will starting publishing heartbeat
                 return
             self.uav.publish_offboard_control_heartbeat_signal()

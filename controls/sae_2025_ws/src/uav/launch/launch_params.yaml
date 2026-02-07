@@ -1,5 +1,5 @@
 # launch_params.yaml
-mission_name: save_image
+mission_name: do_nothing
 uav_debug: false
 vision_debug: true
 run_mission: true

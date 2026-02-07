@@ -64,8 +64,8 @@ class SaveImageMode(Mode):
 
                     if self.circle_pause_time > 0:
                         self.circle_pause_time -= time_delta
-                        # self.log(f"Angle: {self.angle}")
-                        # self.log(f"Pausing to take photos for: {self.circle_pause_time} more seconds")
+                        self.log(f"Angle: {self.angle}")
+                        self.log(f"Pausing to take photos for: {self.circle_pause_time} more seconds")
                         return
 
                     self.angle += 5
@@ -75,8 +75,8 @@ class SaveImageMode(Mode):
                         self.circle_cycle -= 1
                     else:
                         pass
-                        # self.log(f"Angle: {self.angle}")
-                        # self.log(f"Holding - circling for {self.circle_cycle} more cycles.")
+                        self.log(f"Angle: {self.angle}")
+                        self.log(f"Holding - circling for {self.circle_cycle} more cycles.")
 
                 elif self.wait_time >= 0:
                     self.wait_time -= time_delta
