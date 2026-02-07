@@ -67,6 +67,7 @@ def launch_setup(context, *args, **kwargs):
         ))
 
         for node in extract_vision_nodes(YAML_PATH):
+            print(f"Adding vision node: {node}")
             vision_nodes.append(node)
             # Convert CamelCase node names to snake_case executable names.
             s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', node)
@@ -78,6 +79,7 @@ def launch_setup(context, *args, **kwargs):
                 output='screen',
                 parameters=[{'debug': vision_debug_bool, 'sim': sim_bool, 'save_vision': save_vision_bool}],
             ))
+        print(f"Final vision nodes to launch: {vision_nodes}")
         
         # Clear vision node actions if none are found.
         if len(vision_nodes) == 0:
