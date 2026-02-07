@@ -43,9 +43,24 @@ function ConnectCard({ sshCommand }) {
   const [failsafeResult, setFailsafeResult] = useState(null)
 
   const copy = () => {
-    navigator.clipboard.writeText(sshCommand)
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(sshCommand).catch(() => fallbackCopy(sshCommand))
+    } else {
+      fallbackCopy(sshCommand)
+    }
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  const fallbackCopy = (text) => {
+    const el = document.createElement('textarea')
+    el.value = text
+    el.style.position = 'fixed'
+    el.style.opacity = '0'
+    document.body.appendChild(el)
+    el.select()
+    document.execCommand('copy')
+    document.body.removeChild(el)
   }
 
   const failsafe = async () => {

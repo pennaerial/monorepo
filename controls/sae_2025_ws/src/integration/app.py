@@ -9,6 +9,7 @@
 import asyncio
 import json
 import os
+import re
 import subprocess
 import tempfile
 from pathlib import Path
@@ -44,7 +45,6 @@ config = {
 # Auto-detect GitHub repo from git remote if not set
 if not config['github_repo']:
     try:
-        import re
         result = subprocess.run(
             ["git", "remote", "get-url", "origin"],
             capture_output=True, text=True, cwd=Path(__file__).parent,
@@ -176,19 +176,21 @@ async def ssh_command():
 async def wifi_status():
     """Get Pi's current WiFi status via SSH."""
     try:
-        r = await _run_ssh("nmcli -t -f NAME,TYPE,DEVICE,STATE con show --active", timeout=15)
+        r = await _run_ssh("nmcli -f NAME,TYPE,DEVICE,STATE con show --active | tail -n +2", timeout=15)
         if r.returncode != 0:
             return {"success": False, "error": r.stderr.strip()}
 
         connections = []
         for line in r.stdout.strip().split("\n"):
-            parts = line.split(":")
+            if not line.strip():
+                continue
+            parts = re.split(r'\s{2,}', line.strip())
             if len(parts) >= 4:
                 connections.append({
-                    "name": parts[0],
-                    "type": parts[1],
-                    "device": parts[2],
-                    "state": parts[3],
+                    "name": parts[0].strip(),
+                    "type": parts[1].strip(),
+                    "device": parts[2].strip(),
+                    "state": parts[3].strip(),
                 })
 
         is_hotspot = any(c["name"] == config["hotspot_name"] for c in connections)
@@ -210,8 +212,9 @@ async def wifi_status():
 async def wifi_scan():
     """Scan for WiFi networks on the Pi via SSH."""
     try:
+        # Use tab separator to avoid issues with colons in SSID/security fields
         r = await _run_ssh(
-            "nmcli -t -f SSID,SIGNAL,SECURITY dev wifi list --rescan yes",
+            r"nmcli -f SSID,SIGNAL,SECURITY dev wifi list --rescan yes | tail -n +2",
             timeout=20,
         )
         if r.returncode != 0:
@@ -219,24 +222,34 @@ async def wifi_scan():
 
         networks = []
         for line in r.stdout.strip().split("\n"):
-            parts = line.split(":")
-            if len(parts) >= 3 and parts[0].strip():
+            if not line.strip():
+                continue
+            # nmcli tabular output is whitespace-aligned; parse by splitting on 2+ spaces
+            parts = re.split(r'\s{2,}', line.strip())
+            if len(parts) >= 3:
+                ssid = parts[0].strip()
+                if not ssid:
+                    continue
+                try:
+                    signal = int(parts[1].strip())
+                except ValueError:
+                    signal = 0
+                security = parts[2].strip() if len(parts) > 2 else ""
                 networks.append({
-                    "ssid": parts[0],
-                    "signal": parts[1],
-                    "security": ":".join(parts[2:]),
+                    "ssid": ssid,
+                    "signal": signal,
+                    "security": security,
                 })
 
         # Deduplicate by SSID, keep strongest signal
         seen: dict = {}
         for n in networks:
-            sig = int(n.get("signal", 0) or 0)
-            if n["ssid"] not in seen or sig > int(seen[n["ssid"]].get("signal", 0) or 0):
+            if n["ssid"] not in seen or n["signal"] > seen[n["ssid"]]["signal"]:
                 seen[n["ssid"]] = n
 
         return {
             "success": True,
-            "networks": sorted(seen.values(), key=lambda x: -int(x.get("signal", 0) or 0)),
+            "networks": sorted(seen.values(), key=lambda x: -x["signal"]),
         }
     except Exception as e:
         return {"success": False, "error": str(e), "networks": []}
@@ -350,6 +363,7 @@ async def upload_build(file: UploadFile = File(...)):
             fi
             tar -xzf {file.filename}
             rm -f {file.filename}
+            chmod -R +x install/
         """
         r = await _run_ssh(extract_cmd, timeout=120)
         if r.returncode != 0:
@@ -447,6 +461,7 @@ async def download_build(tag: str = Form(...)):
             fi
             tar -xzf {filename}
             rm -f {filename}
+            chmod -R +x install/
         """
         r = await _run_ssh(extract_cmd, timeout=120)
         if r.returncode != 0:
