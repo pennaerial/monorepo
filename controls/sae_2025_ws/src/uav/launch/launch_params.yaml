@@ -1,5 +1,5 @@
 # launch_params.yaml
-mission_name: test_takeoff
+mission_name: simple_tailsitter
 uav_debug: false
 vision_debug: false
 run_mission: true

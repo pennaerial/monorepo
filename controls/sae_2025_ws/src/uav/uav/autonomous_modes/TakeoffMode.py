@@ -34,11 +34,12 @@ class TakeoffMode(Mode):
             self.log("Waiting for position data...")
             return
         
+        # Takeoff command already sent
         if self.takeoff_commanded:
             self.log(f"{self.takeoff_type.capitalize()} takeoff in progress.")
-            return
-
-        if self.takeoff_type == 'horizontal':
+        
+        # Need to send takeoff command
+        elif self.takeoff_type == 'horizontal':
             if not self.uav.is_vtol or not isinstance(self.uav, VTOL):
                 self.node.get_logger().error("Horizontal takeoff only valid for VTOL - cannot proceed.")
                 return
@@ -46,14 +47,16 @@ class TakeoffMode(Mode):
         else:
             # Vertical takeoff (multicopter or VTOL)
             self.log("Attempting vertical takeoff")
-            self.uav.takeoff() # TODO: make uav takeoff return bool as well 
+            self.uav.takeoff() # TODO: change to multicopter_takeoff()
             self.takeoff_commanded = True
             # TODO: change takeoff_type to enum
+        
 
         # When in AUTO_LOITER, engage offboard mode
         if self.uav.nav_state == VehicleStatus.NAVIGATION_STATE_AUTO_LOITER:
             self.log("Takeoff complete. Engaging offboard mode.")
             self.uav.engage_offboard_mode()
+
 
     def check_status(self) -> str:
         """
