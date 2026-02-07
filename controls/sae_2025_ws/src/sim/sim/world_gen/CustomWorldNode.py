@@ -20,7 +20,8 @@ class CustomWorldNode(WorldNode):
         dlz = Entity(
             name="dlz",
             path_to_sdf="~/.simulation-gazebo/models/dlz/model.sdf",
-            position=(-5.0, 0.0, 0.0),
+            # position=(-5.0, 0.0, 0.0),
+            position=(5.0, 10.0, 0.0),
             rpy=(0.0, 0.0, 0.0),
             world="custom"
         )

@@ -8,8 +8,11 @@ start:
 dlz_land:
   class: uav.autonomous_modes.DLZLandingMode
   params:
-    pid_gains_xy: '(0.8, 0.02, 0.15)'
-    centering_threshold: '0.5'
+    # Classic PID
+    pid_gains_xy: '(2.34, 1.48, 0.922)'
+    # No Overshoot
+    # pid_gains_xy: '(0.78, 0.495, 0.811)'
+    centering_threshold: '0.1'
     detection_timeout: '3.0'
     use_auto_land: 'True'
   transitions:

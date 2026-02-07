@@ -28,8 +28,10 @@ pid_test:
     #   pid_gains_xy: '(0.3, 0.0, 0.0)'
     #   ... etc
     # Step 3: Once you find Ku and Tu, calculate final gains
-    pid_gains_xy: '(3.5, 0.0, 0.0)'
-    centering_threshold: '0.15'
+    # Ku = 3.9
+    # Tu = 3.152
+    pid_gains_xy: '(3.9, 0.0, 0.0)'
+    centering_threshold: '0.1'
     detection_timeout: '10.0'
     use_auto_land: 'False'
     # Zero descent rates for PID tuning - isolate horizontal response
