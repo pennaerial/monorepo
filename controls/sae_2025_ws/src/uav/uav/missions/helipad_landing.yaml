@@ -1,0 +1,31 @@
+# Helipad Landing Mission
+#
+# This mission:
+# 1. Navigates to a search area
+# 2. Detects an H-shaped helipad using computer vision
+# 3. Centers over the helipad and lands on it
+#
+# Requires: HelipadTrackingNode vision service running
+
+start:
+  class: uav.autonomous_modes.NavGPSMode
+  params:
+    # Fly to search area at 10m altitude
+    coordinates: '[((0, 0, -10), 2, "LOCAL")]'
+    margin: 1.0
+  transitions:
+    complete: detect_and_land
+
+detect_and_land:
+  class: uav.autonomous_modes.DetectAndLandMode
+  params:
+    search_altitude: 10.0      # Altitude to search from (meters)
+    descent_rate: 0.3          # How fast to descend when centered (m/update)
+    center_threshold: 0.15     # How centered before descending (0-1)
+    land_altitude: 1.0         # Altitude to trigger final landing (meters)
+  transitions:
+    complete: done
+
+# Fallback landing mode (in case detect_and_land completes without landing)
+done:
+  class: uav.autonomous_modes.LandingMode

@@ -35,6 +35,7 @@ setup(
             'global_position_offboard_control = uav.global_position_offboard_control:main',
             'mission = uav.mission:main',
             'payload_tracking_node = uav.vision_nodes.PayloadTrackingNode:main',
+            'helipad_tracking_node = uav.vision_nodes.HelipadTrackingNode:main',
             'camera = uav.CameraNode:main',
         ],
     },
