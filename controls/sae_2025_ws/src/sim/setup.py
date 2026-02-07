@@ -50,6 +50,7 @@ setup(
         'console_scripts': [
             'hoop_course = sim.world_gen.HoopCourse:main',
             'custom_world_node = sim.world_gen.CustomWorldNode:main',
+            'helipad_world_node = sim.world_gen.HelipadWorldNode:main',
             'hoop_score = sim.scoring.HoopScore:main',
         ],
     },

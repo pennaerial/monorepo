@@ -1,0 +1,8 @@
+# Helipad Test Simulation Configuration
+# Use this to test helipad detection and landing missions
+
+world:
+  name: HelipadWorldNode
+  params:
+    template_world: "src/sim/sim/world_gen/worlds/template.sdf"
+    helipad_position: [5, 5, 0]  # x, y, z - where to spawn the helipad

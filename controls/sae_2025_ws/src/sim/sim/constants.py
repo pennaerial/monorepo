@@ -11,7 +11,7 @@ class Competition(IntEnum):
     IN_HOUSE = 0
     IARC = 1
     CUSTOM = 2
-
+    HELIPAD_TEST = 3
 
 
 # Competition name mapping
@@ -19,6 +19,7 @@ COMPETITION_NAMES = {
     Competition.IN_HOUSE: "in_house",
     Competition.IARC: "iarc",
     Competition.CUSTOM: "custom",
+    Competition.HELIPAD_TEST: "helipad_test",
 }
 
 # Platform name mapping
