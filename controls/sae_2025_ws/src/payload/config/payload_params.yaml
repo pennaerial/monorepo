@@ -1,0 +1,9 @@
+#TODO: can differentiate between general (shared), gpio only, and sim only params
+#TODO: Add necessary clamp param values (Ex. linear and angular velocity)
+/**:
+  ros__parameters:
+    controller: "sim" # sim or gpio
+
+
+    sim:
+      world_name: "custom"

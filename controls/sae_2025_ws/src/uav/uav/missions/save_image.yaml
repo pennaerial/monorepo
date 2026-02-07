@@ -1,0 +1,9 @@
+start:
+  class: uav.autonomous_modes.SaveImageMode
+  params:
+    coordinates: '[((0, 0, -6), 10, "LOCAL"), ((0, 20, -3), 10, "LOCAL")]'
+  transitions:
+    complete: land
+
+land:
+  class: uav.autonomous_modes.LandingMode

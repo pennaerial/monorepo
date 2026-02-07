@@ -7,7 +7,7 @@ class NavGPSMode(Mode):
     A mode for navigating to a GPS coordinate
     """
 
-    def __init__(self, node: Node, uav: UAV, coordinates: List[tuple[tuple[float, float, float], float, str]], margin: float = 0.5):
+    def __init__(self, node: Node, uav: UAV, coordinates: List[tuple[tuple[float, float, float], float, str]], margin: float = 1):
         """
         Initialize the NavigateToGPSMode.
 
@@ -23,6 +23,9 @@ class NavGPSMode(Mode):
         self.goal = None
         self.margin = margin
         self.index = -1
+        self.coordinate_system = None
+        self.target = None
+        self.wait_time = 0.0
 
     def on_update(self, time_delta: float) -> None:
         """
@@ -31,21 +34,54 @@ class NavGPSMode(Mode):
         dist = 0
         if self.index != -1:
             dist = self.uav.distance_to_waypoint(self.coordinate_system, self.goal)
-            self.log(f"Distance to waypoint: {dist}, current position: {self.uav.get_local_position()}")
+
+        # Determine if we're waiting at a waypoint (lock yaw to prevent spinning)
+        at_waypoint = (self.index != -1 and dist < self.margin)
+        waiting = at_waypoint and self.wait_time > 0
+
+        # Always publish setpoints to maintain offboard connection (PX4 requires continuous stream)
+        if self.target is not None:
+            self.uav.publish_position_setpoint(self.target, lock_yaw=waiting)
+        elif self.uav.local_position:
+            # Fallback: maintain current position until first waypoint is set
+            self.uav.publish_position_setpoint(
+                (self.uav.local_position.x, self.uav.local_position.y, self.uav.local_position.z),
+                lock_yaw=True
+            )
+        
+        # Consolidated debug output - single line with all information
+        if self.index != -1 and self.target is not None:
+            curr_pos = self.uav.get_local_position()
+            curr_gps = self.uav.get_gps()
+            yaw = self.uav.yaw if self.uav.yaw is not None else (self.uav.local_position.heading if self.uav.local_position else 0.0)
+            vel = (self.uav.local_position.vx, self.uav.local_position.vy, self.uav.local_position.vz) if self.uav.local_position else (0.0, 0.0, 0.0)
             
-        if dist >= self.margin:
-            self.uav.publish_position_setpoint(self.target) # PX4 expects stream of setpoints
-        elif self.goal is None or dist < self.margin:
+            # Build target position string
+            if self.coordinate_system == "GPS":
+                target_str = f"Target GPS: ({self.goal[0]:.6f}, {self.goal[1]:.6f}, {self.goal[2]:.2f}) | Target LOCAL: ({self.target[0]:.2f}, {self.target[1]:.2f}, {self.target[2]:.2f})"
+            else:
+                target_str = f"Target LOCAL: ({self.target[0]:.2f}, {self.target[1]:.2f}, {self.target[2]:.2f})"
+            
+            # Build consolidated log line
+            if curr_pos and curr_gps:
+                self.log(f"Dist: {dist:.2f}m | {target_str} | "
+                        f"Global: ({curr_gps[0]:.6f}, {curr_gps[1]:.6f}, {curr_gps[2]:.2f}) | "
+                        f"Local: ({curr_pos[0]:.2f}, {curr_pos[1]:.2f}, {curr_pos[2]:.2f}) | "
+                        f"Yaw: {yaw:.2f} | Vel: ({vel[0]:.2f}, {vel[1]:.2f}, {vel[2]:.2f})")
+            
+        if self.goal is None or dist < self.margin:
             if self.index == -1 or self.wait_time <= 0:
                 self.index += 1
                 if self.index >= len(self.coordinates):
+                    self.log("All waypoints completed")
                     return
                 self.goal, self.wait_time, self.coordinate_system = self.coordinates[self.index]
                 self.target = self.get_local_target()
-                self.uav.publish_position_setpoint(self.target)
+                self.log(f"Moving to waypoint {self.index+1}/{len(self.coordinates)}: {self.goal} (wait time: {self.wait_time}s)")
             else:
+                # Waiting at waypoint
+                self.log(f"Waiting at waypoint {self.index+1}/{len(self.coordinates)} - {self.wait_time:.1f}s remaining")
                 self.wait_time -= time_delta
-                self.log(f"Holding - waiting for {self.wait_time} more seconds")
 
     def get_local_target(self) -> tuple[float, float, float]:
         """
@@ -55,9 +91,12 @@ class NavGPSMode(Mode):
             tuple[float, float, float]: The local target of the UAV.
         """
         if self.coordinate_system == "GPS":
-            return self.uav.gps_to_local(self.goal)
+            local_target = self.uav.gps_to_local(self.goal)
+            return local_target
         elif self.coordinate_system == "LOCAL":
-            return tuple(float(x) for x in self.goal)
+            # LOCAL coordinates are already in NED frame relative to origin
+            local_target = tuple(float(x) for x in self.goal)
+            return local_target
         else: 
             raise ValueError(f"Invalid coordinate system {self.coordinate_system}")
 

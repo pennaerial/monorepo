@@ -120,6 +120,26 @@ You might run into the following issues during the build process. Here are solut
     cd ~/{path_to_monorepo}/controls/sae_2025_ws/src
     git clone git@github.com:rudislabs/actuator_msgs.git
     ```
+5. **Missing `tf_transformations`**:
+   
+   ```bash
+   sudo apt install tf_transformations
+   ```
+
+6. **`numpy` version is wrong:**
+
+   You might see one of two errors:
+   - `AttributeError: module 'numpy' has no attribute `**
+   - `AttributeError: `np.maximum_sctype` was removed in the NumPy 2.0 release`
+   ```bash
+   pip install numpy==1.21.5
+   ```
+
+7. **Missing `generate_parameter_library`:**
+
+    ```bash
+    sudo apt install ros-humble-generate-parameter-library
+    ```
 
 ---
 

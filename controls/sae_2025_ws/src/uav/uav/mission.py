@@ -2,6 +2,7 @@
 import rclpy
 import sys
 import os
+from uav.utils import Vehicle
 from uav.ModeManager import ModeManager
 
 def main():
@@ -14,7 +15,8 @@ def main():
         except Exception as e:
             print(f"Error parsing camera_offsets: {e}")
             camera_offsets = [0, 0, 0]
-        vision_nodes = sys.argv[5]
+        vehicle_class = Vehicle[sys.argv[5].upper()]
+        vision_nodes = sys.argv[6]
     else:
         cwd = os.getcwd() # default
         yaml_file = f'{cwd}/src/uav/uav/missions/basic.yaml'
@@ -22,10 +24,11 @@ def main():
         debug = 'false'
         camera_offsets = [0, 0, 0]
         servo_only = 'false'
+        vehicle_class = Vehicle.MULTICOPTER
     servo_only = servo_only.lower() == 'true'
     DEBUG = debug.lower() == 'true'
     rclpy.init()
-    mission_node = ModeManager(yaml_file, vision_nodes, camera_offsets, DEBUG=DEBUG, servo_only=servo_only)
+    mission_node = ModeManager(yaml_file, vision_nodes, camera_offsets, DEBUG=DEBUG, servo_only=servo_only, vehicle_class=vehicle_class)
     rclpy.spin(mission_node)
     rclpy.shutdown()
 

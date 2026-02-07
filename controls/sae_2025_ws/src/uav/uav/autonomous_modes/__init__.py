@@ -6,3 +6,5 @@ from .NavGPSMode import NavGPSMode
 from .TransitionMode import TransitionMode
 from .ServoDropoffMode import ServoDropoffMode
 from .WaypointMission import WaypointMission
+from .SaveImageMode import SaveImageMode
+from .DoNothingMode import DoNothingMode

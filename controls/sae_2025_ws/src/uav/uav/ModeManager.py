@@ -2,8 +2,9 @@
 import rclpy
 from rclpy.node import Node
 from time import time
-from uav import UAV
+from uav import VTOL, Multicopter
 from uav.autonomous_modes import Mode, LandingMode
+from uav.utils import Vehicle
 import yaml
 import importlib
 import inspect
@@ -16,7 +17,7 @@ class ModeManager(Node):
     """
     A ROS 2 node for managing UAV modes and mission logic.
     """
-    def __init__(self, mode_map: str, vision_nodes: str, camera_offsets, DEBUG=False, servo_only=False) -> None:
+    def __init__(self, mode_map: str, vision_nodes: str, camera_offsets, DEBUG=False, servo_only=False, vehicle_class=Vehicle.MULTICOPTER) -> None:
         super().__init__('mission_node')
         self.timer = self.create_timer(0.1, self.spin_once)
         self.modes = {}
@@ -24,7 +25,11 @@ class ModeManager(Node):
         self.active_mode = None
         self.last_update_time = time()
         self.start_time = self.last_update_time
-        self.uav = UAV(self, DEBUG=DEBUG, camera_offsets=camera_offsets)
+        # Instantiate appropriate UAV subclass based on vehicle type
+        if vehicle_class == Vehicle.VTOL:
+            self.uav = VTOL(self, DEBUG=DEBUG, camera_offsets=camera_offsets)
+        else:
+            self.uav = Multicopter(self, DEBUG=DEBUG, camera_offsets=camera_offsets)
         self.get_logger().info("Mission Node has started!")
         self.setup_vision(vision_nodes)
         self.setup_modes(mode_map)
@@ -189,14 +194,26 @@ class ModeManager(Node):
                     self.get_logger().info(f"Succesfully Landed UAV")
                     self.get_logger().info(f"Finishing Mission")
                     self.destroy_node()
+                    return
+
+                # If we attempted takeoff but became disarmed (not during landing), something went wrong
+                # Terminate instead of cycling
+                if self.uav.attempted_takeoff and self.active_mode is not None:
+                    self.get_logger().error(f"UAV disarmed unexpectedly after takeoff attempt. Terminating to prevent infinite cycle.")
+                    self.get_logger().error(f"This usually indicates preflight check failures or PX4 safety triggers.")
+                    self.destroy_node()
+                    return
+
                 self.uav.arm()
                 self.get_logger().info(f"Arming UAV")
                 self.start_time = current_time
             if self.uav.local_position is None or self.uav.global_position is None: # Need to wait for the uav to be ready
                 return
             if not self.uav.attempted_takeoff:
-                self.uav.takeoff()
-                self.get_logger().info("Attempting takeoff")
+                # self.uav.takeoff()
+                self.uav.nav_state = VehicleStatus.NAVIGATION_STATE_AUTO_LOITER
+                self.uav.attempted_takeoff = True
+                self.get_logger().info("Changing status to loiter")
                 self.start_time = current_time # Reset the start time because we will starting publishing heartbeat
                 return
             self.uav.publish_offboard_control_heartbeat_signal()
@@ -260,23 +277,3 @@ class ModeManager(Node):
             data = yaml.safe_load(file)
         return data
     
-
-if __name__ == '__main__':
-    mission_node = ModeManager('test_mode_manager')
-    print(mission_node.modes)
-    print(mission_node.transitions)
-    print(mission_node.active_mode)
-    # mission_node.spin()
-    
-    mission_node.transition('continue')
-    print('transition continue')
-    print(mission_node.modes)
-    print(mission_node.transitions)
-    print(mission_node.active_mode)
-    
-    mission_node.transition('continue')
-    print('transition continu 2')
-    print(mission_node.modes)
-    print(mission_node.transitions)
-    print(mission_node.active_mode)
-     
