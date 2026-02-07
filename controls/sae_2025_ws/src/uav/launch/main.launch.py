@@ -19,7 +19,6 @@ def launch_setup(context, *args, **kwargs):
     logger = get_logger('main.launch')
     logger.info("Loading launch parameters...")
     # Load launch parameters from the YAML file.
-    print("Loading launch parameters...")
     params = load_launch_parameters()
     mission_name = params.get('mission_name', 'basic')
     uav_debug = str(params.get('uav_debug', 'false'))
@@ -119,7 +118,7 @@ def launch_setup(context, *args, **kwargs):
     mission_ready_flags = {"uav": False, "middleware": False}
     mission_started = {"value": False}  # mutable so inner functions can modify
     def make_io_handler(process_name):
-        trigger = "INFO  [commander] Ready for takeoff!" if process_name == "uav" else "INFO  [uxrce_dds_client] time sync converged" if process_name == "middleware" else None
+        trigger = "INFO  [commander] Ready for takeoff!" if process_name == "uav" else "INFO  [uxrce_dds_client] synchronized with time offset" if process_name == "middleware" else None
         if trigger is None:
             raise ValueError(f"Invalid process name: {process_name}")
         def clean_text(text):
