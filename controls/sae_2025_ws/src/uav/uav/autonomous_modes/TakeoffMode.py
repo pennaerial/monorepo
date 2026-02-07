@@ -20,7 +20,6 @@ class TakeoffMode(Mode):
             node (Node): The ROS 2 node.
             uav (UAV): The UAV instance.
             takeoff_type (str): 'vertical' or 'horizontal'. Default 'vertical'.
-                Multicopters ignore this (always vertical).
                 Horizontal is only valid for VTOLs.
         """
         super().__init__(node, uav)
@@ -34,23 +33,22 @@ class TakeoffMode(Mode):
         if self.uav.local_position is None or self.uav.global_position is None:
             self.log("Waiting for position data...")
             return
+        
+        if self.takeoff_commanded:
+            self.log(f"{self.takeoff_type.capitalize()} takeoff in progress.")
+            return
 
         if self.takeoff_type == 'horizontal':
-            if not self.uav.is_vtol:
-                self.log("Horizontal takeoff only valid for VTOL - cannot proceed.")
+            if not self.uav.is_vtol or not isinstance(self.uav, VTOL):
+                self.node.get_logger().error("Horizontal takeoff only valid for VTOL - cannot proceed.")
                 return
-            if not isinstance(self.uav, VTOL):
-                return
-            takeoff_done = self.uav.fixed_wing_takeoff()
-            if not takeoff_done:
-                self.log("Horizontal takeoff in progress...")
-                return
+            self.takeoff_commanded = self.uav.fixed_wing_takeoff()
         else:
             # Vertical takeoff (multicopter or VTOL)
-            if not self.takeoff_commanded:
-                self.takeoff_commanded = True
-                self.log("Attempting vertical takeoff")
-                self.uav.takeoff()
+            self.log("Attempting vertical takeoff")
+            self.uav.takeoff() # TODO: make uav takeoff return bool as well 
+            self.takeoff_commanded = True
+            # TODO: change takeoff_type to enum
 
         # When in AUTO_LOITER, engage offboard mode
         if self.uav.nav_state == VehicleStatus.NAVIGATION_STATE_AUTO_LOITER:

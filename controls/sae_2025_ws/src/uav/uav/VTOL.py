@@ -4,7 +4,6 @@ from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy, QoSDur
 import numpy as np
 from uav.UAV import UAV
 
-
 class VTOL(UAV):
     """
     VTOL UAV implementation with MC/FW mode switching.
@@ -32,30 +31,21 @@ class VTOL(UAV):
 
         Call this repeatedly from ModeManager until it returns True.
         """
-        # Create simple state the first time this function is used
-        if not hasattr(self, "_fw_takeoff_stage"):
-            self._fw_takeoff_stage = "idle"   # idle -> transitioning -> takeoff_sent
-            self._fw_takeoff_t0 = 0.0
+        if self.vtol_vehicle_status is None:
+            self.node.get_logger().info("FW takeoff: Vehicle status not available yet.")
+            return False
 
-        # Step 0: start sequence + request FW transition
-        if self._fw_takeoff_stage == "idle":
-            
-            self._fw_takeoff_stage = "transitioning"
+        elif self.vtol_vehicle_status.vehicle_vtol_state == VtolVehicleStatus.VEHICLE_VTOL_STATE_MC:
             self.vtol_transition_to("FW", immediate=False)
             self.node.get_logger().info("FW takeoff Step 1: requested VTOL transition to FW.")
             return False
 
-        # Step 1: wait for FW confirmation
-        if self._fw_takeoff_stage == "transitioning":
-            if self.vehicle_type == "FW":
-                self.node.get_logger().info("FW takeoff Step 2: finished transition to FW mode.")
-                self._fw_takeoff_stage = "takeoff_sent"
-                return False
-            else:
-                return False
+        elif self.vtol_vehicle_status.vehicle_vtol_state == VtolVehicleStatus.VEHICLE_VTOL_STATE_TRANSITION_TO_FW:
+            self.node.get_logger().info("FW takeoff Step 2: transition to FW in progress.")
+            return False
 
-        # Step 2: send NAV_TAKEOFF once
-        if self._fw_takeoff_stage == "takeoff_sent":
+        elif self.vtol_vehicle_status.vehicle_vtol_state == VtolVehicleStatus.VEHICLE_VTOL_STATE_FW:
+            self.node.get_logger().info("FW takeoff Step 3: transition to FW complete.")
             if not self.attempted_takeoff:
                 self.attempted_takeoff = True
 
@@ -83,11 +73,71 @@ class VTOL(UAV):
                 },
             )
             self.node.get_logger().info("FW takeoff Step 3: NAV_TAKEOFF sent.")
-            # Optional: leave stage as-is so we don't resend
-            self._fw_takeoff_stage = "done"
             return True
+        elif self.vtol_vehicle_status.vehicle_vtol_state == VtolVehicleStatus.VEHICLE_VTOL_STATE_TRANSITION_TO_MC:
+            self.node.get_logger().error("FW takeoff: Transition to MC in progress during horizontal takeoff.")
+            return False
+        else:
+            self.node.get_logger().warn("FW takeoff Step 0: unknown vehicle state.")
+            return False
 
-        return True
+
+        # # Create simple state the first time this function is used
+        # if not hasattr(self, "_fw_takeoff_stage"):
+        #     self._fw_takeoff_stage = "idle"   # idle -> transitioning -> takeoff_sent
+        #     self._fw_takeoff_t0 = 0.0
+
+        # # Step 0: start sequence + request FW transition
+        # if self._fw_takeoff_stage == "idle":
+            
+        #     self._fw_takeoff_stage = "transitioning"
+        #     self.vtol_transition_to("FW", immediate=False)
+        #     self.node.get_logger().info("FW takeoff Step 1: requested VTOL transition to FW.")
+        #     return False
+
+        # # Step 1: wait for FW confirmation
+        # if self._fw_takeoff_stage == "transitioning":
+        #     if self.vehicle_type == "FW":
+        #         self.node.get_logger().info("FW takeoff Step 2: finished transition to FW mode.")
+        #         self._fw_takeoff_stage = "takeoff_sent"
+        #         return False
+        #     else:
+        #         return False
+
+        # # Step 2: send NAV_TAKEOFF once
+        # if self._fw_takeoff_stage == "takeoff_sent":
+        #     if not self.attempted_takeoff:
+        #         self.attempted_takeoff = True
+
+        #     lat = self.global_position.lat
+        #     lon = self.global_position.lon
+        #     alt = self.global_position.alt
+        #     self.node.get_logger().info(f"Current GPS: {lat}, {lon}, {alt}")
+            
+        #     # Right now is hard coded to take off east but should be modified based on yaw
+        #     takeoff_gps = (lat, lon + 0.004, alt + self.takeoff_amount)
+
+        #     self.node.get_logger().info(f"Takeoff Destination GPS: {takeoff_gps[0]}, {takeoff_gps[1]}, {takeoff_gps[2]}")
+        #     # self.node.get_logger().info(f"Takeoff Destination GPS: Auto Calculated")
+
+        #     self._send_vehicle_command(
+        #         VehicleCommand.VEHICLE_CMD_NAV_TAKEOFF,
+        #         params={
+        #             "param1": float('nan'), # fw_tko_pitch min (minimum pitch during takeoff)
+        #             "param2": float('nan'), # Unused
+        #             "param3": float('nan'), # Unused
+        #             "param4": float('nan'), # Yaw angle
+        #             "param5": takeoff_gps[0], #Latitude (in GPS coords)
+        #             "param6": takeoff_gps[1], #Longitude (in GPS coords)
+        #             "param7": takeoff_gps[2], #Altitude (in meters)
+        #         },
+        #     )
+        #     self.node.get_logger().info("FW takeoff Step 3: NAV_TAKEOFF sent.")
+        #     # Optional: leave stage as-is so we don't resend
+        #     self._fw_takeoff_stage = "done"
+        #     return True
+
+        # return True
     
     def vtol_transition_to(self, vtol_state, immediate=False):
         """
