@@ -1,18 +1,28 @@
 # launch_params.yaml
-mission_name: basic_waypoints
+mission_name: basic_payload_pickup
 uav_debug: false
 vision_debug: false
-run_mission: true
-airframe: standard_vtol # Enter a preset below or a valid airframe ID (integer), either custom or from PX4
+run_mission: false
+airframe: 4014 # Enter a preset below or a valid airframe ID (integer), either custom or from PX4
                      # quadcopter, tiltrotor_vtol, fixed_wing, standard_vtol, quadtailsitter
                      # Other useful IDs: 4014 for mono cam down
                      # IDs available for simulation can be found in PX4-Autopilot/ROMFS/px4fmu_common/init.d-posix/airframes
                      # These IDs load an airframe file and the corresponding model file in PX4-Autopilot/Tools/simulation/gz/models
-use_camera: false
+use_camera: true
 custom_airframe_model: '' # Leave blank if using default PX4 model or enter file name of custom model
 save_vision: false
 servo_only: false
 camera_offsets: [0, 0, 0] # Should denote the position of the camera relative to the payload mechanism, in meters
                           # In NED frame: x is forward, y is right, and z is down.
 
-sim: true
+# AprilTag Detection Parameters
+apriltag_tag_size: 0.165    # Physical size of AprilTag in meters (default: 165mm)
+apriltag_tag_family: tag36h11  # AprilTag family: tag36h11, tag25h9, tag16h5, etc.
+apriltag_publish_rate: 10.0 # Detection publishing rate in Hz
+
+# Video streaming to QGroundControl
+enable_video_stream: true
+qgc_ip: 127.0.0.1  # QGroundControl IP address (use actual IP for hardware)
+qgc_video_port: 5600  # Default QGC video port
+
+sim: false

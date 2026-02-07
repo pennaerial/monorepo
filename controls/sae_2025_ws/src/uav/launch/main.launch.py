@@ -44,6 +44,14 @@ def launch_setup(context, *args, **kwargs):
     save_vision = str(params.get('save_vision', 'false'))
     camera_offsets = params.get('camera_offsets', [0, 0, 0])
     servo_only = str(params.get('servo_only', 'false'))
+    apriltag_tag_size = params.get('apriltag_tag_size', 0.165)
+    apriltag_tag_family = params.get('apriltag_tag_family', 'tag36h11')
+    apriltag_publish_rate = params.get('apriltag_publish_rate', 10.0)
+
+    # Video streaming parameters
+    enable_video_stream = params.get('enable_video_stream', False)
+    qgc_ip = params.get('qgc_ip', '127.0.0.1')
+    qgc_video_port = params.get('qgc_video_port', 5600)
 
     # Convert debug and simulation flags to booleans.
     vision_debug_bool = vision_debug.lower() == 'true'
@@ -65,6 +73,39 @@ def launch_setup(context, *args, **kwargs):
             name='camera',
             output='screen'
         ))
+
+        # Add AprilTag detection node (always runs when camera is enabled)
+        vision_node_actions.append(Node(
+            package='uav',
+            executable='apriltag_detection_node',
+            name='apriltag_detection_node',
+            output='screen',
+            parameters=[{
+                'debug': vision_debug_bool,
+                'sim': sim_bool,
+                'save_vision': save_vision_bool,
+                'tag_size': apriltag_tag_size,
+                'tag_family': apriltag_tag_family,
+                'publish_rate': apriltag_publish_rate
+            }],
+        ))
+
+        # Add video stream node if enabled
+        if enable_video_stream:
+            vision_node_actions.append(Node(
+                package='uav',
+                executable='video_stream',
+                name='video_stream',
+                output='screen',
+                parameters=[{
+                    'qgc_ip': qgc_ip,
+                    'qgc_port': qgc_video_port,
+                    'width': 640,
+                    'height': 480,
+                    'framerate': 30,
+                    'bitrate': 800
+                }]
+            ))
 
         for node in extract_vision_nodes(YAML_PATH):
             vision_nodes.append(node)

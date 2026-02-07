@@ -35,7 +35,9 @@ setup(
             'global_position_offboard_control = uav.global_position_offboard_control:main',
             'mission = uav.mission:main',
             'payload_tracking_node = uav.vision_nodes.PayloadTrackingNode:main',
+            'apriltag_detection_node = uav.vision_nodes.AprilTagDetectionNode:main',
             'camera = uav.CameraNode:main',
+            'video_stream = uav.VideoStreamNode:main',
         ],
     },
 )
