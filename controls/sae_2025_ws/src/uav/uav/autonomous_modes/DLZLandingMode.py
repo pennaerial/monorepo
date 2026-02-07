@@ -107,7 +107,7 @@ class DLZLandingMode(Mode):
         self,
         node: Node,
         uav: UAV,
-        pid_gains_xy: Tuple[float, float, float] = (0.1, 0.0, 0.0),
+        pid_gains_xy: Tuple[float, float, float] = (0.78, 0.495, 0.811),
         descent_rates: Optional[Dict[str, float]] = None,
         centering_threshold: float = 0.15,
         detection_timeout: float = 2.0,
