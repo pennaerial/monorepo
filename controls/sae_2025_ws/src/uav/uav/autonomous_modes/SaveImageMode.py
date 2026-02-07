@@ -24,12 +24,13 @@ class SaveImageMode(Mode):
         self.coordinates = coordinates
         self.goal = None
         self.margin = margin
-        self.circle_time = 5
         self.circle_pause_time = 2
         self.circle_radius = 0
         self.is_circling = False
         self.index = -1
         self.angle = 0
+        self.angle_increment = 15
+        self.circle_cycle = 360 / self.angle_increment
 
     def on_update(self, time_delta: float) -> None:
         """
@@ -52,7 +53,7 @@ class SaveImageMode(Mode):
                 self.target = self.get_local_target()
                 self.uav.publish_position_setpoint(self.target)
             else:
-                if self.circle_time >= 0:
+                if self.circle_cycle >= 0:
                     self.is_circling = True
                     circle_target = list(self.target)
                     angle_in_radians = self.angle * math.pi / 180
@@ -67,21 +68,22 @@ class SaveImageMode(Mode):
                         self.log(f"Pausing to take photos for: {self.circle_pause_time} more seconds")
                         return
 
-                    self.circle_time -= time_delta
+                    self.circle_cycle -= 1
                     self.angle += 5
 
                     if self.angle % 15 == 0:
                         self.circle_pause_time = 2
                     else:
                         # self.log(f"Angle: {self.angle}")
-                        self.log(f"Holding - circling for {self.circle_time} more seconds")
+                        self.log(f"Holding - circling for {self.circle_cycle} more cycles.")
 
                 elif self.wait_time >= 0:
                     self.wait_time -= time_delta
+                    if self.wait_time <= 0:
+                        self.angle = 0
+                        self.is_circling = False
+                        self.circle_cycle = 360 / self.angle_increment
                     # self.log(f"Holding - waiting for {self.wait_time} more seconds")
-                else:
-                    self.circle_time = 5
-                    self.is_circling = False
 
     def get_local_target(self) -> tuple[float, float, float]:
         """

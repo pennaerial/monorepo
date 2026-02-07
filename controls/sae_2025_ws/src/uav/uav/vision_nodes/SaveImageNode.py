@@ -32,14 +32,14 @@ class SaveImageNode(VisionNode):
         self.get_logger().info("Empty service called (placeholder).")
         return response
     def image_callback(self, msg):
-        if(time.time() - self.time_elapsed > 0.5):
+        if time.time() - self.time_elapsed > 0.5:
             self.time_elapsed = time.time()
-            # self.get_logger().info("Received image for save")
+            self.get_logger().info("Received image for save")
             image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
             image_time = int(time.time())
             os.system(f"mkdir -p ~/saved_imgs/{int(self.begin_time)}")
             path = os.path.expanduser(f"~/saved_imgs/{int(self.begin_time)}")
-            # self.get_logger().info(os.path.join(path, f"payload_{image_time}.png"))
+            self.get_logger().info(os.path.join(path, f"payload_{image_time}.png"))
             cv2.imwrite(os.path.join(path, f"payload_{image_time}.png"), image)
 
 def main():
