@@ -177,16 +177,19 @@ def launch_setup(context, *args, **kwargs):
             RegisterEventHandler(
                 OnProcessIO(
                     target_action=px4_sitl,
-                    on_stdout=make_io_handler("uav"),
-                )
-            ),
-            RegisterEventHandler(
-                OnProcessIO(
-                    target_action=px4_sitl,
                     on_stdout=make_io_handler("middleware"),
                 )
             ),
         ]
+        if run_mission_bool:
+            actions.append(
+                RegisterEventHandler(
+                    OnProcessIO(
+                        target_action=px4_sitl,
+                        on_stdout=make_io_handler("uav"),
+                    )
+                )
+            )
     else:
         # Hardware mode: start mission after middleware is ready
         actions = [
