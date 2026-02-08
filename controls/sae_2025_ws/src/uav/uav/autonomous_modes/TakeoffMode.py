@@ -25,11 +25,16 @@ class TakeoffMode(Mode):
         super().__init__(node, uav)
         self.takeoff_type = takeoff_type.lower()
         self.takeoff_commanded = False  # For vertical: only call takeoff() once
+        self.elapsed_time = 0.0
 
     def on_update(self, time_delta: float) -> None:
         """
         Update the mode
         """
+
+        # Increment elapsed time by the time delta
+        self.elapsed_time += time_delta
+
         if self.uav.local_position is None or self.uav.global_position is None:
             self.log("Waiting for position data...")
             return
@@ -44,16 +49,17 @@ class TakeoffMode(Mode):
                 self.node.get_logger().error("Horizontal takeoff only valid for VTOL - cannot proceed.")
                 return
             self.takeoff_commanded = self.uav.fixed_wing_takeoff()
-        else:
+            self.elapsed_time = 0.0
+        elif self.takeoff_type == 'vertical':
             # Vertical takeoff (multicopter or VTOL)
             self.log("Attempting vertical takeoff")
             self.uav.takeoff() # TODO: change to multicopter_takeoff()
             self.takeoff_commanded = True
+            self.elapsed_time = 0.0
             # TODO: change takeoff_type to enum
         
-
-        # When in AUTO_LOITER, engage offboard mode
-        if self.uav.nav_state == VehicleStatus.NAVIGATION_STATE_AUTO_LOITER:
+        # When in AUTO_LOITER, engage offboard mode after 1 second of elapsed time
+        if self.elapsed_time >= 1.0 and self.uav.nav_state == VehicleStatus.NAVIGATION_STATE_AUTO_LOITER:
             self.log("Takeoff complete. Engaging offboard mode.")
             self.uav.engage_offboard_mode()
 
