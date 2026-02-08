@@ -2,7 +2,7 @@
 <sdf version='1.9'>
   <model name='apriltag_left'>
     <static>true</static>
-    <pose>0 0 0 0 0 -1.5707</pose>
+    <pose>0 0 0 0 0 0</pose>
     <link name='base'>
       <visual name='base_visual'>
         <pose relative_to="base">0 0 0 0 0 -1.5707</pose>

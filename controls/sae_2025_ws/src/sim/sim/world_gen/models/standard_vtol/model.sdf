@@ -39,11 +39,10 @@
         </surface>
       </collision>
       <visual name='base_link_visual'>
-        <pose>0.53 -1.072 -0.1 1.5707963268 0 3.1415926536</pose>
+        <pose relative_to="base_link">0 0 0.08 0 0 0</pose>
         <geometry>
           <mesh>
-            <scale>0.001 0.001 0.001</scale>
-            <uri>model://standard_vtol/meshes/x8_wing.dae</uri>
+            <uri>model://standard_vtol/meshes/advancedshape-vertical.stl</uri>
           </mesh>
         </geometry>
         <material>
@@ -557,6 +556,46 @@
       <pose relative_to="base_link">0 0 0 0 1.5707 0</pose>
       <name>mono_cam</name>
     </include>
+
+    <!-- April Tags-->
+    <include>
+      <pose>-0.01 0 0 0 -1.5707 0 </pose>
+      <uri>model://apriltag_front</uri>
+    </include>
+    <joint name="apriltag_front_joint" type="fixed">
+      <parent>base_link</parent>
+      <child>apriltag_front::base</child>
+    </joint>
+
+    <include>
+      <pose>0 0.545 -0.037 -1.5707 -1.5707 0</pose>
+      <uri>model://apriltag_left</uri>
+    </include>
+    <joint name="apriltag_left_joint" type="fixed">
+      <parent>base_link</parent>
+      <child>apriltag_left::base</child>
+    </joint>
+
+    <include>
+      <pose>0 -0.545 -0.037 1.5707 -1.5707 0</pose>
+      <uri>model://apriltag_right</uri>
+    </include>
+    <joint name="apriltag_right_joint" type="fixed">
+      <parent>base_link</parent>
+      <child>apriltag_right::base</child>
+    </joint>
+
+    <include>
+      <pose>0.02 0 0 1.57 -1.57 1.57</pose>
+      <uri>model://apriltag_back</uri>
+    </include>
+    <joint name="apriltag_back_joint" type="fixed">
+      <parent>base_link</parent>
+      <child>apriltag_back::base</child>
+    </joint>
+
+
+
     <joint name="camera_joint" type="fixed">
       <parent>base_link</parent>
       <child>camera_link</child>
