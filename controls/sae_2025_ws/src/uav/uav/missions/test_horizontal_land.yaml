@@ -3,13 +3,23 @@ start:
   params:
     takeoff_type: vertical
   transitions:
-    complete: GPS
+    complete: gps
 
-GPS:
+
+gps:
   class: uav.autonomous_modes.NavGPSMode
   params:
-    coordinates: '[((5, 3, -10), 5, "LOCAL"), ((10, 1, -1), 20, "LOCAL"), ((-5, 3, -10), 3, "LOCAL"), ((5, 3, -10), 3, "LOCAL")]'
+    coordinates: '[((0, 0, -20), 1, "LOCAL")]'
+  transitions:
+    complete: transition_to_fw
+
+transition_to_fw:
+  class: uav.autonomous_modes.TransitionMode
+  params:
+    to_mode: FW
+  
   transitions:
     complete: land
+
 land:
   class: uav.autonomous_modes.LandingMode

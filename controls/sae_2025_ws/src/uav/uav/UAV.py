@@ -24,9 +24,20 @@ from std_msgs.msg import Bool
 from uav.px4_modes import PX4CustomMainMode, PX4CustomSubModeAuto
 from uav.utils import R_earth
 
+# Map nav_state value -> name for readable logging
+_NAV_STATE_NAMES = {
+    getattr(VehicleStatus, a): a
+    for a in dir(VehicleStatus)
+    if a.startswith('NAVIGATION_STATE_') and isinstance(getattr(VehicleStatus, a), (int, float))
+}
+
+def get_nav_state_str(val):
+    return _NAV_STATE_NAMES.get(val, str(val))
+
 class UAV(ABC):
     """
-    Skeleton class for UAV control and interfacing with PX4 via ROS 2.
+    Abstract base class for UAV control and interfacing with PX4 via ROS 2.
+    Subclasses: VTOL, Multicopter
     """
 
     def __init__(self, node: Node, takeoff_amount=5.0, DEBUG=False, camera_offsets=[0, 0, 0]):
@@ -54,7 +65,7 @@ class UAV(ABC):
         self.default_velocity = 5.0
 
         self.camera_offsets = camera_offsets
-        
+
         # Set up Subscribers/Publishers to communicate with aircraft
         self._initialize_publishers_and_subscribers()
 
@@ -162,10 +173,11 @@ class UAV(ABC):
     
     def publish_position_setpoint(self, coordinate, relative=False, lock_yaw=False):
         """Publish the trajectory setpoint.
-        
+
         Args:
             coordinate (tuple): (x, y, z) in the local frame.
             relative (bool): If True, the position is relative to the current local position.
+            lock_yaw (bool): If True, maintain current yaw instead of recalculating (prevents spinning when hovering).
         """
         x, y, z = coordinate
         if relative:
@@ -222,7 +234,7 @@ class UAV(ABC):
         """Publish the offboard control mode."""
         msg = OffboardControlMode()
         msg.position = True
-        msg.velocity = False
+        msg.velocity = True  # Enable velocity control for trajectory setpoints
         msg.acceleration = False
         msg.attitude = False
         msg.body_rate = False
@@ -286,29 +298,29 @@ class UAV(ABC):
         return (x, y, z)
     
     def uav_to_local(self, point, relative=False):
-            """
-            Converts a point in the UAV's local frame to the global frame.
-            
-            :param point: A tuple (point_x, point_y, point_z) in the UAV's local frame.
-            :param relative: If True, the point is relative to the current local position.
-            :return: A tuple (goal_x, goal_y, goal_z) representing the point in the global frame.
-            """
-            current_pos = self.get_local_position()
-            point_x, point_y, point_z = point
+        """
+        Converts a point in the UAV's local frame to the global frame.
+        
+        :param point: A tuple (point_x, point_y, point_z) in the UAV's local frame.
+        :param relative: If True, the point is relative to the current local position.
+        :return: A tuple (goal_x, goal_y, goal_z) representing the point in the global frame.
+        """
+        current_pos = self.get_local_position()
+        point_x, point_y, point_z = point
 
-            # Rotate the x and y points according to the UAV's yaw angle.
-            rotated_point_x = point_x * math.cos(self.yaw) - point_y * math.sin(self.yaw)
-            rotated_point_y = point_x * math.sin(self.yaw) + point_y * math.cos(self.yaw)
+        # Rotate the x and y points according to the UAV's yaw angle.
+        rotated_point_x = point_x * math.cos(self.yaw) - point_y * math.sin(self.yaw)
+        rotated_point_y = point_x * math.sin(self.yaw) + point_y * math.cos(self.yaw)
 
-            # The z-point remains unchanged.
-            if relative:
-                return (
-                    current_pos[0] + rotated_point_x,
-                    current_pos[1] + rotated_point_y,
-                    current_pos[2] + point_z
-                )
-            else:
-                return (rotated_point_x, rotated_point_y, point_z)
+        # The z-point remains unchanged.
+        if relative:
+            return (
+                current_pos[0] + rotated_point_x,
+                current_pos[1] + rotated_point_y,
+                current_pos[2] + point_z
+            )
+        else:
+            return (rotated_point_x, rotated_point_y, point_z)
     
     def local_to_gps(self, local_pos):
         """
@@ -353,7 +365,7 @@ class UAV(ABC):
         else:
             self.node.get_logger().warn("No GPS data available.")
             return None
-        
+    
     def get_local_position(self):
         if self.local_position:
             return (
@@ -415,13 +427,13 @@ class UAV(ABC):
         msg = VehicleCommand()
 
         # Fill in parameters
-        msg.param1 = params.get('param1', 0.0)
-        msg.param2 = params.get('param2', 0.0)
-        msg.param3 = params.get('param3', 0.0)
-        msg.param4 = params.get('param4', 0.0)
-        msg.param5 = params.get('param5', 0.0)
-        msg.param6 = params.get('param6', 0.0)
-        msg.param7 = params.get('param7', 0.0)
+        msg.param1 = params.get('param1', float('nan'))
+        msg.param2 = params.get('param2', float('nan')) 
+        msg.param3 = params.get('param3', float('nan'))
+        msg.param4 = params.get('param4', float('nan'))
+        msg.param5 = params.get('param5', float('nan'))
+        msg.param6 = params.get('param6', float('nan'))
+        msg.param7 = params.get('param7', float('nan'))
 
         msg.command = command
 
@@ -440,6 +452,8 @@ class UAV(ABC):
     # -------------------------
     def _vehicle_status_callback(self, msg: VehicleStatus):
         self.vehicle_status = msg
+        if self.nav_state != msg.nav_state:
+            self.node.get_logger().info(f"Nav state changed from {get_nav_state_str(self.nav_state)} to {get_nav_state_str(msg.nav_state)}")
         self.nav_state = msg.nav_state
         self.arm_state = msg.arming_state
         self.failsafe_px4 = msg.failsafe
@@ -545,14 +559,14 @@ class UAV(ABC):
         
         self.vehicle_local_position_subscriber = self.node.create_subscription(
             VehicleLocalPosition, 
-            '/fmu/out/vehicle_local_position', 
+            '/fmu/out/vehicle_local_position_v1', 
             self._vehicle_local_position_callback, 
             qos_profile
         )
         
         self.failsafe_trigger_subscriber = self.node.create_subscription(
-            Bool, 
-            '/failsafe_trigger', 
-            self._failsafe_callback, 
+            Bool,
+            '/failsafe_trigger',
+            self._failsafe_callback,
             qos_profile
         )

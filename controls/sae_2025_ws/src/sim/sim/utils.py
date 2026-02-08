@@ -12,6 +12,28 @@ from typing import Any, Dict, Optional, Union
 import yaml
 import re
 
+def load_sim_launch_parameters() -> dict:
+    """Load simulation launch parameters from YAML (sim/launch/launch_params.yaml)."""
+    source_paths = [
+        Path(__file__).parent.parent / 'launch' / 'launch_params.yaml',
+        Path(os.getcwd()) / 'src' / 'sim' / 'launch' / 'launch_params.yaml',
+    ]
+    for path in source_paths:
+        if path.exists():
+            return load_yaml_to_dict(path)
+    try:
+        from ament_index_python.packages import get_package_share_directory
+        package_share = Path(get_package_share_directory('sim'))
+        installed_params = package_share / 'launch' / 'launch_params.yaml'
+        if installed_params.exists():
+            return load_yaml_to_dict(installed_params)
+    except Exception:
+        pass
+    raise FileNotFoundError(
+        f"Launch params file not found. Checked: {source_paths} and installed location."
+    )
+
+
 def load_yaml_to_dict(params_file: Path) -> dict:
     """Load and validate YAML file."""
     try:

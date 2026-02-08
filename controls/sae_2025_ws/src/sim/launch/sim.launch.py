@@ -15,7 +15,7 @@ import logging
 from launch.substitutions import LaunchConfiguration
 from launch.event_handlers import OnProcessStart, OnProcessExit, OnProcessIO
 from launch_ros.actions import Node
-from sim.utils import find_package_resource, load_yaml_to_dict, build_node_arguments, camel_to_snake
+from sim.utils import find_package_resource, load_yaml_to_dict, load_sim_launch_parameters, build_node_arguments, camel_to_snake
 import importlib
 from pathlib import Path
 from sim.constants import (
@@ -25,34 +25,6 @@ from sim.constants import (
     DEFAULT_USE_SCORING
 )
 import json
-
-def load_sim_launch_parameters():
-    """Load simulation launch parameters from YAML."""
-    # Try source location first (for development - no rebuild needed)
-    source_paths = [
-        Path(__file__).parent / 'launch_params.yaml',
-        Path(os.getcwd()) / 'src' / 'sim' / 'launch' / 'launch_params.yaml',
-    ]
-    
-    for path in source_paths:
-        if path.exists():
-            return load_yaml_to_dict(path)
-    
-    # Fallback to installed location (for production/deployed packages)
-    try:
-        from ament_index_python.packages import get_package_share_directory
-        package_share = Path(get_package_share_directory('sim'))
-        installed_params = package_share / 'launch' / 'launch_params.yaml'
-        if installed_params.exists():
-            return load_yaml_to_dict(installed_params)
-    except Exception:
-        pass
-    
-    # If not found, raise error
-    raise FileNotFoundError(
-        f"Launch params file not found. Checked source paths: {source_paths} "
-        f"and installed location."
-    )
 
 def load_sim_parameters(competition: str, logger: logging.Logger) -> str:
     """

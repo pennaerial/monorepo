@@ -1,5 +1,5 @@
 # launch_params.yaml
-mission_name: basic_waypoints
+mission_name: simple_tailsitter
 uav_debug: false
 vision_debug: false
 run_mission: true
@@ -8,6 +8,7 @@ airframe: standard_vtol # Enter a preset below or a valid airframe ID (integer),
                      # Other useful IDs: 4014 for mono cam down
                      # IDs available for simulation can be found in PX4-Autopilot/ROMFS/px4fmu_common/init.d-posix/airframes
                      # These IDs load an airframe file and the corresponding model file in PX4-Autopilot/Tools/simulation/gz/models
+                     # Note: takeoff type (horizontal or vertical) is set in the mission yaml file
 use_camera: false
 custom_airframe_model: '' # Leave blank if using default PX4 model or enter file name of custom model
 save_vision: false
@@ -16,3 +17,4 @@ camera_offsets: [0, 0, 0] # Should denote the position of the camera relative to
                           # In NED frame: x is forward, y is right, and z is down.
 
 sim: true
+
