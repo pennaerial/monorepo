@@ -545,7 +545,7 @@ class UAV(ABC):
         
         self.vehicle_local_position_subscriber = self.node.create_subscription(
             VehicleLocalPosition, 
-            '/fmu/out/vehicle_local_position', 
+            '/fmu/out/vehicle_local_position_v1',
             self._vehicle_local_position_callback, 
             qos_profile
         )

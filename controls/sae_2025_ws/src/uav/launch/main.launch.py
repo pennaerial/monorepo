@@ -120,7 +120,7 @@ def launch_setup(context, *args, **kwargs):
     mission_ready_flags = {"uav": not sim_bool, "middleware": False} # we don't run uav (px4_sitl) in hardware mode
     mission_started = {"value": False}  # mutable so inner functions can modify
     def make_io_handler(process_name):
-        trigger = "INFO  [commander] Ready for takeoff!" if process_name == "uav" else "INFO  [uxrce_dds_client] time sync converged" if process_name == "middleware" else None
+        trigger = "INFO  [commander] Ready for takeoff!" if process_name == "uav" else "INFO  [uxrce_dds_client] synchronized with time offset" if process_name == "middleware" else None
         if not sim_bool:
             trigger = "session established" # we don't run uav (px4_sitl) in hardware mode and middleware has different stdout
         if trigger is None:
@@ -162,7 +162,7 @@ def launch_setup(context, *args, **kwargs):
         )
 
         px4_sitl = ExecuteProcess(
-            cmd=['bash', '-c', f'PX4_GZ_STANDALONE=1 PX4_SYS_AUTOSTART={autostart} PX4_SIM_MODEL={model} ./build/px4_sitl_default/bin/px4'],
+            cmd=['bash', '-c', f'PX4_GZ_WORLD=in_house PX4_GZ_STANDALONE=1 PX4_SYS_AUTOSTART={autostart} PX4_SIM_MODEL={model} ./build/px4_sitl_default/bin/px4'],
             cwd=px4_path,
             output='screen',
             name='px4_sitl'
