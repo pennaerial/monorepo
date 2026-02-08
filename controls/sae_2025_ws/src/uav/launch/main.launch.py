@@ -181,7 +181,7 @@ def launch_setup(context, *args, **kwargs):
                 )
             ),
         ]
-        if run_mission_bool:
+        if run_mission_bool: #TODO: Clean up main logic. (ex. doing 2 'if run_mission_bool')
             actions.append(
                 RegisterEventHandler(
                     OnProcessIO(
