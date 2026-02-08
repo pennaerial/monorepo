@@ -12,14 +12,14 @@ class CustomWorldNode(WorldNode):
 
     def __init__(self, 
                  template_world: str,
-                 friction: Optional[float] = None,
+                 physics: Optional[dict] = None,
                  output_filename: Optional[str] = None, 
                  seed: Optional[int] = None):
         super().__init__(competition_name="custom", output_filename=output_filename, seed=seed)
         self.world_name = template_world
         # defaults to 0.6 if not provided
-        self.friction = friction
-        self.instantiate_static_world(template_world_path=template_world, friction=friction)
+        self.physics = physics
+        self.instantiate_static_world(template_world_path=template_world, physics=physics)
     
     def generate_world(self):
         payload_0 = Entity(

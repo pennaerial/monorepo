@@ -22,7 +22,7 @@ class VTOL(UAV):
         """VTOL aircraft can transition between MC and FW modes."""
         return True
 
-    def fixed_wing_takeoff(self):
+    def fixed_wing_takeoff(self, fw_tko_pitch: float = float('nan'), yaw: float = float('nan'), latitude: float = float('nan'), longitude: float = float('nan'), altitude: float = float('nan')):
         """
         Simple horizontal VTOL takeoff:
           1) request transition to FW
@@ -30,6 +30,12 @@ class VTOL(UAV):
           3) send NAV_TAKEOFF to target altitude
 
         Call this repeatedly from ModeManager until it returns True.
+        Args:
+            fw_tko_pitch: float = float('nan'), # fw_tko_pitch min (minimum pitch during takeoff)
+            yaw: float = float('nan'), # Yaw angle (in degrees)
+            latitude: float = float('nan'), # Latitude (in GPS coords)
+            longitude: float = float('nan'), # Longitude (in GPS coords)
+            altitude: float = float('nan'), # Altitude (in meters)
         """
         if self.vtol_vehicle_status is None:
             self.node.get_logger().info("FW takeoff: Vehicle status not available yet.")
@@ -54,19 +60,19 @@ class VTOL(UAV):
             alt = self.global_position.alt
             self.node.get_logger().info(f"Current GPS: {lat}, {lon}, {alt}")
             
-            self.node.get_logger().info(f"Takeoff Destination GPS: Auto Calculated")
+            if np.isnan(latitude) or np.isnan(longitude) or np.isnan(altitude):
+                self.node.get_logger().info(f"Takeoff Destination GPS: Auto Calculated")
+            else:
+                self.node.get_logger().info(f"Takeoff Destination GPS: {latitude}, {longitude}, {altitude}")
 
             self._send_vehicle_command(
                 VehicleCommand.VEHICLE_CMD_NAV_TAKEOFF,
                 params={
-                    # commented out so takeoff is defaulted
-                    # "param1": float('nan'), # fw_tko_pitch min (minimum pitch during takeoff)
-                    # "param2": float('nan'), # Unused
-                    # "param3": float('nan'), # Unused
-                    # "param4": float('nan'), # Yaw angle
-                    # "param5": takeoff_gps[0], #Latitude (in GPS coords)
-                    # "param6": takeoff_gps[1], #Longitude (in GPS coords)
-                    # "param7": takeoff_gps[2], #Altitude (in meters)
+                    "param1": fw_tko_pitch, # fw_tko_pitch min (minimum pitch during takeoff)
+                    "param4": yaw, # Yaw angle
+                    "param5": latitude, # Latitude (in GPS coords)
+                    "param6": longitude, # Longitude (in GPS coords)
+                    "param7": altitude, # Altitude (in meters)
                 },
             )
             self.node.get_logger().info("FW takeoff Step 3: NAV_TAKEOFF sent.")
