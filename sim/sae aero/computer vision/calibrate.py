@@ -1,7 +1,7 @@
 import numpy as np
-from scipy.stats import norm
 import scipy.stats as stats
 from recalibrate import detect_contour
+
 
 def calibrate(frame):
     """
@@ -11,8 +11,8 @@ def calibrate(frame):
     Returns:
         range (Tuple[Int, Int]): The color optimal color rnage
     """
-    
-    # Initialize variables 
+
+    # Initialize variables
     color = 131
     curr_range = (0.0, 1.0)
     best_confidence = 0.0
@@ -24,16 +24,16 @@ def calibrate(frame):
     high = 1.0
     mid = (low + high) / 2
 
-    while (high - low > 0.01):
+    while high - low > 0.01:
         mid = (low + high) / 2
         points, range = find_points_range(mid, std, color)
 
-        if len(points) > 0: 
+        if len(points) > 0:
             curr_range = range
             low = mid
         else:
             high = mid
-    
+
     best_confidence = (low + high) / 2
 
     # Perform a neighborhood search on 20 points within a 2% buffer

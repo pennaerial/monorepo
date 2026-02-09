@@ -2,12 +2,20 @@ from typing import List
 from uav.autonomous_modes import Mode
 from rclpy.node import Node
 from uav import UAV
+
+
 class NavGPSMode(Mode):
     """
     A mode for navigating to a GPS coordinate
     """
 
-    def __init__(self, node: Node, uav: UAV, coordinates: List[tuple[tuple[float, float, float], float, str]], margin: float = 1):
+    def __init__(
+        self,
+        node: Node,
+        uav: UAV,
+        coordinates: List[tuple[tuple[float, float, float], float, str]],
+        margin: float = 1,
+    ):
         """
         Initialize the NavigateToGPSMode.
 
@@ -36,7 +44,7 @@ class NavGPSMode(Mode):
             dist = self.uav.distance_to_waypoint(self.coordinate_system, self.goal)
 
         # Determine if we're waiting at a waypoint (lock yaw to prevent spinning)
-        at_waypoint = (self.index != -1 and dist < self.margin)
+        at_waypoint = self.index != -1 and dist < self.margin
         waiting = at_waypoint and self.wait_time > 0
 
         # Always publish setpoints to maintain offboard connection (PX4 requires continuous stream)
@@ -45,42 +53,68 @@ class NavGPSMode(Mode):
         elif self.uav.local_position:
             # Fallback: maintain current position until first waypoint is set
             self.uav.publish_position_setpoint(
-                (self.uav.local_position.x, self.uav.local_position.y, self.uav.local_position.z),
-                lock_yaw=True
+                (
+                    self.uav.local_position.x,
+                    self.uav.local_position.y,
+                    self.uav.local_position.z,
+                ),
+                lock_yaw=True,
             )
-        
+
         # Consolidated debug output - single line with all information
         if self.index != -1 and self.target is not None:
             curr_pos = self.uav.get_local_position()
             curr_gps = self.uav.get_gps()
-            yaw = self.uav.yaw if self.uav.yaw is not None else (self.uav.local_position.heading if self.uav.local_position else 0.0)
-            vel = (self.uav.local_position.vx, self.uav.local_position.vy, self.uav.local_position.vz) if self.uav.local_position else (0.0, 0.0, 0.0)
-            
+            yaw = (
+                self.uav.yaw
+                if self.uav.yaw is not None
+                else (
+                    self.uav.local_position.heading if self.uav.local_position else 0.0
+                )
+            )
+            vel = (
+                (
+                    self.uav.local_position.vx,
+                    self.uav.local_position.vy,
+                    self.uav.local_position.vz,
+                )
+                if self.uav.local_position
+                else (0.0, 0.0, 0.0)
+            )
+
             # Build target position string
             if self.coordinate_system == "GPS":
                 target_str = f"Target GPS: ({self.goal[0]:.6f}, {self.goal[1]:.6f}, {self.goal[2]:.2f}) | Target LOCAL: ({self.target[0]:.2f}, {self.target[1]:.2f}, {self.target[2]:.2f})"
             else:
                 target_str = f"Target LOCAL: ({self.target[0]:.2f}, {self.target[1]:.2f}, {self.target[2]:.2f})"
-            
+
             # Build consolidated log line
             if curr_pos and curr_gps:
-                self.log(f"Dist: {dist:.2f}m | {target_str} | "
-                        f"Global: ({curr_gps[0]:.6f}, {curr_gps[1]:.6f}, {curr_gps[2]:.2f}) | "
-                        f"Local: ({curr_pos[0]:.2f}, {curr_pos[1]:.2f}, {curr_pos[2]:.2f}) | "
-                        f"Yaw: {yaw:.2f} | Vel: ({vel[0]:.2f}, {vel[1]:.2f}, {vel[2]:.2f})")
-            
+                self.log(
+                    f"Dist: {dist:.2f}m | {target_str} | "
+                    f"Global: ({curr_gps[0]:.6f}, {curr_gps[1]:.6f}, {curr_gps[2]:.2f}) | "
+                    f"Local: ({curr_pos[0]:.2f}, {curr_pos[1]:.2f}, {curr_pos[2]:.2f}) | "
+                    f"Yaw: {yaw:.2f} | Vel: ({vel[0]:.2f}, {vel[1]:.2f}, {vel[2]:.2f})"
+                )
+
         if self.goal is None or dist < self.margin:
             if self.index == -1 or self.wait_time <= 0:
                 self.index += 1
                 if self.index >= len(self.coordinates):
                     self.log("All waypoints completed")
                     return
-                self.goal, self.wait_time, self.coordinate_system = self.coordinates[self.index]
+                self.goal, self.wait_time, self.coordinate_system = self.coordinates[
+                    self.index
+                ]
                 self.target = self.get_local_target()
-                self.log(f"Moving to waypoint {self.index+1}/{len(self.coordinates)}: {self.goal} (wait time: {self.wait_time}s)")
+                self.log(
+                    f"Moving to waypoint {self.index + 1}/{len(self.coordinates)}: {self.goal} (wait time: {self.wait_time}s)"
+                )
             else:
                 # Waiting at waypoint
-                self.log(f"Waiting at waypoint {self.index+1}/{len(self.coordinates)} - {self.wait_time:.1f}s remaining")
+                self.log(
+                    f"Waiting at waypoint {self.index + 1}/{len(self.coordinates)} - {self.wait_time:.1f}s remaining"
+                )
                 self.wait_time -= time_delta
 
     def get_local_target(self) -> tuple[float, float, float]:
@@ -97,13 +131,13 @@ class NavGPSMode(Mode):
             # LOCAL coordinates are already in NED frame relative to origin
             local_target = tuple(float(x) for x in self.goal)
             return local_target
-        else: 
+        else:
             raise ValueError(f"Invalid coordinate system {self.coordinate_system}")
 
     def check_status(self) -> str:
         """
         Check the status of the mode.
-        
+
         Returns:
             str: The status of the mode.
         """
