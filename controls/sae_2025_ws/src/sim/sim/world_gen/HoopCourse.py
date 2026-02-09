@@ -1,13 +1,9 @@
 import random
-import xml.etree.ElementTree as ET
 from sim.world_gen import WorldNode
 from sim.world_gen.entity import Entity
-from xml.dom import minidom
-from pathlib import Path
 from abc import ABC, abstractmethod
 from typing import List, Tuple, Optional
 from sim_interfaces.srv import HoopList
-from sim.world_gen import WorldNode
 from ros_gz_interfaces.srv import SpawnEntity
 import math
 import rclpy
@@ -17,17 +13,19 @@ import json
 
 Pose = Tuple[float, float, float, float, float, float]
 
+
 class CourseStyle(ABC):
     """Abstract base class for all course styles."""
 
-    def __init__(self,
-                 dlz: Tuple[float, float, float],
-                 uav: Tuple[float, float, float],
-                 num_hoops: int,
-                 max_dist: int,
-                 height: int,
-                 rng: Optional[random.Random] = None
-                ):
+    def __init__(
+        self,
+        dlz: Tuple[float, float, float],
+        uav: Tuple[float, float, float],
+        num_hoops: int,
+        max_dist: int,
+        height: int,
+        rng: Optional[random.Random] = None,
+    ):
         self.dlz = dlz
         self.uav = uav
         self.num_hoops = num_hoops
@@ -42,15 +40,17 @@ class CourseStyle(ABC):
         """Generate a list of (x, y, z, roll, pitch, yaw) for hoop placement."""
         pass
 
+
 class AscentCourse(CourseStyle):
-    def __init__(self,
-                 dlz: Tuple[float, float, float],
-                 uav: Tuple[float, float, float],
-                 num_hoops: int,
-                 max_dist: int,
-                 start_height: int,
-                 rng: Optional[random.Random] = None
-                 ):
+    def __init__(
+        self,
+        dlz: Tuple[float, float, float],
+        uav: Tuple[float, float, float],
+        num_hoops: int,
+        max_dist: int,
+        start_height: int,
+        rng: Optional[random.Random] = None,
+    ):
         super().__init__(dlz, uav, num_hoops, max_dist, start_height, rng)
         self.start_height = start_height
 
@@ -72,7 +72,6 @@ class AscentCourse(CourseStyle):
         # Normalize to get unit vector
         dir_x = dx / dist
         dir_y = dy / dist
-        dir_z = dz / dist
 
         # Distance between hoops
         segment_len = dist / self.num_hoops
@@ -84,7 +83,11 @@ class AscentCourse(CourseStyle):
             # Height transition from UAV's start_height to DLZ altitude
             frac = (i + 1) / self.num_hoops
             z_interp = self.start_height + frac * (z_dlz - self.start_height)
-            z_noise = self.rng.uniform(-0.3, 0.3) * (z_dlz - self.start_height) / self.num_hoops
+            z_noise = (
+                self.rng.uniform(-0.3, 0.3)
+                * (z_dlz - self.start_height)
+                / self.num_hoops
+            )
 
             new_x = x_uav + dir_x * along
             new_y = y_uav + dir_y * along
@@ -96,15 +99,17 @@ class AscentCourse(CourseStyle):
 
         return hoops
 
+
 class DescentCourse(CourseStyle):
-    def __init__(self,
-                 dlz: Tuple[float, float, float],
-                 uav: Tuple[float, float, float],
-                 num_hoops: int,
-                 max_dist: int,
-                 start_height: int,
-                 rng: Optional[random.Random] = None
-                 ):
+    def __init__(
+        self,
+        dlz: Tuple[float, float, float],
+        uav: Tuple[float, float, float],
+        num_hoops: int,
+        max_dist: int,
+        start_height: int,
+        rng: Optional[random.Random] = None,
+    ):
         super().__init__(dlz, uav, num_hoops, max_dist, start_height, rng)
         self.start_height = start_height
 
@@ -126,7 +131,6 @@ class DescentCourse(CourseStyle):
         # Normalize to get unit vector
         dir_x = dx / dist
         dir_y = dy / dist
-        dir_z = dz / dist
 
         # Distance between hoops
         segment_len = dist / self.num_hoops
@@ -137,8 +141,14 @@ class DescentCourse(CourseStyle):
 
             # Height transition from start_height down to DLZ
             frac = (i + 1) / self.num_hoops
-            z_interp = self.start_height + frac * (z_dlz - self.start_height)  # dz negative if descending
-            z_noise = self.rng.uniform(-0.3, 0.3) * abs(z_dlz - self.start_height) / self.num_hoops
+            z_interp = self.start_height + frac * (
+                z_dlz - self.start_height
+            )  # dz negative if descending
+            z_noise = (
+                self.rng.uniform(-0.3, 0.3)
+                * abs(z_dlz - self.start_height)
+                / self.num_hoops
+            )
 
             new_x = x_uav + dir_x * along
             new_y = y_uav + dir_y * along
@@ -150,16 +160,18 @@ class DescentCourse(CourseStyle):
 
         return hoops
 
+
 class SlalomCourse(CourseStyle):
-    def __init__(self,
-                 dlz: Tuple[float, float, float],
-                 uav: Tuple[float, float, float],
-                 num_hoops: int,
-                 max_dist: int,
-                 width: int,
-                 height: int,
-                 rng: Optional[random.Random] = None
-                 ):
+    def __init__(
+        self,
+        dlz: Tuple[float, float, float],
+        uav: Tuple[float, float, float],
+        num_hoops: int,
+        max_dist: int,
+        width: int,
+        height: int,
+        rng: Optional[random.Random] = None,
+    ):
         super().__init__(dlz, uav, num_hoops, max_dist, height, rng)
         self.width = width
         self.height = height
@@ -182,7 +194,6 @@ class SlalomCourse(CourseStyle):
         # Normalize to get unit direction vector
         dir_x = dx / dist
         dir_y = dy / dist
-        dir_z = dz / dist
 
         # Get perpendicular vector in XY plane for slalom offset
         # (-dy, dx) is perpendicular to (dx, dy)
@@ -195,7 +206,9 @@ class SlalomCourse(CourseStyle):
             alt = 1 if i % 2 == 0 else -1
 
             # Move forward along direction vector
-            along_dist = zone_len * (i + self.rng.uniform(0.2, 0.8))  # slight randomness
+            along_dist = zone_len * (
+                i + self.rng.uniform(0.2, 0.8)
+            )  # slight randomness
             offset = alt * self.width * 0.5 * self.rng.uniform(0.5, 1.0)
 
             # Compute new hoop position
@@ -207,70 +220,70 @@ class SlalomCourse(CourseStyle):
 
         return hoops
 
+
 class StraightCourse(CourseStyle):
     """
     Simple straight course with hoops in a straight line.
     Perfect for testing basic navigation and scoring.
     """
 
-    def __init__(self,
-                 dlz: Tuple[float, float, float],
-                 uav: Tuple[float, float, float],
-                 num_hoops: int,
-                 max_dist: int,
-                 height: float = 2.0,
-                 spacing: float = 2.0,
-                 rng: Optional[random.Random] = None
-                ):
+    def __init__(
+        self,
+        dlz: Tuple[float, float, float],
+        uav: Tuple[float, float, float],
+        num_hoops: int,
+        max_dist: int,
+        height: float = 2.0,
+        spacing: float = 2.0,
+        rng: Optional[random.Random] = None,
+    ):
         # Call parent initializer
         super().__init__(dlz, uav, num_hoops, max_dist, height, rng)
-        
+
         # Height of all hoops (same for straight course)
         self.height = height
-        
+
         # Distance between hoops
         self.spacing = spacing
-        
+
     def generate_course(self) -> List[Pose]:
         """
         Generate a straight line of hoops.
-        
+
         Returns:
             List of (x, y, z, roll, pitch, yaw) positions for each hoop
         """
         hoops = []
         x_dlz, y_dlz, z_dlz = self.dlz
         x_uav, y_uav, z_uav = self.uav
-        
-        # Calculate total course length
-        total_length = (self.num_hoops - 1) * self.spacing
-        
+
         # Start position (slightly offset from UAV start)
         start_x = x_uav + 1.0  # 1 meter forward from UAV
         start_y = y_uav
-        
+
         # Generate hoops in a straight line
         for i in range(self.num_hoops):
             # Calculate position
             hoop_x = start_x + (i * self.spacing)
             hoop_y = start_y
             hoop_z = self.height
-            
+
             # Add small random variation (±0.2m) for realism
             variation_x = 0
             variation_y = 0
             variation_z = 0
-            
+
             # Final position with variation
             final_x = hoop_x + variation_x
             final_y = hoop_y + variation_y
             final_z = hoop_z + variation_z
-            
+
             # All hoops face forward (yaw = 0)
             hoop_pose = (final_x, final_y, final_z, 0, 90, 0)
             hoops.append(hoop_pose)
-            
+
         return hoops
+
 
 class BezierCourse(CourseStyle):
     """
@@ -279,14 +292,16 @@ class BezierCourse(CourseStyle):
     P1/P2 are along the line with lateral offsets to create an arc.
     """
 
-    def __init__(self,
-                 dlz: Tuple[float, float, float],
-                 uav: Tuple[float, float, float],
-                 num_hoops: int,
-                 max_dist: int,
-                 height: float = 2.0,
-                 lateral_offset: float = 4.0,
-                 rng: Optional[random.Random] = None):
+    def __init__(
+        self,
+        dlz: Tuple[float, float, float],
+        uav: Tuple[float, float, float],
+        num_hoops: int,
+        max_dist: int,
+        height: float = 2.0,
+        lateral_offset: float = 4.0,
+        rng: Optional[random.Random] = None,
+    ):
         super().__init__(dlz, uav, num_hoops, max_dist, height, rng)
         self.height = height
         self.lateral_offset = lateral_offset
@@ -322,26 +337,44 @@ class BezierCourse(CourseStyle):
         one_third = dist_xy / 3.0
         two_third = 2.0 * dist_xy / 3.0
 
-        P1x = P0x + dir_x * one_third  + perp_x * self.lateral_offset
-        P1y = P0y + dir_y * one_third  + perp_y * self.lateral_offset
+        P1x = P0x + dir_x * one_third + perp_x * self.lateral_offset
+        P1y = P0y + dir_y * one_third + perp_y * self.lateral_offset
 
-        P2x = P0x + dir_x * two_third  - perp_x * self.lateral_offset
-        P2y = P0y + dir_y * two_third  - perp_y * self.lateral_offset
+        P2x = P0x + dir_x * two_third - perp_x * self.lateral_offset
+        P2y = P0y + dir_y * two_third - perp_y * self.lateral_offset
 
         # Helper: cubic Bezier in 2D
         def bezier_xy(t: float) -> Tuple[float, float]:
             mt = 1.0 - t
             mt2 = mt * mt
             t2 = t * t
-            x = (mt2 * mt) * P0x + 3 * (mt2) * t * P1x + 3 * mt * t2 * P2x + (t2 * t) * P3x
-            y = (mt2 * mt) * P0y + 3 * (mt2) * t * P1y + 3 * mt * t2 * P2y + (t2 * t) * P3y
+            x = (
+                (mt2 * mt) * P0x
+                + 3 * (mt2) * t * P1x
+                + 3 * mt * t2 * P2x
+                + (t2 * t) * P3x
+            )
+            y = (
+                (mt2 * mt) * P0y
+                + 3 * (mt2) * t * P1y
+                + 3 * mt * t2 * P2y
+                + (t2 * t) * P3y
+            )
             return x, y
 
         # Helper: derivative for tangent direction
         def bezier_xy_deriv(t: float) -> Tuple[float, float]:
             mt = 1.0 - t
-            x = 3 * mt * mt * (P1x - P0x) + 6 * mt * t * (P2x - P1x) + 3 * t * t * (P3x - P2x)
-            y = 3 * mt * mt * (P1y - P0y) + 6 * mt * t * (P2y - P1y) + 3 * t * t * (P3y - P2y)
+            x = (
+                3 * mt * mt * (P1x - P0x)
+                + 6 * mt * t * (P2x - P1x)
+                + 3 * t * t * (P3x - P2x)
+            )
+            y = (
+                3 * mt * mt * (P1y - P0y)
+                + 6 * mt * t * (P2y - P1y)
+                + 3 * t * t * (P3y - P2y)
+            )
             return x, y
 
         # Place hoops along t in (0, 1)
@@ -376,17 +409,19 @@ class HoopCourseNode(WorldNode):
     Generates a hoop course with various course styles (ascent, descent, slalom, etc.).
     """
 
-    def __init__(self,
-                 course: str,
-                 dlz: Tuple[float, float, float],
-                 uav: Tuple[float, float, float],
-                 num_hoops: int,
-                 max_dist: int,
-                 template_world: str,
-                 height: int,
-                 physics: Optional[dict] = None,
-                 output_filename: Optional[str] = None,
-                 seed: Optional[int] = None):
+    def __init__(
+        self,
+        course: str,
+        dlz: Tuple[float, float, float],
+        uav: Tuple[float, float, float],
+        num_hoops: int,
+        max_dist: int,
+        template_world: str,
+        height: int,
+        physics: Optional[dict] = None,
+        output_filename: Optional[str] = None,
+        seed: Optional[int] = None,
+    ):
         """
         Initialize the hoop course world generator.
 
@@ -400,7 +435,9 @@ class HoopCourseNode(WorldNode):
             output_filename: Optional output filename (defaults to competition name)
             seed: Optional random seed for reproducible world generation
         """
-        super().__init__(competition_name="in_house", output_filename=output_filename, seed=seed)
+        super().__init__(
+            competition_name="in_house", output_filename=output_filename, seed=seed
+        )
         self.course = course
         self.dlz = dlz
         self.uav = uav
@@ -410,12 +447,13 @@ class HoopCourseNode(WorldNode):
         self.height = height
         self.physics = physics
         self.hoops: List[Entity] = []
-        self.instantiate_static_world(template_world_path=template_world, physics=physics)
+        self.instantiate_static_world(
+            template_world_path=template_world, physics=physics
+        )
 
-        
         # Create service for providing hoop positions
         self.srv = self.create_service(HoopList, "list_hoops", self.hoop_list_req)
-    
+
     def hoop_list_req(self, request, response):
         response.hoop_positions = []
         for hoop in self.hoops:
@@ -435,14 +473,22 @@ class HoopCourseNode(WorldNode):
         if len(hoops) == 0:
             raise RuntimeError("hoops is empty! Need hoops to create dlzs")
         model_base_path = "~/.simulation-gazebo/models"
-       
+
         # Use last two hoops to define the approach direction
         if len(hoops) >= 2:
-            (prev_x, prev_y, _prev_z, *_), (end_x, end_y, end_z, *_) = hoops[-2].to_pose(), hoops[-1].to_pose()
+            (prev_x, prev_y, _prev_z, *_), (end_x, end_y, end_z, *_) = (
+                hoops[-2].to_pose(),
+                hoops[-1].to_pose(),
+            )
         else:
             # Fallback: only one hoop; use UAV->hoop direction
             start_x, start_y, _ = self.uav
-            end_x, end_y, end_z, *_, = hoops[-1].to_pose()
+            (
+                end_x,
+                end_y,
+                end_z,
+                *_,
+            ) = hoops[-1].to_pose()
             prev_x, prev_y = start_x, start_y
 
         # Direction vector in XY from previous hoop to final hoop
@@ -477,9 +523,9 @@ class HoopCourseNode(WorldNode):
         pitch = 0.0
         # Colors for 3 DLZs
         colors = [
-            ("red",   "1 0 0 1"),
+            ("red", "1 0 0 1"),
             ("green", "0 1 0 1"),
-            ("blue",  "0 0 1 1"),
+            ("blue", "0 0 1 1"),
         ]
 
         dlz_entities: List[Entity] = []
@@ -492,11 +538,11 @@ class HoopCourseNode(WorldNode):
 
             dlz_entities.append(
                 Entity(
-                    name=f"dlz_{i+1}",
+                    name=f"dlz_{i + 1}",
                     path_to_sdf=f"{model_base_path}/dlz_{color_name}/model.sdf",
                     position=(dlz_x, dlz_y, dlz_z),
                     rpy=(roll, pitch, yaw),
-                    world=self.competition_name
+                    world=self.competition_name,
                 )
             )
         return dlz_entities
@@ -504,14 +550,14 @@ class HoopCourseNode(WorldNode):
     def generate_world(self) -> None:
         """
         Generate the world file with hoops and DLZs.
-        
+
         Implements the abstract method from WorldNode.
         """
-        courses = ['ascent', 'descent', 'slalom', 'bezier']
+        courses = ["ascent", "descent", "slalom", "bezier"]
         course = None
 
         try:
-            if self.course.lower() == 'random':
+            if self.course.lower() == "random":
                 course_id = int(self.rng.uniform(0, len(courses)))
                 course = courses[course_id]
 
@@ -520,46 +566,56 @@ class HoopCourseNode(WorldNode):
                 return
 
             elif self.course.lower() == "ascent":
-                course = AscentCourse(dlz=self.dlz,
-                                    uav=self.uav,
-                                    num_hoops=self.num_hoops,
-                                    max_dist=self.max_dist,
-                                    start_height=self.height,
-                                    rng=self.rng)
+                course = AscentCourse(
+                    dlz=self.dlz,
+                    uav=self.uav,
+                    num_hoops=self.num_hoops,
+                    max_dist=self.max_dist,
+                    start_height=self.height,
+                    rng=self.rng,
+                )
             elif self.course.lower() == "descent":
-                course = DescentCourse(dlz=self.dlz,
-                                    uav=self.uav,
-                                    num_hoops=self.num_hoops,
-                                    max_dist=self.max_dist,
-                                    start_height=self.height,
-                                    rng=self.rng)
+                course = DescentCourse(
+                    dlz=self.dlz,
+                    uav=self.uav,
+                    num_hoops=self.num_hoops,
+                    max_dist=self.max_dist,
+                    start_height=self.height,
+                    rng=self.rng,
+                )
             elif self.course.lower() == "slalom":
-                course = SlalomCourse(dlz=self.dlz,
-                                    uav=self.uav,
-                                    num_hoops=self.num_hoops,
-                                    max_dist=self.max_dist,
-                                    width=4,
-                                    height=self.height,
-                                    rng=self.rng)
+                course = SlalomCourse(
+                    dlz=self.dlz,
+                    uav=self.uav,
+                    num_hoops=self.num_hoops,
+                    max_dist=self.max_dist,
+                    width=4,
+                    height=self.height,
+                    rng=self.rng,
+                )
             elif self.course.lower() == "straight":
-                course = StraightCourse(dlz=self.dlz,
-                                    uav=self.uav,
-                                    num_hoops=self.num_hoops,
-                                    max_dist=self.max_dist,
-                                    height=self.height,
-                                    spacing=2,
-                                    rng=self.rng)
+                course = StraightCourse(
+                    dlz=self.dlz,
+                    uav=self.uav,
+                    num_hoops=self.num_hoops,
+                    max_dist=self.max_dist,
+                    height=self.height,
+                    spacing=2,
+                    rng=self.rng,
+                )
             elif self.course.lower() == "bezier":
-                course = BezierCourse(dlz=self.dlz,
-                                      uav=self.uav,
-                                      num_hoops=self.num_hoops,
-                                      max_dist=self.max_dist,
-                                      height=self.height,
-                                      lateral_offset=4.0,
-                                      rng=self.rng)
+                course = BezierCourse(
+                    dlz=self.dlz,
+                    uav=self.uav,
+                    num_hoops=self.num_hoops,
+                    max_dist=self.max_dist,
+                    height=self.height,
+                    lateral_offset=4.0,
+                    rng=self.rng,
+                )
             else:
                 raise ValueError(f"Invalid course: {self.course}")
-                
+
             hoop_positions = course.generate_course()
             for idx, (x, y, z, roll, pitch, yaw) in enumerate(hoop_positions, start=1):
                 z = 1 if z < 1 else z
@@ -568,7 +624,7 @@ class HoopCourseNode(WorldNode):
                     path_to_sdf="~/.simulation-gazebo/models/hoop/model.sdf",
                     position=(x, y, z),
                     rpy=(roll, pitch, yaw),
-                    world=self.competition_name
+                    world=self.competition_name,
                 )
                 self.hoops.append(hoop_entity)
                 req = SpawnEntity.Request()
@@ -580,19 +636,21 @@ class HoopCourseNode(WorldNode):
                 req = SpawnEntity.Request()
                 req.entity_factory = dlz_ent.to_entity_factory_msg()
                 self.spawn_entity_client.call_async(req)
-            
-            self.get_logger().info(f"Generated {len(self.hoops)} hoops for {self.course} course")
+
+            self.get_logger().info(
+                f"Generated {len(self.hoops)} hoops for {self.course} course"
+            )
         except Exception as e:
             self.get_logger().error(f"Failed to generate world: {e}")
             return False
         return True
 
+
 def main(args=None):
     rclpy.init(args=args)
     node = HoopCourseNode(**json.loads(sys.argv[1]))
-    try:    
+    try:
         rclpy.spin(node)
     except Exception as e:
         print(e)
     rclpy.shutdown()
-
