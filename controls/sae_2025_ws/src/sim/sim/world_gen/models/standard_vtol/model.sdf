@@ -39,11 +39,10 @@
         </surface>
       </collision>
       <visual name='base_link_visual'>
-        <pose>0.53 -1.072 -0.1 1.5707963268 0 3.1415926536</pose>
+        <pose relative_to="base_link">0 0 0.08 0 0 0</pose>
         <geometry>
           <mesh>
-            <scale>0.001 0.001 0.001</scale>
-            <uri>model://standard_vtol/meshes/x8_wing.dae</uri>
+            <uri>model://standard_vtol/meshes/advancedshape-vertical.stl</uri>
           </mesh>
         </geometry>
         <material>
@@ -127,6 +126,95 @@
           <diffuse>.175 .175 .175 1.0</diffuse>
         </material>
       </visual>
+
+
+      <!-- <pose>-0.01 0 0 0 -1.5707 0 </pose> -->
+      <visual name='apriltag_front_visual'>
+        <pose relative_to="base_link">-0.01 0 0 -1.5707 3.141592 1.5707</pose>
+        <geometry>
+          <plane>
+            <normal>0 0 1</normal>
+            <size>0.1 0.1</size>
+          </plane>
+        </geometry>
+        <material>
+          <diffuse>1 1 1 1</diffuse>
+          <specular>0.02 0.02 0.02 1</specular>
+          <pbr>
+            <metal>
+              <albedo_map>model://standard_vtol/materials/apriltag_front.png</albedo_map>
+              <metalness>0.0</metalness>
+              <roughness>0.9</roughness>
+            </metal>
+          </pbr>
+        </material>
+      </visual>
+
+      <visual name='apriltag_back_visual'>
+        <pose relative_to="base_link">0.03 0 0 1.5707 0 1.5707</pose>
+        <geometry>
+          <plane>
+            <normal>0 0 1</normal>
+            <size>0.1 0.1</size>
+          </plane>
+        </geometry>
+        <material>
+          <diffuse>1 1 1 1</diffuse>
+          <specular>0.02 0.02 0.02 1</specular>
+          <pbr>
+            <metal>
+              <albedo_map>model://standard_vtol/materials/apriltag_back.png</albedo_map>
+              <metalness>0.0</metalness>
+              <roughness>0.9</roughness>
+            </metal>
+          </pbr>
+        </material>
+      </visual>
+
+      <!-- <pose>0 0.545 -0.037 -1.5707 -1.5707 0</pose> -->
+      <visual name='apriltag_left_visual'>
+        <pose relative_to="base_link">0 0.545 -0.037 1.5707 0 3.141592</pose>
+        <geometry>
+          <plane>
+            <normal>0 0 1</normal>
+            <size>0.1 0.1</size>
+          </plane>
+        </geometry>
+        <material>
+          <diffuse>1 1 1 1</diffuse>
+          <specular>0.02 0.02 0.02 1</specular>
+          <pbr>
+            <metal>
+              <albedo_map>model://standard_vtol/materials/apriltag_left.png</albedo_map>
+              <metalness>0.0</metalness>
+              <roughness>0.9</roughness>
+            </metal>
+          </pbr>
+        </material>
+      </visual>
+
+      <visual name='apriltag_right_visual'>
+        <pose relative_to="base_link">0 -0.545 -0.037 1.5707 0 0</pose>
+        <geometry>
+          <plane>
+            <normal>0 0 1</normal>
+            <size>0.1 0.1</size>
+          </plane>
+        </geometry>
+        <material>
+          <diffuse>1 1 1 1</diffuse>
+          <specular>0.02 0.02 0.02 1</specular>
+          <pbr>
+            <metal>
+              <albedo_map>model://standard_vtol/materials/apriltag_right.png</albedo_map>
+              <metalness>0.0</metalness>
+              <roughness>0.9</roughness>
+            </metal>
+          </pbr>
+        </material>
+      </visual>
+
+
       <gravity>1</gravity>
       <velocity_decay />
       <self_collide>0</self_collide>
@@ -554,9 +642,10 @@
 
     <include merge='true'>
       <uri>model://mono_cam</uri>
-      <pose relative_to="base_link">0 0 0 0 1.5707 0</pose>
+      <pose relative_to="base_link">0 0 -0.06 0 1.5707 0</pose>
       <name>mono_cam</name>
     </include>
+
     <joint name="camera_joint" type="fixed">
       <parent>base_link</parent>
       <child>camera_link</child>
