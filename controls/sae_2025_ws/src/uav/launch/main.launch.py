@@ -2,12 +2,15 @@
 import os
 import re
 from launch import LaunchDescription
-from launch.actions import ExecuteProcess, LogInfo, OpaqueFunction, RegisterEventHandler, DeclareLaunchArgument
+from launch.actions import ExecuteProcess, LogInfo, OpaqueFunction, RegisterEventHandler, DeclareLaunchArgument, TimerAction
 from launch.event_handlers import OnProcessStart, OnProcessIO
 from launch.events.process import ProcessIO
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
-from uav.utils import vehicle_id_dict, vehicle_camera_map, Vehicle, get_airframe_details, find_folder_with_heuristic, load_launch_parameters, extract_vision_nodes, clean_text
+
+from uav.utils import vehicle_id_dict, vehicle_camera_map, get_airframe_details, find_folder_with_heuristic, load_launch_parameters, extract_vision_nodes, clean_text
+from sim.utils import load_sim_launch_parameters
+from sim.constants import Competition, COMPETITION_NAMES, DEFAULT_COMPETITION
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from ament_index_python.packages import get_package_share_directory
@@ -53,6 +56,7 @@ def launch_setup(context, *args, **kwargs):
     # Build the mission YAML file path using the mission name.
     YAML_PATH = os.path.join(os.getcwd(), 'src', 'uav', 'uav', 'missions', f"{mission_name}.yaml")
     
+    print("Building vision node actions...")
     # Build vision node actions.
     vision_nodes = []
     vision_node_actions = []
@@ -125,7 +129,7 @@ def launch_setup(context, *args, **kwargs):
         if process_name == "uav":
             return "INFO  [commander] Ready for takeoff!"
         elif process_name == "middleware":
-            return "INFO  [uxrce_dds_client] time sync converged" if sim_bool else "session established"
+            return "INFO  [uxrce_dds_client] synchronized with time offset" if sim_bool else "session established"
         else:
             raise ValueError(f"Invalid process name: {process_name}")
     
@@ -148,12 +152,24 @@ def launch_setup(context, *args, **kwargs):
     
     # Now, construct the actions list in a single step, depending on sim_bool
     if sim_bool:
+        # Resolve world name from sim launch params (same source as sim.launch.py)
+        sim_params = load_sim_launch_parameters()
+        competition_num = sim_params.get("competition", DEFAULT_COMPETITION.value)
+        try:
+            competition_type = Competition(competition_num)
+            competition = COMPETITION_NAMES[competition_type]
+        except (ValueError, KeyError):
+            valid_values = [e.value for e in Competition]
+            raise ValueError(f"Invalid competition: {competition_num}. Must be one of {valid_values}")
+        logger.info(f"PX4_GZ_WORLD={competition}")
+
         # Prepare sim launch arguments with all simulation parameters
         sim_launch_args = {
+            'model': model,
             'px4_path': px4_path,
-            'model': model
         }
         
+        print("Including simulation launch description...")
         sim = IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 os.path.join(
@@ -165,8 +181,9 @@ def launch_setup(context, *args, **kwargs):
             launch_arguments=sim_launch_args.items()
         )
 
+        print("Starting PX4 SITL...")
         px4_sitl = ExecuteProcess(
-            cmd=['bash', '-c', f'PX4_GZ_STANDALONE=1 PX4_SYS_AUTOSTART={autostart} PX4_SIM_MODEL={model} ./build/px4_sitl_default/bin/px4'],
+            cmd=['bash', '-c', f'PX4_GZ_WORLD={competition} PX4_GZ_STANDALONE=1 PX4_SYS_AUTOSTART={autostart} PX4_SIM_MODEL={model} ./build/px4_sitl_default/bin/px4'],
             cwd=px4_path,
             output='screen',
             name='px4_sitl'
@@ -210,7 +227,6 @@ def launch_setup(context, *args, **kwargs):
                     )
                 )
             )
-    
     return actions
 
 def generate_launch_description():

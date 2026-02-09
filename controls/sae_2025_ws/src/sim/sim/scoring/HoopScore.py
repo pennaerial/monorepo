@@ -319,7 +319,7 @@ def main(args=None):
     """Main function for scoring node. (SAME AS BEFORE)"""
     rclpy.init(args=args)
     
-    scoring_node = ScoringNode()
+    scoring_node = HoopScoringNode()
     
     try:
         rclpy.spin(scoring_node)
