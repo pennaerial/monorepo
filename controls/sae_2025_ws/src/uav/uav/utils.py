@@ -161,3 +161,8 @@ def load_launch_parameters():
     params_file = os.path.join(os.getcwd(), 'src', 'uav', 'launch', 'launch_params.yaml')
     with open(params_file, 'r', encoding='utf-8') as f:
         return yaml.safe_load(f)
+
+def clean_text(text):
+    """Remove ANSI escape codes from text."""
+    ansi_escape = re.compile(r'\x1b\[[0-9;]*m')
+    return ansi_escape.sub('', text).strip()
