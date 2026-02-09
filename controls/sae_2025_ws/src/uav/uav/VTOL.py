@@ -4,7 +4,6 @@ from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy, QoSDur
 import numpy as np
 from uav.UAV import UAV
 
-
 class VTOL(UAV):
     """
     VTOL UAV implementation with MC/FW mode switching.
@@ -23,6 +22,69 @@ class VTOL(UAV):
         """VTOL aircraft can transition between MC and FW modes."""
         return True
 
+    def fixed_wing_takeoff(self, fw_tko_pitch: float = float('nan'), yaw: float = float('nan'), latitude: float = float('nan'), longitude: float = float('nan'), altitude: float = float('nan')):
+        """
+        Simple horizontal VTOL takeoff:
+          1) request transition to FW
+          2) wait until vehicle_type == 'FW'
+          3) send NAV_TAKEOFF to target altitude
+
+        Call this repeatedly from ModeManager until it returns True.
+        Args:
+            fw_tko_pitch: float = float('nan'), # fw_tko_pitch min (minimum pitch during takeoff)
+            yaw: float = float('nan'), # Yaw angle (in degrees)
+            latitude: float = float('nan'), # Latitude (in GPS coords)
+            longitude: float = float('nan'), # Longitude (in GPS coords)
+            altitude: float = float('nan'), # Altitude (in meters)
+        """
+        if self.vtol_vehicle_status is None:
+            self.node.get_logger().info("FW takeoff: Vehicle status not available yet.")
+            return False
+
+        elif self.vtol_vehicle_status.vehicle_vtol_state == VtolVehicleStatus.VEHICLE_VTOL_STATE_MC:
+            self.vtol_transition_to("FW", immediate=False)
+            self.node.get_logger().info("FW takeoff Step 1: requested VTOL transition to FW.")
+            return False
+
+        elif self.vtol_vehicle_status.vehicle_vtol_state == VtolVehicleStatus.VEHICLE_VTOL_STATE_TRANSITION_TO_FW:
+            self.node.get_logger().info("FW takeoff Step 2: transition to FW in progress.")
+            return False
+
+        elif self.vtol_vehicle_status.vehicle_vtol_state == VtolVehicleStatus.VEHICLE_VTOL_STATE_FW:
+            self.node.get_logger().info("FW takeoff Step 3: transition to FW complete.")
+            if not self.attempted_takeoff:
+                self.attempted_takeoff = True
+
+            lat = self.global_position.lat
+            lon = self.global_position.lon
+            alt = self.global_position.alt
+            self.node.get_logger().info(f"Current GPS: {lat}, {lon}, {alt}")
+            
+            if np.isnan(latitude) or np.isnan(longitude) or np.isnan(altitude):
+                self.node.get_logger().info(f"Takeoff Destination GPS: Auto Calculated")
+            else:
+                self.node.get_logger().info(f"Takeoff Destination GPS: {latitude}, {longitude}, {altitude}")
+
+            self._send_vehicle_command(
+                VehicleCommand.VEHICLE_CMD_NAV_TAKEOFF,
+                params={
+                    "param1": fw_tko_pitch, # fw_tko_pitch min (minimum pitch during takeoff)
+                    "param4": yaw, # Yaw angle
+                    "param5": latitude, # Latitude (in GPS coords)
+                    "param6": longitude, # Longitude (in GPS coords)
+                    "param7": altitude, # Altitude (in meters)
+                },
+            )
+            self.node.get_logger().info("FW takeoff Step 3: NAV_TAKEOFF sent.")
+            return True
+        elif self.vtol_vehicle_status.vehicle_vtol_state == VtolVehicleStatus.VEHICLE_VTOL_STATE_TRANSITION_TO_MC:
+            self.node.get_logger().error("FW takeoff: Transition to MC in progress during horizontal takeoff.")
+            return False
+        else:
+            self.node.get_logger().warn("FW takeoff Step 0: unknown vehicle state.")
+            return False
+
+    
     def vtol_transition_to(self, vtol_state, immediate=False):
         """
         Command a VTOL transition.

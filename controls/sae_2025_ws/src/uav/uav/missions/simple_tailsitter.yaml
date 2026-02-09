@@ -9,14 +9,14 @@ transition_to_fw:
   class: uav.autonomous_modes.TransitionMode
   params:
     to_mode: FW
-  
   transitions:
-    complete: gps
+    complete: GPS
 
-gps:
+GPS:
   class: uav.autonomous_modes.NavGPSMode
   params:
-    coordinates: '[((5, 10, -10), 1, "LOCAL"),((10, 20, -10), 1, "LOCAL"),((-5, 0, -10), 1, "LOCAL")]'
+    coordinates: "[[(0, 30, -10), 2, 'LOCAL']]"
+    margin: "30"
   transitions:
     complete: transition_to_mc
 
@@ -24,9 +24,17 @@ transition_to_mc:
   class: uav.autonomous_modes.TransitionMode
   params:
     to_mode: MC
-  
+  transitions:
+    complete: GPS2
+
+GPS2:
+  class: uav.autonomous_modes.NavGPSMode
+  params:
+    coordinates: "[[(0, 0, -10), 2, 'LOCAL']]"
+    margin: "2"
   transitions:
     complete: land
 
 land:
   class: uav.autonomous_modes.LandingMode
+

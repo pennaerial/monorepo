@@ -384,6 +384,7 @@ class HoopCourseNode(WorldNode):
                  max_dist: int,
                  template_world: str,
                  height: int,
+                 physics: Optional[dict] = None,
                  output_filename: Optional[str] = None,
                  seed: Optional[int] = None):
         """
@@ -407,8 +408,9 @@ class HoopCourseNode(WorldNode):
         self.max_dist = max_dist
         self.template_world = template_world
         self.height = height
+        self.physics = physics
         self.hoops: List[Entity] = []
-        self.instantiate_static_world(template_world_path=template_world)
+        self.instantiate_static_world(template_world_path=template_world, physics=physics)
 
         
         # Create service for providing hoop positions
