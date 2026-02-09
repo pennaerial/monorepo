@@ -1,26 +1,31 @@
 import rclpy
 from rclpy.node import Node
-from px4_msgs.msg import VehicleCommand, ActuatorServos
-from rclpy.clock import Clock
-from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy, QoSDurabilityPolicy
-import math
+from px4_msgs.msg import VehicleCommand
+from rclpy.qos import (
+    QoSProfile,
+    QoSReliabilityPolicy,
+    QoSHistoryPolicy,
+    QoSDurabilityPolicy,
+)
+
 
 class OscillatoryServoCommandNode(Node):
     def __init__(self):
-        super().__init__('oscillatory_servo_command_node')
+        super().__init__("oscillatory_servo_command_node")
         qos_profile = QoSProfile(
             reliability=QoSReliabilityPolicy.BEST_EFFORT,
             durability=QoSDurabilityPolicy.TRANSIENT_LOCAL,
             history=QoSHistoryPolicy.KEEP_LAST,
-            depth=1
+            depth=1,
         )
-        self.vehicle_command_pub = self.create_publisher(VehicleCommand, '/fmu/in/vehicle_command', qos_profile)
+        self.vehicle_command_pub = self.create_publisher(
+            VehicleCommand, "/fmu/in/vehicle_command", qos_profile
+        )
         self.timer = self.create_timer(0.1, self.timer_callback)
         self.timer1 = 0
         self.lower_time = 0.5
-        self.lowering = True        
+        self.lowering = True
         self.last_time = self.get_clock().now().nanoseconds / 1e9  # in seconds
-
 
     def timer_callback(self):
         msg = VehicleCommand()
@@ -37,11 +42,12 @@ class OscillatoryServoCommandNode(Node):
             msg.param1 = 1.0
             self.timer1 -= time_delta
         elif self.timer1 < 0:
-            self.get_logger().info(f"Done")
-            msg.param1 = 0.0        
+            self.get_logger().info("Done")
+            msg.param1 = 0.0
         msg.command = VehicleCommand.VEHICLE_CMD_DO_SET_ACTUATOR
         self.vehicle_command_pub.publish(msg)
         # self.get_logger().info(f"Current time_delta: {time_delta:.5f}")
+
 
 def main(args=None):
     rclpy.init(args=args)
@@ -54,5 +60,6 @@ def main(args=None):
         node.destroy_node()
         rclpy.shutdown()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

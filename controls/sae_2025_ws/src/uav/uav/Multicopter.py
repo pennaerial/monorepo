@@ -8,7 +8,9 @@ class Multicopter(UAV):
     Multicopter UAV implementation with proportional velocity control.
     """
 
-    def __init__(self, node: Node, takeoff_amount=5.0, DEBUG=False, camera_offsets=[0, 0, 0]):
+    def __init__(
+        self, node: Node, takeoff_amount=5.0, DEBUG=False, camera_offsets=[0, 0, 0]
+    ):
         super().__init__(node, takeoff_amount, DEBUG, camera_offsets)
 
     @property
@@ -23,7 +25,9 @@ class Multicopter(UAV):
 
     def vtol_transition_to(self, vtol_state, immediate=False):
         """Not available on multicopters."""
-        self.node.get_logger().warn("vtol_transition_to called on non-VTOL vehicle. Ignoring.")
+        self.node.get_logger().warn(
+            "vtol_transition_to called on non-VTOL vehicle. Ignoring."
+        )
 
     def _calculate_velocity(self, target_pos: tuple, lock_yaw: bool) -> list:
         """

@@ -1,8 +1,14 @@
 from rclpy.node import Node
 from px4_msgs.msg import VtolVehicleStatus, VehicleCommand
-from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy, QoSDurabilityPolicy
+from rclpy.qos import (
+    QoSProfile,
+    QoSReliabilityPolicy,
+    QoSHistoryPolicy,
+    QoSDurabilityPolicy,
+)
 import numpy as np
 from uav.UAV import UAV
+
 
 class VTOL(UAV):
     """
@@ -10,7 +16,9 @@ class VTOL(UAV):
     Handles both multicopter and fixed-wing flight modes.
     """
 
-    def __init__(self, node: Node, takeoff_amount=5.0, DEBUG=False, camera_offsets=[0, 0, 0]):
+    def __init__(
+        self, node: Node, takeoff_amount=5.0, DEBUG=False, camera_offsets=[0, 0, 0]
+    ):
         # Initialize VTOL-specific attributes before calling super().__init__
         self.vehicle_type = None  # 'MC' or 'FW' from VtolVehicleStatus
         self.vtol_vehicle_status = None
@@ -22,7 +30,14 @@ class VTOL(UAV):
         """VTOL aircraft can transition between MC and FW modes."""
         return True
 
-    def fixed_wing_takeoff(self, fw_tko_pitch: float = float('nan'), yaw: float = float('nan'), latitude: float = float('nan'), longitude: float = float('nan'), altitude: float = float('nan')):
+    def fixed_wing_takeoff(
+        self,
+        fw_tko_pitch: float = float("nan"),
+        yaw: float = float("nan"),
+        latitude: float = float("nan"),
+        longitude: float = float("nan"),
+        altitude: float = float("nan"),
+    ):
         """
         Simple horizontal VTOL takeoff:
           1) request transition to FW
@@ -41,16 +56,29 @@ class VTOL(UAV):
             self.node.get_logger().info("FW takeoff: Vehicle status not available yet.")
             return False
 
-        elif self.vtol_vehicle_status.vehicle_vtol_state == VtolVehicleStatus.VEHICLE_VTOL_STATE_MC:
+        elif (
+            self.vtol_vehicle_status.vehicle_vtol_state
+            == VtolVehicleStatus.VEHICLE_VTOL_STATE_MC
+        ):
             self.vtol_transition_to("FW", immediate=False)
-            self.node.get_logger().info("FW takeoff Step 1: requested VTOL transition to FW.")
+            self.node.get_logger().info(
+                "FW takeoff Step 1: requested VTOL transition to FW."
+            )
             return False
 
-        elif self.vtol_vehicle_status.vehicle_vtol_state == VtolVehicleStatus.VEHICLE_VTOL_STATE_TRANSITION_TO_FW:
-            self.node.get_logger().info("FW takeoff Step 2: transition to FW in progress.")
+        elif (
+            self.vtol_vehicle_status.vehicle_vtol_state
+            == VtolVehicleStatus.VEHICLE_VTOL_STATE_TRANSITION_TO_FW
+        ):
+            self.node.get_logger().info(
+                "FW takeoff Step 2: transition to FW in progress."
+            )
             return False
 
-        elif self.vtol_vehicle_status.vehicle_vtol_state == VtolVehicleStatus.VEHICLE_VTOL_STATE_FW:
+        elif (
+            self.vtol_vehicle_status.vehicle_vtol_state
+            == VtolVehicleStatus.VEHICLE_VTOL_STATE_FW
+        ):
             self.node.get_logger().info("FW takeoff Step 3: transition to FW complete.")
             if not self.attempted_takeoff:
                 self.attempted_takeoff = True
@@ -59,32 +87,38 @@ class VTOL(UAV):
             lon = self.global_position.lon
             alt = self.global_position.alt
             self.node.get_logger().info(f"Current GPS: {lat}, {lon}, {alt}")
-            
+
             if np.isnan(latitude) or np.isnan(longitude) or np.isnan(altitude):
-                self.node.get_logger().info(f"Takeoff Destination GPS: Auto Calculated")
+                self.node.get_logger().info("Takeoff Destination GPS: Auto Calculated")
             else:
-                self.node.get_logger().info(f"Takeoff Destination GPS: {latitude}, {longitude}, {altitude}")
+                self.node.get_logger().info(
+                    f"Takeoff Destination GPS: {latitude}, {longitude}, {altitude}"
+                )
 
             self._send_vehicle_command(
                 VehicleCommand.VEHICLE_CMD_NAV_TAKEOFF,
                 params={
-                    "param1": fw_tko_pitch, # fw_tko_pitch min (minimum pitch during takeoff)
-                    "param4": yaw, # Yaw angle
-                    "param5": latitude, # Latitude (in GPS coords)
-                    "param6": longitude, # Longitude (in GPS coords)
-                    "param7": altitude, # Altitude (in meters)
+                    "param1": fw_tko_pitch,  # fw_tko_pitch min (minimum pitch during takeoff)
+                    "param4": yaw,  # Yaw angle
+                    "param5": latitude,  # Latitude (in GPS coords)
+                    "param6": longitude,  # Longitude (in GPS coords)
+                    "param7": altitude,  # Altitude (in meters)
                 },
             )
             self.node.get_logger().info("FW takeoff Step 3: NAV_TAKEOFF sent.")
             return True
-        elif self.vtol_vehicle_status.vehicle_vtol_state == VtolVehicleStatus.VEHICLE_VTOL_STATE_TRANSITION_TO_MC:
-            self.node.get_logger().error("FW takeoff: Transition to MC in progress during horizontal takeoff.")
+        elif (
+            self.vtol_vehicle_status.vehicle_vtol_state
+            == VtolVehicleStatus.VEHICLE_VTOL_STATE_TRANSITION_TO_MC
+        ):
+            self.node.get_logger().error(
+                "FW takeoff: Transition to MC in progress during horizontal takeoff."
+            )
             return False
         else:
             self.node.get_logger().warn("FW takeoff Step 0: unknown vehicle state.")
             return False
 
-    
     def vtol_transition_to(self, vtol_state, immediate=False):
         """
         Command a VTOL transition.
@@ -93,11 +127,20 @@ class VTOL(UAV):
             vtol_state (str): The desired VTOL state ('MC' or 'FW').
             immediate (bool): If True, the transition should be immediate.
         """
-        assert vtol_state in ['MC', 'FW'], "VTOL state must be 'MC' or 'FW'."
-        state = VtolVehicleStatus.VEHICLE_VTOL_STATE_MC if vtol_state == 'MC' else VtolVehicleStatus.VEHICLE_VTOL_STATE_FW
+        assert vtol_state in ["MC", "FW"], "VTOL state must be 'MC' or 'FW'."
+        state = (
+            VtolVehicleStatus.VEHICLE_VTOL_STATE_MC
+            if vtol_state == "MC"
+            else VtolVehicleStatus.VEHICLE_VTOL_STATE_FW
+        )
         immediate = 1 if immediate else 0
-        self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_DO_VTOL_TRANSITION, params={'param1': float(state), 'param2': float(immediate)})
-        self.node.get_logger().info(f"VTOL transition command sent: {state}. Transitioning to {vtol_state} mode.")
+        self._send_vehicle_command(
+            VehicleCommand.VEHICLE_CMD_DO_VTOL_TRANSITION,
+            params={"param1": float(state), "param2": float(immediate)},
+        )
+        self.node.get_logger().info(
+            f"VTOL transition command sent: {state}. Transitioning to {vtol_state} mode."
+        )
 
     def _calculate_velocity(self, target_pos: tuple, lock_yaw: bool) -> list:
         """
@@ -108,7 +151,7 @@ class VTOL(UAV):
         Returns:
             [vx, vy, vz] velocity list in m/s
         """
-        is_fw_mode = (self.vehicle_type == 'FW')
+        is_fw_mode = self.vehicle_type == "FW"
 
         if is_fw_mode:
             # Fixed-wing mode: always maintain forward velocity for lift
@@ -138,12 +181,16 @@ class VTOL(UAV):
             list: [vx, vy, vz] velocity vector in m/s
         """
         if self.yaw is not None:
-            return [float(np.cos(self.yaw) * self.default_velocity),
-                    float(np.sin(self.yaw) * self.default_velocity),
-                    0.0]
+            return [
+                float(np.cos(self.yaw) * self.default_velocity),
+                float(np.sin(self.yaw) * self.default_velocity),
+                0.0,
+            ]
         else:
             # Last resort: forward in X direction
-            self.node.get_logger().warn("FW mode: Using fallback velocity (X-axis forward) - yaw not available")
+            self.node.get_logger().warn(
+                "FW mode: Using fallback velocity (X-axis forward) - yaw not available"
+            )
             return [float(self.default_velocity), 0.0, 0.0]
 
     def _vtol_vehicle_status_callback(self, msg: VtolVehicleStatus):
@@ -153,20 +200,26 @@ class VTOL(UAV):
         """
         self.vtol_vehicle_status = msg
         if msg.vehicle_vtol_state == VtolVehicleStatus.VEHICLE_VTOL_STATE_MC:
-            self.vehicle_type = 'MC'
+            self.vehicle_type = "MC"
         elif msg.vehicle_vtol_state == VtolVehicleStatus.VEHICLE_VTOL_STATE_FW:
-            self.vehicle_type = 'FW'
+            self.vehicle_type = "FW"
         # During transitions, maintain the current state (don't change vehicle_type)
         # VEHICLE_VTOL_STATE_TRANSITION_TO_FW = 1 (still in MC mode)
         # VEHICLE_VTOL_STATE_TRANSITION_TO_MC = 2 (still in FW mode)
-        elif msg.vehicle_vtol_state == VtolVehicleStatus.VEHICLE_VTOL_STATE_TRANSITION_TO_FW:
+        elif (
+            msg.vehicle_vtol_state
+            == VtolVehicleStatus.VEHICLE_VTOL_STATE_TRANSITION_TO_FW
+        ):
             # Transitioning to FW, but still in MC mode
             if self.vehicle_type is None:
-                self.vehicle_type = 'MC'
-        elif msg.vehicle_vtol_state == VtolVehicleStatus.VEHICLE_VTOL_STATE_TRANSITION_TO_MC:
+                self.vehicle_type = "MC"
+        elif (
+            msg.vehicle_vtol_state
+            == VtolVehicleStatus.VEHICLE_VTOL_STATE_TRANSITION_TO_MC
+        ):
             # Transitioning to MC, but still in FW mode
             if self.vehicle_type is None:
-                self.vehicle_type = 'FW'
+                self.vehicle_type = "FW"
 
     def _initialize_publishers_and_subscribers(self):
         """
@@ -181,12 +234,12 @@ class VTOL(UAV):
             reliability=QoSReliabilityPolicy.BEST_EFFORT,
             durability=QoSDurabilityPolicy.TRANSIENT_LOCAL,
             history=QoSHistoryPolicy.KEEP_LAST,
-            depth=1
+            depth=1,
         )
 
         self.vtol_vehicle_status_sub = self.node.create_subscription(
             VtolVehicleStatus,
-            '/fmu/out/vtol_vehicle_status',
+            "/fmu/out/vtol_vehicle_status",
             self._vtol_vehicle_status_callback,
-            qos_profile
+            qos_profile,
         )

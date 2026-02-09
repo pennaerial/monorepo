@@ -13,7 +13,15 @@ class CameraNode(Node):
     Node class to respond to requests with camera image or camera information.
     """
 
-    def __init__(self, node_name: str, service_name: str = '/camera_data', image_topic: str = '/camera', info_topic: str = '/camera_info', queue_size: int = 10, display: bool = False):
+    def __init__(
+        self,
+        node_name: str,
+        service_name: str = "/camera_data",
+        image_topic: str = "/camera",
+        info_topic: str = "/camera_info",
+        queue_size: int = 10,
+        display: bool = False,
+    ):
         """
         Initialize the CameraNode.
 
@@ -29,49 +37,45 @@ class CameraNode(Node):
 
         # ROS 2 Subscription
         self.image_subscription = self.create_subscription(
-            Image,
-            image_topic,
-            self.image_callback,
-            queue_size
+            Image, image_topic, self.image_callback, queue_size
         )
 
         self.camera_info_subscription = self.create_subscription(
-            CameraInfo,
-            info_topic,
-            self.camera_info_callback,
-            queue_size
+            CameraInfo, info_topic, self.camera_info_callback, queue_size
         )
-        
+
         self.image = None
         self.camera_info = None
         self.display = display
 
         self.service = self.create_service(
-            CameraData,
-            service_name,
-            self.service_callback
+            CameraData, service_name, self.service_callback
         )
 
         qos_profile = QoSProfile(
-                        depth=10,
-                        durability=DurabilityPolicy.TRANSIENT_LOCAL,  # Ensures messages persist for new subscribers
-                        reliability=ReliabilityPolicy.RELIABLE
-                    )
-        self.failsafe_publisher = self.create_publisher(Bool, '/failsafe_trigger', qos_profile)
+            depth=10,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,  # Ensures messages persist for new subscribers
+            reliability=ReliabilityPolicy.RELIABLE,
+        )
+        self.failsafe_publisher = self.create_publisher(
+            Bool, "/failsafe_trigger", qos_profile
+        )
 
-        self.get_logger().info(f"{node_name} has started, subscribing to {image_topic}.")
+        self.get_logger().info(
+            f"{node_name} has started, subscribing to {image_topic}."
+        )
         self.get_logger().info(f"{node_name} has started, subscribing to {info_topic}.")
 
     def image_callback(self, msg: Image):
         """
-        Callback for receiving image requests. 
+        Callback for receiving image requests.
         """
         self.image = msg
         if self.display:
             frame = self.convert_image_msg_to_frame(msg)
             cv2.imshow("Camera Feed", frame)
             cv2.waitKey(1)
-    
+
     def camera_info_callback(self, msg: CameraInfo):
         """
         Callback for receiving camera info messages. Stores the camera info
@@ -82,9 +86,11 @@ class CameraNode(Node):
         """
         self.camera_info = msg
 
-    def service_callback(self, request: CameraData.Request, response: CameraData.Response):
+    def service_callback(
+        self, request: CameraData.Request, response: CameraData.Response
+    ):
         """
-        Callback for receiving image messages. 
+        Callback for receiving image messages.
 
         Args:
             msg (Image): The ROS 2 Image message.
@@ -95,7 +101,7 @@ class CameraNode(Node):
                 response.image = self.image
             else:
                 self.get_logger().warn("No image available.")
-        
+
         if request.cam_info is not None:
             if self.camera_info:
                 response.camera_info = self.camera_info
@@ -103,10 +109,11 @@ class CameraNode(Node):
                 self.get_logger().warn("No camera info available.")
         self.get_logger().info("Sending camera data.")
         return response
-    
+
     def publish_failsafe(self):
         self.failsafe_publisher.publish(Bool(data=True))
-    
+
+
 def main():
     rclpy.init()
     try:

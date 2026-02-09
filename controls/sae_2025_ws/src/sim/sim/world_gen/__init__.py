@@ -1,2 +1,3 @@
-from .WorldNode import WorldNode # make sure to import the parent class FIRST (to avoid circular imports)
-from .HoopCourse import HoopCourseNode
+from .WorldNode import WorldNode as WorldNode
+from .HoopCourse import HoopCourseNode as HoopCourseNode
+from .SaeWorldNode import SaeWorldNode as SaeWorldNode
