@@ -10,6 +10,7 @@ import importlib
 import inspect
 import ast
 from px4_msgs.msg import VehicleStatus
+from std_srvs.srv import Trigger
 
 VISION_NODE_PATH = 'uav.vision_nodes'
 
@@ -17,9 +18,21 @@ class ModeManager(Node):
     """
     A ROS 2 node for managing UAV modes and mission logic.
     """
-    def __init__(self, mode_map: str, vision_nodes: str, camera_offsets, DEBUG=False, servo_only=False, vehicle_class=Vehicle.MULTICOPTER) -> None:
-        super().__init__('mission_node')
-        self.timer = self.create_timer(0.1, self.spin_once)
+
+    def __init__(
+        self,
+        mode_map: str,
+        vision_nodes: str,
+        camera_offsets,
+        DEBUG=False,
+        servo_only=False,
+        vehicle_class=Vehicle.MULTICOPTER,
+    ) -> None:
+        super().__init__("mission_node")
+        self.timer = None #delayed start until start mission trigger
+        self.start_mission_srv = self.create_service(
+            Trigger, "/mode_manager/start_mission", self.start_mission_req
+        )
         self.modes = {}
         self.transitions = {}
         self.active_mode = None
@@ -35,6 +48,13 @@ class ModeManager(Node):
         self.setup_modes(mode_map)
         self.servo_only = servo_only
     
+    def start_mission_req(self, request, response):
+        self.get_logger().info("MODE MANAGER | Starting Mission!")
+        self.timer = self.create_timer(0.1, self.spin_once)
+        response.success = True
+        response.message = "Starting Mission!"
+        return response
+
     def get_active_mode(self) -> Mode:
         """
         Get the active mode.
@@ -182,7 +202,7 @@ class ModeManager(Node):
                     self.get_logger().error(f"Error in mode {self.active_mode}. Switching to failsafe.")
                     self.uav.failsafe = True
                 elif state == 'terminate':
-                    self.get_logger().info(f"Mission has completed.")
+                    self.get_logger().info("Mission has completed.")
                     self.destroy_node()
                 elif state != 'continue':
                     self.switch_mode(self.transition(state))
@@ -191,21 +211,21 @@ class ModeManager(Node):
                 self.uav.set_origin()
             if self.uav.arm_state != VehicleStatus.ARMING_STATE_ARMED:
                 if self.active_mode is not None and self.get_active_mode() == LandingMode and self.uav.nav_state != VehicleStatus.NAVIGATION_STATE_AUTO_LAND:
-                    self.get_logger().info(f"Succesfully Landed UAV")
-                    self.get_logger().info(f"Finishing Mission")
+                    self.get_logger().info("Succesfully Landed UAV")
+                    self.get_logger().info("Finishing Mission")
                     self.destroy_node()
                     return
 
                 # If we attempted takeoff but became disarmed (not during landing), something went wrong
                 # Terminate instead of cycling
                 if self.uav.attempted_takeoff and self.active_mode is not None:
-                    self.get_logger().error(f"UAV disarmed unexpectedly after takeoff attempt. Terminating to prevent infinite cycle.")
-                    self.get_logger().error(f"This usually indicates preflight check failures or PX4 safety triggers.")
+                    self.get_logger().error("UAV disarmed unexpectedly after takeoff attempt. Terminating to prevent infinite cycle.")
+                    self.get_logger().error("This usually indicates preflight check failures or PX4 safety triggers.")
                     self.destroy_node()
                     return
 
                 self.uav.arm()
-                self.get_logger().info(f"Arming UAV")
+                self.get_logger().info("Arming UAV")
                 self.start_time = current_time
             if self.uav.local_position is None or self.uav.global_position is None: # Need to wait for the uav to be ready
                 return
@@ -240,7 +260,7 @@ class ModeManager(Node):
                         self.get_logger().error(f"Error in mode {self.active_mode}. Switching to failsafe.")
                         self.uav.failsafe = True
                     elif state == 'terminate':
-                        self.get_logger().info(f"Mission has completed.")
+                        self.get_logger().info("Mission has completed.")
                         self.destroy_node()
                     elif state != 'continue':
                         self.switch_mode(self.transition(state))
