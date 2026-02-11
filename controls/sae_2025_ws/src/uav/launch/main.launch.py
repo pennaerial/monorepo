@@ -170,6 +170,18 @@ def launch_setup(context, *args, **kwargs):
         cmd=mission_cmd, output="screen", emulate_tty=True, name="mission"
     )
 
+    mission_start_trigger = ExecuteProcess(
+        cmd=[
+            "ros2",
+            "service",
+            "call",
+            f"/mode_manager/start_mission",
+            "std_srvs/srv/Trigger",
+        ],
+        output="screen",
+        name="start_mission_trigger",
+    )
+
     # Determine which processes need to be ready before starting mission
     # In sim mode: need both uav (px4_sitl) and middleware
     # In hardware mode: only need middleware (uav is already running as flight controller)
@@ -204,7 +216,7 @@ def launch_setup(context, *args, **kwargs):
                     mission_started["value"] = True
                     return [
                         LogInfo(msg="[launcher] Processes ready, starting mission"),
-                        mission,
+                        mission_start_trigger
                     ]
             return None
 
@@ -272,6 +284,7 @@ def launch_setup(context, *args, **kwargs):
         if run_mission_bool:
             actions.extend(
                 [
+                    mission,
                     RegisterEventHandler(
                         OnProcessIO(
                             target_action=px4_sitl,
@@ -293,6 +306,7 @@ def launch_setup(context, *args, **kwargs):
             middleware,
         ]
         if run_mission_bool:
+            actions.append(mission)
             actions.append(
                 RegisterEventHandler(
                     OnProcessIO(
