@@ -1,17 +1,5 @@
 world:
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
   name: SAEWorldNode
-=======
-  name: SaeWorldNode
->>>>>>> d2821d8 (simple sae world generation)
-=======
-  name: SaeWorldNode
->>>>>>> e0c9f59 (simple sae world generation)
-=======
-  name: SaeWorldNode
->>>>>>> a05302b79dcb2fb1b8d90515a78f6610c0d49854
   params:
     template_world: "src/sim/sim/world_gen/worlds/template.sdf"   # Gazebo world template
     physics:
