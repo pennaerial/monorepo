@@ -3,6 +3,7 @@
 # dependencies = [
 #     "fastapi[standard]",
 #     "python-multipart",
+#     "httpx",
 # ]
 # ///
 
@@ -10,6 +11,7 @@ import asyncio
 import json
 import os
 import re
+import shutil
 import subprocess
 import tempfile
 from pathlib import Path
@@ -18,7 +20,7 @@ from fastapi import FastAPI, Form, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-app = FastAPI(title="SAE Deploy Dashboard")
+app = FastAPI(title="PennAiR Auton Deploy")
 
 app.add_middleware(
     CORSMiddleware,
@@ -36,7 +38,7 @@ config = {
     "pi_host": os.environ.get("PI_HOST", "penn-desktop.local"),
     "remote_dir": os.environ.get("REMOTE_DIR", "/home/penn/monorepo/controls/sae_2025_ws"),
     "ssh_key": os.environ.get("SSH_KEY", ""),
-    "ssh_pass": os.environ.get("SSH_PASS", "123"),
+    "ssh_pass": os.environ.get("SSH_PASS", ""),
     "github_repo": os.environ.get("GITHUB_REPO", ""),
     "github_token": os.environ.get("GITHUB_TOKEN", ""),
     "hotspot_name": os.environ.get("HOTSPOT_CON_NAME", "penn-desktop"),
@@ -107,6 +109,10 @@ def _ssh_opts():
     opts = ["-o", "StrictHostKeyChecking=accept-new", "-o", "ConnectTimeout=3"]
     if config["ssh_key"]:
         opts += ["-i", config["ssh_key"]]
+    # If no password is configured, force non-interactive auth so failures
+    # return quickly (instead of waiting for password prompt timeouts).
+    if not config["ssh_pass"]:
+        opts += ["-o", "BatchMode=yes", "-o", "NumberOfPasswordPrompts=0"]
     return opts
 
 
@@ -114,6 +120,11 @@ def _run_ssh_sync(command: str, timeout: int = 15) -> subprocess.CompletedProces
     """Run a command on the Pi via SSH (blocking)."""
     cmd = ["ssh"] + _ssh_opts() + [_ssh_target(), command]
     if config["ssh_pass"]:
+        if not shutil.which("sshpass"):
+            raise RuntimeError(
+                "SSH password auth is configured, but `sshpass` is not installed. "
+                "Install sshpass or clear SSH password in Settings and use SSH key auth."
+            )
         cmd = ["sshpass", "-p", config["ssh_pass"]] + cmd
     return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
 
@@ -122,6 +133,11 @@ def _run_scp_sync(local_path: str, remote_path: str, timeout: int = 300) -> subp
     """Copy a file to the Pi via SCP (blocking)."""
     cmd = ["scp"] + _ssh_opts() + [local_path, f"{_ssh_target()}:{remote_path}"]
     if config["ssh_pass"]:
+        if not shutil.which("sshpass"):
+            raise RuntimeError(
+                "SSH password auth is configured, but `sshpass` is not installed. "
+                "Install sshpass or clear SSH password in Settings and use SSH key auth."
+            )
         cmd = ["sshpass", "-p", config["ssh_pass"]] + cmd
     return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
 
@@ -134,6 +150,78 @@ async def _run_ssh(command: str, timeout: int = 15) -> subprocess.CompletedProce
 async def _run_scp(local_path: str, remote_path: str, timeout: int = 300) -> subprocess.CompletedProcess:
     """Copy a file to the Pi via SCP (non-blocking)."""
     return await asyncio.to_thread(_run_scp_sync, local_path, remote_path, timeout)
+
+
+def _friendly_ssh_error(stderr: str) -> str:
+    """Convert low-level SSH/SCP errors into operator-facing guidance."""
+    raw = (stderr or "").strip()
+    lower = raw.lower()
+    target = _ssh_target()
+
+    if any(s in lower for s in (
+        "could not resolve hostname",
+        "name or service not known",
+        "no address associated with hostname",
+        "nodename nor servname provided",
+        "temporary failure in name resolution",
+    )):
+        return (
+            f"Cannot find {target}. Connect to the Pi WiFi and make sure "
+            "Pi host/user in Settings are correct."
+        )
+
+    if any(s in lower for s in (
+        "no route to host",
+        "connection refused",
+        "network is unreachable",
+        "operation timed out",
+        "connection timed out",
+    )):
+        return (
+            f"Cannot reach {target}. Connect to the Pi WiFi and make sure "
+            "you are SSHing into the correct Pi host."
+        )
+
+    if any(s in lower for s in ("permission denied", "authentication failed", "auth fail", "access denied")):
+        if config["ssh_pass"]:
+            return (
+                f"SSH reached {target}, but the configured password was rejected. "
+                "Enter the correct SSH password in Settings."
+            )
+        return (
+            f"SSH reached {target}, but password authentication is required and no SSH password is set. "
+            "Enter the Pi SSH password in Settings."
+        )
+
+    if "host key verification failed" in lower:
+        return (
+            f"SSH host key verification failed for {target}. "
+            "Clear the stale known_hosts entry for this host and retry."
+        )
+
+    if "ssh password auth is configured, but `sshpass` is not installed" in lower:
+        return raw
+
+    return raw or (
+        f"SSH failed for {target}. Connect to the Pi WiFi and verify SSH target/user/password in Settings."
+    )
+
+
+def _friendly_ssh_timeout() -> str:
+    target = _ssh_target()
+    return (
+        f"SSH to {target} timed out. Connect to the Pi WiFi and make sure "
+        "you are SSHing into the correct Pi host."
+    )
+
+
+def _format_remote_error(raw_error: str, prefix: str) -> str:
+    """Keep context-specific prefixes unless this is clearly an SSH reachability/auth issue."""
+    raw = (raw_error or "").strip()
+    friendly = _friendly_ssh_error(raw)
+    if friendly != raw or not raw:
+        return friendly
+    return f"{prefix}: {raw}"
 
 
 # ── Connection ───────────────────────────────────────────────
@@ -152,11 +240,11 @@ async def connection_status():
                 "target": _ssh_target(),
                 "info": info.stdout.strip() if info.returncode == 0 else "",
             }
-        return {"success": True, "connected": False, "error": r.stderr.strip()}
+        return {"success": True, "connected": False, "error": _friendly_ssh_error(r.stderr)}
     except subprocess.TimeoutExpired:
-        return {"success": True, "connected": False, "error": "Connection timed out"}
+        return {"success": True, "connected": False, "error": _friendly_ssh_timeout()}
     except Exception as e:
-        return {"success": True, "connected": False, "error": str(e)}
+        return {"success": True, "connected": False, "error": _friendly_ssh_error(str(e))}
 
 
 @app.get("/api/connection/ssh-command")
@@ -178,7 +266,7 @@ async def wifi_status():
     try:
         r = await _run_ssh("nmcli -f NAME,TYPE,DEVICE,STATE con show --active | tail -n +2", timeout=15)
         if r.returncode != 0:
-            return {"success": False, "error": r.stderr.strip()}
+            return {"success": False, "error": _friendly_ssh_error(r.stderr)}
 
         connections = []
         for line in r.stdout.strip().split("\n"):
@@ -203,9 +291,9 @@ async def wifi_status():
             "connections": connections,
         }
     except subprocess.TimeoutExpired:
-        return {"success": False, "error": "SSH timed out"}
+        return {"success": False, "error": _friendly_ssh_timeout()}
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": _friendly_ssh_error(str(e))}
 
 
 @app.get("/api/wifi/scan")
@@ -218,7 +306,7 @@ async def wifi_scan():
             timeout=20,
         )
         if r.returncode != 0:
-            return {"success": False, "error": r.stderr.strip(), "networks": []}
+            return {"success": False, "error": _friendly_ssh_error(r.stderr), "networks": []}
 
         networks = []
         for line in r.stdout.strip().split("\n"):
@@ -252,7 +340,7 @@ async def wifi_scan():
             "networks": sorted(seen.values(), key=lambda x: -x["signal"]),
         }
     except Exception as e:
-        return {"success": False, "error": str(e), "networks": []}
+        return {"success": False, "error": _friendly_ssh_error(str(e)), "networks": []}
 
 
 @app.post("/api/wifi/connect")
@@ -269,12 +357,12 @@ async def wifi_connect(ssid: str = Form(...), password: str = Form("")):
         if r.returncode != 0:
             # Restore hotspot on failure
             await _run_ssh(f"nmcli con up '{config['hotspot_name']}'", timeout=15)
-            return {"success": False, "error": f"Failed to connect: {r.stderr.strip()}"}
+            return {"success": False, "error": _format_remote_error(r.stderr, "Failed to connect")}
 
         return {"success": True, "output": f"Pi connected to {ssid}"}
     except Exception as e:
         await _run_ssh(f"nmcli con up '{config['hotspot_name']}'", timeout=15)
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": _friendly_ssh_error(str(e))}
 
 
 @app.post("/api/wifi/hotspot")
@@ -284,10 +372,10 @@ async def wifi_hotspot():
         await _run_ssh("nmcli dev disconnect wlan0 2>/dev/null; sleep 1", timeout=15)
         r = await _run_ssh(f"nmcli con up '{config['hotspot_name']}'", timeout=15)
         if r.returncode != 0:
-            return {"success": False, "error": r.stderr.strip()}
+            return {"success": False, "error": _friendly_ssh_error(r.stderr)}
         return {"success": True, "output": "Hotspot activated"}
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": _friendly_ssh_error(str(e))}
 
 
 @app.post("/api/wifi/switch-local")
@@ -313,6 +401,18 @@ def _github_headers() -> dict:
     return headers
 
 
+def _require_httpx():
+    try:
+        import httpx
+    except ModuleNotFoundError as e:
+        raise RuntimeError(
+            "Missing Python dependency `httpx`. "
+            "If using conda/pip, run: pip install httpx. "
+            "If using uv, rerun with `uv run app.py`."
+        ) from e
+    return httpx
+
+
 # ── Build Management (via SCP/SSH) ──────────────────────────
 
 
@@ -325,12 +425,14 @@ async def current_build():
             return {"success": True, "installed": True, "info": r.stdout.strip()}
 
         r = await _run_ssh(f"test -d {config['remote_dir']}/install && echo yes || echo no", timeout=10)
+        if r.returncode != 0:
+            return {"success": True, "installed": False, "info": _friendly_ssh_error(r.stderr)}
         if r.stdout.strip() == "yes":
             return {"success": True, "installed": True, "info": "Build installed (no BUILD_INFO.txt)"}
 
         return {"success": True, "installed": False, "info": "No build deployed"}
     except Exception as e:
-        return {"success": True, "installed": False, "info": str(e)}
+        return {"success": True, "installed": False, "info": _friendly_ssh_error(str(e))}
 
 
 @app.post("/api/builds/upload")
@@ -351,7 +453,7 @@ async def upload_build(file: UploadFile = File(...)):
         os.unlink(tmp_path)
 
         if r.returncode != 0:
-            return {"success": False, "error": f"SCP failed: {r.stderr.strip()}"}
+            return {"success": False, "error": _format_remote_error(r.stderr, "SCP failed")}
 
         # Backup + extract on Pi
         extract_cmd = f"""
@@ -367,11 +469,11 @@ async def upload_build(file: UploadFile = File(...)):
         """
         r = await _run_ssh(extract_cmd, timeout=120)
         if r.returncode != 0:
-            return {"success": False, "error": f"Extract failed: {r.stderr.strip()}"}
+            return {"success": False, "error": _format_remote_error(r.stderr, "Extract failed")}
 
         return {"success": True, "output": f"Deployed {file.filename} to Pi"}
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": _friendly_ssh_error(str(e))}
 
 
 @app.get("/api/builds/list")
@@ -380,7 +482,7 @@ async def list_builds():
     if not config['github_repo']:
         return {"success": False, "error": "GITHUB_REPO not configured", "builds": []}
     try:
-        import httpx
+        httpx = _require_httpx()
         async with httpx.AsyncClient(timeout=15) as client:
             resp = await client.get(
                 f"https://api.github.com/repos/{config['github_repo']}/releases",
@@ -415,7 +517,7 @@ async def download_build(tag: str = Form(...)):
     if not config['github_repo']:
         return {"success": False, "error": "GITHUB_REPO not configured"}
     try:
-        import httpx
+        httpx = _require_httpx()
 
         # Get release info
         async with httpx.AsyncClient(timeout=15) as client:
@@ -449,7 +551,7 @@ async def download_build(tag: str = Form(...)):
         os.unlink(tmp_path)
 
         if r.returncode != 0:
-            return {"success": False, "error": f"SCP failed: {r.stderr.strip()}"}
+            return {"success": False, "error": _format_remote_error(r.stderr, "SCP failed")}
 
         # Backup + extract on Pi
         extract_cmd = f"""
@@ -465,11 +567,11 @@ async def download_build(tag: str = Form(...)):
         """
         r = await _run_ssh(extract_cmd, timeout=120)
         if r.returncode != 0:
-            return {"success": False, "error": f"Extract failed: {r.stderr.strip()}"}
+            return {"success": False, "error": _format_remote_error(r.stderr, "Extract failed")}
 
         return {"success": True, "output": f"Downloaded {tag} and deployed to Pi"}
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": _friendly_ssh_error(str(e))}
 
 
 @app.post("/api/builds/rollback")
@@ -494,11 +596,11 @@ async def rollback_build():
         if r.returncode != 0:
             if "NO_BACKUP" in r.stdout:
                 return {"success": False, "error": "No backup build to rollback to"}
-            return {"success": False, "error": r.stderr.strip()}
+            return {"success": False, "error": _friendly_ssh_error(r.stderr)}
 
         return {"success": True, "output": "Rolled back to previous build"}
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": _friendly_ssh_error(str(e))}
 
 
 # ── Failsafe ────────────────────────────────────────────────
@@ -516,12 +618,12 @@ async def trigger_failsafe():
         )
         r = await _run_ssh(f"bash -c '{cmd}'", timeout=15)
         if r.returncode != 0:
-            return {"success": False, "error": r.stderr.strip() or "Failsafe command failed"}
+            return {"success": False, "error": _format_remote_error(r.stderr, "Failsafe command failed")}
         return {"success": True, "output": "Failsafe triggered"}
     except subprocess.TimeoutExpired:
-        return {"success": False, "error": "Failsafe command timed out"}
+        return {"success": False, "error": _friendly_ssh_timeout()}
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": _friendly_ssh_error(str(e))}
 
 
 # ── Static Files (production) ────────────────────────────────
