@@ -11,6 +11,7 @@ import asyncio
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import tempfile
@@ -222,6 +223,51 @@ def _format_remote_error(raw_error: str, prefix: str) -> str:
     if friendly != raw or not raw:
         return friendly
     return f"{prefix}: {raw}"
+
+
+def _q(value: str) -> str:
+    return shlex.quote(value)
+
+
+def _mission_paths() -> dict:
+    remote_dir = config["remote_dir"]
+    return {
+        "log": f"{remote_dir}/.mission_main_launch.log",
+        "pid": f"{remote_dir}/.mission_main_launch.pid",
+        "pgid": f"{remote_dir}/.mission_main_launch.pgid",
+        "launch_params": f"{remote_dir}/src/uav/launch/launch_params.yaml",
+    }
+
+
+async def _mission_launch_status() -> dict:
+    paths = _mission_paths()
+    cmd = f"""
+        pid_file={_q(paths["pid"])}
+        log_file={_q(paths["log"])}
+        if [ -f "$pid_file" ]; then
+            pid="$(cat "$pid_file" 2>/dev/null)"
+            if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+                echo "RUNNING:$pid"
+                exit 0
+            fi
+            echo "STOPPED"
+            exit 0
+        fi
+        if [ -f "$log_file" ]; then
+            echo "STOPPED"
+        else
+            echo "NOT_PREPARED"
+        fi
+    """
+    r = await _run_ssh(cmd, timeout=8)
+    if r.returncode != 0:
+        return {"success": False, "running": False, "state": "error", "error": _friendly_ssh_error(r.stderr)}
+    out = r.stdout.strip()
+    if out.startswith("RUNNING:"):
+        return {"success": True, "running": True, "state": "running", "pid": out.split(":", 1)[1]}
+    if out == "NOT_PREPARED":
+        return {"success": True, "running": False, "state": "not_prepared"}
+    return {"success": True, "running": False, "state": "stopped"}
 
 
 # ── Connection ───────────────────────────────────────────────
@@ -611,19 +657,321 @@ async def trigger_failsafe():
     """Trigger failsafe on the Pi via ros2 topic pub."""
     try:
         cmd = (
-            f"cd {config['remote_dir']} && "
+            f"cd {_q(config['remote_dir'])} && "
             f"source /opt/ros/humble/setup.bash && "
             f"source install/setup.bash && "
-            f'ros2 topic pub --once /failsafe_trigger std_msgs/msg/Bool "{{data: true}}"'
+            f'timeout 3 ros2 topic pub /failsafe_trigger std_msgs/msg/Bool "{{data: true}}"'
         )
         r = await _run_ssh(f"bash -c '{cmd}'", timeout=15)
-        if r.returncode != 0:
+        # timeout(1) returns 124 when it stops the publisher; that still means
+        # the command ran and published while active.
+        if r.returncode not in (0, 124):
             return {"success": False, "error": _format_remote_error(r.stderr, "Failsafe command failed")}
         return {"success": True, "output": "Failsafe triggered"}
     except subprocess.TimeoutExpired:
         return {"success": False, "error": _friendly_ssh_timeout()}
     except Exception as e:
         return {"success": False, "error": _friendly_ssh_error(str(e))}
+
+
+# ── Mission Control ────────────────────────────────────────
+
+
+@app.get("/api/mission/launch/status")
+async def mission_launch_status():
+    """Check if ros2 launch uav main.launch.py is running on the Pi."""
+    return await _mission_launch_status()
+
+
+@app.get("/api/mission/launch/logs")
+async def mission_launch_logs(lines: int = 200, offset: int | None = None):
+    """Get recent launch output from the Pi."""
+    try:
+        paths = _mission_paths()
+        status = await _mission_launch_status()
+
+        if offset is not None:
+            start = max(0, int(offset))
+            cmd = f"""
+                log_file={_q(paths["log"])}
+                start={start}
+                if [ ! -f "$log_file" ]; then
+                    echo "__META__:0:0"
+                    exit 0
+                fi
+
+                size="$(wc -c < "$log_file" | tr -d ' ')"
+                reset=0
+                if [ "$start" -gt "$size" ]; then
+                    start=0
+                    reset=1
+                fi
+
+                echo "__META__:$size:$reset"
+                if [ "$size" -gt "$start" ]; then
+                    tail -c +$((start + 1)) "$log_file"
+                fi
+            """
+        else:
+            line_count = 0 if lines <= 0 else max(20, min(lines, 20000))
+            cmd = f"""
+                log_file={_q(paths["log"])}
+                if [ -f "$log_file" ]; then
+                    {"cat \"$log_file\"" if line_count == 0 else f"tail -n {line_count} \"$log_file\""}
+                fi
+            """
+
+        r = await _run_ssh(cmd, timeout=10)
+        if r.returncode != 0:
+            return {"success": False, "running": status.get("running", False), "error": _friendly_ssh_error(r.stderr)}
+
+        if offset is not None:
+            out = r.stdout or ""
+            first_line, sep, rest = out.partition("\n")
+            meta_match = re.match(r"^__META__:(\d+):([01])$", first_line.strip())
+            if not meta_match:
+                return {
+                    "success": False,
+                    "running": status.get("running", False),
+                    "error": "Failed to parse mission logs metadata",
+                }
+            if not sep:
+                rest = ""
+            next_offset = int(meta_match.group(1))
+            reset = meta_match.group(2) == "1"
+            return {
+                "success": True,
+                "running": status.get("running", False),
+                "logs": rest,
+                "next_offset": next_offset,
+                "reset": reset,
+            }
+
+        return {
+            "success": True,
+            "running": status.get("running", False),
+            "logs": r.stdout,
+        }
+    except Exception as e:
+        return {"success": False, "running": False, "error": _friendly_ssh_error(str(e))}
+
+
+@app.post("/api/mission/prepare")
+async def prepare_mission():
+    """Start ros2 launch uav main.launch.py on the Pi and stream logs from file."""
+    try:
+        paths = _mission_paths()
+        cmd = f"""
+            set -e
+            cd {_q(config["remote_dir"])}
+            source /opt/ros/humble/setup.bash
+            source install/setup.bash
+
+            pid_file={_q(paths["pid"])}
+            pgid_file={_q(paths["pgid"])}
+            log_file={_q(paths["log"])}
+            had_previous=0
+
+            if [ -f "$pid_file" ]; then
+                old_pid="$(cat "$pid_file" 2>/dev/null || true)"
+                old_pgid=""
+                if [ -f "$pgid_file" ]; then
+                    old_pgid="$(cat "$pgid_file" 2>/dev/null || true)"
+                fi
+                if [ -z "$old_pgid" ] && [ -n "$old_pid" ]; then
+                    old_pgid="$(ps -o pgid= "$old_pid" 2>/dev/null | tr -d ' ' || true)"
+                fi
+
+                target=""
+                if [ -n "$old_pgid" ] && kill -0 "-$old_pgid" 2>/dev/null; then
+                    target="-$old_pgid"
+                elif [ -n "$old_pid" ] && kill -0 "$old_pid" 2>/dev/null; then
+                    target="$old_pid"
+                fi
+
+                if [ -n "$target" ]; then
+                    had_previous=1
+                    kill -INT "$target" 2>/dev/null || true
+                    for _ in 1 2 3 4 5; do
+                        if [ -n "$old_pid" ] && kill -0 "$old_pid" 2>/dev/null; then
+                            sleep 1
+                        else
+                            break
+                        fi
+                    done
+                    if [ -n "$old_pid" ] && kill -0 "$old_pid" 2>/dev/null; then
+                        kill -TERM "$target" 2>/dev/null || true
+                        sleep 1
+                    fi
+                    if [ -n "$old_pid" ] && kill -0 "$old_pid" 2>/dev/null; then
+                        kill -KILL "$target" 2>/dev/null || true
+                    fi
+                fi
+
+                rm -f "$pid_file"
+            fi
+            rm -f "$pgid_file"
+
+            : > "$log_file"
+            nohup setsid ros2 launch uav main.launch.py >> "$log_file" 2>&1 < /dev/null &
+            new_pid=$!
+            new_pgid="$(ps -o pgid= "$new_pid" 2>/dev/null | tr -d ' ' || true)"
+            echo "$new_pid" > "$pid_file"
+            if [ -n "$new_pgid" ]; then
+                echo "$new_pgid" > "$pgid_file"
+            fi
+            sleep 1
+
+            if kill -0 "$new_pid" 2>/dev/null; then
+                if [ "$had_previous" -eq 1 ]; then
+                    echo "RESTARTED:$new_pid"
+                else
+                    echo "STARTED:$new_pid"
+                fi
+                exit 0
+            fi
+
+            echo "FAILED"
+            exit 1
+        """
+        r = await _run_ssh(f"bash -lc {_q(cmd)}", timeout=20)
+        stdout = (r.stdout or "").strip()
+        stderr = (r.stderr or "").strip()
+        combined = "\n".join(part for part in (stdout, stderr) if part)
+        match = re.search(r"(STARTED|RESTARTED)\s*:\s*([0-9]+)", combined)
+        if match:
+            pid = match.group(2)
+            if match.group(1) == "RESTARTED":
+                return {"success": True, "output": "Mission launch restarted", "running": True, "pid": pid}
+            return {"success": True, "output": "Mission launch started", "running": True, "pid": pid}
+
+        if r.returncode != 0:
+            return {"success": False, "error": _format_remote_error(r.stderr or r.stdout, "Prepare mission failed")}
+
+        return {"success": False, "error": "Prepare mission failed (launch did not start)"}
+    except Exception as e:
+        return {"success": False, "error": _friendly_ssh_error(str(e))}
+
+
+@app.post("/api/mission/stop")
+async def stop_mission():
+    """Stop the mission launch process (Ctrl+C style first, then escalate if needed)."""
+    try:
+        paths = _mission_paths()
+        cmd = f"""
+            pid_file={_q(paths["pid"])}
+            pgid_file={_q(paths["pgid"])}
+
+            if [ ! -f "$pid_file" ]; then
+                echo "NOT_RUNNING"
+                exit 0
+            fi
+
+            pid="$(cat "$pid_file" 2>/dev/null || true)"
+            pgid=""
+            if [ -f "$pgid_file" ]; then
+                pgid="$(cat "$pgid_file" 2>/dev/null || true)"
+            fi
+
+            target=""
+            if [ -n "$pgid" ] && kill -0 "-$pgid" 2>/dev/null; then
+                target="-$pgid"
+            elif [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+                target="$pid"
+            else
+                rm -f "$pid_file" "$pgid_file"
+                echo "NOT_RUNNING"
+                exit 0
+            fi
+
+            # Ctrl+C equivalent first.
+            kill -INT "$target" 2>/dev/null || true
+            for _ in 1 2 3 4 5; do
+                if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+                    sleep 1
+                else
+                    rm -f "$pid_file" "$pgid_file"
+                    echo "STOPPED"
+                    exit 0
+                fi
+            done
+
+            # Escalate if still alive.
+            kill -TERM "$target" 2>/dev/null || true
+            sleep 1
+            if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+                kill -KILL "$target" 2>/dev/null || true
+            fi
+            rm -f "$pid_file" "$pgid_file"
+            echo "STOPPED"
+        """
+        r = await _run_ssh(f"bash -lc {_q(cmd)}", timeout=20)
+        if r.returncode != 0:
+            return {"success": False, "error": _format_remote_error(r.stderr or r.stdout, "Stop mission failed")}
+
+        out = (r.stdout or "").strip()
+        if "NOT_RUNNING" in out:
+            return {"success": True, "output": "Mission launch is not running"}
+        return {"success": True, "output": "Mission launch stopped"}
+    except Exception as e:
+        return {"success": False, "error": _friendly_ssh_error(str(e))}
+
+
+@app.post("/api/mission/start")
+async def start_mission():
+    """Call /mode_manager/start_mission service on the Pi."""
+    try:
+        cmd = (
+            f"cd {_q(config['remote_dir'])} && "
+            f"source /opt/ros/humble/setup.bash && "
+            f"source install/setup.bash && "
+            f'ros2 service call /mode_manager/start_mission std_srvs/srv/Trigger "{{}}"'
+        )
+        r = await _run_ssh(f"bash -lc {_q(cmd)}", timeout=20)
+        if r.returncode != 0:
+            return {"success": False, "error": _format_remote_error(r.stderr or r.stdout, "Start mission failed")}
+        return {"success": True, "output": r.stdout.strip() or "Start mission service called"}
+    except subprocess.TimeoutExpired:
+        return {"success": False, "error": "Start mission service call timed out"}
+    except Exception as e:
+        return {"success": False, "error": _friendly_ssh_error(str(e))}
+
+
+@app.get("/api/mission/launch-params")
+async def get_launch_params():
+    """Read launch_params.yaml from the Pi workspace."""
+    try:
+        params_path = _mission_paths()["launch_params"]
+        r = await _run_ssh(f"cat {_q(params_path)}", timeout=10)
+        if r.returncode != 0:
+            return {"success": False, "error": _format_remote_error(r.stderr, "Read launch params failed")}
+        return {"success": True, "content": r.stdout}
+    except Exception as e:
+        return {"success": False, "error": _friendly_ssh_error(str(e))}
+
+
+@app.post("/api/mission/launch-params")
+async def set_launch_params(content: str = Form(...)):
+    """Write launch_params.yaml on the Pi workspace."""
+    tmp_path = ""
+    try:
+        params_path = _mission_paths()["launch_params"]
+        await _run_ssh(f"mkdir -p {_q(str(Path(params_path).parent))}", timeout=10)
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as tmp:
+            tmp.write(content)
+            tmp_path = tmp.name
+
+        r = await _run_scp(tmp_path, params_path, timeout=30)
+        if r.returncode != 0:
+            return {"success": False, "error": _format_remote_error(r.stderr, "Write launch params failed")}
+
+        return {"success": True, "output": "launch_params.yaml updated"}
+    except Exception as e:
+        return {"success": False, "error": _friendly_ssh_error(str(e))}
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            os.unlink(tmp_path)
 
 
 # ── Static Files (production) ────────────────────────────────
