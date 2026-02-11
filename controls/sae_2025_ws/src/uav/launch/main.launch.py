@@ -23,8 +23,6 @@ from uav.utils import (
     extract_vision_nodes,
     clean_text,
 )
-from sim.utils import load_sim_launch_parameters
-from sim.constants import Competition, COMPETITION_NAMES, DEFAULT_COMPETITION
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from ament_index_python.packages import get_package_share_directory
@@ -212,6 +210,8 @@ def launch_setup(context, *args, **kwargs):
 
     # Now, construct the actions list in a single step, depending on sim_bool
     if sim_bool:
+        from sim.utils import load_sim_launch_parameters
+        from sim.constants import Competition, COMPETITION_NAMES, DEFAULT_COMPETITION
         # Resolve world name from sim launch params (same source as sim.launch.py)
         sim_params = load_sim_launch_parameters()
         competition_num = sim_params.get("competition", DEFAULT_COMPETITION.value)
