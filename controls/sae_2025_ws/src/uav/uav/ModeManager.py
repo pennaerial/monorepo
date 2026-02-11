@@ -49,12 +49,11 @@ class ModeManager(Node):
         self.setup_modes(mode_map)
         self.servo_only = servo_only
 
-
     def trigger_world_gen_req(self, request, response):
         self.get_logger().info("MODE MANAGER | Starting Mission!")
         self.timer = self.create_timer(0.1, self.spin_once)
         response.success = True
-        response.message = ("Starting Mission!")
+        response.message = "Starting Mission!"
         return response
 
     def get_active_mode(self) -> Mode:

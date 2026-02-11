@@ -216,7 +216,7 @@ def launch_setup(context, *args, **kwargs):
                     mission_started["value"] = True
                     return [
                         LogInfo(msg="[launcher] Processes ready, starting mission"),
-                        start_mission_trigger
+                        start_mission_trigger,
                     ]
             return None
 
@@ -314,7 +314,7 @@ def launch_setup(context, *args, **kwargs):
                             target_action=middleware,
                             on_stderr=make_io_handler("middleware"),
                         )
-                    )
+                    ),
                 ]
             )
     return actions
