@@ -116,7 +116,8 @@ jobs:
           # Copy source files needed at runtime
           mkdir -p deploy/src/uav
           cp -r src/uav/launch deploy/src/uav/
-          cp -r src/uav/uav/missions deploy/src/uav/uav/missions 2>/dev/null || mkdir -p deploy/src/uav/uav/missions
+          mkdir -p deploy/src/uav/uav 
+          cp -r src/uav/uav/missions deploy/src/uav/uav/
           cp -r src/uav/uav/autonomous_modes deploy/src/uav/uav/
 
           # Copy hardware config as the default
