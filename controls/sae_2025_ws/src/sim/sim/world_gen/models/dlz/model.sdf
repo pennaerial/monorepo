@@ -11,7 +11,7 @@
         <geometry>
           <mesh>
             <uri>model://dlz/meshes/dlz.STL</uri>
-            <scale> .001 .001 .001 </scale>
+            <scale> .0025 .0025 .0025 </scale>
           </mesh>
         </geometry>
         <material>
