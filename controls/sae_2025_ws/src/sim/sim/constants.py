@@ -13,10 +13,6 @@ class Competition(IntEnum):
     IARC = 1
     CUSTOM = 2
     SAE = 3
-<<<<<<< HEAD
-=======
-
->>>>>>> d2821d8 (simple sae world generation)
 
 # Competition name mapping
 COMPETITION_NAMES = {
