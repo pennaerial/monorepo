@@ -12,6 +12,7 @@ class Competition(IntEnum):
     IN_HOUSE = 0
     IARC = 1
     CUSTOM = 2
+    SAE = 3
 
 
 # Competition name mapping
@@ -19,6 +20,7 @@ COMPETITION_NAMES = {
     Competition.IN_HOUSE: "in_house",
     Competition.IARC: "iarc",
     Competition.CUSTOM: "custom",
+    Competition.SAE: "sae",
 }
 
 # Platform name mapping

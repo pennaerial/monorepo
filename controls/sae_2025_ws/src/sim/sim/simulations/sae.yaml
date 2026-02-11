@@ -1,0 +1,6 @@
+world:
+  name: SaeWorldNode
+  params:
+    template_world: "src/sim/sim/world_gen/worlds/template.sdf"   # Gazebo world template
+    physics:
+      friction: 0.0 # friction coefficient for the ground plane 
