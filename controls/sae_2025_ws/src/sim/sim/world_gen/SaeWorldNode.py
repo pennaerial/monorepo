@@ -1,8 +1,7 @@
 from sim.world_gen import WorldNode
 from sim.world_gen.entity import Entity
-from typing import Optional, Tuple, List
+from typing import Optional, List
 import rclpy
-from std_srvs.srv import Trigger
 from ros_gz_interfaces.srv import SpawnEntity
 import sys
 import json
