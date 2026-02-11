@@ -358,6 +358,10 @@ select {
   word-break: break-word;
 }
 
+.settings-grid > .result {
+  grid-column: 1 / -1;
+}
+
 .result-ok {
   background: #052e16;
   color: #86efac;
