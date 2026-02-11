@@ -7,7 +7,7 @@ import sys
 import json
 
 
-class SaeWorldNode(WorldNode):
+class SAEWorldNode(WorldNode):
 
     def __init__(
         self,
@@ -49,7 +49,7 @@ class SaeWorldNode(WorldNode):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = SaeWorldNode(**json.loads(sys.argv[1]))
+    node = SAEWorldNode(**json.loads(sys.argv[1]))
     try:
         rclpy.spin(node)
     except Exception as e:
