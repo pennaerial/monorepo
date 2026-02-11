@@ -941,6 +941,14 @@
       <rotorVelocitySlowdownSim>20</rotorVelocitySlowdownSim>
       <motorType>velocity</motorType>
     </plugin>
+
+    <plugin filename="gz-sim-dynamic-detachable-joint-system"
+            name="gz::sim::systems::DynamicDetachableJoint">
+      <parent_link>base_link</parent_link>
+      <attach_distance>0.25</attach_distance>
+    </plugin>
+
+
     <static>0</static>
   </model>
 </sdf>
