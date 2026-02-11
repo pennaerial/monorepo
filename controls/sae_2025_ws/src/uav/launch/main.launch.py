@@ -224,6 +224,7 @@ def launch_setup(context, *args, **kwargs):
     if sim_bool:
         from sim.utils import load_sim_launch_parameters
         from sim.constants import Competition, COMPETITION_NAMES, DEFAULT_COMPETITION
+
         # Resolve world name from sim launch params (same source as sim.launch.py)
         sim_params = load_sim_launch_parameters()
         competition_num = sim_params.get("competition", DEFAULT_COMPETITION.value)
