@@ -8,7 +8,10 @@ import json
 
 
 class SAEWorldNode(WorldNode):
-
+    """
+    World generation node for SAE competition.
+    Generates the environment for the SAE competition.
+    """
     def __init__(
         self,
         template_world: str,
@@ -28,7 +31,7 @@ class SAEWorldNode(WorldNode):
 
     def generate_world(self):
 
-        #Store entities to be spawned
+        # Store entities to be spawned
         entities: List[Entity] = []
 
         dlz = Entity(
@@ -36,7 +39,7 @@ class SAEWorldNode(WorldNode):
             path_to_sdf="~/.simulation-gazebo/models/dlz/model.sdf",
             position=(30.0, -20.0, 0.0),
             rpy=(0.0, 0.0, 0.0),
-            world=self.competition_name
+            world=self.competition_name,
         )
         entities.append(dlz)
 
@@ -46,6 +49,7 @@ class SAEWorldNode(WorldNode):
             self.spawn_entity_client.call_async(req)
 
         return super().generate_world()
+
 
 def main(args=None):
     rclpy.init(args=args)

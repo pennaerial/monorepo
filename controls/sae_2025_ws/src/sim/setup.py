@@ -53,7 +53,7 @@ setup(
             "hoop_course = sim.world_gen.HoopCourse:main",
             "custom_world_node = sim.world_gen.CustomWorldNode:main",
             "hoop_score = sim.scoring.HoopScore:main",
-            'sae_world_node = sim.world_gen.SAEWorldNode:main',
+            "sae_world_node = sim.world_gen.SAEWorldNode:main",
         ],
     },
 )
