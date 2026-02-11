@@ -1,0 +1,25 @@
+start:
+  class: uav.autonomous_modes.TakeoffMode
+  params:
+    takeoff_type: vertical
+  transitions:
+    complete: gps
+
+
+gps:
+  class: uav.autonomous_modes.NavGPSMode
+  params:
+    coordinates: '[((0, 0, -20), 1, "LOCAL")]'
+  transitions:
+    complete: transition_to_fw
+
+transition_to_fw:
+  class: uav.autonomous_modes.TransitionMode
+  params:
+    to_mode: FW
+  
+  transitions:
+    complete: land
+
+land:
+  class: uav.autonomous_modes.LandingMode

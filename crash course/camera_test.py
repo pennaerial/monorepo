@@ -6,8 +6,8 @@ while True:
     ret, frame = cap.read()
     if not ret:
         break
-    cv2.imshow('camera test', frame)
-    if cv2.waitKey(1) & 0xFF == ord('q'):
+    cv2.imshow("camera test", frame)
+    if cv2.waitKey(1) & 0xFF == ord("q"):
         break
 
 cap.release()

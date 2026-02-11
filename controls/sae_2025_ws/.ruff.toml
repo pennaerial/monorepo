@@ -1,0 +1,6 @@
+[lint]
+exclude = [
+    "src/ros_gz",
+    "src/actuator_msgs",
+    "src/px4_msgs",
+]

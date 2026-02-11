@@ -3,25 +3,25 @@ from rclpy.node import Node
 from sensor_msgs.msg import Image
 import cv2
 import numpy as np
-from std_msgs.msg import Header
+
 
 class CameraDisplayNode(Node):
     def __init__(self):
-        super().__init__('camera_display_node')
+        super().__init__("camera_display_node")
         self.subscription = self.create_subscription(
             Image,
-            '/camera',  # Replace with your actual topic name
+            "/camera",  # Replace with your actual topic name
             self.listener_callback,
-            10
+            10,
         )
-        self.get_logger().info('Camera Display Node has started!')
+        self.get_logger().info("Camera Display Node has started!")
 
     def listener_callback(self, msg):
         try:
             # The image data is in msg.data as a byte array
             # Convert the byte array to a NumPy array
             img_data = np.frombuffer(msg.data, dtype=np.uint8)
-            
+
             # The message may be in different encoding (e.g., 'bgr8', 'rgb8', etc.)
             # Ensure the encoding matches your camera's output.
             # In this case, assuming 'bgr8' encoding (3 channels for BGR)
@@ -37,11 +37,12 @@ class CameraDisplayNode(Node):
             filtered_image = find_payload(cv_image)
             cv2.imshow("Camera Feed", filtered_image)
             # Required to process OpenCV events
-            if cv2.waitKey(1) & 0xFF == ord('q'):
+            if cv2.waitKey(1) & 0xFF == ord("q"):
                 self.get_logger().info("Shutting down display.")
                 rclpy.shutdown()
         except Exception as e:
             self.get_logger().error(f"Failed to process image: {e}")
+
 
 def find_payload(image):
     # Convert the image to HSV color space
@@ -60,7 +61,9 @@ def find_payload(image):
     pink_mask = cv2.morphologyEx(pink_mask, cv2.MORPH_OPEN, kernel)
 
     # Find contours in the pink mask
-    contours, _ = cv2.findContours(pink_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    contours, _ = cv2.findContours(
+        pink_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+    )
 
     result_image = image.copy()
     largest_green_contour = None
@@ -71,7 +74,9 @@ def find_payload(image):
 
         # Create a mask for the pink square
         pink_square_mask = np.zeros_like(pink_mask)
-        cv2.drawContours(pink_square_mask, [largest_contour], -1, 255, thickness=cv2.FILLED)
+        cv2.drawContours(
+            pink_square_mask, [largest_contour], -1, 255, thickness=cv2.FILLED
+        )
 
         # Mask the original image to only search within the pink square
         masked_image = cv2.bitwise_and(image, image, mask=pink_square_mask)
@@ -87,7 +92,9 @@ def find_payload(image):
         green_mask = cv2.inRange(hsv_masked, lower_green, upper_green)
 
         # Find contours in the green mask
-        green_contours, _ = cv2.findContours(green_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        green_contours, _ = cv2.findContours(
+            green_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+        )
 
         if green_contours:
             # Find the largest contour (assuming it's the green circle)
@@ -117,12 +124,21 @@ def find_payload(image):
 
             # Draw a circle around the cylinder and its center
             cv2.circle(result_image, (cx, cy), 5, (0, 255, 0), -1)
-            cv2.putText(result_image, f"Payload Center: ({cx}, {cy})", (cx + 10, cy - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+            cv2.putText(
+                result_image,
+                f"Payload Center: ({cx}, {cy})",
+                (cx + 10, cy - 10),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                (0, 255, 0),
+                2,
+            )
 
     # Display the results
     # cv2.imshow("Pink Mask", pink_mask)
     # cv2.imshow("Green Mask", green_mask)
     return pink_mask
+
 
 def main(args=None):
     rclpy.init(args=args)
@@ -139,5 +155,5 @@ def main(args=None):
     cv2.destroyAllWindows()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

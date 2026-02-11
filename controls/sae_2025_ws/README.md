@@ -121,6 +121,13 @@ You might run into the following issues during the build process. Here are solut
     git clone git@github.com:rudislabs/actuator_msgs.git
     ```
 
+5. **Mac Specific: Gazebo Crashing**: If Gazebo is crashing updating from `PX4-Autopilot` to `1.17`
+
+    Navigate to the PX4 installation and add `--render-engine=ogre` to `simulation-gazebo` (should be line 97). The result should be:
+    ```python
+    cmd += f'gz sim --render-engine=ogre -r {args.model_store}/worlds/{args.world}.sdf'
+    ```
+
 ---
 
 ## Launching Components

@@ -1,19 +1,21 @@
-import numpy as np
 from uav import UAV
 from uav.autonomous_modes import Mode
 from rclpy.node import Node
-from uav_interfaces.srv import PayloadTracking
-from uav.vision_nodes import PayloadTrackingNode
 from typing import Optional, Tuple
-from px4_msgs.msg import VehicleStatus
-import cv2
+
 
 class ServoDropoffMode(Mode):
     """
     A mode for dropping off the payload.
     """
 
-    def __init__(self, node: Node, uav: UAV, offsets: Optional[Tuple[float, float, float]] = (0.0, 0.0, 0.0), camera_offsets: Optional[Tuple[float, float, float]] = (0.0, 0.0, 0.0)):
+    def __init__(
+        self,
+        node: Node,
+        uav: UAV,
+        offsets: Optional[Tuple[float, float, float]] = (0.0, 0.0, 0.0),
+        camera_offsets: Optional[Tuple[float, float, float]] = (0.0, 0.0, 0.0),
+    ):
         """
         Initialize the LowerPayload.
 
@@ -29,7 +31,6 @@ class ServoDropoffMode(Mode):
         """
         super().__init__(node, uav)
 
-        
         self.lower_time = 1.87
         self.timer = self.lower_time
         self.done = False
@@ -51,8 +52,6 @@ class ServoDropoffMode(Mode):
             self.uav.disable_servo()
             self.done = True
 
-        
-
     def check_status(self) -> str:
         """
         Check the status of the payload lowering.
@@ -61,5 +60,5 @@ class ServoDropoffMode(Mode):
             str: The status of the payload lowering.
         """
         if self.done:
-            return 'complete'
-        return 'continue'
+            return "complete"
+        return "continue"

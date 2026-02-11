@@ -8,10 +8,10 @@ from enum import IntEnum
 
 class Competition(IntEnum):
     """Competition type enumeration."""
+
     IN_HOUSE = 0
     IARC = 1
     CUSTOM = 2
-
 
 
 # Competition name mapping
@@ -31,4 +31,3 @@ PLATFORM_NAMES = {
 # Default values
 DEFAULT_COMPETITION = Competition.IN_HOUSE
 DEFAULT_USE_SCORING = False
-

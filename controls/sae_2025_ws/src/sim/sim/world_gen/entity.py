@@ -1,21 +1,23 @@
 from ros_gz_interfaces.msg import EntityFactory
 from geometry_msgs.msg import Pose
 import os
-
 from tf_transformations import quaternion_from_euler
+
 
 class Entity:
     """
     Docstring for Entity
     Entity class for dynamically spawning world objects via /world/{competition}/create service
     """
-    def __init__(self,
-        name: str, 
-        path_to_sdf: str, 
+
+    def __init__(
+        self,
+        name: str,
+        path_to_sdf: str,
         position: tuple[float, float, float],
         rpy: tuple[float, float, float],
-        world: str):
-
+        world: str,
+    ):
         self.name = name
         self.path_to_sdf = os.path.expanduser(path_to_sdf)
         self.position = position
@@ -39,6 +41,6 @@ class Entity:
         ent_fact.pose = pose
         ent_fact.relative_to = self.world
         return ent_fact
-    
+
     def to_pose(self):
-        return self.position + self.rpy #(x, y, z, r, p, y)
+        return self.position + self.rpy  # (x, y, z, r, p, y)

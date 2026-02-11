@@ -89,12 +89,14 @@ def check(frame1, frame2, range):
 
     return kl_divergence(region1, region2)
 
+
 def recalibrate(frame1, frame2, range):
     try:
         print("THE DIVERGENCE IS " + (str)(check(frame1, frame2, range)))
     except ValueError as e:
         print(f"Error: {e}")
     return (check(frame1, frame2, range)) > 5
+
 
 if __name__ == "__main__":
     # Example usage

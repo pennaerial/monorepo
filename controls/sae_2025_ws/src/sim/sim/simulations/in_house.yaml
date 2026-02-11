@@ -10,6 +10,8 @@ world:
     max_dist: 1
     template_world: "src/sim/sim/world_gen/worlds/template.sdf"   # Gazebo world template
     # output_filename is optional - defaults to competition name
+    physics:
+      friction: 0.0 # friction coefficient for the ground plane
 
   
 # Scoring parameters
