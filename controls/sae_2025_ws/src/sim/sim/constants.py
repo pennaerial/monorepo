@@ -14,6 +14,7 @@ class Competition(IntEnum):
     CUSTOM = 2
     SAE = 3
 
+
 # Competition name mapping
 COMPETITION_NAMES = {
     Competition.IN_HOUSE: "in_house",

@@ -12,6 +12,7 @@ class SAEWorldNode(WorldNode):
     World generation node for SAE competition.
     Generates the environment for the SAE competition.
     """
+
     def __init__(
         self,
         template_world: str,
