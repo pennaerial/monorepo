@@ -10,6 +10,7 @@ import importlib
 import inspect
 import ast
 from px4_msgs.msg import VehicleStatus
+from std_srvs.srv import Trigger
 
 VISION_NODE_PATH = "uav.vision_nodes"
 
@@ -29,7 +30,10 @@ class ModeManager(Node):
         vehicle_class=Vehicle.MULTICOPTER,
     ) -> None:
         super().__init__("mission_node")
-        self.timer = self.create_timer(0.1, self.spin_once)
+        self.timer = None
+        self.start_mission_trigger = self.create_service(
+            Trigger, "/mode_manager/start_mission", self.trigger_world_gen_req
+        )
         self.modes = {}
         self.transitions = {}
         self.active_mode = None
@@ -44,6 +48,14 @@ class ModeManager(Node):
         self.setup_vision(vision_nodes)
         self.setup_modes(mode_map)
         self.servo_only = servo_only
+
+
+    def trigger_world_gen_req(self, request, response):
+        self.get_logger().info("MODE MANAGER | Starting Mission!")
+        self.timer = self.create_timer(0.1, self.spin_once)
+        response.success = True
+        response.message = ("Starting Mission!")
+        return response
 
     def get_active_mode(self) -> Mode:
         """
