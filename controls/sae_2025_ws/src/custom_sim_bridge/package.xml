@@ -10,6 +10,11 @@
   <buildtool_depend>ament_cmake</buildtool_depend>
 
   <depend>rclcpp</depend>
+  <depend>sim_interfaces</depend>
+  <depend>generate_parameter_library</depend>
+  
+  <build_depend>gz-transport13</build_depend>
+  <build_depend>gz-msgs10</build_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
