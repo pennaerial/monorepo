@@ -30,7 +30,7 @@ class ModeManager(Node):
         vehicle_class=Vehicle.MULTICOPTER,
     ) -> None:
         super().__init__("mission_node")
-        self.timer = None #delayed start until start mission trigger
+        self.timer = None  # delayed start until start mission trigger
         self.start_mission_srv = self.create_service(
             Trigger, "/mode_manager/start_mission", self.start_mission_req
         )
@@ -48,7 +48,7 @@ class ModeManager(Node):
         self.setup_vision(vision_nodes)
         self.setup_modes(mode_map)
         self.servo_only = servo_only
-    
+
     def start_mission_req(self, request, response):
         self.get_logger().info("MODE MANAGER | Starting Mission!")
         self.timer = self.create_timer(0.1, self.spin_once)
@@ -220,7 +220,7 @@ class ModeManager(Node):
                         f"Error in mode {self.active_mode}. Switching to failsafe."
                     )
                     self.uav.failsafe = True
-                elif state == 'terminate':
+                elif state == "terminate":
                     self.get_logger().info("Mission has completed.")
                     self.destroy_node()
                 elif state != "continue":

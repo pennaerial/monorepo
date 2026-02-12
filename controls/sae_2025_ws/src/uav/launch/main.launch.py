@@ -216,7 +216,7 @@ def launch_setup(context, *args, **kwargs):
                     mission_started["value"] = True
                     return [
                         LogInfo(msg="[launcher] Processes ready, starting mission"),
-                        mission_start_trigger
+                        mission_start_trigger,
                     ]
             return None
 

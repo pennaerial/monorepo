@@ -37,7 +37,9 @@ app.add_middleware(
 config = {
     "pi_user": os.environ.get("PI_USER", "penn"),
     "pi_host": os.environ.get("PI_HOST", "penn-desktop.local"),
-    "remote_dir": os.environ.get("REMOTE_DIR", "/home/penn/monorepo/controls/sae_2025_ws"),
+    "remote_dir": os.environ.get(
+        "REMOTE_DIR", "/home/penn/monorepo/controls/sae_2025_ws"
+    ),
     "ssh_key": os.environ.get("SSH_KEY", ""),
     "ssh_pass": os.environ.get("SSH_PASS", ""),
     "github_repo": os.environ.get("GITHUB_REPO", ""),
@@ -46,15 +48,17 @@ config = {
 }
 
 # Auto-detect GitHub repo from git remote if not set
-if not config['github_repo']:
+if not config["github_repo"]:
     try:
         result = subprocess.run(
             ["git", "remote", "get-url", "origin"],
-            capture_output=True, text=True, cwd=Path(__file__).parent,
+            capture_output=True,
+            text=True,
+            cwd=Path(__file__).parent,
         )
         match = re.search(r"github\.com[:/]([^/]+/[^/.]+)", result.stdout)
         if match:
-            config['github_repo'] = match.group(1).strip()
+            config["github_repo"] = match.group(1).strip()
     except Exception:
         pass
 
@@ -82,19 +86,26 @@ async def set_config(
     """Update configuration at runtime."""
     updates = {}
     if pi_user is not None:
-        config["pi_user"] = pi_user; updates["pi_user"] = pi_user
+        config["pi_user"] = pi_user
+        updates["pi_user"] = pi_user
     if pi_host is not None:
-        config["pi_host"] = pi_host; updates["pi_host"] = pi_host
+        config["pi_host"] = pi_host
+        updates["pi_host"] = pi_host
     if remote_dir is not None:
-        config['remote_dir'] = remote_dir; updates["remote_dir"] = remote_dir
+        config["remote_dir"] = remote_dir
+        updates["remote_dir"] = remote_dir
     if ssh_key is not None:
-        config["ssh_key"] = ssh_key; updates["ssh_key"] = ssh_key
+        config["ssh_key"] = ssh_key
+        updates["ssh_key"] = ssh_key
     if ssh_pass is not None and ssh_pass != "••••":
-        config["ssh_pass"] = ssh_pass; updates["ssh_pass"] = "(set)"
+        config["ssh_pass"] = ssh_pass
+        updates["ssh_pass"] = "(set)"
     if github_repo is not None:
-        config['github_repo'] = github_repo; updates["github_repo"] = github_repo
+        config["github_repo"] = github_repo
+        updates["github_repo"] = github_repo
     if hotspot_name is not None:
-        config["hotspot_name"] = hotspot_name; updates["hotspot_name"] = hotspot_name
+        config["hotspot_name"] = hotspot_name
+        updates["hotspot_name"] = hotspot_name
 
     return {"success": True, "output": f"Updated: {', '.join(updates.keys())}"}
 
@@ -130,7 +141,9 @@ def _run_ssh_sync(command: str, timeout: int = 15) -> subprocess.CompletedProces
     return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
 
 
-def _run_scp_sync(local_path: str, remote_path: str, timeout: int = 300) -> subprocess.CompletedProcess:
+def _run_scp_sync(
+    local_path: str, remote_path: str, timeout: int = 300
+) -> subprocess.CompletedProcess:
     """Copy a file to the Pi via SCP (blocking)."""
     cmd = ["scp"] + _ssh_opts() + [local_path, f"{_ssh_target()}:{remote_path}"]
     if config["ssh_pass"]:
@@ -148,7 +161,9 @@ async def _run_ssh(command: str, timeout: int = 15) -> subprocess.CompletedProce
     return await asyncio.to_thread(_run_ssh_sync, command, timeout)
 
 
-async def _run_scp(local_path: str, remote_path: str, timeout: int = 300) -> subprocess.CompletedProcess:
+async def _run_scp(
+    local_path: str, remote_path: str, timeout: int = 300
+) -> subprocess.CompletedProcess:
     """Copy a file to the Pi via SCP (non-blocking)."""
     return await asyncio.to_thread(_run_scp_sync, local_path, remote_path, timeout)
 
@@ -159,31 +174,45 @@ def _friendly_ssh_error(stderr: str) -> str:
     lower = raw.lower()
     target = _ssh_target()
 
-    if any(s in lower for s in (
-        "could not resolve hostname",
-        "name or service not known",
-        "no address associated with hostname",
-        "nodename nor servname provided",
-        "temporary failure in name resolution",
-    )):
+    if any(
+        s in lower
+        for s in (
+            "could not resolve hostname",
+            "name or service not known",
+            "no address associated with hostname",
+            "nodename nor servname provided",
+            "temporary failure in name resolution",
+        )
+    ):
         return (
             f"Cannot find {target}. Connect to the Pi WiFi and make sure "
             "Pi host/user in Settings are correct."
         )
 
-    if any(s in lower for s in (
-        "no route to host",
-        "connection refused",
-        "network is unreachable",
-        "operation timed out",
-        "connection timed out",
-    )):
+    if any(
+        s in lower
+        for s in (
+            "no route to host",
+            "connection refused",
+            "network is unreachable",
+            "operation timed out",
+            "connection timed out",
+        )
+    ):
         return (
             f"Cannot reach {target}. Connect to the Pi WiFi and make sure "
             "you are SSHing into the correct Pi host."
         )
 
-    if any(s in lower for s in ("permission denied", "authentication failed", "auth fail", "access denied")):
+    if any(
+        s in lower
+        for s in (
+            "permission denied",
+            "authentication failed",
+            "auth fail",
+            "access denied",
+        )
+    ):
         if config["ssh_pass"]:
             return (
                 f"SSH reached {target}, but the configured password was rejected. "
@@ -261,10 +290,20 @@ async def _mission_launch_status() -> dict:
     """
     r = await _run_ssh(cmd, timeout=8)
     if r.returncode != 0:
-        return {"success": False, "running": False, "state": "error", "error": _friendly_ssh_error(r.stderr)}
+        return {
+            "success": False,
+            "running": False,
+            "state": "error",
+            "error": _friendly_ssh_error(r.stderr),
+        }
     out = r.stdout.strip()
     if out.startswith("RUNNING:"):
-        return {"success": True, "running": True, "state": "running", "pid": out.split(":", 1)[1]}
+        return {
+            "success": True,
+            "running": True,
+            "state": "running",
+            "pid": out.split(":", 1)[1],
+        }
     if out == "NOT_PREPARED":
         return {"success": True, "running": False, "state": "not_prepared"}
     return {"success": True, "running": False, "state": "stopped"}
@@ -286,11 +325,19 @@ async def connection_status():
                 "target": _ssh_target(),
                 "info": info.stdout.strip() if info.returncode == 0 else "",
             }
-        return {"success": True, "connected": False, "error": _friendly_ssh_error(r.stderr)}
+        return {
+            "success": True,
+            "connected": False,
+            "error": _friendly_ssh_error(r.stderr),
+        }
     except subprocess.TimeoutExpired:
         return {"success": True, "connected": False, "error": _friendly_ssh_timeout()}
     except Exception as e:
-        return {"success": True, "connected": False, "error": _friendly_ssh_error(str(e))}
+        return {
+            "success": True,
+            "connected": False,
+            "error": _friendly_ssh_error(str(e)),
+        }
 
 
 @app.get("/api/connection/ssh-command")
@@ -310,7 +357,9 @@ async def ssh_command():
 async def wifi_status():
     """Get Pi's current WiFi status via SSH."""
     try:
-        r = await _run_ssh("nmcli -f NAME,TYPE,DEVICE,STATE con show --active | tail -n +2", timeout=15)
+        r = await _run_ssh(
+            "nmcli -f NAME,TYPE,DEVICE,STATE con show --active | tail -n +2", timeout=15
+        )
         if r.returncode != 0:
             return {"success": False, "error": _friendly_ssh_error(r.stderr)}
 
@@ -318,17 +367,21 @@ async def wifi_status():
         for line in r.stdout.strip().split("\n"):
             if not line.strip():
                 continue
-            parts = re.split(r'\s{2,}', line.strip())
+            parts = re.split(r"\s{2,}", line.strip())
             if len(parts) >= 4:
-                connections.append({
-                    "name": parts[0].strip(),
-                    "type": parts[1].strip(),
-                    "device": parts[2].strip(),
-                    "state": parts[3].strip(),
-                })
+                connections.append(
+                    {
+                        "name": parts[0].strip(),
+                        "type": parts[1].strip(),
+                        "device": parts[2].strip(),
+                        "state": parts[3].strip(),
+                    }
+                )
 
         is_hotspot = any(c["name"] == config["hotspot_name"] for c in connections)
-        wifi_con = next((c for c in connections if c["type"] == "802-11-wireless"), None)
+        wifi_con = next(
+            (c for c in connections if c["type"] == "802-11-wireless"), None
+        )
 
         return {
             "success": True,
@@ -352,14 +405,18 @@ async def wifi_scan():
             timeout=20,
         )
         if r.returncode != 0:
-            return {"success": False, "error": _friendly_ssh_error(r.stderr), "networks": []}
+            return {
+                "success": False,
+                "error": _friendly_ssh_error(r.stderr),
+                "networks": [],
+            }
 
         networks = []
         for line in r.stdout.strip().split("\n"):
             if not line.strip():
                 continue
             # nmcli tabular output is whitespace-aligned; parse by splitting on 2+ spaces
-            parts = re.split(r'\s{2,}', line.strip())
+            parts = re.split(r"\s{2,}", line.strip())
             if len(parts) >= 3:
                 ssid = parts[0].strip()
                 if not ssid:
@@ -369,11 +426,13 @@ async def wifi_scan():
                 except ValueError:
                     signal = 0
                 security = parts[2].strip() if len(parts) > 2 else ""
-                networks.append({
-                    "ssid": ssid,
-                    "signal": signal,
-                    "security": security,
-                })
+                networks.append(
+                    {
+                        "ssid": ssid,
+                        "signal": signal,
+                        "security": security,
+                    }
+                )
 
         # Deduplicate by SSID, keep strongest signal
         seen: dict = {}
@@ -394,7 +453,10 @@ async def wifi_connect(ssid: str = Form(...), password: str = Form("")):
     """Connect the Pi to a WiFi network (disables hotspot)."""
     try:
         # Bring down hotspot
-        await _run_ssh(f"nmcli con down '{config['hotspot_name']}' 2>/dev/null; sleep 2", timeout=15)
+        await _run_ssh(
+            f"nmcli con down '{config['hotspot_name']}' 2>/dev/null; sleep 2",
+            timeout=15,
+        )
 
         # Connect
         pwd_arg = f' password "{password}"' if password else ""
@@ -403,7 +465,10 @@ async def wifi_connect(ssid: str = Form(...), password: str = Form("")):
         if r.returncode != 0:
             # Restore hotspot on failure
             await _run_ssh(f"nmcli con up '{config['hotspot_name']}'", timeout=15)
-            return {"success": False, "error": _format_remote_error(r.stderr, "Failed to connect")}
+            return {
+                "success": False,
+                "error": _format_remote_error(r.stderr, "Failed to connect"),
+            }
 
         return {"success": True, "output": f"Pi connected to {ssid}"}
     except Exception as e:
@@ -431,7 +496,9 @@ async def switch_local_wifi(ssid: str = Form(...), password: str = Form("")):
         cmd = ["networksetup", "-setairportnetwork", "en0", ssid]
         if password:
             cmd.append(password)
-        r = await asyncio.to_thread(subprocess.run, cmd, capture_output=True, text=True, timeout=15)
+        r = await asyncio.to_thread(
+            subprocess.run, cmd, capture_output=True, text=True, timeout=15
+        )
         if r.returncode != 0:
             return {"success": False, "error": r.stderr.strip() or r.stdout.strip()}
         return {"success": True, "output": f"Mac connected to {ssid}"}
@@ -466,19 +533,35 @@ def _require_httpx():
 async def current_build():
     """Get info about the currently deployed build on the Pi."""
     try:
-        r = await _run_ssh(f"cat {config['remote_dir']}/install/BUILD_INFO.txt 2>/dev/null", timeout=10)
+        r = await _run_ssh(
+            f"cat {config['remote_dir']}/install/BUILD_INFO.txt 2>/dev/null", timeout=10
+        )
         if r.returncode == 0 and r.stdout.strip():
             return {"success": True, "installed": True, "info": r.stdout.strip()}
 
-        r = await _run_ssh(f"test -d {config['remote_dir']}/install && echo yes || echo no", timeout=10)
+        r = await _run_ssh(
+            f"test -d {config['remote_dir']}/install && echo yes || echo no", timeout=10
+        )
         if r.returncode != 0:
-            return {"success": True, "installed": False, "info": _friendly_ssh_error(r.stderr)}
+            return {
+                "success": True,
+                "installed": False,
+                "info": _friendly_ssh_error(r.stderr),
+            }
         if r.stdout.strip() == "yes":
-            return {"success": True, "installed": True, "info": "Build installed (no BUILD_INFO.txt)"}
+            return {
+                "success": True,
+                "installed": True,
+                "info": "Build installed (no BUILD_INFO.txt)",
+            }
 
         return {"success": True, "installed": False, "info": "No build deployed"}
     except Exception as e:
-        return {"success": True, "installed": False, "info": _friendly_ssh_error(str(e))}
+        return {
+            "success": True,
+            "installed": False,
+            "info": _friendly_ssh_error(str(e)),
+        }
 
 
 @app.post("/api/builds/upload")
@@ -499,11 +582,14 @@ async def upload_build(file: UploadFile = File(...)):
         os.unlink(tmp_path)
 
         if r.returncode != 0:
-            return {"success": False, "error": _format_remote_error(r.stderr, "SCP failed")}
+            return {
+                "success": False,
+                "error": _format_remote_error(r.stderr, "SCP failed"),
+            }
 
         # Backup + extract on Pi
         extract_cmd = f"""
-            cd {config['remote_dir']}
+            cd {config["remote_dir"]}
             if [ -d install ]; then
                 rm -rf install.bak src.bak
                 mv install install.bak 2>/dev/null || true
@@ -515,7 +601,10 @@ async def upload_build(file: UploadFile = File(...)):
         """
         r = await _run_ssh(extract_cmd, timeout=120)
         if r.returncode != 0:
-            return {"success": False, "error": _format_remote_error(r.stderr, "Extract failed")}
+            return {
+                "success": False,
+                "error": _format_remote_error(r.stderr, "Extract failed"),
+            }
 
         return {"success": True, "output": f"Deployed {file.filename} to Pi"}
     except Exception as e:
@@ -525,7 +614,7 @@ async def upload_build(file: UploadFile = File(...)):
 @app.get("/api/builds/list")
 async def list_builds():
     """List available builds from GitHub Releases."""
-    if not config['github_repo']:
+    if not config["github_repo"]:
         return {"success": False, "error": "GITHUB_REPO not configured", "builds": []}
     try:
         httpx = _require_httpx()
@@ -544,14 +633,20 @@ async def list_builds():
         for rel in releases:
             if rel.get("tag_name", "").startswith("build-"):
                 assets = rel.get("assets", [])
-                builds.append({
-                    "tag": rel["tag_name"],
-                    "sha": rel["tag_name"].replace("build-", ""),
-                    "name": rel.get("name", rel["tag_name"]),
-                    "date": rel.get("published_at", "")[:10],
-                    "download_url": assets[0]["browser_download_url"] if assets else None,
-                    "size_mb": round(assets[0]["size"] / 1_000_000, 1) if assets else None,
-                })
+                builds.append(
+                    {
+                        "tag": rel["tag_name"],
+                        "sha": rel["tag_name"].replace("build-", ""),
+                        "name": rel.get("name", rel["tag_name"]),
+                        "date": rel.get("published_at", "")[:10],
+                        "download_url": assets[0]["browser_download_url"]
+                        if assets
+                        else None,
+                        "size_mb": round(assets[0]["size"] / 1_000_000, 1)
+                        if assets
+                        else None,
+                    }
+                )
         return {"success": True, "builds": builds[:20]}
     except Exception as e:
         return {"success": False, "error": str(e), "builds": []}
@@ -560,7 +655,7 @@ async def list_builds():
 @app.post("/api/builds/download")
 async def download_build(tag: str = Form(...)):
     """Download a build from GitHub on your Mac, then SCP it to the Pi."""
-    if not config['github_repo']:
+    if not config["github_repo"]:
         return {"success": False, "error": "GITHUB_REPO not configured"}
     try:
         httpx = _require_httpx()
@@ -584,7 +679,9 @@ async def download_build(tag: str = Form(...)):
         # Download to temp file on Mac
         tmp_path = tempfile.mktemp(suffix=".tar.gz")
         async with httpx.AsyncClient(timeout=300, follow_redirects=True) as client:
-            async with client.stream("GET", download_url, headers=_github_headers()) as resp:
+            async with client.stream(
+                "GET", download_url, headers=_github_headers()
+            ) as resp:
                 resp.raise_for_status()
                 with open(tmp_path, "wb") as f:
                     async for chunk in resp.aiter_bytes():
@@ -597,11 +694,14 @@ async def download_build(tag: str = Form(...)):
         os.unlink(tmp_path)
 
         if r.returncode != 0:
-            return {"success": False, "error": _format_remote_error(r.stderr, "SCP failed")}
+            return {
+                "success": False,
+                "error": _format_remote_error(r.stderr, "SCP failed"),
+            }
 
         # Backup + extract on Pi
         extract_cmd = f"""
-            cd {config['remote_dir']}
+            cd {config["remote_dir"]}
             if [ -d install ]; then
                 rm -rf install.bak src.bak
                 mv install install.bak 2>/dev/null || true
@@ -613,7 +713,10 @@ async def download_build(tag: str = Form(...)):
         """
         r = await _run_ssh(extract_cmd, timeout=120)
         if r.returncode != 0:
-            return {"success": False, "error": _format_remote_error(r.stderr, "Extract failed")}
+            return {
+                "success": False,
+                "error": _format_remote_error(r.stderr, "Extract failed"),
+            }
 
         return {"success": True, "output": f"Downloaded {tag} and deployed to Pi"}
     except Exception as e:
@@ -625,7 +728,7 @@ async def rollback_build():
     """Rollback to the previous build on the Pi."""
     try:
         rollback_cmd = f"""
-            cd {config['remote_dir']}
+            cd {config["remote_dir"]}
             if [ ! -d install.bak ]; then
                 echo "NO_BACKUP"
                 exit 1
@@ -666,7 +769,10 @@ async def trigger_failsafe():
         # timeout(1) returns 124 when it stops the publisher; that still means
         # the command ran and published while active.
         if r.returncode not in (0, 124):
-            return {"success": False, "error": _format_remote_error(r.stderr, "Failsafe command failed")}
+            return {
+                "success": False,
+                "error": _format_remote_error(r.stderr, "Failsafe command failed"),
+            }
         return {"success": True, "output": "Failsafe triggered"}
     except subprocess.TimeoutExpired:
         return {"success": False, "error": _friendly_ssh_timeout()}
@@ -713,7 +819,11 @@ async def mission_launch_logs(lines: int = 200, offset: int | None = None):
                 fi
             """
         else:
-            cat_cmd = "cat \"$log_file\"" if line_count == 0 else f"tail -n {line_count} \"$log_file\""
+            cat_cmd = (
+                'cat "$log_file"'
+                if line_count == 0
+                else f'tail -n {line_count} "$log_file"'
+            )
             line_count = 0 if lines <= 0 else max(20, min(lines, 20000))
             cmd = f"""
                 log_file={_q(paths["log"])}
@@ -724,7 +834,11 @@ async def mission_launch_logs(lines: int = 200, offset: int | None = None):
 
         r = await _run_ssh(cmd, timeout=10)
         if r.returncode != 0:
-            return {"success": False, "running": status.get("running", False), "error": _friendly_ssh_error(r.stderr)}
+            return {
+                "success": False,
+                "running": status.get("running", False),
+                "error": _friendly_ssh_error(r.stderr),
+            }
 
         if offset is not None:
             out = r.stdout or ""
@@ -754,7 +868,11 @@ async def mission_launch_logs(lines: int = 200, offset: int | None = None):
             "logs": r.stdout,
         }
     except Exception as e:
-        return {"success": False, "running": False, "error": _friendly_ssh_error(str(e))}
+        return {
+            "success": False,
+            "running": False,
+            "error": _friendly_ssh_error(str(e)),
+        }
 
 
 @app.post("/api/mission/prepare")
@@ -843,13 +961,31 @@ async def prepare_mission():
         if match:
             pid = match.group(2)
             if match.group(1) == "RESTARTED":
-                return {"success": True, "output": "Mission launch restarted", "running": True, "pid": pid}
-            return {"success": True, "output": "Mission launch started", "running": True, "pid": pid}
+                return {
+                    "success": True,
+                    "output": "Mission launch restarted",
+                    "running": True,
+                    "pid": pid,
+                }
+            return {
+                "success": True,
+                "output": "Mission launch started",
+                "running": True,
+                "pid": pid,
+            }
 
         if r.returncode != 0:
-            return {"success": False, "error": _format_remote_error(r.stderr or r.stdout, "Prepare mission failed")}
+            return {
+                "success": False,
+                "error": _format_remote_error(
+                    r.stderr or r.stdout, "Prepare mission failed"
+                ),
+            }
 
-        return {"success": False, "error": "Prepare mission failed (launch did not start)"}
+        return {
+            "success": False,
+            "error": "Prepare mission failed (launch did not start)",
+        }
     except Exception as e:
         return {"success": False, "error": _friendly_ssh_error(str(e))}
 
@@ -908,7 +1044,12 @@ async def stop_mission():
         """
         r = await _run_ssh(f"bash -lc {_q(cmd)}", timeout=20)
         if r.returncode != 0:
-            return {"success": False, "error": _format_remote_error(r.stderr or r.stdout, "Stop mission failed")}
+            return {
+                "success": False,
+                "error": _format_remote_error(
+                    r.stderr or r.stdout, "Stop mission failed"
+                ),
+            }
 
         out = (r.stdout or "").strip()
         if "NOT_RUNNING" in out:
@@ -930,8 +1071,16 @@ async def start_mission():
         )
         r = await _run_ssh(f"bash -lc {_q(cmd)}", timeout=20)
         if r.returncode != 0:
-            return {"success": False, "error": _format_remote_error(r.stderr or r.stdout, "Start mission failed")}
-        return {"success": True, "output": r.stdout.strip() or "Start mission service called"}
+            return {
+                "success": False,
+                "error": _format_remote_error(
+                    r.stderr or r.stdout, "Start mission failed"
+                ),
+            }
+        return {
+            "success": True,
+            "output": r.stdout.strip() or "Start mission service called",
+        }
     except subprocess.TimeoutExpired:
         return {"success": False, "error": "Start mission service call timed out"}
     except Exception as e:
@@ -945,7 +1094,10 @@ async def get_launch_params():
         params_path = _mission_paths()["launch_params"]
         r = await _run_ssh(f"cat {_q(params_path)}", timeout=10)
         if r.returncode != 0:
-            return {"success": False, "error": _format_remote_error(r.stderr, "Read launch params failed")}
+            return {
+                "success": False,
+                "error": _format_remote_error(r.stderr, "Read launch params failed"),
+            }
         return {"success": True, "content": r.stdout}
     except Exception as e:
         return {"success": False, "error": _friendly_ssh_error(str(e))}
@@ -965,7 +1117,10 @@ async def set_launch_params(content: str = Form(...)):
 
         r = await _run_scp(tmp_path, params_path, timeout=30)
         if r.returncode != 0:
-            return {"success": False, "error": _format_remote_error(r.stderr, "Write launch params failed")}
+            return {
+                "success": False,
+                "error": _format_remote_error(r.stderr, "Write launch params failed"),
+            }
 
         return {"success": True, "output": "launch_params.yaml updated"}
     except Exception as e:
@@ -979,9 +1134,12 @@ async def set_launch_params(content: str = Form(...)):
 
 frontend_dist = Path(__file__).parent / "frontend" / "dist"
 if frontend_dist.exists():
-    app.mount("/", StaticFiles(directory=str(frontend_dist), html=True), name="frontend")
+    app.mount(
+        "/", StaticFiles(directory=str(frontend_dist), html=True), name="frontend"
+    )
 
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8080)
