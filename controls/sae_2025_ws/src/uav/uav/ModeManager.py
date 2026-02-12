@@ -34,6 +34,9 @@ class ModeManager(Node):
         self.start_mission_trigger = self.create_service(
             Trigger, "/mode_manager/start_mission", self.trigger_world_gen_req
         )
+        self.failsafe_trigger_service = self.create_service(
+            Trigger, "/mode_manager/failsafe", self.trigger_failsafe
+        )
         self.modes = {}
         self.transitions = {}
         self.active_mode = None
@@ -54,6 +57,16 @@ class ModeManager(Node):
         self.timer = self.create_timer(0.1, self.spin_once)
         response.success = True
         response.message = "Starting Mission!"
+        return response
+
+    def trigger_failsafe(self, request, response):
+        self.get_logger().info("Failsafe triggered via service call")
+
+        self.uav.failsafe_trigger = True
+        self.uav.failsafe = self.uav.failsafe_px4 or self.uav.failsafe_trigger
+
+        response.success = True
+        response.message = "Failsafe triggered."
         return response
 
     def get_active_mode(self) -> Mode:

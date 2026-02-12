@@ -9,8 +9,7 @@ import uuid
 import rclpy
 from rclpy.node import Node
 from uav.utils import camel_to_snake
-from std_msgs.msg import Bool
-from rclpy.qos import QoSProfile, DurabilityPolicy, ReliabilityPolicy
+from std_srvs.srv import Trigger
 
 
 class VisionNode(Node):
@@ -81,13 +80,8 @@ class VisionNode(Node):
 
             self.bridge = CvBridge()
         self.display = display
-        qos_profile = QoSProfile(
-            depth=10,
-            durability=DurabilityPolicy.TRANSIENT_LOCAL,  # Ensures messages persist for new subscribers
-            reliability=ReliabilityPolicy.RELIABLE,
-        )
-        self.failsafe_publisher = self.create_publisher(
-            Bool, "/failsafe_trigger", qos_profile
+        self.failsafe_trigger_client = self.create_client(
+            Trigger, "/mode_manager/failsafe"
         )
 
     def image_callback(self, msg: Image):
@@ -189,4 +183,9 @@ class VisionNode(Node):
         cv2.destroyAllWindows()
 
     def publish_failsafe(self):
-        self.failsafe_publisher.publish(Bool(data=True))
+        future = self.failsafe_trigger_client.call_async(Trigger.Request(data=True))
+        rclpy.spin_until_future_complete(self, future)
+        if future.result().success:
+            self.get_logger().info("Failsafe triggered.")
+        else:
+            self.get_logger().error("Failed to trigger failsafe.")
