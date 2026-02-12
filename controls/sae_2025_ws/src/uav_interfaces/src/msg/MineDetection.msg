@@ -1,0 +1,4 @@
+int32 vehicle_id
+geometry_msgs/PoseStamped detection_pose
+float32 confidence
+builtin_interfaces/Time timestamp

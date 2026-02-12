@@ -1,0 +1,5 @@
+int32 my_vehicle_id
+int32 peer_id
+string link_status
+builtin_interfaces/Time last_peer_update
+float32 age_seconds

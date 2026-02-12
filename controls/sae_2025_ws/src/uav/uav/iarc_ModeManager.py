@@ -33,6 +33,9 @@ class ModeManager(Node):
         self.servo_only = servo_only
         self.safe_test = safe_test
 
+        # Publish current autonomous mode for P2P sharing
+        self._mode_pub = self.create_publisher(String, f'/vehicle_{self.vehicle_id}/current_mode', 10)
+
         # safe_test command/status IO (used by uav.autonomous_modes.iarc_SafetestModes)
         if self.safe_test:
             if not hasattr(self, '_safe_test_cmd'):
@@ -168,6 +171,10 @@ class ModeManager(Node):
         if mode_name in self.modes:
             self.active_mode = mode_name
             self.get_active_mode().activate()
+            # Publish mode change for P2P network
+            mode_msg = String()
+            mode_msg.data = mode_name
+            self._mode_pub.publish(mode_msg)
         else:
             self.get_logger().error(f"Mode {mode_name} not found.")
 
