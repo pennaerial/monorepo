@@ -762,7 +762,7 @@ async def trigger_failsafe():
             f"cd {_q(config['remote_dir'])} && "
             f"source /opt/ros/humble/setup.bash && "
             f"source install/setup.bash && "
-            f'timeout 3 ros2 topic pub /failsafe_trigger std_msgs/msg/Bool "{{data: true}}"'
+            f'ros2 service call /mode_manager/failsafe std_srvs/srv/Trigger "{{}}"'
         )
         r = await _run_ssh(f"bash -c '{cmd}'", timeout=15)
         # timeout(1) returns 124 when it stops the publisher; that still means

@@ -29,6 +29,7 @@ log
 crash course/data/MNIST/raw/*
 */src/actuator_msgs/
 */venv/
+*/dist/*
 
 # submodules
 .gitmodules
