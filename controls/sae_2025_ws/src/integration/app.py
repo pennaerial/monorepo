@@ -713,11 +713,12 @@ async def mission_launch_logs(lines: int = 200, offset: int | None = None):
                 fi
             """
         else:
+            cat_cmd = "cat \"$log_file\"" if line_count == 0 else f"tail -n {line_count} \"$log_file\""
             line_count = 0 if lines <= 0 else max(20, min(lines, 20000))
             cmd = f"""
                 log_file={_q(paths["log"])}
                 if [ -f "$log_file" ]; then
-                    {"cat \"$log_file\"" if line_count == 0 else f"tail -n {line_count} \"$log_file\""}
+                    {cat_cmd}
                 fi
             """
 
