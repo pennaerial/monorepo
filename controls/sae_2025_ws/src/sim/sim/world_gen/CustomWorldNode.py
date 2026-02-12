@@ -5,6 +5,7 @@ import rclpy
 from ros_gz_interfaces.srv import SpawnEntity
 import sys
 import json
+import numpy as np
 
 
 class CustomWorldNode(WorldNode):
@@ -26,27 +27,29 @@ class CustomWorldNode(WorldNode):
         )
 
     def generate_world(self):
+        # Spawn pink DLZ at origin
+        dlz = Entity(
+            name="dlz_pink",
+            path_to_sdf="~/.simulation-gazebo/models/dlz/model.sdf",
+            position=(0, 0, 0),
+            rpy=(0.0, 0.0, 0.0),
+            world=self.world_name,
+        )
+        req_dlz = SpawnEntity.Request()
+        req_dlz.entity_factory = dlz.to_entity_factory_msg()
+        self.spawn_entity_client.call_async(req_dlz)
+
+        # Spawn payload in center of DLZ (DLZ covers X: 3.8-6.24, Y: -1.24-1.2)
         payload_0 = Entity(
             name="payload_0",
             path_to_sdf="~/.simulation-gazebo/models/payload/model.sdf",
-            position=(0, 0, 0.5),
+            position=(5.02, -0.02, 0.5),
             rpy=(0.0, 0.0, 0.0),
             world=self.world_name,
         )
         req = SpawnEntity.Request()
         req.entity_factory = payload_0.to_entity_factory_msg()
         self.spawn_entity_client.call_async(req)
-
-        payload_1 = Entity(
-            name="payload_1",
-            path_to_sdf="~/.simulation-gazebo/models/payload/model.sdf",
-            position=(0.8, 0.8, 0.5),
-            rpy=(0.0, 0.0, 0.0),
-            world=self.world_name,
-        )
-        req1 = SpawnEntity.Request()
-        req1.entity_factory = payload_1.to_entity_factory_msg()
-        self.spawn_entity_client.call_async(req1)
 
         return super().generate_world()
 

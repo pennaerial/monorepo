@@ -1,5 +1,5 @@
 # launch_params.yaml
-mission_name: simple_tailsitter
+mission_name: payload_edge_navigation
 uav_debug: false
 vision_debug: false
 run_mission: true

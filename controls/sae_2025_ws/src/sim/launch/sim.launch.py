@@ -245,6 +245,20 @@ def launch_setup(context, *args, **kwargs):
         name="trigger_world_gen",
     )
 
+    # Launch payload node for ground robot control
+    payload_launch = ExecuteProcess(
+        cmd=[
+            "ros2",
+            "launch",
+            "payload",
+            "payload.launch.py",
+            "payload_name:=payload_0",
+        ],
+        cwd=sae_ws_path,
+        output="screen",
+        name="payload_launch",
+    )
+
     # Initialize scoring node if requested
     scoring = None
     if use_scoring:
@@ -300,6 +314,12 @@ def launch_setup(context, *args, **kwargs):
             OnProcessStart(
                 target_action=gz_ros_bridge_create,
                 on_start=[trigger_world_gen, LogInfo(msg="World generation triggered")],
+            )
+        ),
+        RegisterEventHandler(
+            OnProcessExit(
+                target_action=trigger_world_gen,
+                on_exit=[payload_launch, LogInfo(msg="Payload node launched")],
             )
         ),
     ]

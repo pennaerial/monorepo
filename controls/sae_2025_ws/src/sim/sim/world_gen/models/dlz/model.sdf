@@ -6,12 +6,20 @@
       <inertial>
         <mass>2</mass>
       </inertial>
+      <collision name="collision">
+        <pose>5.02 -0.02 0.1 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>2.44 2.44 0.01</size>
+          </box>
+        </geometry>
+      </collision>
       <visual name="visual">
-      <pose> 3.8 1.2 .1 1.5708 0 0 </pose>
+      <pose>3.8 1.2 0.1 1.5708 0 0</pose>
         <geometry>
           <mesh>
             <uri>model://dlz/meshes/dlz.STL</uri>
-            <scale> .0025 .0025 .0025 </scale>
+            <scale> .001 .001 .001 </scale>
           </mesh>
         </geometry>
         <material>
