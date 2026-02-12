@@ -162,6 +162,11 @@ def launch_setup(context, *args, **kwargs):
         name="download_gz_models",
     )
 
+    gz_plugin_path = os.path.join(sae_ws_path, "install", "custom_gz_plugins", "lib")
+    gz_desc_path = os.path.join(
+        sae_ws_path, "install", "custom_gz_msgs", "share", "gz", "protos"
+    )
+
     spawn_world = ExecuteProcess(
         cmd=[
             "python3",
@@ -171,6 +176,10 @@ def launch_setup(context, *args, **kwargs):
         cwd=px4_path,
         output="screen",
         name="spawn_world",
+        additional_env={
+            "GZ_SIM_SYSTEM_PLUGIN_PATH": gz_plugin_path,
+            "GZ_DESCRIPTOR_PATH": gz_desc_path,
+        },
     )
 
     gz_ros_bridge_create = Node(
