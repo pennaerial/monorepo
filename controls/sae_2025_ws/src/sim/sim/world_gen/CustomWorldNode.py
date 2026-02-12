@@ -5,7 +5,6 @@ import rclpy
 from ros_gz_interfaces.srv import SpawnEntity
 import sys
 import json
-import numpy as np
 
 
 class CustomWorldNode(WorldNode):
