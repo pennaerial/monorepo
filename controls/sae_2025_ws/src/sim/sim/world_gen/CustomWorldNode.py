@@ -29,12 +29,17 @@ class CustomWorldNode(WorldNode):
         payload_0 = Entity(
             name="payload_0",
             path_to_sdf="~/.simulation-gazebo/models/payload/model.sdf",
-            position=(0, 0, 0.5),
+            position=(-1.0, 0, 0.5),
             rpy=(0.0, 0.0, 0.0),
             world=self.world_name,
         )
+        ef0 = payload_0.to_entity_factory_msg()
+        self.get_logger().info(
+            "DEBUG | CustomWorldNode spawning payload_0 at (0, 0, 0.5), relative_to='%s'"
+            % (getattr(ef0, "relative_to", "?") or "?")
+        )
         req = SpawnEntity.Request()
-        req.entity_factory = payload_0.to_entity_factory_msg()
+        req.entity_factory = ef0
         self.spawn_entity_client.call_async(req)
 
         payload_1 = Entity(
@@ -44,8 +49,13 @@ class CustomWorldNode(WorldNode):
             rpy=(0.0, 0.0, 0.0),
             world=self.world_name,
         )
+        ef1 = payload_1.to_entity_factory_msg()
+        self.get_logger().info(
+            "DEBUG | CustomWorldNode spawning payload_1 at (0.8, 0.8, 0.5), relative_to='%s'"
+            % (getattr(ef1, "relative_to", "?") or "?")
+        )
         req1 = SpawnEntity.Request()
-        req1.entity_factory = payload_1.to_entity_factory_msg()
+        req1.entity_factory = ef1
         self.spawn_entity_client.call_async(req1)
 
         return super().generate_world()

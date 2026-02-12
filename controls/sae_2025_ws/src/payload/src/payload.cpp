@@ -38,6 +38,13 @@ Payload::Payload(const std::string& payload_name)
 void Payload::drive_callback(const payload_interfaces::msg::DriveCommand::SharedPtr msg) {
     double linear_v = msg->linear;
     double angular_v = msg->angular;
+    static int callback_count = 0;
+    if (++callback_count % 30 == 1) {
+        RCLCPP_INFO(
+            this->get_logger(),
+            "DEBUG | cmd_drive received: linear=%.2f, angular=%.2f (count=%d)",
+            linear_v, angular_v, callback_count);
+    }
     controller_->drive_command(linear_v, angular_v);
 }
 

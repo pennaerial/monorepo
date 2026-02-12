@@ -1,5 +1,5 @@
 # launch_params.yaml
-mission_name: simple_tailsitter
+mission_name: payload_drive_to_apriltag
 uav_debug: false
 vision_debug: false
 run_mission: true

@@ -17,7 +17,7 @@ setup(
             glob(os.path.join("launch", "*launch.[pxy][yma]*")),
         ),
     ],
-    install_requires=["setuptools"],
+    install_requires=["setuptools", "apriltag"],
     zip_safe=True,
     maintainer="ubuntu",
     maintainer_email="ubuntu@todo.todo",
@@ -36,6 +36,7 @@ setup(
             "mission = uav.mission:main",
             "payload_tracking_node = uav.vision_nodes.PayloadTrackingNode:main",
             "camera = uav.CameraNode:main",
+            "payload_camera_relay = uav.payload_camera_relay:main",
         ],
     },
 )

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""Mission process entry point. Service /mode_manager/start_mission is advertised by ModeManager."""
 import rclpy
 import sys
 import os
@@ -7,6 +8,7 @@ from uav.ModeManager import ModeManager
 
 
 def main():
+    print("[mission] Process started; parsing args and initializing ROS...", flush=True)
     if len(sys.argv) > 3:
         debug = sys.argv[1]
         yaml_file = sys.argv[2]
@@ -31,15 +33,21 @@ def main():
     servo_only = servo_only.lower() == "true"
     DEBUG = debug.lower() == "true"
     rclpy.init()
+    print("[mission] rclpy.init() done; creating ModeManager (mission_node)...", flush=True)
 
-    mission_node = ModeManager(
-        yaml_file,
-        vision_nodes,
-        camera_offsets,
-        DEBUG=DEBUG,
-        servo_only=servo_only,
-        vehicle_class=vehicle_class,
-    )
+    try:
+        mission_node = ModeManager(
+            yaml_file,
+            vision_nodes,
+            camera_offsets,
+            DEBUG=DEBUG,
+            servo_only=servo_only,
+            vehicle_class=vehicle_class,
+        )
+    except Exception as e:
+        print(f"[mission] ERROR: ModeManager init failed: {e}", flush=True)
+        raise
+    print("[mission] ModeManager created; spinning (service /mode_manager/start_mission is available).", flush=True)
     rclpy.spin(mission_node)
     rclpy.shutdown()
 

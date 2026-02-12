@@ -24,6 +24,13 @@ SimController::SimController(
 }
 
 void SimController::drive_command(double linear, double angular) {
+    static int publish_count = 0;
+    if (++publish_count % 30 == 1) {
+        RCLCPP_INFO(
+            logger_,
+            "DEBUG | SimController publishing to gz: linear=%.2f, angular=%.2f (count=%d)",
+            linear, angular, publish_count);
+    }
     gz::msgs::Twist msg;
     msg.mutable_linear()->set_x(linear); //head-on direction
     msg.mutable_angular()->set_z(angular); //positive for left, negative for right

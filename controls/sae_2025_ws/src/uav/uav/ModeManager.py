@@ -34,6 +34,9 @@ class ModeManager(Node):
         self.start_mission_trigger = self.create_service(
             Trigger, "/mode_manager/start_mission", self.trigger_world_gen_req
         )
+        self.get_logger().info(
+            "DEBUG | Mission node: service /mode_manager/start_mission advertised (trigger can call it now)"
+        )
         self.modes = {}
         self.transitions = {}
         self.active_mode = None
@@ -48,10 +51,18 @@ class ModeManager(Node):
         self.setup_vision(vision_nodes)
         self.setup_modes(mode_map)
         self.servo_only = servo_only
+        self.get_logger().info(
+            "DEBUG | Mission node: init complete; ready for start_mission call"
+        )
 
     def trigger_world_gen_req(self, request, response):
         self.get_logger().info("MODE MANAGER | Starting Mission!")
+        first_mode = list(self.modes.keys())[0] if self.modes else "?"
+        self.get_logger().info(
+            f"MODE MANAGER | Mission timer active; first mode will be '{first_mode}'"
+        )
         self.timer = self.create_timer(0.1, self.spin_once)
+        self._last_debug_log_time = 0.0
         response.success = True
         response.message = "Starting Mission!"
         return response
@@ -268,6 +279,11 @@ class ModeManager(Node):
 
             # Run active mode
             if self.active_mode:
+                if current_time - getattr(self, "_last_debug_log_time", 0) >= 5.0:
+                    self._last_debug_log_time = current_time
+                    self.get_logger().info(
+                        f"MODE MANAGER | spin_once: active_mode='{self.active_mode}'"
+                    )
                 time_delta = current_time - self.last_update_time
                 self.last_update_time = current_time
                 try:

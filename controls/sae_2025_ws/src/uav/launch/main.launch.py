@@ -9,7 +9,7 @@ from launch.actions import (
     RegisterEventHandler,
     DeclareLaunchArgument,
 )
-from launch.event_handlers import OnProcessIO
+from launch.event_handlers import OnProcessIO, OnProcessStart
 from launch.events.process import ProcessIO
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
@@ -167,6 +167,11 @@ def launch_setup(context, *args, **kwargs):
     mission = ExecuteProcess(
         cmd=mission_cmd, output="screen", emulate_tty=True, name="mission"
     )
+    logger.info(
+        "Launch: mission process is in the actions list (run_mission=%s); "
+        "it starts with sim/px4; service /mode_manager/start_mission must be advertised before trigger runs."
+        % run_mission_bool
+    )
 
     start_mission_trigger = ExecuteProcess(
         cmd=[
@@ -214,6 +219,7 @@ def launch_setup(context, *args, **kwargs):
                     mission_started["value"] = True
                     return [
                         LogInfo(msg="[launcher] Processes ready, starting mission"),
+                        LogInfo(msg="[launcher] Calling /mode_manager/start_mission (mission timer will start)"),
                         start_mission_trigger,
                     ]
             return None
@@ -237,6 +243,23 @@ def launch_setup(context, *args, **kwargs):
                 f"Invalid competition: {competition_num}. Must be one of {valid_values}"
             )
         logger.info(f"PX4_GZ_WORLD={competition}")
+
+        # When using custom world, payloads are spawned; start payload node to bridge camera and cmd_drive
+        payload_launch_actions = []
+        if competition_type == Competition.CUSTOM:
+            payload_params_path = os.path.join(
+                get_package_share_directory("payload"), "config", "payload_params.yaml"
+            )
+            payload_launch_actions = [
+                Node(
+                    package="payload",
+                    executable="payload",
+                    name="payload_0",
+                    parameters=[payload_params_path],
+                    output="screen",
+                ),
+            ]
+            logger.info("Payload node (payload_0) will start with sim for camera/cmd_drive bridge.")
 
         # Prepare sim launch arguments with all simulation parameters
         sim_launch_args = {
@@ -265,8 +288,10 @@ def launch_setup(context, *args, **kwargs):
             output="screen",
             name="px4_sitl",
         )
+        # Start payload node with sim so it is running when world loads and can receive gz camera topics
         actions = [
             sim,
+            *payload_launch_actions,
             RegisterEventHandler(
                 OnProcessIO(
                     on_stderr=lambda event: (
@@ -286,6 +311,16 @@ def launch_setup(context, *args, **kwargs):
             actions.extend(
                 [
                     mission,
+                    RegisterEventHandler(
+                        OnProcessStart(
+                            target_action=mission,
+                            on_start=[
+                                LogInfo(
+                                    msg="[launcher] Mission process started; wait for 'service /mode_manager/start_mission advertised' before trigger runs."
+                                ),
+                            ],
+                        )
+                    ),
                     RegisterEventHandler(
                         OnProcessIO(
                             target_action=px4_sitl,
@@ -310,6 +345,16 @@ def launch_setup(context, *args, **kwargs):
             actions.extend(
                 [
                     mission,
+                    RegisterEventHandler(
+                        OnProcessStart(
+                            target_action=mission,
+                            on_start=[
+                                LogInfo(
+                                    msg="[launcher] Mission process started (non-sim); wait for service /mode_manager/start_mission advertised."
+                                ),
+                            ],
+                        )
+                    ),
                     RegisterEventHandler(
                         OnProcessIO(
                             target_action=middleware,

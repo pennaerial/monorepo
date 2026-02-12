@@ -1,0 +1,13 @@
+# VTOL stationary; payload finds any AprilTag, drives to it, stops 1 cm in front.
+# AprilTag size: 100 mm x 100 mm. Mode returns "terminate" when done.
+start:
+  class: uav.autonomous_modes.PayloadDriveToAprilTagMode
+  params:
+    payload_name: 'payload_0'
+    tag_size_m: '0.1'   # 100 mm x 100 mm (string so ModeManager literal_eval works)
+    stop_distance_m: '0.01'
+  transitions:
+    complete: land
+
+land:
+  class: uav.autonomous_modes.LandingMode
