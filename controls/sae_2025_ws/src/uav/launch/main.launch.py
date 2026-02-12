@@ -175,7 +175,7 @@ def launch_setup(context, *args, **kwargs):
             "ros2",
             "service",
             "call",
-            f"/mode_manager/start_mission",
+            "/mode_manager/start_mission",
             "std_srvs/srv/Trigger",
         ],
         output="screen",
