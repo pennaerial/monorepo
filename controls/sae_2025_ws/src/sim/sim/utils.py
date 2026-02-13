@@ -5,6 +5,7 @@ Utility functions for the sim package.
 
 import ast
 import inspect
+import logging
 import os
 import shutil
 from pathlib import Path
@@ -48,6 +49,50 @@ def load_yaml_to_dict(params_file: Path) -> dict:
         raise ValueError(f"Invalid YAML in {params_file}: {e}")
     except Exception as e:
         raise RuntimeError(f"Failed to load {params_file}: {e}")
+
+
+def load_sim_parameters(
+    competition: str, logger: logging.Logger, mission_stage: str = ""
+) -> str:
+    """
+    Find simulation configuration file, checking source location first (for development),
+    then falling back to installed location.
+
+    When *mission_stage* is provided the loader looks for
+    ``{competition}.{mission_stage}.yaml`` (e.g. ``sae.horizontal_takeoff.yaml``)
+    and validates that the file's prefix matches the competition name.
+    When *mission_stage* is empty/omitted the original ``{competition}.yaml`` is used.
+
+    Args:
+        competition: Competition name (e.g., 'sae')
+        logger: Logger instance
+        mission_stage: Optional mission stage name (e.g., 'horizontal_takeoff')
+
+    Returns:
+        Tuple of (parsed YAML dict, config file path (as string))
+
+    Raises:
+        FileNotFoundError: If config file cannot be found
+    """
+    if mission_stage:
+        config_filename = f"{competition}.{mission_stage}.yaml"
+    else:
+        config_filename = f"{competition}.yaml"
+
+    # Validate that the filename starts with the expected competition prefix.
+    expected_prefix = f"{competition}."
+    if not config_filename.startswith(expected_prefix):
+        logger.error(
+            "Config filename '{config_filename}' does not start with expected competition prefix '{expected_prefix}'."
+        )
+
+    config_path = find_package_resource(
+        relative_path=f"simulations/{config_filename}",
+        package_name="sim",
+        resource_type="file",
+        logger=logger,
+    )
+    return load_yaml_to_dict(config_path), config_path
 
 
 def convert_parameter_value(

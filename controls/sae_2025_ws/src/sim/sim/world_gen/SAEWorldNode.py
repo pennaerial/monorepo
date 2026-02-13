@@ -16,35 +16,34 @@ class SAEWorldNode(WorldNode):
     def __init__(
         self,
         template_world: str,
+        vehicle_pose: Optional[tuple[float, float, float, float, float, float]] = None,
         physics: Optional[dict] = None,
         output_filename: Optional[str] = None,
         seed: Optional[int] = None,
+        entities: Optional[List[dict]] = None,
     ):
         super().__init__(
             competition_name="sae", output_filename=output_filename, seed=seed
         )
         self.world_name = template_world
+        self.vehicle_pose = vehicle_pose
         # defaults to 0.6 if not provided
         self.physics = physics
+        self.entity_configs = entities or []
         self.instantiate_static_world(
             template_world_path=template_world, physics=physics
         )
 
     def generate_world(self):
 
-        # Store entities to be spawned
-        entities: List[Entity] = []
-
-        dlz = Entity(
-            name="dlz",
-            path_to_sdf="~/.simulation-gazebo/models/dlz/model.sdf",
-            position=(30.0, -20.0, 0.0),
-            rpy=(0.0, 0.0, 0.0),
-            world=self.competition_name,
-        )
-        entities.append(dlz)
-
-        for entity in entities:
+        for cfg in self.entity_configs:
+            entity = Entity(
+                name=cfg["name"],
+                path_to_sdf=cfg["path_to_sdf"],
+                position=tuple(cfg["position"]),
+                rpy=tuple(cfg["rpy"]),
+                world=self.competition_name,
+            )
             req = SpawnEntity.Request()
             req.entity_factory = entity.to_entity_factory_msg()
             self.spawn_entity_client.call_async(req)
