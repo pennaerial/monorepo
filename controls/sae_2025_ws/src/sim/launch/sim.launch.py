@@ -190,7 +190,9 @@ def launch_setup(context, *args, **kwargs):
         cwd=sae_ws_path,
     )
 
-    sim_stage_params, sim_config_path = load_sim_parameters(competition, logger, mission_stage)
+    sim_stage_params, sim_config_path = load_sim_parameters(
+        competition, logger, mission_stage
+    )
 
     if "world" not in sim_stage_params:
         raise ValueError(

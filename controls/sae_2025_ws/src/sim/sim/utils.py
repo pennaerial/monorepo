@@ -82,7 +82,9 @@ def load_sim_parameters(
     # Validate that the filename starts with the expected competition prefix.
     expected_prefix = f"{competition}."
     if not config_filename.startswith(expected_prefix):
-        logger.error("Config filename '{config_filename}' does not start with expected competition prefix '{expected_prefix}'.")
+        logger.error(
+            "Config filename '{config_filename}' does not start with expected competition prefix '{expected_prefix}'."
+        )
 
     config_path = find_package_resource(
         relative_path=f"simulations/{config_filename}",

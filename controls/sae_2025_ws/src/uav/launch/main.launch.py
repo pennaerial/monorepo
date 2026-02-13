@@ -243,7 +243,9 @@ def launch_setup(context, *args, **kwargs):
 
         sim_stage_params, _ = load_sim_parameters(competition, logger, mission_stage)
 
-        vehicle_pose = sim_stage_params["world"]["params"].get("vehicle_pose", [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]) # [x, y, z, roll, pitch, yaw]
+        vehicle_pose = sim_stage_params["world"]["params"].get(
+            "vehicle_pose", [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        )  # [x, y, z, roll, pitch, yaw]
         vehicle_pose_str = ",".join(str(pose) for pose in vehicle_pose)
         logger.info(f"Spawning vehicle at pose: {vehicle_pose_str}")
 
