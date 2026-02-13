@@ -32,21 +32,39 @@ from sim.constants import (
 import json
 
 
-def load_sim_parameters(competition: str, logger: logging.Logger) -> str:
+def load_sim_parameters(
+    competition: str, logger: logging.Logger, mission_stage: str = ""
+) -> str:
     """
     Find simulation configuration file, checking source location first (for development),
     then falling back to installed location.
 
+    When *mission_stage* is provided the loader looks for
+    ``{competition}.{mission_stage}.yaml`` (e.g. ``sae.horizontal_takeoff.yaml``)
+    and validates that the file's prefix matches the competition name.
+    When *mission_stage* is empty/omitted the original ``{competition}.yaml`` is used.
+
     Args:
-        competition: Competition name (e.g., 'in_house')
+        competition: Competition name (e.g., 'sae')
+        logger: Logger instance
+        mission_stage: Optional mission stage name (e.g., 'horizontal_takeoff')
 
     Returns:
-        Path to the simulation config file (as string)
+        Tuple of (parsed YAML dict, config file path (as string))
 
     Raises:
         FileNotFoundError: If config file cannot be found
     """
-    config_filename = f"{competition}.yaml"
+    if mission_stage:
+        config_filename = f"{competition}.{mission_stage}.yaml"
+    else:
+        config_filename = f"{competition}.yaml"
+
+    # Validate that the filename starts with the expected competition prefix.
+    expected_prefix = f"{competition}."
+    if not config_filename.startswith(expected_prefix):
+        logger.error("Config filename '{config_filename}' does not start with expected competition prefix '{expected_prefix}'.")
+
     config_path = find_package_resource(
         relative_path=f"simulations/{config_filename}",
         package_name="sim",
@@ -135,6 +153,11 @@ def launch_setup(context, *args, **kwargs):
         )
     logger.info(f"Running Competition: {competition}")
 
+    # Read optional mission stage (e.g. "horizontal_takeoff")
+    mission_stage = str(params.get("mission_stage", "")).strip()
+    if mission_stage:
+        logger.info(f"Mission stage: {mission_stage}")
+
     scoring_param = params.get("scoring", DEFAULT_USE_SCORING)
 
     if isinstance(scoring_param, str):
@@ -212,7 +235,7 @@ def launch_setup(context, *args, **kwargs):
         cwd=sae_ws_path,
     )
 
-    sim_params, sim_config_path = load_sim_parameters(competition, logger)
+    sim_params, sim_config_path = load_sim_parameters(competition, logger, mission_stage)
 
     if "world" not in sim_params:
         raise ValueError(

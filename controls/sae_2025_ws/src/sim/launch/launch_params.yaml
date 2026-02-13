@@ -1,2 +1,4 @@
 competition: 3 # 0 for in_house, 1 for iarc, 2 for custom, 3 for sae
+mission_stage: "" # optional suffix for different world generation configs; 
+                  # e.g. "horizontal_takeoff" loads src/sim/sim/simulations/sae.horizontal_takeoff.yaml
 use_scoring: false
