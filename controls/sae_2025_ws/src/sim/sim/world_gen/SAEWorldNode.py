@@ -16,6 +16,7 @@ class SAEWorldNode(WorldNode):
     def __init__(
         self,
         template_world: str,
+        vehicle_pose: Optional[tuple[float, float, float, float, float, float]] = None,
         physics: Optional[dict] = None,
         output_filename: Optional[str] = None,
         seed: Optional[int] = None,
@@ -25,6 +26,7 @@ class SAEWorldNode(WorldNode):
             competition_name="sae", output_filename=output_filename, seed=seed
         )
         self.world_name = template_world
+        self.vehicle_pose = vehicle_pose
         # defaults to 0.6 if not provided
         self.physics = physics
         self.entity_configs = entities or []

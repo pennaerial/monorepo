@@ -222,7 +222,7 @@ def launch_setup(context, *args, **kwargs):
 
     # Now, construct the actions list in a single step, depending on sim_bool
     if sim_bool:
-        from sim.utils import load_sim_launch_parameters
+        from sim.utils import load_sim_launch_parameters, load_sim_parameters
         from sim.constants import Competition, COMPETITION_NAMES, DEFAULT_COMPETITION
 
         # Resolve world name from sim launch params (same source as sim.launch.py)
@@ -238,7 +238,12 @@ def launch_setup(context, *args, **kwargs):
             )
         logger.info(f"PX4_GZ_WORLD={competition}")
 
-        vehicle_pose = sim_params.get("vehicle_pose", [0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+        # Read optional mission stage (e.g. "horizontal_takeoff")
+        mission_stage = str(sim_params.get("mission_stage", "")).strip()
+
+        sim_stage_params, _ = load_sim_parameters(competition, logger, mission_stage)
+
+        vehicle_pose = sim_stage_params["world"]["params"].get("vehicle_pose", [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]) # [x, y, z, roll, pitch, yaw]
         vehicle_pose_str = ",".join(str(pose) for pose in vehicle_pose)
         logger.info(f"Spawning vehicle at pose: {vehicle_pose_str}")
 

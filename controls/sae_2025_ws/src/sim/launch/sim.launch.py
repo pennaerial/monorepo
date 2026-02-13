@@ -15,14 +15,12 @@ from launch.substitutions import LaunchConfiguration
 from launch.event_handlers import OnProcessStart, OnProcessExit, OnProcessIO
 from launch_ros.actions import Node
 from sim.utils import (
-    find_package_resource,
-    load_yaml_to_dict,
     load_sim_launch_parameters,
+    load_sim_parameters,
     build_node_arguments,
     camel_to_snake,
 )
 import importlib
-from pathlib import Path
 from sim.constants import (
     Competition,
     COMPETITION_NAMES,
@@ -30,49 +28,6 @@ from sim.constants import (
     DEFAULT_USE_SCORING,
 )
 import json
-
-
-def load_sim_parameters(
-    competition: str, logger: logging.Logger, mission_stage: str = ""
-) -> str:
-    """
-    Find simulation configuration file, checking source location first (for development),
-    then falling back to installed location.
-
-    When *mission_stage* is provided the loader looks for
-    ``{competition}.{mission_stage}.yaml`` (e.g. ``sae.horizontal_takeoff.yaml``)
-    and validates that the file's prefix matches the competition name.
-    When *mission_stage* is empty/omitted the original ``{competition}.yaml`` is used.
-
-    Args:
-        competition: Competition name (e.g., 'sae')
-        logger: Logger instance
-        mission_stage: Optional mission stage name (e.g., 'horizontal_takeoff')
-
-    Returns:
-        Tuple of (parsed YAML dict, config file path (as string))
-
-    Raises:
-        FileNotFoundError: If config file cannot be found
-    """
-    if mission_stage:
-        config_filename = f"{competition}.{mission_stage}.yaml"
-    else:
-        config_filename = f"{competition}.yaml"
-
-    # Validate that the filename starts with the expected competition prefix.
-    expected_prefix = f"{competition}."
-    if not config_filename.startswith(expected_prefix):
-        logger.error("Config filename '{config_filename}' does not start with expected competition prefix '{expected_prefix}'.")
-
-    config_path = find_package_resource(
-        relative_path=f"simulations/{config_filename}",
-        package_name="sim",
-        resource_type="file",
-        logger=logger,
-        base_file=Path(__file__),
-    )
-    return load_yaml_to_dict(config_path), config_path
 
 
 def initialize_mode(logger: logging.Logger, node_path: str, params: dict) -> Node:
@@ -137,12 +92,12 @@ def launch_setup(context, *args, **kwargs):
 
     # Get launch arguments
     try:
-        params = load_sim_launch_parameters()
+        sim_params = load_sim_launch_parameters()
     except Exception as e:
         raise RuntimeError(f"Failed to load launch parameters: {e}")
 
     # Map competition numbers to names
-    competition_num = params.get("competition", DEFAULT_COMPETITION.value)
+    competition_num = sim_params.get("competition", DEFAULT_COMPETITION.value)
     try:
         competition_type = Competition(competition_num)
         competition = COMPETITION_NAMES[competition_type]
@@ -154,11 +109,11 @@ def launch_setup(context, *args, **kwargs):
     logger.info(f"Running Competition: {competition}")
 
     # Read optional mission stage (e.g. "horizontal_takeoff")
-    mission_stage = str(params.get("mission_stage", "")).strip()
+    mission_stage = str(sim_params.get("mission_stage", "")).strip()
     if mission_stage:
         logger.info(f"Mission stage: {mission_stage}")
 
-    scoring_param = params.get("scoring", DEFAULT_USE_SCORING)
+    scoring_param = sim_params.get("scoring", DEFAULT_USE_SCORING)
 
     if isinstance(scoring_param, str):
         use_scoring = scoring_param.lower() == "true"
@@ -235,14 +190,14 @@ def launch_setup(context, *args, **kwargs):
         cwd=sae_ws_path,
     )
 
-    sim_params, sim_config_path = load_sim_parameters(competition, logger, mission_stage)
+    sim_stage_params, sim_config_path = load_sim_parameters(competition, logger, mission_stage)
 
-    if "world" not in sim_params:
+    if "world" not in sim_stage_params:
         raise ValueError(
             f"Missing 'world' section in simulation config: {sim_config_path}"
         )
 
-    world_params = sim_params["world"].copy()
+    world_params = sim_stage_params["world"].copy()
 
     # Initialize world node - it will generate the world file automatically
     world_node_name = camel_to_snake(world_params["name"])
