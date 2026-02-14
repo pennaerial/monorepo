@@ -281,11 +281,11 @@ def launch_setup(context, *args, **kwargs):
                     )
                 )
             ),
+            mission
         ]
         if run_mission_bool:
             actions.extend(
                 [
-                    mission,
                     RegisterEventHandler(
                         OnProcessIO(
                             target_action=px4_sitl,
@@ -305,19 +305,15 @@ def launch_setup(context, *args, **kwargs):
             *vision_node_actions,
             LogInfo(msg="Vision nodes started."),
             middleware,
+            mission
         ]
         if run_mission_bool:
-            actions.extend(
-                [
-                    mission,
-                    RegisterEventHandler(
+            actions.append(
                         OnProcessIO(
                             target_action=middleware,
                             on_stderr=make_io_handler("middleware"),
                         )
-                    ),
-                ]
-            )
+                    )
     return actions
 
 
