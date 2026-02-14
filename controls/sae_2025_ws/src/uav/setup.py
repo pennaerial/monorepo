@@ -40,6 +40,7 @@ setup(
             'test_flight = uav.test_flight:main',
             'vtol_testing = uav.vtol_testing:main',
             'p2p_comm_test = uav.autonomous_modes.p2p_comm_test:main',
+            'p2p_node = uav.iarc_P2PNode:main',
         ],
     },
 )
