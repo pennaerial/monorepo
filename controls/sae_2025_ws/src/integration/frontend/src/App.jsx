@@ -870,7 +870,7 @@ function MissionControl({ buildInfo, onRefresh }) {
   useEffect(() => {
     refreshLaunchData(true)
     loadParams()
-    const interval = setInterval(() => refreshLaunchData(false), 500)
+    const interval = setInterval(() => refreshLaunchData(false), 200)
     return () => clearInterval(interval)
   }, [refreshLaunchData, loadParams])
 
@@ -931,6 +931,14 @@ function MissionControl({ buildInfo, onRefresh }) {
               disabled={actionLoading !== ''}
             >
               {actionLoading === 'start' ? 'STARTING...' : 'START MISSION'}
+            </button>
+
+            <button
+              className="btn btn-mission-stop"
+              onClick={() => runAction('stop', '/api/mission/stop')}
+              disabled={actionLoading !== ''}
+            >
+              {actionLoading === 'stop' ? 'STOPPING...' : 'STOP MISSION'}
             </button>
 
             <button
@@ -1032,7 +1040,7 @@ function MissionControl({ buildInfo, onRefresh }) {
         <h2 className="card-title">Launch Output (ros2 launch uav main.launch.py)</h2>
         <div className="card-content">
           <button className="btn btn-secondary" onClick={() => refreshLaunchData(true)}>Refresh Logs Now</button>
-          <p className="subtext left-note">Logs auto-refresh every 0.5 seconds while launch is running.</p>
+          <p className="subtext left-note">Logs auto-refresh every 0.2 seconds while launch is running.</p>
           <pre className="terminal-output"><AnsiLog text={logs} /></pre>
           <Result data={logsResult} />
         </div>
