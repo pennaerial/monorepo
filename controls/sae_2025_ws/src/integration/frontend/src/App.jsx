@@ -78,6 +78,27 @@ const LAUNCH_PARAM_FIELDS = [
   },
 ]
 
+const LAUNCH_PARAM_FIELD_MAP = Object.fromEntries(
+  LAUNCH_PARAM_FIELDS.map(field => [field.key, field])
+)
+
+const LAUNCH_PARAM_CORE_FIELDS = [
+  'mission_name',
+  'airframe',
+  'custom_airframe_model',
+  'camera_offsets',
+].map(key => LAUNCH_PARAM_FIELD_MAP[key]).filter(Boolean)
+
+const LAUNCH_PARAM_TOGGLE_FIELDS = [
+  'uav_debug',
+  'vision_debug',
+  'run_mission',
+  'use_camera',
+  'save_vision',
+  'servo_only',
+  'sim',
+].map(key => LAUNCH_PARAM_FIELD_MAP[key]).filter(Boolean)
+
 const MISSION_ACTIONS = [
   {
     key: 'prepare',
@@ -208,17 +229,19 @@ function setYamlFieldValue(content, key, type, value) {
 }
 
 function launchStateLabel(status) {
+  if (status?.state === 'offline') return 'Pi Offline'
   if (status?.state === 'running') return 'Launch Running'
   if (status?.state === 'stopped') return 'Launch Stopped'
   if (status?.state === 'not_prepared') return 'Not Prepared'
-  return 'Unknown'
+  return 'Launch Unavailable'
 }
 
 function launchStateClass(status) {
+  if (status?.state === 'offline') return 'pill-offline'
   if (status?.state === 'running') return 'pill-running'
   if (status?.state === 'stopped') return 'pill-stopped'
   if (status?.state === 'not_prepared') return 'pill-not-prepared'
-  return 'pill-stopped'
+  return 'pill-not-prepared'
 }
 
 function trimTerminalBuffer(text) {
@@ -319,6 +342,14 @@ async function api(url, opts, hasRetriedAuth = false) {
 }
 
 function StatusBar({ connected, wifiStatus, buildInfo }) {
+  const wifiText = connected
+    ? (wifiStatus?.is_hotspot ? 'Hotspot' : wifiStatus?.current_wifi || 'No client WiFi')
+    : 'Unavailable (Pi offline)'
+
+  const buildText = connected
+    ? (buildInfo?.installed ? 'Build active' : 'No build')
+    : 'Unavailable (Pi offline)'
+
   return (
     <div className="status-bar">
       <div className="status-item">
@@ -326,12 +357,12 @@ function StatusBar({ connected, wifiStatus, buildInfo }) {
         <span>{connected ? 'Pi connected' : 'Pi unreachable'}</span>
       </div>
       <div className="status-item">
-        <span className={`status-dot ${wifiStatus?.current_wifi ? 'dot-ok' : 'dot-warn'}`} />
-        <span>{wifiStatus?.is_hotspot ? 'Hotspot' : wifiStatus?.current_wifi || 'Unknown'}</span>
+        <span className={`status-dot ${connected && wifiStatus?.current_wifi ? 'dot-ok' : 'dot-warn'}`} />
+        <span>{wifiText}</span>
       </div>
       <div className="status-item">
-        <span className={`status-dot ${buildInfo?.installed ? 'dot-ok' : 'dot-warn'}`} />
-        <span>{buildInfo?.installed ? 'Build active' : 'No build'}</span>
+        <span className={`status-dot ${connected && buildInfo?.installed ? 'dot-ok' : 'dot-warn'}`} />
+        <span>{buildText}</span>
       </div>
     </div>
   )
@@ -373,7 +404,7 @@ function ConnectionCard({ sshCommand }) {
   )
 }
 
-function WifiCard({ wifiStatus, onRefresh }) {
+function WifiCard({ connected, wifiStatus, onRefresh }) {
   const [networks, setNetworks] = useState([])
   const [scanning, setScanning] = useState(false)
   const [selectedSsid, setSelectedSsid] = useState('')
@@ -381,7 +412,16 @@ function WifiCard({ wifiStatus, onRefresh }) {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState(null)
 
+  useEffect(() => {
+    if (!connected) {
+      setNetworks([])
+      setSelectedSsid('')
+      setResult(null)
+    }
+  }, [connected])
+
   const scan = async () => {
+    if (!connected) return
     setScanning(true)
     setResult(null)
     const data = await api('/api/wifi/scan')
@@ -397,7 +437,7 @@ function WifiCard({ wifiStatus, onRefresh }) {
   }
 
   const connect = async () => {
-    if (!selectedSsid) return
+    if (!connected || !selectedSsid) return
     setLoading(true)
     setResult(null)
     const fd = new FormData()
@@ -416,6 +456,7 @@ function WifiCard({ wifiStatus, onRefresh }) {
   }
 
   const hotspot = async () => {
+    if (!connected) return
     setLoading(true)
     setResult(null)
     const data = await api('/api/wifi/hotspot', { method: 'POST' })
@@ -428,9 +469,12 @@ function WifiCard({ wifiStatus, onRefresh }) {
     <div className="card">
       <h2 className="card-title">WiFi</h2>
       <div className="card-content">
-        <button className="btn btn-secondary" onClick={scan} disabled={scanning}>
+        <button className="btn btn-secondary" onClick={scan} disabled={scanning || !connected}>
           {scanning ? 'Scanning...' : 'Scan networks'}
         </button>
+        {!connected && (
+          <p className="subtext left-note">Connect to the Pi WiFi to scan and manage networks.</p>
+        )}
 
         {networks.length > 0 && (
           <>
@@ -451,14 +495,14 @@ function WifiCard({ wifiStatus, onRefresh }) {
               placeholder="Leave empty if open"
             />
 
-            <button className="btn btn-primary" onClick={connect} disabled={loading}>
+            <button className="btn btn-primary" onClick={connect} disabled={loading || !connected}>
               {loading ? 'Connecting...' : 'Connect both devices'}
             </button>
           </>
         )}
 
         {!wifiStatus?.is_hotspot && (
-          <button className="btn btn-secondary" onClick={hotspot} disabled={loading}>
+          <button className="btn btn-secondary" onClick={hotspot} disabled={loading || !connected}>
             {loading ? 'Switching...' : 'Restore hotspot'}
           </button>
         )}
@@ -469,7 +513,7 @@ function WifiCard({ wifiStatus, onRefresh }) {
   )
 }
 
-function BuildCard({ buildInfo, onRefresh }) {
+function BuildCard({ connected, buildInfo, onRefresh }) {
   const [file, setFile] = useState(null)
   const [uploading, setUploading] = useState(false)
   const [builds, setBuilds] = useState([])
@@ -478,8 +522,16 @@ function BuildCard({ buildInfo, onRefresh }) {
   const [downloading, setDownloading] = useState(false)
   const [result, setResult] = useState(null)
 
+  useEffect(() => {
+    if (!connected) {
+      setResult(null)
+      setBuilds([])
+      setSelectedTag('')
+    }
+  }, [connected])
+
   const upload = async () => {
-    if (!file) return
+    if (!connected || !file) return
     setUploading(true)
     setResult(null)
     const fd = new FormData()
@@ -492,6 +544,7 @@ function BuildCard({ buildInfo, onRefresh }) {
   }
 
   const listBuilds = async () => {
+    if (!connected) return
     setLoadingBuilds(true)
     setResult(null)
     const data = await api('/api/builds/list')
@@ -505,7 +558,7 @@ function BuildCard({ buildInfo, onRefresh }) {
   }
 
   const download = async () => {
-    if (!selectedTag) return
+    if (!connected || !selectedTag) return
     setDownloading(true)
     setResult(null)
     const fd = new FormData()
@@ -517,6 +570,7 @@ function BuildCard({ buildInfo, onRefresh }) {
   }
 
   const rollback = async () => {
+    if (!connected) return
     setResult(null)
     const data = await api('/api/builds/rollback', { method: 'POST' })
     setResult(data)
@@ -527,10 +581,13 @@ function BuildCard({ buildInfo, onRefresh }) {
     <div className="card">
       <h2 className="card-title">Build Deploy</h2>
       <div className="card-content">
-        {buildInfo?.info && (
+        {connected && buildInfo?.info && (
           <div className="info-box">
             <pre>{buildInfo.info}</pre>
           </div>
+        )}
+        {!connected && (
+          <p className="subtext left-note">Connect to the Pi WiFi to view deployed build info and deploy updates.</p>
         )}
 
         <label>Upload artifact</label>
@@ -546,14 +603,14 @@ function BuildCard({ buildInfo, onRefresh }) {
           </label>
         </div>
 
-        <button className="btn btn-primary" onClick={upload} disabled={uploading || !file}>
+        <button className="btn btn-primary" onClick={upload} disabled={uploading || !file || !connected}>
           {uploading ? 'Uploading...' : 'Upload & replace install'}
         </button>
 
         <div className="divider" />
 
         <label>From GitHub</label>
-        <button className="btn btn-secondary" onClick={listBuilds} disabled={loadingBuilds}>
+        <button className="btn btn-secondary" onClick={listBuilds} disabled={loadingBuilds || !connected}>
           {loadingBuilds ? 'Loading...' : 'Fetch releases'}
         </button>
 
@@ -567,16 +624,16 @@ function BuildCard({ buildInfo, onRefresh }) {
               ))}
             </select>
 
-            <button className="btn btn-primary" onClick={download} disabled={downloading}>
+            <button className="btn btn-primary" onClick={download} disabled={downloading || !connected}>
               {downloading ? 'Downloading...' : 'Download & deploy'}
             </button>
           </>
         )}
 
-        {buildInfo?.installed && (
+        {connected && buildInfo?.installed && (
           <>
             <div className="divider" />
-            <button className="btn btn-secondary" onClick={rollback}>
+            <button className="btn btn-secondary" onClick={rollback} disabled={!connected}>
               Rollback
             </button>
           </>
@@ -668,11 +725,14 @@ function SettingsPanel({ onRefresh }) {
   )
 }
 
-function MissionControl({ buildInfo, onRefresh }) {
+function MissionControl({ connected, buildInfo, onRefresh }) {
   const [actionLoading, setActionLoading] = useState('')
   const [actionResult, setActionResult] = useState(null)
 
-  const [launchStatus, setLaunchStatus] = useState({ running: false, state: 'unknown' })
+  const [launchStatus, setLaunchStatus] = useState({
+    running: false,
+    state: connected ? 'unknown' : 'offline',
+  })
   const [logsResult, setLogsResult] = useState(null)
   const [streamConnected, setStreamConnected] = useState(false)
   const terminalHostRef = useRef(null)
@@ -756,6 +816,10 @@ function MissionControl({ buildInfo, onRefresh }) {
   }, [])
 
   const loadFullLogs = useCallback(async () => {
+    if (!connected) {
+      setLogsResult(null)
+      return false
+    }
     const data = await api('/api/mission/launch/logs?lines=0')
     if (data.success) {
       resetTerminal(data.logs || '')
@@ -765,7 +829,7 @@ function MissionControl({ buildInfo, onRefresh }) {
     }
     setLogsResult(data)
     return false
-  }, [resetTerminal])
+  }, [connected, resetTerminal])
 
   const closeTerminalStream = useCallback(() => {
     if (streamReconnectTimerRef.current) {
@@ -831,6 +895,14 @@ function MissionControl({ buildInfo, onRefresh }) {
   }, [appendTerminal])
 
   const refreshLaunchStatus = useCallback(async (forceFullLogs = false) => {
+    if (!connected) {
+      streamActiveRef.current = false
+      closeTerminalStream()
+      setLaunchStatus({ running: false, state: 'offline' })
+      setLogsResult(null)
+      setStreamConnected(false)
+      return
+    }
     if (statusInFlightRef.current) return
     statusInFlightRef.current = true
     try {
@@ -867,13 +939,17 @@ function MissionControl({ buildInfo, onRefresh }) {
     } finally {
       statusInFlightRef.current = false
     }
-  }, [closeTerminalStream, loadFullLogs, openTerminalStream])
+  }, [closeTerminalStream, connected, loadFullLogs, openTerminalStream])
 
   const refreshLaunchData = useCallback(async (forceFullLogs = false) => {
     await refreshLaunchStatus(forceFullLogs)
   }, [refreshLaunchStatus])
 
   const loadParams = useCallback(async () => {
+    if (!connected) {
+      setParamsResult(null)
+      return
+    }
     setParamsLoading(true)
     setParamsResult(null)
     const data = await api('/api/mission/launch-params')
@@ -883,9 +959,21 @@ function MissionControl({ buildInfo, onRefresh }) {
       setParamsResult(data)
     }
     setParamsLoading(false)
-  }, [])
+  }, [connected])
 
   useEffect(() => {
+    if (!connected) {
+      streamActiveRef.current = false
+      closeTerminalStream()
+      setLaunchStatus({ running: false, state: 'offline' })
+      setLogsResult(null)
+      setParamsResult(null)
+      setActionResult(null)
+      setActionLoading('')
+      resetTerminal('Connect to the Pi WiFi to view launch output.\r\n')
+      return undefined
+    }
+
     loadFullLogs()
     refreshLaunchStatus(false)
     loadParams()
@@ -895,9 +983,16 @@ function MissionControl({ buildInfo, onRefresh }) {
       streamActiveRef.current = false
       closeTerminalStream()
     }
-  }, [closeTerminalStream, loadFullLogs, loadParams, refreshLaunchStatus])
+  }, [closeTerminalStream, connected, loadFullLogs, loadParams, refreshLaunchStatus, resetTerminal])
 
   const runAction = async (name, url) => {
+    if (!connected) {
+      setActionResult({
+        success: false,
+        error: 'Connect to the Pi WiFi before running mission actions.',
+      })
+      return
+    }
     setActionLoading(name)
     setActionResult(null)
     if (name === 'prepare') {
@@ -912,6 +1007,13 @@ function MissionControl({ buildInfo, onRefresh }) {
   }
 
   const saveParams = async () => {
+    if (!connected) {
+      setParamsResult({
+        success: false,
+        error: 'Connect to the Pi WiFi before editing launch params.',
+      })
+      return
+    }
     setParamsLoading(true)
     setParamsResult(null)
     const fd = new FormData()
@@ -925,22 +1027,83 @@ function MissionControl({ buildInfo, onRefresh }) {
     setParamsText(prev => setYamlFieldValue(prev, field.key, field.type, value))
   }
 
+  const renderCoreField = (field) => {
+    const value = getYamlFieldValue(paramsText, field.key, field.type)
+    if (field.type === 'array3') {
+      const textValue = Array.isArray(value) ? value.join(', ') : '0, 0, 0'
+      return (
+        <div key={field.key} className="param-field">
+          <label>{field.label}</label>
+          <input
+            type="text"
+            value={textValue}
+            onChange={e => {
+              const parts = e.target.value.split(',').map(v => Number(v.trim()) || 0)
+              const normalized = [parts[0] ?? 0, parts[1] ?? 0, parts[2] ?? 0]
+              updateField(field, normalized)
+            }}
+            placeholder="0, 0, 0"
+            disabled={!connected}
+          />
+          <p className="param-help">{field.help}</p>
+        </div>
+      )
+    }
+
+    return (
+      <div key={field.key} className="param-field">
+        <label>{field.label}</label>
+        <input
+          type="text"
+          value={value}
+          onChange={e => updateField(field, e.target.value)}
+          disabled={!connected}
+        />
+        <p className="param-help">{field.help}</p>
+      </div>
+    )
+  }
+
+  const renderToggleField = (field) => {
+    const value = getYamlFieldValue(paramsText, field.key, field.type)
+    return (
+      <label key={field.key} className="toggle-card">
+        <input
+          type="checkbox"
+          checked={Boolean(value)}
+          onChange={e => updateField(field, e.target.checked)}
+          disabled={!connected}
+        />
+        <div>
+          <span className="toggle-card-title">{field.label}</span>
+          <p className="param-help">{field.help}</p>
+        </div>
+      </label>
+    )
+  }
+
   return (
     <>
       <div className="grid mission-grid">
         <div className="card">
           <h2 className="card-title">Current Build On Pi</h2>
           <div className="info-box">
-            <pre>{buildInfo?.info || 'No build metadata available'}</pre>
+            <pre>
+              {connected
+                ? (buildInfo?.info || 'No build metadata available')
+                : 'Pi is unreachable. Connect to the Pi WiFi to read build metadata.'}
+            </pre>
           </div>
           <div className="launch-state-row">
             <span className={`launch-pill ${launchStateClass(launchStatus)}`}>
               {launchStateLabel(launchStatus)}
             </span>
-            {launchStatus?.pid && <span className="launch-pid">PID {launchStatus.pid}</span>}
-            <span className={`launch-pill ${streamConnected ? 'pill-running' : 'pill-not-prepared'}`}>
-              {streamConnected ? 'Live Stream Connected' : 'Live Stream Offline'}
-            </span>
+            {connected && launchStatus?.pid && <span className="launch-pid">PID {launchStatus.pid}</span>}
+            {connected && launchStatus?.state === 'running' && (
+              <span className={`launch-pill ${streamConnected ? 'pill-running' : 'pill-not-prepared'}`}>
+                {streamConnected ? 'Live Stream Connected' : 'Connecting Live Stream'}
+              </span>
+            )}
           </div>
         </div>
 
@@ -952,11 +1115,14 @@ function MissionControl({ buildInfo, onRefresh }) {
                 key={action.key}
                 className={action.className}
                 onClick={() => runAction(action.key, action.url)}
-                disabled={actionLoading !== ''}
+                disabled={actionLoading !== '' || !connected}
               >
                 {actionLoading === action.key ? action.loadingLabel : action.label}
               </button>
             ))}
+            {!connected && (
+              <p className="subtext left-note">Connect to the Pi WiFi to enable mission actions.</p>
+            )}
           </div>
           <Result data={actionResult} />
         </div>
@@ -970,58 +1136,24 @@ function MissionControl({ buildInfo, onRefresh }) {
             <button className={`mini-tab ${paramsMode === 'raw' ? 'mini-tab-active' : ''}`} onClick={() => setParamsMode('raw')}>Raw YAML</button>
           </div>
 
+          {!connected && (
+            <p className="subtext left-note">Connect to the Pi WiFi to load and edit `launch_params.yaml`.</p>
+          )}
+
           {paramsMode === 'form' ? (
-            <div className="params-form-grid">
-              {LAUNCH_PARAM_FIELDS.map(field => {
-                const value = getYamlFieldValue(paramsText, field.key, field.type)
-                if (field.type === 'boolean') {
-                  return (
-                    <div key={field.key} className="param-field">
-                      <label className="toggle-label">
-                        <input
-                          type="checkbox"
-                          checked={Boolean(value)}
-                          onChange={e => updateField(field, e.target.checked)}
-                        />
-                        <span>{field.label}</span>
-                      </label>
-                      <p className="param-help">{field.help}</p>
-                    </div>
-                  )
-                }
-
-                if (field.type === 'array3') {
-                  const textValue = Array.isArray(value) ? value.join(', ') : '0, 0, 0'
-                  return (
-                    <div key={field.key} className="param-field">
-                      <label>{field.label}</label>
-                      <input
-                        type="text"
-                        value={textValue}
-                        onChange={e => {
-                          const parts = e.target.value.split(',').map(v => Number(v.trim()) || 0)
-                          const normalized = [parts[0] ?? 0, parts[1] ?? 0, parts[2] ?? 0]
-                          updateField(field, normalized)
-                        }}
-                        placeholder="0, 0, 0"
-                      />
-                      <p className="param-help">{field.help}</p>
-                    </div>
-                  )
-                }
-
-                return (
-                  <div key={field.key} className="param-field">
-                    <label>{field.label}</label>
-                    <input
-                      type="text"
-                      value={value}
-                      onChange={e => updateField(field, e.target.value)}
-                    />
-                    <p className="param-help">{field.help}</p>
-                  </div>
-                )
-              })}
+            <div className="params-layout">
+              <div className="params-section">
+                <h3 className="params-section-title">Core Configuration</h3>
+                <div className="params-stack">
+                  {LAUNCH_PARAM_CORE_FIELDS.map(renderCoreField)}
+                </div>
+              </div>
+              <div className="params-section">
+                <h3 className="params-section-title">Mission Toggles</h3>
+                <div className="toggle-grid">
+                  {LAUNCH_PARAM_TOGGLE_FIELDS.map(renderToggleField)}
+                </div>
+              </div>
             </div>
           ) : (
             <textarea
@@ -1029,29 +1161,34 @@ function MissionControl({ buildInfo, onRefresh }) {
               value={paramsText}
               onChange={e => setParamsText(e.target.value)}
               spellCheck={false}
+              disabled={!connected}
             />
           )}
 
           <div className="row-actions">
-            <button className="btn btn-secondary" onClick={loadParams} disabled={paramsLoading}>
+            <button className="btn btn-secondary" onClick={loadParams} disabled={paramsLoading || !connected}>
               {paramsLoading ? 'Loading...' : 'Reload From Pi'}
             </button>
-            <button className="btn btn-primary" onClick={saveParams} disabled={paramsLoading}>
+            <button className="btn btn-primary" onClick={saveParams} disabled={paramsLoading || !connected}>
               {paramsLoading ? 'Saving...' : 'Save Params'}
             </button>
           </div>
           <p className="subtext left-note">Reload discards unsaved local edits and re-reads the file from the Pi.</p>
-          <Result data={paramsResult} />
+          {connected && <Result data={paramsResult} />}
         </div>
       </div>
 
       <div className="card card-full">
         <h2 className="card-title">Launch Output (ros2 launch uav main.launch.py)</h2>
         <div className="card-content">
-          <button className="btn btn-secondary" onClick={() => refreshLaunchData(true)}>Refresh Logs Now</button>
-          <p className="subtext left-note">Live SSH stream runs while launch is running. Refresh re-syncs full log history.</p>
+          <button className="btn btn-secondary" onClick={() => refreshLaunchData(true)} disabled={!connected}>Refresh Logs Now</button>
+          <p className="subtext left-note">
+            {connected
+              ? 'Live SSH stream runs while launch is running. Refresh re-syncs full log history.'
+              : 'Connect to the Pi WiFi to stream launch output.'}
+          </p>
           <div ref={terminalHostRef} className="terminal-output terminal-host" />
-          <Result data={logsResult} />
+          {connected && <Result data={logsResult} />}
         </div>
       </div>
 
@@ -1066,14 +1203,14 @@ function MissionControl({ buildInfo, onRefresh }) {
   )
 }
 
-function DeployPage({ sshCommand, wifiStatus, buildInfo, onRefresh }) {
+function DeployPage({ connected, sshCommand, wifiStatus, buildInfo, onRefresh }) {
   return (
     <>
       <ConnectionCard sshCommand={sshCommand} />
 
       <div className="grid">
-        <WifiCard wifiStatus={wifiStatus} onRefresh={onRefresh} />
-        <BuildCard buildInfo={buildInfo} onRefresh={onRefresh} />
+        <WifiCard connected={connected} wifiStatus={wifiStatus} onRefresh={onRefresh} />
+        <BuildCard connected={connected} buildInfo={buildInfo} onRefresh={onRefresh} />
       </div>
     </>
   )
@@ -1098,19 +1235,32 @@ function App() {
   const [pollError, setPollError] = useState(null)
 
   const refreshAll = useCallback(async () => {
-    const [conn, wifi, build, ssh] = await Promise.all([
-      api('/api/connection/status'),
+    const conn = await api('/api/connection/status')
+    const sshPromise = api('/api/connection/ssh-command')
+
+    const isConnected = Boolean(conn?.connected)
+    setConnected(isConnected)
+
+    if (!isConnected) {
+      const ssh = await sshPromise
+      if (ssh.success) setSshCommand(ssh.command)
+      setWifiStatus(null)
+      setBuildInfo(null)
+      setPollError(conn?.error ? { success: false, error: conn.error } : null)
+      return
+    }
+
+    const [wifi, build, ssh] = await Promise.all([
       api('/api/wifi/status'),
       api('/api/builds/current'),
-      api('/api/connection/ssh-command'),
+      sshPromise,
     ])
 
-    setConnected(conn.connected ?? false)
-    if (wifi.success) setWifiStatus(wifi)
-    if (build.success) setBuildInfo(build)
+    setWifiStatus(wifi.success ? wifi : null)
+    setBuildInfo(build.success ? build : null)
     if (ssh.success) setSshCommand(ssh.command)
 
-    const err = conn?.error || (!wifi.success ? wifi?.error : null) || null
+    const err = (!wifi.success ? wifi?.error : null) || (!build.success ? build?.error : null) || null
     setPollError(err ? { success: false, error: err } : null)
   }, [])
 
@@ -1144,9 +1294,9 @@ function App() {
       </div>
 
       {page === 'mission' ? (
-        <MissionControl buildInfo={buildInfo} onRefresh={refreshAll} />
+        <MissionControl connected={connected} buildInfo={buildInfo} onRefresh={refreshAll} />
       ) : (
-        <DeployPage sshCommand={sshCommand} wifiStatus={wifiStatus} buildInfo={buildInfo} onRefresh={refreshAll} />
+        <DeployPage connected={connected} sshCommand={sshCommand} wifiStatus={wifiStatus} buildInfo={buildInfo} onRefresh={refreshAll} />
       )}
     </div>
   )

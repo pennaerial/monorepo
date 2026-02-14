@@ -391,15 +391,42 @@ select {
   border-color: #475569;
 }
 
+.pill-offline {
+  background: #312e81;
+  color: #c7d2fe;
+  border-color: #4338ca;
+}
+
 .launch-pid {
   font-size: 0.68rem;
   color: var(--text-secondary);
 }
 
-.params-form-grid {
+.params-layout {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.6rem 0.75rem;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 0.75rem;
+}
+
+.params-section {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.015);
+  padding: 0.7rem;
+}
+
+.params-section-title {
+  margin: 0 0 0.55rem;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-secondary);
+}
+
+.params-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
 }
 
 .param-field {
@@ -415,15 +442,36 @@ select {
   line-height: 1.35;
 }
 
-.toggle-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  margin: 0;
+.toggle-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.5rem;
 }
 
-.toggle-label input[type="checkbox"] {
-  width: auto;
+.toggle-card {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 0.5rem 0.55rem;
+  background: var(--surface);
+}
+
+.toggle-card-title {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 0.2rem;
+}
+
+.toggle-card input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  margin-top: 0.15rem;
 }
 
 .yaml-editor {
@@ -561,7 +609,7 @@ select {
 
   .placeholder-grid,
   .row-actions,
-  .params-form-grid,
+  .params-layout,
   .settings-grid {
     grid-template-columns: 1fr;
     flex-direction: column;
