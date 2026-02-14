@@ -9,6 +9,9 @@ class NavGPSMode(Mode):
     A mode for navigating to a GPS coordinate
     """
 
+    # TODO: Create "RELATIVE" navigation system, which initializes direction vectors once in the beginning
+    # and converts all coordinates to that frame. +X should point to forward, +Y should point to the right, -Z should point up
+
     def __init__(
         self,
         node: Node,

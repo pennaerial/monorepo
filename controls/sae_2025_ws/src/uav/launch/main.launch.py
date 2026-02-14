@@ -259,7 +259,7 @@ def launch_setup(context, *args, **kwargs):
             cmd=[
                 "bash",
                 "-c",
-                f"PX4_GZ_WORLD={competition} PX4_GZ_STANDALONE=1 PX4_SYS_AUTOSTART={autostart} PX4_SIM_MODEL={model} ./build/px4_sitl_default/bin/px4",
+                f"PX4_GZ_MODEL_POSE='0,0,0,0,0,0' PX4_GZ_WORLD={competition} PX4_GZ_STANDALONE=1 PX4_SYS_AUTOSTART={autostart} PX4_SIM_MODEL={model} ./build/px4_sitl_default/bin/px4",
             ],
             cwd=px4_path,
             output="screen",
