@@ -47,6 +47,9 @@ config = {
     "hotspot_name": os.environ.get("HOTSPOT_CON_NAME", "penn-desktop"),
 }
 
+# Restrict artifact names to safe basenames for remote shell/SCP usage.
+_ARTIFACT_NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+
 # Auto-detect GitHub repo from git remote if not set
 if not config["github_repo"]:
     try:
@@ -154,7 +157,8 @@ def _run_scp_sync(
     local_path: str, remote_path: str, timeout: int = 300
 ) -> subprocess.CompletedProcess:
     """Copy a file to the Pi via SCP (blocking)."""
-    cmd = ["scp"] + _ssh_opts() + [local_path, f"{_ssh_target()}:{remote_path}"]
+    remote_spec = f"{_ssh_target()}:{_q(remote_path)}"
+    cmd = ["scp"] + _ssh_opts() + [local_path, remote_spec]
     if config["ssh_pass"]:
         if not shutil.which("sshpass"):
             raise RuntimeError(
@@ -265,6 +269,18 @@ def _format_remote_error(raw_error: str, prefix: str) -> str:
 
 def _q(value: str) -> str:
     return shlex.quote(value)
+
+
+def _sanitize_artifact_name(filename: str) -> str:
+    name = Path(filename or "").name
+    if not name:
+        raise ValueError("Artifact filename is empty.")
+    if not _ARTIFACT_NAME_RE.match(name):
+        raise ValueError(
+            "Artifact filename contains unsupported characters. "
+            "Use letters, numbers, dots, underscores, and dashes only."
+        )
+    return name
 
 
 def _mission_paths() -> dict:
@@ -460,20 +476,18 @@ async def wifi_scan():
 @app.post("/api/wifi/connect")
 async def wifi_connect(ssid: str = Form(...), password: str = Form("")):
     """Connect the Pi to a WiFi network (disables hotspot)."""
+    hotspot_name = _q(config["hotspot_name"])
     try:
         # Bring down hotspot
-        await _run_ssh(
-            f"nmcli con down '{config['hotspot_name']}' 2>/dev/null; sleep 2",
-            timeout=15,
-        )
+        await _run_ssh(f"nmcli con down {hotspot_name} 2>/dev/null; sleep 2", timeout=15)
 
         # Connect
-        pwd_arg = f' password "{password}"' if password else ""
-        r = await _run_ssh(f'nmcli dev wifi connect "{ssid}"{pwd_arg}', timeout=30)
+        pwd_arg = f" password {_q(password)}" if password else ""
+        r = await _run_ssh(f"nmcli dev wifi connect {_q(ssid)}{pwd_arg}", timeout=30)
 
         if r.returncode != 0:
             # Restore hotspot on failure
-            await _run_ssh(f"nmcli con up '{config['hotspot_name']}'", timeout=15)
+            await _run_ssh(f"nmcli con up {hotspot_name}", timeout=15)
             return {
                 "success": False,
                 "error": _format_remote_error(r.stderr, "Failed to connect"),
@@ -481,7 +495,7 @@ async def wifi_connect(ssid: str = Form(...), password: str = Form("")):
 
         return {"success": True, "output": f"Pi connected to {ssid}"}
     except Exception as e:
-        await _run_ssh(f"nmcli con up '{config['hotspot_name']}'", timeout=15)
+        await _run_ssh(f"nmcli con up {hotspot_name}", timeout=15)
         return {"success": False, "error": _friendly_ssh_error(str(e))}
 
 
@@ -490,7 +504,7 @@ async def wifi_hotspot():
     """Switch Pi back to hotspot mode."""
     try:
         await _run_ssh("nmcli dev disconnect wlan0 2>/dev/null; sleep 1", timeout=15)
-        r = await _run_ssh(f"nmcli con up '{config['hotspot_name']}'", timeout=15)
+        r = await _run_ssh(f"nmcli con up {_q(config['hotspot_name'])}", timeout=15)
         if r.returncode != 0:
             return {"success": False, "error": _friendly_ssh_error(r.stderr)}
         return {"success": True, "output": "Hotspot activated"}
@@ -542,15 +556,13 @@ def _require_httpx():
 async def current_build():
     """Get info about the currently deployed build on the Pi."""
     try:
-        r = await _run_ssh(
-            f"cat {config['remote_dir']}/install/BUILD_INFO.txt 2>/dev/null", timeout=10
-        )
+        build_info_path = f"{config['remote_dir']}/install/BUILD_INFO.txt"
+        install_dir = f"{config['remote_dir']}/install"
+        r = await _run_ssh(f"cat {_q(build_info_path)} 2>/dev/null", timeout=10)
         if r.returncode == 0 and r.stdout.strip():
             return {"success": True, "installed": True, "info": r.stdout.strip()}
 
-        r = await _run_ssh(
-            f"test -d {config['remote_dir']}/install && echo yes || echo no", timeout=10
-        )
+        r = await _run_ssh(f"test -d {_q(install_dir)} && echo yes || echo no", timeout=10)
         if r.returncode != 0:
             return {
                 "success": True,
@@ -576,19 +588,21 @@ async def current_build():
 @app.post("/api/builds/upload")
 async def upload_build(file: UploadFile = File(...)):
     """Upload a build artifact to the Pi via SCP and extract it."""
+    tmp_path = ""
     try:
+        filename = _sanitize_artifact_name(file.filename or "")
+
         # Save to temp file locally
         with tempfile.NamedTemporaryFile(suffix=".tar.gz", delete=False) as tmp:
             tmp.write(await file.read())
             tmp_path = tmp.name
 
         # Ensure remote dir exists
-        await _run_ssh(f"mkdir -p {config['remote_dir']}", timeout=10)
+        await _run_ssh(f"mkdir -p {_q(config['remote_dir'])}", timeout=10)
 
         # SCP to Pi
-        remote_file = f"{config['remote_dir']}/{file.filename}"
+        remote_file = f"{config['remote_dir']}/{filename}"
         r = await _run_scp(tmp_path, remote_file, timeout=300)
-        os.unlink(tmp_path)
 
         if r.returncode != 0:
             return {
@@ -598,14 +612,15 @@ async def upload_build(file: UploadFile = File(...)):
 
         # Backup + extract on Pi
         extract_cmd = f"""
-            cd {config["remote_dir"]}
+            set -e
+            cd {_q(config["remote_dir"])}
             if [ -d install ]; then
                 rm -rf install.bak src.bak
                 mv install install.bak 2>/dev/null || true
                 mv src src.bak 2>/dev/null || true
             fi
-            tar -xzf {file.filename}
-            rm -f {file.filename}
+            tar -xzf {_q(filename)}
+            rm -f {_q(filename)}
             chmod -R +x install/
         """
         r = await _run_ssh(extract_cmd, timeout=120)
@@ -615,9 +630,12 @@ async def upload_build(file: UploadFile = File(...)):
                 "error": _format_remote_error(r.stderr, "Extract failed"),
             }
 
-        return {"success": True, "output": f"Deployed {file.filename} to Pi"}
+        return {"success": True, "output": f"Deployed {filename} to Pi"}
     except Exception as e:
         return {"success": False, "error": _friendly_ssh_error(str(e))}
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            os.unlink(tmp_path)
 
 
 @app.get("/api/builds/list")
@@ -666,6 +684,7 @@ async def download_build(tag: str = Form(...)):
     """Download a build from GitHub on your Mac, then SCP it to the Pi."""
     if not config["github_repo"]:
         return {"success": False, "error": "GITHUB_REPO not configured"}
+    tmp_path = ""
     try:
         httpx = _require_httpx()
 
@@ -683,10 +702,11 @@ async def download_build(tag: str = Form(...)):
             return {"success": False, "error": f"No assets found for {tag}"}
 
         download_url = assets[0]["browser_download_url"]
-        filename = assets[0]["name"]
+        filename = _sanitize_artifact_name(assets[0]["name"])
 
         # Download to temp file on Mac
-        tmp_path = tempfile.mktemp(suffix=".tar.gz")
+        with tempfile.NamedTemporaryFile(suffix=".tar.gz", delete=False) as tmp:
+            tmp_path = tmp.name
         async with httpx.AsyncClient(timeout=300, follow_redirects=True) as client:
             async with client.stream(
                 "GET", download_url, headers=_github_headers()
@@ -697,10 +717,9 @@ async def download_build(tag: str = Form(...)):
                         f.write(chunk)
 
         # SCP to Pi
-        await _run_ssh(f"mkdir -p {config['remote_dir']}", timeout=10)
+        await _run_ssh(f"mkdir -p {_q(config['remote_dir'])}", timeout=10)
         remote_file = f"{config['remote_dir']}/{filename}"
         r = await _run_scp(tmp_path, remote_file, timeout=300)
-        os.unlink(tmp_path)
 
         if r.returncode != 0:
             return {
@@ -710,14 +729,15 @@ async def download_build(tag: str = Form(...)):
 
         # Backup + extract on Pi
         extract_cmd = f"""
-            cd {config["remote_dir"]}
+            set -e
+            cd {_q(config["remote_dir"])}
             if [ -d install ]; then
                 rm -rf install.bak src.bak
                 mv install install.bak 2>/dev/null || true
                 mv src src.bak 2>/dev/null || true
             fi
-            tar -xzf {filename}
-            rm -f {filename}
+            tar -xzf {_q(filename)}
+            rm -f {_q(filename)}
             chmod -R +x install/
         """
         r = await _run_ssh(extract_cmd, timeout=120)
@@ -730,6 +750,9 @@ async def download_build(tag: str = Form(...)):
         return {"success": True, "output": f"Downloaded {tag} and deployed to Pi"}
     except Exception as e:
         return {"success": False, "error": _friendly_ssh_error(str(e))}
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            os.unlink(tmp_path)
 
 
 @app.post("/api/builds/rollback")
@@ -737,7 +760,7 @@ async def rollback_build():
     """Rollback to the previous build on the Pi."""
     try:
         rollback_cmd = f"""
-            cd {config["remote_dir"]}
+            cd {_q(config["remote_dir"])}
             if [ ! -d install.bak ]; then
                 echo "NO_BACKUP"
                 exit 1

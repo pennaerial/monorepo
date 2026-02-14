@@ -6,6 +6,7 @@ import './App.css'
 
 const SSH_AUTH_ERROR_RE = /(permission denied|authentication failed|auth fail|incorrect password|access denied|password was rejected|password authentication is required|no ssh password is set)/i
 const SSH_PASSWORD_HINT = 'If your Pi requires password auth, open Settings and enter the SSH password.'
+const MAX_TERMINAL_BUFFER_CHARS = 1_000_000
 let passwordPromptInFlight = null
 
 const LAUNCH_PARAM_FIELDS = [
@@ -196,6 +197,11 @@ function launchStateClass(status) {
   return 'pill-stopped'
 }
 
+function trimTerminalBuffer(text) {
+  if (text.length <= MAX_TERMINAL_BUFFER_CHARS) return text
+  return text.slice(text.length - MAX_TERMINAL_BUFFER_CHARS)
+}
+
 async function requestJson(url, opts) {
   try {
     const res = await fetch(url, opts)
@@ -204,7 +210,7 @@ async function requestJson(url, opts) {
     if (!raw.trim()) {
       return {
         success: false,
-        error: `Backend returned an empty response (HTTP ${res.status}). Are you connected to the Pi and is the deploy server reachable?`,
+        error: `Backend returned an empty response (HTTP ${res.status}). Are you connected to the Pi and is the backend reachable?`,
       }
     }
 
@@ -215,7 +221,7 @@ async function requestJson(url, opts) {
       const preview = raw.slice(0, 180).replace(/\s+/g, ' ').trim()
       return {
         success: false,
-        error: `Backend returned an invalid response (HTTP ${res.status}). Are you connected to the Pi and is the deploy server reachable? ${preview ? `Details: ${preview}` : ''}`.trim(),
+        error: `Backend returned an invalid response (HTTP ${res.status}). Are you connected to the Pi and is the backend reachable? ${preview ? `Details: ${preview}` : ''}`.trim(),
       }
     }
 
@@ -570,8 +576,12 @@ function SettingsPanel({ onRefresh }) {
   }
 
   const toggle = () => {
-    if (!open && !cfg) load()
-    setOpen(o => !o)
+    setOpen(prev => {
+      const next = !prev
+      setResult(null)
+      if (next) load()
+      return next
+    })
   }
 
   const update = (key, value) => {
@@ -657,19 +667,31 @@ function MissionControl({ buildInfo, onRefresh }) {
   const [paramsResult, setParamsResult] = useState(null)
 
   const resetTerminal = useCallback((text = '') => {
-    terminalBufferRef.current = text
+    const normalized = trimTerminalBuffer(text)
+    terminalBufferRef.current = normalized
     const term = terminalRef.current
     if (!term) return
     term.reset()
-    if (text) term.write(text)
+    if (normalized) term.write(normalized)
   }, [])
 
   const appendTerminal = useCallback((text) => {
     if (typeof text !== 'string' || text.length === 0) return
-    terminalBufferRef.current += text
+    const next = terminalBufferRef.current + text
+    if (next.length <= MAX_TERMINAL_BUFFER_CHARS) {
+      terminalBufferRef.current = next
+      const term = terminalRef.current
+      if (!term) return
+      term.write(text)
+      return
+    }
+
+    const trimmed = trimTerminalBuffer(next)
+    terminalBufferRef.current = trimmed
     const term = terminalRef.current
     if (!term) return
-    term.write(text)
+    term.reset()
+    term.write(trimmed)
   }, [])
 
   useEffect(() => {
@@ -801,6 +823,9 @@ function MissionControl({ buildInfo, onRefresh }) {
       setLaunchStatus(status)
       const isRunning = status.state === 'running'
       if (isRunning) {
+        if (forceFullLogs || !hasLoadedLogsRef.current) {
+          await loadFullLogs()
+        }
         streamActiveRef.current = true
         openTerminalStream()
         setLogsResult(null)
