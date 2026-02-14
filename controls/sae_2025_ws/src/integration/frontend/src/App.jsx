@@ -110,6 +110,13 @@ const MISSION_ACTIONS = [
     loadingLabel: 'STARTING...',
   },
   {
+    key: 'stop',
+    url: '/api/mission/stop',
+    className: 'btn btn-mission-stop',
+    label: 'STOP MISSION',
+    loadingLabel: 'STOPPING...',
+  },
+  {
     key: 'failsafe',
     url: '/api/failsafe',
     className: 'btn btn-failsafe',
