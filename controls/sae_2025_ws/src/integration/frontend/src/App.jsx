@@ -738,7 +738,7 @@ function MissionControl({ buildInfo, onRefresh }) {
     term.loadAddon(fitAddon)
     term.open(host)
     fitAddon.fit()
-    termRef.current = term
+    terminalRef.current = term
     fitAddonRef.current = fitAddon
     if (terminalBufferRef.current) {
       term.write(terminalBufferRef.current)
@@ -750,7 +750,7 @@ function MissionControl({ buildInfo, onRefresh }) {
     return () => {
       window.removeEventListener('resize', onResize)
       fitAddonRef.current = null
-      termRef.current = null
+      terminalRef.current = null
       term.dispose()
     }
   }, [])

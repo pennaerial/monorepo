@@ -30,8 +30,16 @@ if ! command -v npm >/dev/null 2>&1; then
 fi
 
 if [ ! -d "$FRONTEND_DIR/node_modules" ]; then
-  echo "Error: frontend dependencies not installed. Run: cd $FRONTEND_DIR && npm install"
-  exit 1
+  echo "Frontend dependencies missing. Installing..."
+  cd "$FRONTEND_DIR"
+  npm install
+  cd "$SCRIPT_DIR"
+fi
+
+# Ensure required frontend deps are present even if node_modules already exists.
+if ! npm --prefix "$FRONTEND_DIR" ls --depth=0 @xterm/xterm >/dev/null 2>&1; then
+  echo "Frontend dependencies out of date. Running npm install..."
+  npm --prefix "$FRONTEND_DIR" install
 fi
 
 if [ -n "${CONDA_PREFIX:-}" ]; then
