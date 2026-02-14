@@ -1,4 +1,7 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { Terminal } from '@xterm/xterm'
+import { FitAddon } from '@xterm/addon-fit'
+import '@xterm/xterm/css/xterm.css'
 import './App.css'
 
 const SSH_AUTH_ERROR_RE = /(permission denied|authentication failed|auth fail|incorrect password|access denied|password was rejected|password authentication is required|no ssh password is set)/i
@@ -177,157 +180,6 @@ function setYamlFieldValue(content, key, type, value) {
   }
 
   return nextLines.join('\n')
-}
-
-const ANSI_COLOR_16 = [
-  '#111827', '#ef4444', '#22c55e', '#eab308', '#3b82f6', '#a855f7', '#06b6d4', '#d1d5db',
-  '#6b7280', '#f87171', '#4ade80', '#facc15', '#60a5fa', '#c084fc', '#22d3ee', '#f9fafb',
-]
-
-function toHex(value) {
-  return value.toString(16).padStart(2, '0')
-}
-
-function ansi256ToColor(code) {
-  const n = Math.max(0, Math.min(255, Number(code) || 0))
-  if (n < 16) return ANSI_COLOR_16[n]
-  if (n >= 232) {
-    const gray = 8 + (n - 232) * 10
-    const hex = toHex(gray)
-    return `#${hex}${hex}${hex}`
-  }
-  const idx = n - 16
-  const r = Math.floor(idx / 36)
-  const g = Math.floor((idx % 36) / 6)
-  const b = idx % 6
-  const map = [0, 95, 135, 175, 215, 255]
-  return `#${toHex(map[r])}${toHex(map[g])}${toHex(map[b])}`
-}
-
-function defaultAnsiState() {
-  return {
-    fg: null,
-    bg: null,
-    bold: false,
-    dim: false,
-    underline: false,
-    inverse: false,
-  }
-}
-
-function ansiStateToStyle(state) {
-  let fg = state.fg
-  let bg = state.bg
-  if (state.inverse) {
-    const defaultFg = '#d6d6e2'
-    const defaultBg = '#0c0c12'
-    const origFg = fg || defaultFg
-    const origBg = bg || defaultBg
-    fg = origBg
-    bg = origFg
-  }
-
-  const style = {}
-  if (fg) style.color = fg
-  if (bg) style.backgroundColor = bg
-  if (state.bold) style.fontWeight = 700
-  if (state.dim) style.opacity = 0.75
-  if (state.underline) style.textDecoration = 'underline'
-  return style
-}
-
-function applyAnsiCodes(state, codes) {
-  const next = { ...state }
-  for (let i = 0; i < codes.length; i += 1) {
-    const code = codes[i]
-    if (code === 0) {
-      Object.assign(next, defaultAnsiState())
-    } else if (code === 1) {
-      next.bold = true
-    } else if (code === 2) {
-      next.dim = true
-    } else if (code === 21 || code === 22) {
-      next.bold = false
-      next.dim = false
-    } else if (code === 4) {
-      next.underline = true
-    } else if (code === 24) {
-      next.underline = false
-    } else if (code === 7) {
-      next.inverse = true
-    } else if (code === 27) {
-      next.inverse = false
-    } else if (code === 39) {
-      next.fg = null
-    } else if (code === 49) {
-      next.bg = null
-    } else if (code >= 30 && code <= 37) {
-      next.fg = ANSI_COLOR_16[code - 30]
-    } else if (code >= 90 && code <= 97) {
-      next.fg = ANSI_COLOR_16[8 + (code - 90)]
-    } else if (code >= 40 && code <= 47) {
-      next.bg = ANSI_COLOR_16[code - 40]
-    } else if (code >= 100 && code <= 107) {
-      next.bg = ANSI_COLOR_16[8 + (code - 100)]
-    } else if (code === 38 || code === 48) {
-      const target = code === 38 ? 'fg' : 'bg'
-      const mode = codes[i + 1]
-      if (mode === 5 && i + 2 < codes.length) {
-        next[target] = ansi256ToColor(codes[i + 2])
-        i += 2
-      } else if (mode === 2 && i + 4 < codes.length) {
-        const r = Math.max(0, Math.min(255, Number(codes[i + 2]) || 0))
-        const g = Math.max(0, Math.min(255, Number(codes[i + 3]) || 0))
-        const b = Math.max(0, Math.min(255, Number(codes[i + 4]) || 0))
-        next[target] = `#${toHex(r)}${toHex(g)}${toHex(b)}`
-        i += 4
-      }
-    }
-  }
-  return next
-}
-
-function parseAnsiSegments(raw) {
-  const text = typeof raw === 'string' ? raw.replace(/\r\n/g, '\n').replace(/\r/g, '\n') : ''
-  if (!text) return []
-
-  // Accept standard ESC-prefixed ANSI codes and orphan forms like "[0m".
-  const re = /(?:\x1b\[|\[)([0-9;]*)m/g
-  let state = defaultAnsiState()
-  let last = 0
-  const segments = []
-  let match
-
-  while ((match = re.exec(text)) !== null) {
-    if (match.index > last) {
-      segments.push({
-        text: text.slice(last, match.index),
-        style: ansiStateToStyle(state),
-      })
-    }
-    const codes = (match[1] === '' ? ['0'] : match[1].split(';'))
-      .map(v => Number.parseInt(v, 10))
-      .filter(v => Number.isFinite(v))
-    state = applyAnsiCodes(state, codes.length ? codes : [0])
-    last = re.lastIndex
-  }
-
-  if (last < text.length) {
-    segments.push({
-      text: text.slice(last),
-      style: ansiStateToStyle(state),
-    })
-  }
-
-  return segments
-}
-
-function AnsiLog({ text }) {
-  const segments = useMemo(() => parseAnsiSegments(text), [text])
-  if (!segments.length) return 'No launch output yet.'
-  return segments.map((seg, i) => (
-    <span key={i} style={seg.style}>{seg.text}</span>
-  ))
 }
 
 function launchStateLabel(status) {
@@ -787,73 +639,190 @@ function MissionControl({ buildInfo, onRefresh }) {
   const [actionResult, setActionResult] = useState(null)
 
   const [launchStatus, setLaunchStatus] = useState({ running: false, state: 'unknown' })
-  const [logs, setLogs] = useState('')
   const [logsResult, setLogsResult] = useState(null)
-  const logsOffsetRef = useRef(0)
-  const logsRefreshInFlightRef = useRef(false)
+  const [streamConnected, setStreamConnected] = useState(false)
+  const terminalHostRef = useRef(null)
+  const terminalRef = useRef(null)
+  const fitAddonRef = useRef(null)
+  const terminalBufferRef = useRef('')
+  const statusInFlightRef = useRef(false)
+  const streamRef = useRef(null)
+  const streamActiveRef = useRef(false)
+  const streamReconnectTimerRef = useRef(null)
+  const hasLoadedLogsRef = useRef(false)
 
   const [paramsMode, setParamsMode] = useState('form')
   const [paramsText, setParamsText] = useState('')
   const [paramsLoading, setParamsLoading] = useState(false)
   const [paramsResult, setParamsResult] = useState(null)
 
-  const refreshLaunchData = useCallback(async (forceFullLogs = false) => {
-    if (logsRefreshInFlightRef.current) return
-    logsRefreshInFlightRef.current = true
+  const resetTerminal = useCallback((text = '') => {
+    terminalBufferRef.current = text
+    const term = terminalRef.current
+    if (!term) return
+    term.reset()
+    if (text) term.write(text)
+  }, [])
+
+  const appendTerminal = useCallback((text) => {
+    if (typeof text !== 'string' || text.length === 0) return
+    terminalBufferRef.current += text
+    const term = terminalRef.current
+    if (!term) return
+    term.write(text)
+  }, [])
+
+  useEffect(() => {
+    const host = terminalHostRef.current
+    if (!host) return undefined
+
+    const term = new Terminal({
+      disableStdin: true,
+      convertEol: true,
+      cursorBlink: false,
+      fontSize: 12,
+      fontFamily: 'SF Mono, Fira Code, ui-monospace, monospace',
+      scrollback: 200000,
+      theme: {
+        background: '#0c0c12',
+        foreground: '#d6d6e2',
+      },
+    })
+    const fitAddon = new FitAddon()
+    term.loadAddon(fitAddon)
+    term.open(host)
+    fitAddon.fit()
+    termRef.current = term
+    fitAddonRef.current = fitAddon
+    if (terminalBufferRef.current) {
+      term.write(terminalBufferRef.current)
+    }
+
+    const onResize = () => fitAddonRef.current?.fit()
+    window.addEventListener('resize', onResize)
+
+    return () => {
+      window.removeEventListener('resize', onResize)
+      fitAddonRef.current = null
+      termRef.current = null
+      term.dispose()
+    }
+  }, [])
+
+  const loadFullLogs = useCallback(async () => {
+    const data = await api('/api/mission/launch/logs?lines=0')
+    if (data.success) {
+      resetTerminal(data.logs || '')
+      hasLoadedLogsRef.current = true
+      setLogsResult(null)
+      return true
+    }
+    setLogsResult(data)
+    return false
+  }, [resetTerminal])
+
+  const closeTerminalStream = useCallback(() => {
+    if (streamReconnectTimerRef.current) {
+      clearTimeout(streamReconnectTimerRef.current)
+      streamReconnectTimerRef.current = null
+    }
+    const ws = streamRef.current
+    if (!ws) return
+    ws.onopen = null
+    ws.onmessage = null
+    ws.onerror = null
+    ws.onclose = null
+    try {
+      ws.close()
+    } catch {
+      // Ignore close errors during cleanup.
+    }
+    streamRef.current = null
+    setStreamConnected(false)
+  }, [])
+
+  const openTerminalStream = useCallback(() => {
+    if (streamRef.current) return
+    const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
+    const ws = new WebSocket(`${proto}://${window.location.host}/ws/mission/terminal`)
+    streamRef.current = ws
+
+    ws.onopen = () => {
+      setStreamConnected(true)
+      setLogsResult(null)
+    }
+
+    ws.onmessage = event => {
+      if (typeof event.data === 'string' && event.data) {
+        appendTerminal(event.data)
+      }
+    }
+
+    ws.onerror = () => {
+      setLogsResult({
+        success: false,
+        error: 'Live SSH terminal stream encountered an error.',
+      })
+    }
+
+    ws.onclose = () => {
+      if (streamRef.current === ws) {
+        streamRef.current = null
+      }
+      setStreamConnected(false)
+      if (streamActiveRef.current) {
+        if (streamReconnectTimerRef.current) {
+          clearTimeout(streamReconnectTimerRef.current)
+        }
+        streamReconnectTimerRef.current = window.setTimeout(() => {
+          streamReconnectTimerRef.current = null
+          if (streamActiveRef.current) {
+            openTerminalStream()
+          }
+        }, 1000)
+      }
+    }
+  }, [appendTerminal])
+
+  const refreshLaunchStatus = useCallback(async (forceFullLogs = false) => {
+    if (statusInFlightRef.current) return
+    statusInFlightRef.current = true
     try {
       const status = await api('/api/mission/launch/status')
       if (!status.success) {
+        streamActiveRef.current = false
+        closeTerminalStream()
+        setLaunchStatus({ running: false, state: 'error' })
+        setStreamConnected(false)
         setLogsResult(status)
         return
       }
 
       setLaunchStatus(status)
       const isRunning = status.state === 'running'
-      if (!isRunning && !forceFullLogs) {
+      if (isRunning) {
+        streamActiveRef.current = true
+        openTerminalStream()
         setLogsResult(null)
         return
       }
 
-      if (isRunning) {
-        const currentOffset = logsOffsetRef.current
-        const logData = await api(`/api/mission/launch/logs?offset=${currentOffset}`)
-        if (logData.success) {
-          const rawChunk = logData.logs || ''
-          if (logData.reset) {
-            setLogs(rawChunk)
-          } else if (rawChunk) {
-            setLogs(prev => `${prev}${rawChunk}`)
-          }
-
-          if (typeof logData.next_offset === 'number' && Number.isFinite(logData.next_offset) && logData.next_offset >= 0) {
-            logsOffsetRef.current = logData.next_offset
-          } else {
-            const fallbackBytes = typeof TextEncoder !== 'undefined'
-              ? new TextEncoder().encode(rawChunk).length
-              : rawChunk.length
-            logsOffsetRef.current = currentOffset + fallbackBytes
-          }
-          setLogsResult(null)
-        } else {
-          setLogsResult(logData)
-        }
+      const wasStreaming = streamActiveRef.current
+      streamActiveRef.current = false
+      closeTerminalStream()
+      if (forceFullLogs || wasStreaming || !hasLoadedLogsRef.current) {
+        await loadFullLogs()
       } else {
-        const logData = await api('/api/mission/launch/logs?lines=0')
-        if (logData.success) {
-          const full = logData.logs || ''
-          setLogs(full)
-          logsOffsetRef.current = typeof TextEncoder !== 'undefined'
-            ? new TextEncoder().encode(full).length
-            : full.length
-          setLogsResult(null)
-        } else {
-          setLogsResult(logData)
-        }
+        setLogsResult(null)
       }
     } finally {
-      logsRefreshInFlightRef.current = false
+      statusInFlightRef.current = false
     }
-  }, [])
+  }, [closeTerminalStream, loadFullLogs, openTerminalStream])
+
+  const refreshLaunchData = useCallback(async (forceFullLogs = false) => {
+    await refreshLaunchStatus(forceFullLogs)
+  }, [refreshLaunchStatus])
 
   const loadParams = useCallback(async () => {
     setParamsLoading(true)
@@ -868,19 +837,28 @@ function MissionControl({ buildInfo, onRefresh }) {
   }, [])
 
   useEffect(() => {
-    refreshLaunchData(true)
+    loadFullLogs()
+    refreshLaunchStatus(false)
     loadParams()
-    const interval = setInterval(() => refreshLaunchData(false), 200)
-    return () => clearInterval(interval)
-  }, [refreshLaunchData, loadParams])
+    const interval = setInterval(() => refreshLaunchStatus(false), 500)
+    return () => {
+      clearInterval(interval)
+      streamActiveRef.current = false
+      closeTerminalStream()
+    }
+  }, [closeTerminalStream, loadFullLogs, loadParams, refreshLaunchStatus])
 
   const runAction = async (name, url) => {
     setActionLoading(name)
     setActionResult(null)
+    if (name === 'prepare') {
+      resetTerminal('')
+      hasLoadedLogsRef.current = false
+    }
     const data = await api(url, { method: 'POST' })
     setActionResult(data)
     setActionLoading('')
-    refreshLaunchData()
+    await refreshLaunchData(true)
     onRefresh()
   }
 
@@ -911,6 +889,9 @@ function MissionControl({ buildInfo, onRefresh }) {
               {launchStateLabel(launchStatus)}
             </span>
             {launchStatus?.pid && <span className="launch-pid">PID {launchStatus.pid}</span>}
+            <span className={`launch-pill ${streamConnected ? 'pill-running' : 'pill-not-prepared'}`}>
+              {streamConnected ? 'Live Stream Connected' : 'Live Stream Offline'}
+            </span>
           </div>
         </div>
 
@@ -1040,8 +1021,8 @@ function MissionControl({ buildInfo, onRefresh }) {
         <h2 className="card-title">Launch Output (ros2 launch uav main.launch.py)</h2>
         <div className="card-content">
           <button className="btn btn-secondary" onClick={() => refreshLaunchData(true)}>Refresh Logs Now</button>
-          <p className="subtext left-note">Logs auto-refresh every 0.2 seconds while launch is running.</p>
-          <pre className="terminal-output"><AnsiLog text={logs} /></pre>
+          <p className="subtext left-note">Live SSH stream runs while launch is running. Refresh re-syncs full log history.</p>
+          <div ref={terminalHostRef} className="terminal-output terminal-host" />
           <Result data={logsResult} />
         </div>
       </div>

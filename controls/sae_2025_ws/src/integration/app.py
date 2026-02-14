@@ -8,6 +8,7 @@
 # ///
 
 import asyncio
+from contextlib import suppress
 import os
 import re
 import shlex
@@ -16,7 +17,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from fastapi import FastAPI, Form, UploadFile, File
+from fastapi import FastAPI, Form, UploadFile, File, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -127,9 +128,12 @@ def _ssh_opts():
     return opts
 
 
-def _run_ssh_sync(command: str, timeout: int = 15) -> subprocess.CompletedProcess:
-    """Run a command on the Pi via SSH (blocking)."""
-    cmd = ["ssh"] + _ssh_opts() + [_ssh_target(), command]
+def _build_ssh_cmd(command: str, force_tty: bool = False) -> list[str]:
+    """Construct SSH command list, optionally forcing PTY allocation."""
+    cmd = ["ssh"]
+    if force_tty:
+        cmd.append("-tt")
+    cmd += _ssh_opts() + [_ssh_target(), command]
     if config["ssh_pass"]:
         if not shutil.which("sshpass"):
             raise RuntimeError(
@@ -137,6 +141,12 @@ def _run_ssh_sync(command: str, timeout: int = 15) -> subprocess.CompletedProces
                 "Install sshpass or clear SSH password in Settings and use SSH key auth."
             )
         cmd = ["sshpass", "-p", config["ssh_pass"]] + cmd
+    return cmd
+
+
+def _run_ssh_sync(command: str, timeout: int = 15) -> subprocess.CompletedProcess:
+    """Run a command on the Pi via SSH (blocking)."""
+    cmd = _build_ssh_cmd(command)
     return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
 
 
@@ -872,6 +882,86 @@ async def mission_launch_logs(lines: int = 200, offset: int | None = None):
             "running": False,
             "error": _friendly_ssh_error(str(e)),
         }
+
+
+@app.websocket("/ws/mission/terminal")
+async def mission_terminal_stream(websocket: WebSocket):
+    """Stream mission launch log output over a live SSH session."""
+    await websocket.accept()
+    proc: asyncio.subprocess.Process | None = None
+    reader_tasks: list[asyncio.Task] = []
+    disconnect_task: asyncio.Task | None = None
+    try:
+        paths = _mission_paths()
+        stream_script = f"""
+            log_file={_q(paths["log"])}
+            mkdir -p {_q(config["remote_dir"])}
+            touch "$log_file"
+            tail -n 0 -F "$log_file"
+        """
+        cmd = _build_ssh_cmd(f"bash -lc {_q(stream_script)}", force_tty=True)
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+
+        async def _pump(reader: asyncio.StreamReader):
+            while True:
+                chunk = await reader.read(4096)
+                if not chunk:
+                    break
+                await websocket.send_text(chunk.decode("utf-8", errors="replace"))
+
+        async def _wait_for_disconnect():
+            while True:
+                # We do not expect client input; this blocks until disconnect.
+                await websocket.receive_text()
+
+        if proc.stdout is not None:
+            reader_tasks.append(asyncio.create_task(_pump(proc.stdout)))
+        if proc.stderr is not None:
+            reader_tasks.append(asyncio.create_task(_pump(proc.stderr)))
+        disconnect_task = asyncio.create_task(_wait_for_disconnect())
+
+        done, pending = await asyncio.wait(
+            [*reader_tasks, disconnect_task],
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+        for task in pending:
+            task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
+        for task in done:
+            with suppress(asyncio.CancelledError):
+                _ = task.result()
+    except WebSocketDisconnect:
+        pass
+    except Exception as e:
+        with suppress(Exception):
+            await websocket.send_text(f"\r\n[stream error] {_friendly_ssh_error(str(e))}\r\n")
+    finally:
+        for task in reader_tasks:
+            if not task.done():
+                task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await task
+        if disconnect_task is not None and not disconnect_task.done():
+            disconnect_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await disconnect_task
+
+        if proc is not None and proc.returncode is None:
+            proc.terminate()
+            try:
+                await asyncio.wait_for(proc.wait(), timeout=2)
+            except asyncio.TimeoutError:
+                proc.kill()
+                with suppress(Exception):
+                    await proc.wait()
+
+        with suppress(Exception):
+            await websocket.close()
 
 
 @app.post("/api/mission/prepare")
