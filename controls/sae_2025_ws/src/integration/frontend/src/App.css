@@ -198,20 +198,6 @@ select {
   border-radius: 8px;
 }
 
-.btn-mission-stop {
-  background: #d97706;
-  color: #fff;
-  font-size: 0.9rem;
-  font-weight: 800;
-  padding: 0.65rem 0.9rem;
-  letter-spacing: 1.1px;
-  border-radius: 8px;
-}
-
-.btn-mission-stop:hover:not(:disabled) {
-  background: #b45309;
-}
-
 /* ── Tabs ───────────────────────────────────────────────── */
 
 .page-tabs {

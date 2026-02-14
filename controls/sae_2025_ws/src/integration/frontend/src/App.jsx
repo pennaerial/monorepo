@@ -78,6 +78,30 @@ const LAUNCH_PARAM_FIELDS = [
   },
 ]
 
+const MISSION_ACTIONS = [
+  {
+    key: 'prepare',
+    url: '/api/mission/prepare',
+    className: 'btn btn-mission-prepare',
+    label: 'PREPARE MISSION',
+    loadingLabel: 'PREPARING...',
+  },
+  {
+    key: 'start',
+    url: '/api/mission/start',
+    className: 'btn btn-mission-start',
+    label: 'START MISSION',
+    loadingLabel: 'STARTING...',
+  },
+  {
+    key: 'failsafe',
+    url: '/api/failsafe',
+    className: 'btn btn-failsafe',
+    label: 'FAILSAFE',
+    loadingLabel: 'TRIGGERING...',
+  },
+]
+
 function isSshAuthError(error) {
   return typeof error === 'string' && SSH_AUTH_ERROR_RE.test(error)
 }
@@ -923,37 +947,16 @@ function MissionControl({ buildInfo, onRefresh }) {
         <div className="card">
           <h2 className="card-title">Mission Actions</h2>
           <div className="card-content">
-            <button
-              className="btn btn-mission-prepare"
-              onClick={() => runAction('prepare', '/api/mission/prepare')}
-              disabled={actionLoading !== ''}
-            >
-              {actionLoading === 'prepare' ? 'PREPARING...' : 'PREPARE MISSION'}
-            </button>
-
-            <button
-              className="btn btn-mission-start"
-              onClick={() => runAction('start', '/api/mission/start')}
-              disabled={actionLoading !== ''}
-            >
-              {actionLoading === 'start' ? 'STARTING...' : 'START MISSION'}
-            </button>
-
-            <button
-              className="btn btn-mission-stop"
-              onClick={() => runAction('stop', '/api/mission/stop')}
-              disabled={actionLoading !== ''}
-            >
-              {actionLoading === 'stop' ? 'STOPPING...' : 'STOP MISSION'}
-            </button>
-
-            <button
-              className="btn btn-failsafe"
-              onClick={() => runAction('failsafe', '/api/failsafe')}
-              disabled={actionLoading !== ''}
-            >
-              {actionLoading === 'failsafe' ? 'TRIGGERING...' : 'FAILSAFE'}
-            </button>
+            {MISSION_ACTIONS.map(action => (
+              <button
+                key={action.key}
+                className={action.className}
+                onClick={() => runAction(action.key, action.url)}
+                disabled={actionLoading !== ''}
+              >
+                {actionLoading === action.key ? action.loadingLabel : action.label}
+              </button>
+            ))}
           </div>
           <Result data={actionResult} />
         </div>

@@ -549,6 +549,36 @@ def _require_httpx():
     return httpx
 
 
+async def _copy_artifact_to_pi(local_path: str, artifact_name: str) -> None:
+    mkdir_r = await _run_ssh(f"mkdir -p {_q(config['remote_dir'])}", timeout=10)
+    if mkdir_r.returncode != 0:
+        raise RuntimeError(
+            _format_remote_error(mkdir_r.stderr, "Prepare remote directory failed")
+        )
+    remote_file = f"{config['remote_dir']}/{artifact_name}"
+    r = await _run_scp(local_path, remote_file, timeout=300)
+    if r.returncode != 0:
+        raise RuntimeError(_format_remote_error(r.stderr, "SCP failed"))
+
+
+async def _extract_artifact_on_pi(artifact_name: str) -> None:
+    extract_cmd = f"""
+        set -e
+        cd {_q(config["remote_dir"])}
+        if [ -d install ]; then
+            rm -rf install.bak src.bak
+            mv install install.bak 2>/dev/null || true
+            mv src src.bak 2>/dev/null || true
+        fi
+        tar -xzf {_q(artifact_name)}
+        rm -f {_q(artifact_name)}
+        chmod -R +x install/
+    """
+    r = await _run_ssh(extract_cmd, timeout=120)
+    if r.returncode != 0:
+        raise RuntimeError(_format_remote_error(r.stderr, "Extract failed"))
+
+
 # ── Build Management (via SCP/SSH) ──────────────────────────
 
 
@@ -597,40 +627,12 @@ async def upload_build(file: UploadFile = File(...)):
             tmp.write(await file.read())
             tmp_path = tmp.name
 
-        # Ensure remote dir exists
-        await _run_ssh(f"mkdir -p {_q(config['remote_dir'])}", timeout=10)
-
-        # SCP to Pi
-        remote_file = f"{config['remote_dir']}/{filename}"
-        r = await _run_scp(tmp_path, remote_file, timeout=300)
-
-        if r.returncode != 0:
-            return {
-                "success": False,
-                "error": _format_remote_error(r.stderr, "SCP failed"),
-            }
-
-        # Backup + extract on Pi
-        extract_cmd = f"""
-            set -e
-            cd {_q(config["remote_dir"])}
-            if [ -d install ]; then
-                rm -rf install.bak src.bak
-                mv install install.bak 2>/dev/null || true
-                mv src src.bak 2>/dev/null || true
-            fi
-            tar -xzf {_q(filename)}
-            rm -f {_q(filename)}
-            chmod -R +x install/
-        """
-        r = await _run_ssh(extract_cmd, timeout=120)
-        if r.returncode != 0:
-            return {
-                "success": False,
-                "error": _format_remote_error(r.stderr, "Extract failed"),
-            }
+        await _copy_artifact_to_pi(tmp_path, filename)
+        await _extract_artifact_on_pi(filename)
 
         return {"success": True, "output": f"Deployed {filename} to Pi"}
+    except RuntimeError as e:
+        return {"success": False, "error": str(e)}
     except Exception as e:
         return {"success": False, "error": _friendly_ssh_error(str(e))}
     finally:
@@ -716,38 +718,12 @@ async def download_build(tag: str = Form(...)):
                     async for chunk in resp.aiter_bytes():
                         f.write(chunk)
 
-        # SCP to Pi
-        await _run_ssh(f"mkdir -p {_q(config['remote_dir'])}", timeout=10)
-        remote_file = f"{config['remote_dir']}/{filename}"
-        r = await _run_scp(tmp_path, remote_file, timeout=300)
-
-        if r.returncode != 0:
-            return {
-                "success": False,
-                "error": _format_remote_error(r.stderr, "SCP failed"),
-            }
-
-        # Backup + extract on Pi
-        extract_cmd = f"""
-            set -e
-            cd {_q(config["remote_dir"])}
-            if [ -d install ]; then
-                rm -rf install.bak src.bak
-                mv install install.bak 2>/dev/null || true
-                mv src src.bak 2>/dev/null || true
-            fi
-            tar -xzf {_q(filename)}
-            rm -f {_q(filename)}
-            chmod -R +x install/
-        """
-        r = await _run_ssh(extract_cmd, timeout=120)
-        if r.returncode != 0:
-            return {
-                "success": False,
-                "error": _format_remote_error(r.stderr, "Extract failed"),
-            }
+        await _copy_artifact_to_pi(tmp_path, filename)
+        await _extract_artifact_on_pi(filename)
 
         return {"success": True, "output": f"Downloaded {tag} and deployed to Pi"}
+    except RuntimeError as e:
+        return {"success": False, "error": str(e)}
     except Exception as e:
         return {"success": False, "error": _friendly_ssh_error(str(e))}
     finally:
