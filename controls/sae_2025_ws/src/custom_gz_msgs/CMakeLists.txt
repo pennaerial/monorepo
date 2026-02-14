@@ -42,4 +42,8 @@ install(EXPORT custom_gz_msgs-targets
   DESTINATION lib/cmake/custom_gz_msgs
 )
 
+ament_environment_hooks(
+  "${CMAKE_CURRENT_SOURCE_DIR}/env-hooks/gz_descriptor_path.sh.in"
+)
+
 ament_package()
