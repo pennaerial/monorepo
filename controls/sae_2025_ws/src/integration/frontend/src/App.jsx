@@ -1,13 +1,8 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { Terminal } from '@xterm/xterm'
-import { FitAddon } from '@xterm/addon-fit'
+import { useState, useEffect, useCallback } from 'react'
 import '@xterm/xterm/css/xterm.css'
 import './App.css'
-
-const SSH_AUTH_ERROR_RE = /(permission denied|authentication failed|auth fail|incorrect password|access denied|password was rejected|password authentication is required|no ssh password is set)/i
-const SSH_PASSWORD_HINT = 'If your Pi requires password auth, open Settings and enter the SSH password.'
-const MAX_TERMINAL_BUFFER_CHARS = 1_000_000
-let passwordPromptInFlight = null
+import { useMissionControl } from './hooks/useMissionControl'
+import { api } from './services/api'
 
 const LAUNCH_PARAM_FIELDS = [
   {
@@ -123,21 +118,6 @@ const MISSION_ACTIONS = [
   },
 ]
 
-function isSshAuthError(error) {
-  return typeof error === 'string' && SSH_AUTH_ERROR_RE.test(error)
-}
-
-function shouldPromptForAuth(opts) {
-  const method = (opts?.method || 'GET').toUpperCase()
-  return method !== 'GET'
-}
-
-function withSshPasswordHint(error) {
-  if (typeof error !== 'string') return error
-  if (error.includes(SSH_PASSWORD_HINT)) return error
-  return `${error} ${SSH_PASSWORD_HINT}`
-}
-
 function escapeRegex(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
@@ -229,116 +209,21 @@ function setYamlFieldValue(content, key, type, value) {
 }
 
 function launchStateLabel(status) {
-  if (status?.state === 'offline') return 'Pi Offline'
-  if (status?.state === 'running') return 'Launch Running'
-  if (status?.state === 'stopped') return 'Launch Stopped'
-  if (status?.state === 'not_prepared') return 'Not Prepared'
+  const launchState = status?.launch_state || status?.state
+  if (launchState === 'offline') return 'Pi Offline'
+  if (launchState === 'running') return 'Launch Running'
+  if (launchState === 'stopped') return 'Launch Stopped'
+  if (launchState === 'not_prepared') return 'Not Prepared'
   return 'Launch Unavailable'
 }
 
 function launchStateClass(status) {
-  if (status?.state === 'offline') return 'pill-offline'
-  if (status?.state === 'running') return 'pill-running'
-  if (status?.state === 'stopped') return 'pill-stopped'
-  if (status?.state === 'not_prepared') return 'pill-not-prepared'
+  const launchState = status?.launch_state || status?.state
+  if (launchState === 'offline') return 'pill-offline'
+  if (launchState === 'running') return 'pill-running'
+  if (launchState === 'stopped') return 'pill-stopped'
+  if (launchState === 'not_prepared') return 'pill-not-prepared'
   return 'pill-not-prepared'
-}
-
-function trimTerminalBuffer(text) {
-  if (text.length <= MAX_TERMINAL_BUFFER_CHARS) return text
-  return text.slice(text.length - MAX_TERMINAL_BUFFER_CHARS)
-}
-
-async function requestJson(url, opts) {
-  try {
-    const res = await fetch(url, opts)
-    const raw = await res.text()
-
-    if (!raw.trim()) {
-      return {
-        success: false,
-        error: `Backend returned an empty response (HTTP ${res.status}). Are you connected to the Pi and is the backend reachable?`,
-      }
-    }
-
-    let data
-    try {
-      data = JSON.parse(raw)
-    } catch {
-      const preview = raw.slice(0, 180).replace(/\s+/g, ' ').trim()
-      return {
-        success: false,
-        error: `Backend returned an invalid response (HTTP ${res.status}). Are you connected to the Pi and is the backend reachable? ${preview ? `Details: ${preview}` : ''}`.trim(),
-      }
-    }
-
-    if (!res.ok && (typeof data !== 'object' || data === null || data.success === undefined)) {
-      return {
-        success: false,
-        error: `HTTP ${res.status}`,
-      }
-    }
-
-    return data
-  } catch (e) {
-    return { success: false, error: e.message }
-  }
-}
-
-async function promptSshPassword() {
-  if (!passwordPromptInFlight) {
-    passwordPromptInFlight = Promise.resolve(
-      window.prompt('SSH authentication failed. Enter the Pi SSH password to retry:', '')
-    ).finally(() => {
-      passwordPromptInFlight = null
-    })
-  }
-  return passwordPromptInFlight
-}
-
-async function updateSshPassword(password) {
-  const fd = new FormData()
-  fd.append('ssh_pass', password)
-  return requestJson('/api/config', { method: 'POST', body: fd })
-}
-
-async function api(url, opts, hasRetriedAuth = false) {
-  const data = await requestJson(url, opts)
-
-  if (
-    !hasRetriedAuth &&
-    shouldPromptForAuth(opts) &&
-    url !== '/api/config' &&
-    !data.success &&
-    isSshAuthError(data.error)
-  ) {
-    const password = await promptSshPassword()
-    if (password === null) {
-      return {
-        success: false,
-        error: withSshPasswordHint('SSH authentication failed. Password update cancelled.'),
-      }
-    }
-
-    const updateRes = await updateSshPassword(password)
-    if (!updateRes.success) {
-      return {
-        success: false,
-        error: updateRes.error || 'Failed to update SSH password.',
-      }
-    }
-
-    return api(url, opts, true)
-  }
-
-  if (!data.success && isSshAuthError(data.error)) {
-    return {
-      ...data,
-      error: withSshPasswordHint(data.error),
-    }
-  }
-
-  return data
 }
 
 function StatusBar({ connected, wifiStatus, buildInfo }) {
@@ -726,302 +611,23 @@ function SettingsPanel({ onRefresh }) {
 }
 
 function MissionControl({ connected, buildInfo, onRefresh }) {
-  const [actionLoading, setActionLoading] = useState('')
-  const [actionResult, setActionResult] = useState(null)
-
-  const [launchStatus, setLaunchStatus] = useState({
-    running: false,
-    state: connected ? 'unknown' : 'offline',
-  })
-  const [logsResult, setLogsResult] = useState(null)
-  const [streamConnected, setStreamConnected] = useState(false)
-  const terminalHostRef = useRef(null)
-  const terminalRef = useRef(null)
-  const fitAddonRef = useRef(null)
-  const terminalBufferRef = useRef('')
-  const statusInFlightRef = useRef(false)
-  const streamRef = useRef(null)
-  const streamActiveRef = useRef(false)
-  const streamReconnectTimerRef = useRef(null)
-  const hasLoadedLogsRef = useRef(false)
-
   const [paramsMode, setParamsMode] = useState('form')
-  const [paramsText, setParamsText] = useState('')
-  const [paramsLoading, setParamsLoading] = useState(false)
-  const [paramsResult, setParamsResult] = useState(null)
-
-  const resetTerminal = useCallback((text = '') => {
-    const normalized = trimTerminalBuffer(text)
-    terminalBufferRef.current = normalized
-    const term = terminalRef.current
-    if (!term) return
-    term.reset()
-    if (normalized) term.write(normalized)
-  }, [])
-
-  const appendTerminal = useCallback((text) => {
-    if (typeof text !== 'string' || text.length === 0) return
-    const next = terminalBufferRef.current + text
-    if (next.length <= MAX_TERMINAL_BUFFER_CHARS) {
-      terminalBufferRef.current = next
-      const term = terminalRef.current
-      if (!term) return
-      term.write(text)
-      return
-    }
-
-    const trimmed = trimTerminalBuffer(next)
-    terminalBufferRef.current = trimmed
-    const term = terminalRef.current
-    if (!term) return
-    term.reset()
-    term.write(trimmed)
-  }, [])
-
-  useEffect(() => {
-    const host = terminalHostRef.current
-    if (!host) return undefined
-
-    const term = new Terminal({
-      disableStdin: true,
-      convertEol: true,
-      cursorBlink: false,
-      fontSize: 12,
-      fontFamily: 'SF Mono, Fira Code, ui-monospace, monospace',
-      scrollback: 200000,
-      theme: {
-        background: '#0c0c12',
-        foreground: '#d6d6e2',
-      },
-    })
-    const fitAddon = new FitAddon()
-    term.loadAddon(fitAddon)
-    term.open(host)
-    fitAddon.fit()
-    terminalRef.current = term
-    fitAddonRef.current = fitAddon
-    if (terminalBufferRef.current) {
-      term.write(terminalBufferRef.current)
-    }
-
-    const onResize = () => fitAddonRef.current?.fit()
-    window.addEventListener('resize', onResize)
-
-    return () => {
-      window.removeEventListener('resize', onResize)
-      fitAddonRef.current = null
-      terminalRef.current = null
-      term.dispose()
-    }
-  }, [])
-
-  const loadFullLogs = useCallback(async () => {
-    if (!connected) {
-      setLogsResult(null)
-      return false
-    }
-    const data = await api('/api/mission/launch/logs?lines=0')
-    if (data.success) {
-      resetTerminal(data.logs || '')
-      hasLoadedLogsRef.current = true
-      setLogsResult(null)
-      return true
-    }
-    setLogsResult(data)
-    return false
-  }, [connected, resetTerminal])
-
-  const closeTerminalStream = useCallback(() => {
-    if (streamReconnectTimerRef.current) {
-      clearTimeout(streamReconnectTimerRef.current)
-      streamReconnectTimerRef.current = null
-    }
-    const ws = streamRef.current
-    if (!ws) return
-    ws.onopen = null
-    ws.onmessage = null
-    ws.onerror = null
-    ws.onclose = null
-    try {
-      ws.close()
-    } catch {
-      // Ignore close errors during cleanup.
-    }
-    streamRef.current = null
-    setStreamConnected(false)
-  }, [])
-
-  const openTerminalStream = useCallback(() => {
-    if (streamRef.current) return
-    const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
-    const ws = new WebSocket(`${proto}://${window.location.host}/ws/mission/terminal`)
-    streamRef.current = ws
-
-    ws.onopen = () => {
-      setStreamConnected(true)
-      setLogsResult(null)
-    }
-
-    ws.onmessage = event => {
-      if (typeof event.data === 'string' && event.data) {
-        appendTerminal(event.data)
-      }
-    }
-
-    ws.onerror = () => {
-      setLogsResult({
-        success: false,
-        error: 'Live SSH terminal stream encountered an error.',
-      })
-    }
-
-    ws.onclose = () => {
-      if (streamRef.current === ws) {
-        streamRef.current = null
-      }
-      setStreamConnected(false)
-      if (streamActiveRef.current) {
-        if (streamReconnectTimerRef.current) {
-          clearTimeout(streamReconnectTimerRef.current)
-        }
-        streamReconnectTimerRef.current = window.setTimeout(() => {
-          streamReconnectTimerRef.current = null
-          if (streamActiveRef.current) {
-            openTerminalStream()
-          }
-        }, 1000)
-      }
-    }
-  }, [appendTerminal])
-
-  const refreshLaunchStatus = useCallback(async (forceFullLogs = false) => {
-    if (!connected) {
-      streamActiveRef.current = false
-      closeTerminalStream()
-      setLaunchStatus({ running: false, state: 'offline' })
-      setLogsResult(null)
-      setStreamConnected(false)
-      return
-    }
-    if (statusInFlightRef.current) return
-    statusInFlightRef.current = true
-    try {
-      const status = await api('/api/mission/launch/status')
-      if (!status.success) {
-        streamActiveRef.current = false
-        closeTerminalStream()
-        setLaunchStatus({ running: false, state: 'error' })
-        setStreamConnected(false)
-        setLogsResult(status)
-        return
-      }
-
-      setLaunchStatus(status)
-      const isRunning = status.state === 'running'
-      if (isRunning) {
-        if (forceFullLogs || !hasLoadedLogsRef.current) {
-          await loadFullLogs()
-        }
-        streamActiveRef.current = true
-        openTerminalStream()
-        setLogsResult(null)
-        return
-      }
-
-      const wasStreaming = streamActiveRef.current
-      streamActiveRef.current = false
-      closeTerminalStream()
-      if (forceFullLogs || wasStreaming || !hasLoadedLogsRef.current) {
-        await loadFullLogs()
-      } else {
-        setLogsResult(null)
-      }
-    } finally {
-      statusInFlightRef.current = false
-    }
-  }, [closeTerminalStream, connected, loadFullLogs, openTerminalStream])
-
-  const refreshLaunchData = useCallback(async (forceFullLogs = false) => {
-    await refreshLaunchStatus(forceFullLogs)
-  }, [refreshLaunchStatus])
-
-  const loadParams = useCallback(async () => {
-    if (!connected) {
-      setParamsResult(null)
-      return
-    }
-    setParamsLoading(true)
-    setParamsResult(null)
-    const data = await api('/api/mission/launch-params')
-    if (data.success) {
-      setParamsText(data.content || '')
-    } else {
-      setParamsResult(data)
-    }
-    setParamsLoading(false)
-  }, [connected])
-
-  useEffect(() => {
-    if (!connected) {
-      streamActiveRef.current = false
-      closeTerminalStream()
-      setLaunchStatus({ running: false, state: 'offline' })
-      setLogsResult(null)
-      setParamsResult(null)
-      setActionResult(null)
-      setActionLoading('')
-      resetTerminal('Connect to the Pi WiFi to view launch output.\r\n')
-      return undefined
-    }
-
-    loadFullLogs()
-    refreshLaunchStatus(false)
-    loadParams()
-    const interval = setInterval(() => refreshLaunchStatus(false), 500)
-    return () => {
-      clearInterval(interval)
-      streamActiveRef.current = false
-      closeTerminalStream()
-    }
-  }, [closeTerminalStream, connected, loadFullLogs, loadParams, refreshLaunchStatus, resetTerminal])
-
-  const runAction = async (name, url) => {
-    if (!connected) {
-      setActionResult({
-        success: false,
-        error: 'Connect to the Pi WiFi before running mission actions.',
-      })
-      return
-    }
-    setActionLoading(name)
-    setActionResult(null)
-    if (name === 'prepare') {
-      resetTerminal('')
-      hasLoadedLogsRef.current = false
-    }
-    const data = await api(url, { method: 'POST' })
-    setActionResult(data)
-    setActionLoading('')
-    await refreshLaunchData(true)
-    onRefresh()
-  }
-
-  const saveParams = async () => {
-    if (!connected) {
-      setParamsResult({
-        success: false,
-        error: 'Connect to the Pi WiFi before editing launch params.',
-      })
-      return
-    }
-    setParamsLoading(true)
-    setParamsResult(null)
-    const fd = new FormData()
-    fd.append('content', paramsText)
-    const data = await api('/api/mission/launch-params', { method: 'POST', body: fd })
-    setParamsResult(data)
-    setParamsLoading(false)
-  }
+  const {
+    terminalHostRef,
+    missionState,
+    streamConnected,
+    logsResult,
+    actionLoading,
+    actionResult,
+    paramsText,
+    setParamsText,
+    paramsLoading,
+    paramsResult,
+    loadParams,
+    saveParams,
+    runAction,
+    refreshLaunchData,
+  } = useMissionControl({ connected, onRefresh })
 
   const updateField = (field, value) => {
     setParamsText(prev => setYamlFieldValue(prev, field.key, field.type, value))
@@ -1095,11 +701,11 @@ function MissionControl({ connected, buildInfo, onRefresh }) {
             </pre>
           </div>
           <div className="launch-state-row">
-            <span className={`launch-pill ${launchStateClass(launchStatus)}`}>
-              {launchStateLabel(launchStatus)}
+            <span className={`launch-pill ${launchStateClass(missionState)}`}>
+              {launchStateLabel(missionState)}
             </span>
-            {connected && launchStatus?.pid && <span className="launch-pid">PID {launchStatus.pid}</span>}
-            {connected && launchStatus?.state === 'running' && (
+            {connected && missionState?.pid && <span className="launch-pid">PID {missionState.pid}</span>}
+            {connected && missionState?.launch_state === 'running' && (
               <span className={`launch-pill ${streamConnected ? 'pill-running' : 'pill-not-prepared'}`}>
                 {streamConnected ? 'Live Stream Connected' : 'Connecting Live Stream'}
               </span>

@@ -6,10 +6,21 @@ React + FastAPI dashboard for Pi connectivity, WiFi control, and build deploy/ro
 
 ```
 integration/
-├── app.py              # FastAPI backend
+├── app.py              # FastAPI entrypoint
+├── backend/            # Backend modules
+│   ├── app_factory.py
+│   ├── config.py
+│   ├── context.py
+│   ├── models.py
+│   ├── ssh.py
+│   ├── state.py
+│   ├── routers/
+│   └── services/
 ├── frontend/           # React frontend
 │   ├── src/
-│   │   ├── App.jsx     # Main component
+│   │   ├── App.jsx     # Main UI composition
+│   │   ├── hooks/      # API/WebSocket hooks
+│   │   ├── services/   # API client helpers
 │   │   ├── App.css     # Styles
 │   │   ├── main.jsx    # Entry point
 │   │   └── index.css   # Global styles
