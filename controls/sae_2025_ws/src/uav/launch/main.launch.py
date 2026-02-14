@@ -281,7 +281,7 @@ def launch_setup(context, *args, **kwargs):
                     )
                 )
             ),
-            mission
+            mission,
         ]
         if run_mission_bool:
             actions.extend(
@@ -305,15 +305,15 @@ def launch_setup(context, *args, **kwargs):
             *vision_node_actions,
             LogInfo(msg="Vision nodes started."),
             middleware,
-            mission
+            mission,
         ]
         if run_mission_bool:
             actions.append(
-                        OnProcessIO(
-                            target_action=middleware,
-                            on_stderr=make_io_handler("middleware"),
-                        )
-                    )
+                OnProcessIO(
+                    target_action=middleware,
+                    on_stderr=make_io_handler("middleware"),
+                )
+            )
     return actions
 
 
