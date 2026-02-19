@@ -19,7 +19,6 @@ from rclpy.qos import (
 )
 import numpy as np
 import math
-from std_msgs.msg import Bool
 from uav.px4_modes import PX4CustomMainMode, PX4CustomSubModeAuto
 from uav.utils import R_earth
 
@@ -235,7 +234,7 @@ class UAV(ABC):
             msg.yaw = float(self.calculate_yaw(x, y))
 
         # Delegate velocity calculation to subclass (VTOL or Multicopter)
-        msg.velocity = self._calculate_velocity((x, y, z), lock_yaw)
+        # msg.velocity = self._calculate_velocity((x, y, z), lock_yaw) #TODO: Tune this later but for now let px4 handle
 
         self.trajectory_publisher.publish(msg)
 
@@ -513,15 +512,6 @@ class UAV(ABC):
                 f"Nav State: {self.nav_state}, Arm State: {self.arm_state}, Failsafe: {self.failsafe_px4}, Flight Check: {self.flight_check}"
             )
 
-    def _failsafe_callback(self, msg: Bool):
-        # When a manual failsafe command is received, set the failsafe flag.
-        if msg.data:
-            self.failsafe_trigger = True
-            self.failsafe = self.failsafe_px4 or self.failsafe_trigger
-            self.node.get_logger().info(
-                "Failsafe command received – initiating failsafe landing sequence."
-            )
-
     def _attitude_callback(self, msg: VehicleAttitude):
         self.vehicle_attitude = msg
 
@@ -612,8 +602,4 @@ class UAV(ABC):
             "/fmu/out/vehicle_local_position_v1",
             self._vehicle_local_position_callback,
             qos_profile,
-        )
-
-        self.failsafe_trigger_subscriber = self.node.create_subscription(
-            Bool, "/failsafe_trigger", self._failsafe_callback, qos_profile
         )

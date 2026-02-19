@@ -23,8 +23,6 @@ from uav.utils import (
     extract_vision_nodes,
     clean_text,
 )
-from sim.utils import load_sim_launch_parameters
-from sim.constants import Competition, COMPETITION_NAMES, DEFAULT_COMPETITION
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from ament_index_python.packages import get_package_share_directory
@@ -170,7 +168,7 @@ def launch_setup(context, *args, **kwargs):
         cmd=mission_cmd, output="screen", emulate_tty=True, name="mission"
     )
 
-    mission_start_trigger = ExecuteProcess(
+    start_mission_trigger = ExecuteProcess(
         cmd=[
             "ros2",
             "service",
@@ -216,7 +214,7 @@ def launch_setup(context, *args, **kwargs):
                     mission_started["value"] = True
                     return [
                         LogInfo(msg="[launcher] Processes ready, starting mission"),
-                        mission_start_trigger,
+                        start_mission_trigger,
                     ]
             return None
 
@@ -224,6 +222,9 @@ def launch_setup(context, *args, **kwargs):
 
     # Now, construct the actions list in a single step, depending on sim_bool
     if sim_bool:
+        from sim.utils import load_sim_launch_parameters
+        from sim.constants import Competition, COMPETITION_NAMES, DEFAULT_COMPETITION
+
         # Resolve world name from sim launch params (same source as sim.launch.py)
         sim_params = load_sim_launch_parameters()
         competition_num = sim_params.get("competition", DEFAULT_COMPETITION.value)
@@ -258,7 +259,7 @@ def launch_setup(context, *args, **kwargs):
             cmd=[
                 "bash",
                 "-c",
-                f"PX4_GZ_WORLD={competition} PX4_GZ_STANDALONE=1 PX4_SYS_AUTOSTART={autostart} PX4_SIM_MODEL={model} ./build/px4_sitl_default/bin/px4",
+                f"PX4_GZ_MODEL_POSE='0,0,0,0,0,0' PX4_GZ_WORLD={competition} PX4_GZ_STANDALONE=1 PX4_SYS_AUTOSTART={autostart} PX4_SIM_MODEL={model} ./build/px4_sitl_default/bin/px4",
             ],
             cwd=px4_path,
             output="screen",
@@ -280,6 +281,7 @@ def launch_setup(context, *args, **kwargs):
                     )
                 )
             ),
+            mission,
         ]
         if run_mission_bool:
             actions.extend(
@@ -304,15 +306,14 @@ def launch_setup(context, *args, **kwargs):
             *vision_node_actions,
             LogInfo(msg="Vision nodes started."),
             middleware,
+            mission,
         ]
         if run_mission_bool:
             actions.append(mission)
             actions.append(
-                RegisterEventHandler(
-                    OnProcessIO(
-                        target_action=middleware,
-                        on_stderr=make_io_handler("middleware"),
-                    )
+                OnProcessIO(
+                    target_action=middleware,
+                    on_stderr=make_io_handler("middleware"),
                 )
             )
     return actions

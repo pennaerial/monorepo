@@ -30,9 +30,12 @@ class ModeManager(Node):
         vehicle_class=Vehicle.MULTICOPTER,
     ) -> None:
         super().__init__("mission_node")
-        self.timer = None  # delayed start until start mission trigger
-        self.start_mission_srv = self.create_service(
-            Trigger, "/mode_manager/start_mission", self.start_mission_req
+        self.timer = None
+        self.start_mission_trigger = self.create_service(
+            Trigger, "/mode_manager/start_mission", self.trigger_world_gen_req
+        )
+        self.failsafe_trigger_service = self.create_service(
+            Trigger, "/mode_manager/failsafe", self.trigger_failsafe
         )
         self.modes = {}
         self.transitions = {}
@@ -49,11 +52,21 @@ class ModeManager(Node):
         self.setup_modes(mode_map)
         self.servo_only = servo_only
 
-    def start_mission_req(self, request, response):
+    def trigger_world_gen_req(self, request, response):
         self.get_logger().info("MODE MANAGER | Starting Mission!")
         self.timer = self.create_timer(0.1, self.spin_once)
         response.success = True
         response.message = "Starting Mission!"
+        return response
+
+    def trigger_failsafe(self, request, response):
+        self.get_logger().info("Failsafe triggered via service call")
+
+        self.uav.failsafe_trigger = True
+        self.uav.failsafe = self.uav.failsafe_px4 or self.uav.failsafe_trigger
+
+        response.success = True
+        response.message = "Failsafe triggered."
         return response
 
     def get_active_mode(self) -> Mode:

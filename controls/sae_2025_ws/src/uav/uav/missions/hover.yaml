@@ -1,0 +1,16 @@
+start:
+  class: uav.autonomous_modes.TakeoffMode
+  params:
+    takeoff_type: vertical
+  transitions:
+    complete: GPS
+
+GPS: 
+  class: uav.autonomous_modes.NavGPSMode
+  params:
+    coordinates: '[((0, 0, -3), 5, "LOCAL"), ((0, 0, -6), 5, "LOCAL")]'
+  transitions:
+    complete: land
+
+land:
+  class: uav.autonomous_modes.LandingMode
