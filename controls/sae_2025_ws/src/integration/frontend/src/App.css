@@ -456,6 +456,10 @@ select {
   line-height: 1.35;
 }
 
+.param-help-warn {
+  color: #fbbf24;
+}
+
 .toggle-grid {
   display: grid;
   grid-template-columns: 1fr;
@@ -492,6 +496,10 @@ select {
   min-height: 420px;
   resize: vertical;
   white-space: pre;
+}
+
+.mission-editor {
+  min-height: 360px;
 }
 
 .row-actions {

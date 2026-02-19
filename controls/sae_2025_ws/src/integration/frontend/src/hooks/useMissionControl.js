@@ -47,6 +47,13 @@ export function useMissionControl({ connected, onRefresh }) {
   const [paramsText, setParamsText] = useState('')
   const [paramsLoading, setParamsLoading] = useState(false)
   const [paramsResult, setParamsResult] = useState(null)
+  const [missionNames, setMissionNames] = useState([])
+  const [missionNamesLoading, setMissionNamesLoading] = useState(false)
+  const [missionNamesError, setMissionNamesError] = useState(null)
+  const [missionFileText, setMissionFileText] = useState('')
+  const [missionFileLoading, setMissionFileLoading] = useState(false)
+  const [missionFileSaving, setMissionFileSaving] = useState(false)
+  const [missionFileResult, setMissionFileResult] = useState(null)
 
   const terminalHostRef = useRef(null)
   const terminalRef = useRef(null)
@@ -316,6 +323,26 @@ export function useMissionControl({ connected, onRefresh }) {
     await refreshMissionState(forceFullLogs)
   }, [refreshMissionState])
 
+  const loadMissionNames = useCallback(async () => {
+    if (!connected) {
+      setMissionNames([])
+      setMissionNamesError(null)
+      setMissionNamesLoading(false)
+      return
+    }
+
+    setMissionNamesLoading(true)
+    const data = await api('/api/mission/mission-names')
+    if (data.success && Array.isArray(data.missions)) {
+      setMissionNames(data.missions)
+      setMissionNamesError(null)
+    } else {
+      setMissionNames([])
+      setMissionNamesError(data?.error || 'Failed to load mission names')
+    }
+    setMissionNamesLoading(false)
+  }, [connected])
+
   const loadParams = useCallback(async () => {
     if (!connected) {
       setParamsResult(null)
@@ -332,8 +359,63 @@ export function useMissionControl({ connected, onRefresh }) {
       setParamsResult(data)
     }
 
+    await loadMissionNames()
     setParamsLoading(false)
+  }, [connected, loadMissionNames])
+
+  const loadMissionFile = useCallback(async (missionName) => {
+    if (!connected) {
+      setMissionFileText('')
+      setMissionFileResult(null)
+      setMissionFileLoading(false)
+      return false
+    }
+
+    const name = `${missionName || ''}`.trim()
+    if (!name) {
+      setMissionFileText('')
+      setMissionFileResult(null)
+      return false
+    }
+
+    setMissionFileLoading(true)
+    setMissionFileResult(null)
+    const data = await api(`/api/mission/mission-file?name=${encodeURIComponent(name)}`)
+    if (data.success) {
+      setMissionFileText(data.content || '')
+      setMissionFileResult(null)
+      setMissionFileLoading(false)
+      return true
+    }
+
+    setMissionFileText('')
+    setMissionFileResult(data)
+    setMissionFileLoading(false)
+    return false
   }, [connected])
+
+  const saveMissionFile = useCallback(async (missionName) => {
+    if (!connected) {
+      setMissionFileResult({ success: false, error: 'Connect to the Pi WiFi before editing mission YAML.' })
+      return false
+    }
+
+    const name = `${missionName || ''}`.trim()
+    if (!name) {
+      setMissionFileResult({ success: false, error: 'Set mission_name in launch params before saving mission YAML.' })
+      return false
+    }
+
+    setMissionFileSaving(true)
+    setMissionFileResult(null)
+    const fd = new FormData()
+    fd.append('name', name)
+    fd.append('content', missionFileText)
+    const data = await api('/api/mission/mission-file', { method: 'POST', body: fd })
+    setMissionFileResult(data)
+    setMissionFileSaving(false)
+    return Boolean(data.success)
+  }, [connected, missionFileText])
 
   const saveParams = useCallback(async () => {
     if (!connected) {
@@ -382,6 +464,13 @@ export function useMissionControl({ connected, onRefresh }) {
       setMissionState(offlineMissionState())
       setLogsResult(null)
       setParamsResult(null)
+      setMissionNames([])
+      setMissionNamesError(null)
+      setMissionNamesLoading(false)
+      setMissionFileText('')
+      setMissionFileLoading(false)
+      setMissionFileSaving(false)
+      setMissionFileResult(null)
       setActionResult(null)
       setActionLoading('')
       setStreamConnected(false)
@@ -418,7 +507,18 @@ export function useMissionControl({ connected, onRefresh }) {
     paramsLoading,
     paramsResult,
     setParamsResult,
+    missionNames,
+    missionNamesLoading,
+    missionNamesError,
+    missionFileText,
+    setMissionFileText,
+    missionFileLoading,
+    missionFileSaving,
+    missionFileResult,
+    setMissionFileResult,
     loadParams,
+    loadMissionFile,
+    saveMissionFile,
     saveParams,
     runAction,
     refreshLaunchData,

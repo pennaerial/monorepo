@@ -27,9 +27,13 @@ def build_router(ctx: AppContext) -> APIRouter:
                 error=ctx.ssh.friendly_error(result.stderr),
             )
         except subprocess.TimeoutExpired:
-            return ConnectionStatusResponse(connected=False, error=ctx.ssh.friendly_timeout())
+            return ConnectionStatusResponse(
+                connected=False, error=ctx.ssh.friendly_timeout()
+            )
         except Exception as exc:
-            return ConnectionStatusResponse(connected=False, error=ctx.ssh.friendly_error(str(exc)))
+            return ConnectionStatusResponse(
+                connected=False, error=ctx.ssh.friendly_error(str(exc))
+            )
 
     @router.get("/ssh-command", response_model=SSHCommandResponse)
     async def ssh_command() -> SSHCommandResponse:

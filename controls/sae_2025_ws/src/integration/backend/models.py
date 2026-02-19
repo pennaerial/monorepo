@@ -131,6 +131,21 @@ class LaunchParamsResponse(BaseModel):
     error: str | None = None
 
 
+class MissionNameOptionsResponse(BaseModel):
+    success: bool
+    missions: list[str] = Field(default_factory=list)
+    error: str | None = None
+
+
+class MissionFileResponse(BaseModel):
+    success: bool
+    mission: str | None = None
+    path: str | None = None
+    content: str | None = None
+    output: str | None = None
+    error: str | None = None
+
+
 class TerminalChunkMessage(BaseModel):
     type: Literal["chunk"] = "chunk"
     data: str

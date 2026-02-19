@@ -41,17 +41,25 @@ def sanitize_artifact_name(filename: str) -> str:
     return name
 
 
-async def _copy_artifact_to_pi(ctx: AppContext, local_path: str, artifact_name: str) -> None:
-    mkdir_result = await ctx.ssh.run(f"mkdir -p {ctx.ssh.q(ctx.config.remote_dir)}", timeout=10)
+async def _copy_artifact_to_pi(
+    ctx: AppContext, local_path: str, artifact_name: str
+) -> None:
+    mkdir_result = await ctx.ssh.run(
+        f"mkdir -p {ctx.ssh.q(ctx.config.remote_dir)}", timeout=10
+    )
     if mkdir_result.returncode != 0:
         raise RuntimeError(
-            ctx.ssh.format_remote_error(mkdir_result.stderr, "Prepare remote directory failed")
+            ctx.ssh.format_remote_error(
+                mkdir_result.stderr, "Prepare remote directory failed"
+            )
         )
 
     remote_path = f"{ctx.config.remote_dir}/{artifact_name}"
     copy_result = await ctx.ssh.scp(local_path, remote_path, timeout=300)
     if copy_result.returncode != 0:
-        raise RuntimeError(ctx.ssh.format_remote_error(copy_result.stderr, "SCP failed"))
+        raise RuntimeError(
+            ctx.ssh.format_remote_error(copy_result.stderr, "SCP failed")
+        )
 
 
 async def _extract_artifact_on_pi(ctx: AppContext, artifact_name: str) -> None:
@@ -69,7 +77,9 @@ async def _extract_artifact_on_pi(ctx: AppContext, artifact_name: str) -> None:
     """
     extract_result = await ctx.ssh.run(cmd, timeout=120)
     if extract_result.returncode != 0:
-        raise RuntimeError(ctx.ssh.format_remote_error(extract_result.stderr, "Extract failed"))
+        raise RuntimeError(
+            ctx.ssh.format_remote_error(extract_result.stderr, "Extract failed")
+        )
 
 
 async def current_build(ctx: AppContext) -> dict:
@@ -77,11 +87,15 @@ async def current_build(ctx: AppContext) -> dict:
         build_info_path = f"{ctx.config.remote_dir}/install/BUILD_INFO.txt"
         install_dir = f"{ctx.config.remote_dir}/install"
 
-        result = await ctx.ssh.run(f"cat {ctx.ssh.q(build_info_path)} 2>/dev/null", timeout=10)
+        result = await ctx.ssh.run(
+            f"cat {ctx.ssh.q(build_info_path)} 2>/dev/null", timeout=10
+        )
         if result.returncode == 0 and result.stdout.strip():
             return {"success": True, "installed": True, "info": result.stdout.strip()}
 
-        result = await ctx.ssh.run(f"test -d {ctx.ssh.q(install_dir)} && echo yes || echo no", timeout=10)
+        result = await ctx.ssh.run(
+            f"test -d {ctx.ssh.q(install_dir)} && echo yes || echo no", timeout=10
+        )
         if result.returncode != 0:
             return {
                 "success": True,
@@ -90,11 +104,19 @@ async def current_build(ctx: AppContext) -> dict:
             }
 
         if result.stdout.strip() == "yes":
-            return {"success": True, "installed": True, "info": "Build installed (no BUILD_INFO.txt)"}
+            return {
+                "success": True,
+                "installed": True,
+                "info": "Build installed (no BUILD_INFO.txt)",
+            }
 
         return {"success": True, "installed": False, "info": "No build deployed"}
     except Exception as exc:
-        return {"success": True, "installed": False, "info": ctx.ssh.friendly_error(str(exc))}
+        return {
+            "success": True,
+            "installed": False,
+            "info": ctx.ssh.friendly_error(str(exc)),
+        }
 
 
 async def upload_build(ctx: AppContext, filename: str, file_bytes: bytes) -> dict:
@@ -144,8 +166,12 @@ async def list_builds(ctx: AppContext) -> dict:
                         "sha": rel["tag_name"].replace("build-", ""),
                         "name": rel.get("name", rel["tag_name"]),
                         "date": rel.get("published_at", "")[:10],
-                        "download_url": assets[0]["browser_download_url"] if assets else None,
-                        "size_mb": round(assets[0]["size"] / 1_000_000, 1) if assets else None,
+                        "download_url": assets[0]["browser_download_url"]
+                        if assets
+                        else None,
+                        "size_mb": round(assets[0]["size"] / 1_000_000, 1)
+                        if assets
+                        else None,
                     }
                 )
         return {"success": True, "builds": builds[:20]}
@@ -179,7 +205,9 @@ async def download_build(ctx: AppContext, tag: str) -> dict:
             tmp_path = tmp.name
 
         async with httpx.AsyncClient(timeout=300, follow_redirects=True) as client:
-            async with client.stream("GET", download_url, headers=_github_headers(ctx)) as resp:
+            async with client.stream(
+                "GET", download_url, headers=_github_headers(ctx)
+            ) as resp:
                 resp.raise_for_status()
                 with open(tmp_path, "wb") as out:
                     async for chunk in resp.aiter_bytes():

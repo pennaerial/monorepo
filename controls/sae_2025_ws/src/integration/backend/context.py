@@ -20,4 +20,6 @@ def create_context(base_dir: Path) -> AppContext:
     config = RuntimeConfig.from_env(base_dir)
     ssh = SSHExecutor(config)
     mission_state = MissionStateMachine.create()
-    return AppContext(base_dir=base_dir, config=config, ssh=ssh, mission_state=mission_state)
+    return AppContext(
+        base_dir=base_dir, config=config, ssh=ssh, mission_state=mission_state
+    )

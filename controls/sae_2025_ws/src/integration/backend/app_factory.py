@@ -39,6 +39,8 @@ def create_app(base_dir: Path) -> FastAPI:
 
     frontend_dist = base_dir / "frontend" / "dist"
     if frontend_dist.exists():
-        app.mount("/", StaticFiles(directory=str(frontend_dist), html=True), name="frontend")
+        app.mount(
+            "/", StaticFiles(directory=str(frontend_dist), html=True), name="frontend"
+        )
 
     return app

@@ -23,7 +23,9 @@ class RuntimeConfig:
         cfg = cls(
             pi_user=os.environ.get("PI_USER", "penn"),
             pi_host=os.environ.get("PI_HOST", "penn-desktop.local"),
-            remote_dir=os.environ.get("REMOTE_DIR", "/home/penn/monorepo/controls/sae_2025_ws"),
+            remote_dir=os.environ.get(
+                "REMOTE_DIR", "/home/penn/monorepo/controls/sae_2025_ws"
+            ),
             ssh_key=os.environ.get("SSH_KEY", ""),
             ssh_pass=os.environ.get("SSH_PASS", ""),
             github_repo=os.environ.get("GITHUB_REPO", ""),
@@ -43,6 +45,7 @@ class RuntimeConfig:
             "pid": f"{self.remote_dir}/.mission_main_launch.pid",
             "pgid": f"{self.remote_dir}/.mission_main_launch.pgid",
             "launch_params": f"{self.remote_dir}/src/uav/launch/launch_params.yaml",
+            "missions_dir": f"{self.remote_dir}/src/uav/uav/missions",
         }
 
     def to_safe_dict(self) -> dict[str, str]:

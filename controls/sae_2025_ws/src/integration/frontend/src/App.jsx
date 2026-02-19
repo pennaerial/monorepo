@@ -630,7 +630,18 @@ function MissionControl({ connected, buildInfo, onRefresh }) {
     setParamsText,
     paramsLoading,
     paramsResult,
+    missionNames,
+    missionNamesLoading,
+    missionNamesError,
+    missionFileText,
+    setMissionFileText,
+    missionFileLoading,
+    missionFileSaving,
+    missionFileResult,
+    setMissionFileResult,
     loadParams,
+    loadMissionFile,
+    saveMissionFile,
     saveParams,
     runAction,
     refreshLaunchData,
@@ -640,8 +651,67 @@ function MissionControl({ connected, buildInfo, onRefresh }) {
     setParamsText(prev => setYamlFieldValue(prev, field.key, field.type, value))
   }
 
+  const selectedMissionName = `${getYamlFieldValue(paramsText, 'mission_name', 'string') || ''}`.trim()
+
+  useEffect(() => {
+    if (!connected || !selectedMissionName) {
+      setMissionFileText('')
+      setMissionFileResult(null)
+      return
+    }
+    loadMissionFile(selectedMissionName)
+  }, [
+    connected,
+    loadMissionFile,
+    selectedMissionName,
+    setMissionFileResult,
+    setMissionFileText,
+  ])
+
   const renderCoreField = (field) => {
     const value = getYamlFieldValue(paramsText, field.key, field.type)
+
+    if (field.key === 'mission_name') {
+      const currentValue = `${value ?? ''}`
+      const options = Array.isArray(missionNames) ? [...missionNames] : []
+      if (currentValue && !options.includes(currentValue)) {
+        options.unshift(currentValue)
+      }
+
+      return (
+        <div key={field.key} className="param-field">
+          <label>{field.label}</label>
+          <select
+            value={currentValue}
+            onChange={e => updateField(field, e.target.value)}
+            disabled={!connected || missionNamesLoading}
+          >
+            {!currentValue && (
+              <option value="" disabled>
+                {missionNamesLoading ? 'Loading mission files...' : 'Select mission file'}
+              </option>
+            )}
+            {options.length === 0 && (
+              <option value="" disabled>
+                No mission YAML files found
+              </option>
+            )}
+            {options.map(name => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+          <p className="param-help">{field.help}</p>
+          {connected && missionNamesError && (
+            <p className="param-help param-help-warn">
+              Mission file list unavailable from `src/uav/uav/missions`: {missionNamesError}
+            </p>
+          )}
+        </div>
+      )
+    }
+
     if (field.type === 'array3') {
       const textValue = Array.isArray(value) ? value.join(', ') : '0, 0, 0'
       return (
@@ -802,6 +872,55 @@ function MissionControl({ connected, buildInfo, onRefresh }) {
           </p>
           <div ref={terminalHostRef} className="terminal-output terminal-host" />
           {connected && <Result data={logsResult} />}
+        </div>
+      </div>
+
+      <div className="card card-full">
+        <h2 className="card-title">
+          Mission View (
+          {selectedMissionName
+            ? `uav/uav/missions/${selectedMissionName}.yaml`
+            : 'uav/uav/missions/<mission>.yaml'}
+          )
+        </h2>
+        <div className="card-content">
+          {!connected && (
+            <p className="subtext left-note">Connect to the Pi WiFi to view and edit mission YAML.</p>
+          )}
+          {connected && !selectedMissionName && (
+            <p className="subtext left-note">Set `mission_name` in launch params to load a mission YAML file.</p>
+          )}
+          {connected && selectedMissionName && (
+            <>
+              <textarea
+                className="yaml-editor mission-editor"
+                value={missionFileText}
+                onChange={e => setMissionFileText(e.target.value)}
+                spellCheck={false}
+                disabled={missionFileLoading || missionFileSaving}
+              />
+              <div className="row-actions">
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => loadMissionFile(selectedMissionName)}
+                  disabled={missionFileLoading || missionFileSaving}
+                >
+                  {missionFileLoading ? 'Loading...' : 'Reload Mission YAML'}
+                </button>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => saveMissionFile(selectedMissionName)}
+                  disabled={missionFileLoading || missionFileSaving}
+                >
+                  {missionFileSaving ? 'Saving...' : 'Save Mission YAML'}
+                </button>
+              </div>
+              <p className="subtext left-note">
+                Edits are saved on the Pi inside `src/uav/uav/missions` for the selected mission name.
+              </p>
+              <Result data={missionFileResult} />
+            </>
+          )}
         </div>
       </div>
 

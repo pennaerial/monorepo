@@ -14,7 +14,9 @@ def build_router(ctx: AppContext) -> APIRouter:
 
     @router.get("/current", response_model=BuildCurrentResponse)
     async def current_build() -> BuildCurrentResponse:
-        return BuildCurrentResponse.model_validate(await deploy_service.current_build(ctx))
+        return BuildCurrentResponse.model_validate(
+            await deploy_service.current_build(ctx)
+        )
 
     @router.post("/upload", response_model=MessageResponse | BuildListResponse)
     async def upload_build(file: UploadFile = File(...)):

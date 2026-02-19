@@ -10,7 +10,7 @@
 #       - an active conda env with backend deps installed, or
 #       - `uv` installed: curl -LsSf https://astral.sh/uv/install.sh | sh
 #   - Node.js + npm installed
-#   - Frontend deps installed (`cd frontend && npm install`)
+#   - Package manager recommended for sshpass auto-install (brew/apt/dnf)
 #
 # Environment variables (optional):
 #   INSTALL_DIR       Build install directory (default: ~/ros2_ws)
@@ -23,6 +23,99 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FRONTEND_DIR="$SCRIPT_DIR/frontend"
 cd "$SCRIPT_DIR"
+
+ensure_python_backend_deps() {
+  local python_bin="${1:-python}"
+  local missing_modules=""
+
+  if ! missing_modules="$(
+    "$python_bin" - <<'PY'
+import importlib.util
+
+required = ["fastapi", "httpx", "multipart", "uvicorn"]
+missing = [name for name in required if importlib.util.find_spec(name) is None]
+if missing:
+    print(" ".join(missing))
+    raise SystemExit(1)
+PY
+  )"; then
+    echo "Backend Python dependencies missing (${missing_modules:-unknown}). Installing..."
+    if ! "$python_bin" -m pip install "fastapi[standard]" python-multipart httpx; then
+      echo "Error: failed to install backend Python dependencies."
+      echo "Try manually:"
+      echo "  $python_bin -m pip install \"fastapi[standard]\" python-multipart httpx"
+      exit 1
+    fi
+  fi
+}
+
+ensure_sshpass() {
+  if command -v sshpass >/dev/null 2>&1; then
+    return
+  fi
+
+  echo "sshpass not found."
+  local install_attempted=0
+  local install_ok=1
+
+  if command -v brew >/dev/null 2>&1; then
+    install_attempted=1
+    echo "Installing sshpass with Homebrew..."
+    if ! brew list hudochenkov/sshpass/sshpass >/dev/null 2>&1; then
+      if ! brew install hudochenkov/sshpass/sshpass; then
+        install_ok=0
+        echo "Warning: failed to install sshpass via Homebrew."
+      fi
+    fi
+  fi
+
+  if ! command -v sshpass >/dev/null 2>&1 && command -v apt-get >/dev/null 2>&1; then
+    install_attempted=1
+    echo "Installing sshpass with apt..."
+    if [ "$(id -u)" -eq 0 ]; then
+      if ! apt-get update || ! apt-get install -y sshpass; then
+        install_ok=0
+        echo "Warning: failed to install sshpass via apt."
+      fi
+    elif command -v sudo >/dev/null 2>&1; then
+      if ! sudo apt-get update || ! sudo apt-get install -y sshpass; then
+        install_ok=0
+        echo "Warning: failed to install sshpass via sudo apt."
+      fi
+    else
+      install_ok=0
+      echo "Warning: apt is available but sudo is not. Install sshpass manually."
+    fi
+  fi
+
+  if ! command -v sshpass >/dev/null 2>&1 && command -v dnf >/dev/null 2>&1; then
+    install_attempted=1
+    echo "Installing sshpass with dnf..."
+    if [ "$(id -u)" -eq 0 ]; then
+      if ! dnf install -y sshpass; then
+        install_ok=0
+        echo "Warning: failed to install sshpass via dnf."
+      fi
+    elif command -v sudo >/dev/null 2>&1; then
+      if ! sudo dnf install -y sshpass; then
+        install_ok=0
+        echo "Warning: failed to install sshpass via sudo dnf."
+      fi
+    else
+      install_ok=0
+      echo "Warning: dnf is available but sudo is not. Install sshpass manually."
+    fi
+  fi
+
+  if ! command -v sshpass >/dev/null 2>&1; then
+    if [ "$install_attempted" -eq 0 ]; then
+      echo "Warning: no supported package manager found for sshpass auto-install."
+    elif [ "$install_ok" -eq 0 ]; then
+      echo "Warning: sshpass auto-install failed."
+    fi
+    echo "Warning: sshpass is still unavailable. SSH key auth will work; password auth may fail."
+  fi
+}
 
 if ! command -v npm >/dev/null 2>&1; then
   echo "Error: npm not found. Install Node.js and npm first."
@@ -43,6 +136,7 @@ if ! npm --prefix "$FRONTEND_DIR" ls --depth=0 @xterm/xterm >/dev/null 2>&1; the
 fi
 
 if [ -n "${CONDA_PREFIX:-}" ]; then
+  ensure_python_backend_deps python
   BACKEND_CMD=(python app.py)
   BACKEND_LABEL="python app.py (conda env: $(basename "$CONDA_PREFIX"))"
 elif command -v uv >/dev/null 2>&1; then
@@ -54,6 +148,8 @@ else
   echo "  curl -LsSf https://astral.sh/uv/install.sh | sh"
   exit 1
 fi
+
+ensure_sshpass
 
 echo "Starting backend on http://0.0.0.0:8080 ($BACKEND_LABEL)"
 "${BACKEND_CMD[@]}" &

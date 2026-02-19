@@ -14,9 +14,23 @@ from ..context import AppContext
 from ..models import TerminalChunkMessage, TerminalInfoMessage
 
 
+MISSION_NAME_RE = re.compile(r"^[A-Za-z0-9_-]+$")
+
+
 def _is_offline_error(message: str) -> bool:
     lower = (message or "").lower()
     return "cannot find " in lower or "cannot reach " in lower or "timed out" in lower
+
+
+def _normalize_mission_name(name: str) -> str:
+    mission = (name or "").strip()
+    if not mission:
+        raise ValueError("Mission name is required")
+    if not MISSION_NAME_RE.fullmatch(mission):
+        raise ValueError(
+            "Invalid mission name. Use letters, numbers, underscores, or dashes."
+        )
+    return mission
 
 
 async def probe_launch_status(ctx: AppContext) -> dict:
@@ -138,7 +152,9 @@ async def launch_logs(
 
             out = result.stdout or ""
             first_line, sep, rest = out.partition("\n")
-            meta_match = re.match(r"^__META__:(\d+):([01]):(\d+):([01])$", first_line.strip())
+            meta_match = re.match(
+                r"^__META__:(\d+):([01]):(\d+):([01])$", first_line.strip()
+            )
             if not meta_match:
                 return {
                     "success": False,
@@ -163,7 +179,11 @@ async def launch_logs(
             }
 
         line_count = 0 if lines <= 0 else max(20, min(lines, 20000))
-        cat_cmd = 'cat "$log_file"' if line_count == 0 else f'tail -n {line_count} "$log_file"'
+        cat_cmd = (
+            'cat "$log_file"'
+            if line_count == 0
+            else f'tail -n {line_count} "$log_file"'
+        )
         cmd = f"""
             log_file={ctx.ssh.q(paths["log"])}
             if [ -f "$log_file" ]; then
@@ -245,7 +265,9 @@ async def stream_terminal(
         return
     except Exception as exc:
         with suppress(Exception):
-            message = TerminalInfoMessage(type="error", message=ctx.ssh.friendly_error(str(exc)))
+            message = TerminalInfoMessage(
+                type="error", message=ctx.ssh.friendly_error(str(exc))
+            )
             await websocket.send_text(message.model_dump_json())
     finally:
         with suppress(Exception):
@@ -365,7 +387,9 @@ async def prepare_mission(ctx: AppContext) -> dict:
             }
 
         if result.returncode != 0:
-            error = ctx.ssh.format_remote_error(result.stderr or result.stdout, "Prepare mission failed")
+            error = ctx.ssh.format_remote_error(
+                result.stderr or result.stdout, "Prepare mission failed"
+            )
             await ctx.mission_state.set(
                 phase="error",
                 launch_state="error",
@@ -453,7 +477,9 @@ async def stop_mission(ctx: AppContext) -> dict:
         """
         result = await ctx.ssh.run(f"bash -lc {ctx.ssh.q(cmd)}", timeout=20)
         if result.returncode != 0:
-            error = ctx.ssh.format_remote_error(result.stderr or result.stdout, "Stop mission failed")
+            error = ctx.ssh.format_remote_error(
+                result.stderr or result.stdout, "Stop mission failed"
+            )
             await ctx.mission_state.set(
                 phase="error",
                 launch_state="error",
@@ -497,7 +523,9 @@ async def start_mission(ctx: AppContext) -> dict:
         )
         result = await ctx.ssh.run(f"bash -lc {ctx.ssh.q(cmd)}", timeout=20)
         if result.returncode != 0:
-            error = ctx.ssh.format_remote_error(result.stderr or result.stdout, "Start mission failed")
+            error = ctx.ssh.format_remote_error(
+                result.stderr or result.stdout, "Start mission failed"
+            )
             await ctx.mission_state.set(
                 phase="error",
                 launch_state="error",
@@ -508,7 +536,10 @@ async def start_mission(ctx: AppContext) -> dict:
             return {"success": False, "error": error}
 
         await refresh_runtime_state(ctx)
-        return {"success": True, "output": result.stdout.strip() or "Start mission service called"}
+        return {
+            "success": True,
+            "output": result.stdout.strip() or "Start mission service called",
+        }
     except subprocess.TimeoutExpired:
         return {"success": False, "error": "Start mission service call timed out"}
     except Exception as exc:
@@ -535,7 +566,9 @@ async def trigger_failsafe(ctx: AppContext) -> dict:
         if result.returncode not in (0, 124):
             return {
                 "success": False,
-                "error": ctx.ssh.format_remote_error(result.stderr, "Failsafe command failed"),
+                "error": ctx.ssh.format_remote_error(
+                    result.stderr, "Failsafe command failed"
+                ),
             }
         return {"success": True, "output": "Failsafe triggered"}
     except subprocess.TimeoutExpired:
@@ -551,11 +584,209 @@ async def get_launch_params(ctx: AppContext) -> dict:
         if result.returncode != 0:
             return {
                 "success": False,
-                "error": ctx.ssh.format_remote_error(result.stderr, "Read launch params failed"),
+                "error": ctx.ssh.format_remote_error(
+                    result.stderr, "Read launch params failed"
+                ),
             }
         return {"success": True, "content": result.stdout}
     except Exception as exc:
         return {"success": False, "error": ctx.ssh.friendly_error(str(exc))}
+
+
+async def list_mission_names(ctx: AppContext) -> dict:
+    try:
+        missions_dir = ctx.config.mission_paths()["missions_dir"]
+        cmd = f"""
+            missions_dir={ctx.ssh.q(missions_dir)}
+            if [ ! -d "$missions_dir" ]; then
+                echo "__ERR__:missing_dir"
+                exit 0
+            fi
+            for f in "$missions_dir"/*.yaml "$missions_dir"/*.yml; do
+                [ -e "$f" ] || continue
+                base="$(basename "$f")"
+                case "$base" in
+                    *.yaml) echo "${{base%.yaml}}" ;;
+                    *.yml) echo "${{base%.yml}}" ;;
+                esac
+            done | sort -u
+        """
+        result = await ctx.ssh.run(cmd, timeout=10)
+        if result.returncode != 0:
+            return {
+                "success": False,
+                "missions": [],
+                "error": ctx.ssh.format_remote_error(
+                    result.stderr, "Read mission names failed"
+                ),
+            }
+
+        lines = [line.strip() for line in (result.stdout or "").splitlines() if line.strip()]
+        if lines and lines[0] == "__ERR__:missing_dir":
+            return {
+                "success": False,
+                "missions": [],
+                "error": f"Mission directory not found on Pi: {missions_dir}",
+            }
+
+        return {"success": True, "missions": lines}
+    except Exception as exc:
+        return {
+            "success": False,
+            "missions": [],
+            "error": ctx.ssh.friendly_error(str(exc)),
+        }
+
+
+async def _resolve_mission_file_path(
+    ctx: AppContext, mission_name: str, *, allow_create: bool
+) -> dict:
+    missions_dir = ctx.config.mission_paths()["missions_dir"]
+    cmd = f"""
+        missions_dir={ctx.ssh.q(missions_dir)}
+        mission_name={ctx.ssh.q(mission_name)}
+        yaml_path="$missions_dir/$mission_name.yaml"
+        yml_path="$missions_dir/$mission_name.yml"
+
+        if [ -f "$yaml_path" ]; then
+            echo "$yaml_path"
+            exit 0
+        fi
+        if [ -f "$yml_path" ]; then
+            echo "$yml_path"
+            exit 0
+        fi
+        if [ {1 if allow_create else 0} -eq 1 ]; then
+            echo "$yaml_path"
+            exit 0
+        fi
+        echo "__ERR__:not_found"
+    """
+    result = await ctx.ssh.run(cmd, timeout=10)
+    if result.returncode != 0:
+        return {
+            "success": False,
+            "error": ctx.ssh.format_remote_error(
+                result.stderr, "Resolve mission file failed"
+            ),
+        }
+
+    resolved = (result.stdout or "").strip()
+    if not resolved or resolved == "__ERR__:not_found":
+        return {
+            "success": False,
+            "error": (
+                f"Mission file '{mission_name}.yaml' was not found in "
+                f"{missions_dir}. Select a valid mission in launch params."
+            ),
+        }
+
+    return {"success": True, "path": resolved}
+
+
+async def get_mission_file(ctx: AppContext, *, name: str) -> dict:
+    try:
+        mission_name = _normalize_mission_name(name)
+    except ValueError as exc:
+        return {"success": False, "mission": None, "error": str(exc)}
+
+    try:
+        resolved = await _resolve_mission_file_path(
+            ctx, mission_name, allow_create=False
+        )
+        if not resolved.get("success"):
+            return {
+                "success": False,
+                "mission": mission_name,
+                "error": resolved.get("error", "Mission file not found"),
+            }
+
+        mission_path = resolved["path"]
+        result = await ctx.ssh.run(f"cat {ctx.ssh.q(mission_path)}", timeout=10)
+        if result.returncode != 0:
+            return {
+                "success": False,
+                "mission": mission_name,
+                "path": mission_path,
+                "error": ctx.ssh.format_remote_error(
+                    result.stderr, "Read mission YAML failed"
+                ),
+            }
+
+        return {
+            "success": True,
+            "mission": mission_name,
+            "path": mission_path,
+            "content": result.stdout,
+        }
+    except Exception as exc:
+        return {
+            "success": False,
+            "mission": mission_name,
+            "error": ctx.ssh.friendly_error(str(exc)),
+        }
+
+
+async def set_mission_file(ctx: AppContext, *, name: str, content: str) -> dict:
+    tmp_path = ""
+    try:
+        mission_name = _normalize_mission_name(name)
+    except ValueError as exc:
+        return {"success": False, "mission": None, "error": str(exc)}
+
+    try:
+        missions_dir = ctx.config.mission_paths()["missions_dir"]
+        mkdir_result = await ctx.ssh.run(f"mkdir -p {ctx.ssh.q(missions_dir)}", timeout=10)
+        if mkdir_result.returncode != 0:
+            return {
+                "success": False,
+                "mission": mission_name,
+                "error": ctx.ssh.format_remote_error(
+                    mkdir_result.stderr,
+                    "Write mission YAML failed",
+                ),
+            }
+
+        resolved = await _resolve_mission_file_path(ctx, mission_name, allow_create=True)
+        if not resolved.get("success"):
+            return {
+                "success": False,
+                "mission": mission_name,
+                "error": resolved.get("error", "Failed to resolve mission file"),
+            }
+
+        mission_path = resolved["path"]
+        suffix = ".yml" if mission_path.endswith(".yml") else ".yaml"
+        with tempfile.NamedTemporaryFile(mode="w", suffix=suffix, delete=False) as tmp:
+            tmp.write(content)
+            tmp_path = tmp.name
+
+        scp_result = await ctx.ssh.scp(tmp_path, mission_path, timeout=30)
+        if scp_result.returncode != 0:
+            return {
+                "success": False,
+                "mission": mission_name,
+                "path": mission_path,
+                "error": ctx.ssh.format_remote_error(
+                    scp_result.stderr, "Write mission YAML failed"
+                ),
+            }
+
+        return {
+            "success": True,
+            "mission": mission_name,
+            "path": mission_path,
+            "output": f"Mission YAML updated ({mission_name})",
+        }
+    except Exception as exc:
+        return {
+            "success": False,
+            "mission": mission_name,
+            "error": ctx.ssh.friendly_error(str(exc)),
+        }
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            os.unlink(tmp_path)
 
 
 async def set_launch_params(ctx: AppContext, content: str) -> dict:
@@ -582,7 +813,9 @@ async def set_launch_params(ctx: AppContext, content: str) -> dict:
         if result.returncode != 0:
             return {
                 "success": False,
-                "error": ctx.ssh.format_remote_error(result.stderr, "Write launch params failed"),
+                "error": ctx.ssh.format_remote_error(
+                    result.stderr, "Write launch params failed"
+                ),
             }
 
         return {"success": True, "output": "launch_params.yaml updated"}

@@ -13,7 +13,9 @@ def build_router(ctx: AppContext) -> APIRouter:
 
     @router.get("", response_model=ConfigResponse)
     async def get_config() -> ConfigResponse:
-        return ConfigResponse(config=ConfigPayload.model_validate(ctx.config.to_safe_dict()))
+        return ConfigResponse(
+            config=ConfigPayload.model_validate(ctx.config.to_safe_dict())
+        )
 
     @router.post("", response_model=MessageResponse)
     async def set_config(

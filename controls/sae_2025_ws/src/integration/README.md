@@ -38,6 +38,11 @@ cd /Users/ethanyu/VSCodeProjects/monorepo/controls/sae_2025_ws/src/integration/f
 npm install
 ```
 
+`./launch.sh` also auto-checks dependencies at startup:
+- frontend deps (`npm install` when needed)
+- backend Python deps in conda mode (`fastapi[standard]`, `python-multipart`, `httpx`)
+- `sshpass` via package manager when available (`brew`, `apt`, or `dnf`)
+
 ### 2. Launch Backend + Frontend Together
 
 ```bash
@@ -53,16 +58,15 @@ Stop both with `Ctrl+C` in the terminal running `launch.sh`.
 
 ### Conda Workflow (optional)
 
-If you use conda for backend dependencies, activate your env first:
+If you use conda, activate your env first:
 
 ```bash
 conda activate <your-env>
-pip install "fastapi[standard]" python-multipart httpx
 cd /Users/ethanyu/VSCodeProjects/monorepo/controls/sae_2025_ws/src/integration
 ./launch.sh
 ```
 
-When a conda env is active, `launch.sh` uses `python app.py` for the backend.
+When a conda env is active, `launch.sh` uses `python app.py` for the backend and installs missing backend Python deps automatically.
 If no conda env is active, it uses `uv run app.py`.
 
 ## Building for Production

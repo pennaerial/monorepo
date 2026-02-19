@@ -32,7 +32,9 @@ async def wifi_status(ctx: AppContext) -> dict:
                 )
 
         is_hotspot = any(c["name"] == ctx.config.hotspot_name for c in connections)
-        wifi_con = next((c for c in connections if c["type"] == "802-11-wireless"), None)
+        wifi_con = next(
+            (c for c in connections if c["type"] == "802-11-wireless"), None
+        )
         return {
             "success": True,
             "is_hotspot": is_hotspot,
@@ -97,7 +99,9 @@ async def wifi_scan(ctx: AppContext) -> dict:
 async def wifi_connect(ctx: AppContext, ssid: str, password: str) -> dict:
     hotspot_name = ctx.ssh.q(ctx.config.hotspot_name)
     try:
-        await ctx.ssh.run(f"nmcli con down {hotspot_name} 2>/dev/null; sleep 2", timeout=15)
+        await ctx.ssh.run(
+            f"nmcli con down {hotspot_name} 2>/dev/null; sleep 2", timeout=15
+        )
         pwd_arg = f" password {ctx.ssh.q(password)}" if password else ""
         result = await ctx.ssh.run(
             f"nmcli dev wifi connect {ctx.ssh.q(ssid)}{pwd_arg}", timeout=30
@@ -106,7 +110,9 @@ async def wifi_connect(ctx: AppContext, ssid: str, password: str) -> dict:
             await ctx.ssh.run(f"nmcli con up {hotspot_name}", timeout=15)
             return {
                 "success": False,
-                "error": ctx.ssh.format_remote_error(result.stderr, "Failed to connect"),
+                "error": ctx.ssh.format_remote_error(
+                    result.stderr, "Failed to connect"
+                ),
             }
 
         return {"success": True, "output": f"Pi connected to {ssid}"}
