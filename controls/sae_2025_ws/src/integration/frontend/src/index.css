@@ -1,13 +1,32 @@
-* {
+/* ── CSS Custom Properties ──────────────────────────────── */
+
+:root {
+  --bg: #0f0f13;
+  --card: #1a1a24;
+  --surface: #252532;
+  --border: #2e2e3e;
+  --text: #e4e4ed;
+  --text-secondary: #8888a0;
+  --accent: #3b82f6;
+}
+
+/* ── Reset ──────────────────────────────────────────────── */
+
+*,
+*::before,
+*::after {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
-  background: #e8e8e8;
-  padding: 20px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100dvh;
+  padding: 1rem;
+  -webkit-font-smoothing: antialiased;
 }
 
 #root {

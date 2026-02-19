@@ -1,15 +1,26 @@
-# Launch Interface
+# PennAiR Auton Deploy
 
-Simple React + FastAPI web interface for selecting git commits and running bash scripts.
+React + FastAPI dashboard for Pi connectivity, WiFi control, and build deploy/rollback.
 
 ## Structure
 
 ```
 integration/
-├── app.py              # FastAPI backend
+├── app.py              # FastAPI entrypoint
+├── backend/            # Backend modules
+│   ├── app_factory.py
+│   ├── config.py
+│   ├── context.py
+│   ├── models.py
+│   ├── ssh.py
+│   ├── state.py
+│   ├── routers/
+│   └── services/
 ├── frontend/           # React frontend
 │   ├── src/
-│   │   ├── App.jsx     # Main component
+│   │   ├── App.jsx     # Main UI composition
+│   │   ├── hooks/      # API/WebSocket hooks
+│   │   ├── services/   # API client helpers
 │   │   ├── App.css     # Styles
 │   │   ├── main.jsx    # Entry point
 │   │   └── index.css   # Global styles
@@ -20,54 +31,43 @@ integration/
 
 ## Setup & Run
 
-### 1. Start the Backend (Terminal 1)
+### 1. Install Dependencies (first time)
 
 ```bash
-cd /Users/matthewkuo/Desktop/monorepo/controls/sae_2025_ws/src/integration
-
-# Install Python dependencies
-pip install fastapi uvicorn
-
-# Run the API server
-python app.py
-```
-
-Backend will run on http://localhost:8000
-
-### 2. Start the Frontend (Terminal 2)
-
-```bash
-cd /Users/matthewkuo/Desktop/monorepo/controls/sae_2025_ws/src/integration/frontend
-
-# Install dependencies (first time only)
+cd /Users/ethanyu/VSCodeProjects/monorepo/controls/sae_2025_ws/src/integration/frontend
 npm install
-
-# Run the dev server
-npm run dev
 ```
 
-Frontend will run on http://localhost:3000
+`./launch.sh` also auto-checks dependencies at startup:
+- frontend deps (`npm install` when needed)
+- backend Python deps in conda mode (`fastapi[standard]`, `python-multipart`, `httpx`)
+- `sshpass` via package manager when available (`brew`, `apt`, or `dnf`)
 
-### 3. Open Browser
+### 2. Launch Backend + Frontend Together
 
-Go to http://localhost:3000
-
-## Configure Your Launch Script
-
-Edit `app.py` line 48 to point to your actual bash script:
-
-```python
-script_path = os.path.join(REPO_PATH, "launch.sh")
-```
-
-Your script will receive:
-- First argument: commit hash (e.g., `a1b2c3d`)
-- Remaining arguments: space-separated parameters from the input field
-
-Example:
 ```bash
-./launch.sh a1b2c3d --config=dev --verbose --mode=test
+cd /Users/ethanyu/VSCodeProjects/monorepo/controls/sae_2025_ws/src/integration
+./launch.sh
 ```
+
+This starts:
+- Backend API on `http://localhost:8080`
+- Frontend dev server on `http://localhost:3000`
+
+Stop both with `Ctrl+C` in the terminal running `launch.sh`.
+
+### Conda Workflow (optional)
+
+If you use conda, activate your env first:
+
+```bash
+conda activate <your-env>
+cd /Users/ethanyu/VSCodeProjects/monorepo/controls/sae_2025_ws/src/integration
+./launch.sh
+```
+
+When a conda env is active, `launch.sh` uses `python app.py` for the backend and installs missing backend Python deps automatically.
+If no conda env is active, it uses `uv run app.py`.
 
 ## Building for Production
 
