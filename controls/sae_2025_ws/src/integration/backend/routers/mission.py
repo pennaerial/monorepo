@@ -97,9 +97,7 @@ def build_router(ctx: AppContext) -> APIRouter:
             await mission_service.get_launch_params(ctx)
         )
 
-    @router.get(
-        "/api/mission/mission-names", response_model=MissionNameOptionsResponse
-    )
+    @router.get("/api/mission/mission-names", response_model=MissionNameOptionsResponse)
     async def get_mission_names() -> MissionNameOptionsResponse:
         return MissionNameOptionsResponse.model_validate(
             await mission_service.list_mission_names(ctx)

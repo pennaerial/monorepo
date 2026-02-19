@@ -621,7 +621,9 @@ async def list_mission_names(ctx: AppContext) -> dict:
                 ),
             }
 
-        lines = [line.strip() for line in (result.stdout or "").splitlines() if line.strip()]
+        lines = [
+            line.strip() for line in (result.stdout or "").splitlines() if line.strip()
+        ]
         if lines and lines[0] == "__ERR__:missing_dir":
             return {
                 "success": False,
@@ -736,7 +738,9 @@ async def set_mission_file(ctx: AppContext, *, name: str, content: str) -> dict:
 
     try:
         missions_dir = ctx.config.mission_paths()["missions_dir"]
-        mkdir_result = await ctx.ssh.run(f"mkdir -p {ctx.ssh.q(missions_dir)}", timeout=10)
+        mkdir_result = await ctx.ssh.run(
+            f"mkdir -p {ctx.ssh.q(missions_dir)}", timeout=10
+        )
         if mkdir_result.returncode != 0:
             return {
                 "success": False,
@@ -747,7 +751,9 @@ async def set_mission_file(ctx: AppContext, *, name: str, content: str) -> dict:
                 ),
             }
 
-        resolved = await _resolve_mission_file_path(ctx, mission_name, allow_create=True)
+        resolved = await _resolve_mission_file_path(
+            ctx, mission_name, allow_create=True
+        )
         if not resolved.get("success"):
             return {
                 "success": False,
