@@ -4,7 +4,7 @@ payload:
     default_value: "sim"
     description: "Controller type"
     validation:
-      one_of<>: [["sim", "gpio"]]
+      one_of<>: [["SimController", "GPIOController"]]
   
   sim:
     world_name:

@@ -11,15 +11,14 @@
 #include <string>
 
 
-class Payload: public rclcpp::Node {
+class Payload : public rclcpp::Node {
     public:
         Payload(const std::string& payload_name);
+        void init();
 
     private:
         std::string payload_name_;
         rclcpp::Subscription<payload_interfaces::msg::DriveCommand>::SharedPtr ros_drive_subscriber_;
-        rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr ros_camera_publisher_;
-        rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr ros_camera_info_publisher_;
 
         std::shared_ptr<Controller> controller_;
 
