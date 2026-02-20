@@ -15,11 +15,6 @@
   <depend>payload_interfaces</depend>
   <depend>generate_parameter_library</depend>
 
-  <!-- Sim-only deps, skipped in hardware CI via rosdep skip-keys -->
-  <depend>ros_gz_bridge</depend>
-  <build_depend>gz-transport13</build_depend>
-  <build_depend>gz-msgs10</build_depend>
-
   <exec_depend>ros2launch</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
