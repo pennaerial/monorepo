@@ -20,7 +20,6 @@ GPIOController::~GPIOController()
         lgGpioWrite(handle_, LEFT_IN2,  0);
         lgGpioWrite(handle_, RIGHT_IN2, 0);
         lgGpiochipClose(handle_);
-        RCLCPP_INFO(node_->get_logger(), "GPIO | Shutdown: motors zeroed, chip closed");
     }
 }
 
