@@ -9,14 +9,18 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(payload_interfaces REQUIRED)
-find_package(gz-transport13 REQUIRED)
-find_package(gz-msgs10 REQUIRED)
+find_package(pluginlib REQUIRED)
 find_package(generate_parameter_library REQUIRED)
-find_package(ros_gz_bridge REQUIRED)
 find_package(sensor_msgs REQUIRED)
 
-include_directories(include)
+option(BUILD_SIM "Build simulation controller" ON)
+if(BUILD_SIM)
+  find_package(gz-transport13 REQUIRED)
+  find_package(gz-msgs10 REQUIRED)
+  find_package(ros_gz_bridge REQUIRED)
+endif()
 
+include_directories(include)
 
 #Generate Parameter Library
 generate_parameter_library(
@@ -24,32 +28,56 @@ generate_parameter_library(
   config/payload_params.schema.yaml
 )
 
-
-
-#payload executable
-add_executable(payload
-  src/payload.cpp
+# --- Controller plugin shared library ---
+add_library(payload_controllers SHARED
   src/gpio_controller.cpp
-  src/sim_controller.cpp
-  src/main.cpp
+  $<$<BOOL:${BUILD_SIM}>:src/sim_controller.cpp>
 )
 
-#link dependencies
-ament_target_dependencies(payload
-  rclcpp 
-  payload_interfaces
-  ros_gz_bridge
+ament_target_dependencies(payload_controllers
+  rclcpp
+  pluginlib
   sensor_msgs
 )
 
-target_link_libraries(payload
-  gz-transport13::gz-transport13
-  gz-msgs10::gz-msgs10
+target_link_libraries(payload_controllers
   payload_parameters
 )
 
-install(TARGETS
-  payload
+if(BUILD_SIM)
+  ament_target_dependencies(payload_controllers ros_gz_bridge)
+  target_link_libraries(payload_controllers
+    gz-transport13::gz-transport13
+    gz-msgs10::gz-msgs10
+  )
+  target_compile_definitions(payload_controllers PRIVATE BUILD_SIM)
+endif()
+
+pluginlib_export_plugin_description_file(payload plugins.xml)
+
+# --- Payload executable ---
+add_executable(payload
+  src/payload.cpp
+  src/main.cpp
+)
+
+ament_target_dependencies(payload
+  rclcpp
+  payload_interfaces
+  pluginlib
+)
+
+target_link_libraries(payload
+  payload_parameters
+)
+
+install(TARGETS payload_controllers
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+)
+
+install(TARGETS payload
   DESTINATION lib/${PROJECT_NAME}
 )
 

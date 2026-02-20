@@ -1,6 +1,9 @@
 #ifndef CONTROLLER_HPP
 #define CONTROLLER_HPP
 
+#include <memory>
+#include <rclcpp/rclcpp.hpp>
+
 /*
 Abstract class interface for all payload controllers to implement
 All main functionalities should be virtual functions here

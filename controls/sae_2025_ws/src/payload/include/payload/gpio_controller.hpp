@@ -6,12 +6,11 @@
 
 class GPIOController : public Controller {
     public:
-        GPIOController(rclcpp::Logger logger);
+        GPIOController();
         void drive_command(double linear, double angular) override;
         void initialize(std::shared_ptr<rclcpp::Node> node) override;
     
     private:
-        rclcpp::Logger logger_;
         std::shared_ptr<rclcpp::Node> node_;
 
 

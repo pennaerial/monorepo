@@ -38,7 +38,7 @@ void SimController::drive_command(double linear, double angular) {
     gz::msgs::Twist msg;
     msg.mutable_linear()->set_x(linear); //head-on direction
     msg.mutable_angular()->set_z(angular); //positive for left, negative for right
-    gz_drive_publisher_.Publish(msg);   
+    gz_drive_publisher_.Publish(msg);
 }
 
 void SimController::gz_camera_info_callback(const gz::msgs::CameraInfo& gz_msg) {
@@ -52,3 +52,6 @@ void SimController::gz_camera_callback(const gz::msgs::Image& gz_msg) {
     ros_gz_bridge::convert_gz_to_ros(gz_msg, ros_msg);
     ros_camera_publisher_->publish(ros_msg);
 }
+
+#include <pluginlib/class_list_macros.hpp>
+PLUGINLIB_EXPORT_CLASS(SimController, Controller)

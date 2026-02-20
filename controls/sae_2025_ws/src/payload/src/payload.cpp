@@ -1,7 +1,8 @@
 #include "payload/payload.hpp"
 
 Payload::Payload(const std::string& payload_name)
-: rclcpp::Node(payload_name) {
+: rclcpp::Node(payload_name),
+  controller_loader_("payload", "Controller") {
     payload_name_ = this->get_name(); //allows for override from launch file node name
 
     payload_params_listener_ = std::make_shared<payload::ParamListener>(this);
@@ -12,10 +13,7 @@ Payload::Payload(const std::string& payload_name)
         ros_drive_topic, 10, std::bind(&Payload::drive_callback, this, std::placeholders::_1));
     RCLCPP_INFO(this->get_logger(), "Listening on: %s", ros_drive_topic.c_str());
 
-
-    if (payload_params_.controller == "SimController") { //move to enum
-        controller_ = std::make_shared<SimController>();
-    }
+    controller_ = controller_loader_.createSharedInstance(payload_params_.controller);
 }
 
 void Payload::init() {

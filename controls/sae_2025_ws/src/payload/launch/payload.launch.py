@@ -34,24 +34,24 @@ def launch_setup(context):
 
     ros_params = payload_params.get("/**").get("ros__parameters")
     controller = ros_params.get("controller")
-    if controller == "GPIOController": #Real mode
-        v4l2 = ExecuteProcess(
-                    cmd=[
-                        "ros2",
-                        "run",
-                        "v4l2_camera",
-                        "v4l2_camera_node",
-                        "--ros-args",
-                        "-p",
-                        "image_size:=[640,1600]",
-                        "--ros-args",
-                        "--remap",
-                        f"/image_raw:=/{payload_name}/camera",
-                    ],
-                    output="screen",
-                    name="cam2image",
-                )
-        actions.append(v4l2)
+    # if controller == "GPIOController": #Real mode
+    #     v4l2 = ExecuteProcess(
+    #                 cmd=[
+    #                     "ros2",
+    #                     "run",
+    #                     "v4l2_camera",
+    #                     "v4l2_camera_node",
+    #                     "--ros-args",
+    #                     "-p",
+    #                     "image_size:=[640,1600]",
+    #                     "--ros-args",
+    #                     "--remap",
+    #                     f"/image_raw:=/{payload_name}/camera",
+    #                 ],
+    #                 output="screen",
+    #                 name="cam2image",
+    #             )
+    #     actions.append(v4l2)
 
     return actions
 

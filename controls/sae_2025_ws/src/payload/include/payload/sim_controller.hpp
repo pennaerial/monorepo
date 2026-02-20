@@ -8,7 +8,8 @@
 #include <gz/msgs/image.pb.h>
 #include <gz/msgs/camera_info.pb.h>
 #include "ros_gz_bridge/convert.hpp"
-#include "payload/payload.hpp"
+#include "payload/controller.hpp"
+#include "payload/payload_parameters.hpp"
 #include <string>
 
 class SimController : public Controller {

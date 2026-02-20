@@ -1,0 +1,8 @@
+<library path="payload_controllers">
+  <class name="SimController" type="SimController" base_class_type="Controller">
+    <description>Simulation controller using Gazebo transport</description>
+  </class>
+  <class name="GPIOController" type="GPIOController" base_class_type="Controller">
+    <description>GPIO controller for real hardware</description>
+  </class>
+</library>
