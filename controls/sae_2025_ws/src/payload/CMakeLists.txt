@@ -11,10 +11,14 @@ find_package(rclcpp REQUIRED)
 find_package(payload_interfaces REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(generate_parameter_library REQUIRED)
-option(BUILD_SIM "Build simulation controller" ON)
+
+option(BUILD_SIM "Build simulation controller (OFF builds GPIO controller instead)" ON)
 if(BUILD_SIM)
   find_package(gz-transport13 REQUIRED)
   find_package(gz-msgs10 REQUIRED)
+else()
+  find_library(LGPIO_LIBRARY NAMES lgpio REQUIRED)
+  find_path(LGPIO_INCLUDE_DIR NAMES lgpio.h REQUIRED)
 endif()
 
 include_directories(include)
@@ -27,8 +31,7 @@ generate_parameter_library(
 
 # --- Controller plugin shared library ---
 add_library(payload_controllers SHARED
-  src/gpio_controller.cpp
-  $<$<BOOL:${BUILD_SIM}>:src/sim_controller.cpp>
+  $<IF:$<BOOL:${BUILD_SIM}>,src/sim_controller.cpp,src/gpio_controller.cpp>
 )
 
 ament_target_dependencies(payload_controllers
@@ -46,6 +49,10 @@ if(BUILD_SIM)
     gz-msgs10::gz-msgs10
   )
   target_compile_definitions(payload_controllers PRIVATE BUILD_SIM)
+else()
+  target_link_libraries(payload_controllers ${LGPIO_LIBRARY})
+  target_include_directories(payload_controllers PUBLIC ${LGPIO_INCLUDE_DIR})
+  target_compile_definitions(payload_controllers PRIVATE BUILD_GPIO)
 endif()
 
 pluginlib_export_plugin_description_file(payload plugins.xml)

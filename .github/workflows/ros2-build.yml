@@ -42,6 +42,8 @@ jobs:
             ros-humble-vision-msgs \
             ros-humble-pluginlib \
             ros-humble-generate-parameter-library \
+            liblgpio-dev \ 
+            liblgpio1 \
             git
 
           # Initialize rosdep
@@ -120,9 +122,15 @@ jobs:
           # Copy source files needed at runtime
           mkdir -p deploy/src/uav
           cp -r src/uav/launch deploy/src/uav/
-          mkdir -p deploy/src/uav/uav 
+          mkdir -p deploy/src/uav/uav
           cp -r src/uav/uav/missions deploy/src/uav/uav/
           cp -r src/uav/uav/autonomous_modes deploy/src/uav/uav/
+
+          # Copy payload config into src/ layout so it's editable on the Pi
+          mkdir -p deploy/src/payload
+          cp -r src/payload/config deploy/src/payload/
+          cp -r src/payload/launch deploy/src/payload/
+
 
           # Copy hardware config as the default
           cp src/uav/launch/launch_params_hardware.yaml deploy/launch_params.yaml
