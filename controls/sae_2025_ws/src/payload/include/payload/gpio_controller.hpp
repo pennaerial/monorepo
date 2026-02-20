@@ -9,17 +9,17 @@
 
 #include "payload/controller.hpp"
 
-// -------- Motor pins --------
-constexpr int LEFT_IN1  = 5;   // PWM
-constexpr int LEFT_IN2  = 4;
-constexpr int RIGHT_IN1 = 6;   // PWM
-constexpr int RIGHT_IN2 = 7;
+// -------- Motor pins (BCM numbering) --------
+constexpr int LEFT_IN1  = 11;  // PWM  (physical 23) out A1
+constexpr int LEFT_IN2  = 2;   //      (physical 3) out B1
+constexpr int RIGHT_IN1 = 13;  // PWM  (physical 33) out A2
+constexpr int RIGHT_IN2 = 3;   //      (physical 5) out B2
 
-// -------- Encoder pins --------
-constexpr int ENC_LEFT_A  = 2;
-constexpr int ENC_LEFT_B  = 10;
-constexpr int ENC_RIGHT_A = 3;
-constexpr int ENC_RIGHT_B = 11;
+// -------- Encoder pins (BCM numbering) --------
+constexpr int ENC_LEFT_A  = 19;  // interrupt (physical 35) Enc A1
+constexpr int ENC_LEFT_B  = 23;  // sampled   (physical 16) Enc B1
+constexpr int ENC_RIGHT_A = 21;  // interrupt (physical 40) Enc A2
+constexpr int ENC_RIGHT_B = 27;  // sampled   (physical 13) Enc B2
 
 // -------- Control params --------
 constexpr int   MAX_PWM     = 255;
