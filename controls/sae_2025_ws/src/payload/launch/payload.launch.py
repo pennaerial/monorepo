@@ -1,5 +1,5 @@
 from launch import LaunchDescription
-from launch.actions import OpaqueFunction, DeclareLaunchArgument, ExecuteProcess
+from launch.actions import OpaqueFunction, DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory
@@ -20,7 +20,7 @@ def launch_setup(context):
 
     payload_name = LaunchConfiguration("payload_name").perform(context)
 
-    payload_params = load_param_file(payload_params_path)
+    # payload_params = load_param_file(payload_params_path)
 
     payload = Node(
         package="payload",
@@ -34,8 +34,8 @@ def launch_setup(context):
         payload,
     ]
 
-    ros_params = payload_params.get("/**").get("ros__parameters")
-    controller = ros_params.get("controller")
+    # ros_params = payload_params.get("/**").get("ros__parameters")
+    # controller = ros_params.get("controller")
     # if controller == "GPIOController": #Real mode
     #     v4l2 = ExecuteProcess(
     #                 cmd=[
