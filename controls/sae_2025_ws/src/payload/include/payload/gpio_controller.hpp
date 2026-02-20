@@ -9,6 +9,7 @@
 
 #include "payload/controller.hpp"
 
+// TODO: Parameterize these
 // -------- Motor pins (BCM numbering) --------
 constexpr int LEFT_IN1  = 13;  // PWM  (PWM1) out A ENABLE
 constexpr int LEFT_IN2  = 16;  //             out A PHASE
@@ -20,6 +21,10 @@ constexpr int ENC_LEFT_A  = 0;   // interrupt Enc A1
 constexpr int ENC_LEFT_B  = 9;   // sampled   Enc B1
 constexpr int ENC_RIGHT_A = 11;  // interrupt Enc A2
 constexpr int ENC_RIGHT_B = 10;  // sampled   Enc B2
+
+// -------- Servo pin --------
+constexpr int SERVO_PIN = 14;
+
 
 // -------- Control params --------
 constexpr int   MAX_PWM     = 255;

@@ -28,14 +28,11 @@ void GPIOController::initialize(std::shared_ptr<rclcpp::Node> node)
     node_ = node;
     RCLCPP_INFO(node_->get_logger(), "GPIO | Starting initialization...");
 
-    // Try RPi 5 (gpiochip4) first, fall back to RPi 4 (gpiochip0)
-    RCLCPP_INFO(node_->get_logger(), "GPIO | Trying gpiochip4 (RPi 5)...");
-    handle_ = lgGpiochipOpen(4);
-    if (handle_ < 0) {
-        RCLCPP_INFO(node_->get_logger(), "GPIO | gpiochip4 failed (%d), trying gpiochip0 (RPi 4)...", handle_);
-        handle_ = lgGpiochipOpen(0);
-    }
+    // For RPi 5, try gpiochip4 
+    // handle_ = lgGpiochipOpen(4);
 
+    // RPi 4 (gpiochip0)
+    handle_ = lgGpiochipOpen(0);
     if (handle_ < 0) {
         RCLCPP_FATAL(node_->get_logger(),
             "GPIO | lgGpiochipOpen() failed (err=%d) — check /dev/gpiochip* permissions "
