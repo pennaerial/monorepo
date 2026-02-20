@@ -35,11 +35,11 @@ def launch_setup(context):
 
     actions = [payload]
 
-    #TODO: completely get rid of coupled simcontroller and gpio controller
-    #Create a custom sim bridge from DriveCommand -> gz twist, then we can
-    #Create a payload sim controller launch that takes in payload_name and world and
-    #spawns in the correct bridges, all of the sim controlling will be done from the bridges
-    #DriveCommand bridge and camera/camerainfo bridges
+    # TODO: completely get rid of coupled simcontroller and gpio controller
+    # Create a custom sim bridge from DriveCommand -> gz twist, then we can
+    # Create a payload sim controller launch that takes in payload_name and world and
+    # spawns in the correct bridges, all of the sim controlling will be done from the bridges
+    # DriveCommand bridge and camera/camerainfo bridges
     if controller == "SimController":
         gz_camera_topic = (
             f"/world/{world_name}/model/{payload_name}"
