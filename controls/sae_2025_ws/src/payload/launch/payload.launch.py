@@ -6,9 +6,11 @@ from ament_index_python.packages import get_package_share_directory
 import os
 import yaml
 
+
 def load_param_file(path):
     with open(path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
+
 
 def launch_setup(context):
     payload_share_dir = get_package_share_directory("payload")

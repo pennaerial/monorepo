@@ -2,7 +2,7 @@ name: ROS 2 Build for Raspberry Pi
 
 on:
   push:
-    branches: [main, master, integration, do-not-test-pennair-at-4am]
+    branches: [main, master, integration]
     paths:
       - '.github/workflows/ros2-build.yml'
       - 'controls/sae_2025_ws/**'
@@ -40,6 +40,8 @@ jobs:
             ros-humble-cv-bridge \
             ros-humble-gps-msgs \
             ros-humble-vision-msgs \
+            ros-humble-pluginlib \
+            ros-humble-generate-parameter-library \
             git
 
           # Initialize rosdep
@@ -53,7 +55,8 @@ jobs:
           # Only install deps for hardware packages (skip sim/gazebo)
           rosdep install -r -i -y --rosdistro humble \
             --from-paths src/uav src/uav_interfaces src/px4_msgs src/actuator_msgs \
-            --skip-keys "gz-math7 gz-sim8 gz-transport13 gz-msgs10 gz-plugin2" || true
+              src/payload src/payload_interfaces \
+            --skip-keys "gz-math7 gz-sim8 gz-transport13 gz-msgs10 gz-plugin2 ros_gz_bridge" || true
 
       - name: Build workspace
         working-directory: controls/sae_2025_ws
@@ -62,7 +65,8 @@ jobs:
           # Only build hardware packages - skip all simulation/gazebo packages
           # Note: NOT using --symlink-install so artifacts are portable
           colcon build \
-            --packages-up-to uav uav_interfaces px4_msgs actuator_msgs
+            --packages-up-to uav uav_interfaces px4_msgs actuator_msgs payload payload_interfaces \
+            --cmake-args -DBUILD_SIM=OFF
 
       - name: Get short SHA
         id: sha

@@ -11,10 +11,12 @@
 
   <depend>rclcpp</depend>
   <depend>sensor_msgs</depend>
+  <depend>pluginlib</depend>
   <depend>payload_interfaces</depend>
   <depend>generate_parameter_library</depend>
+
+  <!-- Sim-only deps, skipped in hardware CI via rosdep skip-keys -->
   <depend>ros_gz_bridge</depend>
-  
   <build_depend>gz-transport13</build_depend>
   <build_depend>gz-msgs10</build_depend>
 
