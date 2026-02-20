@@ -11,13 +11,10 @@ find_package(rclcpp REQUIRED)
 find_package(payload_interfaces REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(generate_parameter_library REQUIRED)
-find_package(sensor_msgs REQUIRED)
-
 option(BUILD_SIM "Build simulation controller" ON)
 if(BUILD_SIM)
   find_package(gz-transport13 REQUIRED)
   find_package(gz-msgs10 REQUIRED)
-  find_package(ros_gz_bridge REQUIRED)
 endif()
 
 include_directories(include)
@@ -37,7 +34,6 @@ add_library(payload_controllers SHARED
 ament_target_dependencies(payload_controllers
   rclcpp
   pluginlib
-  sensor_msgs
 )
 
 target_link_libraries(payload_controllers
@@ -45,7 +41,6 @@ target_link_libraries(payload_controllers
 )
 
 if(BUILD_SIM)
-  ament_target_dependencies(payload_controllers ros_gz_bridge)
   target_link_libraries(payload_controllers
     gz-transport13::gz-transport13
     gz-msgs10::gz-msgs10

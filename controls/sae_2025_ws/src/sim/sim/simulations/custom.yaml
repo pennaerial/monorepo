@@ -3,5 +3,5 @@ world:
   params:
     template_world: "src/sim/sim/world_gen/worlds/template.sdf"   # Gazebo world template
     physics:
-      friction: 0.0 # friction coefficient for the ground plane
+      friction: 0.3 # friction coefficient for the ground plane
   

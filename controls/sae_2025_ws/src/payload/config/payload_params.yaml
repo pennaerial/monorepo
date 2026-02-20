@@ -2,7 +2,7 @@
 #TODO: Add necessary clamp param values (Ex. linear and angular velocity)
 /**:
   ros__parameters:
-    controller: "GPIOController" #Name of the controller plugin to instantiate. 
+    controller: "SimController" #Name of the controller plugin to instantiate. 
                       #Currently only have SimController or GPIOController
     sim:
       world_name: "custom"
