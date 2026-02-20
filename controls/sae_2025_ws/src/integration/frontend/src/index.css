@@ -1,6 +1,8 @@
 /* ── CSS Custom Properties ──────────────────────────────── */
 
-:root {
+:root,
+:root[data-theme='dark'] {
+  color-scheme: dark;
   --bg: #0f0f13;
   --card: #1a1a24;
   --surface: #252532;
@@ -8,6 +10,73 @@
   --text: #e4e4ed;
   --text-secondary: #8888a0;
   --accent: #3b82f6;
+  --dot-ok: #22c55e;
+  --dot-err: #ef4444;
+  --dot-warn: #f59e0b;
+  --mini-tab-active-bg: #1e40af;
+  --mini-tab-active-border: #1e40af;
+  --pill-running-bg: #052e16;
+  --pill-running-text: #86efac;
+  --pill-running-border: #14532d;
+  --pill-stopped-bg: #3a2705;
+  --pill-stopped-text: #fcd34d;
+  --pill-stopped-border: #92400e;
+  --pill-not-prepared-bg: #1e293b;
+  --pill-not-prepared-text: #cbd5e1;
+  --pill-not-prepared-border: #475569;
+  --pill-offline-bg: #312e81;
+  --pill-offline-text: #c7d2fe;
+  --pill-offline-border: #4338ca;
+  --warning-text: #fbbf24;
+  --params-bg: rgba(255, 255, 255, 0.015);
+  --terminal-bg: #0c0c12;
+  --placeholder-bg: rgba(255, 255, 255, 0.02);
+  --popover-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
+  --result-ok-bg: #052e16;
+  --result-ok-text: #86efac;
+  --result-ok-border: #14532d;
+  --result-err-bg: #450a0a;
+  --result-err-text: #fca5a5;
+  --result-err-border: #7f1d1d;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --bg: #f3f5f8;
+  --card: #ffffff;
+  --surface: #eef2f7;
+  --border: #c7d1de;
+  --text: #0f172a;
+  --text-secondary: #475569;
+  --accent: #2563eb;
+  --dot-ok: #16a34a;
+  --dot-err: #dc2626;
+  --dot-warn: #ca8a04;
+  --mini-tab-active-bg: #1d4ed8;
+  --mini-tab-active-border: #1d4ed8;
+  --pill-running-bg: #dcfce7;
+  --pill-running-text: #166534;
+  --pill-running-border: #86efac;
+  --pill-stopped-bg: #ffedd5;
+  --pill-stopped-text: #9a3412;
+  --pill-stopped-border: #fdba74;
+  --pill-not-prepared-bg: #e2e8f0;
+  --pill-not-prepared-text: #334155;
+  --pill-not-prepared-border: #94a3b8;
+  --pill-offline-bg: #e0e7ff;
+  --pill-offline-text: #3730a3;
+  --pill-offline-border: #a5b4fc;
+  --warning-text: #b45309;
+  --params-bg: rgba(15, 23, 42, 0.035);
+  --terminal-bg: #f8fafc;
+  --placeholder-bg: rgba(15, 23, 42, 0.05);
+  --popover-shadow: 0 10px 24px rgba(15, 23, 42, 0.2);
+  --result-ok-bg: #dcfce7;
+  --result-ok-text: #166534;
+  --result-ok-border: #86efac;
+  --result-err-bg: #fee2e2;
+  --result-err-text: #991b1b;
+  --result-err-border: #fca5a5;
 }
 
 /* ── Reset ──────────────────────────────────────────────── */
@@ -27,6 +96,7 @@ body {
   min-height: 100dvh;
   padding: 1rem;
   -webkit-font-smoothing: antialiased;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
 #root {

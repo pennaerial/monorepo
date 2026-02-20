@@ -957,8 +957,28 @@ function Result({ data }) {
   )
 }
 
+const THEME_STORAGE_KEY = 'integration-theme'
+const THEME_DARK = 'dark'
+const THEME_LIGHT = 'light'
+
+function readStoredTheme() {
+  if (typeof window === 'undefined') return THEME_DARK
+  let theme = THEME_DARK
+  try {
+    const stored = window.localStorage.getItem(THEME_STORAGE_KEY)
+    if (stored === THEME_DARK || stored === THEME_LIGHT) {
+      theme = stored
+    }
+  } catch {
+    // Ignore storage access failures and keep default theme.
+  }
+  document.documentElement.setAttribute('data-theme', theme)
+  return theme
+}
+
 function App() {
   const [page, setPage] = useState('mission')
+  const [theme, setTheme] = useState(readStoredTheme)
 
   const [connected, setConnected] = useState(false)
   const [wifiStatus, setWifiStatus] = useState(null)
@@ -1002,6 +1022,19 @@ function App() {
     return () => clearInterval(interval)
   }, [refreshAll])
 
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+    try {
+      window.localStorage.setItem(THEME_STORAGE_KEY, theme)
+    } catch {
+      // Ignore storage access failures when persistence is unavailable.
+    }
+  }, [theme])
+
+  const toggleTheme = () => {
+    setTheme(prev => (prev === THEME_DARK ? THEME_LIGHT : THEME_DARK))
+  }
+
   return (
     <div className="app">
       <SettingsPanel onRefresh={refreshAll} />
@@ -1010,18 +1043,23 @@ function App() {
       <StatusBar connected={connected} wifiStatus={wifiStatus} buildInfo={buildInfo} />
       <Result data={pollError} />
 
-      <div className="page-tabs">
-        <button
-          className={`tab-btn ${page === 'mission' ? 'tab-active' : ''}`}
-          onClick={() => setPage('mission')}
-        >
-          Mission Control
-        </button>
-        <button
-          className={`tab-btn ${page === 'deploy' ? 'tab-active' : ''}`}
-          onClick={() => setPage('deploy')}
-        >
-          Deploy
+      <div className="top-controls">
+        <div className="page-tabs">
+          <button
+            className={`tab-btn ${page === 'mission' ? 'tab-active' : ''}`}
+            onClick={() => setPage('mission')}
+          >
+            Mission Control
+          </button>
+          <button
+            className={`tab-btn ${page === 'deploy' ? 'tab-active' : ''}`}
+            onClick={() => setPage('deploy')}
+          >
+            Deploy
+          </button>
+        </div>
+        <button className="theme-toggle-btn" type="button" onClick={toggleTheme}>
+          {theme === THEME_DARK ? 'Light Mode' : 'Dark Mode'}
         </button>
       </div>
 
