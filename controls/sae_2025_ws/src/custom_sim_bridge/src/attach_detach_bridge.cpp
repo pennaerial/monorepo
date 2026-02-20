@@ -21,6 +21,9 @@ class AttachDetachBridge
                 RCLCPP_ERROR(this->get_logger(), "gz_service_name param is empty! Requires non-empty string");
             }
 
+            RCLCPP_INFO(this->get_logger(), "ROS AttachDetach srv at: %s", params_.ros_service_name.c_str());
+            RCLCPP_INFO(this->get_logger(), "GZ AttachDetach srv at: %s", params_.gz_service_name.c_str());
+
             gz_node_ = std::make_shared<gz::transport::Node>();
             attach_detach_ros_service_ = this->create_service<AttachDetach>(params_.ros_service_name, std::bind(
                 &AttachDetachBridge::attach_detach_callback, this, std::placeholders::_1, std::placeholders::_2)
