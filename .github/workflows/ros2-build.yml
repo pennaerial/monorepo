@@ -42,8 +42,7 @@ jobs:
             ros-humble-vision-msgs \
             ros-humble-pluginlib \
             ros-humble-generate-parameter-library \
-            liblgpio-dev \ 
-            liblgpio1 \
+            liblgpio-dev \
             git
 
           # Initialize rosdep
