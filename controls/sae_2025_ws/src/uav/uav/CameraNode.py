@@ -52,8 +52,12 @@ class CameraNode(Node):
         self.camera_info = None
         self.display = display
         # Retrieve the 'save_vision' parameter (should be set via the launch file or node definition)
-        self.declare_parameter("save_vision", True)  # Default to True if not set by launch
-        self.save_vision = self.get_parameter("save_vision").get_parameter_value().bool_value
+        self.declare_parameter(
+            "save_vision", True
+        )  # Default to True if not set by launch
+        self.save_vision = (
+            self.get_parameter("save_vision").get_parameter_value().bool_value
+        )
         self.uuid = str(uuid.uuid4())
 
         self.service = self.create_service(
@@ -92,10 +96,9 @@ class CameraNode(Node):
             timestamp = int(time.time())
             path = os.path.expanduser(f"~/vision_imgs/{self.uuid}")
             self.get_logger().error("PRINTSSDFASDFASDFASFDSD")
-            
+
             os.makedirs(path, exist_ok=True)
             cv2.imwrite(os.path.join(path, f"camera_{timestamp}.png"), frame)
-                
 
     def camera_info_callback(self, msg: CameraInfo):
         """

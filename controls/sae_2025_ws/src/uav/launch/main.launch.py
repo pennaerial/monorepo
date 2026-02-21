@@ -78,9 +78,9 @@ def launch_setup(context, *args, **kwargs):
     if use_camera_bool:
         vision_node_actions.append(
             Node(
-                package="uav", 
-                executable="camera", 
-                name="camera", 
+                package="uav",
+                executable="camera",
+                name="camera",
                 output="screen",
                 parameters=[
                     {
