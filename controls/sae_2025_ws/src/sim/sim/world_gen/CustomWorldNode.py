@@ -53,7 +53,7 @@ class CustomWorldNode(WorldNode):
 #        pos0 = self._random_payload_position()
         #yaw0 = random.uniform(-math.pi, math.pi)
         # payload_0 on opposite side from back tag: 2.5 m in front of VTOL (VTOL at origin, back tag on -x)
-        pos0 = (2.5, 0.0, 0.5)
+        pos0 = (-2.5, 0.0, 0.5)
         yaw0 = math.pi  # face VTOL (back tag behind us)
         payload_0 = Entity(
             name="payload_0",

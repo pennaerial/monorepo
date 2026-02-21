@@ -625,49 +625,49 @@ class PayloadDriveToAprilTagMode(Mode):
                 f"DOCK | dock -> orbit (back tag lost, others visible: {seen_ids})"
             )
 
-        # --- recovery -> orbit: any tag reacquired; return to orbit smoothly (no search/spin) ---
-        if self._phase == "recovery" and any_visible:
-            self._phase = "orbit"
-            # Set desired_yaw and init segment state for segment-based orbit
-            if self._vtol_center is not None and self._pose_vtol is not None:
-                x_vtol, y_vtol, yaw = self._pose_vtol
-                ideal_yaw = self._compute_straight_heading(x_vtol, y_vtol)
-                self._desired_yaw = ideal_yaw
-                self._orbit_segment = "straight"
-                self._orbit_straight_start_time = now
-                self._orbit_straight_heading = ideal_yaw
-                self._orbit_peek_start_time = None
-                self._orbit_turn_back_start_time = None
-            else:
-                self._desired_yaw = None
-            self.log(
-                f"DOCK | recovery -> orbit (tags reacquired: {seen_ids}, dir={'CCW' if self._orbit_dir == 1 else 'CW'})"
-            )
+        # # --- recovery -> orbit: any tag reacquired (COMMENTED OUT: recovery disabled) ---
+        # if self._phase == "recovery" and any_visible:
+        #     self._phase = "orbit"
+        #     if self._vtol_center is not None and self._pose_vtol is not None:
+        #         x_vtol, y_vtol, yaw = self._pose_vtol
+        #         ideal_yaw = self._compute_straight_heading(x_vtol, y_vtol)
+        #         self._desired_yaw = ideal_yaw
+        #         self._orbit_segment = "straight"
+        #         self._orbit_straight_start_time = now
+        #         self._orbit_straight_heading = ideal_yaw
+        #         self._orbit_peek_start_time = None
+        #         self._orbit_turn_back_start_time = None
+        #     else:
+        #         self._desired_yaw = None
+        #     self.log(
+        #         f"DOCK | recovery -> orbit (tags reacquired: {seen_ids}, dir={'CCW' if self._orbit_dir == 1 else 'CW'})"
+        #     )
 
         # ============================================================
         # 4. CONTROL LAYER  (continuous corrections)
         # ============================================================
 
-        # Orbit: direction is locked (only recovery can flip). No new spins; brief tag loss = coast.
+        # Orbit: direction is locked. Brief tag loss = coast (recovery mode commented out; rely on peek).
         if self._phase == "orbit":
             self._control_orbit(now, time_delta, seen_ids, any_visible, tag_results)
         elif self._phase == "dock":
             self._control_dock(now, time_delta, tag_results, seen_ids)
-        elif self._phase == "recovery":
-            if self._vtol_center is not None and self._pose_vtol is not None:
-                cx, cy = self._vtol_center
-                _x, _y, yaw = self._pose_vtol
-                bearing_to_vtol = math.atan2(cy, cx)
-                yaw_err = _wrap_angle(bearing_to_vtol - yaw)
-                w = float(np.clip(2.0 * yaw_err, -0.6, 0.6))
-            else:
-                w = 0.5 * (self._orbit_dir if self._orbit_dir else 1)
-            self._publish_drive(0.0, w)
-            if now - self._last_log_time >= 2.0:
-                self._last_log_time = now
-                self.log(
-                    f"DOCK | recovery: turning toward VTOL w={w:.2f}"
-                )
+        # # --- recovery control (COMMENTED OUT: rely on peek/orbit) ---
+        # elif self._phase == "recovery":
+        #     if self._vtol_center is not None and self._pose_vtol is not None:
+        #         cx, cy = self._vtol_center
+        #         _x, _y, yaw = self._pose_vtol
+        #         bearing_to_vtol = math.atan2(cy, cx)
+        #         yaw_err = _wrap_angle(bearing_to_vtol - yaw)
+        #         w = float(np.clip(2.0 * yaw_err, -0.6, 0.6))
+        #     else:
+        #         w = 0.5 * (self._orbit_dir if self._orbit_dir else 1)
+        #     self._publish_drive(0.0, w)
+        #     if now - self._last_log_time >= 2.0:
+        #         self._last_log_time = now
+        #         self.log(
+        #             f"DOCK | recovery: turning toward VTOL w={w:.2f}"
+        #         )
 
     def _choose_orbit_dir(self, x: float, y: float, context: str = "") -> int:
         """Choose orbit direction (shortest way to rear). Rear is +x in VTOL frame (back tag)."""
