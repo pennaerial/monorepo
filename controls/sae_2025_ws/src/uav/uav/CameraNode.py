@@ -9,6 +9,7 @@ from rclpy.qos import QoSProfile, DurabilityPolicy, ReliabilityPolicy
 import time
 import os
 import uuid
+import numpy as np
 
 
 class CameraNode(Node):
@@ -50,7 +51,9 @@ class CameraNode(Node):
         self.image = None
         self.camera_info = None
         self.display = display
-        self.save_vision = self.get_parameter("save_vision").value
+        # Retrieve the 'save_vision' parameter (should be set via the launch file or node definition)
+        self.declare_parameter("save_vision", True)  # Default to True if not set by launch
+        self.save_vision = self.get_parameter("save_vision").get_parameter_value().bool_value
         self.uuid = str(uuid.uuid4())
 
         self.service = self.create_service(
@@ -71,11 +74,16 @@ class CameraNode(Node):
         )
         self.get_logger().info(f"{node_name} has started, subscribing to {info_topic}.")
 
+    def convert_image_msg_to_frame(self, msg: Image) -> np.ndarray:
+        img_data = np.frombuffer(msg.data, dtype=np.uint8)
+        return img_data.reshape((msg.height, msg.width, 3))
+
     def image_callback(self, msg: Image):
         """
         Callback for receiving image requests.
         """
         self.image = msg
+        frame = self.convert_image_msg_to_frame(msg)
         if self.display:
             frame = self.convert_image_msg_to_frame(msg)
             cv2.imshow("Camera Feed", frame)
@@ -83,6 +91,8 @@ class CameraNode(Node):
         if self.save_vision:
             timestamp = int(time.time())
             path = os.path.expanduser(f"~/vision_imgs/{self.uuid}")
+            self.get_logger().error("PRINTSSDFASDFASDFASFDSD")
+            
             os.makedirs(path, exist_ok=True)
             cv2.imwrite(os.path.join(path, f"camera_{timestamp}.png"), frame)
                 

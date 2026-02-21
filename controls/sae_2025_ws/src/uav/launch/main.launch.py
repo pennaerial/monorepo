@@ -112,7 +112,7 @@ def launch_setup(context, *args, **kwargs):
             )
 
         # Clear vision node actions if none are found.
-        if len(vision_nodes) == 0 or not save_vision_bool:
+        if len(vision_nodes) == 0 and not save_vision_bool:
             vision_node_actions = []
 
         if not sim_bool:
