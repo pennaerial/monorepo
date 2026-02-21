@@ -6,6 +6,57 @@ payload:
     validation:
       one_of<>: [["SimController", "GPIOController"]]
   
+
+  pins:
+    APHASE:
+      type: int
+      default_value: 16
+      description: "Pin number for APHASE/AIN1 motor logic input"
+    AENABLE:
+      type: int
+      default_value: 13
+      description: "Pin number for AENABLE/AIN2 motor logic input"
+    BPHASE:
+      type: int
+      default_value: 15
+      description: "Pin number for BPHASE/BIN1 motor logic input"
+    BENABLE:
+      type: int
+      default_value: 18
+      description: "Pin number for BENABLE/BIN1 motor logic input"
+    ENCA_CH1:
+      type: int
+      default_value: 0
+      description: "Pin number for Encoder A1"
+    ENCA_CH2:
+      type: int
+      default_value: 11
+      description: "Pin number for Encoder A2"
+    ENCB_CH1:
+      type: int
+      default_value: 9
+      description: "Pin number for Encoder B1"
+    ENCB_CH2:
+      type: int
+      default_value: 10
+      description: "Pin number for Encoder B2"
+    SERVO:
+      type: int
+      default_value: 14
+      description: "Pin number for hook servo"
+
+  motor:
+    pwm_frequency:
+      type: double
+      default_value: 500.0
+      description: "PWM frequency for motors"
+    max_norm_speed:
+      type: double
+      default_value: 1.0
+      description: "Maximum normalized speed for motors. Uses this value for clamping"
+      validation:
+        bounds<>: [0.0, 1.0]
+  
   sim:
     world_name:
       type: string 
