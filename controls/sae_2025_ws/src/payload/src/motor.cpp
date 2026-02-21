@@ -3,8 +3,9 @@
 Motor::Motor(int handle, int phase, int enable) {
     handle_ = handle;
 
-    phase_ = std::make_unique<GPIO>(handle_, phase, PinType::Binary | PinType::PWM ); //in1
-    enable_ = std::make_unique<GPIO>(handle_, enable, PinType::Binary | PinType::PWM); //in2
+    uint8_t bin_pwm_perm = static_cast<uint8_t>(PinType::Binary) | static_cast<uint8_t>(PinType::PWM);
+    phase_ = std::make_unique<GPIO>(handle_, phase, bin_pwm_perm); //in1
+    enable_ = std::make_unique<GPIO>(handle_, enable, bin_pwm_perm); //in2
 }
 
 void Motor::set_speed(float speed) {
