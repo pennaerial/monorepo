@@ -208,7 +208,7 @@ void DynamicDetachableJoint::PreUpdate(
     }
 
     // store the child and parent link poses in the world frame
-    math::Pose3d childPose = gz::sim::worldPose(this->childLinkEntity, _ecm);
+    math::Pose3d childPose  = gz::sim::worldPose(this->childLinkEntity, _ecm);
     math::Pose3d parentPose = gz::sim::worldPose(this->parentLinkEntity, _ecm);
 
     auto dist = childPose.Pos().Distance(parentPose.Pos());
