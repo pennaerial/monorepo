@@ -241,7 +241,9 @@ def launch_setup(context, *args, **kwargs):
         # Read optional mission stage (e.g. "horizontal_takeoff")
         mission_stage = str(sim_params.get("mission_stage", "")).strip()
 
-        sim_stage_params, _ = load_sim_parameters(competition, logger, mission_stage)
+        sim_stage_params, _ = load_sim_parameters(
+            competition, logger, competition_name=competition, mission_stage=mission_stage
+        )
 
         vehicle_pose = sim_stage_params["world"]["params"].get(
             "vehicle_pose", [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
