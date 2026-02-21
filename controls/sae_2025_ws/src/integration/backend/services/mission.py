@@ -569,7 +569,9 @@ async def trigger_failsafe(ctx: AppContext) -> dict:
         result = await ctx.ssh.run(cmd, timeout=5)
         elapsed = time.perf_counter() - t0
         if result.returncode == 0:
-            print(f"[Failsafe] daemon took {elapsed:.2f} s", file=sys.stderr, flush=True)
+            print(
+                f"[Failsafe] daemon took {elapsed:.2f} s", file=sys.stderr, flush=True
+            )
             return {"success": True, "output": f"Failsafe triggered ({elapsed:.2f} s)"}
         # Fallback: daemon not running, use ros2 service call
         fallback_cmd = (
