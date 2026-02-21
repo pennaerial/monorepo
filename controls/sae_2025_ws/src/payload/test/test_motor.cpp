@@ -82,25 +82,32 @@ int main(int argc, char** argv)
         printf("  ClaimOutput %-8s (BCM%2d): rc=%d\n", label, pin, rc);
     }
 
-    printf("\nPins  APHASE=BCM%d  AENABLE=BCM%d  BPHASE=BCM%d  BENABLE=BCM%d\n\n",
-           APHASE, AENABLE, BPHASE, BENABLE);
-
     Motor motor_a(h, APHASE, AENABLE);
-    Motor motor_b(h, BPHASE, BENABLE);
+    // Motor motor_b(h, BPHASE, BENABLE);
 
-    for (const auto& step : STEPS) {
-        printf("=== %-22s  A=%.0f%%  B=%.0f%% ===\n",
-               step.label,
-               (double)(step.a_speed * 100.0f),
-               (double)(step.b_speed * 100.0f));
+    std::cout << "MOTOR FORWARD 100%\n";
+    motor_a.set_speed(1.0f);
 
-        motor_a.set_speed(step.a_speed);
-        motor_b.set_speed(step.b_speed);
-        pause(step.duration_ms);
-    }
+    pause(2000);
+
+    std::cout << "MOTOR FORWARD 50%\n";
+    motor_a.set_speed(0.5f);
+    pause(2000);
+
+
+    std::cout << "MOTOR REVERSE 100%\n";
+    motor_a.set_speed(-1.0f);
+
+    pause(2000);
+
+    std::cout << "MOTOR REVERSE 50%\n";
+    motor_a.set_speed(-0.5f);
+    pause(2000);
+
+
+
 
     motor_a.set_speed(0.0f);
-    motor_b.set_speed(0.0f);
     printf("\nDone.\n");
 
     lgGpiochipClose(h);
