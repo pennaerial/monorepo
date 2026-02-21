@@ -168,6 +168,13 @@ def launch_setup(context, *args, **kwargs):
         cmd=mission_cmd, output="screen", emulate_tty=True, name="mission"
     )
 
+    failsafe_daemon = Node(
+        package="uav",
+        executable="failsafe_trigger_daemon",
+        name="failsafe_trigger_daemon",
+        output="screen",
+    )
+
     start_mission_trigger = ExecuteProcess(
         cmd=[
             "ros2",
@@ -282,6 +289,7 @@ def launch_setup(context, *args, **kwargs):
                 )
             ),
             mission,
+            failsafe_daemon,
         ]
         if run_mission_bool:
             actions.extend(
@@ -307,6 +315,7 @@ def launch_setup(context, *args, **kwargs):
             LogInfo(msg="Vision nodes started."),
             middleware,
             mission,
+            failsafe_daemon,
         ]
         if run_mission_bool:
             actions.append(mission)

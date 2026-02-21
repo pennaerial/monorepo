@@ -559,56 +559,27 @@ async def start_mission(ctx: AppContext) -> dict:
         return {"success": False, "error": error}
 
 
-def _parse_failsafe_timings(stderr: str) -> dict[str, float]:
-    """Parse FAILSAFE_TIMING:Tn=timestamp lines from remote stderr."""
-    timings: dict[str, float] = {}
-    prefix = "FAILSAFE_TIMING:"
-    for line in (stderr or "").splitlines():
-        if prefix in line:
-            part = line.split(prefix, 1)[1].strip()
-            if "=" in part:
-                key, val = part.split("=", 1)
-                try:
-                    timings[key.strip()] = float(val.strip())
-                except ValueError:
-                    pass
-    return timings
-
-
 async def trigger_failsafe(ctx: AppContext) -> dict:
+    """Trigger failsafe via the daemon's Unix socket (fast) or fallback to ros2 service call."""
+    socket_path = "/tmp/penn_failsafe"
     try:
-        rd = ctx.config.remote_dir
-        cmd = (
-            f'echo "FAILSAFE_TIMING:T0=$(date +%s.%N)" >&2; '
-            f"cd {ctx.ssh.q(rd)}; "
-            f'echo "FAILSAFE_TIMING:T1=$(date +%s.%N)" >&2; '
-            "source /opt/ros/humble/setup.bash; "
-            f'echo "FAILSAFE_TIMING:T2=$(date +%s.%N)" >&2; '
-            "source install/setup.bash; "
-            f'echo "FAILSAFE_TIMING:T3=$(date +%s.%N)" >&2; '
-            'ros2 service call /mode_manager/failsafe std_srvs/srv/Trigger "{}"; '
-            f'echo "FAILSAFE_TIMING:T4=$(date +%s.%N)" >&2'
-        )
+        # Fast path: daemon listening on Unix socket (mission must be running)
+        cmd = f"echo 1 | socat - UNIX-CONNECT:{ctx.ssh.q(socket_path)}"
         t0 = time.perf_counter()
-        result = await ctx.ssh.run(f"bash -lc {ctx.ssh.q(cmd)}", timeout=15)
+        result = await ctx.ssh.run(cmd, timeout=5)
         elapsed = time.perf_counter() - t0
-        timings = _parse_failsafe_timings(result.stderr)
-        parts: list[str] = [f"total={elapsed:.2f}s"]
-        if "T0" in timings and "T4" in timings:
-            remote_duration = timings["T4"] - timings["T0"]
-            overhead = max(0, elapsed - remote_duration)
-            parts.append(f"ssh+shell≈{overhead:.2f}s")
-        for a, b, label in [
-            ("T0", "T1", "cd"),
-            ("T1", "T2", "source_ros"),
-            ("T2", "T3", "source_workspace"),
-            ("T3", "T4", "ros2_call"),
-        ]:
-            if a in timings and b in timings:
-                d = timings[b] - timings[a]
-                parts.append(f"{label}={d:.2f}s")
-        breakdown = " | ".join(parts)
-        print(f"[Failsafe] {breakdown}", file=sys.stderr, flush=True)
+        if result.returncode == 0:
+            print(f"[Failsafe] daemon took {elapsed:.2f} s", file=sys.stderr, flush=True)
+            return {"success": True, "output": f"Failsafe triggered ({elapsed:.2f} s)"}
+        # Fallback: daemon not running, use ros2 service call
+        fallback_cmd = (
+            f"cd {ctx.ssh.q(ctx.config.remote_dir)} && "
+            "source /opt/ros/humble/setup.bash && "
+            "source install/setup.bash && "
+            'ros2 service call /mode_manager/failsafe std_srvs/srv/Trigger "{}"'
+        )
+        result = await ctx.ssh.run(f"bash -lc {ctx.ssh.q(fallback_cmd)}", timeout=15)
+        elapsed = time.perf_counter() - t0
         if result.returncode not in (0, 124):
             return {
                 "success": False,
@@ -616,10 +587,8 @@ async def trigger_failsafe(ctx: AppContext) -> dict:
                     result.stderr, "Failsafe command failed"
                 ),
             }
-        return {
-            "success": True,
-            "output": f"Failsafe triggered ({breakdown})",
-        }
+        print(f"[Failsafe] fallback took {elapsed:.2f} s", file=sys.stderr, flush=True)
+        return {"success": True, "output": f"Failsafe triggered ({elapsed:.2f} s)"}
     except subprocess.TimeoutExpired:
         return {"success": False, "error": ctx.ssh.friendly_timeout()}
     except Exception as exc:

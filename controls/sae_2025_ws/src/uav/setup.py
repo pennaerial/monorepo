@@ -36,6 +36,7 @@ setup(
             "mission = uav.mission:main",
             "payload_tracking_node = uav.vision_nodes.PayloadTrackingNode:main",
             "camera = uav.CameraNode:main",
+            "failsafe_trigger_daemon = uav.failsafe_trigger_daemon:main",
         ],
     },
 )
