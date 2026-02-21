@@ -52,7 +52,7 @@ def load_yaml_to_dict(params_file: Path) -> dict:
 
 
 def load_sim_parameters(
-    competition: str, logger: logging.Logger, mission_stage: str = ""
+    competition: str, logger: logging.Logger, competition_name: str = "", mission_stage: str = ""
 ) -> str:
     """
     Find simulation configuration file, checking source location first (for development),
@@ -74,20 +74,25 @@ def load_sim_parameters(
     Raises:
         FileNotFoundError: If config file cannot be found
     """
-    if mission_stage:
-        config_filename = f"{competition}.{mission_stage}.yaml"
-    else:
-        config_filename = f"{competition}.yaml"
+    # if mission_stage:
+    #     config_filename = f"{competition}.{mission_stage}.yaml"
+    # else:
+    #     config_filename = f"{competition}.yaml"
 
-    # Validate that the filename starts with the expected competition prefix.
-    expected_prefix = f"{competition}."
-    if not config_filename.startswith(expected_prefix):
-        logger.error(
-            "Config filename '{config_filename}' does not start with expected competition prefix '{expected_prefix}'."
-        )
+    if mission_stage:
+        config_filename = f"{mission_stage}.yaml"
+    else:
+        config_filename = f"base.yaml"
+
+    # # Validate that the filename starts with the expected competition prefix.
+    # expected_prefix = f"{competition}."
+    # if not config_filename.startswith(expected_prefix):
+    #     logger.error(
+    #         "Config filename '{config_filename}' does not start with expected competition prefix '{expected_prefix}'."
+    #     )
 
     config_path = find_package_resource(
-        relative_path=f"simulations/{config_filename}",
+        relative_path=f"simulations/{competition_name}/{config_filename}",
         package_name="sim",
         resource_type="file",
         logger=logger,

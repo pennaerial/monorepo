@@ -191,7 +191,7 @@ def launch_setup(context, *args, **kwargs):
     )
 
     sim_stage_params, sim_config_path = load_sim_parameters(
-        competition, logger, mission_stage
+        competition, logger, competition, mission_stage
     )
 
     if "world" not in sim_stage_params:
