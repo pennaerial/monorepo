@@ -251,9 +251,11 @@ def launch_setup(context, *args, **kwargs):
     # Launch payload node for ground robot control
     payload_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
-            os.path.join(get_package_share_directory('payload'), 'launch', 'payload.launch.py')
+            os.path.join(
+                get_package_share_directory("payload"), "launch", "payload.launch.py"
+            )
         ),
-        launch_arguments={'payload_name': 'payload_0'}.items()
+        launch_arguments={"payload_name": "payload_0"}.items(),
     )
 
     # Initialize scoring node if requested

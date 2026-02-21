@@ -62,7 +62,9 @@ class CustomWorldNode(WorldNode):
         req_payload_0.entity_factory = payload_0.to_entity_factory_msg()
         self.spawn_entity_client.call_async(req_payload_0)
 
-        self.get_logger().info(f"Spawned payload_0 at position=({random_x:.2f}, {random_y:.2f}, 0.5), yaw={math.degrees(random_yaw):.1f}°")
+        self.get_logger().info(
+            f"Spawned payload_0 at position=({random_x:.2f}, {random_y:.2f}, 0.5), yaw={math.degrees(random_yaw):.1f}°"
+        )
 
         # Spawn VTOL aircraft 0.2m behind payload
         aircraft_distance = 0.2  # meters behind payload
@@ -81,7 +83,9 @@ class CustomWorldNode(WorldNode):
         req_vtol.entity_factory = vtol_aircraft.to_entity_factory_msg()
         self.spawn_entity_client.call_async(req_vtol)
 
-        self.get_logger().info(f"Spawned standard_vtol_0 0.2m behind payload at ({aircraft_x:.2f}, {aircraft_y:.2f}, 0.5), yaw={math.degrees(aircraft_yaw):.1f}°")
+        self.get_logger().info(
+            f"Spawned standard_vtol_0 0.2m behind payload at ({aircraft_x:.2f}, {aircraft_y:.2f}, 0.5), yaw={math.degrees(aircraft_yaw):.1f}°"
+        )
 
         # Spawn payload_1 at edge of DLZ, facing center (toward -X)
         # payload_1 = Entity(

@@ -5,7 +5,7 @@ from uav.autonomous_modes import Mode
 from rclpy.node import Node
 from sensor_msgs.msg import Image
 from payload_interfaces.msg import DriveCommand
-from uav.utils import pink, green
+from uav.utils import pink
 from typing import Optional
 
 
@@ -19,10 +19,10 @@ class PayloadEdgeNavigationMode(Mode):
         self,
         node: Node,
         uav: UAV,
-        payload_name: str = 'payload_0',
+        payload_name: str = "payload_0",
         edge_threshold: float = 0.15,
         linear_velocity: float = 0.3,
-        min_color_pixels: int = 100
+        min_color_pixels: int = 100,
     ):
         """
         Initialize the PayloadEdgeNavigationMode.
@@ -68,21 +68,14 @@ class PayloadEdgeNavigationMode(Mode):
         Sets up camera subscription and drive command publisher.
         """
         # Create publisher for payload drive commands
-        drive_topic = f'/{self.payload_name}/cmd_drive'
-        self.drive_publisher = self.node.create_publisher(
-            DriveCommand,
-            drive_topic,
-            10
-        )
+        drive_topic = f"/{self.payload_name}/cmd_drive"
+        self.drive_publisher = self.node.create_publisher(DriveCommand, drive_topic, 10)
         self.log(f"Created drive publisher on {drive_topic}")
 
         # Subscribe to payload camera
-        camera_topic = f'/{self.payload_name}/camera'
+        camera_topic = f"/{self.payload_name}/camera"
         self.camera_subscriber = self.node.create_subscription(
-            Image,
-            camera_topic,
-            self._camera_callback,
-            10
+            Image, camera_topic, self._camera_callback, 10
         )
         self.log(f"Subscribed to camera on {camera_topic}")
 
@@ -162,7 +155,9 @@ class PayloadEdgeNavigationMode(Mode):
             green_px = cv2.countNonZero(green_mask)
 
             self.frames_without_valid_detection += 1
-            self.log(f"Insufficient color detection ({self.frames_without_valid_detection}/{self.max_frames_without_detection}) - pink: {pink_px}, green: {green_px}")
+            self.log(
+                f"Insufficient color detection ({self.frames_without_valid_detection}/{self.max_frames_without_detection}) - pink: {pink_px}, green: {green_px}"
+            )
 
             if self.frames_without_valid_detection >= self.max_frames_without_detection:
                 self.log("Error: Too many frames without valid color detection")
@@ -175,7 +170,9 @@ class PayloadEdgeNavigationMode(Mode):
 
         # Check if we've reached the edge
         if pink_ratio < self.edge_threshold:
-            self.log(f"Edge detected! Pink ratio: {pink_ratio:.3f} < threshold {self.edge_threshold}")
+            self.log(
+                f"Edge detected! Pink ratio: {pink_ratio:.3f} < threshold {self.edge_threshold}"
+            )
             self._stop_payload()
             self.edge_detected = True
             return
@@ -192,10 +189,10 @@ class PayloadEdgeNavigationMode(Mode):
             str: 'complete' when edge is reached, 'error' on failure, 'continue' otherwise.
         """
         if self.error_state:
-            return 'error'
+            return "error"
         if self.edge_detected:
-            return 'complete'
-        return 'continue'
+            return "complete"
+        return "continue"
 
     def on_exit(self) -> None:
         """
