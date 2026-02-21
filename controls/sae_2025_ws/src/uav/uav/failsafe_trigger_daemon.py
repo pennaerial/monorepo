@@ -5,7 +5,6 @@ import os
 import socket
 
 import rclpy
-from rclpy.node import Node
 from std_srvs.srv import Trigger
 
 SOCKET_PATH = "/tmp/penn_failsafe"

@@ -11,14 +11,12 @@ import time
 from contextlib import suppress
 from pathlib import Path
 
-logger = logging.getLogger(__name__)
-
 from fastapi import WebSocket, WebSocketDisconnect
 
 from ..context import AppContext
 from ..models import TerminalChunkMessage, TerminalInfoMessage
 
-
+logger = logging.getLogger(__name__)
 MISSION_NAME_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 
 
