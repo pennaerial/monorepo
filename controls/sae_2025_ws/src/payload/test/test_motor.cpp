@@ -87,11 +87,10 @@ int main(int argc, char** argv)
 
     std::cout << "MOTOR FORWARD 100%\n";
     motor_a.set_speed(1.0f);
-
     pause(2000);
 
-    std::cout << "MOTOR FORWARD 50%\n";
-    motor_a.set_speed(0.5f);
+    std::cout << "MOTOR FORWARD 20%\n";
+    motor_a.set_speed(0.2f);
     pause(2000);
 
 
@@ -100,8 +99,8 @@ int main(int argc, char** argv)
 
     pause(2000);
 
-    std::cout << "MOTOR REVERSE 50%\n";
-    motor_a.set_speed(-0.5f);
+    std::cout << "MOTOR REVERSE 20%\n";
+    motor_a.set_speed(-0.2f);
     pause(2000);
 
 
