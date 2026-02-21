@@ -134,6 +134,14 @@ class PayloadCornerNavigationMode(Mode):
         self.turn_elapsed = 0.0
         self.turn_duration = 0.0
 
+        # Coast compensation for turn accuracy
+        self.coast_angle_left = np.radians(4.0)  # 4° coast for left turns
+        self.coast_angle_right = np.radians(
+            10.0
+        )  # 10° coast for right turns (more overshoot)
+        self.settling_time = 0.15  # 150ms to settle after stopping
+        self.turn_settling_elapsed = 0.0
+
         # Centering state
         self.centering_scan_index = 0
         self.centering_measurements = []  # List of (angle, balance_diff) tuples
@@ -384,7 +392,7 @@ class PayloadCornerNavigationMode(Mode):
 
     def _start_turn(self, target_angle: float) -> None:
         """
-        Start a turn to face a target angle.
+        Start a turn with coast compensation awareness.
 
         Args:
             target_angle: Angle in radians to turn (relative)
@@ -392,63 +400,74 @@ class PayloadCornerNavigationMode(Mode):
         self.is_turning = True
         self.turn_target = target_angle
         self.turn_elapsed = 0.0
+        self.turn_settling_elapsed = 0.0  # Reset settling timer
         self.turn_duration = abs(target_angle) / self.angular_velocity
 
-        turn_deg = np.degrees(target_angle)
-        self.log(f"Starting turn: {turn_deg:.1f} degrees ({self.turn_duration:.2f}s)")
+        turn_dir = "RIGHT" if target_angle < 0 else "LEFT"
+        coast = self.coast_angle_right if target_angle < 0 else self.coast_angle_left
+        self.log(
+            f"Starting {turn_dir} turn: {np.degrees(target_angle):.1f}° "
+            f"(coast={np.degrees(coast):.1f}°, duration={self.turn_duration:.2f}s)"
+        )
 
     def _update_turn(self, time_delta: float) -> bool:
         """
-        Update turning state with precise angle control using predictive lookahead.
+        Update turning state with early stopping to compensate for coast momentum.
 
         Returns:
             bool: True if turn is complete, False otherwise
         """
-        # Calculate how much angle we've turned so far
+        # Determine turn direction and coast compensation
+        is_right_turn = self.turn_target < 0
+        coast_angle = self.coast_angle_right if is_right_turn else self.coast_angle_left
+
+        # Calculate how much we've turned
         angle_turned_so_far = (self.turn_elapsed / self.turn_duration) * abs(
             self.turn_target
         )
+        angle_remaining = abs(self.turn_target) - angle_turned_so_far
 
-        # Predict how much we'll have turned AFTER this timestep at full speed
-        angle_if_full_speed = angle_turned_so_far + (self.angular_velocity * time_delta)
-        angle_remaining_now = abs(self.turn_target) - angle_turned_so_far
-
-        # Check if we're already done
-        if angle_remaining_now <= 0.0001:  # Within 0.0001 radians (~0.006 degrees)
+        # Check if we should stop commanding (coast zone)
+        if angle_remaining <= coast_angle:
+            # Stop commanding velocity - let it coast
             self._stop_payload()
-            self.is_turning = False
-            self.current_heading += self.turn_target
-            self.log(f"Turn complete (error: {np.degrees(angle_remaining_now):.4f}°)")
-            return True
 
-        # Determine angular velocity for this timestep
-        # If full speed would overshoot, reduce velocity proportionally
-        if angle_if_full_speed > abs(self.turn_target):
-            # We're on the final approach - slow down to hit target exactly
-            # Calculate exact velocity needed to reach target in this timestep
-            if time_delta > 0.001:
-                angular_vel = angle_remaining_now / time_delta
-                # Apply direction
-                if self.turn_target < 0:
-                    angular_vel = -angular_vel
-                self.log(
-                    f"Final approach: {np.degrees(angle_remaining_now):.3f}° remaining, vel={angular_vel:.4f} rad/s"
-                )
-            else:
-                # Safety: timestep too small, stop
-                self._stop_payload()
+            # Wait for settling
+            self.turn_settling_elapsed += time_delta
+
+            if self.turn_settling_elapsed >= self.settling_time:
+                # Mark turn complete
                 self.is_turning = False
                 self.current_heading += self.turn_target
+                turn_dir = "RIGHT" if is_right_turn else "LEFT"
+                self.log(
+                    f"{turn_dir} turn complete after {self.settling_time:.2f}s settling"
+                )
                 return True
-        else:
-            # Normal turning - still far from target
-            angular_vel = (
-                self.angular_velocity
-                if self.turn_target > 0
-                else -self.angular_velocity
-            )
+            return False
 
-        # Send command and update elapsed time
+        # Reset settling timer while still turning
+        self.turn_settling_elapsed = 0.0
+
+        # Smooth deceleration parameters
+        decel_start_angle = np.radians(20)  # Start decel at 20° remaining
+        min_angular_vel = self.angular_velocity * 0.20  # Min 20% speed
+
+        # Velocity control with smooth ramp
+        if angle_remaining > decel_start_angle:
+            angular_vel = self.angular_velocity
+        else:
+            # Proportional deceleration
+            vel_range = self.angular_velocity - min_angular_vel
+            angle_range = decel_start_angle - coast_angle
+            progress = (angle_remaining - coast_angle) / angle_range
+            angular_vel = min_angular_vel + (vel_range * progress)
+            angular_vel = max(angular_vel, min_angular_vel)
+
+        # Apply direction
+        if is_right_turn:
+            angular_vel = -angular_vel
+
         self._publish_drive_command(0.0, angular_vel)
         self.turn_elapsed += time_delta
         return False
@@ -679,7 +698,7 @@ class PayloadCornerNavigationMode(Mode):
         if self.scan_index == 0:
             # Start scan: turn left 90°
             self.log("Scanning for corners: turning left 90°")
-            self._start_turn(np.pi / 2)  # Turn left
+            self._start_turn(np.radians(90))
             self.scan_index = 1
             return
 
@@ -699,15 +718,13 @@ class PayloadCornerNavigationMode(Mode):
                         )
                         # Now turn right 90° (first of two 90° turns to check right corner)
                         self.log("Scanning for corners: turning right 90° (1/2)")
-                        self._start_turn(-np.pi / 2)  # Turn right 90° back to center
+                        self._start_turn(np.radians(-90))
                         self.scan_index = 2
                     elif self.scan_index == 2:
                         # Just finished first 90° right turn, now turn another 90° right
                         # After first 90° right turn, current_heading = 0
                         self.log("Scanning for corners: turning right 90° (2/2)")
-                        self._start_turn(
-                            -np.pi / 2
-                        )  # Turn right another 90° to right position
+                        self._start_turn(np.radians(-90))
                         self.scan_index = 3
                     elif self.scan_index == 3:
                         # Just finished second 90° right turn, record right corner distance
@@ -739,7 +756,9 @@ class PayloadCornerNavigationMode(Mode):
                         # Split large turns (>90°) into two 90° turns
                         if abs(turn_needed) > np.pi / 2:
                             # First turn: 90° in the direction of the turn
-                            first_turn = np.pi / 2 if turn_needed > 0 else -np.pi / 2
+                            first_turn = (
+                                np.radians(90) if turn_needed > 0 else np.radians(-90)
+                            )
                             self.log("Splitting large turn: First 90° turn (1/2)")
                             self._start_turn(first_turn)
                             self.scan_index = 4  # Go to intermediate state
@@ -762,11 +781,11 @@ class PayloadCornerNavigationMode(Mode):
                         # Intermediate state: first 90° turn complete, do second 90° turn
                         if self.is_turning:
                             if self._update_turn(time_delta):
-                                # First turn complete, do second 90° turn
+                                # First turn complete, do second turn (compensated)
                                 turn_needed = (
                                     self.corner_direction - self.current_heading
                                 )
-                                self.log("Splitting large turn: Second 90° turn (2/2)")
+                                self.log("Splitting large turn: Second turn (2/2)")
                                 self._start_turn(turn_needed)
                                 self.scan_index = 5
                         return
@@ -887,7 +906,7 @@ class PayloadCornerNavigationMode(Mode):
             if self.obstacle_detected:
                 if self.scan_index == 1:
                     self.log("Scanning left to check pink ratio...")
-                    self._start_turn(np.radians(90))  # Turn left 90°
+                    self._start_turn(np.radians(90))
                     self.scan_index = 2
                     return
                 elif self.scan_index == 2:
@@ -897,13 +916,13 @@ class PayloadCornerNavigationMode(Mode):
                             pink_ratio = self._calculate_color_ratio(frame)
                             if pink_ratio is not None:
                                 self.scan_ratios = [
-                                    (np.radians(90), pink_ratio)
+                                    (self.current_heading, pink_ratio)
                                 ]  # Store left measurement
-                                self.log(f"Left side pink ratio: {pink_ratio:.3f}")
+                                self.log(
+                                    f"Left side pink ratio: {pink_ratio:.3f} at heading={np.degrees(self.current_heading):.1f}°"
+                                )
                                 self.log("Scanning right: turning right 90° (1/2)...")
-                                self._start_turn(
-                                    np.radians(-90)
-                                )  # Turn right 90° back to center
+                                self._start_turn(np.radians(-90))
                                 self.scan_index = 3
                         return
                 elif self.scan_index == 3:
@@ -911,9 +930,7 @@ class PayloadCornerNavigationMode(Mode):
                         if self._update_turn(time_delta):
                             # First 90° right turn complete, turn another 90° right
                             self.log("Scanning right: turning right 90° (2/2)...")
-                            self._start_turn(
-                                np.radians(-90)
-                            )  # Turn right another 90° to right position
+                            self._start_turn(np.radians(-90))
                             self.scan_index = 4
                         return
                 elif self.scan_index == 4:
@@ -923,9 +940,11 @@ class PayloadCornerNavigationMode(Mode):
                             pink_ratio = self._calculate_color_ratio(frame)
                             if pink_ratio is not None:
                                 self.scan_ratios.append(
-                                    (np.radians(-90), pink_ratio)
+                                    (self.current_heading, pink_ratio)
                                 )  # Store right measurement
-                                self.log(f"Right side pink ratio: {pink_ratio:.3f}")
+                                self.log(
+                                    f"Right side pink ratio: {pink_ratio:.3f} at heading={np.degrees(self.current_heading):.1f}°"
+                                )
                                 # Decide direction: go towards side with MORE pink (towards DLZ)
                                 left_pink = self.scan_ratios[0][1]
                                 right_pink = self.scan_ratios[1][1]
@@ -973,10 +992,7 @@ class PayloadCornerNavigationMode(Mode):
 
             if self.orbit_step == 0:
                 # Turn 90° sideways in chosen orbit direction
-                # Compensate for right turn overshoot
                 base_angle = 90
-                if self.orbit_direction < 0:  # Right turn
-                    base_angle = 78  # Reduce by 7° to compensate for overshoot
                 turn_angle = self.orbit_direction * np.radians(base_angle)
                 self.log(
                     f"Orbit step 0: Turning {np.degrees(turn_angle):.0f}° sideways"
@@ -1019,10 +1035,7 @@ class PayloadCornerNavigationMode(Mode):
 
             elif self.orbit_step == 3:
                 # Second turn in same direction (90° to complete 180° total)
-                # Compensate for right turn overshoot
                 base_angle = 90
-                if self.orbit_direction < 0:  # Right turn
-                    base_angle = 83  # Reduce by 7° to compensate for overshoot
                 turn_angle = self.orbit_direction * np.radians(base_angle)
                 self.log(
                     f"Orbit step 3: Turning {np.degrees(turn_angle):.0f}° (second turn)"
@@ -1058,10 +1071,7 @@ class PayloadCornerNavigationMode(Mode):
 
             elif self.orbit_step == 6:
                 # Third turn in same direction
-                # Compensate for right turn overshoot
                 base_angle = 90
-                if self.orbit_direction < 0:  # Right turn
-                    base_angle = 83  # Reduce by 7° to compensate for overshoot
                 turn_angle = self.orbit_direction * np.radians(base_angle)
                 self.log(
                     f"Orbit step 6: Turning {np.degrees(turn_angle):.0f}° (third turn)"
@@ -1097,11 +1107,7 @@ class PayloadCornerNavigationMode(Mode):
 
             elif self.orbit_step == 9:
                 # Final turn in OPPOSITE direction to face 180° from original
-                # Compensate for right turn overshoot
                 base_angle = 90
-                # This is opposite direction, so check the actual turn direction
-                if self.orbit_direction > 0:  # Left orbit means final turn is right
-                    base_angle = 83  # Reduce by 7° to compensate for overshoot
                 turn_angle = -self.orbit_direction * np.radians(base_angle)
                 self.log(
                     f"Orbit step 9: Turning {np.degrees(turn_angle):.0f}° to face opposite direction"
