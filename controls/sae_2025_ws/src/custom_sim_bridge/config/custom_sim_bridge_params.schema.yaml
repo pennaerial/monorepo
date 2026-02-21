@@ -14,7 +14,7 @@ custom_sim_bridge:
     default_value: ""
     description: "ROS topic name"
 
-  ros_topic_name:
+  gz_topic_name:
     type: string
     default_value: ""
     description: "gz topic name"
