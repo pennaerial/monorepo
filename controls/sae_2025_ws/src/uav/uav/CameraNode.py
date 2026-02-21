@@ -6,6 +6,9 @@ from sensor_msgs.msg import Image
 import cv2
 from std_msgs.msg import Bool
 from rclpy.qos import QoSProfile, DurabilityPolicy, ReliabilityPolicy
+import time
+import os
+import uuid
 
 
 class CameraNode(Node):
@@ -47,6 +50,8 @@ class CameraNode(Node):
         self.image = None
         self.camera_info = None
         self.display = display
+        self.save_vision = self.get_parameter("save_vision").value
+        self.uuid = str(uuid.uuid4())
 
         self.service = self.create_service(
             CameraData, service_name, self.service_callback
@@ -75,6 +80,12 @@ class CameraNode(Node):
             frame = self.convert_image_msg_to_frame(msg)
             cv2.imshow("Camera Feed", frame)
             cv2.waitKey(1)
+        if self.save_vision:
+            timestamp = int(time.time())
+            path = os.path.expanduser(f"~/vision_imgs/{self.uuid}")
+            os.makedirs(path, exist_ok=True)
+            cv2.imwrite(os.path.join(path, f"camera_{timestamp}.png"), frame)
+                
 
     def camera_info_callback(self, msg: CameraInfo):
         """

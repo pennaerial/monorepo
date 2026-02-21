@@ -77,7 +77,17 @@ def launch_setup(context, *args, **kwargs):
     vision_node_actions = []
     if use_camera_bool:
         vision_node_actions.append(
-            Node(package="uav", executable="camera", name="camera", output="screen")
+            Node(
+                package="uav", 
+                executable="camera", 
+                name="camera", 
+                output="screen",
+                parameters=[
+                    {
+                        "save_vision": save_vision_bool,
+                    }
+                ],
+            )
         )
 
         for node in extract_vision_nodes(YAML_PATH):
@@ -102,7 +112,7 @@ def launch_setup(context, *args, **kwargs):
             )
 
         # Clear vision node actions if none are found.
-        if len(vision_nodes) == 0:
+        if len(vision_nodes) == 0 or not save_vision_bool:
             vision_node_actions = []
 
         if not sim_bool:
