@@ -10,6 +10,7 @@ import time
 import os
 import uuid
 import numpy as np
+import math
 
 
 class CameraNode(Node):
@@ -51,14 +52,14 @@ class CameraNode(Node):
         self.image = None
         self.camera_info = None
         self.display = display
+
         # Retrieve the 'save_vision' parameter (should be set via the launch file or node definition)
-        self.declare_parameter(
-            "save_vision", True
-        )  # Default to True if not set by launch
-        self.save_vision = (
-            self.get_parameter("save_vision").get_parameter_value().bool_value
-        )
+        self.save_vision_milliseconds = self.declare_parameter(
+            "save_vision_milliseconds", 0
+        ).value
+
         self.uuid = str(uuid.uuid4())
+        self.last_saved_time = time.time_ns() // 1_000_000 # Convert to milliseconds
 
         self.service = self.create_service(
             CameraData, service_name, self.service_callback
@@ -92,13 +93,14 @@ class CameraNode(Node):
             frame = self.convert_image_msg_to_frame(msg)
             cv2.imshow("Camera Feed", frame)
             cv2.waitKey(1)
-        if self.save_vision:
-            timestamp = int(time.time())
-            path = os.path.expanduser(f"~/vision_imgs/{self.uuid}")
-            self.get_logger().error("PRINTSSDFASDFASDFASFDSD")
-
-            os.makedirs(path, exist_ok=True)
-            cv2.imwrite(os.path.join(path, f"camera_{timestamp}.png"), frame)
+        if self.save_vision_milliseconds > 0:
+            if(math.abs(time.time_ns() // 1_000_000 - self.last_saved_time) >= self.save_vision_milliseconds):
+                self.last_saved_time = time.time_ns() // 1_000_000
+                timestamp = int(time.time())
+                path = os.path.expanduser(f"~/vision_imgs/{self.uuid}")
+                self.get_logger().error("Saving vision image @ " + str(timestamp))
+                os.makedirs(path, exist_ok=True)
+                cv2.imwrite(os.path.join(path, f"camera_{timestamp}.png"), frame)
 
     def camera_info_callback(self, msg: CameraInfo):
         """
