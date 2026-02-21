@@ -1,0 +1,1 @@
+ament_prepend_unique_value GZ_DESCRIPTOR_PATH "@CMAKE_INSTALL_PREFIX@/share/gz/protos"

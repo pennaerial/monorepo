@@ -1,0 +1,6 @@
+<library path="custom_sim_bridge_plugins">
+  <class type="custom_sim_bridge::AttachDetachBridge" base_class_type="rclcpp::Node">
+    <description>Attach/detach bridge between ROS and Gazebo</description>
+  </class>
+  <!-- Future bridges: just add another <class> entry here -->
+</library>

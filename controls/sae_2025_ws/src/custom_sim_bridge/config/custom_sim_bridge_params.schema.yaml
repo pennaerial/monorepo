@@ -1,0 +1,20 @@
+custom_sim_bridge:
+  ros_service_name:
+    type: string
+    default_value: ""
+    description: "ROS service name"
+
+  gz_service_name:
+    type: string
+    default_value: ""
+    description: "GZ service name"
+  
+  ros_topic_name:
+    type: string
+    default_value: ""
+    description: "ROS topic name"
+
+  gz_topic_name:
+    type: string
+    default_value: ""
+    description: "gz topic name"
