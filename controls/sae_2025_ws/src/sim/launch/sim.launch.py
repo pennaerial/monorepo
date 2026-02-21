@@ -10,7 +10,6 @@ from launch.actions import (
     OpaqueFunction,
     DeclareLaunchArgument,
     IncludeLaunchDescription,
-    TimerAction,
 )
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from ament_index_python.packages import get_package_share_directory
@@ -314,10 +313,10 @@ def launch_setup(context, *args, **kwargs):
                 on_start=[
                     trigger_world_gen,
                     LogInfo(msg="World generation triggered"),
-                    TimerAction(period=3.0, actions=[payload_launch, LogInfo(msg="Payload node launched")])
                 ],
             )
         ),
+        payload_launch,
     ]
 
     if scoring:

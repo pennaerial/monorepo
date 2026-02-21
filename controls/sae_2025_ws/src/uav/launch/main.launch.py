@@ -286,7 +286,6 @@ def launch_setup(context, *args, **kwargs):
         if run_mission_bool:
             actions.extend(
                 [
-                    mission,
                     RegisterEventHandler(
                         OnProcessIO(
                             target_action=px4_sitl,
@@ -309,7 +308,6 @@ def launch_setup(context, *args, **kwargs):
             mission,
         ]
         if run_mission_bool:
-            actions.append(mission)
             actions.append(
                 OnProcessIO(
                     target_action=middleware,

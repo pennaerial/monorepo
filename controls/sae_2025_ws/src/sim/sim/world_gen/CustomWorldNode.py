@@ -41,10 +41,10 @@ class CustomWorldNode(WorldNode):
         self.spawn_entity_client.call_async(req_dlz)
 
         # Spawn payload_0 at random position and orientation within DLZ
-        # DLZ covers X: 3.8-6.24, Y: -1.24-1.2
+        # DLZ covers X: 3.8-6.728, Y: -1.728-1.2
         # Add margin to keep payload fully on DLZ (payload is ~0.6m wide)
-        x_min, x_max = 4.1, 5.94
-        y_min, y_max = -0.94, 0.9
+        x_min, x_max = 4.1, 6.428
+        y_min, y_max = -1.428, 0.9
 
         random_x = random.uniform(x_min, x_max)
         random_y = random.uniform(y_min, y_max)
