@@ -128,12 +128,11 @@ class PayloadDriveToAprilTagMode(Mode):
         dock_approach_backup_margin_m: float = 0.2,
         dock_approach_bearing_gain: float = 0.3,
         dock_approach_pixel_scale: float = 0.5,
-        dock_orbit_straight_duration_s: float = 3,
-        dock_orbit_peek_duration_s: float = 10,
+        dock_orbit_straight_duration_s: float = 7.0,
+        dock_orbit_peek_duration_s: float = 1.5,
         dock_orbit_radial_k: float = 0.8,
         dock_orbit_yaw_k: float = 2.0,
         dock_orbit_peek_blend: float = 0.4,
-        dock_orbit_peek_back_cooldown_s: float = 3.0,
         start_phase: Optional[str] = None,
     ):
         super().__init__(node, uav)
@@ -169,7 +168,6 @@ class PayloadDriveToAprilTagMode(Mode):
         self.dock_orbit_radial_k = float(dock_orbit_radial_k)
         self.dock_orbit_yaw_k = float(dock_orbit_yaw_k)
         self.dock_orbit_peek_blend = float(dock_orbit_peek_blend)
-        self.dock_orbit_peek_back_cooldown_s = float(dock_orbit_peek_back_cooldown_s)
         self.done = False
         # One-time log to verify mission YAML params are passed
         self.node.get_logger().info(
@@ -200,18 +198,14 @@ class PayloadDriveToAprilTagMode(Mode):
         if getattr(self, "start_phase", None) == "dock":
             self._phase = "dock"
             self._orbit_dir = 1
-            self._orbit_locked = True
             self._pose_vtol = None
             self._vtol_center = None
-            self._desired_yaw = None
             self.log("PayloadDriveToAprilTagMode: started in dock phase (handoff from color orbit)")
         else:
             self._phase = "search"       # search | approach_front | orbit | dock | recovery
             self._orbit_dir = None       # +1 CCW, -1 CW; computed once, locked
-            self._orbit_locked = False
             self._pose_vtol = None       # (x, y, yaw) camera in VTOL base_link
             self._vtol_center = None     # (cx, cy) slow-filtered VTOL center in payload frame
-            self._desired_yaw = None     # persistent trajectory heading
         self._last_cmd = (0.0, 0.0)
         self._last_tag_time = None
         self._last_log_time = 0.0
@@ -301,10 +295,10 @@ class PayloadDriveToAprilTagMode(Mode):
         return math.degrees(math.acos(max(-1.0, min(1.0, cos_angle))))
 
     def _compute_straight_heading(self, x_vtol: float, y_vtol: float) -> float:
-        """Compute desired heading for straight segment (tangent + radial correction). Lock once per segment."""
+        """Orbit straight heading: tangent to circle (perpendicular to VTOL body), not parallel. Bearing from payload to VTOL + 90° for orbit direction."""
         r = math.hypot(x_vtol, y_vtol)
-        theta = math.atan2(y_vtol, x_vtol)
-        heading_tangent = _wrap_angle(theta + self._orbit_dir * (math.pi / 2.0))
+        bearing_to_vtol = math.atan2(-y_vtol, -x_vtol)
+        heading_tangent = _wrap_angle(bearing_to_vtol + self._orbit_dir * (math.pi / 2.0))
         radial_err = r - self.dock_orbit_radius_m
         radial_k_eff = self.dock_orbit_radial_k * (2.0 if radial_err < 0 else 1.0)
         corr = math.atan(radial_k_eff * radial_err)
@@ -382,23 +376,6 @@ class PayloadDriveToAprilTagMode(Mode):
                     key=lambda tid: float(np.asarray(tag_results[tid][2]).ravel()[2]),
                 )
             meas = tag_results[closest_id][0]
-            # #region agent log
-            if self._phase == "orbit" and (now - getattr(self, "_pose_dbg_time", 0) >= 0.5):
-                self._pose_dbg_time = now
-                try:
-                    import json as _json
-                    _mx, _my = meas[0], meas[1]
-                    _r = math.hypot(_mx, _my)
-                    _pay = {"location": "PayloadDriveToAprilTagMode.py:pose_update", "message": "orbit_pose", "data": {"closest_id": closest_id, "x": _mx, "y": _my, "r_from_meas": _r, "seen_ids": list(tag_results.keys())}, "timestamp": int(now * 1000), "hypothesisId": "R2"}
-                    for _path in ("/home/ubuntu/monorepo/.cursor/debug.log", "/tmp/payload_dock_debug.log"):
-                        try:
-                            with open(_path, "a") as _f:
-                                _f.write(_json.dumps(_pay) + "\n")
-                        except Exception:
-                            pass
-                except Exception:
-                    pass
-            # #endregion
             if self._pose_vtol is None or closest_id != self._last_closest_id:
                 self._pose_vtol = meas
                 if self._last_closest_id is None:
@@ -455,14 +432,6 @@ class PayloadDriveToAprilTagMode(Mode):
                     self.log(
                         f"DOCK | search -> approach_front (only front tag, d={front_dist:.2f}m > {self.dock_approach_front_max_m}m)"
                     )
-                    # #region agent log
-                    try:
-                        import json as _json
-                        with open("/tmp/payload_dock_debug.log", "a") as _f:
-                            _f.write(_json.dumps({"location": "PayloadDriveToAprilTagMode.py:search_to_approach_front", "message": "enter_approach_front", "data": {"front_dist": front_dist, "threshold": self.dock_approach_front_dist_m}, "timestamp": int(now * 1000), "hypothesisId": "AF"}) + "\n")
-                    except Exception:
-                        pass
-                    # #endregion
                     self._control_approach_front(now, tag_results, seen_ids)
                     return
                 if too_close:
@@ -470,14 +439,6 @@ class PayloadDriveToAprilTagMode(Mode):
                     self.log(
                         f"DOCK | search -> approach_front (only front tag, d={front_dist:.2f}m < {self.dock_approach_front_min_m}m, will back up to 1.8–2.2 m)"
                     )
-                    # #region agent log
-                    try:
-                        import json as _json
-                        with open("/tmp/payload_dock_debug.log", "a") as _f:
-                            _f.write(_json.dumps({"location": "PayloadDriveToAprilTagMode.py:search_to_approach_front", "message": "enter_approach_front_too_close", "data": {"front_dist": front_dist, "min_m": self.dock_approach_front_min_m}, "timestamp": int(now * 1000), "hypothesisId": "AF"}) + "\n")
-                    except Exception:
-                        pass
-                    # #endregion
                     self._control_approach_front(now, tag_results, seen_ids)
                     return
                 # else: already in band [min_m, max_m], fall through to start 360° or orbit
@@ -547,67 +508,46 @@ class PayloadDriveToAprilTagMode(Mode):
         # --- approach_front: drive toward front tag until within 1.5 m; exit to orbit ---
         if self._phase == "approach_front":
             front_id = 0
-            # #region agent log
-            _af_branch = None
-            _af_front_dist = None
-            # #endregion
             if not any_visible or front_id not in tag_results:
-                _af_branch = "tags_lost"
                 self._control_approach_front(now, tag_results, seen_ids)
                 return
             # If we see more than front, go to orbit using current pose (recommended in plan)
             if set(seen_ids) != {front_id}:
-                _af_branch = "other_tag"
                 self._transition_approach_front_to_orbit(now)
                 return
             front_tvec = np.asarray(tag_results[front_id][2]).ravel()
             front_dist = float(front_tvec[2])
-            _af_front_dist = front_dist
             # Hard safety: do not drive forward if already inside standoff (VTOL ~1.5 m long).
             if front_dist < self.dock_front_safe_standoff_m:
-                _af_branch = "safe_standoff"
                 self._transition_approach_front_to_orbit(now)
                 return
             # Transition to orbit when in target band (1.8–2.2 m).
             if self.dock_approach_front_min_m <= front_dist <= self.dock_approach_front_max_m:
-                _af_branch = "within_dist"
                 self._transition_approach_front_to_orbit(now)
                 return
-            _af_branch = "control"
             self._control_approach_front(now, tag_results, seen_ids)
-            # #region agent log
-            if now - getattr(self, "_af_log_time", 0) >= 0.5:
-                self._af_log_time = now
-                try:
-                    import json as _json
-                    with open("/tmp/payload_dock_debug.log", "a") as _f:
-                        _f.write(_json.dumps({"location": "PayloadDriveToAprilTagMode.py:approach_front", "message": "approach_front", "data": {"branch": _af_branch, "front_dist": _af_front_dist, "threshold": self.dock_approach_front_dist_m, "seen_ids": list(seen_ids) if seen_ids else []}, "timestamp": int(now * 1000), "hypothesisId": "AF"}) + "\n")
-                except Exception:
-                    pass
-            # #endregion
             return
 
         # Dock entry is only from orbit segment peek_back_120 (view angle <=45° held); no instant orbit->dock here.
 
-        # --- orbit/dock/approach_front -> recovery: tags lost for sustained duration ---
-        # Skip for dock spin_180/back_up_5s: we intentionally lose the tag during spin and backup
-        if self._phase in ("orbit", "dock", "approach_front"):
-            dock_finishing = self._phase == "dock" and getattr(self, "_dock_sub", None) in ("spin_180", "back_up_5s")
-            if not dock_finishing and not any_visible and self._last_tag_time is not None:
-                gap = now - self._last_tag_time
-                if gap >= self.dock_recovery_timeout_s:
-                    prev_phase = self._phase
-                    self._phase = "recovery"
-                    self._dock_align_start = None
-                    self._recovery_timestamps.append(now)
-                    if prev_phase == "approach_front" and self._pose_vtol is not None:
-                        x, y, _ = self._pose_vtol
-                        self._vtol_center = (-x, -y)
-                        self._orbit_dir = self._choose_orbit_dir(x, y, "recovery")
-                    self.log(
-                        f"DOCK | {prev_phase} -> recovery (tags lost {gap:.1f}s)"
-                    )
-                    self._maybe_flip_direction(now)
+        # --- orbit/dock/approach_front -> recovery (DISABLED: rely on peek/orbit; do not transition to recovery) ---
+        # if self._phase in ("orbit", "dock", "approach_front"):
+        #     dock_finishing = self._phase == "dock" and getattr(self, "_dock_sub", None) in ("spin_180", "back_up_5s")
+        #     if not dock_finishing and not any_visible and self._last_tag_time is not None:
+        #         gap = now - self._last_tag_time
+        #         if gap >= self.dock_recovery_timeout_s:
+        #             prev_phase = self._phase
+        #             self._phase = "recovery"
+        #             self._dock_align_start = None
+        #             self._recovery_timestamps.append(now)
+        #             if prev_phase == "approach_front" and self._pose_vtol is not None:
+        #                 x, y, _ = self._pose_vtol
+        #                 self._vtol_center = (-x, -y)
+        #                 self._orbit_dir = self._choose_orbit_dir(x, y, "recovery")
+        #             self.log(
+        #                 f"DOCK | {prev_phase} -> recovery (tags lost {gap:.1f}s)"
+        #             )
+        #             self._maybe_flip_direction(now)
 
         # --- dock: back tag lost but other tags visible -> orbit (not during spin_180/back_up_5s) ---
         if self._phase == "dock" and getattr(self, "_dock_sub", None) not in ("spin_180", "back_up_5s") and not back_visible and any_visible:
@@ -699,44 +639,22 @@ class PayloadDriveToAprilTagMode(Mode):
             )
 
     def _transition_approach_front_to_orbit(self, now: float) -> None:
-        """Set orbit direction and segment state from current pose, then enter orbit."""
+        """Set orbit direction and segment state from current pose, then enter orbit. Start in turn_back so we align to orbit heading before driving straight."""
         if self._pose_vtol is None:
             return
         x, y, yaw = self._pose_vtol
         self._orbit_dir = self._choose_orbit_dir(x, y, "approach_front")
-        self._orbit_locked = True
         self._vtol_center = (-x, -y)
-        self._desired_yaw = _wrap_angle(math.atan2(-y, -x))
         self._phase = "orbit"
-        self._orbit_segment = "straight"
-        self._orbit_straight_start_time = now
-        theta_vtol = math.atan2(y, x)
-        self._orbit_straight_heading = _wrap_angle(
-            theta_vtol + self._orbit_dir * (math.pi / 2.0)
-        )
-        radial_err = self.dock_orbit_radius_m - math.hypot(x, y)
-        self._orbit_straight_heading = _wrap_angle(
-            self._orbit_straight_heading + 0.5 * radial_err
-        )
+        self._orbit_segment = "turn_back"
+        self._orbit_turn_back_start_time = now
+        self._orbit_turn_back_heading = self._compute_straight_heading(x, y)
+        self._orbit_straight_start_time = None
+        self._orbit_straight_heading = None
         self._orbit_peek_start_time = None
-        self._orbit_turn_back_start_time = None
         self.log(
-            f"DOCK | approach_front -> orbit (dir={'CCW' if self._orbit_dir == 1 else 'CW'})"
+            f"DOCK | approach_front -> orbit (dir={'CCW' if self._orbit_dir == 1 else 'CW'}, align first)"
         )
-        # #region agent log
-        try:
-            import json as _json
-            _r = math.hypot(x, y)
-            _pay = {"location": "PayloadDriveToAprilTagMode.py:_transition_approach_front_to_orbit", "message": "enter_orbit", "data": {"x": x, "y": y, "r": _r, "R": self.dock_orbit_radius_m}, "timestamp": int(now * 1000), "hypothesisId": "R0"}
-            for _path in ("/home/ubuntu/monorepo/.cursor/debug.log", "/tmp/payload_dock_debug.log"):
-                try:
-                    with open(_path, "a") as _f:
-                        _f.write(_json.dumps(_pay) + "\n")
-                except Exception:
-                    pass
-        except Exception:
-            pass
-        # #endregion
 
     def _control_approach_front(self, now: float, tag_results: dict, seen_ids: list) -> None:
         """Drive toward front tag (ID 0). Back up if < min_m; drive forward if > max_m; target band is [min_m, max_m] (e.g. 1.8–2.2 m)."""
@@ -789,17 +707,6 @@ class PayloadDriveToAprilTagMode(Mode):
             0.05, 0.2,
         )) if dist_err > 0.0 else 0.0
 
-        # #region agent log
-        if now - getattr(self, "_af_ctrl_log_time", 0) >= 0.5:
-            self._af_ctrl_log_time = now
-            try:
-                import json as _json
-                with open("/tmp/payload_dock_debug.log", "a") as _f:
-                    _f.write(_json.dumps({"location": "PayloadDriveToAprilTagMode.py:_control_approach_front", "message": "approach_front_ctrl", "data": {"distance": distance, "dist_err": dist_err, "linear": linear, "angular": angular, "dist_err_gt_005": dist_err > 0.05}, "timestamp": int(now * 1000), "hypothesisId": "AF"}) + "\n")
-            except Exception:
-                pass
-        # #endregion
-
         if now - self._last_log_time >= 1.0:
             self._last_log_time = now
             self.log(
@@ -818,6 +725,9 @@ class PayloadDriveToAprilTagMode(Mode):
             return
 
         x_vtol, y_vtol, yaw = self._pose_vtol
+        # Keep current yaw estimate in sync when we have tags; when tags lost we dead-reckon from last w.
+        if any_visible:
+            self._orbit_yaw_estimate = yaw
         # Radius from pose (responsive); not from laggy _vtol_center.
         r = math.hypot(x_vtol, y_vtol)
         theta_vtol = math.atan2(y_vtol, x_vtol)
@@ -845,19 +755,6 @@ class PayloadDriveToAprilTagMode(Mode):
             else:
                 self._dock_align_start = None
 
-        # Hard guard: too close to VTOL — force outward turn + small forward away (no inward spiral).
-        if r < (self.dock_orbit_radius_m - 0.4):
-            bearing_out = math.atan2(y_vtol, x_vtol)
-            yaw_err_out = _wrap_angle(bearing_out - yaw)
-            w = float(np.clip(2.0 * yaw_err_out, -0.6, 0.6))
-            if now - self._last_log_time >= 1.0:
-                self._last_log_time = now
-                self.log(
-                    f"DOCK | orbit GUARD r={r:.3f}m < R-0.4 — steering outward v=0.05 w={w:.3f}"
-                )
-            self._publish_drive(0.05, w)
-            return
-
         # Continuous vector-field orbit heading (every tick).
         heading_tangent = _wrap_angle(
             theta_vtol + self._orbit_dir * (math.pi / 2.0)
@@ -879,45 +776,36 @@ class PayloadDriveToAprilTagMode(Mode):
             self._orbit_peek_start_time = None
             self._orbit_turn_back_start_time = None
 
-        # Tags lost: rotate in place to reacquire (no forward motion — avoids inward spiral).
+        # Tags lost: advance segment when needed; in peek_turn actually rotate to look; otherwise continue straight on locked heading.
         if not any_visible:
-            w = 0.4 * (self._orbit_dir if self._orbit_dir else 1)
-            if now - self._last_log_time >= 1.0:
-                self._last_log_time = now
-                self.log(
-                    f"DOCK | orbit tags lost — rotate in place r={r:.3f}m w={w:.3f} (no inward drift)"
-                )
-            self._publish_drive(0.0, w)
+            seg_tl = self._orbit_segment
+            elapsed_straight = now - (self._orbit_straight_start_time or now)
+            if seg_tl == "straight" and elapsed_straight >= self.dock_orbit_straight_duration_s:
+                self._orbit_segment = "peek_turn"
+                self._orbit_peek_start_time = now
+                self._orbit_peek_start_yaw = self._orbit_yaw_estimate if self._orbit_yaw_estimate is not None else yaw
+            if seg_tl == "peek_turn":
+                peek_elapsed = now - (self._orbit_peek_start_time or now)
+                if peek_elapsed < self.dock_orbit_peek_duration_s:
+                    w_peek = self._orbit_dir * 0.5
+                    self._publish_drive(0.0, w_peek)
+                    yaw_eff = self._orbit_yaw_estimate if self._orbit_yaw_estimate is not None else yaw
+                    self._orbit_yaw_estimate = _wrap_angle(yaw_eff + w_peek * time_delta)
+                    return
+                self._orbit_segment = "straight"
+                self._orbit_straight_start_time = now
+            yaw_eff = self._orbit_yaw_estimate if self._orbit_yaw_estimate is not None else yaw
+            hold_heading = self._orbit_straight_heading if self._orbit_straight_heading is not None else heading_tangent
+            yaw_err_hold = _wrap_angle(hold_heading - yaw_eff)
+            v = float(np.clip(self.dock_orbit_speed_mps, 0.05, 0.2))
+            w = float(np.clip(self.dock_orbit_yaw_k * yaw_err_hold, -0.4, 0.4))
+            self._orbit_yaw_estimate = _wrap_angle(yaw_eff + w * time_delta)
+            self._publish_drive(v, w)
             return
 
         seg = self._orbit_segment
 
-        # When back tag appears during straight, switch to 120° peek only after cooldown (avoid tight loop).
-        # Otherwise: turn_back -> straight -> next tick back_visible -> peek_back_120 -> 120° -> turn_back -> straight -> repeat.
-        # (peek_back commented out)
-        # if seg == "straight" and back_visible:
-        #     elapsed_straight = now - (self._orbit_straight_start_time or now)
-        #     if elapsed_straight >= self.dock_orbit_peek_back_cooldown_s:
-        #         self._orbit_segment = "peek_back_120"
-        #         self._orbit_peek_start_time = now
-        #         self._orbit_peek_start_yaw = yaw
-        #         self._dock_align_start = None
-        #         self.log(
-        #             f"DOCK | orbit straight -> peek_back_120 (back tag seen, straight {elapsed_straight:.1f}s >= cooldown {self.dock_orbit_peek_back_cooldown_s}s)"
-        #         )
-        #         # #region agent log
-        #         try:
-        #             import json as _json
-        #             _n = getattr(self, "_peek_back_120_count", 0) + 1
-        #             self._peek_back_120_count = _n
-        #             with open("/home/ubuntu/monorepo/.cursor/debug.log", "a") as _f:
-        #                 _f.write(_json.dumps({"location": "PayloadDriveToAprilTagMode.py:straight_to_peek_back_120", "message": "peek_back_120_enter", "data": {"elapsed_straight": elapsed_straight, "count": _n}, "timestamp": int(now * 1000), "hypothesisId": "H_peek_loop"}) + "\n")
-        #         except Exception:
-        #             pass
-        #         # #endregion
-        #         seg = "peek_back_120"
-
-        # --- straight: locked heading (actually drive straight, no feed-forward turn) ---
+        # --- straight: drive straight (tangent to orbit), then peek every straight_duration_s ---
         if seg == "straight":
             elapsed = now - (self._orbit_straight_start_time or now)
             if elapsed >= self.dock_orbit_straight_duration_s:
@@ -928,7 +816,7 @@ class PayloadDriveToAprilTagMode(Mode):
                     self._last_log_time = now
                     self.log(f"DOCK | orbit straight -> peek_turn (elapsed={elapsed:.1f}s)")
 
-            # Locked heading (straight line); no w_ff during straight
+            # Use one locked heading for the whole segment (set at segment start). No tangent follow = no circle.
             if self._orbit_straight_heading is None:
                 self._orbit_straight_heading = self._compute_straight_heading(x_vtol, y_vtol)
             yaw_err = _wrap_angle(self._orbit_straight_heading - yaw)
@@ -944,63 +832,7 @@ class PayloadDriveToAprilTagMode(Mode):
             self._publish_drive(v, w)
             return
 
-        # --- peek_back_120: rotate in place toward VTOL (up to 120°); enter dock only if view_angle <= dock_align_angle_deg (e.g. 30°) held --- (commented out)
-        # if seg == "peek_back_120":
-        #     view_angle = self._back_tag_view_angle_deg(tag_results)
-        #     max_deg = self.dock_align_angle_deg
-        #     aligned_now = (view_angle is not None) and (view_angle <= max_deg)
-        #
-        #     if aligned_now:
-        #         if self._dock_align_start is None:
-        #             self._dock_align_start = now
-        #         if (now - self._dock_align_start) >= self.dock_align_hold_s:
-        #             self._phase = "dock"
-        #             self._dock_sub = "align"
-        #             self._dock_align_start = None
-        #             self.log(
-        #                 f"DOCK | peek_back_120 -> dock (view_angle={view_angle:.1f}° <= {max_deg}° held)"
-        #             )
-        #             # #region agent log
-        #             try:
-        #                 import json as _json
-        #                 with open("/home/ubuntu/monorepo/.cursor/debug.log", "a") as _f:
-        #                     _f.write(_json.dumps({"location": "PayloadDriveToAprilTagMode.py:peek_back_120", "message": "dock_entry", "data": {"view_angle_deg": view_angle, "max_deg": max_deg}, "timestamp": int(now * 1000), "hypothesisId": "H1"}) + "\n")
-        #             except Exception:
-        #                 pass
-        #             # #endregion
-        #             self._publish_drive(0.0, 0.0)
-        #             return
-        #     else:
-        #         self._dock_align_start = None
-        #
-        #     # Rotate toward VTOL (same idea as normal peek: we know where the VTOL is from tags)
-        #     bearing_to_vtol = math.atan2(-y_vtol, -x_vtol)
-        #     yaw_err_peek = _wrap_angle(bearing_to_vtol - yaw)
-        #     w = float(np.clip(2.0 * yaw_err_peek, -0.6, 0.6))
-        #     if abs(w) < 0.2:
-        #         w = 0.2 * (1.0 if yaw_err_peek >= 0 else -1.0)
-        #
-        #     peek_start_yaw = getattr(self, "_orbit_peek_start_yaw", yaw)
-        #     delta = abs(_wrap_angle(yaw - peek_start_yaw))
-        #
-        #     if delta >= math.radians(120.0):
-        #         self._orbit_segment = "turn_back"
-        #         self._orbit_turn_back_start_time = now
-        #         self._dock_align_start = None
-        #         self.log("DOCK | peek_back_120 -> turn_back (120° done, not aligned)")
-        #         self._publish_drive(0.0, 0.0)
-        #         return
-        #
-        #     if now - getattr(self, "_last_log_time", 0) >= 1.0:
-        #         self._last_log_time = now
-        #         va_str = f"{view_angle:.1f}°" if view_angle is not None else "N/A"
-        #         self.log(
-        #             f"DOCK | peek_back_120 rotating delta={math.degrees(delta):.1f}° view_angle={va_str}"
-        #         )
-        #     self._publish_drive(0.0, w)
-        #     return
-
-        # --- peek_turn: pure rotation (no forward creep); use tag_results for visibility ---
+        # --- peek_turn: rotate in place to look for tags (every straight_duration_s) ---
         if seg == "peek_turn":
             bearing_to_center = math.atan2(-y_vtol, -x_vtol)
             blend = self.dock_orbit_peek_blend
@@ -1041,15 +873,20 @@ class PayloadDriveToAprilTagMode(Mode):
             self._publish_drive(v, w)
             return
 
-        # --- turn_back: align to orbit heading_cmd, then straight ---
+        # --- turn_back: align to ONE locked heading (set on entry), then straight. Stops chasing moving tangent.
         if seg == "turn_back":
-            yaw_err_tb = _wrap_angle(heading_cmd - yaw)
+            # Lock target heading when we enter turn_back so we don't chase a moving tangent.
+            if getattr(self, "_orbit_turn_back_heading", None) is None:
+                self._orbit_turn_back_heading = self._compute_straight_heading(x_vtol, y_vtol)
+            heading_tb = self._orbit_turn_back_heading
+            yaw_err_tb = _wrap_angle(heading_tb - yaw)
             w = float(np.clip(self.dock_orbit_yaw_k * yaw_err_tb, -0.6, 0.6))
             v = 0.05
             if abs(yaw_err_tb) < 0.12:
                 self._orbit_segment = "straight"
                 self._orbit_straight_start_time = now
-                self._orbit_straight_heading = self._compute_straight_heading(x_vtol, y_vtol)
+                self._orbit_straight_heading = self._orbit_turn_back_heading
+                self._orbit_turn_back_heading = None  # clear so next turn_back gets fresh lock
                 if now - self._last_log_time >= 0.5:
                     self._last_log_time = now
                     self.log("DOCK | orbit turn_back -> straight (aligned)")
@@ -1177,17 +1014,6 @@ class PayloadDriveToAprilTagMode(Mode):
             )
             self._publish_drive(0.0, 0.0)
             return
-
-        # #region agent log
-        if now - getattr(self, "_approach_angle_log_time", 0) >= 0.5:
-            self._approach_angle_log_time = now
-            try:
-                import json as _json
-                with open("/home/ubuntu/monorepo/.cursor/debug.log", "a") as _f:
-                    _f.write(_json.dumps({"location": "PayloadDriveToAprilTagMode.py:approach", "message": "approach_angle", "data": {"view_angle_deg": view_angle_deg, "bearing_deg": math.degrees(bearing), "max_deg": max_angle_deg, "distance": distance}, "timestamp": int(now * 1000), "hypothesisId": "H2"}) + "\n")
-            except Exception:
-                pass
-        # #endregion
 
         angular = float(np.clip(
             -self.angular_gain * err_x - 0.5 * bearing,
