@@ -5,6 +5,8 @@ import rclpy
 from ros_gz_interfaces.srv import SpawnEntity
 import sys
 import json
+import random
+import math
 
 
 class CustomWorldNode(WorldNode):
@@ -38,18 +40,40 @@ class CustomWorldNode(WorldNode):
         req_dlz.entity_factory = dlz.to_entity_factory_msg()
         self.spawn_entity_client.call_async(req_dlz)
 
-        # Spawn payload in center of DLZ (slightly above ground)
-        # Yaw of 0.785 rad (45 degrees) to point toward corner
+        # Spawn payload_0 at random position and orientation within DLZ
+        # DLZ covers X: 3.8-6.24, Y: -1.24-1.2
+        # Add margin to keep payload fully on DLZ (payload is ~0.6m wide)
+        x_min, x_max = 4.1, 5.94
+        y_min, y_max = -0.94, 0.9
+
+        random_x = random.uniform(x_min, x_max)
+        random_y = random.uniform(y_min, y_max)
+        random_yaw = random.uniform(-math.pi, math.pi)  # Random orientation
+
         payload_0 = Entity(
             name="payload_0",
             path_to_sdf="~/.simulation-gazebo/models/payload/model.sdf",
-            position=(5, 0, 0.1),
-            rpy=(0.0, 0.0, 0.785),
-            world=self.world_name
+            position=(random_x, random_y, 0.5),
+            rpy=(0.0, 0.0, random_yaw),
+            world=self.world_name,
         )
-        req = SpawnEntity.Request()
-        req.entity_factory = payload_0.to_entity_factory_msg()
-        self.spawn_entity_client.call_async(req)
+        req_payload_0 = SpawnEntity.Request()
+        req_payload_0.entity_factory = payload_0.to_entity_factory_msg()
+        self.spawn_entity_client.call_async(req_payload_0)
+
+        self.get_logger().info(f"Spawned payload_0 at position=({random_x:.2f}, {random_y:.2f}, 0.5), yaw={math.degrees(random_yaw):.1f}°")
+
+        # Spawn payload_1 at edge of DLZ, facing center (toward -X)
+        # payload_1 = Entity(
+        #     name="payload_1",
+        #     path_to_sdf="~/.simulation-gazebo/models/payload/model.sdf",
+        #     position=(6.0, -0.02, 0.5),
+        #     rpy=(0.0, 0.0, 3.14159),  # Face -X direction (toward center)
+        #     world=self.world_name,
+        # )
+        # req_payload_1 = SpawnEntity.Request()
+        # req_payload_1.entity_factory = payload_1.to_entity_factory_msg()
+        # self.spawn_entity_client.call_async(req_payload_1)
 
         return super().generate_world()
 

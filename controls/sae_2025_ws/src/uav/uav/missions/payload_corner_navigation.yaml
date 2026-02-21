@@ -1,0 +1,30 @@
+start:
+  class: uav.autonomous_modes.TakeoffMode
+  params:
+    takeoff_type: vertical
+  transitions:
+    complete: navigate
+
+navigate:
+  class: uav.autonomous_modes.NavGPSMode
+  params:
+    coordinates: '[((0, 0, -5), 2, "LOCAL"),]'
+  transitions:
+    complete: payload_corner_navigate
+
+payload_corner_navigate:
+  class: uav.autonomous_modes.PayloadCornerNavigationMode
+  params:
+    payload_name: 'payload_0'
+    corner_threshold: '0.30'
+    linear_velocity: '0.3'
+    angular_velocity: '0.5'
+    scan_span: '0.5236'  # 30 degrees in radians
+    scan_interval: '0.0873'  # 5 degrees in radians
+    rescan_interval: '3.0'
+  transitions:
+    complete: land
+    error: land
+
+land:
+  class: uav.autonomous_modes.LandingMode

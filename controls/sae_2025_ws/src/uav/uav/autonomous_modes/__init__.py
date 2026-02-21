@@ -12,3 +12,6 @@ from .TransitionMode import TransitionMode as TransitionMode
 from .ServoDropoffMode import ServoDropoffMode as ServoDropoffMode
 from .WaypointMission import WaypointMission as WaypointMission
 from .TakeoffMode import TakeoffMode as TakeoffMode
+from .PayloadCornerNavigationMode import (
+    PayloadCornerNavigationMode as PayloadCornerNavigationMode,
+)
