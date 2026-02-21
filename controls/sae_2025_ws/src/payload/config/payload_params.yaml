@@ -7,3 +7,4 @@
 
     sim:
       world_name: "custom"
+      gz_drive_model_name: "payload_box"  # SDF model name; must match <model name="..."> for DiffDrive cmd_vel

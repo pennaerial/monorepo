@@ -12,3 +12,6 @@ from .TakeoffMode import TakeoffMode as TakeoffMode
 from .PayloadDriveToAprilTagMode import (
     PayloadDriveToAprilTagMode as PayloadDriveToAprilTagMode,
 )
+from .PayloadColorOrbitToRearMode import (
+    PayloadColorOrbitToRearMode as PayloadColorOrbitToRearMode,
+)

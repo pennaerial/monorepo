@@ -8,6 +8,10 @@ payload:
   
   sim:
     world_name:
-      type: string 
+      type: string
       default_value: "sae"
       description: "Simulation World name"
+    gz_drive_model_name:
+      type: string
+      default_value: ""
+      description: "Gazebo model name for cmd_vel topic. If empty, uses node name (e.g. payload_0). Set to payload_box if the spawned SDF model name is payload_box."

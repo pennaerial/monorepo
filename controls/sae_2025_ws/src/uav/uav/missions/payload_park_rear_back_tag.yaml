@@ -1,0 +1,22 @@
+# VTOL stationary; payload localizes off any VTOL AprilTag, orbits around, and docks at the back tag.
+# In this sim: front=ID0, back=ID1, left=ID2, right=ID3 (tag36h11).
+start:
+  class: uav.autonomous_modes.PayloadDriveToAprilTagMode
+  params:
+    payload_name: 'payload_0'
+    tag_size_m: '0.1'
+    dock_rear_orthogonal: 'True'
+    dock_target_tag_id: '1'
+    dock_orbit_radius_m: '1.2'
+    dock_orbit_speed_mps: '0.15'
+    dock_recovery_timeout_s: '5.0'
+    dock_heading_rate_limit: '0.3'
+    dock_align_angle_deg: '30.0'
+    dock_align_hold_s: '0.4'
+    dock_recovery_flip_window_s: '15.0'
+    dock_recovery_flip_count: '3'
+  transitions:
+    complete: land
+
+land:
+  class: uav.autonomous_modes.LandingMode

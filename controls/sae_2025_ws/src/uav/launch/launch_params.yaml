@@ -1,6 +1,5 @@
 # launch_params.yaml
-mission_name: payload_drive_to_apriltag
-uav_debug: false
+mission_name: payload_color_orbit_to_rear
 vision_debug: false
 run_mission: true
 airframe: standard_vtol # Enter a preset below or a valid airframe ID (integer), either custom or from PX4
@@ -12,7 +11,7 @@ airframe: standard_vtol # Enter a preset below or a valid airframe ID (integer),
 use_camera: false
 custom_airframe_model: '' # Leave blank if using default PX4 model or enter file name of custom model
 save_vision: false
-servo_only: false
+servo_only: false 
 camera_offsets: [0, 0, 0] # Should denote the position of the camera relative to the payload mechanism, in meters
                           # In NED frame: x is forward, y is right, and z is down.
 

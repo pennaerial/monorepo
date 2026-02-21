@@ -7,7 +7,7 @@
         <mass>2</mass>
       </inertial>
       <visual name="visual">
-      <pose> 3.8 1.2 .1 1.5708 0 0 </pose>
+      <pose> 0 0 0 1.5708 0 0 </pose>
         <geometry>
           <mesh>
             <uri>model://dlz/meshes/dlz.STL</uri>

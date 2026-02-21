@@ -1,6 +1,8 @@
 from sim.world_gen import WorldNode
 from sim.world_gen.entity import Entity
 from typing import Optional
+import random
+import math
 import rclpy
 from ros_gz_interfaces.srv import SpawnEntity
 import sys
@@ -25,18 +27,42 @@ class CustomWorldNode(WorldNode):
             template_world_path=template_world, physics=physics
         )
 
+    def _random_payload_position(self, max_radius=3.0, min_radius=0.5):
+        """Random position within max_radius of the VTOL (origin), x < 0."""
+        while True:
+            r = random.uniform(min_radius, max_radius)
+            theta = random.uniform(-math.pi / 2, math.pi / 2)
+            x = -abs(r * math.cos(theta))
+            y = r * math.sin(theta)
+            if abs(x) >= min_radius:
+                return (x, y, 0.5)
+
     def generate_world(self):
+        dlz = Entity(
+            name="dlz_pink",
+            path_to_sdf="~/.simulation-gazebo/models/dlz/model.sdf",
+            position=(-3, 3, -0.005),
+            rpy=(0.0, 0.0, 0.0),
+            world=self.world_name,
+        )
+        req_dlz = SpawnEntity.Request()
+        req_dlz.entity_factory = dlz.to_entity_factory_msg()
+        self.spawn_entity_client.call_async(req_dlz)
+        self.get_logger().info("CustomWorldNode spawning dlz_pink at (0, 0, 0.01)")
+
+        pos0 = self._random_payload_position()
+        yaw0 = random.uniform(-math.pi, math.pi)
         payload_0 = Entity(
             name="payload_0",
             path_to_sdf="~/.simulation-gazebo/models/payload/model.sdf",
-            position=(-1.0, 0, 0.5),
-            rpy=(0.0, 0.0, 0.0),
+            position=pos0,
+            rpy=(0.0, 0.0, yaw0),
             world=self.world_name,
         )
         ef0 = payload_0.to_entity_factory_msg()
         self.get_logger().info(
-            "DEBUG | CustomWorldNode spawning payload_0 at (0, 0, 0.5), relative_to='%s'"
-            % (getattr(ef0, "relative_to", "?") or "?")
+            "CustomWorldNode spawning payload_0 at (%.2f, %.2f, %.2f) yaw=%.1f deg"
+            % (pos0[0], pos0[1], pos0[2], math.degrees(yaw0))
         )
         req = SpawnEntity.Request()
         req.entity_factory = ef0
@@ -45,14 +71,13 @@ class CustomWorldNode(WorldNode):
         payload_1 = Entity(
             name="payload_1",
             path_to_sdf="~/.simulation-gazebo/models/payload/model.sdf",
-            position=(0.8, 0.8, 0.5),
+            position=(2, 2, 0.5),
             rpy=(0.0, 0.0, 0.0),
             world=self.world_name,
         )
         ef1 = payload_1.to_entity_factory_msg()
         self.get_logger().info(
-            "DEBUG | CustomWorldNode spawning payload_1 at (0.8, 0.8, 0.5), relative_to='%s'"
-            % (getattr(ef1, "relative_to", "?") or "?")
+            "CustomWorldNode spawning payload_1 at (2, 2, 0.5)"
         )
         req1 = SpawnEntity.Request()
         req1.entity_factory = ef1

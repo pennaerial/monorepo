@@ -244,7 +244,9 @@ def launch_setup(context, *args, **kwargs):
             )
         logger.info(f"PX4_GZ_WORLD={competition}")
 
-        # When using custom world, payloads are spawned; start payload node to bridge camera and cmd_drive
+        # When using custom world, payloads are spawned; start payload node to bridge camera and cmd_drive.
+        # Gazebo (spawn_world) is started without GZ_PARTITION so it uses the default partition.
+        # Do not set GZ_PARTITION on the payload so it also uses default and can receive gz camera and send cmd_vel.
         payload_launch_actions = []
         if competition_type == Competition.CUSTOM:
             payload_params_path = os.path.join(
@@ -259,7 +261,9 @@ def launch_setup(context, *args, **kwargs):
                     output="screen",
                 ),
             ]
-            logger.info("Payload node (payload_0) will start with sim for camera/cmd_drive bridge.")
+            logger.info(
+                "Payload node (payload_0) will start with sim for camera/cmd_drive bridge (default gz partition)."
+            )
 
         # Prepare sim launch arguments with all simulation parameters
         sim_launch_args = {

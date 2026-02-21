@@ -21,7 +21,7 @@
         <pose>0 0 -0.07 0 0 0</pose>
         <geometry>
           <box>
-            <size>0.55 2.144 0.05</size>
+            <size>0.1 1.5 0.03</size>
           </box>
         </geometry>
         <surface>
@@ -138,8 +138,10 @@
           </plane>
         </geometry>
         <material>
+          <ambient>1 1 1 1</ambient>
           <diffuse>1 1 1 1</diffuse>
           <specular>0.02 0.02 0.02 1</specular>
+          <emissive>1 1 1 1</emissive>
           <pbr>
             <metal>
               <albedo_map>model://standard_vtol/materials/apriltag_front.png</albedo_map>
@@ -159,8 +161,10 @@
           </plane>
         </geometry>
         <material>
+          <ambient>1 1 1 1</ambient>
           <diffuse>1 1 1 1</diffuse>
           <specular>0.02 0.02 0.02 1</specular>
+          <emissive>1 1 1 1</emissive>
           <pbr>
             <metal>
               <albedo_map>model://standard_vtol/materials/apriltag_back.png</albedo_map>
@@ -181,8 +185,10 @@
           </plane>
         </geometry>
         <material>
+          <ambient>1 1 1 1</ambient>
           <diffuse>1 1 1 1</diffuse>
           <specular>0.02 0.02 0.02 1</specular>
+          <emissive>1 1 1 1</emissive>
           <pbr>
             <metal>
               <albedo_map>model://standard_vtol/materials/apriltag_left.png</albedo_map>
@@ -202,8 +208,10 @@
           </plane>
         </geometry>
         <material>
+          <ambient>1 1 1 1</ambient>
           <diffuse>1 1 1 1</diffuse>
           <specular>0.02 0.02 0.02 1</specular>
+          <emissive>1 1 1 1</emissive>
           <pbr>
             <metal>
               <albedo_map>model://standard_vtol/materials/apriltag_right.png</albedo_map>
@@ -336,7 +344,7 @@
           <izz>0.000167604</izz>
         </inertia>
       </inertial>
-      <collision name='rotor_0_collision'>
+      <!-- <collision name='rotor_0_collision'>
         <pose>0 0 0 0 0 0</pose>
         <geometry>
           <cylinder>
@@ -352,8 +360,8 @@
             <ode />
           </friction>
         </surface>
-      </collision>
-      <visual name='rotor_0_visual'>
+      </collision> -->
+      <!-- <visual name='rotor_0_visual'>
         <pose>0 0 0 0 0 0</pose>
         <geometry>
           <mesh>
@@ -365,7 +373,7 @@
           <ambient>0 0 1 1.0</ambient>
           <diffuse>0 0 1 1.0</diffuse>
         </material>
-      </visual>
+      </visual> -->
       <gravity>1</gravity>
       <velocity_decay />
       <self_collide>0</self_collide>
@@ -399,7 +407,7 @@
           <izz>0.000167604</izz>
         </inertia>
       </inertial>
-      <collision name='rotor_1_collision'>
+      <!-- <collision name='rotor_1_collision'>
         <pose>0 0 0 0 0 0</pose>
         <geometry>
           <cylinder>
@@ -415,8 +423,8 @@
             <ode />
           </friction>
         </surface>
-      </collision>
-      <visual name='rotor_1_visual'>
+      </collision> -->
+      <!-- <visual name='rotor_1_visual'>
         <pose>0 0 0 0 0 0</pose>
         <geometry>
           <mesh>
@@ -428,7 +436,7 @@
           <ambient>0 0 1 1.0</ambient>
           <diffuse>0 0 1 1.0</diffuse>
         </material>
-      </visual>
+      </visual> -->
       <gravity>1</gravity>
       <velocity_decay />
       <self_collide>0</self_collide>
@@ -462,7 +470,7 @@
           <izz>0.000167604</izz>
         </inertia>
       </inertial>
-      <collision name='rotor_2_collision'>
+      <!-- <collision name='rotor_2_collision'>
         <pose>0 0 0 0 0 0</pose>
         <geometry>
           <cylinder>
@@ -478,8 +486,8 @@
             <ode />
           </friction>
         </surface>
-      </collision>
-      <visual name='rotor_2_visual'>
+      </collision> -->
+      <!-- <visual name='rotor_2_visual'>
         <pose>0 0 0 0 0 0</pose>
         <geometry>
           <mesh>
@@ -491,7 +499,7 @@
           <ambient>0 0 1 1.0</ambient>
           <diffuse>0 0 1 1.0</diffuse>
         </material>
-      </visual>
+      </visual> -->
       <gravity>1</gravity>
       <velocity_decay />
       <self_collide>0</self_collide>
@@ -525,7 +533,7 @@
           <izz>0.000167604</izz>
         </inertia>
       </inertial>
-      <collision name='rotor_3_collision'>
+      <!-- <collision name='rotor_3_collision'>
         <pose>0 0 0 0 0 0</pose>
         <geometry>
           <cylinder>
@@ -541,8 +549,8 @@
             <ode />
           </friction>
         </surface>
-      </collision>
-      <visual name='rotor_3_visual'>
+      </collision> -->
+      <!-- <visual name='rotor_3_visual'>
         <pose>0 0 0 0 0 0</pose>
         <geometry>
           <mesh>
@@ -554,7 +562,7 @@
           <ambient>0 0 1 1.0</ambient>
           <diffuse>0 0 1 1.0</diffuse>
         </material>
-      </visual>
+      </visual> -->
       <gravity>1</gravity>
       <velocity_decay />
       <self_collide>0</self_collide>
@@ -589,7 +597,7 @@
           <izz>0.000167604</izz>
         </inertia>
       </inertial>
-      <collision name='rotor_puller_collision'>
+      <!-- <collision name='rotor_puller_collision'>
         <pose>0.0 0 -0.04 0 0 0</pose>
         <geometry>
           <cylinder>
@@ -605,8 +613,8 @@
             <ode />
           </friction>
         </surface>
-      </collision>
-      <visual name='rotor_puller_visual'>
+      </collision> -->
+      <!-- <visual name='rotor_puller_visual'>
         <pose>0 0 -0.04 0 0 0</pose>
         <geometry>
           <mesh>
@@ -618,7 +626,7 @@
           <ambient>0 0 1 1.0</ambient>
           <diffuse>0 0 1 1.0</diffuse>
         </material>
-      </visual>
+      </visual> -->
       <gravity>1</gravity>
       <velocity_decay />
       <self_collide>0</self_collide>
