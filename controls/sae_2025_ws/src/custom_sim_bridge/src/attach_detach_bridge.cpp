@@ -14,11 +14,9 @@ class AttachDetachBridge
             param_listener_ = std::make_shared<custom_sim_bridge::ParamListener>(this);
             params_ = param_listener_->get_params();
             //validate necessary params
-            if (params_.ros_service_name == "") {
-                RCLCPP_ERROR(this->get_logger(), "ros_service_name param is empty! Requires non-empty string");
-            }
-            if (params_.gz_service_name == "") {
-                RCLCPP_ERROR(this->get_logger(), "gz_service_name param is empty! Requires non-empty string");
+            if (params_.ros_service_name.empty() || params_.gz_service_name.empty()) {
+                RCLCPP_ERROR(this->get_logger(), "Both ros_service_name and gz_service_name must be non-empty");
+                throw std::invalid_argument("Invalid bridge parameters");
             }
 
             RCLCPP_INFO(this->get_logger(), "ROS AttachDetach srv at: %s", params_.ros_service_name.c_str());
