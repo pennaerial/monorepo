@@ -1,5 +1,5 @@
 # launch_params.yaml
-mission_name: payload_color_orbit_to_rear
+mission_name: payload_park_rear_back_tag
 vision_debug: false
 run_mission: true
 airframe: standard_vtol # Enter a preset below or a valid airframe ID (integer), either custom or from PX4

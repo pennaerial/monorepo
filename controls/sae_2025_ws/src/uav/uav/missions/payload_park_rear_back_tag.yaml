@@ -1,20 +1,34 @@
 # VTOL stationary; payload localizes off any VTOL AprilTag, orbits around, and docks at the back tag.
 # In this sim: front=ID0, back=ID1, left=ID2, right=ID3 (tag36h11).
+# Numeric/bool params unquoted so mission loader passes them as numbers (not strings).
 start:
   class: uav.autonomous_modes.PayloadDriveToAprilTagMode
   params:
-    payload_name: 'payload_0'
-    tag_size_m: '0.1'
-    dock_rear_orthogonal: 'True'
-    dock_target_tag_id: '1'
-    dock_orbit_radius_m: '1.2'
-    dock_orbit_speed_mps: '0.15'
-    dock_recovery_timeout_s: '5.0'
-    dock_heading_rate_limit: '0.3'
-    dock_align_angle_deg: '30.0'
-    dock_align_hold_s: '0.4'
-    dock_recovery_flip_window_s: '15.0'
-    dock_recovery_flip_count: '3'
+    payload_name: payload_0
+    tag_size_m: 0.1
+    dock_rear_orthogonal: true
+    dock_target_tag_id: 1
+    dock_approach_front_dist_m: 2.0
+    dock_approach_front_min_m: 1.8
+    dock_approach_front_max_m: 2.2
+    dock_front_safe_standoff_m: 1.0
+    dock_approach_backup_margin_m: 0.2
+    dock_approach_bearing_gain: 0.3
+    dock_approach_pixel_scale: 0.5
+    dock_orbit_radius_m: 2.0
+    dock_orbit_speed_mps: 0.15
+    dock_orbit_straight_duration_s: 50.0
+    dock_orbit_peek_duration_s: 10
+    dock_orbit_radial_k: 0.8
+    dock_orbit_yaw_k: 2.0
+    dock_orbit_peek_blend: 0.4
+    dock_orbit_peek_back_cooldown_s: 3.0
+    dock_recovery_timeout_s: 5.0
+    dock_heading_rate_limit: 0.3
+    dock_align_angle_deg: 30.0
+    dock_align_hold_s: 0.4
+    dock_recovery_flip_window_s: 15.0
+    dock_recovery_flip_count: 3
   transitions:
     complete: land
 

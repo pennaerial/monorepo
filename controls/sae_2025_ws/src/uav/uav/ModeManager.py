@@ -118,12 +118,16 @@ class ModeManager(Node):
                 ):
                     args[name] = param_value
                 else:
-                    try:
-                        args[name] = ast.literal_eval(param_value)
-                    except (ValueError, SyntaxError):
-                        raise ValueError(
-                            f"Parameter '{name}' must be a valid literal for mode '{mode_path}'. Received: {param_value}"
-                        )
+                    # YAML may pass native types (float, int, bool) or strings; literal_eval only accepts strings
+                    if isinstance(param_value, (int, float, bool)):
+                        args[name] = param_value
+                    else:
+                        try:
+                            args[name] = ast.literal_eval(param_value)
+                        except (ValueError, SyntaxError):
+                            raise ValueError(
+                                f"Parameter '{name}' must be a valid literal for mode '{mode_path}'. Received: {param_value}"
+                            )
             elif param.default != inspect.Parameter.empty:
                 args[name] = param.default
             else:
