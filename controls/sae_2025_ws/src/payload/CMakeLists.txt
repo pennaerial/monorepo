@@ -53,6 +53,17 @@ else()
   target_link_libraries(payload_controllers ${LGPIO_LIBRARY})
   target_include_directories(payload_controllers PUBLIC ${LGPIO_INCLUDE_DIR})
   target_compile_definitions(payload_controllers PRIVATE BUILD_GPIO)
+
+  # --- Motor test executable (hardware only) ---
+  add_executable(test_motor
+    test/test_motor.cpp
+    src/motor.cpp
+    src/gpio.cpp
+  )
+  target_include_directories(test_motor PRIVATE include ${LGPIO_INCLUDE_DIR})
+  ament_target_dependencies(test_motor rclcpp)
+  target_link_libraries(test_motor ${LGPIO_LIBRARY})
+  install(TARGETS test_motor DESTINATION lib/${PROJECT_NAME})
 endif()
 
 pluginlib_export_plugin_description_file(payload plugins.xml)
@@ -110,6 +121,26 @@ if(BUILD_TESTING)
   # a copyright and license is added to all source files
   set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
+
+  # GPIO permission tests — only when building for real hardware (lgpio available)
+  if(NOT BUILD_SIM)
+    find_package(ament_cmake_gtest REQUIRED)
+
+    ament_add_gtest(test_gpio_permissions
+      test/test_gpio_permissions.cpp
+      test/mock_lgpio.cpp
+      src/gpio.cpp                     # compile GPIO class directly (not via shared lib)
+    )
+
+    target_include_directories(test_gpio_permissions PRIVATE
+      include
+      ${LGPIO_INCLUDE_DIR}             # lgpio.h needed for PinType struct declarations
+      test                             # mock_lgpio.hpp
+    )
+
+    ament_target_dependencies(test_gpio_permissions rclcpp)
+    # NOTE: do NOT link ${LGPIO_LIBRARY} — the mock provides the lgpio symbols
+  endif()
 endif()
 
 ament_package()
