@@ -58,8 +58,13 @@ class CameraNode(Node):
             "save_vision_milliseconds", 0
         ).value
 
+        self.vision_debug = self.declare_parameter(
+            "debug", False
+        ).value
+
+
         self.uuid = str(uuid.uuid4())
-        self.last_saved_time = time.time_ns() // 1_000_000 # Convert to milliseconds
+        self.last_saved_time = time.time_ns() // 1_000_000  # Convert to milliseconds
 
         self.service = self.create_service(
             CameraData, service_name, self.service_callback
@@ -94,13 +99,17 @@ class CameraNode(Node):
             cv2.imshow("Camera Feed", frame)
             cv2.waitKey(1)
         if self.save_vision_milliseconds > 0:
-            if(math.abs(time.time_ns() // 1_000_000 - self.last_saved_time) >= self.save_vision_milliseconds):
+            if (
+                math.abs(time.time_ns() // 1_000_000 - self.last_saved_time)
+                >= self.save_vision_milliseconds
+            ):
                 self.last_saved_time = time.time_ns() // 1_000_000
                 timestamp = int(time.time())
                 path = os.path.expanduser(f"~/vision_imgs/{self.uuid}")
-                self.get_logger().error("Saving vision image @ " + str(timestamp))
                 os.makedirs(path, exist_ok=True)
                 cv2.imwrite(os.path.join(path, f"camera_{timestamp}.png"), frame)
+                if self.vision_debug:
+                    self.get_logger().error("Saving vision image @ " + str(timestamp))
 
     def camera_info_callback(self, msg: CameraInfo):
         """

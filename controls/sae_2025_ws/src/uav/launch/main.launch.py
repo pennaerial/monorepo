@@ -38,7 +38,8 @@ def launch_setup(context, *args, **kwargs):
     uav_debug = str(params.get("uav_debug", "false"))
     vision_debug = str(params.get("vision_debug", "false"))
     use_camera = str(params.get("use_camera", "true"))
-    save_vision_milliseconds = int(params.get("save_vision", "0"))
+    save_vision_milliseconds = int(params.get("save_vision_milliseconds", "0"))
+    save_vision_bool = save_vision_milliseconds > 0
     servo_only = str(params.get("servo_only", "false"))
 
     sim_bool = str(params.get("sim", "false")).lower() == "true"
@@ -83,6 +84,7 @@ def launch_setup(context, *args, **kwargs):
                 output="screen",
                 parameters=[
                     {
+                        "debug": vision_debug_bool,
                         "save_vision_milliseconds": save_vision_milliseconds,
                     }
                 ],
@@ -104,14 +106,14 @@ def launch_setup(context, *args, **kwargs):
                         {
                             "debug": vision_debug_bool,
                             "sim": sim_bool,
-                            "save_vision": save_vision_milliseconds > 0,
+                            "save_vision": save_vision_bool,
                         }
                     ],
                 )
             )
 
         # Clear vision node actions if none are found.
-        if len(vision_nodes) == 0 and not save_vision_milliseconds > 0:
+        if len(vision_nodes) == 0 and not save_vision_bool:
             vision_node_actions = []
 
         if not sim_bool:
