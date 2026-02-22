@@ -100,7 +100,7 @@ class CameraNode(Node):
             cv2.waitKey(1)
         if self.save_vision_milliseconds > 0:
             if (
-                math.abs(time.time_ns() // 1_000_000 - self.last_saved_time)
+                abs(time.time_ns() // 1_000_000 - self.last_saved_time)
                 >= self.save_vision_milliseconds
             ):
                 self.last_saved_time = time.time_ns() // 1_000_000
