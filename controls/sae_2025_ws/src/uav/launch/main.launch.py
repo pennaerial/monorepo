@@ -38,13 +38,13 @@ def launch_setup(context, *args, **kwargs):
     uav_debug = str(params.get("uav_debug", "false"))
     vision_debug = str(params.get("vision_debug", "false"))
     use_camera = str(params.get("use_camera", "true"))
-    save_vision = str(params.get("save_vision", "false"))
+    save_vision_milliseconds = int(params.get("save_vision_milliseconds", "0"))
+    save_vision_bool = save_vision_milliseconds > 0
     servo_only = str(params.get("servo_only", "false"))
 
     sim_bool = str(params.get("sim", "false")).lower() == "true"
     run_mission_bool = str(params.get("run_mission", "true")).lower() == "true"
     vision_debug_bool = vision_debug.lower() == "true"
-    save_vision_bool = save_vision.lower() == "true"
     use_camera_bool = use_camera.lower() == "true"
 
     """
@@ -77,7 +77,18 @@ def launch_setup(context, *args, **kwargs):
     vision_node_actions = []
     if use_camera_bool:
         vision_node_actions.append(
-            Node(package="uav", executable="camera", name="camera", output="screen")
+            Node(
+                package="uav",
+                executable="camera",
+                name="camera",
+                output="screen",
+                parameters=[
+                    {
+                        "debug": vision_debug_bool,
+                        "save_vision_milliseconds": save_vision_milliseconds,
+                    }
+                ],
+            )
         )
 
         for node in extract_vision_nodes(YAML_PATH):
@@ -102,7 +113,7 @@ def launch_setup(context, *args, **kwargs):
             )
 
         # Clear vision node actions if none are found.
-        if len(vision_nodes) == 0:
+        if len(vision_nodes) == 0 and not save_vision_bool:
             vision_node_actions = []
 
         if not sim_bool:

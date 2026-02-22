@@ -6,6 +6,10 @@ from sensor_msgs.msg import Image
 import cv2
 from std_msgs.msg import Bool
 from rclpy.qos import QoSProfile, DurabilityPolicy, ReliabilityPolicy
+import time
+import os
+import uuid
+import numpy as np
 
 
 class CameraNode(Node):
@@ -48,6 +52,16 @@ class CameraNode(Node):
         self.camera_info = None
         self.display = display
 
+        # Retrieve the 'save_vision' parameter (should be set via the launch file or node definition)
+        self.save_vision_milliseconds = self.declare_parameter(
+            "save_vision_milliseconds", 0
+        ).value
+
+        self.vision_debug = self.declare_parameter("debug", False).value
+
+        self.uuid = str(uuid.uuid4())
+        self.last_saved_time = time.time_ns() // 1_000_000  # Convert to milliseconds
+
         self.service = self.create_service(
             CameraData, service_name, self.service_callback
         )
@@ -66,15 +80,32 @@ class CameraNode(Node):
         )
         self.get_logger().info(f"{node_name} has started, subscribing to {info_topic}.")
 
+    def convert_image_msg_to_frame(self, msg: Image) -> np.ndarray:
+        img_data = np.frombuffer(msg.data, dtype=np.uint8)
+        return img_data.reshape((msg.height, msg.width, 3))
+
     def image_callback(self, msg: Image):
         """
         Callback for receiving image requests.
         """
         self.image = msg
+        frame = self.convert_image_msg_to_frame(msg)
         if self.display:
             frame = self.convert_image_msg_to_frame(msg)
             cv2.imshow("Camera Feed", frame)
             cv2.waitKey(1)
+        if self.save_vision_milliseconds > 0:
+            if (
+                abs(time.time_ns() // 1_000_000 - self.last_saved_time)
+                >= self.save_vision_milliseconds
+            ):
+                self.last_saved_time = time.time_ns() // 1_000_000
+                timestamp = int(time.time())
+                path = os.path.expanduser(f"~/vision_imgs/{self.uuid}/raw")
+                os.makedirs(path, exist_ok=True)
+                cv2.imwrite(os.path.join(path, f"{timestamp}.png"), frame)
+                if self.vision_debug:
+                    self.get_logger().error("Saving vision image @ " + str(timestamp))
 
     def camera_info_callback(self, msg: CameraInfo):
         """
