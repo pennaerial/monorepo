@@ -10,7 +10,6 @@ import time
 import os
 import uuid
 import numpy as np
-import math
 
 
 class CameraNode(Node):
