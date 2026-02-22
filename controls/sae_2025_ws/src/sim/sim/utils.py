@@ -52,7 +52,10 @@ def load_yaml_to_dict(params_file: Path) -> dict:
 
 
 def load_sim_parameters(
-    competition: str, logger: logging.Logger, competition_name: str = "", mission_stage: str = ""
+    competition: str,
+    logger: logging.Logger,
+    competition_name: str = "",
+    mission_stage: str = "",
 ) -> str:
     """
     Find simulation configuration file, checking source location first (for development),
@@ -82,7 +85,7 @@ def load_sim_parameters(
     if mission_stage:
         config_filename = f"{mission_stage}.yaml"
     else:
-        config_filename = f"base.yaml"
+        config_filename = "base.yaml"
 
     # # Validate that the filename starts with the expected competition prefix.
     # expected_prefix = f"{competition}."
