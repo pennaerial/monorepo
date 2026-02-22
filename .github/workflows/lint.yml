@@ -1,0 +1,21 @@
+name: Ruff Checks
+
+on: [pull_request, push]
+
+jobs:
+  ruff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      # Step 1: Check Formatting
+      - name: Check Formatting
+        uses: astral-sh/ruff-action@v3
+        with:
+          args: "format --check --diff"
+          
+      # Step 2: Check Linting
+      - name: Check Linting
+        uses: astral-sh/ruff-action@v3
+        with:
+          args: "check"

@@ -6,8 +6,8 @@ def fit_quadrilateral(contour):
     print(contour)
     return cv2.boxPoints(cv2.minAreaRect(np.array(list(contour))))
 
-def rect_confidence(contour, height, width):
 
+def rect_confidence(contour, height, width):
     # Create empty masks
     mask1 = np.zeros((height, width), dtype=np.uint8)
     mask2 = np.zeros((height, width), dtype=np.uint8)
@@ -26,7 +26,7 @@ def rect_confidence(contour, height, width):
 
     # Calculate the area of the intersection
     area = cv2.countNonZero(intersection)
-    confidence = 1 - area/(cv2.contourArea(contour)+cv2.contourArea(box))
+    confidence = 1 - area / (cv2.contourArea(contour) + cv2.contourArea(box))
     return confidence
 
 
@@ -35,13 +35,12 @@ def confidence(contour, target_area, height, width):
     if target_area < 0:
         return rect_confidence(contour, height, width)
     area = cv2.contourArea(contour)
-    area_confidence = (1-area/target_area)**2
-    if area_confidence>1:
+    area_confidence = (1 - area / target_area) ** 2
+    if area_confidence > 1:
         area_confidence = 0
     else:
-        area_confidence = 1-area_confidence
-    
-    shape_confidence = rect_confidence(contour, height, width)
-    
-    return shape_confidence*area_confidence
+        area_confidence = 1 - area_confidence
 
+    shape_confidence = rect_confidence(contour, height, width)
+
+    return shape_confidence * area_confidence

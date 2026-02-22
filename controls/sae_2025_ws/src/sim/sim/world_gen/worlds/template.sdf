@@ -315,8 +315,5 @@
       <longitude_deg> 8.546163739800146</longitude_deg>
       <elevation>0</elevation>
     </spherical_coordinates>
-    <include>
-      <uri>model://payload</uri>
-    </include>
   </world>
 </sdf>

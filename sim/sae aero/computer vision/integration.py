@@ -1,6 +1,4 @@
-import os
 import cv2
-from typing import List, Tuple
 from calibrate import calibrate
 from recalibrate import recalibrate
 from threshold import threshold
@@ -8,6 +6,8 @@ from threshold import threshold
 
 def confidence():
     pass
+
+
 def process_video(input_path: str):
     video_capture = cv2.VideoCapture(input_path)
 
@@ -32,11 +32,12 @@ def process_video(input_path: str):
         prev_frame = frame
         prev_center = center
 
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        if cv2.waitKey(1) & 0xFF == ord("q"):
             break
 
     video_capture.release()
     cv2.destroyAllWindows()
+
 
 input_path = ""
 process_video(input_path)

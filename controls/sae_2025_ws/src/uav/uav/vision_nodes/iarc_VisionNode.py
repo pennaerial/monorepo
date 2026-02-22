@@ -49,15 +49,18 @@ class VisionNode(Node):
         self.sim = self.get_parameter('sim').value
         self.declare_parameter('save_vision', False)
         self.save_vision = self.get_parameter('save_vision').value
+        self.declare_parameter('vehicle_id', 0)
+        self.vehicle_id = int(self.get_parameter('vehicle_id').value)
         self.custom_service_type = custom_service
         self.uuid = str(uuid.uuid4())
         if self.save_vision:
             os.makedirs(os.path.expanduser(f"~/vision_imgs/{self.uuid}"), exist_ok=True)
 
         self.use_service = use_service
+        cam_prefix = f"/vehicle_{self.vehicle_id}"
 
         if use_service:
-            self.client = self.create_client(CameraData, '/camera_data')
+            self.client = self.create_client(CameraData, f'{cam_prefix}/camera_data')
 
             if not self.client.wait_for_service(timeout_sec=1.0):
                 self.get_logger().error('Service not available.')
@@ -65,14 +68,14 @@ class VisionNode(Node):
         else:
             self.image_subscription = self.create_subscription(
                 Image,
-                '/camera',
+                f'{cam_prefix}/camera',
                 self.image_callback,
                 10
             )
 
             self.camera_info_subscription = self.create_subscription(
                 CameraInfo,
-                '/camera_info',
+                f'{cam_prefix}/camera_info',
                 self.camera_info_callback,
                 10
             )
@@ -86,10 +89,10 @@ class VisionNode(Node):
         self.display = display
         qos_profile = QoSProfile(
                         depth=10,
-                        durability=DurabilityPolicy.TRANSIENT_LOCAL,  # Ensures messages persist for new subscribers
+                        durability=DurabilityPolicy.TRANSIENT_LOCAL,
                         reliability=ReliabilityPolicy.RELIABLE
                     )
-        self.failsafe_publisher = self.create_publisher(Bool, '/failsafe_trigger', qos_profile)
+        self.failsafe_publisher = self.create_publisher(Bool, f'{cam_prefix}/failsafe_trigger', qos_profile)
         
     def image_callback(self, msg: Image):
         """

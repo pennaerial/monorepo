@@ -1,14 +1,14 @@
+from abc import ABC, abstractmethod
 from rclpy.node import Node
 from px4_msgs.msg import (
     OffboardControlMode,
     TrajectorySetpoint,
     VehicleStatus,
-    VtolVehicleStatus,
     VehicleCommand,
     VehicleAttitude,
     VehicleGlobalPosition,
     VehicleLocalPosition,
-    SensorGps
+    SensorGps,
 )
 from rclpy.clock import Clock
 from rclpy.qos import (
@@ -19,27 +19,41 @@ from rclpy.qos import (
 )
 import numpy as np
 import math
-from collections import deque
-from std_msgs.msg import Bool
 from uav.px4_modes import PX4CustomMainMode, PX4CustomSubModeAuto
 from uav.utils import R_earth
 
-class UAV:
+# Map nav_state value -> name for readable logging
+_NAV_STATE_NAMES = {
+    getattr(VehicleStatus, a): a
+    for a in dir(VehicleStatus)
+    if a.startswith("NAVIGATION_STATE_")
+    and isinstance(getattr(VehicleStatus, a), (int, float))
+}
+
+
+def get_nav_state_str(val):
+    return _NAV_STATE_NAMES.get(val, str(val))
+
+
+class UAV(ABC):
     """
-    Skeleton class for UAV control and interfacing with PX4 via ROS 2.
+    Abstract base class for UAV control and interfacing with PX4 via ROS 2.
+    Subclasses: VTOL, Multicopter
     """
 
-    def __init__(self, node: Node, takeoff_amount=5.0, DEBUG=False, camera_offsets=[0, 0, 0]):
-
+    def __init__(
+        self, node: Node, takeoff_amount=5.0, DEBUG=False, camera_offsets=[0, 0, 0]
+    ):
         self.node = node
         self.DEBUG = DEBUG
-        self.vehicle_id = int(getattr(node, 'vehicle_id', 0))
+        self.vehicle_id = int(getattr(node, "vehicle_id", 0))
         self.node.get_logger().info(f"Initializing UAV with DEBUG={DEBUG}")
         self.vision_clients = {}
 
-        self._px4_prefix = '' if self.vehicle_id == 0 else f"/px4_{self.vehicle_id}"
+        # PX4 instance N uses topics /px4_N/... (vehicle_id 0 -> instance 1 -> /px4_1)
+        self._px4_prefix = f"/px4_{self.vehicle_id + 1}"
         self.node.get_logger().info(
-            f"PX4 topic prefix for vehicle_id={self.vehicle_id}: '{self._px4_prefix or '/'}'"
+            f"PX4 topic prefix for vehicle_id={self.vehicle_id}: '{self._px4_prefix}'"
         )
         def _topic(path: str) -> str:
             if not path.startswith('/'):
@@ -61,28 +75,31 @@ class UAV:
 
         self.system_id = 1
         self.component_id = 1
-        
+
         self.max_acceleration = 0.01
+        self.default_velocity = 5.0
 
         self.camera_offsets = camera_offsets
-        
+
         # Set up Subscribers/Publishers to communicate with aircraft
         self._initialize_publishers_and_subscribers()
 
         # set takeoff parameters
         self.origin_set = False
+        self.roll = None
+        self.pitch = None
         self.yaw = None
         self.takeoff_amount = takeoff_amount
         self.attempted_takeoff = False
 
         # Initialize drone position
         self.local_origin = None
-        self.GPS_origin = None
+        self.gps_origin = None
 
         # Store current drone position
         self.global_position = None
         self.local_position = None
-    
+
     # -------------------------
     # Public commands
     # -------------------------
@@ -90,52 +107,73 @@ class UAV:
         """Send an arm command to the UAV."""
         self._send_vehicle_command(
             VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM,
-            params={'param1': 1.0}  # param1=1 => Arm
+            params={"param1": 1.0},  # param1=1 => Arm
         )
         self.node.get_logger().info("Sent Arm Command")
-        
-    
+
     def set_origin(self):
-        if self.global_position and self.yaw:  
+        if self.global_position and self.yaw:
             lat = self.global_position.lat
             lon = self.global_position.lon
             alt = self.global_position.alt
             self.node.get_logger().info(f"Setting origin to {lat}, {lon}, {alt}")
-            self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_SET_GPS_GLOBAL_ORIGIN,
-                                   params={'param1':0.0, 'param2':0.0, 'param3': 0.0, 'param4': 0.0, 'param5':lat, 'param6': lon, 'param7': alt})
+            self._send_vehicle_command(
+                VehicleCommand.VEHICLE_CMD_SET_GPS_GLOBAL_ORIGIN,
+                params={
+                    "param1": 0.0,
+                    "param2": 0.0,
+                    "param3": 0.0,
+                    "param4": 0.0,
+                    "param5": lat,
+                    "param6": lon,
+                    "param7": alt,
+                },
+            )
             self.camera_offsets = self.uav_to_local(self.camera_offsets)
             self.origin_set = True
 
     def distance_to_waypoint(self, coordinate_system, waypoint) -> float:
         """Calculate the distance to the current waypoint."""
-        if coordinate_system == 'GPS':
+        if coordinate_system == "GPS":
             curr_gps = self.get_gps()
-            return self.gps_distance_3d(waypoint[0], waypoint[1], waypoint[2], curr_gps[0], curr_gps[1], curr_gps[2])
-        elif coordinate_system == 'LOCAL':
+            return self.gps_distance_3d(
+                waypoint[0],
+                waypoint[1],
+                waypoint[2],
+                curr_gps[0],
+                curr_gps[1],
+                curr_gps[2],
+            )
+        elif coordinate_system == "LOCAL":
             return np.sqrt(
-                (self.local_position.x - waypoint[0]) ** 2 +
-                (self.local_position.y - waypoint[1]) ** 2 +
-                (self.local_position.z - waypoint[2]) ** 2
+                (self.local_position.x - waypoint[0]) ** 2
+                + (self.local_position.y - waypoint[1]) ** 2
+                + (self.local_position.z - waypoint[2]) ** 2
             )
 
     def hover(self):
         self._send_vehicle_command(
             VehicleCommand.VEHICLE_CMD_DO_SET_MODE,
-            params={'param1': 1.0, 'param2': PX4CustomMainMode.AUTO.value, 'param3': PX4CustomSubModeAuto.LOITER.value}
+            params={
+                "param1": 1.0,
+                "param2": PX4CustomMainMode.AUTO.value,
+                "param3": PX4CustomSubModeAuto.LOITER.value,
+            },
         )
+
     def disarm(self):
         """Send a disarm command to the UAV."""
         self._send_vehicle_command(
             VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM,
-            params={'param1': 0.0}  # param1=0 => Disarm
+            params={"param1": 0.0},  # param1=0 => Disarm
         )
         self.node.get_logger().info("Sent Disarm Command")
-    
+
     def engage_offboard_mode(self):
         """Switch to offboard mode."""
         self._send_vehicle_command(
-            VehicleCommand.VEHICLE_CMD_DO_SET_MODE, 
-            params={'param1':1.0, 'param2': PX4CustomMainMode.OFFBOARD.value}
+            VehicleCommand.VEHICLE_CMD_DO_SET_MODE,
+            params={"param1": 1.0, "param2": PX4CustomMainMode.OFFBOARD.value},
         )
         self.node.get_logger().info("Switching to offboard mode")
 
@@ -150,8 +188,18 @@ class UAV:
             lon = self.global_position.lon
             alt = self.global_position.alt
             takeoff_gps = (lat, lon, alt + self.takeoff_amount)
-            self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_NAV_TAKEOFF,
-                                    params={'param1':10.0, 'param2':0.0, 'param3': 0.0, 'param4': 0.0, 'param5': takeoff_gps[0], 'param6': takeoff_gps[1], 'param7': takeoff_gps[2]})
+            self._send_vehicle_command(
+                VehicleCommand.VEHICLE_CMD_NAV_TAKEOFF,
+                params={
+                    "param1": 10.0,
+                    "param2": 0.0,
+                    "param3": 0.0,
+                    "param4": 0.0,
+                    "param5": takeoff_gps[0],
+                    "param6": takeoff_gps[1],
+                    "param7": takeoff_gps[2],
+                },
+            )
             self.node.get_logger().info("Takeoff command sent.")
 
     def land(self):
@@ -159,68 +207,85 @@ class UAV:
         self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_NAV_LAND)
         self.node.get_logger().info("Landing command sent.")
 
-    def vtol_transition_to(self, vtol_state, immediate=False):
-        """
-        Command a VTOL transition. 
-        Following https://mavlink.io/en/messages/common.html#MAV_CMD_DO_VTOL_TRANSITION
-
-        Args:
-            vtol_state (str): The desired VTOL state ('MC' or 'FW').
-            immediate (bool): If True, the transition should be immediate.
-        """
-        assert vtol_state in ['MC', 'FW'], "VTOL state must be 'MC' or 'FW'."
-        state = VtolVehicleStatus.VEHICLE_VTOL_STATE_MC if vtol_state == 'MC' else VtolVehicleStatus.VEHICLE_VTOL_STATE_FW
-        immediate = 1 if immediate else 0
-        self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_DO_VTOL_TRANSITION, params={'param1': float(state), 'param2': float(immediate)})
-        self.node.get_logger().info(f"VTOL transition command sent: {state}. Transitioning to {vtol_state} mode.")
-
     def drop_payload(self):
-        self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_DO_SET_ACTUATOR, params={'param1': -1.0})
+        self._send_vehicle_command(
+            VehicleCommand.VEHICLE_CMD_DO_SET_ACTUATOR, params={"param1": -1.0}
+        )
 
     def pickup_payload(self):
-        self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_DO_SET_ACTUATOR, params={'param1': 1.0})
+        self._send_vehicle_command(
+            VehicleCommand.VEHICLE_CMD_DO_SET_ACTUATOR, params={"param1": 1.0}
+        )
 
     def disable_servo(self):
-        self._send_vehicle_command(VehicleCommand.VEHICLE_CMD_DO_SET_ACTUATOR, params={'param1': 0.0})
-    
-    def publish_position_setpoint(self, coordinate, yaw=None, calculate_yaw=False, relative=False):
+        self._send_vehicle_command(
+            VehicleCommand.VEHICLE_CMD_DO_SET_ACTUATOR, params={"param1": 0.0}
+        )
+
+    def publish_position_setpoint(self, coordinate, relative=False, lock_yaw=False):
         """Publish the trajectory setpoint.
-        
+
         Args:
             coordinate (tuple): (x, y, z) in the local frame.
-            yaw (float): Yaw angle in radians (optional).
-            calculate_yaw (bool): Calculate yaw angle based on the next waypoint.
             relative (bool): If True, the position is relative to the current local position.
+            lock_yaw (bool): If True, maintain current yaw instead of recalculating (prevents spinning when hovering).
         """
         x, y, z = coordinate
         if relative:
             x += self.local_position.x
             y += self.local_position.y
             z += self.local_position.z
+
         msg = TrajectorySetpoint()
         msg.position = [float(x), float(y), float(z)]
-        msg.yaw = self.calculate_yaw(x, y) if calculate_yaw else yaw if yaw else float(self.yaw)
         msg.timestamp = int(self.node.get_clock().now().nanoseconds / 1000)
-        norm_dir = np.array([x, y, z]) / np.linalg.norm(np.array([x, y, z]))
-        msg.velocity = [norm_dir[0] * self.max_acceleration, norm_dir[1] * self.max_acceleration, norm_dir[2] * self.max_acceleration]
+
+        # Lock yaw when hovering to prevent spinning from position noise
+        if lock_yaw and self.yaw is not None:
+            msg.yaw = float(self.yaw)
+        else:
+            msg.yaw = float(self.calculate_yaw(x, y))
+
+        # Delegate velocity calculation to subclass (VTOL or Multicopter)
+        # msg.velocity = self._calculate_velocity((x, y, z), lock_yaw) #TODO: Tune this later but for now let px4 handle
+
         self.trajectory_publisher.publish(msg)
-        self.node.get_logger().info(f"Publishing setpoint: pos={[x, y, z]}, yaw={msg.yaw:.2f}")
-        
+
     def calculate_yaw(self, x: float, y: float) -> float:
         """Calculate the yaw angle to point towards the next waypoint."""
         # Calculate relative position
         dx = x - self.local_position.x
         dy = y - self.local_position.y
-        
+
+        # If very close to target (hovering), maintain current yaw to prevent spinning
+        # caused by noisy position estimates when dx/dy are near zero
+        if np.linalg.norm([dx, dy]) < 3.0 and self.yaw is not None:
+            return self.yaw
+
         # Calculate yaw angle
         yaw = np.arctan2(dy, dx)
         return yaw
-    
+
+    @abstractmethod
+    def _calculate_velocity(self, target_pos: tuple, lock_yaw: bool) -> list:
+        """
+        Calculate velocity vector for trajectory setpoint.
+        Must be implemented by subclasses (VTOL, Multicopter).
+
+        Args:
+            target_pos: (x, y, z) target position in local frame
+            lock_yaw: Whether yaw is locked (hovering)
+
+        Returns:
+            [vx, vy, vz] velocity list in m/s
+        """
+        pass
+
     def publish_offboard_control_heartbeat_signal(self):
         """Publish the offboard control mode."""
         msg = OffboardControlMode()
         msg.position = True
-        msg.velocity = False
+        msg.velocity = True  # Enable velocity control for trajectory setpoints
         msg.acceleration = False
         msg.attitude = False
         msg.body_rate = False
@@ -246,10 +311,8 @@ class UAV:
         curr_x, curr_y, curr_z = self.gps_to_local((lat1, lon1, alt1))
         tar_x, tar_y, tar_z = self.gps_to_local((lat2, lon2, alt2))
         return np.sqrt(
-                (curr_x - tar_x) ** 2 +
-                (curr_y - tar_y) ** 2 +
-                (curr_z - tar_z) ** 2
-            )
+            (curr_x - tar_x) ** 2 + (curr_y - tar_y) ** 2 + (curr_z - tar_z) ** 2
+        )
 
     def gps_to_local(self, target):
         """
@@ -265,8 +328,14 @@ class UAV:
                 y is East (meters),
                 z is Down (meters)
         """
+        if self.gps_origin is None:
+            self.node.get_logger().error(
+                "gps_origin not set. Cannot convert GPS to local coordinates."
+            )
+            return None
+
         target_lat, target_lon, target_alt = target
-        ref_lat, ref_lon, ref_alt = self.GPS_origin
+        ref_lat, ref_lon, ref_alt = self.gps_origin
 
         # Convert differences in latitude and longitude from degrees to radians
         d_lat = math.radians(target_lat - ref_lat)
@@ -278,62 +347,63 @@ class UAV:
         z = -(target_alt - ref_alt)  # Down displacement
 
         return (x, y, z)
-    
+
     def uav_to_local(self, point, relative=False):
-            """
-            Converts a point in the UAV's local frame to the global frame.
-            
-            :param point: A tuple (point_x, point_y, point_z) in the UAV's local frame.
-            :param relative: If True, the point is relative to the current local position.
-            :return: A tuple (goal_x, goal_y, goal_z) representing the point in the global frame.
-            """
-            current_pos = self.get_local_position()
-            point_x, point_y, point_z = point
+        """
+        Converts a point in the UAV's local frame to the global frame.
 
-            # Rotate the x and y points according to the UAV's yaw angle.
-            rotated_point_x = point_x * math.cos(self.yaw) - point_y * math.sin(self.yaw)
-            rotated_point_y = point_x * math.sin(self.yaw) + point_y * math.cos(self.yaw)
+        :param point: A tuple (point_x, point_y, point_z) in the UAV's local frame.
+        :param relative: If True, the point is relative to the current local position.
+        :return: A tuple (goal_x, goal_y, goal_z) representing the point in the global frame.
+        """
+        current_pos = self.get_local_position()
+        point_x, point_y, point_z = point
 
-            # The z-point remains unchanged.
-            if relative:
-                point = (
-                    current_pos[0] + rotated_point_x,
-                    current_pos[1] + rotated_point_y,
-                    current_pos[2] + point_z
-                )
-            else:
-                point = (rotated_point_x, rotated_point_y, point_z)
+        # Rotate the x and y points according to the UAV's yaw angle.
+        rotated_point_x = point_x * math.cos(self.yaw) - point_y * math.sin(self.yaw)
+        rotated_point_y = point_x * math.sin(self.yaw) + point_y * math.cos(self.yaw)
 
-            return point
-    
+        # The z-point remains unchanged.
+        if relative:
+            return (
+                current_pos[0] + rotated_point_x,
+                current_pos[1] + rotated_point_y,
+                current_pos[2] + point_z,
+            )
+        else:
+            return (rotated_point_x, rotated_point_y, point_z)
+
     def local_to_gps(self, local_pos):
         """
         Convert a local NED coordinate to a GPS coordinate.
-        
+
         Args:
             local_pos (tuple): (x, y, z) in meters, where:
                 x: North displacement,
                 y: East displacement,
                 z: Down displacement.
             ref_gps (tuple): (lat, lon, alt) of the reference point (takeoff) in degrees and meters.
-        
+
         Returns:
             tuple: (lat, lon, alt) GPS coordinate corresponding to local_pos.
         """
-        x, y, z = local_pos
-        lat0, lon0, alt0 = self.GPS_origin
-        R_earth = 6378137.0  # Earth's radius in meters
+        if self.gps_origin is None:
+            self.node.get_logger().error(
+                "gps_origin not set. Cannot convert local to GPS coordinates."
+            )
+            return None
+        else:
+            x, y, z = local_pos
+            lat0, lon0, alt0 = self.gps_origin
 
-        # Convert displacements from meters to degrees
-        dlat = (x / R_earth) * (180.0 / math.pi)
-        dlon = (y / (R_earth * math.cos(math.radians(lat0)))) * (180.0 / math.pi)
-        
-        lat = lat0 + dlat
-        lon = lon0 + dlon
-        alt = alt0 - z  # because z is down in NED
-        return (lat, lon, alt)
+            # Convert displacements from meters to degrees
+            dlat = (x / R_earth) * (180.0 / math.pi)
+            dlon = (y / (R_earth * math.cos(math.radians(lat0)))) * (180.0 / math.pi)
 
-    # def reached_position 
+            lat = lat0 + dlat
+            lon = lon0 + dlon
+            alt = alt0 - z  # because z is down in NED
+            return (lat, lon, alt)
 
     # -------------------------
     # Getters / data access
@@ -343,22 +413,53 @@ class UAV:
             return (
                 self.global_position.lat,
                 self.global_position.lon,
-                self.global_position.alt
+                self.global_position.alt,
             )
         else:
             self.node.get_logger().warn("No GPS data available.")
             return None
-        
+
     def get_local_position(self):
         if self.local_position:
-            return (
-                self.local_position.x,
-                self.local_position.y,
-                self.local_position.z
-            )
+            return (self.local_position.x, self.local_position.y, self.local_position.z)
         else:
             self.node.get_logger().warn("No local position data available.")
             return None
+
+    def _calculate_proportional_velocity(
+        self, direction: np.ndarray, distance: float
+    ) -> list:
+        """
+        Calculate velocity using proportional control to prevent oscillation.
+        Velocity smoothly decreases as distance to target decreases.
+
+        Args:
+            direction (np.ndarray): Unit direction vector [dx, dy, dz]
+            distance (float): Distance to target in meters
+
+        Returns:
+            list: [vx, vy, vz] velocity vector in m/s
+        """
+        # Proportional control with lenient thresholds to reduce oscillation
+        # Full speed above 10m, proportional between 10m-2m, slow below 2m
+        if distance > 10.0:
+            target_speed = self.default_velocity
+        elif distance > 2.0:
+            # Smooth deceleration from 10m to 2m
+            # At 10m: 5 m/s, at 2m: 1 m/s
+            target_speed = max(1.0, self.default_velocity * (distance / 10.0))
+        elif distance > 0.1:
+            # Close to target: gentle approach to prevent overshoot
+            target_speed = 0.8
+        else:
+            # Very close: hover
+            return [0.0, 0.0, 0.0]
+
+        return [
+            float(direction[0] * target_speed),
+            float(direction[1] * target_speed),
+            float(direction[2] * target_speed),
+        ]
 
     # -------------------------
     # Internal helper methods
@@ -371,7 +472,7 @@ class UAV:
         target_component=None,
         source_system=None,
         source_component=None,
-        from_external=True
+        from_external=True,
     ):
         """
         Publish a VehicleCommand message to instruct PX4 to perform an action.
@@ -379,20 +480,24 @@ class UAV:
         msg = VehicleCommand()
 
         # Fill in parameters
-        msg.param1 = params.get('param1', 0.0)
-        msg.param2 = params.get('param2', 0.0)
-        msg.param3 = params.get('param3', 0.0)
-        msg.param4 = params.get('param4', 0.0)
-        msg.param5 = params.get('param5', 0.0)
-        msg.param6 = params.get('param6', 0.0)
-        msg.param7 = params.get('param7', 0.0)
+        msg.param1 = params.get("param1", float("nan"))
+        msg.param2 = params.get("param2", float("nan"))
+        msg.param3 = params.get("param3", float("nan"))
+        msg.param4 = params.get("param4", float("nan"))
+        msg.param5 = params.get("param5", float("nan"))
+        msg.param6 = params.get("param6", float("nan"))
+        msg.param7 = params.get("param7", float("nan"))
 
         msg.command = command
 
         msg.target_system = target_system if target_system else self.system_id
-        msg.target_component = target_component if target_component else self.component_id
+        msg.target_component = (
+            target_component if target_component else self.component_id
+        )
         msg.source_system = source_system if source_system else self.system_id
-        msg.source_component = source_component if source_component else self.component_id
+        msg.source_component = (
+            source_component if source_component else self.component_id
+        )
         msg.from_external = from_external
         msg.timestamp = int(Clock().now().nanoseconds / 1000)  # microseconds
 
@@ -404,25 +509,21 @@ class UAV:
     # -------------------------
     def _vehicle_status_callback(self, msg: VehicleStatus):
         self.vehicle_status = msg
+        if self.nav_state != msg.nav_state:
+            self.node.get_logger().info(
+                f"Nav state changed from {get_nav_state_str(self.nav_state)} to {get_nav_state_str(msg.nav_state)}"
+            )
         self.nav_state = msg.nav_state
         self.arm_state = msg.arming_state
         self.failsafe_px4 = msg.failsafe
         self.flight_check = msg.pre_flight_checks_pass
-        self.is_vtol = msg.is_vtol
         self.system_id = msg.system_id
         self.component_id = msg.component_id
-        if msg.is_vtol:
-            self.vehicle_type = 'MC' if msg.vehicle_type == 0 else 'FW'
         self.failsafe = self.failsafe_px4 or self.failsafe_trigger
         if self.DEBUG:
-            self.node.get_logger().info(f"Nav State: {self.nav_state}, Arm State: {self.arm_state}, Failsafe: {self.failsafe_px4}, Flight Check: {self.flight_check}")
-
-    def _failsafe_callback(self, msg: Bool):
-        # When a manual failsafe command is received, set the failsafe flag.
-        if msg.data:
-            self.failsafe_trigger = True
-            self.failsafe = self.failsafe_px4 or self.failsafe_trigger
-            self.node.get_logger().info("Failsafe command received – initiating failsafe landing sequence.")
+            self.node.get_logger().info(
+                f"Nav State: {self.nav_state}, Arm State: {self.arm_state}, Failsafe: {self.failsafe_px4}, Flight Check: {self.flight_check}"
+            )
 
     def _attitude_callback(self, msg: VehicleAttitude):
         self.vehicle_attitude = msg
@@ -430,14 +531,14 @@ class UAV:
         q = msg.q
         w, x, y, z = q[0], q[1], q[2], q[3]
 
-        self.roll = np.arctan2(2.0 * (w * x + y * z),
-                            1.0 - 2.0 * (x**2 + y**2))
+        self.roll = np.arctan2(2.0 * (w * x + y * z), 1.0 - 2.0 * (x**2 + y**2))
         self.pitch = np.arcsin(2.0 * (w * y - z * x))
-        self.yaw = np.arctan2(2.0 * (w * z + x * y),
-                            1.0 - 2.0 * (y**2 + z**2))
+        self.yaw = np.arctan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y**2 + z**2))
 
     def _global_position_callback(self, msg: VehicleGlobalPosition):
-        self.node.destroy_subscription(self.vehicle_gps_sub) # vehicle_gps_sub is available faster but more coarse
+        self.node.destroy_subscription(
+            self.vehicle_gps_sub
+        )  # vehicle_gps_sub is available faster but more coarse
         self.global_position = msg
 
     def _vehicle_gps_callback(self, msg: SensorGps):
@@ -445,13 +546,13 @@ class UAV:
         self.global_position.lat = msg.latitude_deg
         self.global_position.lon = msg.longitude_deg
         self.global_position.alt = msg.altitude_msl_m
-        
+
     def _vehicle_local_position_callback(self, msg: VehicleLocalPosition):
         if not self.local_origin:
             self.local_origin = (msg.x, msg.y, msg.z)
-            self.GPS_origin = (msg.ref_lat, msg.ref_lon, msg.ref_alt)
+            self.gps_origin = (msg.ref_lat, msg.ref_lon, msg.ref_alt)
             self.node.get_logger().info(f"Local start position: {self.local_origin}")
-            self.node.get_logger().info(f"GPS start position: {self.GPS_origin}")
+            self.node.get_logger().info(f"GPS start position: {self.gps_origin}")
         self.local_position = msg
 
     def _initialize_publishers_and_subscribers(self):
@@ -463,7 +564,7 @@ class UAV:
             reliability=QoSReliabilityPolicy.BEST_EFFORT,
             durability=QoSDurabilityPolicy.TRANSIENT_LOCAL,
             history=QoSHistoryPolicy.KEEP_LAST,
-            depth=10
+            depth=10,
         )
 
         # Publishers
@@ -485,96 +586,33 @@ class UAV:
             VehicleStatus,
             self._px4_topic('/fmu/out/vehicle_status_v1'),
             self._vehicle_status_callback,
-            qos_profile
+            qos_profile,
         )
-        
+
         self.attitude_sub = self.node.create_subscription(
             VehicleAttitude,
             self._px4_topic('/fmu/out/vehicle_attitude'),
             self._attitude_callback,
-            qos_profile
+            qos_profile,
         )
 
         self.global_position_sub = self.node.create_subscription(
             VehicleGlobalPosition,
             self._px4_topic('/fmu/out/vehicle_global_position'),
             self._global_position_callback,
-            qos_profile
+            qos_profile,
         )
 
         self.vehicle_gps_sub = self.node.create_subscription(
             SensorGps,
             self._px4_topic('/fmu/out/vehicle_gps_position'),
             self._vehicle_gps_callback,
-            qos_profile
+            qos_profile,
         )
 
-        
         self.vehicle_local_position_subscriber = self.node.create_subscription(
             VehicleLocalPosition, 
             self._px4_topic('/fmu/out/vehicle_local_position'), 
             self._vehicle_local_position_callback, 
             qos_profile
         )
-        
-        self.failsafe_trigger_subscriber = self.node.create_subscription(
-            Bool, 
-            '/failsafe_trigger', 
-            self._failsafe_callback, 
-            qos_profile
-        )
-
-    # def set_velocity(self, vx: float, vy: float, vz: float, yaw_rate: float):
-    #     """
-    #     Set velocity commands for offboard control (local frame).
-    #     Only valid if the vehicle is in OFFBOARD mode.
-    #     """
-    #     trajectory = TrajectorySetpoint()
-    #     trajectory.timestamp = int(Clock().now().nanoseconds / 1000)
-    #     trajectory.velocity = [vx, vy, vz]
-    #     trajectory.yawspeed = yaw_rate
-    #     # Mark position and acceleration as NaN if you only want to control velocity
-    #     trajectory.position = [float('nan'), float('nan'), float('nan')] 
-    #     trajectory.acceleration = [float('nan')] * 3  
-    #     trajectory.yaw = float('nan') 
-
-    #     self.trajectory_publisher.publish(trajectory)
-    #     self.node.get_logger().debug(
-    #         f"Velocity command sent: vx={vx}, vy={vy}, vz={vz}, yaw_rate={yaw_rate}"
-    #     )
-
-    # def set_target_position(self, pos: tuple[float , float, float]):
-    #     """
-    #     Set the target local position for offboard control.
-    #     Typically used with local-position offboard setpoints (X,Y,Z).
-    #     """
-    #     x, y, z = pos
-    #     position = VehicleLocalPosition()
-    #     position.timestamp = int(Clock().now().nanoseconds / 1000)
-    #     position.x = x
-    #     position.y = y
-    #     position.z = z
-    #     self.target_position_publisher.publish(position)
-    #     self.node.get_logger().debug(f"Target position set: x={x}, y={y}, z={z}")
-
-        # def get_quaternion(self):
-    #     if self.vehicle_attitude:
-    #         return {
-    #             "q": self.vehicle_attitude.q,
-    #             "delta_q": self.vehicle_attitude.delta_q_reset
-    #         }
-    #     else:
-    #         self.node.get_logger().warn("No quaternion data available.")
-    #         return None
-
-    # def get_state(self):
-    #     # Example placeholder; if you want real nav_state or arm_state,
-    #     # retrieve them from self.vehicle_status
-    #     if self.vehicle_status:
-    #         return {
-    #             "nav_state": self.vehicle_status.nav_state,
-    #             "arm_state": self.vehicle_status.arm_state
-    #         }
-    #     else:
-    #         self.node.get_logger().warn("No state data available.")
-    #         return None

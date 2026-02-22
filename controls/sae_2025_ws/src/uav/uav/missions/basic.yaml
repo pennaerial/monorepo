@@ -1,5 +1,18 @@
 # start:
 #   class: uav.autonomous_modes.LandingMode
 start:
-  class: uav.autonomous_modes.p2pMode
-  
+  class: uav.autonomous_modes.TakeoffMode
+  params:
+    takeoff_type: horizontal
+  transitions:
+    complete: GPS
+
+GPS:
+  class: uav.autonomous_modes.NavGPSMode
+  params:
+    coordinates: '[((5, 0, -5), 1, "LOCAL"),]'
+  transitions:
+    complete: land
+
+land:
+  class: uav.autonomous_modes.LandingMode

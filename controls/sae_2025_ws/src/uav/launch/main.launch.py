@@ -1,290 +1,376 @@
 #!/usr/bin/env python3
 import os
 import re
-import platform
 from launch import LaunchDescription
-from launch.actions import ExecuteProcess, LogInfo, OpaqueFunction, RegisterEventHandler, DeclareLaunchArgument
-from launch.event_handlers import OnProcessIO, OnProcessStart
+from launch.actions import (
+    ExecuteProcess,
+    LogInfo,
+    OpaqueFunction,
+    RegisterEventHandler,
+    DeclareLaunchArgument,
+)
+from launch.event_handlers import OnProcessIO
 from launch.events.process import ProcessIO
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
-from uav.utils import vehicle_map, find_folder_with_heuristic, load_launch_parameters, extract_vision_nodes
+
+from uav.utils import (
+    vehicle_id_dict,
+    vehicle_camera_map,
+    get_airframe_details,
+    find_folder_with_heuristic,
+    load_launch_parameters,
+    extract_vision_nodes,
+    clean_text,
+)
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.logging import get_logger
 from ament_index_python.packages import get_package_share_directory
+from launch.logging import get_logger
+
 
 def launch_setup(context, *args, **kwargs):
-    logger =  get_logger('main.launch')
-
-    vehicle_id = int(LaunchConfiguration('vehicle_id').perform(context))
-    start_middleware = LaunchConfiguration('start_middleware').perform(context).lower() == 'true'
-    start_sim = LaunchConfiguration('start_sim').perform(context).lower() == 'true'
-    start_vision = LaunchConfiguration('start_vision').perform(context).lower() == 'true'
-    
+    logger = get_logger("main.launch")
+    logger.info("Loading launch parameters...")
     # Load launch parameters from the YAML file.
     params = load_launch_parameters()
-    mission_name = params.get('mission_name', 'basic')
-    uav_debug = str(params.get('uav_debug', 'false'))
-    vision_debug = str(params.get('vision_debug', 'false'))
-    sim_bool = str(params.get('sim', 'false'))
-    run_mission = str(params.get('run_mission', 'true'))
-    vehicle_type = vehicle_map[params.get('vehicle_type', 0)]
-    save_vision = str(params.get('save_vision', 'false'))
-    camera_offsets = params.get('camera_offsets', [0, 0, 0])
-    servo_only = str(params.get('servo_only', 'false'))
+    vehicle_id = int(LaunchConfiguration("vehicle_id").perform(context))
+    mission_name = params.get("mission_name", "basic")
+    uav_debug = str(params.get("uav_debug", "false"))
+    vision_debug = str(params.get("vision_debug", "false"))
+    use_camera = str(params.get("use_camera", "true"))
+    save_vision = str(params.get("save_vision", "false"))
+    servo_only = str(params.get("servo_only", "false"))
 
-    # Convert debug and simulation flags to booleans.
-    vision_debug_bool = vision_debug.lower() == 'true'
-    sim_bool = sim_bool.lower() == 'true'
-    run_mission_bool = run_mission.lower() == 'true'
-    save_vision_bool = save_vision.lower() == 'true'
-    
+    sim_bool = str(params.get("sim", "false")).lower() == "true"
+    run_mission_bool = str(params.get("run_mission", "true")).lower() == "true"
+    vision_debug_bool = vision_debug.lower() == "true"
+    save_vision_bool = save_vision.lower() == "true"
+    use_camera_bool = use_camera.lower() == "true"
+
+    """
+    Airframe ID handling
+    All PX4 supported IDs can be found here: https://docs.px4.io/main/en/airframes/airframe_reference
+    However, IDs available for simulation can be found in PX4-Autopilot/ROMFS/px4fmu_common/init.d-posix/airframes
+    """
+    airframe_id = params.get("airframe", "quadcopter")
+    try:
+        # If an airframe ID is provided directly, use it
+        airframe_id = int(airframe_id)
+    except ValueError:
+        try:
+            # Otherwise, map preset vehicle name to airframe ID
+            airframe_id = vehicle_id_dict[airframe_id]
+        except KeyError:
+            raise ValueError(f"Unknown airframe name: {airframe_id}")
+
+    custom_airframe_model = params.get("custom_airframe_model", "")
+    camera_offsets = params.get("camera_offsets", [0, 0, 0])
+
     # Build the mission YAML file path using the mission name.
-    YAML_PATH = os.path.join(os.getcwd(), 'src', 'uav', 'uav', 'missions', f"{mission_name}.yaml")
-    
+    YAML_PATH = os.path.join(
+        os.getcwd(), "src", "uav", "uav", "missions", f"{mission_name}.yaml"
+    )
+
+    print("Building vision node actions...")
     # Build vision node actions.
     vision_nodes = []
     vision_node_actions = []
-    if start_vision:
-        vision_node_actions = [Node(
-            package='uav',
-            executable='camera',
-            name=f'camera_{vehicle_id}',
-            output='screen'
-        )]
+    if use_camera_bool:
+        vision_node_actions.append(
+            Node(
+                package="uav",
+                executable="camera",
+                name="camera",
+                output="screen",
+                parameters=[{"vehicle_id": vehicle_id}],
+            )
+        )
 
-    for node in extract_vision_nodes(YAML_PATH):
-        vision_nodes.append(node)
-        # Convert CamelCase node names to snake_case executable names.
-        s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', node)
-        exe_name = re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
-        if start_vision:
-            vision_node_actions.append(Node(
-                package='uav',
-                executable=exe_name,
-                name=f"{exe_name}_{vehicle_id}",
-                output='screen',
-                parameters=[{'debug': vision_debug_bool, 'sim': sim_bool, 'save_vision': save_vision_bool}],
-            ))
-    
-    # Clear vision node actions if none are found.
-    if len(vision_nodes) == 0:
-        vision_node_actions = []
-    
-    if not sim_bool:
-        vision_node_actions.insert(0, ExecuteProcess(
-            cmd=['ros2', 'run', 'v4l2_camera', 'v4l2_camera_node', '--ros-args', '-p', 'image_size:=[640,480]', '--ros-args', '--remap', '/image_raw:=/camera'],
-            output='screen',
-            name='cam2image'
-        ))
-    
+        for node in extract_vision_nodes(YAML_PATH):
+            vision_nodes.append(node)
+            # Convert CamelCase node names to snake_case executable names.
+            s1 = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", node)
+            exe_name = re.sub("([a-z0-9])([A-Z])", r"\1_\2", s1).lower()
+            vision_node_actions.append(
+                Node(
+                    package="uav",
+                    executable=exe_name,
+                    name=exe_name,
+                    output="screen",
+                    parameters=[
+                        {
+                            "debug": vision_debug_bool,
+                            "sim": sim_bool,
+                            "save_vision": save_vision_bool,
+                            "vehicle_id": vehicle_id,
+                        }
+                    ],
+                )
+            )
+
+        # Clear vision node actions if none are found.
+        if len(vision_nodes) == 0:
+            vision_node_actions = []
+
+        if not sim_bool:
+            vision_node_actions.insert(
+                0,
+                ExecuteProcess(
+                    cmd=[
+                        "ros2",
+                        "run",
+                        "v4l2_camera",
+                        "v4l2_camera_node",
+                        "--ros-args",
+                        "-p",
+                        "image_size:=[640,480]",
+                        "--ros-args",
+                        "--remap",
+                        f"/image_raw:=/vehicle_{vehicle_id}/camera",
+                    ],
+                    output="screen",
+                    name="cam2image",
+                ),
+            )
+
     # Define the middleware process.
     middleware = ExecuteProcess(
-        cmd=['MicroXRCEAgent', 'udp4', '-p', '8888'] if sim_bool else ['MicroXRCEAgent', 'serial', '--dev', '/dev/serial0', '-b', '921600'],
-        output='screen',
-        name='middleware'
-    )
-    
-    # Define the PX4 SITL model and autostart
-    if vehicle_type == 'quadcopter':
-        autostart = 4001
-        model = 'gz_x500_mono_cam' # append '_down' for down-facing camera
-    elif vehicle_type == 'tiltrotor_vtol':
-        autostart = 4020
-        model = 'gz_tiltrotor'
-    elif vehicle_type == 'fixed_wing':
-        autostart = 4003
-        model = 'gz_rc_cessna'
-    elif vehicle_type == 'standard_vtol':
-        autostart = 4004
-        model = 'gz_standard_vtol'
-    else:
-        raise ValueError(f"Invalid vehicle type: {vehicle_type}")
-
-    
-    topic_model_name = model[3:]  # remove 'gz_' prefix
-
-    arch = platform.machine().lower()
-    if arch in ("x86_64", "amd64", "i386", "i686"):
-        platform_type = "x86"
-    elif arch in ("arm64", "aarch64", "armv7l", "arm"):
-        platform_type = "arm"
-    else:
-        raise ValueError(f"Unknown architecture: {arch}")
-
-    logger.debug(f"Running Architecture: {arch}")
-
-    model_name = f"{topic_model_name}_{vehicle_id}"
-
-    GZ_CAMERA_TOPIC = f"/world/custom/model/{model_name}/link/camera_link/sensor/camera/image"
-    GZ_CAMERA_INFO_TOPIC = f"/world/custom/model/{model_name}/link/camera_link/sensor/camera/camera_info"
-
-    sae_ws_path = os.path.expanduser(os.getcwd())
-    
-    ros_camera_topic = "/camera" if vehicle_id == 0 else f"/camera{vehicle_id}"
-    ros_camera_info_topic = "/camera_info" if vehicle_id == 0 else f"/camera_info{vehicle_id}"
-
-    gz_ros_bridge_camera = Node(
-        package="ros_gz_bridge",
-        executable="parameter_bridge",
-        arguments=[f"{GZ_CAMERA_TOPIC}@sensor_msgs/msg/Image[gz.msgs.Image"],
-        remappings=[(GZ_CAMERA_TOPIC, ros_camera_topic)],
+        cmd=["MicroXRCEAgent", "udp4", "-p", "8888"]
+        if sim_bool
+        else ["MicroXRCEAgent", "serial", "--dev", "/dev/serial0", "-b", "921600"],
         output="screen",
-        name=f"gz_ros_bridge_camera_{vehicle_id}",
-        cwd=sae_ws_path,
+        name="middleware",
     )
 
-    gz_ros_bridge_camera_info = Node(
-        package="ros_gz_bridge",
-        executable="parameter_bridge",
-        arguments=[
-            f"{GZ_CAMERA_INFO_TOPIC}@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo"
-        ],
-        remappings=[(GZ_CAMERA_INFO_TOPIC, ros_camera_info_topic)],
-        output="screen",
-        name=f"gz_ros_bridge_camera_info_{vehicle_id}",
-        cwd=sae_ws_path,
+    # Define the PX4 SITL model, autostart, and vehicle class
+    px4_path = find_folder_with_heuristic(
+        "PX4-Autopilot",
+        os.path.expanduser(LaunchConfiguration("px4_path").perform(context)),
+    )
+    vehicle_class, model_name = get_airframe_details(px4_path, airframe_id)
+    autostart = int(airframe_id)
+    model = custom_airframe_model or model_name
+    if (not vehicle_camera_map.get(model, False)) and use_camera_bool:
+        raise ValueError(
+            f"The selected airframe ID {airframe_id} ({model}) does not have a camera sensor configured. Please choose a different airframe or add a camera to the model."
+        )
+    print(
+        f"Launching a {vehicle_class.name} with airframe ID {airframe_id}, using model {model}"
     )
 
-    camera_offsets_str = ','.join(str(offset) for offset in camera_offsets)
-    mission_cmd = ['ros2', 'run', 'uav', 'mission', uav_debug, YAML_PATH, servo_only, camera_offsets_str, ','.join(vision_nodes)]
+    camera_offsets_str = ",".join(str(offset) for offset in camera_offsets)
+    mission_cmd = [
+        "ros2",
+        "run",
+        "uav",
+        "mission",
+        uav_debug,
+        YAML_PATH,
+        servo_only,
+        camera_offsets_str,
+        vehicle_class.name,
+        ",".join(vision_nodes),
+        str(vehicle_id),
+    ]
     mission = ExecuteProcess(
-        cmd=mission_cmd,
-        output='screen',
-        emulate_tty=True,
-        name='mission'
+        cmd=mission_cmd, output="screen", emulate_tty=True, name="mission"
     )
-    mission_ready_flags = {"uav": False, "middleware": False}
+
+    start_mission_trigger = ExecuteProcess(
+        cmd=[
+            "ros2",
+            "service",
+            "call",
+            f"/mode_manager/vehicle_{vehicle_id}/start_mission",
+            "std_srvs/srv/Trigger",
+        ],
+        output="screen",
+        name="start_mission_trigger",
+    )
+
+    # Determine which processes need to be ready before starting mission
+    # Sim, vehicle_id 0: Gazebo + PX4 + middleware; need both uav and middleware
+    # Sim, vehicle_id >= 1: only this PX4 (middleware already running); need only uav
+    # Hardware: only need middleware
+    if sim_bool:
+        required_processes = ["uav", "middleware"] if vehicle_id == 0 else ["uav"]
+    else:
+        required_processes = ["middleware"]
+    mission_ready_flags = {proc: False for proc in required_processes}
     mission_started = {"value": False}  # mutable so inner functions can modify
-    def make_io_handler(process_name):
-        trigger = "INFO  [commander] Ready for takeoff!" if process_name == "uav" else "INFO  [uxrce_dds_client] time sync converged" if process_name == "middleware" else None
-        if trigger is None:
+
+    def get_trigger(process_name):
+        """Get the trigger string for a given process based on sim mode."""
+        if process_name == "uav":
+            return "INFO  [commander] Ready for takeoff!"
+        elif process_name == "middleware":
+            return (
+                "INFO  [uxrce_dds_client] synchronized with time offset"
+                if sim_bool
+                else "session established"
+            )
+        else:
             raise ValueError(f"Invalid process name: {process_name}")
-        def clean_text(text):
-            ansi_escape = re.compile(r'\x1b\[[0-9;]*m') # remove ANSI escape codes that give color in terminal
-            return ansi_escape.sub('', text).strip()
+
+    def make_io_handler(process_name):
+        """Create an IO handler for a specific process."""
+        trigger = get_trigger(process_name)
+
         def handler(event: ProcessIO):
-            text = clean_text(event.text.decode() if isinstance(event.text, bytes) else event.text)
+            text = clean_text(
+                event.text.decode() if isinstance(event.text, bytes) else event.text
+            )
             if trigger in text:
                 mission_ready_flags[process_name] = True
-                # Only when BOTH are ready do we launch spawn_world
                 if not mission_started["value"] and all(mission_ready_flags.values()):
                     mission_started["value"] = True
                     return [
-                        LogInfo(msg="[launcher] Both processes ready, starting mission"),
-                        mission,
+                        LogInfo(msg="[launcher] Processes ready, starting mission"),
+                        start_mission_trigger,
                     ]
             return None
+
         return handler
+
     # Now, construct the actions list in a single step, depending on sim_bool
     if sim_bool:
-        # Find required paths.
-        px4_path = find_folder_with_heuristic('PX4-Autopilot', os.path.expanduser(LaunchConfiguration('px4_path').perform(context)))
+        from sim.utils import load_sim_launch_parameters
+        from sim.constants import Competition, COMPETITION_NAMES, DEFAULT_COMPETITION
 
-        # Prepare sim launch arguments with all simulation parameters
-        sim_launch_args = {
-            'px4_path': px4_path,
-        }
-        
-        sim = None
-        if start_sim:
+        # Resolve world name from sim launch params (same source as sim.launch.py)
+        sim_params = load_sim_launch_parameters()
+        competition_num = sim_params.get("competition", DEFAULT_COMPETITION.value)
+        try:
+            competition_type = Competition(competition_num)
+            competition = COMPETITION_NAMES[competition_type]
+        except (ValueError, KeyError):
+            valid_values = [e.value for e in Competition]
+            raise ValueError(
+                f"Invalid competition: {competition_num}. Must be one of {valid_values}"
+            )
+        logger.info(f"PX4_GZ_WORLD={competition} (vehicle_id={vehicle_id})")
+
+        # PX4 instance: vehicle_id 0 -> -i 1 (/px4_1), vehicle_id 1 -> -i 2 (/px4_2), etc.
+        px4_instance = vehicle_id + 1
+        # Model pose offset for multi-vehicle (x, y in meters; see PX4 multi-vehicle doc)
+        model_pose = f"0,{vehicle_id},0,0,0,0" if vehicle_id > 0 else "0,0,0,0,0,0"
+        # First vehicle (vehicle_id=0) starts Gazebo and connects; others use STANDALONE and connect to existing server
+        px4_sitl_cmd = (
+            f"PX4_GZ_MODEL_POSE='{model_pose}' PX4_GZ_WORLD={competition} "
+            f"PX4_GZ_STANDALONE=1 PX4_SYS_AUTOSTART={autostart} PX4_SIM_MODEL={model} "
+            f"./build/px4_sitl_default/bin/px4 -i {px4_instance}"
+        )
+
+        print(f"Starting PX4 SITL instance {px4_instance} (vehicle_id={vehicle_id})...")
+        px4_sitl = ExecuteProcess(
+            cmd=["bash", "-c", px4_sitl_cmd],
+            cwd=px4_path,
+            output="screen",
+            name="px4_sitl",
+        )
+
+        if vehicle_id == 0:
+            # First vehicle: start Gazebo (sim) then PX4, vision, middleware, mission
+            sim_launch_args = {
+                "model": model,
+                "px4_path": px4_path,
+                "vehicle_id": "0",
+            }
             sim = IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
                     os.path.join(
-                        get_package_share_directory('sim'),
-                        'launch',
-                        'sim.launch.py'
+                        get_package_share_directory("sim"), "launch", "sim.launch.py"
                     )
                 ),
-                launch_arguments=sim_launch_args.items()
+                launch_arguments=sim_launch_args.items(),
             )
-        if vehicle_id == 0:
-            standalone_cmd =""
-            gz_model_pose_cmd = ""
-        else:
-            standalone_cmd = "PX4_GZ_STANDALONE=1"
-            gz_model_pose_cmd = f"PX4_GZ_MODEL_POSE=\"0, {vehicle_id}\""
-        px4_sitl = ExecuteProcess(
-            cmd=['bash', '-c', f'{standalone_cmd} PX4_SYS_AUTOSTART={autostart} PX4_SIM_MODEL={model} {gz_model_pose_cmd} ./build/px4_sitl_default/bin/px4 -i {vehicle_id}'],
-            cwd=px4_path,
-            output='screen',
-            name=f'px4_sitl_{vehicle_id}'
-        )
-        startup_actions = [px4_sitl, *vision_node_actions]
-        if start_middleware:
-            startup_actions.append(middleware)
-
-        actions = []
-        if start_sim:
-            actions.extend([
+            actions = [
                 sim,
                 RegisterEventHandler(
-                        OnProcessIO(on_stderr=lambda event: (
-                            [LogInfo(msg="Gazebo process started."), *startup_actions] if b"Successfully generated world file:" in event.text else None
+                    OnProcessIO(
+                        on_stderr=lambda event: (
+                            [
+                                LogInfo(msg="Gazebo process started."),
+                                px4_sitl,
+                                *vision_node_actions,
+                                middleware,
+                            ]
+                            if b"Successfully generated world file:" in event.text
+                            else None
                         )
                     )
                 ),
-            ])
+                mission,
+            ]
         else:
-            actions.extend(startup_actions)
+            # Additional vehicles: PX4 + camera bridge (GZ -> /vehicle_{id}/camera), vision, mission
+            # In GZ topics the model name has no "gz_" prefix (e.g. x500_mono_cam_down_2)
+            instance = vehicle_id + 1
+            model_name_in_world = f"{model[3:]}_{instance}"
+            gz_cam = f"/world/{competition}/model/{model_name_in_world}/link/camera_link/sensor/camera/image"
+            gz_cam_info = f"/world/{competition}/model/{model_name_in_world}/link/camera_link/sensor/camera/camera_info"
+            cam_prefix = f"/vehicle_{vehicle_id}"
+            bridge_camera = Node(
+                package="ros_gz_bridge",
+                executable="parameter_bridge",
+                arguments=[f"{gz_cam}@sensor_msgs/msg/Image[gz.msgs.Image"],
+                remappings=[(gz_cam, f"{cam_prefix}/camera")],
+                output="screen",
+                name="gz_ros_bridge_camera",
+            )
+            bridge_camera_info = Node(
+                package="ros_gz_bridge",
+                executable="parameter_bridge",
+                arguments=[f"{gz_cam_info}@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo"],
+                remappings=[(gz_cam_info, f"{cam_prefix}/camera_info")],
+                output="screen",
+                name="gz_ros_bridge_camera_info",
+            )
+            actions = [
+                LogInfo(msg=f"Connecting vehicle_id={vehicle_id} to existing Gazebo (px4_{px4_instance})..."),
+                bridge_camera,
+                bridge_camera_info,
+                px4_sitl,
+                *vision_node_actions,
+                mission,
+            ]
 
-        actions.extend([
-            RegisterEventHandler(
-                OnProcessIO(
-                    target_action=px4_sitl,
-                    on_stdout=lambda event: (
-                        [LogInfo(msg="PX4 SITL started."), gz_ros_bridge_camera, gz_ros_bridge_camera_info] if b"INFO  [init] Spawning model" in event.text else None
+        if run_mission_bool:
+            handlers = [RegisterEventHandler(OnProcessIO(target_action=px4_sitl, on_stdout=make_io_handler("uav")))]
+            if vehicle_id == 0:
+                handlers.append(
+                    RegisterEventHandler(
+                        OnProcessIO(
+                            target_action=px4_sitl,
+                            on_stdout=make_io_handler("middleware"),
+                        )
                     )
                 )
-            ),
-            RegisterEventHandler(
-                OnProcessStart(
-                    target_action=gz_ros_bridge_camera,
-                    on_start=LogInfo(msg="Bridge camera topic started.")
-                )
-            ),
-            RegisterEventHandler(
-                OnProcessStart(
-                    target_action=gz_ros_bridge_camera_info,
-                    on_start=LogInfo(msg="Bridge camera info topic started.")
-                )
-            ),
-            RegisterEventHandler(
-                OnProcessIO(
-                    target_action=px4_sitl,
-                    on_stdout=make_io_handler("uav"),
-                )
-            ),
-        ])
+            actions.extend(handlers)
     else:
-        # Hardware mode: start mission after middleware is ready
         actions = [
             *vision_node_actions,
             LogInfo(msg="Vision nodes started."),
             middleware,
+            mission,
         ]
-    if run_mission_bool:
-        if start_middleware:
+        if run_mission_bool:
+            actions.append(mission)
             actions.append(
-                RegisterEventHandler(
-                    OnProcessIO(
-                        target_action=middleware,
-                        on_stdout=make_io_handler("middleware"),
-                    )
+                OnProcessIO(
+                    target_action=middleware,
+                    on_stderr=make_io_handler("middleware"),
                 )
             )
-        else:
-            actions.append(mission)
-    
     return actions
 
+
 def generate_launch_description():
-    return LaunchDescription([
-        DeclareLaunchArgument('px4_path', default_value='~/Tools-users/PX4-Autopilot'),
-        DeclareLaunchArgument('vehicle_id', default_value='0'),
-        DeclareLaunchArgument('start_sim', default_value='true'),
-        DeclareLaunchArgument('start_middleware', default_value='true'),
-        DeclareLaunchArgument('start_vision', default_value='true'),
-        OpaqueFunction(function=launch_setup)
-    ])
+    return LaunchDescription(
+        [
+            DeclareLaunchArgument("px4_path", default_value="~/Tools-users/PX4-Autopilot"),
+            DeclareLaunchArgument("vehicle_id", default_value="0"),
+            OpaqueFunction(function=launch_setup),
+        ]
+    )

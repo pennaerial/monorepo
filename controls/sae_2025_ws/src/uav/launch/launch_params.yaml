@@ -1,14 +1,23 @@
 # launch_params.yaml
-# mission_name: test_straight_course
-mission_name: safe_test
+# For multi-vehicle sim: pass vehicle_id at launch, e.g. ros2 launch uav main.launch.py vehicle_id:=1
+# vehicle_id 0 = first vehicle (starts Gazebo + PX4); topics /px4_1/...
+# vehicle_id 1,2,... = extra vehicles (PX4 only); topics /px4_2/, /px4_3/, ...
+mission_name: straight_waypoints
 uav_debug: false
 vision_debug: false
 run_mission: true
-vehicle_type: 0 # 0 for quadrotor, 1 for tiltrotor VTOL, 2 for fixed-wing, 3 for standard VTOL
+airframe: 4014 # Enter a preset below or a valid airframe ID (integer), either custom or from PX4
+                     # quadcopter, tiltrotor_vtol, fixed_wing, standard_vtol, quadtailsitter
+                     # Other useful IDs: 4014 for mono cam down
+                     # IDs available for simulation can be found in PX4-Autopilot/ROMFS/px4fmu_common/init.d-posix/airframes
+                     # These IDs load an airframe file and the corresponding model file in PX4-Autopilot/Tools/simulation/gz/models
+                     # Note: takeoff type (horizontal or vertical) is set in the mission yaml file
+use_camera: false
+custom_airframe_model: '' # Leave blank if using default PX4 model or enter file name of custom model
 save_vision: false
 servo_only: false
-safe_test: true
-camera_offsets: [0, 0, 0] #Should denote the position of the camera relative to the payload mechanism, in meters
-                              # In NED frame: x is forward, y is right, and z is down.
-
+camera_offsets: [0, 0, 0] # Should denote the position of the camera relative to the payload mechanism, in meters
+                          # In NED frame: x is forward, y is right, and z is down.
+safe_test: false
 sim: true
+

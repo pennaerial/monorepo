@@ -1,9 +1,10 @@
 from abc import ABC, abstractmethod
-import rclpy
 from rclpy.node import Node
+
 # from rclpy.type_support import SrvRequestT
 from uav.vision_nodes import VisionNode
 from uav import UAV
+
 
 class Mode(ABC):
     """
@@ -44,7 +45,9 @@ class Mode(ABC):
             if self.future.done():
                 response = self.future.result()
                 self.sent_request = False
-                assert type(response) == vision_node.srv.Response, f"Expected response type {vision_node.srv.Response}, got {type(response)}."
+                assert type(response) is vision_node.srv.Response, (
+                    f"Expected response type {vision_node.srv.Response}, got {type(response)}."
+                )
                 return response
         else:
             self.sent_request = True

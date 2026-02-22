@@ -1,7 +1,8 @@
 from time import time
 import yaml
 
-class ModeManager():    
+
+class ModeManager:
     """
     A ROS 2 node for managing UAV modes and mission logic.
     """
@@ -11,7 +12,7 @@ class ModeManager():
         self.transitions = {}
         self.active_mode = None
         self.last_update_time = time()
-        self.starting_mode = 'start'
+        self.starting_mode = "start"
 
         self.setup_modes(mode_map)
 
@@ -22,7 +23,7 @@ class ModeManager():
         Logic executed when this mode is activated.
         """
         self.switch_mode(self.starting_mode)
-        
+
     def setup_modes(self, mode_map: str) -> None:
         """
         Setup the modes for the mission node.
@@ -32,13 +33,13 @@ class ModeManager():
         """
         mode_yaml = self.load_yaml_to_dict(mode_map)
 
-        for mode_name in mode_yaml.keys(): 
-            params = mode_yaml[mode_name].get('params', {})    
+        for mode_name in mode_yaml.keys():
+            params = mode_yaml[mode_name].get("params", {})
             for key, value in params.items():
                 params[key] = eval(value)
             self.modes[mode_name] = params
-            
-            self.transitions[mode_name] = mode_yaml[mode_name].get('transitions', {})
+
+            self.transitions[mode_name] = mode_yaml[mode_name].get("transitions", {})
 
     def transition(self, state: str) -> str:
         """
@@ -65,11 +66,11 @@ class ModeManager():
             mode_name (str): Name of the mode to activate.
         """
         if self.active_mode:
-            print('deactivating mode')
+            print("deactivating mode")
 
         if mode_name in self.modes:
             self.active_mode = mode_name
-            print('activating mode')
+            print("activating mode")
         else:
             print(f"Mode {mode_name} not found.")
 
@@ -83,16 +84,16 @@ class ModeManager():
         Returns:
             dict: The yaml file as a dictionary.
         """
-        with open(filename, 'r') as file:
+        with open(filename, "r") as file:
             data = yaml.safe_load(file)
         return data
-    
 
-if __name__ == '__main__':
-    mission_node = ModeManager('./missions/sim_test.yaml')
+
+if __name__ == "__main__":
+    mission_node = ModeManager("./missions/sim_test.yaml")
     print(mission_node.modes)
     print(mission_node.transitions)
     print(mission_node.active_mode)
 
-    mission_node.transition('continue')
+    mission_node.transition("continue")
     print(mission_node.active_mode)
