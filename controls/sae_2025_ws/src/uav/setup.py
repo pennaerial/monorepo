@@ -33,7 +33,7 @@ setup(
             "temp = uav.temp:main",
             "vision_pipeline = uav.vision_pipeline:main",
             "global_position_offboard_control = uav.global_position_offboard_control:main",
-            "mission = uav.mission:main",
+            "mission = uav.ModeManager:main",
             "payload_tracking_node = uav.vision_nodes.PayloadTrackingNode:main",
             "camera = uav.CameraNode:main",
         ],

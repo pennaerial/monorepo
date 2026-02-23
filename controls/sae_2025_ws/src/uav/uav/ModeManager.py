@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
+import os
+from time import time
+import importlib
+import inspect
+import ast
 import rclpy
 from rclpy.node import Node
-from time import time
+from rclpy.parameter import Parameter
+from px4_msgs.msg import VehicleStatus
+from std_srvs.srv import Trigger
 from uav import VTOL, Multicopter
 from uav.autonomous_modes import Mode, LandingMode
 from uav.utils import Vehicle
 import yaml
-import importlib
-import inspect
-import ast
-from px4_msgs.msg import VehicleStatus
-from std_srvs.srv import Trigger
 
 VISION_NODE_PATH = "uav.vision_nodes"
 
@@ -20,16 +22,37 @@ class ModeManager(Node):
     A ROS 2 node for managing UAV modes and mission logic.
     """
 
-    def __init__(
-        self,
-        mode_map: str,
-        vision_nodes: str,
-        camera_offsets,
-        DEBUG=False,
-        servo_only=False,
-        vehicle_class=Vehicle.MULTICOPTER,
-    ) -> None:
+    def __init__(self) -> None:
         super().__init__("mission_node")
+        self.declare_parameter(
+            "mode_map",
+            os.path.join(os.getcwd(), "src", "uav", "uav", "missions", "basic.yaml"),
+        )
+        self.declare_parameter("vision_nodes", Parameter.Type.STRING_ARRAY)
+        self.declare_parameter("camera_offsets", [0.0, 0.0, 0.0])
+        self.declare_parameter("debug", False)
+        self.declare_parameter("servo_only", False)
+        self.declare_parameter("vehicle_class", Vehicle.MULTICOPTER.name)
+
+        mode_map = self.get_parameter("mode_map").value
+        if not mode_map:
+            raise ValueError(
+                "ModeManager requires a non-empty 'mode_map' node parameter."
+            )
+
+        vision_nodes = self.get_parameter("vision_nodes").value
+        camera_offsets = self.get_parameter("camera_offsets").value
+        if len(camera_offsets) != 3:
+            raise ValueError(
+                f"'camera_offsets' must have exactly 3 values. Received: {camera_offsets}"
+            )
+
+        debug = bool(self.get_parameter("debug").value)
+        servo_only = bool(self.get_parameter("servo_only").value)
+        vehicle_class = self._parse_vehicle_class(
+            self.get_parameter("vehicle_class").value
+        )
+
         self.timer = None
         self.start_mission_trigger = self.create_service(
             Trigger, "/mode_manager/start_mission", self.trigger_world_gen_req
@@ -44,13 +67,28 @@ class ModeManager(Node):
         self.start_time = self.last_update_time
         # Instantiate appropriate UAV subclass based on vehicle type
         if vehicle_class == Vehicle.VTOL:
-            self.uav = VTOL(self, DEBUG=DEBUG, camera_offsets=camera_offsets)
+            self.uav = VTOL(self, DEBUG=debug, camera_offsets=camera_offsets)
         else:
-            self.uav = Multicopter(self, DEBUG=DEBUG, camera_offsets=camera_offsets)
+            self.uav = Multicopter(self, DEBUG=debug, camera_offsets=camera_offsets)
         self.get_logger().info("Mission Node has started!")
         self.setup_vision(vision_nodes)
         self.setup_modes(mode_map)
         self.servo_only = servo_only
+
+    def _parse_vehicle_class(self, vehicle_class) -> Vehicle:
+        if isinstance(vehicle_class, Vehicle):
+            return vehicle_class
+        if isinstance(vehicle_class, str):
+            try:
+                return Vehicle[vehicle_class.upper()]
+            except KeyError as exc:
+                valid = ", ".join(v.name for v in Vehicle)
+                raise ValueError(
+                    f"Invalid vehicle_class '{vehicle_class}'. Expected one of: {valid}"
+                ) from exc
+        raise ValueError(
+            f"Invalid vehicle_class type '{type(vehicle_class)}'. Expected string."
+        )
 
     def trigger_world_gen_req(self, request, response):
         self.get_logger().info("MODE MANAGER | Starting Mission!")
@@ -78,18 +116,19 @@ class ModeManager(Node):
         """
         return self.modes[self.active_mode]
 
-    def setup_vision(self, vision_nodes: str) -> None:
+    def setup_vision(self, vision_nodes: list[str]) -> None:
         """
         Setup the vision node for this mode.
 
         Args:
             mode (Mode): The mode to setup vision for.
-            vision (str): The comma-separated string of vision nodes to setup for this mode.
+            vision_nodes (list[str]): Vision node class names to setup for this mode.
         """
-        if vision_nodes.strip() == "":
+        nodes_to_setup = [node for node in vision_nodes if node]
+        if not nodes_to_setup:
             return
         module = importlib.import_module(VISION_NODE_PATH)
-        for vision_node in vision_nodes.split(","):
+        for vision_node in nodes_to_setup:
             vision_class = getattr(module, vision_node)
             if vision_class.service_name() not in self.uav.vision_clients:
                 client = self.create_client(
@@ -332,3 +371,17 @@ class ModeManager(Node):
         with open(filename, "r") as file:
             data = yaml.safe_load(file)
         return data
+
+
+def main(args=None):
+    rclpy.init(args=args)
+    mission_node = ModeManager()
+    try:
+        rclpy.spin(mission_node)
+    finally:
+        mission_node.destroy_node()
+        rclpy.shutdown()
+
+
+if __name__ == "__main__":
+    main()

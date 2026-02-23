@@ -24,10 +24,10 @@ const LAUNCH_PARAM_FIELDS = [
     help: 'Enable extra vision pipeline debug outputs.',
   },
   {
-    key: 'run_mission',
-    label: 'Run mission',
+    key: 'auto_launch',
+    label: 'Auto launch mission',
     type: 'boolean',
-    help: 'If true, mission flow starts after launch prepares.',
+    help: 'If true, mission flow starts automatically after launch is ready.',
   },
   {
     key: 'airframe',
@@ -87,7 +87,7 @@ const LAUNCH_PARAM_CORE_FIELDS = [
 const LAUNCH_PARAM_TOGGLE_FIELDS = [
   'uav_debug',
   'vision_debug',
-  'run_mission',
+  'auto_launch',
   'use_camera',
   'save_vision',
   'servo_only',
