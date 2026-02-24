@@ -6,7 +6,6 @@ import inspect
 import ast
 import rclpy
 from rclpy.node import Node
-from rclpy.parameter import Parameter
 from px4_msgs.msg import VehicleStatus
 from std_srvs.srv import Trigger
 from uav import VTOL, Multicopter
@@ -28,7 +27,7 @@ class ModeManager(Node):
             "mode_map",
             os.path.join(os.getcwd(), "src", "uav", "uav", "missions", "basic.yaml"),
         )
-        self.declare_parameter("vision_nodes", Parameter.Type.STRING_ARRAY)
+        self.declare_parameter("vision_nodes", [""])
         self.declare_parameter("camera_offsets", [0.0, 0.0, 0.0])
         self.declare_parameter("debug", False)
         self.declare_parameter("servo_only", False)

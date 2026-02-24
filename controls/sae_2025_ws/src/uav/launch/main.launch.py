@@ -176,7 +176,7 @@ def launch_setup(context, *args, **kwargs):
                 "servo_only": servo_only_bool,
                 "camera_offsets": camera_offsets,
                 "vehicle_class": vehicle_class.name,
-                "vision_nodes": vision_nodes,
+                **({"vision_nodes": vision_nodes} if vision_nodes else {}),
             }
         ],
     )

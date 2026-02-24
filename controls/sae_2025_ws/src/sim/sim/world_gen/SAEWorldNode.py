@@ -31,7 +31,6 @@ class SAEWorldNode(WorldNode):
         )
 
     def generate_world(self):
-
         # Store entities to be spawned
         entities: List[Entity] = []
 
