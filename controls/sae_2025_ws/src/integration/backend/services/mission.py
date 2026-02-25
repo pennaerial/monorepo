@@ -561,8 +561,15 @@ async def trigger_failsafe(ctx: AppContext) -> dict:
     """Trigger failsafe via the daemon's Unix socket (fast) or fallback to ros2 service call."""
     socket_path = "/tmp/penn_failsafe"
     try:
-        # Fast path: daemon listening on Unix socket (mission must be running)
-        cmd = f"echo 1 | socat - UNIX-CONNECT:{ctx.ssh.q(socket_path)}"
+        # Fast path: daemon listening on Unix socket (mission must be running).
+        # Python stdlib only—no socat or other installs on the Pi.
+        cmd = (
+            f'python3 -c "import socket; '
+            f"s=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM); "
+            f"s.connect('{socket_path}'); "
+            f"s.send(b'1'); "
+            f's.close()"'
+        )
         t0 = time.perf_counter()
         result = await ctx.ssh.run(cmd, timeout=5)
         elapsed = time.perf_counter() - t0
