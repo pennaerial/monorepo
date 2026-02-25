@@ -645,6 +645,8 @@ function MissionControl({ connected, buildInfo, onRefresh }) {
     saveParams,
     runAction,
     refreshLaunchData,
+    refreshLogsLoading,
+    refreshLogsNow,
   } = useMissionControl({ connected, onRefresh })
 
   const updateField = (field, value) => {
@@ -864,7 +866,9 @@ function MissionControl({ connected, buildInfo, onRefresh }) {
       <div className="card card-full">
         <h2 className="card-title">Launch Output (ros2 launch uav main.launch.py)</h2>
         <div className="card-content">
-          <button className="btn btn-secondary" onClick={() => refreshLaunchData(true)} disabled={!connected}>Refresh Logs Now</button>
+          <button className="btn btn-secondary" onClick={() => refreshLogsNow()} disabled={!connected || refreshLogsLoading}>
+            {refreshLogsLoading ? 'Refreshing...' : 'Refresh Logs Now'}
+          </button>
           <p className="subtext left-note">
             {connected
               ? 'Live SSH stream runs while launch is running. Refresh re-syncs full log history.'

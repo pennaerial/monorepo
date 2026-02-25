@@ -42,6 +42,7 @@ export function useMissionControl({ connected, onRefresh }) {
 
   const [missionState, setMissionState] = useState(initialMissionState(connected))
   const [logsResult, setLogsResult] = useState(null)
+  const [refreshLogsLoading, setRefreshLogsLoading] = useState(false)
   const [streamConnected, setStreamConnected] = useState(false)
 
   const [paramsText, setParamsText] = useState('')
@@ -323,6 +324,19 @@ export function useMissionControl({ connected, onRefresh }) {
     await refreshMissionState(forceFullLogs)
   }, [refreshMissionState])
 
+  const refreshLogsNow = useCallback(async () => {
+    if (!connected || refreshLogsLoading) return
+    setRefreshLogsLoading(true)
+    try {
+      // Yield so React paints "Refreshing..." before we block on the request
+      await new Promise((r) => setTimeout(r, 0))
+      // Bypass refreshMissionState's guard so we always run and loading stays visible
+      await loadFullLogs()
+    } finally {
+      setRefreshLogsLoading(false)
+    }
+  }, [connected, loadFullLogs, refreshLogsLoading])
+
   const loadMissionNames = useCallback(async () => {
     if (!connected) {
       setMissionNames([])
@@ -473,6 +487,7 @@ export function useMissionControl({ connected, onRefresh }) {
       setMissionFileResult(null)
       setActionResult(null)
       setActionLoading('')
+      setRefreshLogsLoading(false)
       setStreamConnected(false)
       hasLoadedLogsRef.current = false
       logCursorRef.current = { offset: 0, inode: 0 }
@@ -522,5 +537,7 @@ export function useMissionControl({ connected, onRefresh }) {
     saveParams,
     runAction,
     refreshLaunchData,
+    refreshLogsLoading,
+    refreshLogsNow,
   }
 }
