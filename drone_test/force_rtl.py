@@ -2,8 +2,8 @@ import asyncio
 from mavsdk import System
 from mavsdk.action import ActionError
 
-# YOUR SPECIFIC DEVICE PATH
-SERIAL_PORT = "/dev/tty.usbserial-DU0D9G4R"
+# YOUR CURRENT DEVICE PATH
+SERIAL_PORT = "/dev/cu.usbserial-D30B0OI4"
 BAUD_RATE = 57600
 
 async def run():
@@ -12,7 +12,7 @@ async def run():
 
     # Connect using the serial protocol
     await drone.connect(system_address=f"serial://{SERIAL_PORT}:{BAUD_RATE}")
-
+    
     print("Waiting for drone to connect...")
     async for state in drone.core.connection_state():
         if state.is_connected:
