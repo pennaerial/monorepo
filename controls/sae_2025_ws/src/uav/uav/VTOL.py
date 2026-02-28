@@ -12,6 +12,7 @@ from rclpy.qos import (
 )
 import numpy as np
 from uav.UAV import UAV
+import time
 
 
 class VTOL(UAV):
@@ -26,7 +27,6 @@ class VTOL(UAV):
         # Initialize VTOL-specific attributes before calling super().__init__
         self.vehicle_type = None  # 'MC' or 'FW' from VtolVehicleStatus
         self.vtol_vehicle_status = None
-        self.land_detected = None
         self._fw_takeoff_phase = 0  # state machine phase for FW takeoff
 
         super().__init__(node, takeoff_amount, DEBUG, camera_offsets)
@@ -97,7 +97,6 @@ class VTOL(UAV):
             # auto-arms the vehicle on every spin cycle when it detects disarmed state.
 
             if self._fw_takeoff_phase == 0:
-                import time
 
                 self.node.get_logger().info(
                     "FW takeoff Step 3: transition complete. Starting disarm→takeoff→arm sequence."
