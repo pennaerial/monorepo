@@ -1,5 +1,5 @@
 from rclpy.node import Node
-from px4_msgs.msg import VtolVehicleStatus, VehicleCommand
+from px4_msgs.msg import VtolVehicleStatus, VehicleCommand, VehicleLandDetected, VehicleStatus
 from rclpy.qos import (
     QoSProfile,
     QoSReliabilityPolicy,
@@ -22,6 +22,8 @@ class VTOL(UAV):
         # Initialize VTOL-specific attributes before calling super().__init__
         self.vehicle_type = None  # 'MC' or 'FW' from VtolVehicleStatus
         self.vtol_vehicle_status = None
+        self.land_detected = None
+        self._fw_takeoff_phase = 0  # state machine phase for FW takeoff
 
         super().__init__(node, takeoff_amount, DEBUG, camera_offsets)
 
@@ -79,34 +81,73 @@ class VTOL(UAV):
             self.vtol_vehicle_status.vehicle_vtol_state
             == VtolVehicleStatus.VEHICLE_VTOL_STATE_FW
         ):
-            self.node.get_logger().info("FW takeoff Step 3: transition to FW complete.")
-            if not self.attempted_takeoff:
-                self.attempted_takeoff = True
+            # After the ground transition to FW, PX4's land detector falsely reports
+            # "not landed." If we send NAV_TAKEOFF in this state, Navigator downgrades
+            # SETPOINT_TYPE_TAKEOFF to SETPOINT_TYPE_POSITION, causing the vehicle to
+            # orbit instead of performing a runway takeoff. The workaround is to briefly
+            # disarm (which resets the land detector to landed=true), send NAV_TAKEOFF
+            # while disarmed, then re-arm. This mirrors PX4's own `commander takeoff`
+            # which sends NAV_TAKEOFF before arming.
+            #
+            # This must be done atomically (single call with sleeps) because ModeManager
+            # auto-arms the vehicle on every spin cycle when it detects disarmed state.
 
-            lat = self.global_position.lat
-            lon = self.global_position.lon
-            alt = self.global_position.alt
-            self.node.get_logger().info(f"Current GPS: {lat}, {lon}, {alt}")
+            if self._fw_takeoff_phase == 0:
+                import time
 
-            if np.isnan(latitude) or np.isnan(longitude) or np.isnan(altitude):
-                self.node.get_logger().info("Takeoff Destination GPS: Auto Calculated")
-            else:
                 self.node.get_logger().info(
-                    f"Takeoff Destination GPS: {latitude}, {longitude}, {altitude}"
+                    "FW takeoff Step 3: transition complete. Starting disarm→takeoff→arm sequence."
                 )
 
-            self._send_vehicle_command(
-                VehicleCommand.VEHICLE_CMD_NAV_TAKEOFF,
-                params={
-                    "param1": fw_tko_pitch,  # fw_tko_pitch min (minimum pitch during takeoff)
-                    "param4": yaw,  # Yaw angle
-                    "param5": latitude,  # Latitude (in GPS coords)
-                    "param6": longitude,  # Longitude (in GPS coords)
-                    "param7": altitude,  # Altitude (in meters)
-                },
-            )
-            self.node.get_logger().info("FW takeoff Step 3: NAV_TAKEOFF sent.")
-            return True
+                lat = self.global_position.lat
+                lon = self.global_position.lon
+                alt = self.global_position.alt
+                self.node.get_logger().info(f"Current GPS: {lat}, {lon}, {alt}")
+
+                if np.isnan(latitude) or np.isnan(longitude) or np.isnan(altitude):
+                    self.node.get_logger().info("Takeoff Destination GPS: Auto Calculated")
+                else:
+                    self.node.get_logger().info(
+                        f"Takeoff Destination GPS: {latitude}, {longitude}, {altitude}"
+                    )
+
+                # disarm command 
+                # self._send_vehicle_command(
+                #     VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM,
+                #     params={"param1": 0.0, "param2": 21196.0},
+                # )
+                self.disarm(force=True)
+                self.node.get_logger().info("FW takeoff Step 3a: force-disarmed to reset land detector.")
+                time.sleep(0.5)
+
+                self._send_vehicle_command(
+                    VehicleCommand.VEHICLE_CMD_NAV_TAKEOFF,
+                    params={
+                        "param1": fw_tko_pitch,
+                        "param4": yaw,
+                        "param5": latitude,
+                        "param6": longitude,
+                        "param7": altitude,
+                    },
+                )
+                self.node.get_logger().info("FW takeoff Step 3b: NAV_TAKEOFF sent while disarmed.")
+                time.sleep(0.1)
+
+                self.arm()
+                self.node.get_logger().info("FW takeoff Step 3c: re-arm command sent.")
+                self._fw_takeoff_phase = 1
+                return False
+
+            elif self._fw_takeoff_phase == 1:
+                if self.nav_state == VehicleStatus.NAVIGATION_STATE_AUTO_TAKEOFF:
+                    self.node.get_logger().info("FW takeoff Step 4: In AUTO_TAKEOFF. Runway takeoff running.")
+                    self.attempted_takeoff = True
+                    return True
+                else:
+                    self.node.get_logger().info(
+                        f"FW takeoff: Waiting for AUTO_TAKEOFF nav state (current: {self.nav_state})."
+                    )
+                    return False
         elif (
             self.vtol_vehicle_status.vehicle_vtol_state
             == VtolVehicleStatus.VEHICLE_VTOL_STATE_TRANSITION_TO_MC
@@ -193,6 +234,9 @@ class VTOL(UAV):
             )
             return [float(self.default_velocity), 0.0, 0.0]
 
+    def _land_detected_callback(self, msg: VehicleLandDetected):
+        self.land_detected = msg
+
     def _vtol_vehicle_status_callback(self, msg: VtolVehicleStatus):
         """
         Callback for VTOL vehicle status updates.
@@ -241,5 +285,12 @@ class VTOL(UAV):
             VtolVehicleStatus,
             "/fmu/out/vtol_vehicle_status",
             self._vtol_vehicle_status_callback,
+            qos_profile,
+        )
+
+        self.land_detected_sub = self.node.create_subscription(
+            VehicleLandDetected,
+            "/fmu/out/vehicle_land_detected",
+            self._land_detected_callback,
             qos_profile,
         )
