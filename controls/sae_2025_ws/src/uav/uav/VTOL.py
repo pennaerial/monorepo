@@ -97,7 +97,6 @@ class VTOL(UAV):
             # auto-arms the vehicle on every spin cycle when it detects disarmed state.
 
             if self._fw_takeoff_phase == 0:
-
                 self.node.get_logger().info(
                     "FW takeoff Step 3: transition complete. Starting disarm→takeoff→arm sequence."
                 )
