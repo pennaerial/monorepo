@@ -1,5 +1,9 @@
 from rclpy.node import Node
-from px4_msgs.msg import VtolVehicleStatus, VehicleCommand, VehicleLandDetected, VehicleStatus
+from px4_msgs.msg import (
+    VtolVehicleStatus,
+    VehicleCommand,
+    VehicleStatus,
+)
 from rclpy.qos import (
     QoSProfile,
     QoSReliabilityPolicy,
@@ -105,19 +109,19 @@ class VTOL(UAV):
                 self.node.get_logger().info(f"Current GPS: {lat}, {lon}, {alt}")
 
                 if np.isnan(latitude) or np.isnan(longitude) or np.isnan(altitude):
-                    self.node.get_logger().info("Takeoff Destination GPS: Auto Calculated")
+                    self.node.get_logger().info(
+                        "Takeoff Destination GPS: Auto Calculated"
+                    )
                 else:
                     self.node.get_logger().info(
                         f"Takeoff Destination GPS: {latitude}, {longitude}, {altitude}"
                     )
 
-                # disarm command 
-                # self._send_vehicle_command(
-                #     VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM,
-                #     params={"param1": 0.0, "param2": 21196.0},
-                # )
+                # disarm command (needs to be force disarm to reset land detector)
                 self.disarm(force=True)
-                self.node.get_logger().info("FW takeoff Step 3a: force-disarmed to reset land detector.")
+                self.node.get_logger().info(
+                    "FW takeoff Step 3a: force-disarmed to reset land detector."
+                )
                 time.sleep(0.5)
 
                 self._send_vehicle_command(
@@ -130,7 +134,9 @@ class VTOL(UAV):
                         "param7": altitude,
                     },
                 )
-                self.node.get_logger().info("FW takeoff Step 3b: NAV_TAKEOFF sent while disarmed.")
+                self.node.get_logger().info(
+                    "FW takeoff Step 3b: NAV_TAKEOFF sent while disarmed."
+                )
                 time.sleep(0.1)
 
                 self.arm()
@@ -140,7 +146,9 @@ class VTOL(UAV):
 
             elif self._fw_takeoff_phase == 1:
                 if self.nav_state == VehicleStatus.NAVIGATION_STATE_AUTO_TAKEOFF:
-                    self.node.get_logger().info("FW takeoff Step 4: In AUTO_TAKEOFF. Runway takeoff running.")
+                    self.node.get_logger().info(
+                        "FW takeoff Step 4: In AUTO_TAKEOFF. Runway takeoff running."
+                    )
                     self.attempted_takeoff = True
                     return True
                 else:
@@ -234,9 +242,6 @@ class VTOL(UAV):
             )
             return [float(self.default_velocity), 0.0, 0.0]
 
-    def _land_detected_callback(self, msg: VehicleLandDetected):
-        self.land_detected = msg
-
     def _vtol_vehicle_status_callback(self, msg: VtolVehicleStatus):
         """
         Callback for VTOL vehicle status updates.
@@ -285,12 +290,5 @@ class VTOL(UAV):
             VtolVehicleStatus,
             "/fmu/out/vtol_vehicle_status",
             self._vtol_vehicle_status_callback,
-            qos_profile,
-        )
-
-        self.land_detected_sub = self.node.create_subscription(
-            VehicleLandDetected,
-            "/fmu/out/vehicle_land_detected",
-            self._land_detected_callback,
             qos_profile,
         )
