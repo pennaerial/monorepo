@@ -1,7 +1,9 @@
 from uav.autonomous_modes import Mode
 from rclpy.node import Node
 from uav import UAV, VTOL
-from px4_msgs.msg import VehicleStatus
+from px4_msgs.msg import VehicleStatus, VtolVehicleStatus, VehicleCommand
+import numpy as np
+import time
 
 
 class TakeoffMode(Mode):
@@ -12,7 +14,13 @@ class TakeoffMode(Mode):
     - VTOLs: vertical or horizontal (fixed-wing style) based on takeoff_type param.
     """
 
-    def __init__(self, node: Node, uav: UAV, takeoff_type: str = "vertical"):
+    def __init__(self, node: Node, uav: UAV, takeoff_type: str = "vertical", 
+        fw_tko_pitch: float = float("nan"),
+        yaw: float = float("nan"),
+        latitude: float = float("nan"),
+        longitude: float = float("nan"),
+        altitude: float = float("nan"),
+    ):
         """
         Initialize the TakeoffMode.
 
@@ -28,6 +36,13 @@ class TakeoffMode(Mode):
         self.takeoff_elapsed_time = (
             0.0  # PX4-Autopilot on ARM has a race condition when changing vehicle state
         )
+        self.fw_takeoff_phase = 0  # state machine phase for FW takeoff
+        self.fw_tko_pitch = fw_tko_pitch
+        self.yaw = yaw
+        self.latitude = latitude
+        self.longitude = longitude
+        self.altitude = altitude
+
 
     def on_update(self, time_delta: float) -> None:
         """
@@ -54,7 +69,108 @@ class TakeoffMode(Mode):
                         "Horizontal takeoff only valid for VTOL - cannot proceed."
                     )
                     return
-                self.takeoff_commanded = self.uav.fixed_wing_takeoff()
+                
+                # fixed wing takeoff sequence
+                if self.uav.vtol_vehicle_status is None:
+                    self.node.get_logger().info("FW takeoff: Vehicle status not available yet.")
+                    return
+
+                elif (
+                    self.uav.vtol_vehicle_status.vehicle_vtol_state
+                    == VtolVehicleStatus.VEHICLE_VTOL_STATE_MC
+                ):
+                    self.uav.vtol_transition_to("FW", immediate=False)
+                    self.node.get_logger().info(
+                        "FW takeoff Step 1: requested VTOL transition to FW."
+                    )
+                    return
+
+                elif (
+                    self.uav.vtol_vehicle_status.vehicle_vtol_state
+                    == VtolVehicleStatus.VEHICLE_VTOL_STATE_TRANSITION_TO_FW
+                ):
+                    self.node.get_logger().info(
+                        "FW takeoff Step 2: transition to FW in progress."
+                    )
+                    return
+
+                elif (
+                    self.uav.vtol_vehicle_status.vehicle_vtol_state
+                    == VtolVehicleStatus.VEHICLE_VTOL_STATE_FW
+                ):
+                    # After the ground transition to FW, PX4's land detector falsely reports
+                    # "not landed." If we send NAV_TAKEOFF in this state, Navigator downgrades
+                    # SETPOINT_TYPE_TAKEOFF to SETPOINT_TYPE_POSITION, causing the vehicle to
+                    # orbit instead of performing a runway takeoff. The workaround is to briefly
+                    # disarm (which resets the land detector to landed=true), send NAV_TAKEOFF
+                    # while disarmed, then re-arm. This mirrors PX4's own `commander takeoff`
+                    # which sends NAV_TAKEOFF before arming.
+                    #
+                    # This must be done atomically (single call with sleeps) because ModeManager
+                    # auto-arms the vehicle on every spin cycle when it detects disarmed state.
+
+                    if self.fw_takeoff_phase == 0:
+                        self.node.get_logger().info(
+                            "FW takeoff Step 3: transition complete. Starting disarm→takeoff→arm sequence."
+                        )
+
+                        lat = self.uav.global_position.lat
+                        lon = self.uav.global_position.lon
+                        alt = self.uav.global_position.alt
+                        self.node.get_logger().info(f"Current GPS: {lat}, {lon}, {alt}")
+
+                        if np.isnan(self.latitude) or np.isnan(self.longitude) or np.isnan(self.altitude):
+                            self.node.get_logger().info(
+                                "Takeoff Destination GPS: Auto Calculated"
+                            )
+                        else:
+                            self.node.get_logger().info(
+                                f"Takeoff Destination GPS: {self.latitude}, {self.longitude}, {self.altitude}"
+                            )
+
+                        # disarm command (needs to be force disarm to reset land detector)
+                        self.uav.disarm(force=True)
+                        self.node.get_logger().info(
+                            "FW takeoff Step 3a: force-disarmed to reset land detector."
+                        )
+                        time.sleep(0.5)
+
+                        self.uav.fixed_wing_takeoff(self.fw_tko_pitch, self.yaw, self.latitude, self.longitude, self.altitude)
+
+                        self.node.get_logger().info(
+                            "FW takeoff Step 3b: NAV_TAKEOFF sent while disarmed."
+                        )
+                        time.sleep(0.1)
+
+                        self.uav.arm()
+                        self.node.get_logger().info("FW takeoff Step 3c: re-arm command sent.")
+                        self.fw_takeoff_phase = 1
+
+                    elif self.fw_takeoff_phase == 1:
+                        if self.uav.nav_state == VehicleStatus.NAVIGATION_STATE_AUTO_TAKEOFF:
+                            self.node.get_logger().info(
+                                "FW takeoff Step 4: In AUTO_TAKEOFF. Runway takeoff running."
+                            )
+                            self.takeoff_commanded = True
+                            # return True
+                        else:
+                            self.node.get_logger().info(
+                                f"FW takeoff: Waiting for AUTO_TAKEOFF nav state (current: {self.nav_state})."
+                            )
+                            # return False
+                elif (
+                    self.uav.vtol_vehicle_status.vehicle_vtol_state
+                    == VtolVehicleStatus.VEHICLE_VTOL_STATE_TRANSITION_TO_MC
+                ):
+                    self.node.get_logger().error(
+                        "FW takeoff: Transition to MC in progress during horizontal takeoff."
+                    )
+                    # return False
+                else:
+                    self.node.get_logger().warn("FW takeoff Step 0: unknown vehicle state.")
+                    # return False
+
+
             else:
                 # Vertical takeoff (multicopter or VTOL)
                 self.log("Attempting vertical takeoff")
