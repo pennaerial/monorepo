@@ -101,6 +101,7 @@ class ModeManager(Node):
 
         self.uav.failsafe_trigger = True
         self.uav.failsafe = self.uav.failsafe_px4 or self.uav.failsafe_trigger
+        self.uav.rtl()
 
         response.success = True
         response.message = "Failsafe triggered."
@@ -243,15 +244,9 @@ class ModeManager(Node):
         current_time = time()
         if self.uav.failsafe:
             if not self.uav.emergency_landing:
-                self.uav.hover()
-                self.get_logger().warn("Failsafe: Switching to AUTO_LOITER mode.")
+                self.uav.rtl()
+                self.get_logger().warn("Failsafe: Returning to Launch.")
                 self.uav.emergency_landing = True
-            if (
-                self.uav.nav_state == VehicleStatus.NAVIGATION_STATE_AUTO_LOITER
-                or self.uav.arm_state != VehicleStatus.ARMING_STATE_ARMED
-            ):
-                self.uav.land()  # Initiate the landing procedure.
-                self.get_logger().warn("Failsafe: Initiating landing.")
             return
         if self.servo_only:
             if self.active_mode is None:
