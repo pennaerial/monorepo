@@ -35,7 +35,7 @@ def launch_setup(context, *args, **kwargs):
     # Load launch parameters from the YAML file.
     params = load_launch_parameters()
     mission_name = params.get("mission_name", "basic")
-    uav_debug_bool = params.get("uav_debug", False)
+    uav_debug_bool = params.get("verbose", False)
     vision_debug_bool = params.get("vision_debug", False)
     use_camera_bool = params.get("use_camera", True)
     save_vision_milliseconds = params.get("save_vision_milliseconds", 0)

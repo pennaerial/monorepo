@@ -1,6 +1,6 @@
 # launch_params.yaml
 mission_name: straight_waypoints
-uav_debug: false
+verbose: false
 vision_debug: false
 auto_launch: true
 airframe: standard_vtol # Enter a preset below or a valid airframe ID (integer), either custom or from PX4
