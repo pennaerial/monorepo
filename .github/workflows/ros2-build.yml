@@ -100,7 +100,7 @@ jobs:
           Environment Overrides:
           - UAV_SIM=false (already set in hardware config)
           - UAV_MISSION=mission_name
-          - UAV_DEBUG=true/false
+          - VERBOSE=true/false
           - UAV_LAUNCH_PARAMS=/path/to/custom/params.yaml
           EOF
 
