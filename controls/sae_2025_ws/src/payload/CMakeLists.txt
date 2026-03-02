@@ -12,8 +12,15 @@ find_package(payload_interfaces REQUIRED)
 find_package(gz-transport13 REQUIRED)
 find_package(gz-msgs10 REQUIRED)
 find_package(generate_parameter_library REQUIRED)
-find_package(ros_gz_bridge REQUIRED)
 find_package(sensor_msgs REQUIRED)
+
+# ros_gz_bridge transitively needs ignition-msgs8 which needs FindIgnProtobuf.cmake
+# from ignition-cmake2. Temporarily add that module path, then restore to avoid
+# polluting gz-cmake3 modules used by gz-transport13/gz-msgs10.
+set(_saved_module_path "${CMAKE_MODULE_PATH}")
+list(APPEND CMAKE_MODULE_PATH "/usr/share/cmake/ignition-cmake2/cmake2")
+find_package(ros_gz_bridge REQUIRED)
+set(CMAKE_MODULE_PATH "${_saved_module_path}")
 
 include_directories(include)
 
