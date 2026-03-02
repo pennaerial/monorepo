@@ -147,11 +147,13 @@ class UAV(ABC):
                 "param3": PX4CustomSubModeAuto.LOITER.value,
             },
         )
+
     def rtl(self):
         self._send_vehicle_command(
             VehicleCommand.VEHICLE_CMD_DO_SET_MODE,
-            params={'param1': 1.0, 'param2':4.0, 'param3': 5.0}
+            params={'param1': 1.0, 'param2':4.0, 'param3': 5.0},
         )
+        
     def disarm(self):
         """Send a disarm command to the UAV."""
         self._send_vehicle_command(
