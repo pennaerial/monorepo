@@ -12,8 +12,8 @@ const LAUNCH_PARAM_FIELDS = [
     help: 'Mission profile identifier used by launch.',
   },
   {
-    key: 'uav_debug',
-    label: 'UAV debug',
+    key: 'verbose',
+    label: 'Verbose',
     type: 'boolean',
     help: 'Enable extra UAV-side debug outputs.',
   },
@@ -85,7 +85,7 @@ const LAUNCH_PARAM_CORE_FIELDS = [
 ].map(key => LAUNCH_PARAM_FIELD_MAP[key]).filter(Boolean)
 
 const LAUNCH_PARAM_TOGGLE_FIELDS = [
-  'uav_debug',
+  'verbose',
   'vision_debug',
   'auto_launch',
   'use_camera',
