@@ -20,11 +20,8 @@ class SimController : public Controller {
             const std::string& gz_drive_topic,
             const std::string& gz_camera_topic,
             const std::string& gz_camera_info_topic,
-            // const std::string& gz_pose_topic,
             rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr ros_camera_publisher,
             rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr ros_camera_info_publisher,
-            // rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr ros_pose_global_publisher,
-            // std::function<rclcpp::Time()> get_clock_now,
             rclcpp::Logger logger);
         void drive_command(double linear, double angular) override;
 
