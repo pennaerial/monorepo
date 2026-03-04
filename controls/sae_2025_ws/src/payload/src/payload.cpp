@@ -20,16 +20,23 @@ Payload::Payload(const std::string& payload_name)
     ros_camera_info_publisher_ = this->create_publisher<sensor_msgs::msg::CameraInfo>(ros_camera_info_topic, 10);
     RCLCPP_INFO(this->get_logger(), "Publishing ros camera_info: %s", ros_camera_info_topic.c_str());
 
+    // std::string ros_pose_global_topic = "/" + payload_name_ + "/pose_global";
+    // ros_pose_global_publisher_ = this->create_publisher<geometry_msgs::msg::PoseStamped>(ros_pose_global_topic, 10);
+
     if (payload_params_.controller == "sim") { //move to enum
         std::string gz_drive_topic = "/model/" + payload_name_ + "/cmd_vel";
         std::string gz_camera_topic = "/world/" + payload_params_.sim.world_name + "/model/" + payload_name_ + "/link/camera_link/sensor/camera/image";
         std::string gz_camera_info_topic = "/world/" + payload_params_.sim.world_name + "/model/" + payload_name_ + "/link/camera_link/sensor/camera/camera_info";
+        // std::string gz_pose_topic = "/model/" + payload_name_ + "/pose";
         controller_ = std::make_shared<SimController>(
             gz_drive_topic,
             gz_camera_topic,
             gz_camera_info_topic,
+            // gz_pose_topic,
             ros_camera_publisher_,
             ros_camera_info_publisher_,
+            // ros_pose_global_publisher_,
+            // [this]() { return this->now(); },
             this->get_logger()
         );
     }
@@ -47,6 +54,4 @@ void Payload::drive_callback(const payload_interfaces::msg::DriveCommand::Shared
     }
     controller_->drive_command(linear_v, angular_v);
 }
-
-
 

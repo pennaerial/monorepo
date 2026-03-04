@@ -14,6 +14,7 @@ find_package(gz-msgs10 REQUIRED)
 find_package(generate_parameter_library REQUIRED)
 find_package(ros_gz_bridge REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
 
 include_directories(include)
 
@@ -40,6 +41,7 @@ ament_target_dependencies(payload
   payload_interfaces
   ros_gz_bridge
   sensor_msgs
+  geometry_msgs
 )
 
 target_link_libraries(payload

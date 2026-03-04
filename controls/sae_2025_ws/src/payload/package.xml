@@ -11,6 +11,7 @@
 
   <depend>rclcpp</depend>
   <depend>sensor_msgs</depend>
+  <depend>geometry_msgs</depend>
   <depend>payload_interfaces</depend>
   <depend>generate_parameter_library</depend>
   <depend>ros_gz_bridge</depend>

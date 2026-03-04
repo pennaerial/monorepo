@@ -8,6 +8,7 @@
 #include "payload/sim_controller.hpp"
 #include "sensor_msgs/msg/image.hpp"
 #include "sensor_msgs/msg/camera_info.hpp"
+// #include "geometry_msgs/msg/pose_stamped.hpp"
 #include <string>
 
 
@@ -20,6 +21,7 @@ class Payload: public rclcpp::Node {
         rclcpp::Subscription<payload_interfaces::msg::DriveCommand>::SharedPtr ros_drive_subscriber_;
         rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr ros_camera_publisher_;
         rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr ros_camera_info_publisher_;
+        // rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr ros_pose_global_publisher_;
 
         std::shared_ptr<Controller> controller_;
 
