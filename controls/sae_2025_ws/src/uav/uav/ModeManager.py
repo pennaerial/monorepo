@@ -101,7 +101,7 @@ class ModeManager(Node):
 
         self.uav.failsafe_trigger = True
         self.uav.failsafe = self.uav.failsafe_px4 or self.uav.failsafe_trigger
-        self.uav.rtl()
+        # self.uav.rtl()
 
         response.success = True
         response.message = "Failsafe triggered."
@@ -247,6 +247,8 @@ class ModeManager(Node):
                 self.uav.rtl()
                 self.get_logger().warn("Failsafe: Returning to Launch.")
                 self.uav.emergency_landing = True
+                self.destroy_node()
+                rclpy.shutdown()
             return
         if self.servo_only:
             if self.active_mode is None:
@@ -305,7 +307,6 @@ class ModeManager(Node):
 
             if self.uav.local_position is None or self.uav.global_position is None:
                 return  # Wait for position data
-
             self.uav.publish_offboard_control_heartbeat_signal()
 
             # Start mission - TakeoffMode handles takeoff, heartbeat, and offboard engagement

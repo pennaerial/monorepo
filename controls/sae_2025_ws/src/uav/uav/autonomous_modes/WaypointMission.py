@@ -51,7 +51,6 @@ class WaypointMission(Mode):
 
         # Enable offboard mode
         self.publish_offboard_control_mode()
-
         # Arm the vehicle
         self.arm_vehicle()
 
