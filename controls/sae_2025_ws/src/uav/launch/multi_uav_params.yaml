@@ -1,0 +1,12 @@
+# multi_uav_params.yaml
+# Number and types of vehicles to launch. Each entry is one vehicle; "type" is
+# an airframe name (e.g. quadcopter, tiltrotor_vtol) or PX4 airframe ID (e.g. 4014).
+# Other launch params (mission, sim, etc.) come from launch_params.yaml.
+
+px4_path: "~/Tools-users/PX4-Autopilot"
+
+vehicles:
+  - type: 4014   # x500 mono cam down
+  - type: 4014   # second same type
+  - type: 4014   # second same type
+  - type: 4014   # second same type

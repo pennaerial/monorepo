@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import subprocess
 import launch
 from launch import LaunchDescription
 from launch.actions import (
@@ -30,6 +31,20 @@ from sim.constants import (
     DEFAULT_USE_SCORING,
 )
 import json
+
+
+def _is_gazebo_running() -> bool:
+    """Return True when a Gazebo server process is already running."""
+    try:
+        result = subprocess.run(
+            ["pgrep", "-f", r"(^|/)(gz|ign)(\s+sim|\s+gazebo)|simulation-gazebo"],
+            capture_output=True,
+            timeout=2,
+            text=True,
+        )
+        return result.returncode == 0
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        return False
 
 
 def load_sim_parameters(competition: str, logger: logging.Logger) -> str:
@@ -116,6 +131,7 @@ def launch_setup(context, *args, **kwargs):
     """Setup launch configuration."""
 
     logger = launch.logging.get_logger("sim.launch")
+    gazebo_already_running = _is_gazebo_running()
 
     # Get launch arguments
     try:
@@ -186,7 +202,8 @@ def launch_setup(context, *args, **kwargs):
     model = LaunchConfiguration("model").perform(context)
     vehicle_id_str = LaunchConfiguration("vehicle_id", default="0").perform(context)
     vehicle_id = int(vehicle_id_str) if vehicle_id_str else 0
-    # PX4 names models as ${PX4_SIM_MODEL}_instance; in GZ topics the model name has no "gz_" prefix
+    # PX4 instance numbering starts at 1, so vehicle_0 maps to model suffix "_1",
+    # vehicle_1 maps to "_2", etc. GZ topic names do not include the "gz_" prefix.
     instance = vehicle_id + 1
     model_name_in_world = f"{model[3:]}_{instance}"  # e.g. x500_mono_cam_down_1
     camera_prefix = f"/vehicle_{vehicle_id}"
@@ -268,47 +285,78 @@ def launch_setup(context, *args, **kwargs):
                 cwd=sae_ws_path,
             )
 
-    # Build and return the complete list of actions
-    actions = [
-        download_gz_models,
-        RegisterEventHandler(
-            OnProcessExit(
-                target_action=download_gz_models,
-                on_exit=[LogInfo(msg="Gazebo models downloaded."), world],
+    bridges_and_world_gen = [
+        LogInfo(
+            msg=(
+                "Gazebo already running; reusing existing server."
+                if gazebo_already_running
+                else "spawn_world started, creating bridges"
             )
         ),
-        RegisterEventHandler(
-            OnProcessIO(
-                target_action=world,
-                on_stderr=lambda event: (
-                    [
-                        spawn_world,
-                        LogInfo(msg="Simulation world node started."),
-                        scoring,
-                    ]
-                    if b"Successfully generated world file:" in event.text
-                    else None
-                ),
-            )
-        ),
-        RegisterEventHandler(
-            OnProcessStart(
-                target_action=spawn_world,
-                on_start=[
-                    LogInfo(msg="spawn_world started, creating bridges"),
-                    gz_ros_bridge_create,
-                    gz_ros_bridge_camera,
-                    gz_ros_bridge_camera_info,
-                ],
-            )
-        ),
-        RegisterEventHandler(
-            OnProcessStart(
-                target_action=gz_ros_bridge_create,
-                on_start=[trigger_world_gen, LogInfo(msg="World generation triggered")],
-            )
-        ),
+        gz_ros_bridge_create,
+        gz_ros_bridge_camera,
+        gz_ros_bridge_camera_info,
     ]
+    if scoring:
+        bridges_and_world_gen.append(scoring)
+
+    # Build and return the complete list of actions
+    if gazebo_already_running:
+        actions = [
+            world,
+            RegisterEventHandler(
+                OnProcessIO(
+                    target_action=world,
+                    on_stderr=lambda event, ready_actions=bridges_and_world_gen: (
+                        ready_actions
+                        if b"Successfully generated world file:" in event.text
+                        else None
+                    ),
+                )
+            ),
+            RegisterEventHandler(
+                OnProcessStart(
+                    target_action=gz_ros_bridge_create,
+                    on_start=[trigger_world_gen, LogInfo(msg="World generation triggered")],
+                )
+            ),
+        ]
+    else:
+        actions = [
+            download_gz_models,
+            RegisterEventHandler(
+                OnProcessExit(
+                    target_action=download_gz_models,
+                    on_exit=[LogInfo(msg="Gazebo models downloaded."), world],
+                )
+            ),
+            RegisterEventHandler(
+                OnProcessIO(
+                    target_action=world,
+                    on_stderr=lambda event: (
+                        [
+                            spawn_world,
+                            LogInfo(msg="Simulation world node started."),
+                            *([scoring] if scoring else []),
+                        ]
+                        if b"Successfully generated world file:" in event.text
+                        else None
+                    ),
+                )
+            ),
+            RegisterEventHandler(
+                OnProcessStart(
+                    target_action=spawn_world,
+                    on_start=bridges_and_world_gen,
+                )
+            ),
+            RegisterEventHandler(
+                OnProcessStart(
+                    target_action=gz_ros_bridge_create,
+                    on_start=[trigger_world_gen, LogInfo(msg="World generation triggered")],
+                )
+            ),
+        ]
 
     if scoring:
         actions.append(

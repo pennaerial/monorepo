@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import os
 import re
+import subprocess
 from launch import LaunchDescription
 from launch.actions import (
     ExecuteProcess,
@@ -29,6 +30,20 @@ from ament_index_python.packages import get_package_share_directory
 from launch.logging import get_logger
 
 
+def _is_middleware_running():
+    """Return True if MicroXRCEAgent is already running on this machine (e.g. port 8888 in sim)."""
+    try:
+        # Prefer port check for sim (UDP 8888); pgrep as fallback
+        result = subprocess.run(
+            ["pgrep", "-f", "MicroXRCEAgent"],
+            capture_output=True,
+            timeout=2,
+        )
+        return result.returncode == 0
+    except (FileNotFoundError, subprocess.TimeoutExpired, Exception):
+        return False
+
+
 def launch_setup(context, *args, **kwargs):
     logger = get_logger("main.launch")
     logger.info("Loading launch parameters...")
@@ -53,14 +68,15 @@ def launch_setup(context, *args, **kwargs):
     All PX4 supported IDs can be found here: https://docs.px4.io/main/en/airframes/airframe_reference
     However, IDs available for simulation can be found in PX4-Autopilot/ROMFS/px4fmu_common/init.d-posix/airframes
     """
-    airframe_id = params.get("airframe", "quadcopter")
+    airframe_override = LaunchConfiguration("airframe", default="").perform(context)
+    airframe_id = airframe_override if airframe_override else params.get("airframe", "quadcopter")
     try:
         # If an airframe ID is provided directly, use it
         airframe_id = int(airframe_id)
-    except ValueError:
+    except (ValueError, TypeError):
         try:
             # Otherwise, map preset vehicle name to airframe ID
-            airframe_id = vehicle_id_dict[airframe_id]
+            airframe_id = vehicle_id_dict[str(airframe_id)]
         except KeyError:
             raise ValueError(f"Unknown airframe name: {airframe_id}")
 
@@ -140,7 +156,7 @@ def launch_setup(context, *args, **kwargs):
                 ),
             )
 
-    # Define the middleware process.
+    # Define the middleware process (may be skipped if already running on device).
     middleware = ExecuteProcess(
         cmd=["MicroXRCEAgent", "udp4", "-p", "8888"]
         if sim_bool
@@ -148,6 +164,10 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
         name="middleware",
     )
+    middleware_already_running = _is_middleware_running()
+    if middleware_already_running:
+        logger = get_logger("main.launch")
+        logger.info("MicroXRCEAgent already running on device; skipping start and ready wait.")
 
     # Define the PX4 SITL model, autostart, and vehicle class
     px4_path = find_folder_with_heuristic(
@@ -195,14 +215,13 @@ def launch_setup(context, *args, **kwargs):
         name="start_mission_trigger",
     )
 
-    # Determine which processes need to be ready before starting mission
-    # Sim, vehicle_id 0: Gazebo + PX4 + middleware; need both uav and middleware
-    # Sim, vehicle_id >= 1: only this PX4 (middleware already running); need only uav
-    # Hardware: only need middleware
+    # Determine which processes need to be ready before starting mission.
+    # Only wait for middleware if we are starting it (not already running on device).
     if sim_bool:
-        required_processes = ["uav", "middleware"] if vehicle_id == 0 else ["uav"]
+        wait_for_middleware = vehicle_id == 0 and not middleware_already_running
+        required_processes = ["uav"] + (["middleware"] if wait_for_middleware else [])
     else:
-        required_processes = ["middleware"]
+        required_processes = [] if middleware_already_running else ["middleware"]
     mission_ready_flags = {proc: False for proc in required_processes}
     mission_started = {"value": False}  # mutable so inner functions can modify
 
@@ -277,7 +296,9 @@ def launch_setup(context, *args, **kwargs):
         )
 
         if vehicle_id == 0:
-            # First vehicle: start Gazebo (sim) then PX4, vision, middleware, mission
+            # First vehicle: sim.launch.py owns Gazebo startup/reuse and vehicle_0 ROS<->GZ bridges.
+            # This launch file only waits for the sim world to be ready, then starts PX4, vision,
+            # and middleware (if not already running).
             sim_launch_args = {
                 "model": model,
                 "px4_path": px4_path,
@@ -291,26 +312,27 @@ def launch_setup(context, *args, **kwargs):
                 ),
                 launch_arguments=sim_launch_args.items(),
             )
+            processes_after_sim_ready = [
+                LogInfo(msg="Simulation world ready; starting vehicle_0 stack."),
+                px4_sitl,
+                *vision_node_actions,
+            ]
+            if not middleware_already_running:
+                processes_after_sim_ready.append(middleware)
             actions = [
                 sim,
                 RegisterEventHandler(
                     OnProcessIO(
-                        on_stderr=lambda event: (
-                            [
-                                LogInfo(msg="Gazebo process started."),
-                                px4_sitl,
-                                *vision_node_actions,
-                                middleware,
-                            ]
-                            if b"Successfully generated world file:" in event.text
-                            else None
+                        on_stderr=lambda event, procs=processes_after_sim_ready: (
+                            procs if b"Successfully generated world file:" in event.text else None
                         )
                     )
                 ),
                 mission,
             ]
         else:
-            # Additional vehicles: PX4 + camera bridge (GZ -> /vehicle_{id}/camera), vision, mission
+            # Additional vehicles still need their own camera bridges here because sim.launch.py
+            # only creates the ROS<->GZ bridges for vehicle_0.
             # In GZ topics the model name has no "gz_" prefix (e.g. x500_mono_cam_down_2)
             instance = vehicle_id + 1
             model_name_in_world = f"{model[3:]}_{instance}"
@@ -344,29 +366,32 @@ def launch_setup(context, *args, **kwargs):
 
         if run_mission_bool:
             handlers = [RegisterEventHandler(OnProcessIO(target_action=px4_sitl, on_stdout=make_io_handler("uav")))]
-            if vehicle_id == 0:
+            if vehicle_id == 0 and not middleware_already_running:
                 handlers.append(
                     RegisterEventHandler(
                         OnProcessIO(
-                            target_action=px4_sitl,
+                            target_action=middleware,
                             on_stdout=make_io_handler("middleware"),
                         )
                     )
                 )
             actions.extend(handlers)
     else:
+        # Hardware: start vision, middleware (if not already running), mission
         actions = [
             *vision_node_actions,
             LogInfo(msg="Vision nodes started."),
-            middleware,
-            mission,
         ]
-        if run_mission_bool:
-            actions.append(mission)
+        if not middleware_already_running:
+            actions.append(middleware)
+        actions.append(mission)
+        if run_mission_bool and not middleware_already_running:
             actions.append(
-                OnProcessIO(
-                    target_action=middleware,
-                    on_stderr=make_io_handler("middleware"),
+                RegisterEventHandler(
+                    OnProcessIO(
+                        target_action=middleware,
+                        on_stderr=make_io_handler("middleware"),
+                    )
                 )
             )
     return actions
@@ -377,6 +402,11 @@ def generate_launch_description():
         [
             DeclareLaunchArgument("px4_path", default_value="~/Tools-users/PX4-Autopilot"),
             DeclareLaunchArgument("vehicle_id", default_value="0"),
+            DeclareLaunchArgument(
+                "airframe",
+                default_value="",
+                description="Override vehicle type (airframe name or ID). Used by multi_uav.launch.py.",
+            ),
             OpaqueFunction(function=launch_setup),
         ]
     )
