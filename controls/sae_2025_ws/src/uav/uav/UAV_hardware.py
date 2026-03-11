@@ -31,7 +31,7 @@ class UAV:
         self.takeoff_gps = None
 
         self.node = node
-        self.vehicle_id = int(getattr(node, 'vehicle_id', 1))
+        self.vehicle_id = int(getattr(node, 'vehicle_id', 0))
 
         self._px4_prefix = f"/px4_{self.vehicle_id}"
 

@@ -50,9 +50,8 @@ def launch_setup(context, *args, **kwargs):
     # Load launch parameters from the YAML file.
     params = load_launch_parameters()
     vehicle_id = int(LaunchConfiguration("vehicle_id").perform(context))
-    if vehicle_id < 1:
-        raise ValueError("vehicle_id must be >= 1")
-    vehicle_index = vehicle_id - 1
+    if vehicle_id < 0:
+        raise ValueError("vehicle_id must be >= 0")
     mission_name = params.get("mission_name", "basic")
     uav_debug = str(params.get("uav_debug", "false"))
     vision_debug = str(params.get("vision_debug", "false"))
@@ -223,7 +222,7 @@ def launch_setup(context, *args, **kwargs):
     # Determine which processes need to be ready before starting mission.
     # Only wait for middleware if we are starting it (not already running on device).
     if sim_bool:
-        wait_for_middleware = vehicle_id == 1 and not middleware_already_running
+        wait_for_middleware = vehicle_id == 0 and not middleware_already_running
         required_processes = ["uav"] + (["middleware"] if wait_for_middleware else [])
     else:
         required_processes = [] if middleware_already_running else ["middleware"]
@@ -281,15 +280,11 @@ def launch_setup(context, *args, **kwargs):
             )
         logger.info(f"PX4_GZ_WORLD={competition} (vehicle_id={vehicle_id})")
 
-        # vehicle_id is now 1-based and matches the PX4 instance number directly.
+        # vehicle_id is 0-based and matches the PX4 instance number directly.
         px4_instance = vehicle_id
         # Model pose offset for multi-vehicle (x, y in meters; see PX4 multi-vehicle doc)
-        model_pose = (
-            f"0,{vehicle_index},0,0,0,0"
-            if vehicle_index > 0
-            else "0,0,0,0,0,0"
-        )
-        # First vehicle (vehicle_id=1) starts Gazebo and connects; others use STANDALONE and connect to existing server
+        model_pose = f"0,{vehicle_id},0,0,0,0" if vehicle_id > 0 else "0,0,0,0,0,0"
+        # First vehicle (vehicle_id=0) starts Gazebo and connects; others use STANDALONE and connect to existing server
         px4_sitl_cmd = (
             f"PX4_GZ_MODEL_POSE='{model_pose}' PX4_GZ_WORLD={competition} "
             f"PX4_GZ_STANDALONE=1 PX4_SYS_AUTOSTART={autostart} PX4_SIM_MODEL={model} "
@@ -304,14 +299,14 @@ def launch_setup(context, *args, **kwargs):
             name="px4_sitl",
         )
 
-        if vehicle_id == 1:
-            # First vehicle: sim.launch.py owns Gazebo startup/reuse and /px4_1 ROS<->GZ bridges.
+        if vehicle_id == 0:
+            # First vehicle: sim.launch.py owns Gazebo startup/reuse and /px4_0 ROS<->GZ bridges.
             # This launch file only waits for the sim world to be ready, then starts PX4, vision,
             # and middleware (if not already running).
             sim_launch_args = {
                 "model": model,
                 "px4_path": px4_path,
-                "vehicle_id": "1",
+                "vehicle_id": "0",
             }
             sim = IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
@@ -341,7 +336,7 @@ def launch_setup(context, *args, **kwargs):
             ]
         else:
             # Additional vehicles still need their own camera bridges here because sim.launch.py
-            # only creates the ROS<->GZ bridges for vehicle_id=1.
+            # only creates the ROS<->GZ bridges for vehicle_id=0.
             # In GZ topics the model name has no "gz_" prefix (e.g. x500_mono_cam_down_2)
             model_name_in_world = f"{model[3:]}_{px4_instance}"
             gz_cam = f"/world/{competition}/model/{model_name_in_world}/link/camera_link/sensor/camera/image"
@@ -374,7 +369,7 @@ def launch_setup(context, *args, **kwargs):
 
         if run_mission_bool:
             handlers = [RegisterEventHandler(OnProcessIO(target_action=px4_sitl, on_stdout=make_io_handler("uav")))]
-            if vehicle_id == 1 and not middleware_already_running:
+            if vehicle_id == 0 and not middleware_already_running:
                 handlers.append(
                     RegisterEventHandler(
                         OnProcessIO(
@@ -409,7 +404,7 @@ def generate_launch_description():
     return LaunchDescription(
         [
             DeclareLaunchArgument("px4_path", default_value="~/Tools-users/PX4-Autopilot"),
-            DeclareLaunchArgument("vehicle_id", default_value="1"),
+            DeclareLaunchArgument("vehicle_id", default_value="0"),
             DeclareLaunchArgument(
                 "airframe",
                 default_value="",

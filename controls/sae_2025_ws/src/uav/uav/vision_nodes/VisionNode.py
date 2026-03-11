@@ -50,7 +50,7 @@ class VisionNode(Node):
         self.sim = self.get_parameter("sim").value
         self.declare_parameter("save_vision", False)
         self.save_vision = self.get_parameter("save_vision").value
-        self.declare_parameter("vehicle_id", 1)
+        self.declare_parameter("vehicle_id", 0)
         self.vehicle_id = int(self.get_parameter("vehicle_id").value)
         self.custom_service_type = custom_service
         self.uuid = str(uuid.uuid4())

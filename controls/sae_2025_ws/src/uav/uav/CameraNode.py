@@ -30,7 +30,7 @@ class CameraNode(Node):
         Initialize the CameraNode. Topics/service are namespaced by PX4-style ID for multi-vehicle.
         """
         super().__init__(node_name)
-        self.declare_parameter("vehicle_id", 1)
+        self.declare_parameter("vehicle_id", 0)
         self._vehicle_id = self.get_parameter("vehicle_id").value
 
         prefix = f"/px4_{self._vehicle_id}"
