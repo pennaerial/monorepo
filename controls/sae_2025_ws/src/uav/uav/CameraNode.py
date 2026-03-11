@@ -27,13 +27,13 @@ class CameraNode(Node):
         display: bool = False,
     ):
         """
-        Initialize the CameraNode. Topics/service are namespaced by vehicle_id for multi-vehicle.
+        Initialize the CameraNode. Topics/service are namespaced by PX4-style ID for multi-vehicle.
         """
         super().__init__(node_name)
         self.declare_parameter("vehicle_id", 0)
         self._vehicle_id = self.get_parameter("vehicle_id").value
 
-        prefix = f"/vehicle_{self._vehicle_id}"
+        prefix = f"/px4_{self._vehicle_id}"
         if service_name is None:
             service_name = f"{prefix}/camera_data"
         if image_topic is None:

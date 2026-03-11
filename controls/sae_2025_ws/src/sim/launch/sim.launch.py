@@ -206,7 +206,7 @@ def launch_setup(context, *args, **kwargs):
     # vehicle_1 maps to "_2", etc. GZ topic names do not include the "gz_" prefix.
     instance = vehicle_id + 1
     model_name_in_world = f"{model[3:]}_{instance}"  # e.g. x500_mono_cam_down_1
-    camera_prefix = f"/vehicle_{vehicle_id}"
+    camera_prefix = f"/px4_{vehicle_id}"
 
     GZ_CAMERA_TOPIC = (
         f"/world/{competition}/model/{model_name_in_world}/link/camera_link/sensor/camera/image"

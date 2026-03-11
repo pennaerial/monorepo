@@ -149,7 +149,9 @@ def launch_setup(context, *args, **kwargs):
                         "image_size:=[640,480]",
                         "--ros-args",
                         "--remap",
-                        f"/image_raw:=/vehicle_{vehicle_id}/camera",
+                        f"/image_raw:=/px4_{vehicle_id}/camera",
+                        "--remap",
+                        f"/camera_info:=/px4_{vehicle_id}/camera_info",
                     ],
                     output="screen",
                     name="cam2image",
@@ -338,7 +340,7 @@ def launch_setup(context, *args, **kwargs):
             model_name_in_world = f"{model[3:]}_{instance}"
             gz_cam = f"/world/{competition}/model/{model_name_in_world}/link/camera_link/sensor/camera/image"
             gz_cam_info = f"/world/{competition}/model/{model_name_in_world}/link/camera_link/sensor/camera/camera_info"
-            cam_prefix = f"/vehicle_{vehicle_id}"
+            cam_prefix = f"/px4_{vehicle_id}"
             bridge_camera = Node(
                 package="ros_gz_bridge",
                 executable="parameter_bridge",

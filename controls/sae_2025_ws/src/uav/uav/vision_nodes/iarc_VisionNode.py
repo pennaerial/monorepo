@@ -57,7 +57,7 @@ class VisionNode(Node):
             os.makedirs(os.path.expanduser(f"~/vision_imgs/{self.uuid}"), exist_ok=True)
 
         self.use_service = use_service
-        cam_prefix = f"/vehicle_{self.vehicle_id}"
+        cam_prefix = f"/px4_{self.vehicle_id}"
 
         if use_service:
             self.client = self.create_client(CameraData, f'{cam_prefix}/camera_data')
