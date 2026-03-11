@@ -29,7 +29,7 @@ class P2PNode(Node):
 	def __init__(self) -> None:
 		super().__init__('p2p_node')
 
-		self.declare_parameter('vehicle_id', 0)
+		self.declare_parameter('vehicle_id', 1)
 		self.declare_parameter('peer_ids', [1])
 		self.declare_parameter('topic_prefix', '/p2p')
 		self.declare_parameter('connection_timeout_sec', 3.0)
@@ -49,8 +49,8 @@ class P2PNode(Node):
 		if self.vehicle_id in self.peer_ids:
 			raise ValueError(f"vehicle_id {self.vehicle_id} cannot be in peer_ids list")
 		
-		# Auto-derive PX4 topics based on vehicle_id
-		px4_prefix = '' if self.vehicle_id == 0 else f"/px4_{self.vehicle_id}"
+		# vehicle_id is 1-based and matches the PX4 instance number directly.
+		px4_prefix = f"/px4_{self.vehicle_id}"
 		local_position_topic = f"{px4_prefix}/fmu/out/vehicle_local_position"
 		vehicle_status_topic = f"{px4_prefix}/fmu/out/vehicle_status"
 		battery_topic = f"{px4_prefix}/fmu/out/battery_status"

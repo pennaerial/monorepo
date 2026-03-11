@@ -200,13 +200,14 @@ def launch_setup(context, *args, **kwargs):
     )
 
     model = LaunchConfiguration("model").perform(context)
-    vehicle_id_str = LaunchConfiguration("vehicle_id", default="0").perform(context)
-    vehicle_id = int(vehicle_id_str) if vehicle_id_str else 0
-    # PX4 instance numbering starts at 1, so vehicle_0 maps to model suffix "_1",
-    # vehicle_1 maps to "_2", etc. GZ topic names do not include the "gz_" prefix.
-    instance = vehicle_id + 1
+    vehicle_id_str = LaunchConfiguration("vehicle_id", default="1").perform(context)
+    vehicle_id = int(vehicle_id_str) if vehicle_id_str else 1
+    if vehicle_id < 1:
+        raise ValueError("vehicle_id must be >= 1")
+    # vehicle_id is 1-based and matches the PX4 instance number directly.
+    instance = vehicle_id
     model_name_in_world = f"{model[3:]}_{instance}"  # e.g. x500_mono_cam_down_1
-    camera_prefix = f"/px4_{vehicle_id}"
+    camera_prefix = f"/px4_{instance}"
 
     GZ_CAMERA_TOPIC = (
         f"/world/{competition}/model/{model_name_in_world}/link/camera_link/sensor/camera/image"
@@ -376,7 +377,7 @@ def generate_launch_description():
         [
             DeclareLaunchArgument("px4_path", default_value="~/PX4-Autopilot"),
             DeclareLaunchArgument("model", default_value="gz_x500_mono_cam"),
-            DeclareLaunchArgument("vehicle_id", default_value="0"),
+            DeclareLaunchArgument("vehicle_id", default_value="1"),
             OpaqueFunction(function=launch_setup),
         ]
     )

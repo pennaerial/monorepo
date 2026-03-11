@@ -6,8 +6,8 @@ Reads multi_uav_params.yaml (or path given by multi_uav_config) for:
   - px4_path: path to PX4-Autopilot
   - vehicles: list of { type: <airframe name or ID> } (one per vehicle)
 
-- vehicle_id=0: starts Gazebo (sim), first PX4, MicroXRCEAgent, vision, mission.
-- vehicle_id>=1: starts only that PX4 (connects to existing Gazebo), vision, mission.
+- vehicle_id=1: starts Gazebo (sim), first PX4, MicroXRCEAgent, vision, mission.
+- vehicle_id>=2: starts only that PX4 (connects to existing Gazebo), vision, mission.
 
 Usage:
   ros2 launch uav multi_uav.launch.py
@@ -62,7 +62,7 @@ def _launch_multiple(context, *args, **kwargs):
     main_launch = os.path.join(uav_share, "launch", "main.launch.py")
 
     actions = []
-    for vehicle_id, vehicle_spec in enumerate(vehicles):
+    for vehicle_id, vehicle_spec in enumerate(vehicles, start=1):
         if isinstance(vehicle_spec, dict):
             vehicle_type = vehicle_spec.get("type")
         else:

@@ -50,8 +50,8 @@ class UAV(ABC):
         self.node.get_logger().info(f"Initializing UAV with DEBUG={DEBUG}")
         self.vision_clients = {}
 
-        # PX4 instance N uses topics /px4_N/... (vehicle_id 0 -> instance 1 -> /px4_1)
-        self._px4_prefix = f"/px4_{self.vehicle_id + 1}"
+        # vehicle_id is 1-based and matches the PX4 instance number directly.
+        self._px4_prefix = f"/px4_{self.vehicle_id}"
         self.node.get_logger().info(
             f"PX4 topic prefix for vehicle_id={self.vehicle_id}: '{self._px4_prefix}'"
         )

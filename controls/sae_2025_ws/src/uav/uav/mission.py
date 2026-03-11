@@ -20,7 +20,7 @@ def main():
             camera_offsets = [0, 0, 0]
         vehicle_class = Vehicle[sys.argv[5].upper()]
         vision_nodes = sys.argv[6]
-        vehicle_id = int(sys.argv[7]) if len(sys.argv) > 7 else 0
+        vehicle_id = int(sys.argv[7]) if len(sys.argv) > 7 else 1
     else:
         cwd = os.getcwd()  # default
         yaml_file = f"{cwd}/src/uav/uav/missions/basic.yaml"
@@ -29,7 +29,7 @@ def main():
         camera_offsets = [0, 0, 0]
         servo_only = "false"
         vehicle_class = Vehicle.MULTICOPTER
-        vehicle_id = 0
+        vehicle_id = 1
     servo_only = servo_only.lower() == "true"
     DEBUG = debug.lower() == "true"
     rclpy.init()

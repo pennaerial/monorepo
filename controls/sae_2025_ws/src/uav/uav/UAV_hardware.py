@@ -31,9 +31,9 @@ class UAV:
         self.takeoff_gps = None
 
         self.node = node
-        self.vehicle_id = int(getattr(node, 'vehicle_id', 0))
+        self.vehicle_id = int(getattr(node, 'vehicle_id', 1))
 
-        self._px4_prefix = '' if self.vehicle_id == 0 else f"/px4_{self.vehicle_id}"
+        self._px4_prefix = f"/px4_{self.vehicle_id}"
 
         def _topic(path: str) -> str:
             if not path.startswith('/'):

@@ -28,7 +28,7 @@ class ModeManager(Node):
         DEBUG=False,
         servo_only=False,
         vehicle_class=Vehicle.MULTICOPTER,
-        vehicle_id: int = 0,
+        vehicle_id: int = 1,
     ) -> None:
         self.vehicle_id = int(vehicle_id)
         super().__init__(f"mission_node_{self.vehicle_id}")

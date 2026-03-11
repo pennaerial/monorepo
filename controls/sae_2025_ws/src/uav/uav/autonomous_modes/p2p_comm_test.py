@@ -59,11 +59,10 @@ class P2PCommTest(Node):
 	def __init__(self) -> None:
 		super().__init__('p2p_comm_test')
 
-		self.declare_parameter('vehicle_id', 0)
+		self.declare_parameter('vehicle_id', 1)
 		self.declare_parameter('peer_ids', 0)
 		self.declare_parameter('topic_prefix', '/swarm')
-		# If empty or 'auto', derive from vehicle_id:
-		# - 0: /fmu/out/vehicle_local_position
+		# If empty or 'auto', derive from 1-based vehicle_id:
 		# - n: /px4_n/fmu/out/vehicle_local_position
 		self.declare_parameter('source_topic', 'auto')
 		self.declare_parameter('publish_hz', 5.0)
@@ -74,7 +73,7 @@ class P2PCommTest(Node):
 		self.topic_prefix = str(self.get_parameter('topic_prefix').value).rstrip('/')
 		configured_source_topic = str(self.get_parameter('source_topic').value).strip()
 		if configured_source_topic == '' or configured_source_topic.lower() == 'auto':
-			prefix = '' if self.vehicle_id == 0 else f"/px4_{self.vehicle_id}"
+			prefix = f"/px4_{self.vehicle_id}"
 			self.source_topic = f"{prefix}/fmu/out/vehicle_local_position"
 		else:
 			self.source_topic = configured_source_topic
