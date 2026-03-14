@@ -2,7 +2,6 @@ from rclpy.node import Node
 from px4_msgs.msg import (
     VtolVehicleStatus,
     VehicleCommand,
-    VehicleStatus,
 )
 from rclpy.qos import (
     QoSProfile,
@@ -12,7 +11,6 @@ from rclpy.qos import (
 )
 import numpy as np
 from uav.UAV import UAV
-import time
 
 
 class VTOL(UAV):
