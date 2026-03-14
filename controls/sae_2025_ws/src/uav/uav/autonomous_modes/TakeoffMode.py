@@ -62,6 +62,7 @@ class TakeoffMode(Mode):
 
         # Need to send takeoff command
         else:
+            self.node.get_logger().info(f"BRUHHHH. takeoff {self.fw_takeoff_phase}")
             self.takeoff_elapsed_time = 0.0  # time reset as a result of time_delta counting from beginning of launch
             if self.takeoff_type == "horizontal":
                 if not self.uav.is_vtol or not isinstance(self.uav, VTOL):
@@ -90,7 +91,7 @@ class TakeoffMode(Mode):
                     == VtolVehicleStatus.VEHICLE_VTOL_STATE_TRANSITION_TO_FW
                 ):
                     self.node.get_logger().info(
-                        "FW takeoff Step 2: transition to FW in progress."
+                        "FW takeoff Step 1a: transition to FW in progress."
                     )
                     return
 
@@ -108,10 +109,11 @@ class TakeoffMode(Mode):
                     #
                     # This must be done atomically (single call with sleeps) because ModeManager
                     # auto-arms the vehicle on every spin cycle when it detects disarmed state.
+                    self.node.get_logger().info(f"HEREEEEEE. takeoff {self.fw_takeoff_phase}")
 
                     if self.fw_takeoff_phase == 0:
                         self.node.get_logger().info(
-                            "FW takeoff Step 3: transition complete. Starting disarm→takeoff→arm sequence."
+                            "FW takeoff Step 2: transition complete. Starting disarm->takeoff->arm sequence."
                         )
 
                         lat = self.uav.global_position.lat
@@ -131,31 +133,44 @@ class TakeoffMode(Mode):
                         # disarm command (needs to be force disarm to reset land detector)
                         self.uav.disarm(force=True)
                         self.node.get_logger().info(
-                            "FW takeoff Step 3a: force-disarmed to reset land detector."
+                            "FW takeoff Step 2a: force-disarmed to reset land detector."
                         )
                         time.sleep(0.5)
 
                         self.uav.fixed_wing_takeoff(self.fw_tko_pitch, self.yaw, self.latitude, self.longitude, self.altitude)
 
                         self.node.get_logger().info(
-                            "FW takeoff Step 3b: NAV_TAKEOFF sent while disarmed."
+                            "FW takeoff Step 2b: takeoff command sent while disarmed."
                         )
-                        time.sleep(0.1)
+                        time.sleep(0.1) 
 
                         self.uav.arm()
-                        self.node.get_logger().info("FW takeoff Step 3c: re-arm command sent.")
+                        self.node.get_logger().info("FW takeoff Step 2c: re-arm command sent.")
                         self.fw_takeoff_phase = 1
+                        time.sleep(1)
 
-                    elif self.fw_takeoff_phase == 1:
+                        # # Wait until the vehicle is armed to start the takeoff sequence
+                        # arming_wait_start_time = time.time()
+                        # arming_timeout = 10  # seconds
+                        # while self.uav.arm_state != VehicleStatus.ARMING_STATE_ARMED and (time.time() - arming_wait_start_time) < arming_timeout:
+                        #     self.node.get_logger().info("Waiting for UAV to finish arming...")
+                        #     time.sleep(0.1)
+                        # if self.uav.arm_state == VehicleStatus.ARMING_STATE_ARMED:
+                        #     self.node.get_logger().info("UAV is armed. Attempting takeoff...")
+                        # else:
+                        #     self.node.get_logger().warn(f"Timeout of {arming_timeout} seconds hit. Unable to arm UAV after takeoff command.")
+
+                    if self.fw_takeoff_phase == 1:
+                        self.node.get_logger().info(f"FW takeoff Step 3: nav state: {self.uav.nav_state}")
                         if self.uav.nav_state == VehicleStatus.NAVIGATION_STATE_AUTO_TAKEOFF:
                             self.node.get_logger().info(
-                                "FW takeoff Step 4: In AUTO_TAKEOFF. Runway takeoff running."
+                                "FW takeoff Step 3: In AUTO_TAKEOFF. Runway takeoff running."
                             )
                             self.takeoff_commanded = True
                             # return True
                         else:
                             self.node.get_logger().info(
-                                f"FW takeoff: Waiting for AUTO_TAKEOFF nav state (current: {self.nav_state})."
+                                f"FW takeoff: Waiting for AUTO_TAKEOFF nav state (current: {self.uav.nav_state})."
                             )
                             # return False
                 elif (

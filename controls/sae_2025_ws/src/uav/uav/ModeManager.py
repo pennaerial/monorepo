@@ -280,6 +280,7 @@ class ModeManager(Node):
             if not self.uav.origin_set:
                 self.uav.set_origin()
             if self.uav.arm_state != VehicleStatus.ARMING_STATE_ARMED:
+                self.get_logger().info(f"UAV is not armed. Current arm state: {self.uav.arm_state}")
                 # Successfully landed - terminate mission
                 if (
                     self.active_mode is not None
