@@ -52,6 +52,12 @@ def launch_setup(context, *args, **kwargs):
     vehicle_id = int(LaunchConfiguration("vehicle_id").perform(context))
     if vehicle_id < 0:
         raise ValueError("vehicle_id must be >= 0")
+    launch_sim_arg = LaunchConfiguration("launch_sim", default="auto").perform(context).lower()
+    # "auto" = start sim for vehicle_id 0; "true" = always; "false" = never
+    should_launch_sim = (
+        launch_sim_arg == "true"
+        or (launch_sim_arg == "auto" and vehicle_id == 0)
+    )
     mission_name = params.get("mission_name", "basic")
     uav_debug = str(params.get("uav_debug", "false"))
     vision_debug = str(params.get("vision_debug", "false"))
@@ -222,7 +228,7 @@ def launch_setup(context, *args, **kwargs):
     # Determine which processes need to be ready before starting mission.
     # Only wait for middleware if we are starting it (not already running on device).
     if sim_bool:
-        wait_for_middleware = vehicle_id == 0 and not middleware_already_running
+        wait_for_middleware = not middleware_already_running
         required_processes = ["uav"] + (["middleware"] if wait_for_middleware else [])
     else:
         required_processes = [] if middleware_already_running else ["middleware"]
@@ -299,14 +305,12 @@ def launch_setup(context, *args, **kwargs):
             name="px4_sitl",
         )
 
-        if vehicle_id == 0:
-            # First vehicle: sim.launch.py owns Gazebo startup/reuse and /px4_0 ROS<->GZ bridges.
-            # This launch file only waits for the sim world to be ready, then starts PX4, vision,
-            # and middleware (if not already running).
+        if should_launch_sim:
+            # This vehicle is responsible for starting Gazebo via sim.launch.py.
             sim_launch_args = {
                 "model": model,
                 "px4_path": px4_path,
-                "vehicle_id": "0",
+                "vehicle_id": str(vehicle_id),
             }
             sim = IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
@@ -317,7 +321,7 @@ def launch_setup(context, *args, **kwargs):
                 launch_arguments=sim_launch_args.items(),
             )
             processes_after_sim_ready = [
-                LogInfo(msg="Simulation world ready; starting vehicle_0 stack."),
+                LogInfo(msg=f"Simulation world ready; starting vehicle_{vehicle_id} stack."),
                 px4_sitl,
                 *vision_node_actions,
             ]
@@ -364,12 +368,14 @@ def launch_setup(context, *args, **kwargs):
                 bridge_camera_info,
                 px4_sitl,
                 *vision_node_actions,
-                mission,
             ]
+            if not middleware_already_running:
+                actions.append(middleware)
+            actions.append(mission)
 
         if run_mission_bool:
             handlers = [RegisterEventHandler(OnProcessIO(target_action=px4_sitl, on_stdout=make_io_handler("uav")))]
-            if vehicle_id == 0 and not middleware_already_running:
+            if not middleware_already_running:
                 handlers.append(
                     RegisterEventHandler(
                         OnProcessIO(
@@ -409,6 +415,11 @@ def generate_launch_description():
                 "airframe",
                 default_value="",
                 description="Override vehicle type (airframe name or ID). Used by multi_uav.launch.py.",
+            ),
+            DeclareLaunchArgument(
+                "launch_sim",
+                default_value="auto",
+                description="'auto' = start Gazebo for vehicle_id 0; 'true' = always; 'false' = never.",
             ),
             OpaqueFunction(function=launch_setup),
         ]

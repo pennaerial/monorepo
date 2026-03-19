@@ -6,8 +6,9 @@ Reads multi_uav_params.yaml (or path given by multi_uav_config) for:
   - px4_path: path to PX4-Autopilot
   - vehicles: list of { type: <airframe name or ID> } (one per vehicle)
 
-- vehicle_id=0: starts Gazebo (sim), first PX4, MicroXRCEAgent, vision, mission.
-- vehicle_id>=1: starts only that PX4 (connects to existing Gazebo), vision, mission.
+Gazebo (sim.launch.py) is launched once up-front, then each vehicle is started
+via main.launch.py with launch_sim:=false.  Camera bridges are created per-vehicle
+inside main.launch.py.
 
 Usage:
   ros2 launch uav multi_uav.launch.py
@@ -58,10 +59,25 @@ def _launch_multiple(context, *args, **kwargs):
     config_path = _resolve_config_path(context)
     vehicles, px4_path = _load_multi_uav_params(config_path)
 
+    sim_share = get_package_share_directory("sim")
     uav_share = get_package_share_directory("uav")
+    sim_launch = os.path.join(sim_share, "launch", "sim.launch.py")
     main_launch = os.path.join(uav_share, "launch", "main.launch.py")
 
     actions = []
+
+    # --- 1. Launch Gazebo environment (no per-vehicle camera bridges) ---
+    actions.append(
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(sim_launch),
+            launch_arguments={
+                "px4_path": px4_path,
+                "create_bridges": "false",
+            }.items(),
+        )
+    )
+
+    # --- 2. Launch each vehicle (PX4 + bridges + vision + mission) ---
     for vehicle_id, vehicle_spec in enumerate(vehicles):
         if isinstance(vehicle_spec, dict):
             vehicle_type = vehicle_spec.get("type")
@@ -78,6 +94,7 @@ def _launch_multiple(context, *args, **kwargs):
                     "px4_path": px4_path,
                     "vehicle_id": str(vehicle_id),
                     "airframe": airframe_str,
+                    "launch_sim": "false",
                 }.items(),
             )
         )

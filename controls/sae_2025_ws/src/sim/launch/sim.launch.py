@@ -204,37 +204,40 @@ def launch_setup(context, *args, **kwargs):
     vehicle_id = int(vehicle_id_str) if vehicle_id_str else 0
     if vehicle_id < 0:
         raise ValueError("vehicle_id must be >= 0")
-    # vehicle_id is 0-based and matches the PX4 instance number directly.
+    create_bridges = (
+        LaunchConfiguration("create_bridges", default="true").perform(context).lower() == "true"
+    )
     instance = vehicle_id
-    model_name_in_world = f"{model[3:]}_{instance}"  # e.g. x500_mono_cam_down_1
+    model_name_in_world = f"{model[3:]}_{instance}"
     camera_prefix = f"/px4_{instance}"
 
-    GZ_CAMERA_TOPIC = (
-        f"/world/{competition}/model/{model_name_in_world}/link/camera_link/sensor/camera/image"
-    )
-    GZ_CAMERA_INFO_TOPIC = f"/world/{competition}/model/{model_name_in_world}/link/camera_link/sensor/camera/camera_info"
-
-    gz_ros_bridge_camera = Node(
-        package="ros_gz_bridge",
-        executable="parameter_bridge",
-        arguments=[f"{GZ_CAMERA_TOPIC}@sensor_msgs/msg/Image[gz.msgs.Image"],
-        remappings=[(GZ_CAMERA_TOPIC, f"{camera_prefix}/camera")],
-        output="screen",
-        name="gz_ros_bridge_camera",
-        cwd=sae_ws_path,
-    )
-
-    gz_ros_bridge_camera_info = Node(
-        package="ros_gz_bridge",
-        executable="parameter_bridge",
-        arguments=[
-            f"{GZ_CAMERA_INFO_TOPIC}@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo"
-        ],
-        remappings=[(GZ_CAMERA_INFO_TOPIC, f"{camera_prefix}/camera_info")],
-        output="screen",
-        name="gz_ros_bridge_camera_info",
-        cwd=sae_ws_path,
-    )
+    gz_ros_bridge_camera = None
+    gz_ros_bridge_camera_info = None
+    if create_bridges:
+        GZ_CAMERA_TOPIC = (
+            f"/world/{competition}/model/{model_name_in_world}/link/camera_link/sensor/camera/image"
+        )
+        GZ_CAMERA_INFO_TOPIC = f"/world/{competition}/model/{model_name_in_world}/link/camera_link/sensor/camera/camera_info"
+        gz_ros_bridge_camera = Node(
+            package="ros_gz_bridge",
+            executable="parameter_bridge",
+            arguments=[f"{GZ_CAMERA_TOPIC}@sensor_msgs/msg/Image[gz.msgs.Image"],
+            remappings=[(GZ_CAMERA_TOPIC, f"{camera_prefix}/camera")],
+            output="screen",
+            name="gz_ros_bridge_camera",
+            cwd=sae_ws_path,
+        )
+        gz_ros_bridge_camera_info = Node(
+            package="ros_gz_bridge",
+            executable="parameter_bridge",
+            arguments=[
+                f"{GZ_CAMERA_INFO_TOPIC}@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo"
+            ],
+            remappings=[(GZ_CAMERA_INFO_TOPIC, f"{camera_prefix}/camera_info")],
+            output="screen",
+            name="gz_ros_bridge_camera_info",
+            cwd=sae_ws_path,
+        )
 
     sim_params, sim_config_path = load_sim_parameters(competition, logger)
 
@@ -295,9 +298,11 @@ def launch_setup(context, *args, **kwargs):
             )
         ),
         gz_ros_bridge_create,
-        gz_ros_bridge_camera,
-        gz_ros_bridge_camera_info,
     ]
+    if gz_ros_bridge_camera:
+        bridges_and_world_gen.append(gz_ros_bridge_camera)
+    if gz_ros_bridge_camera_info:
+        bridges_and_world_gen.append(gz_ros_bridge_camera_info)
     if scoring:
         bridges_and_world_gen.append(scoring)
 
@@ -378,6 +383,11 @@ def generate_launch_description():
             DeclareLaunchArgument("px4_path", default_value="~/PX4-Autopilot"),
             DeclareLaunchArgument("model", default_value="gz_x500_mono_cam"),
             DeclareLaunchArgument("vehicle_id", default_value="0"),
+            DeclareLaunchArgument(
+                "create_bridges",
+                default_value="true",
+                description="Create ROS<->GZ camera bridges. Set 'false' when bridges are managed externally.",
+            ),
             OpaqueFunction(function=launch_setup),
         ]
     )
