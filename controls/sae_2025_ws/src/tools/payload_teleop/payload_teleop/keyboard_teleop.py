@@ -13,7 +13,7 @@ from payload_interfaces.msg import DriveCommand
 def get_key(settings, timeout):
     tty.setraw(sys.stdin.fileno())
     rlist, _, _ = select([sys.stdin], [], [], timeout)
-    key = sys.stdin.read(1) if rlist else ''
+    key = sys.stdin.read(1) if rlist else ""
     termios.tcsetattr(sys.stdin, termios.TCSADRAIN, settings)
     return key
 
@@ -70,9 +70,9 @@ class PublishThread(threading.Thread):
 class KeyboardTeleop(Node):
     def __init__(self):
         super().__init__("keyboard_teleop")
-        self.declare_parameter('topic', '')
-        self.topic = self.get_parameter('topic').get_parameter_value().string_value
-        if self.topic == '':
+        self.declare_parameter("topic", "")
+        self.topic = self.get_parameter("topic").get_parameter_value().string_value
+        if self.topic == "":
             raise RuntimeError(
                 "topic parameter must not be an empty string!\n"
                 "set with this flag: --ros-args -p topic:=/my/topic/name"
@@ -83,27 +83,32 @@ class KeyboardTeleop(Node):
         self.pub = self.create_publisher(DriveCommand, self.topic, 10)
 
     def _print_status(self, key, linear, angular):
-        G = '\033[92m'
-        R = '\033[0m'
+        G = "\033[92m"
+        R = "\033[0m"
 
         def k(letter):
             return f"{G}{letter}{R}" if letter == key else letter
 
-        sys.stdout.write('\033[2J\033[H')
-        sys.stdout.write("\n".join([
-            "┌─────────────────────────────────────────────┐",
-            "│           Keyboard Teleop  (DriveCommand)    │",
-            "├─────────────────────────────────────────────┤",
-            f"│  topic : {self.topic:<36s}│",
-            f"│  cmd   : lin={linear:+6.2f}  ang={angular:+6.2f}              │",
-            "├──────────────┬──────────────────────────────┤",
-            "│  Movement    │  Speed Adjust                │",
-            f"│  {k('w')}  forward  │  {k('m')} / {k('M')}  linear  +/- 0.1  {self.linear:.2f}│",
-            f"│  {k('s')}  reverse  │  {k('n')} / {k('N')}  angular +/- 0.1  {self.angular:.2f}│",
-            f"│  {k('a')}  left     │                              │",
-            f"│  {k('d')}  right    │  Ctrl-C to quit              │",
-            "└──────────────┴──────────────────────────────┘",
-        ]) + "\n")
+        sys.stdout.write("\033[2J\033[H")
+        sys.stdout.write(
+            "\n".join(
+                [
+                    "┌─────────────────────────────────────────────┐",
+                    "│           Keyboard Teleop  (DriveCommand)    │",
+                    "├─────────────────────────────────────────────┤",
+                    f"│  topic : {self.topic:<36s}│",
+                    f"│  cmd   : lin={linear:+6.2f}  ang={angular:+6.2f}              │",
+                    "├──────────────┬──────────────────────────────┤",
+                    "│  Movement    │  Speed Adjust                │",
+                    f"│  {k('w')}  forward  │  {k('m')} / {k('M')}  linear  +/- 0.1  {self.linear:.2f}│",
+                    f"│  {k('s')}  reverse  │  {k('n')} / {k('N')}  angular +/- 0.1  {self.angular:.2f}│",
+                    f"│  {k('a')}  left     │                              │",
+                    f"│  {k('d')}  right    │  Ctrl-C to quit              │",
+                    "└──────────────┴──────────────────────────────┘",
+                ]
+            )
+            + "\n"
+        )
         sys.stdout.flush()
 
 
@@ -126,31 +131,31 @@ def main():
         while True:
             key = get_key(settings, timeout=0.20)
 
-            if key == '\x03':
+            if key == "\x03":
                 break
 
-            if key == 'w':
+            if key == "w":
                 linear = node.linear
                 angular = 0.0
-            elif key == 's':
+            elif key == "s":
                 linear = -node.linear
                 angular = 0.0
-            elif key == 'a':
+            elif key == "a":
                 linear = 0.0
                 angular = node.angular
-            elif key == 'd':
+            elif key == "d":
                 linear = 0.0
                 angular = -node.angular
-            elif key == 'm':
+            elif key == "m":
                 node.linear = round(node.linear + 0.1, 2)
-            elif key == 'M':
+            elif key == "M":
                 node.linear = round(node.linear - 0.1, 2)
-            elif key == 'n':
+            elif key == "n":
                 node.angular = round(node.angular + 0.1, 2)
-            elif key == 'N':
+            elif key == "N":
                 node.angular = round(node.angular - 0.1, 2)
             else:
-                if key == '' and linear == 0.0 and angular == 0.0:
+                if key == "" and linear == 0.0 and angular == 0.0:
                     node._print_status(key, linear, angular)
                     continue
                 linear = 0.0
