@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+import os
+import sys
+from time import time
+import importlib
+import inspect
+import ast
 import rclpy
 from rclpy.node import Node
 from time import time
@@ -338,3 +344,47 @@ class ModeManager(Node):
         with open(filename, "r") as file:
             data = yaml.safe_load(file)
         return data
+
+
+def main(args=None):
+    rclpy.init(args=args)
+
+    argv = sys.argv
+    if len(argv) > 3:
+        debug = argv[1].lower() == "true"
+        mode_map = argv[2]
+        servo_only = argv[3].lower() == "true"
+        try:
+            camera_offsets = [float(v.strip()) for v in argv[4].split(",")]
+        except Exception:
+            camera_offsets = [0.0, 0.0, 0.0]
+        vehicle_class = Vehicle[argv[5].upper()]
+        vision_nodes = argv[6] if len(argv) > 6 else ""
+        vehicle_id = int(argv[7]) if len(argv) > 7 else 0
+    else:
+        debug = False
+        mode_map = None
+        servo_only = False
+        camera_offsets = [0.0, 0.0, 0.0]
+        vehicle_class = Vehicle.MULTICOPTER
+        vision_nodes = ""
+        vehicle_id = 0
+
+    mission_node = ModeManager(
+        mode_map=mode_map,
+        vision_nodes=vision_nodes,
+        camera_offsets=camera_offsets,
+        DEBUG=debug,
+        servo_only=servo_only,
+        vehicle_class=vehicle_class,
+        vehicle_id=vehicle_id,
+    )
+    try:
+        rclpy.spin(mission_node)
+    finally:
+        mission_node.destroy_node()
+        rclpy.shutdown()
+
+
+if __name__ == "__main__":
+    main()
