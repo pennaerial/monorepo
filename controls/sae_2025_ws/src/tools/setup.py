@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-package_name = "payload_teleop"
+package_name = "tools"
 
 setup(
     name=package_name,
