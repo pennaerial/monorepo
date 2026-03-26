@@ -24,6 +24,7 @@ setup(
     entry_points={
         "console_scripts": [
             "keyboard_teleop = payload_teleop.keyboard_teleop:main",
+            "apriltag_debug = apriltag_debug.apriltag_debug:main",
         ],
     },
 )
