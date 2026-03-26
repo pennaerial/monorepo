@@ -693,7 +693,6 @@ class PayloadDriveToAprilTagMode(Mode):
             self._orbit_yaw_estimate = yaw
         r = math.hypot(x_vtol, y_vtol)
         theta_vtol = math.atan2(y_vtol, x_vtol)
-        R = max(self.dock_orbit_radius_m, 1e-3)
         back_id = self.dock_target_tag_id
         back_visible = back_id in tag_results if tag_results else False
 
@@ -720,9 +719,6 @@ class PayloadDriveToAprilTagMode(Mode):
         # Continuous vector-field orbit heading
         heading_tangent = _wrap_angle(theta_vtol + self._orbit_dir * (math.pi / 2.0))
         radial_err = r - self.dock_orbit_radius_m
-        radial_k_eff = self.dock_orbit_radial_k * (2.0 if radial_err < 0 else 1.0)
-        corr = math.atan(radial_k_eff * radial_err)
-        heading_cmd = _wrap_angle(heading_tangent - self._orbit_dir * corr)
 
         # Lazy init segment state
         if self._orbit_segment is None:
