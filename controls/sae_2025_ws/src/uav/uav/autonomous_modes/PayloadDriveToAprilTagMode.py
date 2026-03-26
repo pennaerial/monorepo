@@ -22,9 +22,9 @@ DEFAULT_TAG_FAMILY = "tag36h11"
 # Poses are relative_to="base_link" in SDF: (x, y, z, roll, pitch, yaw).
 _VTOL_TAG_POSES = {
     0: (-0.023, 0.0, 0.0, -1.5707, 3.141592, 1.5707),  # front
-    1: (0.03, 0.0, 0.0, 1.5707, 0.0, 1.5707),          # back
-    2: (0.0, 0.545, -0.037, 1.5707, 0.0, 3.141592),    # left
-    3: (0.0, -0.545, -0.037, 1.5707, 0.0, 0.0),        # right
+    1: (0.03, 0.0, 0.0, 1.5707, 0.0, 1.5707),  # back
+    2: (0.0, 0.545, -0.037, 1.5707, 0.0, 3.141592),  # left
+    3: (0.0, -0.545, -0.037, 1.5707, 0.0, 0.0),  # right
 }
 
 
@@ -194,12 +194,16 @@ class PayloadDriveToAprilTagMode(Mode):
             self._orbit_dir = 1
             self._pose_vtol = None
             self._vtol_center = None
-            self.log("PayloadDriveToAprilTagMode: started in dock phase (handoff from color orbit)")
+            self.log(
+                "PayloadDriveToAprilTagMode: started in dock phase (handoff from color orbit)"
+            )
         else:
-            self._phase = "search"       # search | approach_front | orbit | dock
-            self._orbit_dir = None       # +1 CCW, -1 CW; computed once, locked
-            self._pose_vtol = None       # (x, y, yaw) camera in VTOL base_link
-            self._vtol_center = None     # (cx, cy) slow-filtered VTOL center in payload frame
+            self._phase = "search"  # search | approach_front | orbit | dock
+            self._orbit_dir = None  # +1 CCW, -1 CW; computed once, locked
+            self._pose_vtol = None  # (x, y, yaw) camera in VTOL base_link
+            self._vtol_center = (
+                None  # (cx, cy) slow-filtered VTOL center in payload frame
+            )
 
         self._last_cmd = (0.0, 0.0)
         self._last_tag_time = None
@@ -213,9 +217,9 @@ class PayloadDriveToAprilTagMode(Mode):
         self._search_started = False
 
         # Segment-based orbit: straight -> peek_turn -> turn_back -> straight
-        self._orbit_segment = None       # 'straight' | 'peek_turn' | 'turn_back'
+        self._orbit_segment = None  # 'straight' | 'peek_turn' | 'turn_back'
         self._orbit_straight_start_time = None
-        self._orbit_straight_heading = None   # VTOL-frame yaw to hold during straight
+        self._orbit_straight_heading = None  # VTOL-frame yaw to hold during straight
         self._orbit_peek_start_time = None
         self._orbit_turn_back_start_time = None
 
@@ -228,14 +232,22 @@ class PayloadDriveToAprilTagMode(Mode):
             f"PayloadDriveToAprilTagMode: subscribing to {cam_topic}, {info_topic}"
         )
         self._image_sub = self.node.create_subscription(
-            Image, cam_topic, self._image_cb, 10,
+            Image,
+            cam_topic,
+            self._image_cb,
+            10,
         )
         self._info_sub = self.node.create_subscription(
-            CameraInfo, info_topic, self._info_cb, 10,
+            CameraInfo,
+            info_topic,
+            self._info_cb,
+            10,
         )
         drive_topic = f"/{self.payload_name}/cmd_drive"
         self._drive_pub = self.node.create_publisher(
-            DriveCommand, drive_topic, 10,
+            DriveCommand,
+            drive_topic,
+            10,
         )
         self._first_image_logged = False
         self._last_wait_log_time = 0.0
@@ -250,7 +262,10 @@ class PayloadDriveToAprilTagMode(Mode):
     # ------------------------------------------------------------------
 
     def _estimate_camera_pose_in_vtol(
-        self, tag_id: int, rvec: np.ndarray, tvec: np.ndarray,
+        self,
+        tag_id: int,
+        rvec: np.ndarray,
+        tvec: np.ndarray,
     ):
         if tag_id not in _VTOL_TAG_POSES:
             return None
@@ -287,7 +302,9 @@ class PayloadDriveToAprilTagMode(Mode):
         Bearing from payload to VTOL + 90° for orbit direction."""
         r = math.hypot(x_vtol, y_vtol)
         bearing_to_vtol = math.atan2(-y_vtol, -x_vtol)
-        heading_tangent = _wrap_angle(bearing_to_vtol + self._orbit_dir * (math.pi / 2.0))
+        heading_tangent = _wrap_angle(
+            bearing_to_vtol + self._orbit_dir * (math.pi / 2.0)
+        )
         radial_err = r - self.dock_orbit_radius_m
         radial_k_eff = self.dock_orbit_radial_k * (2.0 if radial_err < 0 else 1.0)
         corr = math.atan(radial_k_eff * radial_err)
@@ -311,6 +328,7 @@ class PayloadDriveToAprilTagMode(Mode):
 
     def _dock_update(self, time_delta: float, detections, K, dist_coeffs) -> None:
         import time as _time
+
         now = _time.time()
 
         # ============================================================
@@ -328,7 +346,10 @@ class PayloadDriveToAprilTagMode(Mode):
             if len(corners) != 4:
                 continue
             ok, rvec, tvec = cv2.solvePnP(
-                obj_pts, corners, K, dist_coeffs,
+                obj_pts,
+                corners,
+                K,
+                dist_coeffs,
                 flags=cv2.SOLVEPNP_IPPE_SQUARE,
             )
             if not ok:
@@ -366,7 +387,13 @@ class PayloadDriveToAprilTagMode(Mode):
                 side = [tid for tid in [2, 3] if tid in tag_results]
                 back = [1] if 1 in tag_results else []
                 front = [0] if 0 in tag_results else []
-                candidates = side if side else (back if back else (front if front else list(tag_results.keys())))
+                candidates = (
+                    side
+                    if side
+                    else (
+                        back if back else (front if front else list(tag_results.keys()))
+                    )
+                )
                 closest_id = min(
                     candidates,
                     key=lambda tid: float(np.asarray(tag_results[tid][2]).ravel()[2]),
@@ -423,7 +450,12 @@ class PayloadDriveToAprilTagMode(Mode):
                 front_tvec = np.asarray(tag_results[front_id][2]).ravel()
                 front_dist = float(front_tvec[2])
 
-            if not self._search_started and self._pose_vtol is not None and only_front and front_dist is not None:
+            if (
+                not self._search_started
+                and self._pose_vtol is not None
+                and only_front
+                and front_dist is not None
+            ):
                 too_far = front_dist > self.dock_approach_front_max_m
                 too_close = front_dist < self.dock_approach_front_min_m
                 if too_far:
@@ -515,14 +547,23 @@ class PayloadDriveToAprilTagMode(Mode):
             if front_dist < self.dock_front_safe_standoff_m:
                 self._transition_approach_front_to_orbit(now)
                 return
-            if self.dock_approach_front_min_m <= front_dist <= self.dock_approach_front_max_m:
+            if (
+                self.dock_approach_front_min_m
+                <= front_dist
+                <= self.dock_approach_front_max_m
+            ):
                 self._transition_approach_front_to_orbit(now)
                 return
             self._control_approach_front(now, tag_results, seen_ids)
             return
 
         # --- dock: back tag lost but other tags visible -> orbit ---
-        if self._phase == "dock" and getattr(self, "_dock_sub", None) not in ("spin_180", "back_up_5s") and not back_visible and any_visible:
+        if (
+            self._phase == "dock"
+            and getattr(self, "_dock_sub", None) not in ("spin_180", "back_up_5s")
+            and not back_visible
+            and any_visible
+        ):
             self._phase = "orbit"
             self._dock_sub = None
             self._dock_align_start = None
@@ -530,7 +571,9 @@ class PayloadDriveToAprilTagMode(Mode):
                 x_vtol, y_vtol, yaw = self._pose_vtol
                 self._orbit_segment = "straight"
                 self._orbit_straight_start_time = now
-                self._orbit_straight_heading = self._compute_straight_heading(x_vtol, y_vtol)
+                self._orbit_straight_heading = self._compute_straight_heading(
+                    x_vtol, y_vtol
+                )
                 self._orbit_peek_start_time = None
                 self._orbit_turn_back_start_time = None
             self.log(
@@ -568,7 +611,9 @@ class PayloadDriveToAprilTagMode(Mode):
             f"DOCK | approach_front -> orbit (dir={'CCW' if self._orbit_dir == 1 else 'CW'}, align first)"
         )
 
-    def _control_approach_front(self, now: float, tag_results: dict, seen_ids: list) -> None:
+    def _control_approach_front(
+        self, now: float, tag_results: dict, seen_ids: list
+    ) -> None:
         """Drive toward front tag (ID 0). Back up if < min_m; drive forward if > max_m."""
         front_id = 0
         if front_id not in tag_results:
@@ -586,11 +631,14 @@ class PayloadDriveToAprilTagMode(Mode):
         cx = img_w / 2.0
         tag_cx = float(detection.center[0])
         err_x = tag_cx - cx
-        angular = float(np.clip(
-            -self.dock_approach_bearing_gain * bearing
-            - self.angular_gain * self.dock_approach_pixel_scale * err_x,
-            -0.4, 0.4
-        ))
+        angular = float(
+            np.clip(
+                -self.dock_approach_bearing_gain * bearing
+                - self.angular_gain * self.dock_approach_pixel_scale * err_x,
+                -0.4,
+                0.4,
+            )
+        )
 
         if distance < self.dock_approach_front_min_m:
             dist_to_band = self.dock_approach_front_min_m - distance
@@ -609,10 +657,17 @@ class PayloadDriveToAprilTagMode(Mode):
             return
 
         dist_err = distance - self.dock_approach_front_max_m
-        linear = float(np.clip(
-            self.linear_gain * max(0.0, dist_err),
-            0.05, 0.2,
-        )) if dist_err > 0.0 else 0.0
+        linear = (
+            float(
+                np.clip(
+                    self.linear_gain * max(0.0, dist_err),
+                    0.05,
+                    0.2,
+                )
+            )
+            if dist_err > 0.0
+            else 0.0
+        )
 
         if now - self._last_log_time >= 1.0:
             self._last_log_time = now
@@ -626,7 +681,9 @@ class PayloadDriveToAprilTagMode(Mode):
     # Control: smooth orbit with persistent heading
     # ------------------------------------------------------------------
 
-    def _control_orbit(self, now, time_delta, seen_ids, any_visible, tag_results) -> None:
+    def _control_orbit(
+        self, now, time_delta, seen_ids, any_visible, tag_results
+    ) -> None:
         if self._pose_vtol is None:
             self._publish_drive(0.0, 0.0)
             return
@@ -671,7 +728,9 @@ class PayloadDriveToAprilTagMode(Mode):
         if self._orbit_segment is None:
             self._orbit_segment = "straight"
             self._orbit_straight_start_time = now
-            self._orbit_straight_heading = self._compute_straight_heading(x_vtol, y_vtol)
+            self._orbit_straight_heading = self._compute_straight_heading(
+                x_vtol, y_vtol
+            )
             self._orbit_peek_start_time = None
             self._orbit_turn_back_start_time = None
 
@@ -679,10 +738,17 @@ class PayloadDriveToAprilTagMode(Mode):
         if not any_visible:
             seg_tl = self._orbit_segment
             elapsed_straight = now - (self._orbit_straight_start_time or now)
-            if seg_tl == "straight" and elapsed_straight >= self.dock_orbit_straight_duration_s:
+            if (
+                seg_tl == "straight"
+                and elapsed_straight >= self.dock_orbit_straight_duration_s
+            ):
                 self._orbit_segment = "peek_turn"
                 self._orbit_peek_start_time = now
-                self._orbit_peek_start_yaw = self._orbit_yaw_estimate if self._orbit_yaw_estimate is not None else yaw
+                self._orbit_peek_start_yaw = (
+                    self._orbit_yaw_estimate
+                    if self._orbit_yaw_estimate is not None
+                    else yaw
+                )
             if seg_tl == "peek_turn":
                 peek_elapsed = now - (self._orbit_peek_start_time or now)
                 if peek_elapsed >= self.dock_orbit_peek_max_when_lost_s:
@@ -693,14 +759,30 @@ class PayloadDriveToAprilTagMode(Mode):
                         self.log("DOCK | orbit peek_turn -> straight (timeout, no tag)")
                 else:
                     bearing_to_center = math.atan2(-y_vtol, -x_vtol)
-                    yaw_eff = self._orbit_yaw_estimate if self._orbit_yaw_estimate is not None else yaw
+                    yaw_eff = (
+                        self._orbit_yaw_estimate
+                        if self._orbit_yaw_estimate is not None
+                        else yaw
+                    )
                     yaw_err_peek = _wrap_angle(bearing_to_center - yaw_eff)
-                    w_peek = float(np.clip(self.dock_orbit_yaw_k * yaw_err_peek, -0.6, 0.6))
+                    w_peek = float(
+                        np.clip(self.dock_orbit_yaw_k * yaw_err_peek, -0.6, 0.6)
+                    )
                     self._publish_drive(0.0, w_peek)
-                    self._orbit_yaw_estimate = _wrap_angle(yaw_eff + w_peek * time_delta)
+                    self._orbit_yaw_estimate = _wrap_angle(
+                        yaw_eff + w_peek * time_delta
+                    )
                     return
-            yaw_eff = self._orbit_yaw_estimate if self._orbit_yaw_estimate is not None else yaw
-            hold_heading = self._orbit_straight_heading if self._orbit_straight_heading is not None else heading_tangent
+            yaw_eff = (
+                self._orbit_yaw_estimate
+                if self._orbit_yaw_estimate is not None
+                else yaw
+            )
+            hold_heading = (
+                self._orbit_straight_heading
+                if self._orbit_straight_heading is not None
+                else heading_tangent
+            )
             yaw_err_hold = _wrap_angle(hold_heading - yaw_eff)
             v = float(np.clip(self.dock_orbit_speed_mps, 0.05, 0.2))
             w = float(np.clip(self.dock_orbit_yaw_k * yaw_err_hold, -0.4, 0.4))
@@ -719,10 +801,14 @@ class PayloadDriveToAprilTagMode(Mode):
                 self._orbit_peek_start_yaw = yaw
                 if now - self._last_log_time >= 0.5:
                     self._last_log_time = now
-                    self.log(f"DOCK | orbit straight -> peek_turn (elapsed={elapsed:.1f}s)")
+                    self.log(
+                        f"DOCK | orbit straight -> peek_turn (elapsed={elapsed:.1f}s)"
+                    )
 
             if self._orbit_straight_heading is None:
-                self._orbit_straight_heading = self._compute_straight_heading(x_vtol, y_vtol)
+                self._orbit_straight_heading = self._compute_straight_heading(
+                    x_vtol, y_vtol
+                )
             yaw_err = _wrap_angle(self._orbit_straight_heading - yaw)
             v = float(np.clip(self.dock_orbit_speed_mps, 0.05, 0.2))
             w = float(np.clip(self.dock_orbit_yaw_k * yaw_err, -0.4, 0.4))
@@ -762,13 +848,15 @@ class PayloadDriveToAprilTagMode(Mode):
         # --- turn_back: align to locked heading, then resume straight ---
         if seg == "turn_back":
             if getattr(self, "_orbit_turn_back_heading", None) is None:
-                self._orbit_turn_back_heading = self._compute_straight_heading(x_vtol, y_vtol)
+                self._orbit_turn_back_heading = self._compute_straight_heading(
+                    x_vtol, y_vtol
+                )
             heading_tb = self._orbit_turn_back_heading
             yaw_err_tb = _wrap_angle(heading_tb - yaw)
             w = float(np.clip(self.dock_orbit_yaw_k * yaw_err_tb, -0.6, 0.6))
             v = 0.05
             # Relaxed threshold (0.25 rad ~14°) so we actually transition to straight; 0.12 rad was never reached with pose noise.
-            if abs(yaw_err_tb) < .25:
+            if abs(yaw_err_tb) < 0.25:
                 self._orbit_segment = "straight"
                 self._orbit_straight_start_time = now
                 self._orbit_straight_heading = self._orbit_turn_back_heading
@@ -833,7 +921,10 @@ class PayloadDriveToAprilTagMode(Mode):
         if sub == "spin_180":
             spin_rate_rad_s = 0.5
             spin_stop_rad = 1.05 * math.pi
-            total_rot = getattr(self, "_dock_spin_total_rot", 0.0) + spin_rate_rad_s * time_delta
+            total_rot = (
+                getattr(self, "_dock_spin_total_rot", 0.0)
+                + spin_rate_rad_s * time_delta
+            )
             self._dock_spin_total_rot = total_rot
             if total_rot >= spin_stop_rad:
                 self._dock_sub = "back_up_5s"
@@ -899,10 +990,7 @@ class PayloadDriveToAprilTagMode(Mode):
             self._publish_drive(0.0, 0.0)
             return
 
-        angular = float(np.clip(
-            -self.angular_gain * err_x - 0.5 * bearing,
-            -0.4, 0.4
-        ))
+        angular = float(np.clip(-self.angular_gain * err_x - 0.5 * bearing, -0.4, 0.4))
         linear = float(
             np.clip(
                 self.linear_gain * (distance - self.stop_distance_m),
@@ -935,11 +1023,14 @@ class PayloadDriveToAprilTagMode(Mode):
 
     def on_update(self, time_delta: float) -> None:
         import time as _time
+
         now = _time.time()
         if self.done:
             return
         if self._detector is None:
-            self.log("PayloadDriveToAprilTagMode: apriltag not installed; cannot detect tags.")
+            self.log(
+                "PayloadDriveToAprilTagMode: apriltag not installed; cannot detect tags."
+            )
             return
         if self._image is None or self._camera_info is None:
             if now - getattr(self, "_last_wait_log_time", 0) >= 2.0:
@@ -951,7 +1042,9 @@ class PayloadDriveToAprilTagMode(Mode):
             return
         if not getattr(self, "_first_image_logged", False):
             self._first_image_logged = True
-            self.log("PayloadDriveToAprilTagMode: first image received from payload camera")
+            self.log(
+                "PayloadDriveToAprilTagMode: first image received from payload camera"
+            )
         try:
             gray = self._bridge.imgmsg_to_cv2(self._image, desired_encoding="mono8")
         except Exception as e:
@@ -986,7 +1079,9 @@ class PayloadDriveToAprilTagMode(Mode):
                 self._last_no_tag_log_time = now
                 if detections:
                     ids = [det.tag_id for det in detections]
-                    self.log(f"PayloadDriveToAprilTagMode: tags in view {ids} but no match, angular=0.2")
+                    self.log(
+                        f"PayloadDriveToAprilTagMode: tags in view {ids} but no match, angular=0.2"
+                    )
                 else:
                     self.log("PayloadDriveToAprilTagMode: no tag in view, angular=0.2")
             self._drive_pub.publish(DriveCommand(linear=0.0, angular=0.2))
@@ -997,7 +1092,10 @@ class PayloadDriveToAprilTagMode(Mode):
         if len(corners) != 4:
             return
         ok, rvec, tvec = cv2.solvePnP(
-            obj_pts, corners, K, dist_coeffs,
+            obj_pts,
+            corners,
+            K,
+            dist_coeffs,
             flags=cv2.SOLVEPNP_IPPE_SQUARE,
         )
         if not ok:
