@@ -421,6 +421,7 @@ class HoopCourseNode(WorldNode):
         physics: Optional[dict] = None,
         output_filename: Optional[str] = None,
         seed: Optional[int] = None,
+        **kwargs,
     ):
         """
         Initialize the hoop course world generator.
@@ -436,7 +437,10 @@ class HoopCourseNode(WorldNode):
             seed: Optional random seed for reproducible world generation
         """
         super().__init__(
-            competition_name="in_house", output_filename=output_filename, seed=seed
+            competition_name="in_house",
+            output_filename=output_filename,
+            seed=seed,
+            **kwargs,
         )
         self.course = course
         self.dlz = dlz
@@ -643,7 +647,7 @@ class HoopCourseNode(WorldNode):
         except Exception as e:
             self.get_logger().error(f"Failed to generate world: {e}")
             return False
-        return True
+        return super().generate_world()
 
 
 def main(args=None):

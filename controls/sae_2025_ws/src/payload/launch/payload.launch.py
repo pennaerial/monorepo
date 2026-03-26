@@ -19,16 +19,25 @@ def launch_setup(context):
     )
 
     payload_name = LaunchConfiguration("payload_name").perform(context)
+    controller_override = LaunchConfiguration("controller").perform(context)
 
     payload_params = load_param_file(payload_params_path)
     ros_params = payload_params.get("/**", {}).get("ros__parameters", {})
-    controller = ros_params.get("controller", "GPIOController")
+    controller = (
+        controller_override
+        if controller_override
+        else ros_params.get("controller", "GPIOController")
+    )
     world_name = ros_params.get("sim", {}).get("world_name", "default")
+
+    parameters = [payload_params_path]
+    if controller_override:
+        parameters.append({"controller": controller_override})
 
     payload = Node(
         package="payload",
         executable="payload",
-        parameters=[payload_params_path],
+        parameters=parameters,
         output="screen",
         name=payload_name,
     )
@@ -86,6 +95,7 @@ def generate_launch_description():
     return LaunchDescription(
         [
             DeclareLaunchArgument("payload_name", default_value="payload_0"),
+            DeclareLaunchArgument("controller", default_value=""),
             OpaqueFunction(function=launch_setup),
         ]
     )

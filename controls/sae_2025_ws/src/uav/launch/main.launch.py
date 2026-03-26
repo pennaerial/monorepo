@@ -235,7 +235,7 @@ def launch_setup(context, *args, **kwargs):
 
     # Now, construct the actions list in a single step, depending on sim_bool
     if sim_bool:
-        from sim.utils import load_sim_launch_parameters
+        from sim.utils import load_sim_launch_parameters, load_sim_parameters
         from sim.constants import Competition, COMPETITION_NAMES, DEFAULT_COMPETITION
 
         # Resolve world name from sim launch params (same source as sim.launch.py)
@@ -250,6 +250,48 @@ def launch_setup(context, *args, **kwargs):
                 f"Invalid competition: {competition_num}. Must be one of {valid_values}"
             )
         logger.info(f"PX4_GZ_WORLD={competition}")
+
+        # Read optional mission stage (e.g. "horizontal_takeoff")
+        mission_stage = str(sim_params.get("mission_stage", "")).strip()
+
+        sim_stage_params, _ = load_sim_parameters(
+            competition,
+            logger,
+            competition_name=competition,
+            mission_stage=mission_stage,
+        )
+
+        vehicle_pose = sim_stage_params["world"]["params"].get(
+            "vehicle_pose", [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        )  # [x, y, z, roll, pitch, yaw]
+        vehicle_pose_str = ",".join(str(pose) for pose in vehicle_pose)
+        logger.info(f"Spawning vehicle at pose: {vehicle_pose_str}")
+
+        world_params_dict = sim_stage_params["world"]["params"]
+        payload_names = [
+            name
+            for name in ("payload_0", "payload_1")
+            if world_params_dict.get(name) is not None
+        ]
+        logger.info(f"Detected payloads from config: {payload_names}")
+
+        payload_launch_actions = []
+        for payload_name in payload_names:
+            payload_launch_actions.append(
+                IncludeLaunchDescription(
+                    PythonLaunchDescriptionSource(
+                        os.path.join(
+                            get_package_share_directory("payload"),
+                            "launch",
+                            "payload.launch.py",
+                        )
+                    ),
+                    launch_arguments={
+                        "payload_name": payload_name,
+                        "controller": "SimController",
+                    }.items(),
+                )
+            )
 
         # Prepare sim launch arguments with all simulation parameters
         sim_launch_args = {
@@ -272,7 +314,7 @@ def launch_setup(context, *args, **kwargs):
             cmd=[
                 "bash",
                 "-c",
-                f"PX4_GZ_MODEL_POSE='0,0,0,0,0,0' PX4_GZ_WORLD={competition} PX4_GZ_STANDALONE=1 PX4_SYS_AUTOSTART={autostart} PX4_SIM_MODEL={model} ./build/px4_sitl_default/bin/px4",
+                f"PX4_GZ_MODEL_POSE='{vehicle_pose_str}' PX4_GZ_WORLD={competition} PX4_GZ_STANDALONE=1 PX4_SYS_AUTOSTART={autostart} PX4_SIM_MODEL={model} ./build/px4_sitl_default/bin/px4",
             ],
             cwd=px4_path,
             output="screen",
@@ -288,6 +330,7 @@ def launch_setup(context, *args, **kwargs):
                             px4_sitl,
                             *vision_node_actions,
                             middleware,
+                            *payload_launch_actions,
                         ]
                         if b"Successfully generated world file:" in event.text
                         else None

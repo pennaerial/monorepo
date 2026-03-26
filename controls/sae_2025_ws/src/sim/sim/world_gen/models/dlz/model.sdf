@@ -7,17 +7,883 @@
         <mass>2</mass>
       </inertial>
       <visual name="visual">
+  
       <pose> 3.8 1.2 .1 1.5708 0 0 </pose>
         <geometry>
           <mesh>
             <uri>model://dlz/meshes/dlz.STL</uri>
-            <scale> .0025 .0025 .0025 </scale>
+            <scale>  0.001000164 0.001000164 0.001000164 </scale>
           </mesh>
         </geometry>
         <material>
           <diffuse>1 0 1 1</diffuse> <!-- Pink color -->
       </material>
       </visual>
-    </link>
+      <!-- Inner square: 6 ft × 6 ft inside 8 ft × 8 ft pad. Flat on ground, rot=0 0 0. -->
+      <visual name="inner_border_top">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.0192 0.8952 0.112 0 0 0</pose>
+        <geometry><box><size>1.8288 0.02 0.001</size></box></geometry>
+        <material><ambient>0.1 0.1 0.1 1</ambient><diffuse>0.1 0.1 0.1 1</diffuse></material>
+      </visual>
+      <visual name="inner_border_bottom">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.0192 -0.9336 0.112 0 0 0</pose>
+        <geometry><box><size>1.8288 0.02 0.001</size></box></geometry>
+        <material><ambient>0.1 0.1 0.1 1</ambient><diffuse>0.1 0.1 0.1 1</diffuse></material>
+      </visual>
+      <visual name="inner_border_left">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.1048 -0.0192 0.112 0 0 0</pose>
+        <geometry><box><size>0.02 1.8288 0.001</size></box></geometry>
+        <material><ambient>0.1 0.1 0.1 1</ambient><diffuse>0.1 0.1 0.1 1</diffuse></material>
+      </visual>
+      <visual name="inner_border_right">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.9336 -0.0192 0.112 0 0 0</pose>
+        <geometry><box><size>0.02 1.8288 0.001</size></box></geometry>
+        <material><ambient>0.1 0.1 0.1 1</ambient><diffuse>0.1 0.1 0.1 1</diffuse></material>
+      </visual>
+      <visual name="hash_top_00">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.1556 0.8952 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>0.0 0.6 0.0 1</ambient><diffuse>0.0 0.6 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_top_01">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.2064 0.8952 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 0.8 1</ambient><diffuse>0.0 0.0 0.8 1</diffuse></material>
+      </visual>
+      <visual name="hash_top_02">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.2572 0.8952 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>1.0 0.5 0.0 1</ambient><diffuse>1.0 0.5 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_top_03">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.308 0.8952 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>0.0 0.6 0.0 1</ambient><diffuse>0.0 0.6 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_top_04">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.3588 0.8952 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 0.8 1</ambient><diffuse>0.0 0.0 0.8 1</diffuse></material>
+      </visual>
+      <visual name="hash_top_05">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.4096 0.8952 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>1.0 0.5 0.0 1</ambient><diffuse>1.0 0.5 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_top_06">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.4604 0.8952 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>0.0 0.6 0.0 1</ambient><diffuse>0.0 0.6 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_top_07">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.5112 0.8952 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 0.8 1</ambient><diffuse>0.0 0.0 0.8 1</diffuse></material>
+      </visual>
+      <visual name="hash_top_08">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.562 0.8952 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>1.0 0.5 0.0 1</ambient><diffuse>1.0 0.5 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_top_09">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.6128 0.8952 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>0.0 0.6 0.0 1</ambient><diffuse>0.0 0.6 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_top_10">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.6636 0.8952 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 0.8 1</ambient><diffuse>0.0 0.0 0.8 1</diffuse></material>
+      </visual>
+      <visual name="hash_top_11">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.7144 0.8952 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>1.0 0.5 0.0 1</ambient><diffuse>1.0 0.5 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_top_12">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.7652 0.8952 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>0.0 0.6 0.0 1</ambient><diffuse>0.0 0.6 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_top_13">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.816 0.8952 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 0.8 1</ambient><diffuse>0.0 0.0 0.8 1</diffuse></material>
+      </visual>
+      <visual name="hash_top_14">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.8668 0.8952 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>1.0 0.5 0.0 1</ambient><diffuse>1.0 0.5 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_top_15">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.9176 0.8952 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>0.0 0.6 0.0 1</ambient><diffuse>0.0 0.6 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_top_16">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.9684 0.8952 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 0.8 1</ambient><diffuse>0.0 0.0 0.8 1</diffuse></material>
+      </visual>
+      <visual name="hash_top_17">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.0192 0.8952 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>1.0 0.5 0.0 1</ambient><diffuse>1.0 0.5 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_top_18">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.07 0.8952 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>0.0 0.6 0.0 1</ambient><diffuse>0.0 0.6 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_top_19">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.1208 0.8952 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 0.8 1</ambient><diffuse>0.0 0.0 0.8 1</diffuse></material>
+      </visual>
+      <visual name="hash_top_20">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.1716 0.8952 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>1.0 0.5 0.0 1</ambient><diffuse>1.0 0.5 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_top_21">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.2224 0.8952 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>0.0 0.6 0.0 1</ambient><diffuse>0.0 0.6 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_top_22">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.2732 0.8952 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 0.8 1</ambient><diffuse>0.0 0.0 0.8 1</diffuse></material>
+      </visual>
+      <visual name="hash_top_23">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.324 0.8952 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>1.0 0.5 0.0 1</ambient><diffuse>1.0 0.5 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_top_24">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.3748 0.8952 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>0.0 0.6 0.0 1</ambient><diffuse>0.0 0.6 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_top_25">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.4256 0.8952 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 0.8 1</ambient><diffuse>0.0 0.0 0.8 1</diffuse></material>
+      </visual>
+      <visual name="hash_top_26">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.4764 0.8952 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>1.0 0.5 0.0 1</ambient><diffuse>1.0 0.5 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_top_27">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.5272 0.8952 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>0.0 0.6 0.0 1</ambient><diffuse>0.0 0.6 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_top_28">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.578 0.8952 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 0.8 1</ambient><diffuse>0.0 0.0 0.8 1</diffuse></material>
+      </visual>
+      <visual name="hash_top_29">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.6288 0.8952 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>1.0 0.5 0.0 1</ambient><diffuse>1.0 0.5 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_top_30">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.6796 0.8952 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>0.0 0.6 0.0 1</ambient><diffuse>0.0 0.6 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_top_31">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.7304 0.8952 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 0.8 1</ambient><diffuse>0.0 0.0 0.8 1</diffuse></material>
+      </visual>
+      <visual name="hash_top_32">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.7812 0.8952 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>1.0 0.5 0.0 1</ambient><diffuse>1.0 0.5 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_top_33">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.832 0.8952 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>0.0 0.6 0.0 1</ambient><diffuse>0.0 0.6 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_top_34">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.8828 0.8952 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 0.8 1</ambient><diffuse>0.0 0.0 0.8 1</diffuse></material>
+      </visual>
+      <visual name="hash_bottom_00">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.1556 -0.9336 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>0.0 0.6 0.0 1</ambient><diffuse>0.0 0.6 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_bottom_01">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.2064 -0.9336 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 0.8 1</ambient><diffuse>0.0 0.0 0.8 1</diffuse></material>
+      </visual>
+      <visual name="hash_bottom_02">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.2572 -0.9336 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>1.0 0.5 0.0 1</ambient><diffuse>1.0 0.5 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_bottom_03">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.308 -0.9336 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>0.0 0.6 0.0 1</ambient><diffuse>0.0 0.6 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_bottom_04">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.3588 -0.9336 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 0.8 1</ambient><diffuse>0.0 0.0 0.8 1</diffuse></material>
+      </visual>
+      <visual name="hash_bottom_05">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.4096 -0.9336 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>1.0 0.5 0.0 1</ambient><diffuse>1.0 0.5 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_bottom_06">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.4604 -0.9336 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>0.0 0.6 0.0 1</ambient><diffuse>0.0 0.6 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_bottom_07">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.5112 -0.9336 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 0.8 1</ambient><diffuse>0.0 0.0 0.8 1</diffuse></material>
+      </visual>
+      <visual name="hash_bottom_08">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.562 -0.9336 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>1.0 0.5 0.0 1</ambient><diffuse>1.0 0.5 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_bottom_09">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.6128 -0.9336 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>0.0 0.6 0.0 1</ambient><diffuse>0.0 0.6 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_bottom_10">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.6636 -0.9336 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 0.8 1</ambient><diffuse>0.0 0.0 0.8 1</diffuse></material>
+      </visual>
+      <visual name="hash_bottom_11">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.7144 -0.9336 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>1.0 0.5 0.0 1</ambient><diffuse>1.0 0.5 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_bottom_12">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.7652 -0.9336 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>0.0 0.6 0.0 1</ambient><diffuse>0.0 0.6 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_bottom_13">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.816 -0.9336 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 0.8 1</ambient><diffuse>0.0 0.0 0.8 1</diffuse></material>
+      </visual>
+      <visual name="hash_bottom_14">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.8668 -0.9336 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>1.0 0.5 0.0 1</ambient><diffuse>1.0 0.5 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_bottom_15">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.9176 -0.9336 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>0.0 0.6 0.0 1</ambient><diffuse>0.0 0.6 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_bottom_16">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.9684 -0.9336 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 0.8 1</ambient><diffuse>0.0 0.0 0.8 1</diffuse></material>
+      </visual>
+      <visual name="hash_bottom_17">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.0192 -0.9336 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>1.0 0.5 0.0 1</ambient><diffuse>1.0 0.5 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_bottom_18">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.07 -0.9336 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>0.0 0.6 0.0 1</ambient><diffuse>0.0 0.6 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_bottom_19">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.1208 -0.9336 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 0.8 1</ambient><diffuse>0.0 0.0 0.8 1</diffuse></material>
+      </visual>
+      <visual name="hash_bottom_20">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.1716 -0.9336 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>1.0 0.5 0.0 1</ambient><diffuse>1.0 0.5 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_bottom_21">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.2224 -0.9336 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>0.0 0.6 0.0 1</ambient><diffuse>0.0 0.6 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_bottom_22">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.2732 -0.9336 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 0.8 1</ambient><diffuse>0.0 0.0 0.8 1</diffuse></material>
+      </visual>
+      <visual name="hash_bottom_23">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.324 -0.9336 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>1.0 0.5 0.0 1</ambient><diffuse>1.0 0.5 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_bottom_24">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.3748 -0.9336 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>0.0 0.6 0.0 1</ambient><diffuse>0.0 0.6 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_bottom_25">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.4256 -0.9336 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 0.8 1</ambient><diffuse>0.0 0.0 0.8 1</diffuse></material>
+      </visual>
+      <visual name="hash_bottom_26">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.4764 -0.9336 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>1.0 0.5 0.0 1</ambient><diffuse>1.0 0.5 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_bottom_27">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.5272 -0.9336 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>0.0 0.6 0.0 1</ambient><diffuse>0.0 0.6 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_bottom_28">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.578 -0.9336 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 0.8 1</ambient><diffuse>0.0 0.0 0.8 1</diffuse></material>
+      </visual>
+      <visual name="hash_bottom_29">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.6288 -0.9336 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>1.0 0.5 0.0 1</ambient><diffuse>1.0 0.5 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_bottom_30">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.6796 -0.9336 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>0.0 0.6 0.0 1</ambient><diffuse>0.0 0.6 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_bottom_31">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.7304 -0.9336 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 0.8 1</ambient><diffuse>0.0 0.0 0.8 1</diffuse></material>
+      </visual>
+      <visual name="hash_bottom_32">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.7812 -0.9336 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>1.0 0.5 0.0 1</ambient><diffuse>1.0 0.5 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_bottom_33">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.832 -0.9336 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>0.0 0.6 0.0 1</ambient><diffuse>0.0 0.6 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_bottom_34">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.8828 -0.9336 0.112 0 0 0</pose>
+        <geometry><box><size>0.0508 0.127 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 0.8 1</ambient><diffuse>0.0 0.0 0.8 1</diffuse></material>
+      </visual>
+      <visual name="hash_left_00">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.1048 -0.8828 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>0.0 0.6 0.0 1</ambient><diffuse>0.0 0.6 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_left_01">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.1048 -0.832 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 0.8 1</ambient><diffuse>0.0 0.0 0.8 1</diffuse></material>
+      </visual>
+      <visual name="hash_left_02">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.1048 -0.7812 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>1.0 0.5 0.0 1</ambient><diffuse>1.0 0.5 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_left_03">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.1048 -0.7304 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>0.0 0.6 0.0 1</ambient><diffuse>0.0 0.6 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_left_04">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.1048 -0.6796 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 0.8 1</ambient><diffuse>0.0 0.0 0.8 1</diffuse></material>
+      </visual>
+      <visual name="hash_left_05">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.1048 -0.6288 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>1.0 0.5 0.0 1</ambient><diffuse>1.0 0.5 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_left_06">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.1048 -0.578 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>0.0 0.6 0.0 1</ambient><diffuse>0.0 0.6 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_left_07">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.1048 -0.5272 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 0.8 1</ambient><diffuse>0.0 0.0 0.8 1</diffuse></material>
+      </visual>
+      <visual name="hash_left_08">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.1048 -0.4764 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>1.0 0.5 0.0 1</ambient><diffuse>1.0 0.5 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_left_09">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.1048 -0.4256 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>0.0 0.6 0.0 1</ambient><diffuse>0.0 0.6 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_left_10">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.1048 -0.3748 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 0.8 1</ambient><diffuse>0.0 0.0 0.8 1</diffuse></material>
+      </visual>
+      <visual name="hash_left_11">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.1048 -0.324 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>1.0 0.5 0.0 1</ambient><diffuse>1.0 0.5 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_left_12">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.1048 -0.2732 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>0.0 0.6 0.0 1</ambient><diffuse>0.0 0.6 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_left_13">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.1048 -0.2224 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 0.8 1</ambient><diffuse>0.0 0.0 0.8 1</diffuse></material>
+      </visual>
+      <visual name="hash_left_14">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.1048 -0.1716 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>1.0 0.5 0.0 1</ambient><diffuse>1.0 0.5 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_left_15">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.1048 -0.1208 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>0.0 0.6 0.0 1</ambient><diffuse>0.0 0.6 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_left_16">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.1048 -0.07 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 0.8 1</ambient><diffuse>0.0 0.0 0.8 1</diffuse></material>
+      </visual>
+      <visual name="hash_left_17">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.1048 -0.0192 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>1.0 0.5 0.0 1</ambient><diffuse>1.0 0.5 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_left_18">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.1048 0.0316 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>0.0 0.6 0.0 1</ambient><diffuse>0.0 0.6 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_left_19">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.1048 0.0824 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 0.8 1</ambient><diffuse>0.0 0.0 0.8 1</diffuse></material>
+      </visual>
+      <visual name="hash_left_20">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.1048 0.1332 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>1.0 0.5 0.0 1</ambient><diffuse>1.0 0.5 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_left_21">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.1048 0.184 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>0.0 0.6 0.0 1</ambient><diffuse>0.0 0.6 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_left_22">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.1048 0.2348 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 0.8 1</ambient><diffuse>0.0 0.0 0.8 1</diffuse></material>
+      </visual>
+      <visual name="hash_left_23">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.1048 0.2856 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>1.0 0.5 0.0 1</ambient><diffuse>1.0 0.5 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_left_24">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.1048 0.3364 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>0.0 0.6 0.0 1</ambient><diffuse>0.0 0.6 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_left_25">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.1048 0.3872 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 0.8 1</ambient><diffuse>0.0 0.0 0.8 1</diffuse></material>
+      </visual>
+      <visual name="hash_left_26">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.1048 0.438 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>1.0 0.5 0.0 1</ambient><diffuse>1.0 0.5 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_left_27">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.1048 0.4888 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>0.0 0.6 0.0 1</ambient><diffuse>0.0 0.6 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_left_28">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.1048 0.5396 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 0.8 1</ambient><diffuse>0.0 0.0 0.8 1</diffuse></material>
+      </visual>
+      <visual name="hash_left_29">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.1048 0.5904 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>1.0 0.5 0.0 1</ambient><diffuse>1.0 0.5 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_left_30">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.1048 0.6412 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>0.0 0.6 0.0 1</ambient><diffuse>0.0 0.6 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_left_31">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.1048 0.692 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 0.8 1</ambient><diffuse>0.0 0.0 0.8 1</diffuse></material>
+      </visual>
+      <visual name="hash_left_32">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.1048 0.7428 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>1.0 0.5 0.0 1</ambient><diffuse>1.0 0.5 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_left_33">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.1048 0.7936 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>0.0 0.6 0.0 1</ambient><diffuse>0.0 0.6 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_left_34">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.1048 0.8444 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 0.8 1</ambient><diffuse>0.0 0.0 0.8 1</diffuse></material>
+      </visual>
+      <visual name="hash_right_00">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.9336 -0.8828 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>0.0 0.6 0.0 1</ambient><diffuse>0.0 0.6 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_right_01">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.9336 -0.832 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 0.8 1</ambient><diffuse>0.0 0.0 0.8 1</diffuse></material>
+      </visual>
+      <visual name="hash_right_02">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.9336 -0.7812 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>1.0 0.5 0.0 1</ambient><diffuse>1.0 0.5 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_right_03">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.9336 -0.7304 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>0.0 0.6 0.0 1</ambient><diffuse>0.0 0.6 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_right_04">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.9336 -0.6796 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 0.8 1</ambient><diffuse>0.0 0.0 0.8 1</diffuse></material>
+      </visual>
+      <visual name="hash_right_05">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.9336 -0.6288 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>1.0 0.5 0.0 1</ambient><diffuse>1.0 0.5 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_right_06">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.9336 -0.578 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>0.0 0.6 0.0 1</ambient><diffuse>0.0 0.6 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_right_07">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.9336 -0.5272 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 0.8 1</ambient><diffuse>0.0 0.0 0.8 1</diffuse></material>
+      </visual>
+      <visual name="hash_right_08">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.9336 -0.4764 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>1.0 0.5 0.0 1</ambient><diffuse>1.0 0.5 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_right_09">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.9336 -0.4256 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>0.0 0.6 0.0 1</ambient><diffuse>0.0 0.6 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_right_10">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.9336 -0.3748 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 0.8 1</ambient><diffuse>0.0 0.0 0.8 1</diffuse></material>
+      </visual>
+      <visual name="hash_right_11">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.9336 -0.324 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>1.0 0.5 0.0 1</ambient><diffuse>1.0 0.5 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_right_12">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.9336 -0.2732 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>0.0 0.6 0.0 1</ambient><diffuse>0.0 0.6 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_right_13">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.9336 -0.2224 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 0.8 1</ambient><diffuse>0.0 0.0 0.8 1</diffuse></material>
+      </visual>
+      <visual name="hash_right_14">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.9336 -0.1716 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>1.0 0.5 0.0 1</ambient><diffuse>1.0 0.5 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_right_15">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.9336 -0.1208 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>0.0 0.6 0.0 1</ambient><diffuse>0.0 0.6 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_right_16">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.9336 -0.07 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 0.8 1</ambient><diffuse>0.0 0.0 0.8 1</diffuse></material>
+      </visual>
+      <visual name="hash_right_17">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.9336 -0.0192 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>1.0 0.5 0.0 1</ambient><diffuse>1.0 0.5 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_right_18">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.9336 0.0316 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>0.0 0.6 0.0 1</ambient><diffuse>0.0 0.6 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_right_19">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.9336 0.0824 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 0.8 1</ambient><diffuse>0.0 0.0 0.8 1</diffuse></material>
+      </visual>
+      <visual name="hash_right_20">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.9336 0.1332 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>1.0 0.5 0.0 1</ambient><diffuse>1.0 0.5 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_right_21">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.9336 0.184 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>0.0 0.6 0.0 1</ambient><diffuse>0.0 0.6 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_right_22">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.9336 0.2348 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 0.8 1</ambient><diffuse>0.0 0.0 0.8 1</diffuse></material>
+      </visual>
+      <visual name="hash_right_23">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.9336 0.2856 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>1.0 0.5 0.0 1</ambient><diffuse>1.0 0.5 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_right_24">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.9336 0.3364 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>0.0 0.6 0.0 1</ambient><diffuse>0.0 0.6 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_right_25">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.9336 0.3872 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 0.8 1</ambient><diffuse>0.0 0.0 0.8 1</diffuse></material>
+      </visual>
+      <visual name="hash_right_26">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.9336 0.438 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>1.0 0.5 0.0 1</ambient><diffuse>1.0 0.5 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_right_27">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.9336 0.4888 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>0.0 0.6 0.0 1</ambient><diffuse>0.0 0.6 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_right_28">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.9336 0.5396 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 0.8 1</ambient><diffuse>0.0 0.0 0.8 1</diffuse></material>
+      </visual>
+      <visual name="hash_right_29">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.9336 0.5904 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>1.0 0.5 0.0 1</ambient><diffuse>1.0 0.5 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_right_30">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.9336 0.6412 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>0.0 0.6 0.0 1</ambient><diffuse>0.0 0.6 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_right_31">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.9336 0.692 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 0.8 1</ambient><diffuse>0.0 0.0 0.8 1</diffuse></material>
+      </visual>
+      <visual name="hash_right_32">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.9336 0.7428 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>1.0 0.5 0.0 1</ambient><diffuse>1.0 0.5 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_right_33">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.9336 0.7936 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>0.0 0.6 0.0 1</ambient><diffuse>0.0 0.6 0.0 1</diffuse></material>
+      </visual>
+      <visual name="hash_right_34">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.9336 0.8444 0.112 0 0 0</pose>
+        <geometry><box><size>0.127 0.0508 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 0.8 1</ambient><diffuse>0.0 0.0 0.8 1</diffuse></material>
+      </visual>
+        </link>
   </model>
 </sdf>

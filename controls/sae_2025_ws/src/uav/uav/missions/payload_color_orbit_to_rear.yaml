@@ -1,0 +1,38 @@
+# Payload navigates to rear via DLZ boundary when on opposite side; then hands off to docking.
+# start: PayloadColorOrbitToRearMode (SEARCH -> GO_TO_EDGE -> EDGE_ORBIT -> HANDOFF_TO_DOCK)
+# dock: PayloadDriveToAprilTagMode in dock phase (same docking as payload_park_rear_back_tag)
+start:
+  class: uav.autonomous_modes.PayloadColorOrbitToRearMode
+  params:
+    payload_name: 'payload_0'
+    tag_size_m: '0.1'
+    dock_target_tag_id: '1'
+    dock_align_angle_deg: '30.0'
+    dock_align_hold_s: '0.4'
+    search_spin_rps: '0.3'
+    go_to_edge_speed_mps: '0.12'
+    edge_threshold: '0.35'
+    edge_stable_frames: '5'
+    edge_min_pixels: '500'
+    edge_orbit_speed_mps: '0.12'
+    edge_k_lat: '0.008'
+    edge_k_ang: '0.6'
+  transitions:
+    handoff_dock: dock
+
+dock:
+  class: uav.autonomous_modes.PayloadDriveToAprilTagMode
+  params:
+    payload_name: 'payload_0'
+    tag_size_m: '0.1'
+    dock_rear_orthogonal: 'True'
+    dock_target_tag_id: '1'
+    stop_distance_m: '0.1'
+    dock_align_angle_deg: '30.0'
+    dock_align_hold_s: '0.4'
+    start_phase: '"dock"'   # quoted so ast.literal_eval yields string "dock"
+  transitions:
+    terminate: land
+
+land:
+  class: uav.autonomous_modes.LandingMode

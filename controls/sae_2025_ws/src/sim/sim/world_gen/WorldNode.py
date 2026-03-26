@@ -11,13 +11,14 @@ Each competition should have a corresponding WorldNode subclass that:
 from pathlib import Path
 from typing import Optional
 from abc import ABC, abstractmethod
+from rclpy.impl.rcutils_logger import RcutilsLogger
 from rclpy.node import Node
 from sim.utils import camel_to_snake, find_package_resource, copy_models_to_gazebo
 import xml.etree.ElementTree as ET
-import logging
 import random
 from std_srvs.srv import Trigger
 from ros_gz_interfaces.srv import SpawnEntity
+from sim.world_gen.entity import Entity
 
 
 class WorldNode(Node, ABC):
@@ -34,6 +35,7 @@ class WorldNode(Node, ABC):
         competition_name: str,
         output_filename: Optional[str] = None,
         seed: Optional[int] = None,
+        entities: Optional[dict] = None,
     ):
         """
         Initialize the WorldNode.
@@ -60,6 +62,8 @@ class WorldNode(Node, ABC):
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.output_path = self.output_dir / output_filename
 
+        self.entities = entities or {}
+
         self.get_logger().info(
             f"Initializing world node for competition: {competition_name}"
         )
@@ -71,7 +75,7 @@ class WorldNode(Node, ABC):
             SpawnEntity, f"/world/{competition_name}/create"
         )
 
-    def setup_gazebo_models(self, logger: logging.Logger) -> None:
+    def setup_gazebo_models(self, logger: RcutilsLogger) -> None:
         """
         Setup Gazebo models by copying from package to user's Gazebo models directory.
         This ensures models are available to Gazebo at runtime.
@@ -156,6 +160,21 @@ class WorldNode(Node, ABC):
         except Exception as e:
             raise RuntimeError(f"Failed to write output SDF to {out_path}: {e}")
 
+    def spawn_entity(self, name: str, cfg: dict) -> None:
+        """
+        Spawn a named entity from a config dict with keys: path_to_sdf, position, rpy.
+        """
+        entity = Entity(
+            name=name,
+            path_to_sdf=cfg["path_to_sdf"],
+            position=tuple(cfg["position"]),
+            rpy=tuple(cfg["rpy"]),
+            world=self.competition_name,
+        )
+        req = SpawnEntity.Request()
+        req.entity_factory = entity.to_entity_factory_msg()
+        self.spawn_entity_client.call_async(req)
+
     def trigger_world_gen_req(self, request, response):
         self.get_logger().info("Starting Dynamic World Generation!")
         response.success = self.generate_world()
@@ -178,6 +197,9 @@ class WorldNode(Node, ABC):
 
         return True if dynamic generation is successful, False otherwise
         """
+        for name, cfg in self.entities.items():
+            self.get_logger().info(f"Spawning entity: {name}")
+            self.spawn_entity(name, cfg)
         return True
 
     def get_world_path(self) -> Path:

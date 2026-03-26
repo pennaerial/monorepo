@@ -1,2 +1,6 @@
-competition: 2 # 0 for in_house, 1 for iarc, 2 for custom, 3 for sae
+competition: 3 # 0 for in_house, 1 for iarc, 2 for custom, 3 for sae
+mission_stage: "" # optional mission stage for world generation config
+                  # if empty: loads src/sim/sim/simulations/sae/base.yaml
+                  # if set:   loads src/sim/sim/simulations/sae/<mission_stage>.yaml
+                  #           e.g. "horizontal_takeoff" loads .../sae/horizontal_takeoff.yaml
 use_scoring: false
