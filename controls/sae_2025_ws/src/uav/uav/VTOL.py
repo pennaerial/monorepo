@@ -23,12 +23,16 @@ class VTOL(UAV):
         self, node: Node, takeoff_amount=5.0, DEBUG=False, camera_offsets=[0, 0, 0]
     ):
         # Initialize VTOL-specific attributes before calling super().__init__
-        self.vehicle_type = None  # 'MC' or 'FW' from VtolVehicleStatus
+        self.flight_mode = None  # 'MC' or 'FW' from VtolVehicleStatus
         self.vtol_vehicle_status = None
         self._fw_takeoff_phase = 0  # state machine phase for FW takeoff
         self.attempted_takeoff = False
 
         super().__init__(node, takeoff_amount, DEBUG, camera_offsets)
+
+    @property
+    def vehicle_type(self) -> str:
+        return "VTOL"
 
     @property
     def is_vtol(self) -> bool:
@@ -103,7 +107,7 @@ class VTOL(UAV):
         Returns:
             [vx, vy, vz] velocity list in m/s
         """
-        is_fw_mode = self.vehicle_type == "FW"
+        is_fw_mode = self.flight_mode == "FW"
 
         if is_fw_mode:
             # Fixed-wing mode: always maintain forward velocity for lift
@@ -152,10 +156,10 @@ class VTOL(UAV):
         """
         self.vtol_vehicle_status = msg
         if msg.vehicle_vtol_state == VtolVehicleStatus.VEHICLE_VTOL_STATE_MC:
-            self.vehicle_type = "MC"
+            self.flight_mode = "MC"
         elif msg.vehicle_vtol_state == VtolVehicleStatus.VEHICLE_VTOL_STATE_FW:
-            self.vehicle_type = "FW"
-        # During transitions, maintain the current state (don't change vehicle_type)
+            self.flight_mode = "FW"
+        # During transitions, maintain the current state (don't change flight_mode)
         # VEHICLE_VTOL_STATE_TRANSITION_TO_FW = 1 (still in MC mode)
         # VEHICLE_VTOL_STATE_TRANSITION_TO_MC = 2 (still in FW mode)
         elif (
@@ -163,15 +167,15 @@ class VTOL(UAV):
             == VtolVehicleStatus.VEHICLE_VTOL_STATE_TRANSITION_TO_FW
         ):
             # Transitioning to FW, but still in MC mode
-            if self.vehicle_type is None:
-                self.vehicle_type = "MC"
+            if self.flight_mode is None:
+                self.flight_mode = "MC"
         elif (
             msg.vehicle_vtol_state
             == VtolVehicleStatus.VEHICLE_VTOL_STATE_TRANSITION_TO_MC
         ):
             # Transitioning to MC, but still in FW mode
-            if self.vehicle_type is None:
-                self.vehicle_type = "FW"
+            if self.flight_mode is None:
+                self.flight_mode = "FW"
 
     def _initialize_publishers_and_subscribers(self):
         """

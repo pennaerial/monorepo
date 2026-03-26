@@ -14,14 +14,13 @@ class Multicopter(UAV):
         super().__init__(node, takeoff_amount, DEBUG, camera_offsets)
 
     @property
+    def vehicle_type(self) -> str:
+        return "MULTICOPTER"
+
+    @property
     def is_vtol(self) -> bool:
         """Multicopters are not VTOL."""
         return False
-
-    @property
-    def vehicle_type(self) -> None:
-        """Multicopters don't have vehicle_type (not VTOL)."""
-        return None
 
     def vtol_transition_to(self, vtol_state, immediate=False):
         """Not available on multicopters."""

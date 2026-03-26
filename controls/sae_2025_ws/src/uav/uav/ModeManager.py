@@ -8,9 +8,9 @@ import rclpy
 from rclpy.node import Node
 from px4_msgs.msg import VehicleStatus
 from std_srvs.srv import Trigger
-from uav import VTOL, Multicopter
+from uav import VTOL, Multicopter, Payload
 from uav.autonomous_modes import Mode, LandingMode
-from uav.utils import Vehicle
+from uav.utils import VehicleType
 import yaml
 
 VISION_NODE_PATH = "uav.vision_nodes"
@@ -31,7 +31,7 @@ class ModeManager(Node):
         self.declare_parameter("camera_offsets", [0.0, 0.0, 0.0])
         self.declare_parameter("debug", False)
         self.declare_parameter("servo_only", False)
-        self.declare_parameter("vehicle_class", Vehicle.MULTICOPTER.name)
+        self.declare_parameter("vehicle_class", VehicleType.MULTICOPTER.name)
 
         mode_map = self.get_parameter("mode_map").value
         if not mode_map:
@@ -64,9 +64,11 @@ class ModeManager(Node):
         self.active_mode = None
         self.last_update_time = time()
         self.start_time = self.last_update_time
-        # Instantiate appropriate UAV subclass based on vehicle type
-        if vehicle_class == Vehicle.VTOL:
+        # Instantiate appropriate Vehicle subclass based on vehicle type
+        if vehicle_class == VehicleType.VTOL:
             self.uav = VTOL(self, DEBUG=debug, camera_offsets=camera_offsets)
+        elif vehicle_class == VehicleType.PAYLOAD:
+            self.uav = Payload(self, DEBUG=debug)
         else:
             self.uav = Multicopter(self, DEBUG=debug, camera_offsets=camera_offsets)
         self.get_logger().info("Mission Node has started!")
@@ -74,14 +76,14 @@ class ModeManager(Node):
         self.setup_modes(mode_map)
         self.servo_only = servo_only
 
-    def _parse_vehicle_class(self, vehicle_class) -> Vehicle:
-        if isinstance(vehicle_class, Vehicle):
+    def _parse_vehicle_class(self, vehicle_class) -> VehicleType:
+        if isinstance(vehicle_class, VehicleType):
             return vehicle_class
         if isinstance(vehicle_class, str):
             try:
-                return Vehicle[vehicle_class.upper()]
+                return VehicleType[vehicle_class.upper()]
             except KeyError as exc:
-                valid = ", ".join(v.name for v in Vehicle)
+                valid = ", ".join(v.name for v in VehicleType)
                 raise ValueError(
                     f"Invalid vehicle_class '{vehicle_class}'. Expected one of: {valid}"
                 ) from exc

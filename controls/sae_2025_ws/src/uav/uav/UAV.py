@@ -1,5 +1,6 @@
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from rclpy.node import Node
+from uav.Vehicle import Vehicle
 from px4_msgs.msg import (
     OffboardControlMode,
     TrajectorySetpoint,
@@ -18,9 +19,7 @@ from rclpy.qos import (
     QoSDurabilityPolicy,
 )
 import numpy as np
-import math
 from uav.px4_modes import PX4CustomMainMode, PX4CustomSubModeAuto
-from uav.utils import R_earth
 
 # Map nav_state value -> name for readable logging
 _NAV_STATE_NAMES = {
@@ -35,7 +34,7 @@ def get_nav_state_str(val):
     return _NAV_STATE_NAMES.get(val, str(val))
 
 
-class UAV(ABC):
+class UAV(Vehicle):
     """
     Abstract base class for UAV control and interfacing with PX4 via ROS 2.
     Subclasses: VTOL, Multicopter
@@ -44,21 +43,16 @@ class UAV(ABC):
     def __init__(
         self, node: Node, takeoff_amount=5.0, DEBUG=False, camera_offsets=[0, 0, 0]
     ):
-        self.node = node
-        self.DEBUG = DEBUG
+        super().__init__(node, DEBUG)
         self.node.get_logger().info(f"Initializing UAV with DEBUG={DEBUG}")
-        self.vision_clients = {}
 
-        # Initialize necessary parameters to handle PX4 flight failures
+        # PX4/flight-specific state
         self.flight_check = False
         self.emergency_landing = False
-        self.failsafe = False
         self.failsafe_px4 = False
-        self.failsafe_trigger = False
         self.vehicle_status = None
         self.vehicle_attitude = None
         self.nav_state = None
-        self.arm_state = None
 
         self.system_id = 1
         self.component_id = 1
@@ -75,17 +69,12 @@ class UAV(ABC):
         self.origin_set = False
         self.roll = None
         self.pitch = None
-        self.yaw = None
         self.takeoff_amount = takeoff_amount
         self.attempted_takeoff = False
 
         # Initialize drone position
         self.local_origin = None
-        self.gps_origin = None
 
-        # Store current drone position
-        self.global_position = None
-        self.local_position = None
 
     # -------------------------
     # Public commands
@@ -118,25 +107,6 @@ class UAV(ABC):
             )
             self.camera_offsets = self.uav_to_local(self.camera_offsets)
             self.origin_set = True
-
-    def distance_to_waypoint(self, coordinate_system, waypoint) -> float:
-        """Calculate the distance to the current waypoint."""
-        if coordinate_system == "GPS":
-            curr_gps = self.get_gps()
-            return self.gps_distance_3d(
-                waypoint[0],
-                waypoint[1],
-                waypoint[2],
-                curr_gps[0],
-                curr_gps[1],
-                curr_gps[2],
-            )
-        elif coordinate_system == "LOCAL":
-            return np.sqrt(
-                (self.local_position.x - waypoint[0]) ** 2
-                + (self.local_position.y - waypoint[1]) ** 2
-                + (self.local_position.z - waypoint[2]) ** 2
-            )
 
     def hover(self):
         self._send_vehicle_command(
@@ -239,20 +209,6 @@ class UAV(ABC):
 
         self.trajectory_publisher.publish(msg)
 
-    def calculate_yaw(self, x: float, y: float) -> float:
-        """Calculate the yaw angle to point towards the next waypoint."""
-        # Calculate relative position
-        dx = x - self.local_position.x
-        dy = y - self.local_position.y
-
-        # If very close to target (hovering), maintain current yaw to prevent spinning
-        # caused by noisy position estimates when dx/dy are near zero
-        if np.linalg.norm([dx, dy]) < 3.0 and self.yaw is not None:
-            return self.yaw
-
-        # Calculate yaw angle
-        yaw = np.arctan2(dy, dx)
-        return yaw
 
     @abstractmethod
     def _calculate_velocity(self, target_pos: tuple, lock_yaw: bool) -> list:
@@ -280,139 +236,9 @@ class UAV(ABC):
         msg.timestamp = int(self.node.get_clock().now().nanoseconds / 1000)
         self.offboard_mode_publisher.publish(msg)
 
-    def gps_distance_3d(self, lat1, lon1, alt1, lat2, lon2, alt2):
-        """
-        Calculate the 3D distance in feet between two GPS points, including altitude.
-
-        Parameters:
-            lat1 (float): Latitude of the first point in decimal degrees.
-            lon1 (float): Longitude of the first point in decimal degrees.
-            alt1 (float): Altitude of the first point in feet above sea level.
-            lat2 (float): Latitude of the second point in decimal degrees.
-            lon2 (float): Longitude of the second point in decimal degrees.
-            alt2 (float): Altitude of the second point in feet above sea level.
-
-        Returns:
-            float: The 3D distance between the two points in feet.
-        """
-        # Earth's radius in feet (using an average value)
-        curr_x, curr_y, curr_z = self.gps_to_local((lat1, lon1, alt1))
-        tar_x, tar_y, tar_z = self.gps_to_local((lat2, lon2, alt2))
-        return np.sqrt(
-            (curr_x - tar_x) ** 2 + (curr_y - tar_y) ** 2 + (curr_z - tar_z) ** 2
-        )
-
-    def gps_to_local(self, target):
-        """
-        Convert target GPS coordinates to local NED coordinates.
-
-        Args:
-            target (tuple): (target_lat, target_lon, target_alt)
-            ref (tuple): (ref_lat, ref_lon, ref_alt) from the local position message
-
-        Returns:
-            tuple: (x, y, z) in the local frame where:
-                x is North (meters),
-                y is East (meters),
-                z is Down (meters)
-        """
-        if self.gps_origin is None:
-            self.node.get_logger().error(
-                "gps_origin not set. Cannot convert GPS to local coordinates."
-            )
-            return None
-
-        target_lat, target_lon, target_alt = target
-        ref_lat, ref_lon, ref_alt = self.gps_origin
-
-        # Convert differences in latitude and longitude from degrees to radians
-        d_lat = math.radians(target_lat - ref_lat)
-        d_lon = math.radians(target_lon - ref_lon)
-
-        # Compute local displacements
-        x = d_lat * R_earth  # North displacement
-        y = d_lon * R_earth * math.cos(math.radians(ref_lat))  # East displacement
-        z = -(target_alt - ref_alt)  # Down displacement
-
-        return (x, y, z)
-
     def uav_to_local(self, point, relative=False):
-        """
-        Converts a point in the UAV's local frame to the global frame.
-
-        :param point: A tuple (point_x, point_y, point_z) in the UAV's local frame.
-        :param relative: If True, the point is relative to the current local position.
-        :return: A tuple (goal_x, goal_y, goal_z) representing the point in the global frame.
-        """
-        current_pos = self.get_local_position()
-        point_x, point_y, point_z = point
-
-        # Rotate the x and y points according to the UAV's yaw angle.
-        rotated_point_x = point_x * math.cos(self.yaw) - point_y * math.sin(self.yaw)
-        rotated_point_y = point_x * math.sin(self.yaw) + point_y * math.cos(self.yaw)
-
-        # The z-point remains unchanged.
-        if relative:
-            return (
-                current_pos[0] + rotated_point_x,
-                current_pos[1] + rotated_point_y,
-                current_pos[2] + point_z,
-            )
-        else:
-            return (rotated_point_x, rotated_point_y, point_z)
-
-    def local_to_gps(self, local_pos):
-        """
-        Convert a local NED coordinate to a GPS coordinate.
-
-        Args:
-            local_pos (tuple): (x, y, z) in meters, where:
-                x: North displacement,
-                y: East displacement,
-                z: Down displacement.
-            ref_gps (tuple): (lat, lon, alt) of the reference point (takeoff) in degrees and meters.
-
-        Returns:
-            tuple: (lat, lon, alt) GPS coordinate corresponding to local_pos.
-        """
-        if self.gps_origin is None:
-            self.node.get_logger().error(
-                "gps_origin not set. Cannot convert local to GPS coordinates."
-            )
-            return None
-        else:
-            x, y, z = local_pos
-            lat0, lon0, alt0 = self.gps_origin
-
-            # Convert displacements from meters to degrees
-            dlat = (x / R_earth) * (180.0 / math.pi)
-            dlon = (y / (R_earth * math.cos(math.radians(lat0)))) * (180.0 / math.pi)
-
-            lat = lat0 + dlat
-            lon = lon0 + dlon
-            alt = alt0 - z  # because z is down in NED
-            return (lat, lon, alt)
-
-    # -------------------------
-    # Getters / data access
-    # -------------------------
-    def get_gps(self):
-        if self.global_position:
-            return (
-                self.global_position.lat,
-                self.global_position.lon,
-                self.global_position.alt,
-            )
-        else:
-            self.node.get_logger().warn("No GPS data available.")
-            return None
-
-    def get_local_position(self):
-        if self.local_position:
-            return (self.local_position.x, self.local_position.y, self.local_position.z)
-        else:
-            self.node.get_logger().warn("No local position data available.")
-            return None
+        """Alias for vehicle_to_local — kept for backwards compatibility."""
+        return self.vehicle_to_local(point, relative)
 
     def _calculate_proportional_velocity(
         self, direction: np.ndarray, distance: float

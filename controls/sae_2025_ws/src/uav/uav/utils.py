@@ -37,14 +37,15 @@ vehicle_camera_map = {
 }
 
 
-class Vehicle(IntEnum):
-    """Vehicle class enumeration."""
+class VehicleType(IntEnum):
+    """Vehicle type enumeration."""
 
     MULTICOPTER = 0
     PLANE = 1
     VTOL = 2
-    OTHER = 3
-    UNKNOWN = 4
+    PAYLOAD = 3
+    OTHER = 4
+    UNKNOWN = 5
 
 
 def camel_to_snake(name):
@@ -137,7 +138,7 @@ def get_airframe_details(px4_path, airframe_id):
     """
     Parses PX4 airframe files to find vehicle type and model name from an ID.
     Returns: (vehicle_class, model_name)
-    Example: (4001) -> (Vehicle.MULTICOPTER, 'x500')
+    Example: (4001) -> (VehicleType.MULTICOPTER, 'x500')
     """
     # 1. Locate the Airframe File
     # PX4 stores these in ROMFS/px4fmu_common/init.d-posix/airframes
@@ -151,7 +152,7 @@ def get_airframe_details(px4_path, airframe_id):
 
     if not matches:
         print(f"Warning: Airframe ID {airframe_id} not found in {airframes_dir}")
-        return Vehicle.UNKNOWN, "gz_ERROR"
+        return VehicleType.UNKNOWN, "gz_ERROR"
 
     # 2. Extract Model Name from Filename
     filename = os.path.basename(matches[0])
@@ -163,13 +164,13 @@ def get_airframe_details(px4_path, airframe_id):
         content = f.read()
 
         if "rc.mc_defaults" in content:
-            vehicle_class = Vehicle.MULTICOPTER
+            vehicle_class = VehicleType.MULTICOPTER
         elif "rc.fw_defaults" in content:
-            vehicle_class = Vehicle.PLANE
+            vehicle_class = VehicleType.PLANE
         elif "rc.vtol_defaults" in content:
-            vehicle_class = Vehicle.VTOL
+            vehicle_class = VehicleType.VTOL
         else:
-            vehicle_class = Vehicle.OTHER
+            vehicle_class = VehicleType.OTHER
 
     return vehicle_class, model_name
 
