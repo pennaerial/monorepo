@@ -14,6 +14,12 @@ except ImportError:
     apriltag = None
 
 DEFAULT_TAG_FAMILY = "tag36h11"
+_CV2_APRILTAG_DICTIONARIES = {
+    "tag16h5": cv2.aruco.DICT_APRILTAG_16h5,
+    "tag25h9": cv2.aruco.DICT_APRILTAG_25h9,
+    "tag36h10": cv2.aruco.DICT_APRILTAG_36h10,
+    "tag36h11": cv2.aruco.DICT_APRILTAG_36h11,
+}
 
 # Standard VTOL AprilTag layout in simulation (from `sim/world_gen/models/standard_vtol/model.sdf`).
 # IDs (DICT_APRILTAG_36h11): front=0, back=1, left=2, right=3.
@@ -43,27 +49,70 @@ class AprilTagDetectorCache:
     def __init__(self) -> None:
         self._family: str | None = None
         self._detector = None
+        self._backend: str | None = None
 
     def get(self, family: str | None):
-        if apriltag is None:
-            return None
-
         normalized_family = family or DEFAULT_TAG_FAMILY
         if self._detector is not None and self._family == normalized_family:
             return self._detector
 
-        try:
-            options = apriltag.DetectorOptions(
-                families=normalized_family,
-                refine_edges=True,
-            )
-            detector = apriltag.Detector(options)
-        except (AttributeError, TypeError):
-            detector = apriltag.Detector()
+        detector = None
+        backend = None
+        if apriltag is not None:
+            try:
+                options = apriltag.DetectorOptions(
+                    families=normalized_family,
+                    refine_edges=True,
+                )
+                detector = apriltag.Detector(options)
+            except (AttributeError, TypeError):
+                detector = apriltag.Detector()
+            backend = "apriltag"
+        else:
+            dictionary_id = _CV2_APRILTAG_DICTIONARIES.get(normalized_family)
+            if dictionary_id is not None and hasattr(cv2, "aruco"):
+                detector = cv2.aruco.ArucoDetector(
+                    cv2.aruco.getPredefinedDictionary(dictionary_id)
+                )
+                backend = "opencv"
 
         self._family = normalized_family
         self._detector = detector
+        self._backend = backend
         return detector
+
+    @property
+    def backend(self) -> Optional[str]:
+        return self._backend
+
+
+@dataclass(frozen=True)
+class _DetectionAdapter:
+    tag_id: int
+    corners: np.ndarray
+    center: tuple[float, float]
+
+
+def _iter_detections(gray: np.ndarray, detector, backend: Optional[str]):
+    if detector is None:
+        return []
+    if backend == "opencv":
+        corners, ids, _ = detector.detectMarkers(gray)
+        if ids is None:
+            return []
+        detections: list[_DetectionAdapter] = []
+        for marker_corners, marker_id in zip(corners, ids.flatten(), strict=False):
+            corners_array = np.asarray(marker_corners, dtype=np.float32).reshape(4, 2)
+            center = tuple(np.mean(corners_array, axis=0).tolist())
+            detections.append(
+                _DetectionAdapter(
+                    tag_id=int(marker_id),
+                    corners=corners_array,
+                    center=(float(center[0]), float(center[1])),
+                )
+            )
+        return detections
+    return detector.detect(gray) or []
 
 
 def camera_model_from_info(camera_info: CameraInfo) -> tuple[np.ndarray, np.ndarray]:
@@ -245,6 +294,7 @@ def solve_payload_apriltags(
     gray: np.ndarray,
     camera_info: CameraInfo,
     detector,
+    detector_backend: Optional[str],
     tag_size_m: float,
 ) -> list[AprilTagObservation]:
     if detector is None:
@@ -254,7 +304,7 @@ def solve_payload_apriltags(
     object_points = _object_points_for_tag_size(float(tag_size_m))
     observations: list[AprilTagObservation] = []
 
-    for detection in detector.detect(gray) or []:
+    for detection in _iter_detections(gray, detector, detector_backend):
         tag_id = int(getattr(detection, "tag_id", -1))
         if tag_id not in VTOL_TAG_POSES:
             continue
