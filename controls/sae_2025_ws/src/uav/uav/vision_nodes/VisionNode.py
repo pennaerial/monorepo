@@ -4,6 +4,7 @@ import uuid
 import cv2
 import numpy as np
 import rclpy
+from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from sensor_msgs.msg import CameraInfo, Image
 from std_srvs.srv import Trigger
@@ -99,8 +100,16 @@ class VisionNode(Node):
         self.client = None
         self.image = None
         self.camera_info = None
+        self._camera_request_future = None
+        self._camera_service_warned = False
+        self._camera_wait_warned = False
         if self.use_service:
             self.client = self.create_client(CameraData, self.camera_service_name)
+            # Poll camera_data asynchronously so service callbacks can read cached data
+            # without issuing nested blocking service requests.
+            self._camera_poll_timer = self.create_timer(
+                0.1, self._refresh_camera_cache_from_service
+            )
         else:
             self.image_subscription = self.create_subscription(
                 Image, self.image_topic, self.image_callback, 10
@@ -206,6 +215,48 @@ class VisionNode(Node):
             raise RuntimeError("Camera service transport is not configured.")
         return self.client.call_async(req)
 
+    def _refresh_camera_cache_from_service(self) -> None:
+        if self.client is None:
+            return
+        if self._camera_request_future is not None and not self._camera_request_future.done():
+            return
+        if not self.client.wait_for_service(timeout_sec=0.0):
+            if not self._camera_wait_warned:
+                self.get_logger().warn(
+                    f"Waiting for camera service {self.camera_service_name}."
+                )
+                self._camera_wait_warned = True
+            return
+
+        self._camera_wait_warned = False
+        request = CameraData.Request()
+        request.cam_image = True
+        request.cam_info = True
+        self._camera_request_future = self.send_req(request)
+        self._camera_request_future.add_done_callback(self._handle_camera_response)
+
+    def _handle_camera_response(self, future) -> None:
+        self._camera_request_future = None
+        try:
+            response = future.result()
+        except Exception as exc:
+            if not self._camera_service_warned:
+                self.get_logger().error(f"Camera service call failed: {exc}")
+                self._camera_service_warned = True
+            return
+
+        self._camera_service_warned = False
+        if response is None:
+            return
+        if response.image.data:
+            self.image = response.image
+            if self.display:
+                self.display_frame(
+                    self.convert_image_msg_to_frame(response.image), self.node_name()
+                )
+        if response.camera_info.header.frame_id or response.camera_info.width > 0:
+            self.camera_info = response.camera_info
+
     def request_data(self, cam_image: bool = False, cam_info: bool = False):
         """
         Sends request for camera image or camera information.
@@ -218,31 +269,11 @@ class VisionNode(Node):
             camera_info = self.camera_info if cam_info else None
             return image, camera_info
 
-        if self.client is None or not self.client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().error(
-                f"Camera service {self.camera_service_name} is not available."
-            )
-            return None, None
-
-        request = CameraData.Request()
-        request.cam_image = cam_image
-        request.cam_info = cam_info
-
-        future = self.send_req(request)
-        rclpy.spin_until_future_complete(self, future)
-        try:
-            response = future.result()
-        except Exception as exc:
-            self.get_logger().error(f"Service call failed: {exc}")
-            return None, None
-
-        if self.display and response is not None and response.image.data:
-            self.display_frame(
-                self.convert_image_msg_to_frame(response.image), self.node_name()
-            )
-        if response is None:
-            return None, None
-        return response.image, response.camera_info
+        image = self.image if cam_image else None
+        camera_info = self.camera_info if cam_info else None
+        if (cam_image and image is None) or (cam_info and camera_info is None):
+            self._refresh_camera_cache_from_service()
+        return image, camera_info
 
     def display_frame(self, frame: np.ndarray, window_name: str) -> None:
         """
@@ -251,7 +282,8 @@ class VisionNode(Node):
         cv2.imshow(window_name, frame)
         if cv2.waitKey(1) & 0xFF == ord("q"):
             self.get_logger().info("Shutting down display.")
-            rclpy.shutdown()
+            if rclpy.ok():
+                rclpy.shutdown()
             cv2.destroyAllWindows()
 
     def cleanup(self):
@@ -261,13 +293,16 @@ class VisionNode(Node):
         cv2.destroyAllWindows()
 
     def publish_failsafe(self):
-        if self.failsafe_trigger_client is None:
+        if self.failsafe_trigger_client is None or not rclpy.ok():
             return
         if not self.failsafe_trigger_client.wait_for_service(timeout_sec=1.0):
             self.get_logger().error("Failsafe service is not available.")
             return
         future = self.failsafe_trigger_client.call_async(Trigger.Request())
-        rclpy.spin_until_future_complete(self, future)
+        try:
+            rclpy.spin_until_future_complete(self, future)
+        except ExternalShutdownException:
+            return
         result = future.result()
         if result is not None and result.success:
             self.get_logger().info("Failsafe triggered.")

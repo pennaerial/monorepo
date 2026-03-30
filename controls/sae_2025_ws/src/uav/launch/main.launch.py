@@ -38,6 +38,13 @@ def _load_launch_parameters() -> dict:
         return yaml.safe_load(params_file) or {}
 
 
+def _yaml_or_launch_string(context, name: str, config_value) -> str:
+    override = LaunchConfiguration(name).perform(context).strip()
+    if override:
+        return override
+    return "" if config_value is None else str(config_value).strip()
+
+
 def _runtime_executable_for(mission_spec: MissionSpec) -> str:
     if mission_spec.is_uav:
         return "uav_mission"
@@ -161,6 +168,7 @@ def _build_camera_actions(
                         "vehicle_name": camera_contract["vehicle_name"],
                         "camera_namespace": camera_contract["camera_namespace"],
                         "camera_service_name": camera_contract["camera_service_name"],
+                        "use_camera_service": True,
                         "debug": vision_debug,
                         "sim": sim,
                         "save_vision": save_vision,
@@ -180,7 +188,9 @@ def launch_setup(context, *args, **kwargs):
     logger = get_logger("main.launch")
     params = _load_launch_parameters()
 
-    mission_name = params.get("mission_name", "basic")
+    mission_name = _yaml_or_launch_string(
+        context, "mission_name", params.get("mission_name", "basic")
+    )
     uav_debug = bool(params.get("uav_debug", False))
     vision_debug = bool(params.get("vision_debug", False))
     enable_vehicle_camera_pipeline = bool(
@@ -190,7 +200,9 @@ def launch_setup(context, *args, **kwargs):
     servo_only = bool(params.get("servo_only", False))
     sim = bool(params.get("sim", False))
     auto_launch = bool(params.get("auto_launch", True))
-    payload_name = str(params.get("payload_name", "")).strip()
+    payload_name = _yaml_or_launch_string(
+        context, "payload_name", params.get("payload_name", "")
+    )
     payload_controller = str(params.get("payload_controller", "")).strip()
 
     mission_path = mission_path_for_name(mission_name)
@@ -242,7 +254,7 @@ def launch_setup(context, *args, **kwargs):
             os.path.expanduser(LaunchConfiguration("px4_path").perform(context)),
         )
 
-    if mission_spec.is_uav:
+    if mission_spec.is_uav or sim:
         airframe_id = params.get("airframe", "quadcopter")
         custom_airframe_model = params.get("custom_airframe_model", "")
         try:
@@ -256,10 +268,13 @@ def launch_setup(context, *args, **kwargs):
         vehicle_class, model_name = get_airframe_details(px4_path, airframe_id)
         autostart = int(airframe_id)
         model = custom_airframe_model or model_name
-        if requires_vision and not vehicle_camera_map.get(model, False):
+        if mission_spec.is_uav and requires_vision and not vehicle_camera_map.get(
+            model, False
+        ):
             raise ValueError(
                 f"The selected airframe ID {airframe_id} ({model}) does not have a camera sensor configured."
             )
+    if mission_spec.is_uav:
         middleware = ExecuteProcess(
             cmd=["MicroXRCEAgent", "udp4", "-p", "8888"]
             if sim
@@ -267,11 +282,15 @@ def launch_setup(context, *args, **kwargs):
             output="screen",
             name="middleware",
         )
+    if mission_spec.is_uav:
         logger.info(
             f"Launching UAV mission '{mission_name}' with airframe ID {airframe_id}, using model {model}"
         )
     else:
-        logger.info(f"Launching payload mission '{mission_name}'")
+        logger.info(
+            f"Launching payload mission '{mission_name}'"
+            + (f" in sim with backing airframe '{model}'" if sim else "")
+        )
 
     mission_node = Node(
         package="uav",
@@ -338,6 +357,11 @@ def launch_setup(context, *args, **kwargs):
         from sim.constants import COMPETITION_NAMES, DEFAULT_COMPETITION, Competition
         from sim.utils import load_sim_launch_parameters, load_sim_parameters
 
+        if autostart is None or not model:
+            raise ValueError(
+                "Simulation-backed launches require a valid airframe/model configuration."
+            )
+
         sim_params = load_sim_launch_parameters()
         competition_num = sim_params.get("competition", DEFAULT_COMPETITION.value)
         try:
@@ -391,20 +415,20 @@ def launch_setup(context, *args, **kwargs):
         )
 
         startup_actions = []
-        if mission_spec.is_uav:
-            px4_sitl = ExecuteProcess(
-                cmd=[
-                    "bash",
-                    "-c",
-                    f"PX4_GZ_MODEL_POSE='{vehicle_pose_str}' PX4_GZ_WORLD={competition} PX4_GZ_STANDALONE=1 "
-                    f"PX4_SYS_AUTOSTART={autostart} PX4_SIM_MODEL={model} ./build/px4_sitl_default/bin/px4",
-                ],
-                cwd=px4_path,
-                output="screen",
-                name="px4_sitl",
-            )
-            startup_actions.extend([px4_sitl, *camera_actions, middleware])
-        else:
+        px4_sitl = ExecuteProcess(
+            cmd=[
+                "bash",
+                "-c",
+                f"PX4_GZ_MODEL_POSE='{vehicle_pose_str}' PX4_GZ_WORLD={competition} PX4_GZ_STANDALONE=1 "
+                f"PX4_SYS_AUTOSTART={autostart} PX4_SIM_MODEL={model} ./build/px4_sitl_default/bin/px4",
+            ],
+            cwd=px4_path,
+            output="screen",
+            name="px4_sitl",
+        )
+        startup_actions.append(px4_sitl)
+
+        if mission_spec.is_payload:
             startup_actions.append(
                 IncludeLaunchDescription(
                     PythonLaunchDescriptionSource(
@@ -420,7 +444,9 @@ def launch_setup(context, *args, **kwargs):
                     }.items(),
                 )
             )
-            startup_actions.extend(camera_actions)
+        startup_actions.extend(camera_actions)
+        if middleware is not None:
+            startup_actions.append(middleware)
 
         actions = [
             sim_launch,
@@ -494,6 +520,8 @@ def generate_launch_description():
     return LaunchDescription(
         [
             DeclareLaunchArgument("px4_path", default_value="~/PX4-Autopilot"),
+            DeclareLaunchArgument("mission_name", default_value=""),
+            DeclareLaunchArgument("payload_name", default_value=""),
             OpaqueFunction(function=launch_setup),
         ]
     )

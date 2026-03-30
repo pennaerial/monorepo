@@ -3,6 +3,7 @@ from __future__ import annotations
 import cv2
 import numpy as np
 import rclpy
+from rclpy.executors import ExternalShutdownException
 
 from uav.utils import green, pink
 from .VisionNode import VisionNode
@@ -74,7 +75,13 @@ class PayloadColorOrbitNode(VisionNode):
             return response
 
         tag_size_m = float(request.tag_size_m) if request.tag_size_m > 0.0 else 0.1
-        observations = solve_payload_apriltags(gray, camera_info, detector, tag_size_m)
+        observations = solve_payload_apriltags(
+            gray,
+            camera_info,
+            detector,
+            self._detector_cache.backend,
+            tag_size_m,
+        )
         for observation in observations:
             response.tag_ids.append(int(observation.tag_id))
             response.pose_x.append(float(observation.pose_x))
@@ -99,9 +106,14 @@ class PayloadColorOrbitNode(VisionNode):
 
 def main() -> None:
     rclpy.init()
-    node = PayloadColorOrbitNode()
+    node = None
     try:
+        node = PayloadColorOrbitNode()
         rclpy.spin(node)
+    except (KeyboardInterrupt, ExternalShutdownException):
+        pass
     finally:
-        node.destroy_node()
-        rclpy.shutdown()
+        if node is not None:
+            node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()

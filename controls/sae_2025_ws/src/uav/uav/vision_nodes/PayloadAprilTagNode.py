@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import cv2
 import rclpy
+from rclpy.executors import ExternalShutdownException
 
 from .VisionNode import VisionNode
 from uav.vision_nodes.payload_perception_common import (
@@ -44,7 +45,13 @@ class PayloadAprilTagNode(VisionNode):
         bgr = self.convert_image_msg_to_frame(image_msg)
         gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
         tag_size_m = float(request.tag_size_m) if request.tag_size_m > 0.0 else 0.1
-        observations = solve_payload_apriltags(gray, camera_info, detector, tag_size_m)
+        observations = solve_payload_apriltags(
+            gray,
+            camera_info,
+            detector,
+            self._detector_cache.backend,
+            tag_size_m,
+        )
 
         response.image_width = int(camera_info.width)
         for observation in observations:
@@ -63,9 +70,14 @@ class PayloadAprilTagNode(VisionNode):
 
 def main() -> None:
     rclpy.init()
-    node = PayloadAprilTagNode()
+    node = None
     try:
+        node = PayloadAprilTagNode()
         rclpy.spin(node)
+    except (KeyboardInterrupt, ExternalShutdownException):
+        pass
     finally:
-        node.destroy_node()
-        rclpy.shutdown()
+        if node is not None:
+            node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()

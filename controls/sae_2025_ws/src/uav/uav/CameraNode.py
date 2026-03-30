@@ -5,6 +5,7 @@ import uuid
 import cv2
 import numpy as np
 import rclpy
+from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, DurabilityPolicy, ReliabilityPolicy
 from sensor_msgs.msg import CameraInfo, Image
@@ -208,41 +209,50 @@ class Camera(Node):
         """
         Callback for receiving camera requests.
         """
-        self.get_logger().info("Received request for camera data.")
+        self.get_logger().debug("Received request for camera data.")
         if request.cam_image:
             if self.image is not None:
                 response.image = self.image
             else:
-                self.get_logger().warn("No image available.")
+                self.get_logger().warn(
+                    f"Waiting for first image on {self.image_topic}.",
+                    throttle_duration_sec=5.0,
+                )
 
         if request.cam_info:
             if self.camera_info is not None:
                 response.camera_info = self.camera_info
             else:
-                self.get_logger().warn("No camera info available.")
-        self.get_logger().info("Sending camera data.")
+                self.get_logger().warn(
+                    f"Waiting for first camera info on {self.camera_info_topic}.",
+                    throttle_duration_sec=5.0,
+                )
+        self.get_logger().debug("Sending camera data.")
         return response
 
     def publish_failsafe(self) -> None:
-        if self.failsafe_publisher is None:
+        if self.failsafe_publisher is None or not rclpy.ok():
             return
         self.failsafe_publisher.publish(Bool(data=True))
 
 
-def main():
-    rclpy.init()
+def main(args=None):
+    rclpy.init(args=args)
     node = None
     try:
         node = Camera()
         rclpy.spin(node)
+    except (KeyboardInterrupt, ExternalShutdownException):
+        pass
     except Exception as exc:
         print(exc)
-        if node is not None:
+        if node is not None and rclpy.ok():
             node.publish_failsafe()
     finally:
         if node is not None:
             node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 CameraNode = Camera

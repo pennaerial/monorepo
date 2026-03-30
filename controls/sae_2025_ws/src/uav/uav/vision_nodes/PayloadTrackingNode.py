@@ -5,6 +5,7 @@ from uav.cv.tracking import find_payload, compute_3d_vector, rotate_image
 from uav.vision_nodes import VisionNode
 from uav_interfaces.srv import PayloadTracking
 import rclpy
+from rclpy.executors import ExternalShutdownException
 from uav.utils import pink, green, blue, yellow
 
 
@@ -110,11 +111,14 @@ def main():
     try:
         node = PayloadTrackingNode()
         rclpy.spin(node)
+    except (KeyboardInterrupt, ExternalShutdownException):
+        pass
     except Exception as e:
         print(e)
-        if node is not None:
+        if node is not None and rclpy.ok():
             node.publish_failsafe()
     finally:
         if node is not None:
             node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
