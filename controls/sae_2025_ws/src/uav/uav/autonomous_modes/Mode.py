@@ -1,9 +1,12 @@
 from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING, ClassVar
+
 from rclpy.node import Node
 
-# from rclpy.type_support import SrvRequestT
-from uav.vision_nodes import VisionNode
-from uav import UAV
+from uav.Vehicle import Vehicle
+
+if TYPE_CHECKING:
+    from uav.vision_nodes import VisionNode
 
 
 class Mode(ABC):
@@ -12,19 +15,31 @@ class Mode(ABC):
     Provides a structured template for implementing autonomous behaviors.
     """
 
-    def __init__(self, node: Node, uav: UAV):
+    mission_target: ClassVar[str | None] = None
+    required_vision_nodes: ClassVar[tuple[object, ...]] = ()
+
+    def __init__(self, node: Node, vehicle: Vehicle):
         """
         Initialize the mode with a reference to the ROS 2 node.
 
         Args:
-            node (Node): The ROS 2 node instance managing the UAV and this mode.
-            uav (UAV): The UAV instance to control.
+            node (Node): The ROS 2 node instance managing this mode.
+            vehicle (Vehicle): The controlled entity.
         """
         self.node = node
         self.active = False
-        self.uav: UAV = uav
-        self.vision_clients = {}
-        self.sent_request = False
+        self.vehicle: Vehicle = vehicle
+        self.pending_requests = {}
+
+    @classmethod
+    def required_vision_node_names(cls) -> tuple[str, ...]:
+        names: list[str] = []
+        for node in cls.required_vision_nodes:
+            if isinstance(node, str):
+                names.append(node)
+            else:
+                names.append(node.__name__)
+        return tuple(names)
 
     def on_enter(self) -> None:
         """
@@ -33,7 +48,7 @@ class Mode(ABC):
         """
         pass
 
-    def send_request(self, vision_node: VisionNode, request):
+    def send_request(self, vision_node: type["VisionNode"], request):
         """
         Send a request to a service.
 
@@ -41,18 +56,22 @@ class Mode(ABC):
             request (SrvRequestT): The request to send.
             service_name (VIsionNode): The name of the service.
         """
-        if self.sent_request:
-            if self.future.done():
-                response = self.future.result()
-                self.sent_request = False
-                assert type(response) is vision_node.srv.Response, (
-                    f"Expected response type {vision_node.srv.Response}, got {type(response)}."
-                )
-                return response
-        else:
-            self.sent_request = True
-            client = self.uav.vision_clients[vision_node.service_name()]
-            self.future = client.call_async(request)
+        service_name = self.vehicle.vision_service_name(vision_node)
+        future = self.pending_requests.get(service_name)
+        if future is None:
+            client = self.node.get_vision_client(vision_node)
+            self.pending_requests[service_name] = client.call_async(request)
+            return None
+
+        if not future.done():
+            return None
+
+        response = future.result()
+        self.pending_requests.pop(service_name, None)
+        assert type(response) is vision_node.srv.Response, (
+            f"Expected response type {vision_node.srv.Response}, got {type(response)}."
+        )
+        return response
 
     def on_exit(self) -> None:
         """
@@ -92,6 +111,7 @@ class Mode(ABC):
         Deactivate the mode. Calls the `on_exit` method.
         """
         self.active = False
+        self.pending_requests.clear()
         self.node.get_logger().info(f"Deactivating mode: {self.__class__.__name__}")
         self.on_exit()
 

@@ -6,6 +6,9 @@ from px4_msgs.msg import TrajectorySetpoint
 import math
 import time
 from typing import List
+
+from uav.UAV import UAV
+
 from .Mode import Mode
 
 
@@ -15,17 +18,19 @@ class WaypointMission(Mode):
     Flies through a series of waypoints defined in YAML.
     """
 
+    mission_target = "uav"
+
     def __init__(
         self,
         node: Node,
-        uav,
+        vehicle: UAV,
         waypoints: List[List[float]] = None,
         waypoint_tolerance: float = 0.5,
         speed: float = 1.0,
         loiter_time: float = 1.0,
         altitude: float = 2.0,
     ):
-        super().__init__(node, uav)
+        super().__init__(node, vehicle)
 
         # Mission parameters
         self.waypoints = waypoints or []
@@ -62,7 +67,7 @@ class WaypointMission(Mode):
 
     def on_update(self, time_delta: float):
         """Periodic update called by ModeManager."""
-        if not self.mission_active or not self.uav.local_position:
+        if not self.mission_active or not self.vehicle.local_position:
             return
 
         if self.current_waypoint >= len(self.waypoints):
@@ -74,9 +79,9 @@ class WaypointMission(Mode):
         target_x, target_y, target_z = target
 
         current_x, current_y, current_z = (
-            self.uav.local_position.x,
-            self.uav.local_position.y,
-            self.uav.local_position.z,
+            self.vehicle.local_position.x,
+            self.vehicle.local_position.y,
+            self.vehicle.local_position.z,
         )
         distance = math.sqrt(
             (current_x - target_x) ** 2
@@ -105,7 +110,7 @@ class WaypointMission(Mode):
         setpoint = TrajectorySetpoint()
         setpoint.position = [float(target_x), float(target_y), float(target_z)]
         setpoint.yaw = 0.0  # Keep yaw at 0
-        self.uav.publish_position_setpoint((target_x, target_y, target_z))
+        self.vehicle.publish_position_setpoint((target_x, target_y, target_z))
 
         # Log progress every 10 iterations
         if self.current_waypoint % 10 == 0:
@@ -135,11 +140,11 @@ class WaypointMission(Mode):
 
     def publish_offboard_control_mode(self):
         """Publish offboard control mode."""
-        self.uav.publish_offboard_control_heartbeat_signal()
+        self.vehicle.publish_offboard_control_heartbeat_signal()
 
     def arm_vehicle(self):
         """Arm the vehicle."""
-        self.uav.arm()
+        self.vehicle.arm()
         self.node.get_logger().info("Arming vehicle...")
 
 

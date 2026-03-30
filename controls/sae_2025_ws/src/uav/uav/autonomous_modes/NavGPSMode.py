@@ -1,7 +1,9 @@
 from typing import List
-from uav.autonomous_modes import Mode
 from rclpy.node import Node
-from uav import UAV
+
+from uav.UAV import UAV
+
+from .Mode import Mode
 
 
 class NavGPSMode(Mode):
@@ -9,13 +11,15 @@ class NavGPSMode(Mode):
     A mode for navigating to a GPS coordinate
     """
 
+    mission_target = "uav"
+
     # TODO: Create "RELATIVE" navigation system, which initializes direction vectors once in the beginning
     # and converts all coordinates to that frame. +X should point to forward, +Y should point to the right, -Z should point up
 
     def __init__(
         self,
         node: Node,
-        uav: UAV,
+        vehicle: UAV,
         coordinates: List[tuple[tuple[float, float, float], float, str]],
         margin: float = 1,
     ):
@@ -24,12 +28,12 @@ class NavGPSMode(Mode):
 
         Args:
             node (Node): ROS 2 node managing the UAV.
-            uav (UAV): The UAV instance to control.
+            vehicle (UAV): The UAV instance to control.
             coordinates (List[tuple[tuple[float, float, float], float, str]]): The coordinates to navigate to (x/y/z or lon/lat/alt, wait time, GPS/LOCAL).
                                                                                Local are NED coordinates, relative to the starting position (https://docs.px4.io/main/en/ros2/user_guide.html#ros-2-px4-frame-conventions).
             margin (float): The margin of error for the GPS coordinate.
         """
-        super().__init__(node, uav)
+        super().__init__(node, vehicle)
         self.coordinates = coordinates
         self.goal = None
         self.margin = margin
@@ -44,7 +48,7 @@ class NavGPSMode(Mode):
         """
         dist = 0
         if self.index != -1:
-            dist = self.uav.distance_to_waypoint(self.coordinate_system, self.goal)
+            dist = self.vehicle.distance_to_waypoint(self.coordinate_system, self.goal)
 
         # Determine if we're waiting at a waypoint (lock yaw to prevent spinning)
         at_waypoint = self.index != -1 and dist < self.margin
@@ -52,36 +56,36 @@ class NavGPSMode(Mode):
 
         # Always publish setpoints to maintain offboard connection (PX4 requires continuous stream)
         if self.target is not None:
-            self.uav.publish_position_setpoint(self.target, lock_yaw=waiting)
-        elif self.uav.local_position:
+            self.vehicle.publish_position_setpoint(self.target, lock_yaw=waiting)
+        elif self.vehicle.local_position:
             # Fallback: maintain current position until first waypoint is set
-            self.uav.publish_position_setpoint(
+            self.vehicle.publish_position_setpoint(
                 (
-                    self.uav.local_position.x,
-                    self.uav.local_position.y,
-                    self.uav.local_position.z,
+                    self.vehicle.local_position.x,
+                    self.vehicle.local_position.y,
+                    self.vehicle.local_position.z,
                 ),
                 lock_yaw=True,
             )
 
         # Consolidated debug output - single line with all information
         if self.index != -1 and self.target is not None:
-            curr_pos = self.uav.get_local_position()
-            curr_gps = self.uav.get_gps()
+            curr_pos = self.vehicle.get_local_position()
+            curr_gps = self.vehicle.get_gps()
             yaw = (
-                self.uav.yaw
-                if self.uav.yaw is not None
+                self.vehicle.yaw
+                if self.vehicle.yaw is not None
                 else (
-                    self.uav.local_position.heading if self.uav.local_position else 0.0
+                    self.vehicle.local_position.heading if self.vehicle.local_position else 0.0
                 )
             )
             vel = (
                 (
-                    self.uav.local_position.vx,
-                    self.uav.local_position.vy,
-                    self.uav.local_position.vz,
+                    self.vehicle.local_position.vx,
+                    self.vehicle.local_position.vy,
+                    self.vehicle.local_position.vz,
                 )
-                if self.uav.local_position
+                if self.vehicle.local_position
                 else (0.0, 0.0, 0.0)
             )
 
@@ -128,7 +132,7 @@ class NavGPSMode(Mode):
             tuple[float, float, float]: The local target of the UAV.
         """
         if self.coordinate_system == "GPS":
-            local_target = self.uav.gps_to_local(self.goal)
+            local_target = self.vehicle.gps_to_local(self.goal)
             return local_target
         elif self.coordinate_system == "LOCAL":
             # LOCAL coordinates are already in NED frame relative to origin

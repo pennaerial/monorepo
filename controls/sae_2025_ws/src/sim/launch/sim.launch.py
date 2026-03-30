@@ -1,145 +1,149 @@
 #!/usr/bin/env python3
 
+import importlib
+import json
+import logging
 import os
+
 import launch
 from launch import LaunchDescription
 from launch.actions import (
+    DeclareLaunchArgument,
     ExecuteProcess,
     LogInfo,
-    RegisterEventHandler,
     OpaqueFunction,
-    DeclareLaunchArgument,
+    RegisterEventHandler,
 )
-import logging
+from launch.event_handlers import OnProcessExit, OnProcessIO, OnProcessStart
 from launch.substitutions import LaunchConfiguration
-from launch.event_handlers import OnProcessStart, OnProcessExit, OnProcessIO
 from launch_ros.actions import Node
-from sim.utils import (
-    load_sim_launch_parameters,
-    load_sim_parameters,
-    build_node_arguments,
-    camel_to_snake,
-)
-import importlib
+
 from sim.constants import (
-    Competition,
     COMPETITION_NAMES,
     DEFAULT_COMPETITION,
     DEFAULT_USE_SCORING,
+    Competition,
 )
-import json
+from sim.utils import (
+    build_node_arguments,
+    camel_to_snake,
+    load_sim_launch_parameters,
+    load_sim_parameters,
+)
 
 
 def initialize_mode(logger: logging.Logger, node_path: str, params: dict) -> Node:
-    """
-    Initialize a node from a class path and parameters.
-
-    Args:
-        node_path: Dot-separated path to the node class (e.g., 'sim.world_gen.HoopCourseNode')
-        params: Dictionary of parameters to pass to the node constructor
-
-    Returns:
-        Initialized node instance
-
-    Raises:
-        ValueError: If node_path is invalid or parameters are missing/invalid
-        ImportError: If the module cannot be imported
-        AttributeError: If the class is not found in the module
-    """
     logger.debug(f"Initializing mode: {node_path} with params: {params}")
-
-    # Parse node path
     try:
         module_name, class_name = node_path.rsplit(".", 1)
-    except ValueError:
+    except ValueError as exc:
         raise ValueError(
             f"Invalid node path format: '{node_path}'. Expected 'module.ClassName'"
-        )
+        ) from exc
 
-    # Import module
-    try:
-        module = importlib.import_module(module_name)
-    except ImportError as e:
-        raise ImportError(f"Failed to import module '{module_name}': {e}")
-
-    # Get class
+    module = importlib.import_module(module_name)
     if not hasattr(module, class_name):
         raise AttributeError(
             f"Class '{class_name}' not found in module '{module_name}'"
         )
-
     node_class = getattr(module, class_name)
+    args = build_node_arguments(node_class, params)
+    return node_class(**args)
 
-    # Build arguments from parameters
-    try:
-        args = build_node_arguments(node_class, params)
-        logger.debug(f"Initializing {class_name} with args: {list(args.keys())}")
-    except ValueError as e:
-        raise ValueError(f"Failed to build arguments for {node_path}: {e}")
 
-    # Instantiate node
-    try:
-        return node_class(**args)
-    except Exception as e:
-        logger.error(f"Failed to initialize {node_path} with args {args}: {e}")
-        raise
+def _camera_bridge_nodes(
+    *,
+    competition: str,
+    model: str,
+    vehicle_type: str,
+    vehicle_name: str,
+    cwd: str,
+):
+    if not vehicle_type or not vehicle_name:
+        return []
+
+    if vehicle_type == "uav":
+        if not model:
+            raise ValueError("UAV camera bridging requires a non-empty model name.")
+        gz_image_topic = (
+            f"/world/{competition}/model/{model[3:]}_0/link/camera_link/sensor/camera/image"
+        )
+        gz_camera_info_topic = (
+            f"/world/{competition}/model/{model[3:]}_0/link/camera_link/sensor/camera/camera_info"
+        )
+        ros_namespace = f"/{vehicle_name}"
+    elif vehicle_type == "payload":
+        gz_image_topic = (
+            f"/world/{competition}/model/{vehicle_name}/link/camera_link/sensor/camera/image"
+        )
+        gz_camera_info_topic = (
+            f"/world/{competition}/model/{vehicle_name}/link/camera_link/sensor/camera/camera_info"
+        )
+        ros_namespace = f"/{vehicle_name}"
+    else:
+        raise ValueError(f"Unsupported camera_vehicle_type '{vehicle_type}'.")
+
+    return [
+        Node(
+            package="ros_gz_bridge",
+            executable="parameter_bridge",
+            arguments=[f"{gz_image_topic}@sensor_msgs/msg/Image[gz.msgs.Image"],
+            remappings=[(gz_image_topic, f"{ros_namespace}/camera")],
+            output="screen",
+            name=f"{vehicle_name}_camera_bridge",
+            cwd=cwd,
+        ),
+        Node(
+            package="ros_gz_bridge",
+            executable="parameter_bridge",
+            arguments=[
+                f"{gz_camera_info_topic}@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo"
+            ],
+            remappings=[(gz_camera_info_topic, f"{ros_namespace}/camera_info")],
+            output="screen",
+            name=f"{vehicle_name}_camera_info_bridge",
+            cwd=cwd,
+        ),
+    ]
 
 
 def launch_setup(context, *args, **kwargs):
-    """Setup launch configuration."""
-
     logger = launch.logging.get_logger("sim.launch")
+    sim_params = load_sim_launch_parameters()
 
-    # Get launch arguments
-    try:
-        sim_params = load_sim_launch_parameters()
-    except Exception as e:
-        raise RuntimeError(f"Failed to load launch parameters: {e}")
-
-    # Map competition numbers to names
     competition_num = sim_params.get("competition", DEFAULT_COMPETITION.value)
     try:
         competition_type = Competition(competition_num)
         competition = COMPETITION_NAMES[competition_type]
-    except (ValueError, KeyError):
-        valid_values = [e.value for e in Competition]
+    except (ValueError, KeyError) as exc:
+        valid_values = [entry.value for entry in Competition]
         raise ValueError(
             f"Invalid competition: {competition_num}. Must be one of {valid_values}"
-        )
+        ) from exc
     logger.info(f"Running Competition: {competition}")
 
-    # Read optional mission stage (e.g. "horizontal_takeoff")
     mission_stage = str(sim_params.get("mission_stage", "")).strip()
     if mission_stage:
         logger.info(f"Mission stage: {mission_stage}")
 
     scoring_param = sim_params.get("scoring", DEFAULT_USE_SCORING)
+    use_scoring = (
+        scoring_param.lower() == "true"
+        if isinstance(scoring_param, str)
+        else bool(scoring_param)
+    )
 
-    if isinstance(scoring_param, str):
-        use_scoring = scoring_param.lower() == "true"
-    else:
-        use_scoring = bool(scoring_param)
-
-    px4_path_raw = LaunchConfiguration("px4_path").perform(context)
-
-    if px4_path_raw is None:
+    px4_path = os.path.expanduser(LaunchConfiguration("px4_path").perform(context))
+    if px4_path is None:
         raise RuntimeError("PX4 path is required")
-
-    px4_path = os.path.expanduser(px4_path_raw)
-
-    sae_ws_path = os.path.expanduser(os.getcwd())
+    cwd = os.path.expanduser(os.getcwd())
 
     download_gz_models = ExecuteProcess(
-        cmd=[
-            "python3",
-            "Tools/simulation/gz/simulation-gazebo",
-            "--dryrun",
-        ],
+        cmd=["python3", "Tools/simulation/gz/simulation-gazebo", "--dryrun"],
         cwd=px4_path,
         output="screen",
         name="download_gz_models",
     )
-
     spawn_world = ExecuteProcess(
         cmd=[
             "python3",
@@ -150,58 +154,35 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
         name="spawn_world",
     )
-
     gz_ros_bridge_create = Node(
         package="ros_gz_bridge",
         executable="parameter_bridge",
         arguments=[f"/world/{competition}/create@ros_gz_interfaces/srv/SpawnEntity"],
-        remappings=[],
         output="screen",
         name="gz_ros_bridge_create",
-        cwd=sae_ws_path,
+        cwd=cwd,
     )
 
     model = LaunchConfiguration("model").perform(context)
-
-    GZ_CAMERA_TOPIC = (
-        f"/world/{competition}/model/{model[3:]}_0/link/camera_link/sensor/camera/image"
-    )
-    GZ_CAMERA_INFO_TOPIC = f"/world/{competition}/model/{model[3:]}_0/link/camera_link/sensor/camera/camera_info"
-
-    gz_ros_bridge_camera = Node(
-        package="ros_gz_bridge",
-        executable="parameter_bridge",
-        arguments=[f"{GZ_CAMERA_TOPIC}@sensor_msgs/msg/Image[gz.msgs.Image"],
-        remappings=[(GZ_CAMERA_TOPIC, "/camera")],
-        output="screen",
-        name="gz_ros_bridge_camera",
-        cwd=sae_ws_path,
-    )
-
-    gz_ros_bridge_camera_info = Node(
-        package="ros_gz_bridge",
-        executable="parameter_bridge",
-        arguments=[
-            f"{GZ_CAMERA_INFO_TOPIC}@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo"
-        ],
-        remappings=[(GZ_CAMERA_INFO_TOPIC, "/camera_info")],
-        output="screen",
-        name="gz_ros_bridge_camera_info",
-        cwd=sae_ws_path,
+    camera_vehicle_type = LaunchConfiguration("camera_vehicle_type").perform(context)
+    camera_vehicle_name = LaunchConfiguration("camera_vehicle_name").perform(context)
+    camera_bridge_actions = _camera_bridge_nodes(
+        competition=competition,
+        model=model,
+        vehicle_type=str(camera_vehicle_type).strip(),
+        vehicle_name=str(camera_vehicle_name).strip(),
+        cwd=cwd,
     )
 
     sim_stage_params, sim_config_path = load_sim_parameters(
         competition, logger, competition, mission_stage
     )
-
     if "world" not in sim_stage_params:
         raise ValueError(
             f"Missing 'world' section in simulation config: {sim_config_path}"
         )
 
     world_params = sim_stage_params["world"].copy()
-
-    # Initialize world node - it will generate the world file automatically
     world_node_name = camel_to_snake(world_params["name"])
     world = Node(
         package="sim",
@@ -209,7 +190,7 @@ def launch_setup(context, *args, **kwargs):
         arguments=[json.dumps(world_params["params"])],
         output="screen",
         name=world_node_name,
-        cwd=sae_ws_path,
+        cwd=cwd,
     )
 
     trigger_world_gen = ExecuteProcess(
@@ -220,29 +201,22 @@ def launch_setup(context, *args, **kwargs):
             f"/{world_node_name}/trigger_world_gen",
             "std_srvs/srv/Trigger",
         ],
-        cwd=sae_ws_path,
+        cwd=cwd,
         output="screen",
         name="trigger_world_gen",
     )
 
-    # Initialize scoring node if requested
     scoring = None
-    if use_scoring:
-        if "scoring" not in sim_params:
-            logger.warning(
-                f"Scoring requested but no 'scoring' section in sim config: {sim_config_path}"
-            )
-        else:
-            scoring = Node(
-                package="sim",
-                executable=camel_to_snake(sim_params["scoring"]["name"]),
-                arguments=[sim_params["scoring"]["params"]],
-                output="screen",
-                name=sim_params["scoring"]["name"],
-                cwd=sae_ws_path,
-            )
+    if use_scoring and "scoring" in sim_params:
+        scoring = Node(
+            package="sim",
+            executable=camel_to_snake(sim_params["scoring"]["name"]),
+            arguments=[sim_params["scoring"]["params"]],
+            output="screen",
+            name=sim_params["scoring"]["name"],
+            cwd=cwd,
+        )
 
-    # Build and return the complete list of actions
     actions = [
         download_gz_models,
         RegisterEventHandler(
@@ -255,11 +229,7 @@ def launch_setup(context, *args, **kwargs):
             OnProcessIO(
                 target_action=world,
                 on_stderr=lambda event: (
-                    [
-                        spawn_world,
-                        LogInfo(msg="Simulation world node started."),
-                        scoring,
-                    ]
+                    [spawn_world, LogInfo(msg="Simulation world node started."), scoring]
                     if b"Successfully generated world file:" in event.text
                     else None
                 ),
@@ -271,8 +241,7 @@ def launch_setup(context, *args, **kwargs):
                 on_start=[
                     LogInfo(msg="spawn_world started, creating bridges"),
                     gz_ros_bridge_create,
-                    gz_ros_bridge_camera,
-                    gz_ros_bridge_camera_info,
+                    *camera_bridge_actions,
                 ],
             )
         ),
@@ -301,7 +270,9 @@ def generate_launch_description():
     return LaunchDescription(
         [
             DeclareLaunchArgument("px4_path", default_value="~/PX4-Autopilot"),
-            DeclareLaunchArgument("model", default_value="gz_x500_mono_cam"),
+            DeclareLaunchArgument("model", default_value=""),
+            DeclareLaunchArgument("camera_vehicle_type", default_value=""),
+            DeclareLaunchArgument("camera_vehicle_name", default_value=""),
             OpaqueFunction(function=launch_setup),
         ]
     )

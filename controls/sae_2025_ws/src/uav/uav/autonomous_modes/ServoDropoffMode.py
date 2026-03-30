@@ -1,7 +1,10 @@
-from uav import UAV
-from uav.autonomous_modes import Mode
-from rclpy.node import Node
 from typing import Optional, Tuple
+
+from rclpy.node import Node
+
+from uav.UAV import UAV
+
+from .Mode import Mode
 
 
 class ServoDropoffMode(Mode):
@@ -9,10 +12,12 @@ class ServoDropoffMode(Mode):
     A mode for dropping off the payload.
     """
 
+    mission_target = "uav"
+
     def __init__(
         self,
         node: Node,
-        uav: UAV,
+        vehicle: UAV,
         offsets: Optional[Tuple[float, float, float]] = (0.0, 0.0, 0.0),
         camera_offsets: Optional[Tuple[float, float, float]] = (0.0, 0.0, 0.0),
     ):
@@ -21,7 +26,7 @@ class ServoDropoffMode(Mode):
 
         Args:
             node (Node): ROS 2 node managing the UAV.
-            uav (UAV): The UAV instance to control.
+            vehicle (UAV): The UAV instance to control.
             offsets (Optional[Tuple[float, float, float]]):
                 Should denote the position of dropoff relative to the center of zone, in meters
                 In NED frame: x is forward, y is right, and z is down.
@@ -29,7 +34,7 @@ class ServoDropoffMode(Mode):
                 Should denote the position of the camera relative to the payload mechanism, in meters
                 In NED frame: x is forward, y is right, and z is down.
         """
-        super().__init__(node, uav)
+        super().__init__(node, vehicle)
 
         self.lower_time = 1.87
         self.timer = self.lower_time
@@ -42,14 +47,14 @@ class ServoDropoffMode(Mode):
         """
         # If UAV is unstable, skip the update
         if self.timer >= 0:
-            self.uav.drop_payload()
+            self.vehicle.drop_payload()
             self.timer -= time_delta
         if self.timer < 0 and self.timer > -self.lower_time:
             self.lowering = False
-            self.uav.pickup_payload()
+            self.vehicle.pickup_payload()
             self.timer -= time_delta
         if self.timer < -self.lower_time:
-            self.uav.disable_servo()
+            self.vehicle.disable_servo()
             self.done = True
 
     def check_status(self) -> str:

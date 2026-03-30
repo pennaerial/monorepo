@@ -1,37 +1,40 @@
-start:
-  class: uav.autonomous_modes.TakeoffMode
-  params:
-    takeoff_type: vertical
-  transitions:
-    complete: GPS
+modes:
+  start:
+    class: uav.autonomous_modes.TakeoffMode
+    params:
+      takeoff_type: vertical
+    transitions:
+      complete: GPS
 
-GPS:
-  class: uav.autonomous_modes.NavGPSMode
-  params:
-    coordinates: '[((5, 10, -10), 1, "LOCAL"),]'
-  transitions:
-    complete: dropoff
+  GPS:
+    class: uav.autonomous_modes.NavGPSMode
+    params:
+      coordinates:
+        - [[5, 10, -10], 1, LOCAL]
+    transitions:
+      complete: dropoff
 
-dropoff:
-  class: uav.autonomous_modes.PayloadDropoffMode
-  params:
-    offsets: '(0, 0, 0)'
-  transitions:
-    complete: pickup
+  dropoff:
+    class: uav.autonomous_modes.PayloadDropoffMode
+    params:
+      offsets: [0.0, 0.0, 0.0]
+    transitions:
+      complete: pickup
 
-pickup:
-  class: uav.autonomous_modes.PayloadPickupMode
-  params:
-    color: 'blue'
-  transitions:
-    complete: return
+  pickup:
+    class: uav.autonomous_modes.PayloadPickupMode
+    params:
+      color: blue
+    transitions:
+      complete: return
 
-return:
-  class: uav.autonomous_modes.NavGPSMode
-  params:
-    coordinates: '[((0, 0, -5), 1, "LOCAL"),]'
-  transitions:
-    complete: land
+  return:
+    class: uav.autonomous_modes.NavGPSMode
+    params:
+      coordinates:
+        - [[0, 0, -5], 1, LOCAL]
+    transitions:
+      complete: land
 
-land:
-  class: uav.autonomous_modes.LandingMode
+  land:
+    class: uav.autonomous_modes.LandingMode

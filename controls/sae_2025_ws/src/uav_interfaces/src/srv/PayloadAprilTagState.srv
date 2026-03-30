@@ -1,0 +1,16 @@
+float64 tag_size_m
+string tag_family
+---
+bool detector_available
+bool has_image
+bool has_camera_info
+int32[] tag_ids
+float64[] pose_x
+float64[] pose_y
+float64[] pose_yaw
+float64[] tvec_x
+float64[] tvec_y
+float64[] tvec_z
+float64[] center_x
+float64[] center_y
+uint32 image_width

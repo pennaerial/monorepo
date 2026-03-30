@@ -1,7 +1,9 @@
-from uav.autonomous_modes import Mode
 from rclpy.node import Node
-from uav import UAV
 from px4_msgs.msg import VehicleStatus
+
+from uav.UAV import UAV
+
+from .Mode import Mode
 
 
 class LandingMode(Mode):
@@ -9,15 +11,17 @@ class LandingMode(Mode):
     A mode for taking off vertically.
     """
 
-    def __init__(self, node: Node, uav: UAV):
+    mission_target = "uav"
+
+    def __init__(self, node: Node, vehicle: UAV):
         """
         Initialize the LandingMode
 
         Args:
             node (Node): ROS 2 node managing the UAV.
-            uav (UAV): The UAV instance to control.
+            vehicle (UAV): The UAV instance to control.
         """
-        super().__init__(node, uav)
+        super().__init__(node, vehicle)
 
     def on_update(self, time_delta: float) -> None:
         """
@@ -26,19 +30,19 @@ class LandingMode(Mode):
         # Maintain current position setpoints until AUTO_LAND mode is engaged
         # This prevents losing offboard connection during the transition
         # Lock yaw to prevent spinning while hovering before landing
-        if self.uav.local_position:
-            self.uav.publish_position_setpoint(
+        if self.vehicle.local_position:
+            self.vehicle.publish_position_setpoint(
                 (
-                    self.uav.local_position.x,
-                    self.uav.local_position.y,
-                    self.uav.local_position.z,
+                    self.vehicle.local_position.x,
+                    self.vehicle.local_position.y,
+                    self.vehicle.local_position.z,
                 ),
                 lock_yaw=True,
             )
 
         # Only send land command if not already in AUTO_LAND mode
-        if self.uav.nav_state != VehicleStatus.NAVIGATION_STATE_AUTO_LAND:
-            self.uav.land()
+        if self.vehicle.nav_state != VehicleStatus.NAVIGATION_STATE_AUTO_LAND:
+            self.vehicle.land()
 
     def check_status(self) -> str:
         """
@@ -52,8 +56,8 @@ class LandingMode(Mode):
         # 2. Exited AUTO_LAND mode (nav_state != AUTO_LAND)
         # This ensures the full landing sequence completes before terminating
         if (
-            self.uav.arm_state == VehicleStatus.ARMING_STATE_DISARMED
-            and self.uav.nav_state != VehicleStatus.NAVIGATION_STATE_AUTO_LAND
+            self.vehicle.arm_state == VehicleStatus.ARMING_STATE_DISARMED
+            and self.vehicle.nav_state != VehicleStatus.NAVIGATION_STATE_AUTO_LAND
         ):
             return "terminate"  # Mission complete - shut down
         return "continue"

@@ -1,232 +1,136 @@
 #!/usr/bin/env python3
-import os
-from time import time
-import importlib
 import inspect
-import ast
-import rclpy
+from time import time
+from typing import Any, get_type_hints
 from rclpy.node import Node
-from px4_msgs.msg import VehicleStatus
-from std_srvs.srv import Trigger
-from uav import VTOL, Multicopter
-from uav.autonomous_modes import Mode, LandingMode
-from uav.utils import Vehicle
-import yaml
+import importlib
+
+from uav.Vehicle import Vehicle
+from uav.autonomous_modes.Mode import Mode
+from uav.mission_spec import MissionSpec, load_mode_class
 
 VISION_NODE_PATH = "uav.vision_nodes"
 
 
 class ModeManager(Node):
-    """
-    A ROS 2 node for managing UAV modes and mission logic.
-    """
+    """Shared mission manager plumbing for a single bound vehicle."""
 
-    def __init__(self) -> None:
-        super().__init__("mission_node")
-        self.declare_parameter(
-            "mode_map",
-            os.path.join(os.getcwd(), "src", "uav", "uav", "missions", "basic.yaml"),
-        )
-        self.declare_parameter("vision_nodes", [""])
-        self.declare_parameter("camera_offsets", [0.0, 0.0, 0.0])
-        self.declare_parameter("debug", False)
-        self.declare_parameter("servo_only", False)
-        self.declare_parameter("vehicle_class", Vehicle.MULTICOPTER.name)
-
-        mode_map = self.get_parameter("mode_map").value
-        if not mode_map:
-            raise ValueError(
-                "ModeManager requires a non-empty 'mode_map' node parameter."
-            )
-
-        vision_nodes = self.get_parameter("vision_nodes").value
-        camera_offsets = self.get_parameter("camera_offsets").value
-        if len(camera_offsets) != 3:
-            raise ValueError(
-                f"'camera_offsets' must have exactly 3 values. Received: {camera_offsets}"
-            )
-
-        debug = bool(self.get_parameter("debug").value)
-        servo_only = bool(self.get_parameter("servo_only").value)
-        vehicle_class = self._parse_vehicle_class(
-            self.get_parameter("vehicle_class").value
-        )
-
-        self.timer = None
-        self.start_mission_trigger = self.create_service(
-            Trigger, "/mode_manager/start_mission", self.trigger_world_gen_req
-        )
-        self.failsafe_trigger_service = self.create_service(
-            Trigger, "/mode_manager/failsafe", self.trigger_failsafe
-        )
+    def __init__(self, node_name: str) -> None:
+        super().__init__(node_name)
+        self.vehicle = None
         self.modes = {}
         self.transitions = {}
         self.active_mode = None
         self.last_update_time = time()
-        self.start_time = self.last_update_time
-        # Instantiate appropriate UAV subclass based on vehicle type
-        if vehicle_class == Vehicle.VTOL:
-            self.uav = VTOL(self, DEBUG=debug, camera_offsets=camera_offsets)
-        else:
-            self.uav = Multicopter(self, DEBUG=debug, camera_offsets=camera_offsets)
-        self.get_logger().info("Mission Node has started!")
-        self.setup_vision(vision_nodes)
-        self.setup_modes(mode_map)
-        self.servo_only = servo_only
-
-    def _parse_vehicle_class(self, vehicle_class) -> Vehicle:
-        if isinstance(vehicle_class, Vehicle):
-            return vehicle_class
-        if isinstance(vehicle_class, str):
-            try:
-                return Vehicle[vehicle_class.upper()]
-            except KeyError as exc:
-                valid = ", ".join(v.name for v in Vehicle)
-                raise ValueError(
-                    f"Invalid vehicle_class '{vehicle_class}'. Expected one of: {valid}"
-                ) from exc
-        raise ValueError(
-            f"Invalid vehicle_class type '{type(vehicle_class)}'. Expected string."
-        )
-
-    def trigger_world_gen_req(self, request, response):
-        self.get_logger().info("MODE MANAGER | Starting Mission!")
-        self.timer = self.create_timer(0.1, self.spin_once)
-        response.success = True
-        response.message = "Starting Mission!"
-        return response
-
-    def trigger_failsafe(self, request, response):
-        self.get_logger().info("Failsafe triggered via service call")
-
-        self.uav.failsafe_trigger = True
-        self.uav.failsafe = self.uav.failsafe_px4 or self.uav.failsafe_trigger
-
-        response.success = True
-        response.message = "Failsafe triggered."
-        return response
+        self._vision_clients = {}
 
     def get_active_mode(self) -> Mode:
-        """
-        Get the active mode.
-
-        Returns:
-            Mode: The active mode.
-        """
         return self.modes[self.active_mode]
 
     def setup_vision(self, vision_nodes: list[str]) -> None:
-        """
-        Setup the vision node for this mode.
-
-        Args:
-            mode (Mode): The mode to setup vision for.
-            vision_nodes (list[str]): Vision node class names to setup for this mode.
-        """
         nodes_to_setup = [node for node in vision_nodes if node]
         if not nodes_to_setup:
             return
+        if self.vehicle is None or not getattr(self.vehicle, "has_camera", False):
+            raise ValueError("Vision nodes require an active vehicle camera contract.")
+
         module = importlib.import_module(VISION_NODE_PATH)
         for vision_node in nodes_to_setup:
             vision_class = getattr(module, vision_node)
-            if vision_class.service_name() not in self.uav.vision_clients:
-                client = self.create_client(
-                    vision_class.srv, vision_class.service_name()
-                )
-                while not client.wait_for_service(timeout_sec=1.0):
-                    self.get_logger().info(
-                        f"Service {vision_class.service_name()} not available, waiting again..."
-                    )
-                self.uav.vision_clients[vision_class.service_name()] = client
+            key = vision_class.__name__
+            if key in self._vision_clients:
+                continue
+            client, service_name = self._connect_vision_client(vision_class)
+            self._vision_clients[key] = client
+            self.get_logger().info(
+                f"Registered vision client {vision_class.__name__} on {service_name}."
+            )
+
+    @property
+    def vision_clients(self) -> dict:
+        return self._vision_clients
+
+    def _connect_vision_client(self, vision_class):
+        service_name = self.vehicle.vision_service_name(vision_class)
+        while True:
+            client = self.create_client(vision_class.srv, service_name)
+            if client.wait_for_service(timeout_sec=1.0):
+                return client, service_name
+            self.destroy_client(client)
+            self.get_logger().info(
+                f"Service {service_name} not available yet, waiting again..."
+            )
+
+    def get_vision_client(self, vision_node):
+        key = vision_node.__name__
+        if key not in self._vision_clients:
+            raise KeyError(f"Vision client '{key}' is not registered.")
+        return self._vision_clients[key]
 
     def initialize_mode(self, mode_path: str, params: dict) -> Mode:
-        module_name, class_name = mode_path.rsplit(".", 1)
-        module = importlib.import_module(module_name)
-        mode_class = getattr(module, class_name)
-
+        mode_class = load_mode_class(mode_path)
         signature = inspect.signature(mode_class.__init__)
+        type_hints = get_type_hints(mode_class.__init__)
         args = {}
+        consumed_params = set()
 
         for name, param in signature.parameters.items():
             if name == "self":
                 continue
+            if name == "node":
+                args[name] = self
+                continue
+            if name == "vehicle":
+                self._validate_vehicle_annotation(mode_path, type_hints.get(name))
+                args[name] = self.vehicle
+                continue
             if name in params:
-                param_value = params[name]
-                if param.annotation in (str, inspect.Parameter.empty) or name in (
-                    "node",
-                    "uav",
-                ):
-                    args[name] = param_value
-                else:
-                    try:
-                        args[name] = ast.literal_eval(param_value)
-                    except (ValueError, SyntaxError):
-                        raise ValueError(
-                            f"Parameter '{name}' must be a valid literal for mode '{mode_path}'. Received: {param_value}"
-                        )
-            elif param.default != inspect.Parameter.empty:
+                args[name] = params[name]
+                consumed_params.add(name)
+                continue
+            if param.default != inspect.Parameter.empty:
                 args[name] = param.default
-            else:
-                raise ValueError(
-                    f"Missing required parameter '{name}' for mode '{mode_path}'"
-                )
+                continue
+            raise ValueError(
+                f"Missing required parameter '{name}' for mode '{mode_path}'"
+            )
+
+        unexpected_params = sorted(set(params) - consumed_params)
+        if unexpected_params:
+            raise ValueError(
+                f"Mode '{mode_path}' received unexpected parameter(s): {', '.join(unexpected_params)}"
+            )
 
         return mode_class(**args)
 
-    def setup_modes(self, mode_map: str) -> None:
-        """
-        Setup the modes for the mission node.
+    def _validate_vehicle_annotation(self, mode_path: str, annotation) -> None:
+        if annotation in (None, inspect.Parameter.empty, Vehicle, Any):
+            return
+        if isinstance(annotation, type) and isinstance(self.vehicle, annotation):
+            return
+        actual = type(self.vehicle).__name__
+        expected = getattr(annotation, "__name__", str(annotation))
+        raise TypeError(
+            f"Mode '{mode_path}' expects vehicle type '{expected}', got '{actual}'."
+        )
 
-        Args:
-            mode_yaml (dict): A dictionary mapping mode names to instances of the mode.
-        """
-        mode_yaml = self.load_yaml_to_dict(mode_map)
-
-        assert "start" in mode_yaml, "No start mode defined in mode map."
-
-        for mode_name in mode_yaml.keys():
-            mode_info = mode_yaml[mode_name]
-
-            mode_path = mode_info["class"]
-
-            params = mode_info.get("params", {}) | {"node": self, "uav": self.uav}
-            mode = self.initialize_mode(mode_path, params)
+    def setup_modes(self, mission_spec: MissionSpec) -> None:
+        for mode_name, mode_info in mission_spec.modes.items():
+            mode = self.initialize_mode(mode_info.class_path, mode_info.params)
             self.add_mode(mode_name, mode)
-            self.transitions[mode_name] = mode_info.get("transitions", {})
+            self.transitions[mode_name] = mode_info.transitions
 
     def add_mode(self, mode_name: str, mode_instance: Mode) -> None:
-        """
-        Register a mode to the mission node.
-
-        Args:
-            mode_name (str): Name of the mode.
-            mode_instance (Mode): An instance of the mode.
-        """
         self.modes[mode_name] = mode_instance
         self.get_logger().info(f"Mode {mode_name} registered.")
 
     def transition(self, state: str) -> str:
-        """
-        Transition to the next mode based on the current state.
-
-        Args:
-            state (str): The current state of the mode.
-
-        Returns:
-            str: The name of the next mode to transition to.
-        """
         self.get_logger().info(
             f"Transitioning from {self.active_mode} based on state {state}."
         )
         return self.transitions[self.active_mode][state]
 
     def switch_mode(self, mode_name: str) -> None:
-        """
-        Switch to a new mode.
-
-        Args:
-            mode_name (str): Name of the mode to activate.
-        """
         if self.active_mode:
             self.get_active_mode().deactivate()
 
@@ -236,154 +140,39 @@ class ModeManager(Node):
         else:
             self.get_logger().error(f"Mode {mode_name} not found.")
 
-    def spin_once(self) -> None:
-        """
-        Execute one spin cycle of the node, updating the active mode.
-        """
-        current_time = time()
-        if self.uav.failsafe:
-            if not self.uav.emergency_landing:
-                self.uav.hover()
-                self.get_logger().warn("Failsafe: Switching to AUTO_LOITER mode.")
-                self.uav.emergency_landing = True
-            if (
-                self.uav.nav_state == VehicleStatus.NAVIGATION_STATE_AUTO_LOITER
-                or self.uav.arm_state != VehicleStatus.ARMING_STATE_ARMED
-            ):
-                self.uav.land()  # Initiate the landing procedure.
-                self.get_logger().warn("Failsafe: Initiating landing.")
+    def _run_active_mode(self, current_time: float) -> None:
+        if not self.active_mode:
             return
-        if self.servo_only:
-            if self.active_mode is None:
-                self.switch_mode("start")
-            if self.active_mode:
-                time_delta = current_time - self.last_update_time
-                self.last_update_time = current_time
-                try:
-                    self.get_active_mode().update(time_delta)
-                except Exception as e:
-                    self.get_logger().error(f"Error in mode {self.active_mode}: {e}")
-                    self.uav.failsafe = True
-                    return
-                state = self.get_active_mode().check_status()
-                if state == "error":
-                    self.get_logger().error(
-                        f"Error in mode {self.active_mode}. Switching to failsafe."
-                    )
-                    self.uav.failsafe = True
-                elif state == "terminate":
-                    self.get_logger().info("Mission has completed.")
-                    self.destroy_node()
-                elif state != "continue":
-                    self.switch_mode(self.transition(state))
-        else:
-            if not self.uav.origin_set:
-                self.uav.set_origin()
-            if self.uav.arm_state != VehicleStatus.ARMING_STATE_ARMED:
-                self.get_logger().info(
-                    f"UAV is not armed. Current arm state: {self.uav.arm_state}"
-                )
-                # Successfully landed - terminate mission
-                if (
-                    self.active_mode is not None
-                    and self.get_active_mode() == LandingMode
-                    and self.uav.nav_state != VehicleStatus.NAVIGATION_STATE_AUTO_LAND
-                ):
-                    self.get_logger().info("Successfully Landed UAV")
-                    self.get_logger().info("Finishing Mission")
-                    self.destroy_node()
-                    return
 
-                # If we attempted takeoff but became disarmed (not during landing), something went wrong
-                # Terminate instead of cycling
-                if self.uav.attempted_takeoff and self.active_mode is not None:
-                    self.get_logger().error(
-                        "UAV disarmed unexpectedly after takeoff attempt. Terminating to prevent infinite cycle."
-                    )
-                    self.get_logger().error(
-                        "This usually indicates preflight check failures or PX4 safety triggers."
-                    )
-                    self.destroy_node()
-                    return
-
-                self.uav.arm()
-                self.get_logger().info("Arming UAV")
-                self.start_time = current_time
-                return  # Wait for arm to complete
-
-            if self.uav.local_position is None or self.uav.global_position is None:
-                return  # Wait for position data
-
-            self.uav.publish_offboard_control_heartbeat_signal()
-
-            # Start mission - TakeoffMode handles takeoff, heartbeat, and offboard engagement
-            if self.active_mode is None:
-                self.switch_mode("start")
-
-            # Run active mode
-            if self.active_mode:
-                time_delta = current_time - self.last_update_time
-                self.last_update_time = current_time
-                try:
-                    self.get_active_mode().update(time_delta)
-                except Exception as e:
-                    self.get_logger().error(f"Error in mode {self.active_mode}: {e}")
-                    self.uav.failsafe = True
-                    return
-                state = self.get_active_mode().check_status()
-                if state == "error":
-                    self.get_logger().error(
-                        f"Error in mode {self.active_mode}. Switching to failsafe."
-                    )
-                    self.uav.failsafe = True
-                elif state == "terminate":
-                    self.get_logger().info("Mission has completed.")
-                    self.destroy_node()
-                elif state != "continue":
-                    self.switch_mode(self.transition(state))
-
-            if (
-                self.uav.nav_state == VehicleStatus.NAVIGATION_STATE_AUTO_LAND
-            ):  # nav_state will/should change when LandingMode is spun
-                self.get_logger().info("Landing")
-
-    def spin(self):
-        """
-        Run the mission node loop.
-        """
-        self.switch_mode("start")
+        time_delta = current_time - self.last_update_time
+        self.last_update_time = current_time
         try:
-            while rclpy.ok():
-                self.spin_once()
-        except KeyboardInterrupt:
-            self.get_logger().info("Mission Node shutting down.")
-        finally:
-            rclpy.shutdown()
+            self.get_active_mode().update(time_delta)
+        except Exception as exc:
+            self.get_logger().error(f"Error in mode {self.active_mode}: {exc}")
+            self.handle_mode_state("error")
+            return
 
-    def load_yaml_to_dict(self, filename: str):
-        """
-        Load a yaml file into a dictionary.
+        state = self.get_active_mode().check_status()
+        self.handle_mode_state(state)
 
-        Args:
-            filename (str): The path to the yaml file.
+    def _stop_vehicle(self) -> None:
+        if self.vehicle is None:
+            return
+        stop_method = getattr(self.vehicle, "stop", None)
+        if callable(stop_method):
+            stop_method()
 
-        Returns:
-            dict: The yaml file as a dictionary.
-        """
-        with open(filename, "r") as file:
-            data = yaml.safe_load(file)
-        return data
-
-
-def main(args=None):
-    rclpy.init(args=args)
-    mission_node = ModeManager()
-    try:
-        rclpy.spin(mission_node)
-    finally:
-        mission_node.destroy_node()
-        rclpy.shutdown()
-
-
-if __name__ == "__main__":
-    main()
+    def handle_mode_state(self, state: str) -> None:
+        if state == "error":
+            self.get_logger().error(
+                f"Error in mode {self.active_mode}. Switching to safe stop behavior."
+            )
+            self._stop_vehicle()
+            self.destroy_node()
+        elif state == "terminate":
+            self.get_logger().info("Mission has completed.")
+            self._stop_vehicle()
+            self.destroy_node()
+        elif state != "continue":
+            self.switch_mode(self.transition(state))
