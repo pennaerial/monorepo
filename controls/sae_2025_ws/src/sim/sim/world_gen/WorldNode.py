@@ -185,7 +185,26 @@ class WorldNode(Node, ABC):
         )
         req = SpawnEntity.Request()
         req.entity_factory = entity.to_entity_factory_msg()
-        self.spawn_entity_client.call_async(req)
+        future = self.spawn_entity_client.call_async(req)
+        future.add_done_callback(
+            lambda completed_future, entity_name=name: self._log_spawn_result(
+                entity_name, completed_future
+            )
+        )
+
+    def _log_spawn_result(self, name: str, future) -> None:
+        try:
+            response = future.result()
+        except Exception as exc:
+            self.get_logger().error(f"Failed to spawn entity '{name}': {exc}")
+            return
+
+        if getattr(response, "success", False):
+            self.get_logger().info(f"Spawned entity successfully: {name}")
+            return
+
+        status_message = getattr(response, "status_message", "unknown error")
+        self.get_logger().error(f"Failed to spawn entity '{name}': {status_message}")
 
     def trigger_world_gen_req(self, request, response):
         self.get_logger().info("Starting Dynamic World Generation!")

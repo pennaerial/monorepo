@@ -89,8 +89,9 @@ def _camera_bridge_nodes(
     if vehicle_type == "uav":
         if not model:
             raise ValueError("UAV camera bridging requires a non-empty model name.")
-        gz_image_topic = f"/world/{competition}/model/{model[3:]}_0/link/camera_link/sensor/camera/image"
-        gz_camera_info_topic = f"/world/{competition}/model/{model[3:]}_0/link/camera_link/sensor/camera/camera_info"
+        sim_model_name = model[3:] if model.startswith("gz_") else model
+        gz_image_topic = f"/world/{competition}/model/{sim_model_name}_0/link/camera_link/sensor/camera/image"
+        gz_camera_info_topic = f"/world/{competition}/model/{sim_model_name}_0/link/camera_link/sensor/camera/camera_info"
         ros_namespace = f"/{vehicle_name}"
     elif vehicle_type == "payload":
         gz_image_topic = f"/world/{competition}/model/{vehicle_name}/link/camera_link/sensor/camera/image"
@@ -195,6 +196,9 @@ def launch_setup(context, *args, **kwargs):
     )
 
     model = LaunchConfiguration("model").perform(context)
+    spawn_uav_model = LaunchConfiguration("spawn_uav_model").perform(
+        context
+    ).strip().lower() in {"1", "true", "yes", "on"}
     camera_vehicle_type = LaunchConfiguration("camera_vehicle_type").perform(context)
     camera_vehicle_name = LaunchConfiguration("camera_vehicle_name").perform(context)
     camera_bridge_actions = _camera_bridge_nodes(
@@ -214,11 +218,31 @@ def launch_setup(context, *args, **kwargs):
         )
 
     world_params = sim_stage_params["world"].copy()
+    world_node_params = world_params["params"].copy()
+    if spawn_uav_model:
+        if not model:
+            raise ValueError("spawn_uav_model requires a non-empty model name.")
+        sim_model_name = model[3:] if model.startswith("gz_") else model
+        vehicle_pose = world_node_params.get(
+            "vehicle_pose", [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        )
+        if len(vehicle_pose) != 6:
+            raise ValueError(
+                f"vehicle_pose must contain exactly 6 values. Received: {vehicle_pose}"
+            )
+        entities = dict(world_node_params.get("entities", {}))
+        entities[f"{sim_model_name}_0"] = {
+            "path_to_sdf": f"~/.simulation-gazebo/models/{sim_model_name}/model.sdf",
+            "position": vehicle_pose[:3],
+            "rpy": vehicle_pose[3:],
+        }
+        world_node_params["entities"] = entities
+
     world_node_name = camel_to_snake(world_params["name"])
     world = Node(
         package="sim",
         executable=camel_to_snake(world_params["name"]),
-        arguments=[json.dumps(world_params["params"])],
+        arguments=[json.dumps(world_node_params)],
         output="screen",
         name=world_node_name,
         cwd=cwd,
@@ -306,6 +330,7 @@ def generate_launch_description():
         [
             DeclareLaunchArgument("px4_path", default_value="~/PX4-Autopilot"),
             DeclareLaunchArgument("model", default_value=""),
+            DeclareLaunchArgument("spawn_uav_model", default_value="false"),
             DeclareLaunchArgument("camera_vehicle_type", default_value=""),
             DeclareLaunchArgument("camera_vehicle_name", default_value=""),
             OpaqueFunction(function=launch_setup),

@@ -14,6 +14,8 @@ Simulation launch behavior:
 - GUI is now the default
 - `SAE_SIM_GUI=0` forces headless mode
 - `SAE_SIM_HEADLESS=1` also forces headless mode
+- UAV sim launches start Gazebo, spawn the configured aircraft model into the SAE world, attach PX4 SITL to that existing model, and run the UAV mission runtime
+- Payload sim launches start Gazebo, spawn the configured aircraft model into the SAE world for context, and run the payload mission/runtime only; they do not start PX4 SITL
 
 Example:
 

@@ -53,6 +53,15 @@ def _runtime_executable_for(mission_spec: MissionSpec) -> str:
     raise ValueError(f"Unsupported mission target '{mission_spec.target}'.")
 
 
+def _sim_requires_px4_sitl(mission_spec: MissionSpec, *, sim: bool) -> bool:
+    return bool(sim and mission_spec.is_uav)
+
+
+def _gz_entity_name_for_model(model: str) -> str:
+    sim_model_name = model[3:] if model.startswith("gz_") else model
+    return f"{sim_model_name}_0"
+
+
 def _camera_contract_for(
     mission_spec: MissionSpec, payload_name: str
 ) -> dict[str, str]:
@@ -250,6 +259,8 @@ def launch_setup(context, *args, **kwargs):
     middleware = None
     px4_sitl = None
     autostart = None
+    launch_px4_sitl = _sim_requires_px4_sitl(mission_spec, sim=sim)
+
     if mission_spec.is_uav or sim:
         px4_path = find_folder_with_heuristic(
             "PX4-Autopilot",
@@ -293,7 +304,7 @@ def launch_setup(context, *args, **kwargs):
     else:
         logger.info(
             f"Launching payload mission '{mission_name}'"
-            + (f" in sim with backing airframe '{model}'" if sim else "")
+            + (f" in sim with vehicle model '{model}'" if sim and model else "")
         )
 
     mission_node = Node(
@@ -358,14 +369,15 @@ def launch_setup(context, *args, **kwargs):
 
     mission_ready_flags = {key: False for key in ("uav", "middleware")}
     mission_started = {"value": False}
+    sim_startup_started = {"value": False}
 
     if sim:
         from sim.constants import COMPETITION_NAMES, DEFAULT_COMPETITION, Competition
         from sim.utils import load_sim_launch_parameters, load_sim_parameters
 
-        if autostart is None or not model:
+        if launch_px4_sitl and (autostart is None or not model):
             raise ValueError(
-                "Simulation-backed launches require a valid airframe/model configuration."
+                "UAV simulation launches require a valid airframe/model configuration."
             )
 
         sim_params = load_sim_launch_parameters()
@@ -400,12 +412,10 @@ def launch_setup(context, *args, **kwargs):
                 f"Available payloads: {payload_names}"
             )
 
-        vehicle_pose = world_params.get("vehicle_pose", [0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-        vehicle_pose_str = ",".join(str(pose) for pose in vehicle_pose)
-
         sim_launch_args = {
             "px4_path": px4_path,
             "model": model,
+            "spawn_uav_model": str(bool(model)).lower(),
             "camera_vehicle_type": mission_spec.target if requires_vision else "",
             "camera_vehicle_name": camera_contract["vehicle_name"]
             if camera_contract is not None
@@ -421,18 +431,32 @@ def launch_setup(context, *args, **kwargs):
         )
 
         startup_actions = []
-        px4_sitl = ExecuteProcess(
-            cmd=[
-                "bash",
-                "-c",
-                f"PX4_GZ_MODEL_POSE='{vehicle_pose_str}' PX4_GZ_WORLD={competition} PX4_GZ_STANDALONE=1 "
-                f"PX4_SYS_AUTOSTART={autostart} PX4_SIM_MODEL={model} ./build/px4_sitl_default/bin/px4",
-            ],
-            cwd=px4_path,
-            output="screen",
-            name="px4_sitl",
-        )
-        startup_actions.append(px4_sitl)
+        if launch_px4_sitl:
+            model_entity_name = _gz_entity_name_for_model(model)
+            px4_sitl = ExecuteProcess(
+                cmd=[
+                    "bash",
+                    "-c",
+                    " ".join(
+                        [
+                            (
+                                "until gz topic -l | grep -q "
+                                f"'^/world/{competition}/model/{model_entity_name}/link/base_link/sensor/imu_sensor/imu$'; "
+                                "do sleep 0.2; done;"
+                            ),
+                            f"PX4_GZ_MODEL_NAME={model_entity_name}",
+                            f"PX4_GZ_WORLD={competition}",
+                            "PX4_GZ_STANDALONE=1",
+                            f"PX4_SYS_AUTOSTART={autostart}",
+                            "./build/px4_sitl_default/bin/px4",
+                        ]
+                    ),
+                ],
+                cwd=px4_path,
+                output="screen",
+                name="px4_sitl",
+            )
+            startup_actions.append(px4_sitl)
 
         if mission_spec.is_payload:
             startup_actions.append(
@@ -454,20 +478,22 @@ def launch_setup(context, *args, **kwargs):
         if middleware is not None:
             startup_actions.append(middleware)
 
+        startup_trigger = "World generation successful"
+
+        def maybe_start_sim_runtime(event: ProcessIO):
+            text = event.text.decode() if isinstance(event.text, bytes) else event.text
+            if sim_startup_started["value"] or startup_trigger not in text:
+                return None
+            sim_startup_started["value"] = True
+            return [LogInfo(msg="Gazebo process started."), *startup_actions]
+
         actions = [
             sim_launch,
-            RegisterEventHandler(
-                OnProcessIO(
-                    on_stderr=lambda event: (
-                        [LogInfo(msg="Gazebo process started."), *startup_actions]
-                        if b"Successfully generated world file:" in event.text
-                        else None
-                    )
-                )
-            ),
+            RegisterEventHandler(OnProcessIO(on_stdout=maybe_start_sim_runtime)),
+            RegisterEventHandler(OnProcessIO(on_stderr=maybe_start_sim_runtime)),
             mission_node,
         ]
-        if auto_launch and mission_spec.is_uav:
+        if auto_launch and mission_spec.is_uav and px4_sitl is not None:
             actions.extend(
                 [
                     RegisterEventHandler(
