@@ -39,6 +39,8 @@ class PayloadColorOrbitNode(VisionNode):
         request: PayloadColorOrbitState.Request,
         response: PayloadColorOrbitState.Response,
     ) -> PayloadColorOrbitState.Response:
+        detector = self._detector_cache.get(request.tag_family or DEFAULT_TAG_FAMILY)
+        response.detector_available = detector is not None
         image_msg, camera_info = self.request_data(cam_image=True, cam_info=True)
         response.has_image = image_msg is not None
         response.has_camera_info = camera_info is not None
@@ -71,8 +73,6 @@ class PayloadColorOrbitNode(VisionNode):
         response.lateral_error_px = float(lateral_error_px)
         response.boundary_angle = float(boundary_angle)
 
-        detector = self._detector_cache.get(request.tag_family or DEFAULT_TAG_FAMILY)
-        response.detector_available = detector is not None
         if detector is None:
             return response
 

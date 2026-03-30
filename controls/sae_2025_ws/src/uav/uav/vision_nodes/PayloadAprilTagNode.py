@@ -30,14 +30,14 @@ class PayloadAprilTagNode(VisionNode):
         request: PayloadAprilTagState.Request,
         response: PayloadAprilTagState.Response,
     ) -> PayloadAprilTagState.Response:
+        detector = self._detector_cache.get(request.tag_family or DEFAULT_TAG_FAMILY)
+        response.detector_available = detector is not None
         image_msg, camera_info = self.request_data(cam_image=True, cam_info=True)
         response.has_image = image_msg is not None
         response.has_camera_info = camera_info is not None
         if image_msg is None or camera_info is None:
             return response
 
-        detector = self._detector_cache.get(request.tag_family or DEFAULT_TAG_FAMILY)
-        response.detector_available = detector is not None
         if detector is None:
             response.image_width = int(camera_info.width)
             return response
