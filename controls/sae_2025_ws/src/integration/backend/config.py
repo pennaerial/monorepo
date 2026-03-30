@@ -43,10 +43,10 @@ class RuntimeConfig:
         root = self.remote_dir.rstrip("/")
         return {
             "workspace_root": root,
-            "launch_params": f"{root}/src/uav/launch/launch_params.yaml",
-            "missions_dir": f"{root}/src/uav/uav/missions",
-            "uav_modes_dir": f"{root}/src/uav/uav/modes/uav",
-            "payload_modes_dir": f"{root}/src/uav/uav/modes/payload",
+            "launch_params": f"{root}/install/uav/share/uav/launch/launch_params.yaml",
+            "missions_dir": f"{root}/install/uav/share/uav/missions",
+            "uav_modes_dir": "uav.modes.uav",
+            "payload_modes_dir": "uav.modes.payload",
         }
 
     def mission_paths(self) -> dict[str, str]:

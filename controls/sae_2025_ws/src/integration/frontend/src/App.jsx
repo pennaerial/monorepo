@@ -685,16 +685,16 @@ function MissionControl({ connected, buildInfo, onRefresh, workspacePaths }) {
   const workspaceRoot = workspacePaths?.workspace_root || ''
   const launchParamsDisplayPath =
     displayWorkspacePath(workspacePaths?.launch_params, workspaceRoot) ||
-    'src/uav/launch/launch_params.yaml'
+    'install/uav/share/uav/launch/launch_params.yaml'
   const missionsDirDisplayPath =
     displayWorkspacePath(workspacePaths?.missions_dir, workspaceRoot) ||
-    'src/uav/uav/missions'
+    'install/uav/share/uav/missions'
   const uavModesDisplayPath =
     displayWorkspacePath(workspacePaths?.uav_modes_dir, workspaceRoot) ||
-    'src/uav/uav/modes/uav'
+    'uav.modes.uav'
   const payloadModesDisplayPath =
     displayWorkspacePath(workspacePaths?.payload_modes_dir, workspaceRoot) ||
-    'src/uav/uav/modes/payload'
+    'uav.modes.payload'
 
   useEffect(() => {
     if (!connected || !selectedMissionName) {
@@ -918,7 +918,7 @@ function MissionControl({ connected, buildInfo, onRefresh, workspacePaths }) {
           </div>
           <p className="subtext left-note">Reload discards unsaved local edits and re-reads the file from the Pi.</p>
           <p className="subtext left-note">
-            Workspace reference: UAV mode classes live under `{uavModesDisplayPath}`, and payload mode classes live under `{payloadModesDisplayPath}`.
+            Mode class references use the Python module roots `{uavModesDisplayPath}` and `{payloadModesDisplayPath}`.
           </p>
           {connected && <Result data={paramsResult} />}
         </div>

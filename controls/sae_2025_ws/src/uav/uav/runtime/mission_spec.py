@@ -7,14 +7,34 @@ from typing import Any
 
 import yaml
 
+try:
+    from ament_index_python.packages import (
+        PackageNotFoundError,
+        get_package_share_directory,
+    )
+except ModuleNotFoundError:
+
+    class PackageNotFoundError(Exception):
+        pass
+
+    def get_package_share_directory(_package_name: str) -> str:
+        raise PackageNotFoundError
+
+
 VALID_MISSION_TARGETS = {"uav", "payload"}
-MISSION_ROOT = Path(__file__).resolve().parent.parent / "missions"
 _TOP_LEVEL_KEYS = {"modes"}
 _MODE_KEYS = {"class", "params", "transitions"}
 
 
+def mission_root() -> Path:
+    try:
+        return Path(get_package_share_directory("uav")) / "missions"
+    except PackageNotFoundError:
+        return Path(__file__).resolve().parent.parent / "missions"
+
+
 def mission_path_for_name(mission_name: str) -> str:
-    return str(MISSION_ROOT / f"{mission_name}.yaml")
+    return str(mission_root() / f"{mission_name}.yaml")
 
 
 def load_mode_class(class_path: str):
