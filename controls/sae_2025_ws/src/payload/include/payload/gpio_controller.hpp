@@ -23,7 +23,7 @@ public:
     GPIOController();
     ~GPIOController() override;
 
-    void initialize(std::shared_ptr<rclcpp::Node> node) override;
+    void initialize(rclcpp::Node* node) override;
     void drive_command(double linear, double angular) override;
 
 private:
@@ -80,7 +80,6 @@ private:
 
     void control_loop();
 
-    std::shared_ptr<rclcpp::Node> node_;
     int handle_ {-1};
 
     std::mutex config_mutex_;

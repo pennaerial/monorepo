@@ -2,6 +2,7 @@
 
 import rclpy
 from px4_msgs.msg import VehicleLocalPosition
+from rclpy.executors import ExternalShutdownException
 from rclpy.qos import (
     QoSProfile,
     QoSReliabilityPolicy,
@@ -360,11 +361,12 @@ def main(args=None):
 
     try:
         rclpy.spin(scoring_node)
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, ExternalShutdownException):
         pass
     finally:
         scoring_node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == "__main__":

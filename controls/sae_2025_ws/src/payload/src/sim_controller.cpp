@@ -5,18 +5,17 @@ SimController::SimController() {
 
 }
 
-void SimController::initialize(std::shared_ptr<rclcpp::Node> node) {
-    node_ = node;
+void SimController::initialize(rclcpp::Node* node) {
     gz_node_ = std::make_shared<gz::transport::Node>();
 
-    payload_params_listener_ = std::make_shared<payload::ParamListener>(node_);
+    payload_params_listener_ = std::make_shared<payload::ParamListener>(node);
     payload_params_ = payload_params_listener_->get_params();
 
-    std::string payload_name = node_->get_name();
+    std::string payload_name = node->get_name();
     std::string gz_drive_topic = "/model/" + payload_name + "/cmd_vel";
 
     gz_drive_publisher_ = gz_node_->Advertise<gz::msgs::Twist>(gz_drive_topic);
-    RCLCPP_INFO(node_->get_logger(), "SIM | Publishing gz drive commands to %s", gz_drive_topic.c_str());
+    RCLCPP_INFO(node->get_logger(), "SIM | Publishing gz drive commands to %s", gz_drive_topic.c_str());
 }
 
 void SimController::drive_command(double linear, double angular) {

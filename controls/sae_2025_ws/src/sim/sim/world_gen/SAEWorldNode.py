@@ -1,8 +1,10 @@
 from sim.world_gen import WorldNode
-from typing import Optional
-import rclpy
-import sys
 import json
+import sys
+from typing import Optional
+
+import rclpy
+from rclpy.executors import ExternalShutdownException
 
 
 class SAEWorldNode(WorldNode):
@@ -54,9 +56,16 @@ class SAEWorldNode(WorldNode):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = SAEWorldNode(**json.loads(sys.argv[1]))
+    node = None
     try:
+        node = SAEWorldNode(**json.loads(sys.argv[1]))
         rclpy.spin(node)
+    except (KeyboardInterrupt, ExternalShutdownException):
+        pass
     except Exception as e:
         print(e)
-    rclpy.shutdown()
+    finally:
+        if node is not None:
+            node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()

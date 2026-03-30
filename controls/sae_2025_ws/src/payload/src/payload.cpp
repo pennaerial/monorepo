@@ -16,8 +16,22 @@ Payload::Payload(const std::string& payload_name)
     controller_ = controller_loader_.createSharedInstance(payload_params_.controller);
 }
 
+Payload::~Payload() {
+    if (timed_drive_timer_) {
+        timed_drive_timer_->cancel();
+        timed_drive_timer_.reset();
+    }
+    timed_override_active_.store(false);
+    timed_drive_srv_.reset();
+    ros_drive_subscriber_.reset();
+    if (controller_) {
+        controller_->drive_command(0.0, 0.0);
+        controller_.reset();
+    }
+}
+
 void Payload::init() {
-    controller_->initialize(shared_from_this());
+    controller_->initialize(this);
 
     std::string timed_drive_name = "/" + payload_name_ + "/timed_drive";
     timed_drive_srv_ = this->create_service<payload_interfaces::srv::TimedDrive>(
@@ -63,6 +77,5 @@ void Payload::timed_drive_callback(
     response->success = true;
     response->message = "Timed drive started";
 }
-
 
 

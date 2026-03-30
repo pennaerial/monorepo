@@ -34,5 +34,4 @@ class PayloadModeManager(ModeManager):
         self._run_active_mode(current_time)
 
     def _stop_vehicle(self) -> None:
-        if self.vehicle is not None:
-            self.vehicle.stop()
+        super()._stop_vehicle()

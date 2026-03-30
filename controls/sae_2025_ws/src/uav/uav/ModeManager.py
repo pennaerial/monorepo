@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 import inspect
+import importlib
 from time import time
 from typing import Any, get_type_hints
+
+import rclpy
 from rclpy.node import Node
-import importlib
 
 from uav.Vehicle import Vehicle
 from uav.autonomous_modes.Mode import Mode
@@ -157,11 +159,14 @@ class ModeManager(Node):
         self.handle_mode_state(state)
 
     def _stop_vehicle(self) -> None:
-        if self.vehicle is None:
+        if self.vehicle is None or not rclpy.ok():
             return
         stop_method = getattr(self.vehicle, "stop", None)
         if callable(stop_method):
-            stop_method()
+            try:
+                stop_method()
+            except Exception as exc:
+                self.get_logger().warn(f"Failed to stop vehicle during shutdown: {exc}")
 
     def handle_mode_state(self, state: str) -> None:
         if state == "error":

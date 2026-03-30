@@ -7,6 +7,7 @@ from sim_interfaces.srv import HoopList
 from ros_gz_interfaces.srv import SpawnEntity
 import math
 import rclpy
+from rclpy.executors import ExternalShutdownException
 import sys
 from sim_interfaces.msg import HoopPose
 import json
@@ -652,9 +653,16 @@ class HoopCourseNode(WorldNode):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = HoopCourseNode(**json.loads(sys.argv[1]))
+    node = None
     try:
+        node = HoopCourseNode(**json.loads(sys.argv[1]))
         rclpy.spin(node)
+    except (KeyboardInterrupt, ExternalShutdownException):
+        pass
     except Exception as e:
         print(e)
-    rclpy.shutdown()
+    finally:
+        if node is not None:
+            node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import rclpy
+from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 
 from uav.AirframeClass import AirframeClass
@@ -50,12 +51,15 @@ def main(args=None) -> None:
         bootstrap.destroy_node()
         bootstrap = None
         rclpy.spin(mission_node)
+    except (KeyboardInterrupt, ExternalShutdownException):
+        pass
     finally:
         if bootstrap is not None:
             bootstrap.destroy_node()
         if mission_node is not None:
             mission_node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == "__main__":
