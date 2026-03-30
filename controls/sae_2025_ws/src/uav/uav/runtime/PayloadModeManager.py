@@ -20,7 +20,7 @@ class PayloadModeManager(ModeManager):
         if not mission_spec.is_payload:
             raise ValueError(
                 f"PayloadModeManager requires a payload mission spec, received target '{mission_spec.target}'."
-        )
+            )
 
         self.vehicle = Payload(self, str(payload_name))
         self.setup_vision(list(mission_spec.vision_nodes))

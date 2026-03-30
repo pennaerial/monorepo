@@ -26,11 +26,11 @@ class Vehicle(ABC):
         self.camera_service_name = None
         if self.has_camera:
             self.image_topic = image_topic or self._default_camera_path("camera")
-            self.camera_info_topic = (
-                camera_info_topic or self._default_camera_path("camera_info")
+            self.camera_info_topic = camera_info_topic or self._default_camera_path(
+                "camera_info"
             )
-            self.camera_service_name = (
-                camera_service_name or self._default_camera_path("camera_data")
+            self.camera_service_name = camera_service_name or self._default_camera_path(
+                "camera_data"
             )
 
     @staticmethod
@@ -60,7 +60,9 @@ class Vehicle(ABC):
         return self.node.get_logger()
 
     def namespaced_path(self, suffix: str, *, namespace: str | None = None) -> str:
-        resolved_namespace = self._normalize_namespace(namespace) or self.camera_namespace
+        resolved_namespace = (
+            self._normalize_namespace(namespace) or self.camera_namespace
+        )
         clean_suffix = suffix.lstrip("/")
         if not resolved_namespace:
             return f"/{clean_suffix}"

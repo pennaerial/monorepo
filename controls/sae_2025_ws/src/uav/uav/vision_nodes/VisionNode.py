@@ -150,7 +150,9 @@ class VisionNode(Node):
     def _resolve_namespace(self, explicit_namespace: str | None) -> str | None:
         if explicit_namespace is not None:
             return self._normalize_namespace(explicit_namespace)
-        configured_namespace = str(self.get_parameter("vehicle_namespace").value).strip()
+        configured_namespace = str(
+            self.get_parameter("vehicle_namespace").value
+        ).strip()
         if configured_namespace:
             return self._normalize_namespace(configured_namespace)
         vehicle_name = str(self.get_parameter("vehicle_name").value).strip()
@@ -218,7 +220,10 @@ class VisionNode(Node):
     def _refresh_camera_cache_from_service(self) -> None:
         if self.client is None:
             return
-        if self._camera_request_future is not None and not self._camera_request_future.done():
+        if (
+            self._camera_request_future is not None
+            and not self._camera_request_future.done()
+        ):
             return
         if not self.client.wait_for_service(timeout_sec=0.0):
             if not self._camera_wait_warned:

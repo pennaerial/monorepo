@@ -55,12 +55,14 @@ class PayloadColorOrbitNode(VisionNode):
             self._lower_green,
             self._upper_green,
         )
-        boundary_detected, lateral_error_px, boundary_angle = compute_edge_follow_control(
-            bgr,
-            self._lower_pink,
-            self._upper_pink,
-            self._lower_green,
-            self._upper_green,
+        boundary_detected, lateral_error_px, boundary_angle = (
+            compute_edge_follow_control(
+                bgr,
+                self._lower_pink,
+                self._upper_pink,
+                self._lower_green,
+                self._upper_green,
+            )
         )
         response.pink_ratio = float(pink_ratio)
         response.pink_count = int(pink_count)

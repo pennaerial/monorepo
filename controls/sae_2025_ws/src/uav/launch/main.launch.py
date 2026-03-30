@@ -53,7 +53,9 @@ def _runtime_executable_for(mission_spec: MissionSpec) -> str:
     raise ValueError(f"Unsupported mission target '{mission_spec.target}'.")
 
 
-def _camera_contract_for(mission_spec: MissionSpec, payload_name: str) -> dict[str, str]:
+def _camera_contract_for(
+    mission_spec: MissionSpec, payload_name: str
+) -> dict[str, str]:
     if mission_spec.is_uav:
         vehicle_name = "uav"
         namespace = "/uav"
@@ -268,8 +270,10 @@ def launch_setup(context, *args, **kwargs):
         vehicle_class, model_name = get_airframe_details(px4_path, airframe_id)
         autostart = int(airframe_id)
         model = custom_airframe_model or model_name
-        if mission_spec.is_uav and requires_vision and not vehicle_camera_map.get(
-            model, False
+        if (
+            mission_spec.is_uav
+            and requires_vision
+            and not vehicle_camera_map.get(model, False)
         ):
             raise ValueError(
                 f"The selected airframe ID {airframe_id} ({model}) does not have a camera sensor configured."
@@ -303,7 +307,9 @@ def launch_setup(context, *args, **kwargs):
                 mission_spec,
                 debug=uav_debug,
                 servo_only=servo_only,
-                vehicle_class_name=vehicle_class.name if vehicle_class is not None else None,
+                vehicle_class_name=vehicle_class.name
+                if vehicle_class is not None
+                else None,
                 payload_name=payload_name,
                 uav_camera_offsets=uav_camera_offsets,
             )
@@ -394,9 +400,7 @@ def launch_setup(context, *args, **kwargs):
                 f"Available payloads: {payload_names}"
             )
 
-        vehicle_pose = world_params.get(
-            "vehicle_pose", [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-        )
+        vehicle_pose = world_params.get("vehicle_pose", [0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
         vehicle_pose_str = ",".join(str(pose) for pose in vehicle_pose)
 
         sim_launch_args = {
@@ -409,7 +413,9 @@ def launch_setup(context, *args, **kwargs):
         }
         sim_launch = IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
-                os.path.join(get_package_share_directory("sim"), "launch", "sim.launch.py")
+                os.path.join(
+                    get_package_share_directory("sim"), "launch", "sim.launch.py"
+                )
             ),
             launch_arguments=sim_launch_args.items(),
         )

@@ -30,9 +30,7 @@ def load_mode_class(class_path: str):
     from uav.modes.Mode import Mode
 
     if not isinstance(mode_class, type) or not issubclass(mode_class, Mode):
-        raise TypeError(
-            f"Mode path '{class_path}' did not resolve to a Mode subclass."
-        )
+        raise TypeError(f"Mode path '{class_path}' did not resolve to a Mode subclass.")
     return mode_class
 
 

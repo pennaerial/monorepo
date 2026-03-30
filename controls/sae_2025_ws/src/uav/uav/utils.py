@@ -124,6 +124,8 @@ def get_airframe_details(px4_path, airframe_id):
             vehicle_class = AirframeClass.OTHER
 
     return vehicle_class, model_name
+
+
 def clean_text(text):
     """Remove ANSI escape codes from text."""
     ansi_escape = re.compile(r"\x1b\[[0-9;]*m")

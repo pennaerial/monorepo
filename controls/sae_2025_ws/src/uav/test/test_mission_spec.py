@@ -28,12 +28,8 @@ MODE_METADATA = {
     "uav.modes.uav.NavGPSMode": _fake_mode("uav"),
     "uav.modes.uav.LandingMode": _fake_mode("uav"),
     "uav.modes.uav.TransitionMode": _fake_mode("uav"),
-    "uav.modes.uav.PayloadPickupMode": _fake_mode(
-        "uav", ("PayloadTrackingNode",)
-    ),
-    "uav.modes.uav.PayloadDropoffMode": _fake_mode(
-        "uav", ("PayloadTrackingNode",)
-    ),
+    "uav.modes.uav.PayloadPickupMode": _fake_mode("uav", ("PayloadTrackingNode",)),
+    "uav.modes.uav.PayloadDropoffMode": _fake_mode("uav", ("PayloadTrackingNode",)),
     "uav.modes.uav.ServoDropoffMode": _fake_mode("uav"),
     "uav.modes.uav.WaypointMission": _fake_mode("uav"),
     "uav.modes.payload.PayloadDriveToAprilTagMode": _fake_mode(
@@ -77,9 +73,7 @@ modes:
 
         self.assertTrue(mission_spec.is_uav)
         self.assertEqual(mission_spec.vision_nodes, ("PayloadTrackingNode",))
-        self.assertEqual(
-            mission_spec.modes["start"].params["takeoff_type"], "vertical"
-        )
+        self.assertEqual(mission_spec.modes["start"].params["takeoff_type"], "vertical")
         self.assertEqual(mission_spec.modes["track"].params["color"], "yellow")
 
     @patch("uav.runtime.mission_spec.load_mode_class", side_effect=_resolve_fake_mode)

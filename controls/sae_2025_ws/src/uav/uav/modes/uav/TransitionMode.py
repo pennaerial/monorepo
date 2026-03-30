@@ -102,8 +102,10 @@ class TransitionMode(Mode):
                     # For FW mode: maintain forward velocity by setting position ahead
                     ahead_dist = 10.0
                     target_pos = (
-                        self.vehicle.local_position.x + np.cos(self.vehicle.yaw) * ahead_dist,
-                        self.vehicle.local_position.y + np.sin(self.vehicle.yaw) * ahead_dist,
+                        self.vehicle.local_position.x
+                        + np.cos(self.vehicle.yaw) * ahead_dist,
+                        self.vehicle.local_position.y
+                        + np.sin(self.vehicle.yaw) * ahead_dist,
                         self.vehicle.local_position.z,
                     )
                     self.vehicle.publish_position_setpoint(target_pos)

@@ -263,11 +263,17 @@ class PayloadDriveToAprilTagMode(Mode):
                 candidates = (
                     side_ids
                     if side_ids
-                    else (back_ids if back_ids else (front_ids if front_ids else seen_ids))
+                    else (
+                        back_ids if back_ids else (front_ids if front_ids else seen_ids)
+                    )
                 )
-                closest_id = min(candidates, key=lambda tag_id: tag_results[tag_id].tvec_z)
+                closest_id = min(
+                    candidates, key=lambda tag_id: tag_results[tag_id].tvec_z
+                )
             else:
-                closest_id = min(seen_ids, key=lambda tag_id: tag_results[tag_id].tvec_z)
+                closest_id = min(
+                    seen_ids, key=lambda tag_id: tag_results[tag_id].tvec_z
+                )
 
             closest = tag_results[closest_id]
             measurement = (closest.pose_x, closest.pose_y, closest.pose_yaw)
@@ -344,14 +350,16 @@ class PayloadDriveToAprilTagMode(Mode):
             self._search_total_rot += abs(spin_w) * time_delta
             for tag_id, observation in tag_results.items():
                 self._search_poses.append(
-                    (tag_id, (observation.pose_x, observation.pose_y, observation.pose_yaw))
+                    (
+                        tag_id,
+                        (observation.pose_x, observation.pose_y, observation.pose_yaw),
+                    )
                 )
 
             if self._search_total_rot < 2.0 * math.pi:
                 view_angle = self._back_tag_view_angle_deg(tag_results)
                 aligned_now = (
-                    view_angle is not None
-                    and view_angle <= self.dock_align_angle_deg
+                    view_angle is not None and view_angle <= self.dock_align_angle_deg
                 )
                 if back_visible and aligned_now:
                     if self._dock_align_start is None:
@@ -405,7 +413,11 @@ class PayloadDriveToAprilTagMode(Mode):
             if front.tvec_z < self.dock_front_safe_standoff_m:
                 self._transition_approach_front_to_orbit(now)
                 return
-            if self.dock_approach_front_min_m <= front.tvec_z <= self.dock_approach_front_max_m:
+            if (
+                self.dock_approach_front_min_m
+                <= front.tvec_z
+                <= self.dock_approach_front_max_m
+            ):
                 self._transition_approach_front_to_orbit(now)
                 return
             self._control_approach_front(now, tag_results, seen_ids)
@@ -429,7 +441,9 @@ class PayloadDriveToAprilTagMode(Mode):
                 )
                 self._orbit_peek_start_time = None
                 self._orbit_turn_back_start_time = None
-            self.log(f"DOCK | dock -> orbit (back tag lost, others visible: {seen_ids})")
+            self.log(
+                f"DOCK | dock -> orbit (back tag lost, others visible: {seen_ids})"
+            )
 
         if self._phase == "orbit":
             self._control_orbit(now, time_delta, seen_ids, any_visible, tag_results)
@@ -532,8 +546,7 @@ class PayloadDriveToAprilTagMode(Mode):
         if back_visible and any_visible:
             view_angle = self._back_tag_view_angle_deg(tag_results)
             aligned_now = (
-                view_angle is not None
-                and view_angle <= self.dock_align_angle_deg
+                view_angle is not None and view_angle <= self.dock_align_angle_deg
             )
             if aligned_now:
                 if self._dock_align_start is None:
@@ -598,11 +611,15 @@ class PayloadDriveToAprilTagMode(Mode):
                         np.clip(self.dock_orbit_yaw_k * yaw_err_peek, -0.6, 0.6)
                     )
                     self._publish_drive(0.0, w_peek)
-                    self._orbit_yaw_estimate = _wrap_angle(yaw_eff + (w_peek * time_delta))
+                    self._orbit_yaw_estimate = _wrap_angle(
+                        yaw_eff + (w_peek * time_delta)
+                    )
                     return
 
             yaw_eff = (
-                self._orbit_yaw_estimate if self._orbit_yaw_estimate is not None else pose_yaw
+                self._orbit_yaw_estimate
+                if self._orbit_yaw_estimate is not None
+                else pose_yaw
             )
             hold_heading = (
                 self._orbit_straight_heading
@@ -715,13 +732,17 @@ class PayloadDriveToAprilTagMode(Mode):
             else:
                 self._dock_align_start = None
 
-            angular = float(np.clip((-1.2 * bearing) - (self.angular_gain * err_x), -0.6, 0.6))
+            angular = float(
+                np.clip((-1.2 * bearing) - (self.angular_gain * err_x), -0.6, 0.6)
+            )
             self._publish_drive(0.0, angular)
             return
 
         if sub == "spin_180":
             spin_rate = 0.5
-            total_rot = getattr(self, "_dock_spin_total_rot", 0.0) + (spin_rate * time_delta)
+            total_rot = getattr(self, "_dock_spin_total_rot", 0.0) + (
+                spin_rate * time_delta
+            )
             self._dock_spin_total_rot = total_rot
             if total_rot >= (1.05 * math.pi):
                 self._dock_sub = "back_up_5s"
@@ -776,7 +797,9 @@ class PayloadDriveToAprilTagMode(Mode):
             self._publish_drive(0.0, 0.0)
             return
 
-        angular = float(np.clip((-self.angular_gain * err_x) - (0.5 * bearing), -0.4, 0.4))
+        angular = float(
+            np.clip((-self.angular_gain * err_x) - (0.5 * bearing), -0.4, 0.4)
+        )
         linear = float(
             np.clip(
                 self.linear_gain * (distance - self.stop_distance_m),

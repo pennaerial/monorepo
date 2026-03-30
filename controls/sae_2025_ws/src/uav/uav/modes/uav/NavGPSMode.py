@@ -76,7 +76,9 @@ class NavGPSMode(Mode):
                 self.vehicle.yaw
                 if self.vehicle.yaw is not None
                 else (
-                    self.vehicle.local_position.heading if self.vehicle.local_position else 0.0
+                    self.vehicle.local_position.heading
+                    if self.vehicle.local_position
+                    else 0.0
                 )
             )
             vel = (

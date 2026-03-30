@@ -116,15 +116,15 @@ class Camera(Node):
         self.get_logger().info(
             f"{node_name} subscribing to {self.image_topic} and serving {self.camera_service_name}."
         )
-        self.get_logger().info(
-            f"{node_name} subscribing to {self.camera_info_topic}."
-        )
+        self.get_logger().info(f"{node_name} subscribing to {self.camera_info_topic}.")
 
     def _resolve_namespace(self, explicit_namespace: str | None) -> str | None:
         if explicit_namespace is not None:
             return self._normalize_namespace(explicit_namespace)
 
-        configured_namespace = str(self.get_parameter("vehicle_namespace").value).strip()
+        configured_namespace = str(
+            self.get_parameter("vehicle_namespace").value
+        ).strip()
         if configured_namespace:
             return self._normalize_namespace(configured_namespace)
 

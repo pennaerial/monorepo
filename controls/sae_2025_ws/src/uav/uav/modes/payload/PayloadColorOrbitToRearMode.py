@@ -179,7 +179,14 @@ class PayloadColorOrbitToRearMode(Mode):
             if any_visible:
                 for tag_id, observation in observations.items():
                     self._search_poses.append(
-                        (tag_id, (observation.pose_x, observation.pose_y, observation.pose_yaw))
+                        (
+                            tag_id,
+                            (
+                                observation.pose_x,
+                                observation.pose_y,
+                                observation.pose_yaw,
+                            ),
+                        )
                     )
             if self._search_total_rot < 2.0 * math.pi:
                 if now - self._last_log_time >= 2.0:
@@ -205,7 +212,9 @@ class PayloadColorOrbitToRearMode(Mode):
                 )
                 return
             if self._pose_vtol is None:
-                self.log("PayloadColorOrbitToRearMode: no pose after scan, cannot proceed")
+                self.log(
+                    "PayloadColorOrbitToRearMode: no pose after scan, cannot proceed"
+                )
                 self._publish_drive(0.0, 0.0)
                 return
             self._phase = "decide_direction"
@@ -304,9 +313,7 @@ class PayloadColorOrbitToRearMode(Mode):
                 if response.dock_target_visible
                 else None
             )
-            aligned = (
-                view_angle is not None and view_angle <= self.dock_align_angle_deg
-            )
+            aligned = view_angle is not None and view_angle <= self.dock_align_angle_deg
             if aligned and back_visible:
                 if self._dock_align_start is None:
                     self._dock_align_start = now
