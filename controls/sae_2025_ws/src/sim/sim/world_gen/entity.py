@@ -1,7 +1,27 @@
 from ros_gz_interfaces.msg import EntityFactory
 from geometry_msgs.msg import Pose
+from math import cos, sin
 import os
-from tf_transformations import quaternion_from_euler
+
+
+def quaternion_from_euler(roll: float, pitch: float, yaw: float) -> tuple[float, float, float, float]:
+    half_roll = roll * 0.5
+    half_pitch = pitch * 0.5
+    half_yaw = yaw * 0.5
+
+    cr = cos(half_roll)
+    sr = sin(half_roll)
+    cp = cos(half_pitch)
+    sp = sin(half_pitch)
+    cy = cos(half_yaw)
+    sy = sin(half_yaw)
+
+    return (
+        sr * cp * cy - cr * sp * sy,
+        cr * sp * cy + sr * cp * sy,
+        cr * cp * sy - sr * sp * cy,
+        cr * cp * cy + sr * sp * sy,
+    )
 
 
 class Entity:

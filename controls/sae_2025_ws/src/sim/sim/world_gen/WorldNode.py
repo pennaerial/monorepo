@@ -109,8 +109,20 @@ class WorldNode(Node, ABC):
 
         """
 
-        # Expand ~, make absolute, and validate paths
-        in_path = Path(template_world_path).expanduser().resolve()
+        template_path = Path(template_world_path).expanduser()
+        if template_path.is_absolute():
+            in_path = template_path.resolve()
+        else:
+            try:
+                in_path = find_package_resource(
+                    relative_path=str(template_path),
+                    package_name="sim",
+                    resource_type="file",
+                    logger=self.get_logger(),
+                    base_file=Path(__file__),
+                ).resolve()
+            except FileNotFoundError:
+                in_path = template_path.resolve()
         out_path = Path(self.output_path).expanduser().resolve()
 
         if not in_path.exists():
