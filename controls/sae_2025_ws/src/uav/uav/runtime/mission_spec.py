@@ -8,7 +8,7 @@ from typing import Any
 import yaml
 
 VALID_MISSION_TARGETS = {"uav", "payload"}
-MISSION_ROOT = Path(__file__).resolve().parent / "missions"
+MISSION_ROOT = Path(__file__).resolve().parent.parent / "missions"
 _TOP_LEVEL_KEYS = {"modes"}
 _MODE_KEYS = {"class", "params", "transitions"}
 
@@ -27,7 +27,7 @@ def load_mode_class(class_path: str):
         module = importlib.import_module(class_path.rsplit(".", 1)[0])
 
     mode_class = getattr(module, class_name)
-    from uav.autonomous_modes.Mode import Mode
+    from uav.modes.Mode import Mode
 
     if not isinstance(mode_class, type) or not issubclass(mode_class, Mode):
         raise TypeError(

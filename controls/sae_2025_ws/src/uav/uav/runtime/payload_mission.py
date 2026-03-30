@@ -4,8 +4,8 @@ import rclpy
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 
-from uav.PayloadModeManager import PayloadModeManager
-from uav.mission_spec import MissionSpec, mission_path_for_name
+from .PayloadModeManager import PayloadModeManager
+from .mission_spec import MissionSpec, mission_path_for_name
 
 
 class PayloadMissionBootstrap(Node):

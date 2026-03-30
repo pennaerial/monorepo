@@ -3,7 +3,7 @@
 # dock: PayloadDriveToAprilTagMode in dock phase, then terminates cleanly.
 modes:
   start:
-    class: uav.autonomous_modes.PayloadColorOrbitToRearMode
+    class: uav.modes.payload.PayloadColorOrbitToRearMode
     params:
       tag_size_m: 0.1
       dock_target_tag_id: 1
@@ -21,7 +21,7 @@ modes:
       handoff_dock: dock
 
   dock:
-    class: uav.autonomous_modes.PayloadDriveToAprilTagMode
+    class: uav.modes.payload.PayloadDriveToAprilTagMode
     params:
       tag_size_m: 0.1
       dock_rear_orthogonal: true

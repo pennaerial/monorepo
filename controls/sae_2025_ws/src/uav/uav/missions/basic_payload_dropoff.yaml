@@ -1,13 +1,13 @@
 modes:
   start:
-    class: uav.autonomous_modes.TakeoffMode
+    class: uav.modes.uav.TakeoffMode
     params:
       takeoff_type: vertical
     transitions:
       complete: GPS
 
   GPS:
-    class: uav.autonomous_modes.NavGPSMode
+    class: uav.modes.uav.NavGPSMode
     params:
       coordinates:
         - [[5, 10, -10], 1, LOCAL]
@@ -15,11 +15,11 @@ modes:
       complete: payload
 
   payload:
-    class: uav.autonomous_modes.PayloadDropoffMode
+    class: uav.modes.uav.PayloadDropoffMode
     params:
       offsets: [0.0, 0.0, 0.0]
     transitions:
       complete: land
 
   land:
-    class: uav.autonomous_modes.LandingMode
+    class: uav.modes.uav.LandingMode

@@ -4,10 +4,10 @@ import numpy as np
 from px4_msgs.msg import VehicleStatus, VtolVehicleStatus
 from rclpy.node import Node
 
-from uav.UAV import UAV, get_nav_state_str
-from uav.VTOL import VTOL
+from uav.vehicles.UAV import UAV, get_nav_state_str
+from uav.vehicles.VTOL import VTOL
 
-from .Mode import Mode
+from ..Mode import Mode
 
 
 class TakeoffMode(Mode):

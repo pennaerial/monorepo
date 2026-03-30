@@ -2,7 +2,7 @@
 # AprilTag size: 100 mm x 100 mm. No UAV landing handoff.
 modes:
   start:
-    class: uav.autonomous_modes.PayloadDriveToAprilTagMode
+    class: uav.modes.payload.PayloadDriveToAprilTagMode
     params:
       tag_size_m: 0.1
       stop_distance_m: 0.01

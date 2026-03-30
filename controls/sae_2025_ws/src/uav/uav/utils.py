@@ -3,7 +3,7 @@ import glob
 import re
 from pathlib import Path
 
-from uav.AirframeClass import AirframeClass
+from uav.vehicles.AirframeClass import AirframeClass
 
 R_earth = 6378137.0  # Earth's radius in meters (WGS84)
 

@@ -3,7 +3,7 @@ from rclpy.node import Node
 from payload_interfaces.msg import DriveCommand
 from payload_interfaces.srv import TimedDrive
 
-from uav.Vehicle import Vehicle
+from .Vehicle import Vehicle
 
 
 class Payload(Vehicle):

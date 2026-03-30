@@ -19,9 +19,9 @@ from rclpy.qos import (
 )
 import numpy as np
 import math
-from uav.px4_modes import PX4CustomMainMode, PX4CustomSubModeAuto
+from .px4_modes import PX4CustomMainMode, PX4CustomSubModeAuto
 from uav.utils import R_earth
-from uav.Vehicle import Vehicle
+from .Vehicle import Vehicle
 
 # Map nav_state value -> name for readable logging
 _NAV_STATE_NAMES = {

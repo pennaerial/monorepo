@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 from time import time
 
-from uav.ModeManager import ModeManager
-from uav.Payload import Payload
-from uav.mission_spec import MissionSpec
+from uav.vehicles.Payload import Payload
+from .ModeManager import ModeManager
+from .mission_spec import MissionSpec
 
 
 class PayloadModeManager(ModeManager):

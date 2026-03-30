@@ -34,8 +34,8 @@ setup(
     },
     entry_points={
         "console_scripts": [
-            "uav_mission = uav.uav_mission:main",
-            "payload_mission = uav.payload_mission:main",
+            "uav_mission = uav.runtime.uav_mission:main",
+            "payload_mission = uav.runtime.payload_mission:main",
             "payload_tracking_node = uav.vision_nodes.PayloadTrackingNode:main",
             "payload_april_tag_node = uav.vision_nodes.PayloadAprilTagNode:main",
             "payload_color_orbit_node = uav.vision_nodes.PayloadColorOrbitNode:main",

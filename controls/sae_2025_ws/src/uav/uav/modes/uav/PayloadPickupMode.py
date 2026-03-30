@@ -1,11 +1,11 @@
 import numpy as np
 from rclpy.node import Node
 
-from uav.UAV import UAV
+from uav.vehicles.UAV import UAV
 from uav.vision_nodes import PayloadTrackingNode
 from uav_interfaces.srv import PayloadTracking
 
-from .Mode import Mode
+from ..Mode import Mode
 
 
 class PayloadPickupMode(Mode):

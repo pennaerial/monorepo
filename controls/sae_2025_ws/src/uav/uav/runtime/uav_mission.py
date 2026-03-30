@@ -4,9 +4,9 @@ import rclpy
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 
-from uav.AirframeClass import AirframeClass
-from uav.UAVModeManager import UAVModeManager
-from uav.mission_spec import MissionSpec, mission_path_for_name
+from uav.vehicles.AirframeClass import AirframeClass
+from .UAVModeManager import UAVModeManager
+from .mission_spec import MissionSpec, mission_path_for_name
 
 
 class UAVMissionBootstrap(Node):

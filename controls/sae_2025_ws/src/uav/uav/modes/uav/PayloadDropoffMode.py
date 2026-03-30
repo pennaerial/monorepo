@@ -4,11 +4,11 @@ import numpy as np
 from px4_msgs.msg import VehicleStatus
 from rclpy.node import Node
 
-from uav.UAV import UAV
+from uav.vehicles.UAV import UAV
 from uav.vision_nodes import PayloadTrackingNode
 from uav_interfaces.srv import PayloadTracking
 
-from .Mode import Mode
+from ..Mode import Mode
 
 
 class PayloadDropoffMode(Mode):

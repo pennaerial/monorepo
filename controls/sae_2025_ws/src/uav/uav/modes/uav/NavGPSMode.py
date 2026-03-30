@@ -1,9 +1,9 @@
 from typing import List
 from rclpy.node import Node
 
-from uav.UAV import UAV
+from uav.vehicles.UAV import UAV
 
-from .Mode import Mode
+from ..Mode import Mode
 
 
 class NavGPSMode(Mode):

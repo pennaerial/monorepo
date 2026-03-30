@@ -7,9 +7,9 @@ from typing import Any, get_type_hints
 import rclpy
 from rclpy.node import Node
 
-from uav.Vehicle import Vehicle
-from uav.autonomous_modes.Mode import Mode
-from uav.mission_spec import MissionSpec, load_mode_class
+from uav.vehicles.Vehicle import Vehicle
+from uav.modes.Mode import Mode
+from .mission_spec import MissionSpec, load_mode_class
 
 VISION_NODE_PATH = "uav.vision_nodes"
 

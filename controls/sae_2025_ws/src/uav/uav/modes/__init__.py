@@ -1,14 +1,9 @@
 from importlib import import_module
 
-__all__ = ["AirframeClass", "Payload", "Vehicle", "UAV", "VTOL", "Multicopter"]
+__all__ = ["Mode"]
 
 _EXPORTS = {
-    "AirframeClass": ".vehicles.AirframeClass",
-    "Payload": ".vehicles.Payload",
-    "Vehicle": ".vehicles.Vehicle",
-    "UAV": ".vehicles.UAV",
-    "VTOL": ".vehicles.VTOL",
-    "Multicopter": ".vehicles.Multicopter",
+    "Mode": ".Mode",
 }
 
 

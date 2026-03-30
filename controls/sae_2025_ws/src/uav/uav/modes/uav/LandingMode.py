@@ -1,9 +1,9 @@
 from rclpy.node import Node
 from px4_msgs.msg import VehicleStatus
 
-from uav.UAV import UAV
+from uav.vehicles.UAV import UAV
 
-from .Mode import Mode
+from ..Mode import Mode
 
 
 class LandingMode(Mode):

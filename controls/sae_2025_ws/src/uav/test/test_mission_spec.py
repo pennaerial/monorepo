@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from uav.mission_spec import load_mission_spec, mission_path_for_name
+from uav.runtime.mission_spec import load_mission_spec, mission_path_for_name
 
 
 def _write_mission(tmpdir: str, content: str) -> Path:
@@ -24,22 +24,22 @@ def _fake_mode(target: str, vision_nodes: tuple[str, ...] = ()):
 
 
 MODE_METADATA = {
-    "uav.autonomous_modes.TakeoffMode": _fake_mode("uav"),
-    "uav.autonomous_modes.NavGPSMode": _fake_mode("uav"),
-    "uav.autonomous_modes.LandingMode": _fake_mode("uav"),
-    "uav.autonomous_modes.TransitionMode": _fake_mode("uav"),
-    "uav.autonomous_modes.PayloadPickupMode": _fake_mode(
+    "uav.modes.uav.TakeoffMode": _fake_mode("uav"),
+    "uav.modes.uav.NavGPSMode": _fake_mode("uav"),
+    "uav.modes.uav.LandingMode": _fake_mode("uav"),
+    "uav.modes.uav.TransitionMode": _fake_mode("uav"),
+    "uav.modes.uav.PayloadPickupMode": _fake_mode(
         "uav", ("PayloadTrackingNode",)
     ),
-    "uav.autonomous_modes.PayloadDropoffMode": _fake_mode(
+    "uav.modes.uav.PayloadDropoffMode": _fake_mode(
         "uav", ("PayloadTrackingNode",)
     ),
-    "uav.autonomous_modes.ServoDropoffMode": _fake_mode("uav"),
-    "uav.autonomous_modes.WaypointMission": _fake_mode("uav"),
-    "uav.autonomous_modes.PayloadDriveToAprilTagMode": _fake_mode(
+    "uav.modes.uav.ServoDropoffMode": _fake_mode("uav"),
+    "uav.modes.uav.WaypointMission": _fake_mode("uav"),
+    "uav.modes.payload.PayloadDriveToAprilTagMode": _fake_mode(
         "payload", ("PayloadAprilTagNode",)
     ),
-    "uav.autonomous_modes.PayloadColorOrbitToRearMode": _fake_mode(
+    "uav.modes.payload.PayloadColorOrbitToRearMode": _fake_mode(
         "payload", ("PayloadColorOrbitNode",)
     ),
 }
@@ -53,7 +53,7 @@ def _resolve_fake_mode(class_path: str):
 
 
 class MissionSpecTests(unittest.TestCase):
-    @patch("uav.mission_spec.load_mode_class", side_effect=_resolve_fake_mode)
+    @patch("uav.runtime.mission_spec.load_mode_class", side_effect=_resolve_fake_mode)
     def test_load_uav_mission_spec(self, _resolver) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             mission_path = _write_mission(
@@ -61,13 +61,13 @@ class MissionSpecTests(unittest.TestCase):
                 """
 modes:
   start:
-    class: uav.autonomous_modes.TakeoffMode
+    class: uav.modes.uav.TakeoffMode
     params:
       takeoff_type: vertical
     transitions:
       complete: track
   track:
-    class: uav.autonomous_modes.PayloadPickupMode
+    class: uav.modes.uav.PayloadPickupMode
     params:
       color: yellow
 """.strip(),
@@ -82,7 +82,7 @@ modes:
         )
         self.assertEqual(mission_spec.modes["track"].params["color"], "yellow")
 
-    @patch("uav.mission_spec.load_mode_class", side_effect=_resolve_fake_mode)
+    @patch("uav.runtime.mission_spec.load_mode_class", side_effect=_resolve_fake_mode)
     def test_load_payload_mission_spec(self, _resolver) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             mission_path = _write_mission(
@@ -90,7 +90,7 @@ modes:
                 """
 modes:
   start:
-    class: uav.autonomous_modes.PayloadDriveToAprilTagMode
+    class: uav.modes.payload.PayloadDriveToAprilTagMode
     params:
       tag_size_m: 0.1
       stop_distance_m: 0.05
@@ -103,7 +103,7 @@ modes:
         self.assertEqual(mission_spec.vision_nodes, ("PayloadAprilTagNode",))
         self.assertEqual(mission_spec.modes["start"].params["stop_distance_m"], 0.05)
 
-    @patch("uav.mission_spec.load_mode_class", side_effect=_resolve_fake_mode)
+    @patch("uav.runtime.mission_spec.load_mode_class", side_effect=_resolve_fake_mode)
     def test_mode_derived_metadata_rejects_mixed_targets(self, _resolver) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             mission_path = _write_mission(
@@ -111,18 +111,18 @@ modes:
                 """
 modes:
   start:
-    class: uav.autonomous_modes.TakeoffMode
+    class: uav.modes.uav.TakeoffMode
     transitions:
       complete: dock
   dock:
-    class: uav.autonomous_modes.PayloadDriveToAprilTagMode
+    class: uav.modes.payload.PayloadDriveToAprilTagMode
 """.strip(),
             )
 
             with self.assertRaisesRegex(ValueError, "mixes incompatible mode targets"):
                 load_mission_spec(mission_path)
 
-    @patch("uav.mission_spec.load_mode_class", side_effect=_resolve_fake_mode)
+    @patch("uav.runtime.mission_spec.load_mode_class", side_effect=_resolve_fake_mode)
     def test_target_key_is_rejected(self, _resolver) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             mission_path = _write_mission(
@@ -131,14 +131,14 @@ modes:
 target: payload
 modes:
   start:
-    class: uav.autonomous_modes.PayloadDriveToAprilTagMode
+    class: uav.modes.payload.PayloadDriveToAprilTagMode
 """.strip(),
             )
 
             with self.assertRaisesRegex(ValueError, "unsupported top-level keys"):
                 load_mission_spec(mission_path)
 
-    @patch("uav.mission_spec.load_mode_class", side_effect=_resolve_fake_mode)
+    @patch("uav.runtime.mission_spec.load_mode_class", side_effect=_resolve_fake_mode)
     def test_undefined_transition_target_is_rejected(self, _resolver) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             mission_path = _write_mission(
@@ -146,7 +146,7 @@ modes:
                 """
 modes:
   start:
-    class: uav.autonomous_modes.TakeoffMode
+    class: uav.modes.uav.TakeoffMode
     transitions:
       complete: missing
 """.strip(),
@@ -155,7 +155,7 @@ modes:
             with self.assertRaisesRegex(ValueError, "undefined mode"):
                 load_mission_spec(mission_path)
 
-    @patch("uav.mission_spec.load_mode_class", side_effect=_resolve_fake_mode)
+    @patch("uav.runtime.mission_spec.load_mode_class", side_effect=_resolve_fake_mode)
     def test_all_repo_missions_use_explicit_schema(self, _resolver) -> None:
         mission_dir = Path(__file__).resolve().parents[1] / "uav" / "missions"
         mission_paths = sorted(mission_dir.glob("*.yaml"))

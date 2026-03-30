@@ -3,12 +3,12 @@ from time import time
 from px4_msgs.msg import VehicleStatus
 from std_srvs.srv import Trigger
 
-from uav.AirframeClass import AirframeClass
-from uav.ModeManager import ModeManager
-from uav.Multicopter import Multicopter
-from uav.VTOL import VTOL
-from uav.autonomous_modes.LandingMode import LandingMode
-from uav.mission_spec import MissionSpec
+from uav.vehicles.AirframeClass import AirframeClass
+from uav.vehicles.Multicopter import Multicopter
+from uav.vehicles.VTOL import VTOL
+from uav.modes.uav.LandingMode import LandingMode
+from .ModeManager import ModeManager
+from .mission_spec import MissionSpec
 
 
 class UAVModeManager(ModeManager):

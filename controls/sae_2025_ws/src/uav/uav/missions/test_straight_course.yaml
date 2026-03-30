@@ -1,14 +1,14 @@
 # Straight course, LOCAL frame, pausing briefly at each waypoint.
 modes:
   start:
-    class: uav.autonomous_modes.TakeoffMode
+    class: uav.modes.uav.TakeoffMode
     params:
       takeoff_type: vertical
     transitions:
       complete: GPS
 
   GPS:
-    class: uav.autonomous_modes.NavGPSMode
+    class: uav.modes.uav.NavGPSMode
     params:
       coordinates:
         - [[0, 0, -0.5], 1, LOCAL]
@@ -22,6 +22,6 @@ modes:
       complete: land
 
   land:
-    class: uav.autonomous_modes.LandingMode
+    class: uav.modes.uav.LandingMode
     params: {}
     transitions: {}

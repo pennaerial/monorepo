@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 from rclpy.node import Node
 
-from uav.Vehicle import Vehicle
+from uav.vehicles.Vehicle import Vehicle
 
 if TYPE_CHECKING:
     from uav.vision_nodes import VisionNode

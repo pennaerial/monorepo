@@ -2,7 +2,7 @@
 # In this sim: front=ID0, back=ID1, left=ID2, right=ID3 (tag36h11).
 modes:
   start:
-    class: uav.autonomous_modes.PayloadDriveToAprilTagMode
+    class: uav.modes.payload.PayloadDriveToAprilTagMode
     params:
       tag_size_m: 0.1
       dock_rear_orthogonal: true

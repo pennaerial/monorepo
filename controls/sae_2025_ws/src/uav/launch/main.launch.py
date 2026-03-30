@@ -21,7 +21,7 @@ from launch.logging import get_logger
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
-from uav.mission_spec import MissionSpec, mission_path_for_name
+from uav.runtime.mission_spec import MissionSpec, mission_path_for_name
 from uav.utils import (
     camel_to_snake,
     clean_text,
