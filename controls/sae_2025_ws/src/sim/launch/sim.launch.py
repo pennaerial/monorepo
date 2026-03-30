@@ -32,6 +32,30 @@ from sim.utils import (
 )
 
 
+def _is_truthy_env(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _is_falsey_env(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in {"0", "false", "no", "off"}
+
+
+def _gui_enabled() -> bool:
+    if _is_truthy_env("SAE_SIM_HEADLESS"):
+        return False
+    if _is_falsey_env("SAE_SIM_GUI"):
+        return False
+    return True
+
+
+def _spawn_world_command(*, competition: str, model_store: str) -> list[str]:
+    world_path = os.path.join(model_store, "worlds", f"{competition}.sdf")
+    cmd = ["gz", "sim", "--render-engine", "ogre", "-r", world_path]
+    if not _gui_enabled():
+        cmd.extend(["-s", "--headless-rendering"])
+    return cmd
+
+
 def initialize_mode(logger: logging.Logger, node_path: str, params: dict) -> Node:
     logger.debug(f"Initializing mode: {node_path} with params: {params}")
     try:
@@ -138,6 +162,24 @@ def launch_setup(context, *args, **kwargs):
         raise RuntimeError("PX4 path is required")
     cwd = os.path.expanduser(os.getcwd())
 
+    model_store = os.path.expanduser("~/.simulation-gazebo")
+    server_config_path = os.path.join(
+        os.path.dirname(os.path.realpath(__file__)), "server.config"
+    )
+    gz_sim_env = {
+        "GZ_SIM_RESOURCE_PATH": os.path.join(model_store, "models"),
+        "GZ_SIM_SERVER_CONFIG_PATH": server_config_path,
+    }
+    if not _gui_enabled():
+        gz_sim_env["LIBGL_ALWAYS_SOFTWARE"] = "1"
+        gz_sim_env["QT_QPA_PLATFORM"] = "offscreen"
+    else:
+        # OpenCV's Python package mutates QT_QPA_* env vars at import time.
+        # Gazebo GUI inheriting those points it at cv2's bundled Qt plugins,
+        # which crashes the GUI startup on this machine.
+        gz_sim_env["QT_QPA_PLATFORM_PLUGIN_PATH"] = ""
+        gz_sim_env["QT_QPA_FONTDIR"] = ""
+
     download_gz_models = ExecuteProcess(
         cmd=["python3", "Tools/simulation/gz/simulation-gazebo", "--dryrun"],
         cwd=px4_path,
@@ -145,14 +187,11 @@ def launch_setup(context, *args, **kwargs):
         name="download_gz_models",
     )
     spawn_world = ExecuteProcess(
-        cmd=[
-            "python3",
-            "Tools/simulation/gz/simulation-gazebo",
-            f"--world={competition}",
-        ],
+        cmd=_spawn_world_command(competition=competition, model_store=model_store),
         cwd=px4_path,
         output="screen",
         name="spawn_world",
+        additional_env=gz_sim_env,
     )
     gz_ros_bridge_create = Node(
         package="ros_gz_bridge",

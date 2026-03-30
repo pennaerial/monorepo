@@ -1,3 +1,26 @@
+## Launch
+The main entry point for the integrated SAE stack is:
+
+```bash
+ros2 launch uav main.launch.py
+```
+
+Useful overrides:
+- `mission_name:=...` to override the mission configured in `launch/launch_params.yaml`
+- `payload_name:=...` to bind payload missions to a different payload entity
+- `px4_path:=...` to use a non-default PX4 checkout
+
+Simulation launch behavior:
+- GUI is now the default
+- `SAE_SIM_GUI=0` forces headless mode
+- `SAE_SIM_HEADLESS=1` also forces headless mode
+
+Example:
+
+```bash
+SAE_SIM_HEADLESS=1 ros2 launch uav main.launch.py mission_name:=payload_drive_to_apriltag payload_name:=payload_0
+```
+
 When launching VTOL in fixed wing mode, make sure these parameters are configured in QGC:
 - CBRK_VTOLARMING: 159753
 - FW_W_EN: ENABLED
