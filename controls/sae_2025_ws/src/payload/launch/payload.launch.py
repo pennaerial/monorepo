@@ -1,15 +1,9 @@
-from launch import LaunchDescription
-from launch.actions import OpaqueFunction, DeclareLaunchArgument
-from launch.substitutions import LaunchConfiguration
-from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory
 import os
-import yaml
-
-
-def load_param_file(path):
-    with open(path, "r", encoding="utf-8") as f:
-        return yaml.safe_load(f)
+from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument, OpaqueFunction
+from launch.substitutions import LaunchConfiguration
+from launch_ros.actions import Node
 
 
 def launch_setup(context):
@@ -21,13 +15,6 @@ def launch_setup(context):
     payload_name = LaunchConfiguration("payload_name").perform(context)
     controller_override = LaunchConfiguration("controller").perform(context)
 
-    payload_params = load_param_file(payload_params_path)
-    ros_params = payload_params.get("/**", {}).get("ros__parameters", {})
-    controller = (
-        controller_override
-        if controller_override
-        else ros_params.get("controller", "GPIOController")
-    )
     parameters = [payload_params_path]
     if controller_override:
         parameters.append({"controller": controller_override})

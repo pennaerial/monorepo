@@ -89,20 +89,12 @@ def _camera_bridge_nodes(
     if vehicle_type == "uav":
         if not model:
             raise ValueError("UAV camera bridging requires a non-empty model name.")
-        gz_image_topic = (
-            f"/world/{competition}/model/{model[3:]}_0/link/camera_link/sensor/camera/image"
-        )
-        gz_camera_info_topic = (
-            f"/world/{competition}/model/{model[3:]}_0/link/camera_link/sensor/camera/camera_info"
-        )
+        gz_image_topic = f"/world/{competition}/model/{model[3:]}_0/link/camera_link/sensor/camera/image"
+        gz_camera_info_topic = f"/world/{competition}/model/{model[3:]}_0/link/camera_link/sensor/camera/camera_info"
         ros_namespace = f"/{vehicle_name}"
     elif vehicle_type == "payload":
-        gz_image_topic = (
-            f"/world/{competition}/model/{vehicle_name}/link/camera_link/sensor/camera/image"
-        )
-        gz_camera_info_topic = (
-            f"/world/{competition}/model/{vehicle_name}/link/camera_link/sensor/camera/camera_info"
-        )
+        gz_image_topic = f"/world/{competition}/model/{vehicle_name}/link/camera_link/sensor/camera/image"
+        gz_camera_info_topic = f"/world/{competition}/model/{vehicle_name}/link/camera_link/sensor/camera/camera_info"
         ros_namespace = f"/{vehicle_name}"
     else:
         raise ValueError(f"Unsupported camera_vehicle_type '{vehicle_type}'.")
@@ -268,7 +260,11 @@ def launch_setup(context, *args, **kwargs):
             OnProcessIO(
                 target_action=world,
                 on_stderr=lambda event: (
-                    [spawn_world, LogInfo(msg="Simulation world node started."), scoring]
+                    [
+                        spawn_world,
+                        LogInfo(msg="Simulation world node started."),
+                        scoring,
+                    ]
                     if b"Successfully generated world file:" in event.text
                     else None
                 ),

@@ -54,13 +54,28 @@ jobs:
             --from-paths src/uav src/uav_interfaces src/px4_msgs src/actuator_msgs \
               src/payload src/payload_interfaces
 
-      - name: Build hardware-oriented packages
+      - name: Build shared hardware dependencies
         working-directory: controls/sae_2025_ws
         run: |
           . /opt/ros/humble/setup.sh
           colcon build \
-            --packages-up-to uav uav_interfaces px4_msgs actuator_msgs payload payload_interfaces \
+            --packages-select payload_interfaces px4_msgs uav_interfaces actuator_msgs
+
+      - name: Build hardware payload package
+        working-directory: controls/sae_2025_ws
+        run: |
+          . /opt/ros/humble/setup.sh
+          . install/setup.sh
+          colcon build \
+            --packages-select payload \
             --cmake-args -DBUILD_SIM=OFF
+
+      - name: Build uav package
+        working-directory: controls/sae_2025_ws
+        run: |
+          . /opt/ros/humble/setup.sh
+          . install/setup.sh
+          colcon build --packages-select uav
 
       - name: Build sim package
         working-directory: controls/sae_2025_ws
@@ -145,13 +160,28 @@ jobs:
             --from-paths src/uav src/uav_interfaces src/px4_msgs src/actuator_msgs \
               src/payload src/payload_interfaces
 
-      - name: Build workspace
+      - name: Build shared hardware dependencies
         working-directory: controls/sae_2025_ws
         run: |
           . /opt/ros/humble/setup.sh
           colcon build \
-            --packages-up-to uav uav_interfaces px4_msgs actuator_msgs payload payload_interfaces \
+            --packages-select payload_interfaces px4_msgs uav_interfaces actuator_msgs
+
+      - name: Build hardware payload package
+        working-directory: controls/sae_2025_ws
+        run: |
+          . /opt/ros/humble/setup.sh
+          . install/setup.sh
+          colcon build \
+            --packages-select payload \
             --cmake-args -DBUILD_SIM=OFF
+
+      - name: Build uav package
+        working-directory: controls/sae_2025_ws
+        run: |
+          . /opt/ros/humble/setup.sh
+          . install/setup.sh
+          colcon build --packages-select uav
 
       - name: Get short SHA
         id: sha

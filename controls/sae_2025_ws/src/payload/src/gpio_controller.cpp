@@ -122,6 +122,8 @@ void GPIOController::initialize(rclcpp::Node* node)
         state_topic.c_str(), zn_service_name.c_str());
 }
 
-void GPIOController::drive_command(double linear, double angular) {
-    
+void GPIOController::drive_command(double linear, double angular)
+{
+    (void)linear;
+    (void)angular;
 }

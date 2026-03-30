@@ -1,4 +1,3 @@
-[lint]
 exclude = [
     "src/ros_gz",
     "src/actuator_msgs",

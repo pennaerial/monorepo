@@ -4,7 +4,9 @@ from math import cos, sin
 import os
 
 
-def quaternion_from_euler(roll: float, pitch: float, yaw: float) -> tuple[float, float, float, float]:
+def quaternion_from_euler(
+    roll: float, pitch: float, yaw: float
+) -> tuple[float, float, float, float]:
     half_roll = roll * 0.5
     half_pitch = pitch * 0.5
     half_yaw = yaw * 0.5
