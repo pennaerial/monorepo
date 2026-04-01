@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-package_name = "payload_teleop"
+package_name = "tools"
 
 setup(
     name=package_name,
@@ -24,6 +24,7 @@ setup(
     entry_points={
         "console_scripts": [
             "keyboard_teleop = payload_teleop.keyboard_teleop:main",
+            "apriltag_debug = apriltag_debug.apriltag_debug:main",
         ],
     },
 )
