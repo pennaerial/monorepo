@@ -13,9 +13,18 @@
 
 // ---- Pins from payload_params.yaml ----
 // SN754410 pins
+//
+//
+      //LEFT_PWM: 13
+      //LEFT_IN1: 20
+      //LEFT_IN2: 16
+      //RIGHT_PWM: 18
+      //RIGHT_IN1: 15
+      //RIGHT_IN2: 14
+//
 static constexpr int SN_A_PWM = 13;
-static constexpr int SN_AIN1  = 16;
-static constexpr int SN_AIN2  = 20;
+static constexpr int SN_AIN1  = 20;
+static constexpr int SN_AIN2  = 16;
 static constexpr int SN_B_PWM = 18;
 static constexpr int SN_BIN1  = 15;
 static constexpr int SN_BIN2  = 14;
