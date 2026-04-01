@@ -39,7 +39,9 @@ from uav.autonomous_modes.PayloadDriveToAprilTagMode import (
 )
 
 
-def _estimate_camera_pose_in_vtol(tag_id: int, rvec: np.ndarray, tvec: np.ndarray) -> Optional[Tuple[float, float, float]]:
+def _estimate_camera_pose_in_vtol(
+    tag_id: int, rvec: np.ndarray, tvec: np.ndarray
+) -> Optional[Tuple[float, float, float]]:
     """Same pose estimation as PayloadDriveToAprilTagMode."""
     if tag_id not in _VTOL_TAG_POSES:
         return None
@@ -124,7 +126,9 @@ class PayloadColorOrbitToRearMode(Mode):
         self._detector = None
         if apriltag is not None:
             try:
-                options = apriltag.DetectorOptions(families=self.tag_family, refine_edges=True)
+                options = apriltag.DetectorOptions(
+                    families=self.tag_family, refine_edges=True
+                )
                 self._detector = apriltag.Detector(options)
             except (AttributeError, TypeError):
                 self._detector = apriltag.Detector()
@@ -159,8 +163,12 @@ class PayloadColorOrbitToRearMode(Mode):
         self.node.get_logger().info(
             f"PayloadColorOrbitToRearMode: subscribing to {cam_topic}, {info_topic}"
         )
-        self._image_sub = self.node.create_subscription(Image, cam_topic, self._image_cb, 10)
-        self._info_sub = self.node.create_subscription(CameraInfo, info_topic, self._info_cb, 10)
+        self._image_sub = self.node.create_subscription(
+            Image, cam_topic, self._image_cb, 10
+        )
+        self._info_sub = self.node.create_subscription(
+            CameraInfo, info_topic, self._info_cb, 10
+        )
         drive_topic = f"/{self.payload_name}/cmd_drive"
         self._drive_pub = self.node.create_publisher(DriveCommand, drive_topic, 10)
         self.node.get_logger().info(
@@ -174,7 +182,9 @@ class PayloadColorOrbitToRearMode(Mode):
         self._camera_info = msg
 
     def _publish_drive(self, linear: float, angular: float) -> None:
-        self._drive_pub.publish(DriveCommand(linear=float(linear), angular=float(angular)))
+        self._drive_pub.publish(
+            DriveCommand(linear=float(linear), angular=float(angular))
+        )
 
     def _process_tags(self, detections, K, dist_coeffs) -> Tuple[dict, list]:
         """Same tag processing as PayloadDriveToAprilTagMode: tag_results, seen_ids."""
@@ -213,7 +223,9 @@ class PayloadColorOrbitToRearMode(Mode):
         pink_ratio = pink_count / total if total > 0 else 0.5
         return pink_ratio, pink_count, green_count
 
-    def _edge_detected(self, pink_ratio: float, pink_count: int, green_count: int) -> bool:
+    def _edge_detected(
+        self, pink_ratio: float, pink_count: int, green_count: int
+    ) -> bool:
         total = pink_count + green_count
         if total < self.edge_min_pixels:
             return False
@@ -243,7 +255,10 @@ class PayloadColorOrbitToRearMode(Mode):
             if len(xs) < 2:
                 return None
             for i in range(len(ratios) - 1):
-                if ratios[i] >= 0.5 >= ratios[i + 1] or ratios[i] <= 0.5 <= ratios[i + 1]:
+                if (
+                    ratios[i] >= 0.5 >= ratios[i + 1]
+                    or ratios[i] <= 0.5 <= ratios[i + 1]
+                ):
                     t = (0.5 - ratios[i]) / (ratios[i + 1] - ratios[i] + 1e-9)
                     return xs[i] + t * (xs[i + 1] - xs[i])
             return sum(xs) / len(xs) if xs else None
@@ -254,7 +269,11 @@ class PayloadColorOrbitToRearMode(Mode):
         if x_top is not None:
             boundary_center = x_top
         if x_bot is not None:
-            boundary_center = (boundary_center + x_bot) / 2.0 if boundary_center is not None else x_bot
+            boundary_center = (
+                (boundary_center + x_bot) / 2.0
+                if boundary_center is not None
+                else x_bot
+            )
 
         if boundary_center is None:
             return 0.0, 0.0
@@ -285,7 +304,9 @@ class PayloadColorOrbitToRearMode(Mode):
             gray = self._bridge.imgmsg_to_cv2(self._image, desired_encoding="mono8")
             bgr = self._bridge.imgmsg_to_cv2(self._image, desired_encoding="bgr8")
         except Exception as e:
-            self.node.get_logger().warn(f"PayloadColorOrbitToRearMode: image convert failed: {e}")
+            self.node.get_logger().warn(
+                f"PayloadColorOrbitToRearMode: image convert failed: {e}"
+            )
             return
         K = np.array(self._camera_info.k, dtype=np.float64).reshape(3, 3)
         d = getattr(self._camera_info, "d", None) or []
@@ -334,10 +355,14 @@ class PayloadColorOrbitToRearMode(Mode):
                 self._phase = "handoff_to_dock"
                 self._handoff_requested = True
                 self._publish_drive(0.0, 0.0)
-                self.log("PayloadColorOrbitToRearMode: rear tag seen during scan -> HANDOFF_TO_DOCK (dock immediately)")
+                self.log(
+                    "PayloadColorOrbitToRearMode: rear tag seen during scan -> HANDOFF_TO_DOCK (dock immediately)"
+                )
                 return
             if self._pose_vtol is None:
-                self.log("PayloadColorOrbitToRearMode: no pose after scan, cannot proceed")
+                self.log(
+                    "PayloadColorOrbitToRearMode: no pose after scan, cannot proceed"
+                )
                 self._publish_drive(0.0, 0.0)
                 return
             self._phase = "decide_direction"
@@ -366,7 +391,9 @@ class PayloadColorOrbitToRearMode(Mode):
             if not valid:
                 self._edge_invalid_count += 1
                 if self._edge_invalid_count >= self.edge_invalid_max_frames:
-                    self.log("PayloadColorOrbitToRearMode: GO_TO_EDGE too many invalid frames, stopping")
+                    self.log(
+                        "PayloadColorOrbitToRearMode: GO_TO_EDGE too many invalid frames, stopping"
+                    )
                     self._publish_drive(0.0, 0.0)
                     return
                 self._publish_drive(self.go_to_edge_speed_mps, 0.0)
@@ -381,12 +408,18 @@ class PayloadColorOrbitToRearMode(Mode):
                     self._edge_stable_count = 0
                     self._edge_align_yaw_turned = 0.0
                     self._edge_align_start = now
-                    self.log("PayloadColorOrbitToRearMode: GO_TO_EDGE -> EDGE_ALIGN (edge detected)")
+                    self.log(
+                        "PayloadColorOrbitToRearMode: GO_TO_EDGE -> EDGE_ALIGN (edge detected)"
+                    )
                     return
             else:
                 self._edge_stable_count = 0
 
-            yaw_err = _wrap_angle(self._outward_heading - self._pose_vtol[2]) if self._pose_vtol else 0.0
+            yaw_err = (
+                _wrap_angle(self._outward_heading - self._pose_vtol[2])
+                if self._pose_vtol
+                else 0.0
+            )
             # Deadband + lower gain to avoid angular flip-flop (circles) from pose noise/overshoot
             yaw_deadband = 0.12  # rad (~7°)
             if abs(yaw_err) <= yaw_deadband:
