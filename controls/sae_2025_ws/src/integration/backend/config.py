@@ -39,13 +39,24 @@ class RuntimeConfig:
     def ssh_target(self) -> str:
         return f"{self.pi_user}@{self.pi_host}"
 
-    def mission_paths(self) -> dict[str, str]:
+    def workspace_paths(self) -> dict[str, str]:
+        root = self.remote_dir.rstrip("/")
         return {
-            "log": f"{self.remote_dir}/.mission_main_launch.log",
-            "pid": f"{self.remote_dir}/.mission_main_launch.pid",
-            "pgid": f"{self.remote_dir}/.mission_main_launch.pgid",
-            "launch_params": f"{self.remote_dir}/src/uav/launch/launch_params.yaml",
-            "missions_dir": f"{self.remote_dir}/src/uav/uav/missions",
+            "workspace_root": root,
+            "launch_params": f"{root}/install/uav/share/uav/launch/launch_params.yaml",
+            "missions_dir": f"{root}/install/uav/share/uav/missions",
+            "uav_modes_dir": "uav.modes.uav",
+            "payload_modes_dir": "uav.modes.payload",
+        }
+
+    def mission_paths(self) -> dict[str, str]:
+        workspace_paths = self.workspace_paths()
+        return {
+            "log": f"{workspace_paths['workspace_root']}/.mission_main_launch.log",
+            "pid": f"{workspace_paths['workspace_root']}/.mission_main_launch.pid",
+            "pgid": f"{workspace_paths['workspace_root']}/.mission_main_launch.pgid",
+            "launch_params": workspace_paths["launch_params"],
+            "missions_dir": workspace_paths["missions_dir"],
         }
 
     def to_safe_dict(self) -> dict[str, str]:

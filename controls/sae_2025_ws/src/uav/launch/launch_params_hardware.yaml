@@ -1,15 +1,23 @@
 # launch_params_hardware.yaml
-# Configuration for running on real hardware (Raspberry Pi)
-# Copy this to launch_params.yaml or set UAV_LAUNCH_PARAMS env var
+# Configuration for running on real hardware.
 
 mission_name: basic
 uav_debug: false
 vision_debug: false
 auto_launch: true
-vehicle_type: 0  # 0 for quadrotor, 1 for tiltrotor VTOL, 2 for fixed-wing, 3 for standard VTOL
-save_vision: false
-servo_only: false
-camera_offsets: [0.0, 0.0, 0.0]  # Position of camera relative to payload mechanism, in meters (NED frame)
 
-# IMPORTANT: Set to false for real hardware
+# PX4 / airframe settings for UAV missions.
+airframe: standard_vtol
+custom_airframe_model: ""
+
+# Vehicle camera pipeline settings. Only used when the mission modes require vision nodes.
+enable_vehicle_camera_pipeline: true
+save_vision_milliseconds: 0
+uav_camera_offsets: [0.0, 0.0, 0.0]
+
+# Mission runtime knobs.
+servo_only: false
+payload_name: payload_0
+payload_controller: GPIOController
+
 sim: false

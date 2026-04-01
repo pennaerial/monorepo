@@ -84,7 +84,7 @@ deploy_build() {
         warn "Backing up existing workspace to backup/"
         rm -rf backup
         mkdir -p backup
-        mv install src launch_params.yaml backup/ 2>/dev/null || true
+        mv install backup/ 2>/dev/null || true
     fi
     
     # Extract
@@ -106,16 +106,15 @@ cd "$SCRIPT_DIR"
 source /opt/ros/humble/setup.bash
 source install/setup.bash
 
-# Ensure hardware mode (sim=false) is used
-export UAV_SIM=false
-
 echo "ROS 2 workspace activated!"
 echo ""
 echo "Build info:"
 cat install/BUILD_INFO.txt 2>/dev/null || echo "No build info available"
 echo ""
 echo "To run: ros2 launch uav main.launch.py"
-echo "Config: edit launch_params.yaml or use UAV_MISSION=name"
+echo "Config: edit install/uav/share/uav/launch/launch_params.yaml"
+echo "Missions: edit install/uav/share/uav/missions/*.yaml"
+echo "Override launch args like: mission_name:=basic payload_name:=payload_0 px4_path:=~/PX4-Autopilot"
 ACTIVATE_EOF
     chmod +x activate.sh
     
@@ -183,4 +182,3 @@ main() {
 }
 
 main "$@"
-

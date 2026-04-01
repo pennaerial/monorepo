@@ -1,4 +1,4 @@
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from rclpy.node import Node
 from px4_msgs.msg import (
     OffboardControlMode,
@@ -19,8 +19,9 @@ from rclpy.qos import (
 )
 import numpy as np
 import math
-from uav.px4_modes import PX4CustomMainMode, PX4CustomSubModeAuto
+from .px4_modes import PX4CustomMainMode, PX4CustomSubModeAuto
 from uav.utils import R_earth
+from .Vehicle import Vehicle
 
 # Map nav_state value -> name for readable logging
 _NAV_STATE_NAMES = {
@@ -35,7 +36,7 @@ def get_nav_state_str(val):
     return _NAV_STATE_NAMES.get(val, str(val))
 
 
-class UAV(ABC):
+class UAV(Vehicle):
     """
     Abstract base class for UAV control and interfacing with PX4 via ROS 2.
     Subclasses: VTOL, Multicopter
@@ -44,10 +45,18 @@ class UAV(ABC):
     def __init__(
         self, node: Node, takeoff_amount=5.0, DEBUG=False, camera_offsets=[0, 0, 0]
     ):
+        super().__init__(
+            node,
+            "uav",
+            has_camera=True,
+            camera_namespace="/uav",
+            image_topic="/uav/camera",
+            camera_info_topic="/uav/camera_info",
+            camera_service_name="/uav/camera_data",
+        )
         self.node = node
         self.DEBUG = DEBUG
         self.node.get_logger().info(f"Initializing UAV with DEBUG={DEBUG}")
-        self.vision_clients = {}
 
         # Initialize necessary parameters to handle PX4 flight failures
         self.flight_check = False
@@ -147,6 +156,9 @@ class UAV(ABC):
                 "param3": PX4CustomSubModeAuto.LOITER.value,
             },
         )
+
+    def stop(self) -> None:
+        self.hover()
 
     def disarm(self, force=False):
         """Send a disarm command to the UAV."""

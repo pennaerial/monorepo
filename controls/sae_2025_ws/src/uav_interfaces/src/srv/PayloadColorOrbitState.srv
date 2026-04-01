@@ -1,0 +1,22 @@
+float64 tag_size_m
+string tag_family
+int32 dock_target_tag_id
+---
+bool detector_available
+bool has_image
+bool has_camera_info
+int32[] tag_ids
+float64[] pose_x
+float64[] pose_y
+float64[] pose_yaw
+float64[] tvec_x
+float64[] tvec_y
+float64[] tvec_z
+float64 pink_ratio
+int32 pink_count
+int32 green_count
+bool boundary_detected
+float64 lateral_error_px
+float64 boundary_angle
+bool dock_target_visible
+float64 dock_target_view_angle_deg

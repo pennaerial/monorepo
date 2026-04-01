@@ -1,15 +1,15 @@
-# from typing import Type
-# from rclpy.type_support import Srv, SrvRequestT, SrvResponseT
-from uav_interfaces.srv import CameraData
-from sensor_msgs.msg import Image, CameraInfo
-import cv2
 import os
-import numpy as np
 import uuid
+
+import cv2
+import numpy as np
 import rclpy
+from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
-from uav.utils import camel_to_snake
+from sensor_msgs.msg import CameraInfo, Image
 from std_srvs.srv import Trigger
+from uav.utils import camel_to_snake
+from uav_interfaces.srv import CameraData
 
 
 class VisionNode(Node):
@@ -24,65 +24,166 @@ class VisionNode(Node):
         return camel_to_snake(cls.__name__)
 
     @classmethod
-    def service_name(cls):
-        return f"vision/{cls.node_name()}"
+    def service_name(cls, camera_namespace: str | None = None):
+        normalized_namespace = cls._normalize_namespace(camera_namespace)
+        if not normalized_namespace:
+            return f"vision/{cls.node_name()}"
+        return f"{normalized_namespace}/vision/{cls.node_name()}"
 
     @classmethod
     def __str__(cls):
         return cls.node_name()
 
     def __init__(
-        self, custom_service, display: bool = False, use_service: bool = False
+        self,
+        custom_service,
+        *,
+        node_name: str | None = None,
+        display: bool = False,
+        use_service: bool = True,
+        vehicle_namespace: str | None = None,
+        camera_service_name: str | None = None,
+        image_topic: str | None = None,
+        camera_info_topic: str | None = None,
+        vision_service_name: str | None = None,
+        enable_failsafe: bool | None = None,
+        failsafe_service_name: str | None = None,
     ):
-        """
-        Initialize the VisionNode.
-
-        Args:
-            custom_service (Type[Srv[SrvRequestT, SrvResponseT]]): The custom service type.
-            display (bool): Whether to display the image in a window.
-            use_service (bool): Whether to use the custom CameraNode service.
-        """
-        super().__init__(self.__class__.__name__)
+        super().__init__(node_name or self.__class__.__name__)
 
         self.declare_parameter("debug", False)
-        self.debug = self.get_parameter("debug").value
         self.declare_parameter("sim", True)
-        self.sim = self.get_parameter("sim").value
         self.declare_parameter("save_vision", False)
-        self.save_vision = self.get_parameter("save_vision").value
+        self.declare_parameter("display", display)
+        self.declare_parameter("vehicle_name", "uav")
+        self.declare_parameter("vehicle_namespace", "")
+        self.declare_parameter("camera_service_name", "")
+        self.declare_parameter("camera_image_topic", "")
+        self.declare_parameter("camera_info_topic", "")
+        self.declare_parameter("vision_service_name", "")
+        self.declare_parameter("use_camera_service", use_service)
+        self.declare_parameter("enable_failsafe_service", False)
+        self.declare_parameter("failsafe_service_name", "")
+
+        self.debug = bool(self.get_parameter("debug").value)
+        self.sim = bool(self.get_parameter("sim").value)
+        self.save_vision = bool(self.get_parameter("save_vision").value)
+        self.display = bool(self.get_parameter("display").value)
         self.custom_service_type = custom_service
         self.uuid = str(uuid.uuid4())
         if self.save_vision:
             os.makedirs(os.path.expanduser(f"~/vision_imgs/{self.uuid}"), exist_ok=True)
 
-        self.use_service = use_service
+        self.vehicle_namespace = self._resolve_namespace(vehicle_namespace)
+        self.camera_namespace = self.vehicle_namespace
+        self.camera_service_name = self._resolve_transport_path(
+            explicit=camera_service_name,
+            param_name="camera_service_name",
+            default_suffix="camera_data",
+            legacy_default="/camera_data",
+        )
+        self.image_topic = self._resolve_transport_path(
+            explicit=image_topic,
+            param_name="camera_image_topic",
+            default_suffix="camera",
+            legacy_default="/camera",
+        )
+        self.camera_info_topic = self._resolve_transport_path(
+            explicit=camera_info_topic,
+            param_name="camera_info_topic",
+            default_suffix="camera_info",
+            legacy_default="/camera_info",
+        )
+        self.vision_service = self._resolve_vision_service_name(vision_service_name)
+        self.use_service = bool(self.get_parameter("use_camera_service").value)
 
-        if use_service:
-            self.client = self.create_client(CameraData, "/camera_data")
-
-            if not self.client.wait_for_service(timeout_sec=1.0):
-                self.get_logger().error("Service not available.")
-                return
+        self.client = None
+        self.image = None
+        self.camera_info = None
+        self._camera_request_future = None
+        self._camera_service_warned = False
+        self._camera_wait_warned = False
+        if self.use_service:
+            self.client = self.create_client(CameraData, self.camera_service_name)
+            # Poll camera_data asynchronously so service callbacks can read cached data
+            # without issuing nested blocking service requests.
+            self._camera_poll_timer = self.create_timer(
+                0.1, self._refresh_camera_cache_from_service
+            )
         else:
             self.image_subscription = self.create_subscription(
-                Image, "/camera", self.image_callback, 10
+                Image, self.image_topic, self.image_callback, 10
             )
-
             self.camera_info_subscription = self.create_subscription(
-                CameraInfo, "/camera_info", self.camera_info_callback, 10
+                CameraInfo, self.camera_info_topic, self.camera_info_callback, 10
             )
-
-            self.image = None
-            self.camera_info = None
 
         if not self.sim:
             from cv_bridge import CvBridge
 
             self.bridge = CvBridge()
-        self.display = display
-        self.failsafe_trigger_client = self.create_client(
-            Trigger, "/mode_manager/failsafe"
+
+        resolved_enable_failsafe = (
+            bool(enable_failsafe)
+            if enable_failsafe is not None
+            else bool(self.get_parameter("enable_failsafe_service").value)
         )
+        resolved_failsafe_service = (
+            failsafe_service_name
+            or str(self.get_parameter("failsafe_service_name").value).strip()
+        )
+        self.failsafe_trigger_client = None
+        if resolved_enable_failsafe and resolved_failsafe_service:
+            self.failsafe_trigger_client = self.create_client(
+                Trigger, resolved_failsafe_service
+            )
+
+    @staticmethod
+    def _normalize_namespace(namespace: str | None) -> str | None:
+        if namespace is None:
+            return None
+        normalized = str(namespace).strip().strip("/")
+        if not normalized:
+            return None
+        return f"/{normalized}"
+
+    def _resolve_namespace(self, explicit_namespace: str | None) -> str | None:
+        if explicit_namespace is not None:
+            return self._normalize_namespace(explicit_namespace)
+        configured_namespace = str(
+            self.get_parameter("vehicle_namespace").value
+        ).strip()
+        if configured_namespace:
+            return self._normalize_namespace(configured_namespace)
+        vehicle_name = str(self.get_parameter("vehicle_name").value).strip()
+        if vehicle_name:
+            return self._normalize_namespace(vehicle_name)
+        return None
+
+    def _resolve_transport_path(
+        self,
+        *,
+        explicit: str | None,
+        param_name: str,
+        default_suffix: str,
+        legacy_default: str,
+    ) -> str:
+        if explicit:
+            return explicit
+        configured = str(self.get_parameter(param_name).value).strip()
+        if configured:
+            return configured
+        if self.vehicle_namespace:
+            return f"{self.vehicle_namespace}/{default_suffix}"
+        return legacy_default
+
+    def _resolve_vision_service_name(self, explicit: str | None) -> str:
+        if explicit:
+            return explicit
+        configured = str(self.get_parameter("vision_service_name").value).strip()
+        if configured:
+            return configured
+        return self.service_name(self.vehicle_namespace)
 
     def image_callback(self, msg: Image):
         """
@@ -103,77 +204,91 @@ class VisionNode(Node):
     def convert_image_msg_to_frame(self, msg: Image) -> np.ndarray:
         """
         Converts a ROS 2 Image message to a NumPy array.
-
-        Args:
-            msg (Image): The ROS 2 Image message.
-
-        Returns:
-            np.ndarray: The decoded image as a NumPy array.
         """
         if self.sim:
             img_data = np.frombuffer(msg.data, dtype=np.uint8)
-            frame = img_data.reshape(
-                (msg.height, msg.width, 3)
-            )  # Assuming BGR8 encoding
+            frame = img_data.reshape((msg.height, msg.width, 3))
         else:
             frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
         return frame
 
     def send_req(self, req):
+        if self.client is None:
+            raise RuntimeError("Camera service transport is not configured.")
         return self.client.call_async(req)
 
-    def request_data(
-        self, cam_image: bool = False, cam_info: bool = False
-    ) -> CameraData.Response:
-        """
-        Sends request for camera image or camera information.
-        """
-        if not self.use_service:
-            response = CameraData.Response()
-            if cam_image:
-                response.image = self.image
-            if cam_info:
-                response.camera_info = self.camera_info
-        else:
-            self.get_logger().info("Requesting camera data from service...")
-            request = CameraData.Request()
-            if not cam_info and not cam_image:
-                return CameraData.Response()
-            request.cam_image = cam_image
-            request.cam_info = cam_info
+    def _refresh_camera_cache_from_service(self) -> None:
+        if self.client is None:
+            return
+        if (
+            self._camera_request_future is not None
+            and not self._camera_request_future.done()
+        ):
+            return
+        if not self.client.wait_for_service(timeout_sec=0.0):
+            if not self._camera_wait_warned:
+                self.get_logger().warn(
+                    f"Waiting for camera service {self.camera_service_name}."
+                )
+                self._camera_wait_warned = True
+            return
 
-            future = self.send_req(request)
-            self.get_logger().info("Sending request to CameraNode...")
-            rclpy.spin_until_future_complete(self, future)
-            self.get_logger().info("Request sent.")
-            try:
-                response = future.result()
-                if response.image:
-                    self.get_logger().info(f"Received image: {response.image}")
-                if response.camera_info:
-                    self.get_logger().info(
-                        f"Received camera info: {response.camera_info}"
-                    )
-            except Exception as e:
-                self.get_logger().error(f"Service call failed: {e}")
+        self._camera_wait_warned = False
+        request = CameraData.Request()
+        request.cam_image = True
+        request.cam_info = True
+        self._camera_request_future = self.send_req(request)
+        self._camera_request_future.add_done_callback(self._handle_camera_response)
+
+    def _handle_camera_response(self, future) -> None:
+        self._camera_request_future = None
+        try:
+            response = future.result()
+        except Exception as exc:
+            if not self._camera_service_warned:
+                self.get_logger().error(f"Camera service call failed: {exc}")
+                self._camera_service_warned = True
+            return
+
+        self._camera_service_warned = False
+        if response is None:
+            return
+        if response.image.data:
+            self.image = response.image
             if self.display:
                 self.display_frame(
                     self.convert_image_msg_to_frame(response.image), self.node_name()
                 )
-        return response.image, response.camera_info
+        if response.camera_info.header.frame_id or response.camera_info.width > 0:
+            self.camera_info = response.camera_info
+
+    def request_data(self, cam_image: bool = False, cam_info: bool = False):
+        """
+        Sends request for camera image or camera information.
+        """
+        if not cam_info and not cam_image:
+            return None, None
+
+        if not self.use_service:
+            image = self.image if cam_image else None
+            camera_info = self.camera_info if cam_info else None
+            return image, camera_info
+
+        image = self.image if cam_image else None
+        camera_info = self.camera_info if cam_info else None
+        if (cam_image and image is None) or (cam_info and camera_info is None):
+            self._refresh_camera_cache_from_service()
+        return image, camera_info
 
     def display_frame(self, frame: np.ndarray, window_name: str) -> None:
         """
         Displays the given frame using OpenCV.
-
-        Args:
-            frame (np.ndarray): The image frame to display.
-            window_name (str): The name of the display window.
         """
         cv2.imshow(window_name, frame)
         if cv2.waitKey(1) & 0xFF == ord("q"):
             self.get_logger().info("Shutting down display.")
-            rclpy.shutdown()
+            if rclpy.ok():
+                rclpy.shutdown()
             cv2.destroyAllWindows()
 
     def cleanup(self):
@@ -183,9 +298,18 @@ class VisionNode(Node):
         cv2.destroyAllWindows()
 
     def publish_failsafe(self):
-        future = self.failsafe_trigger_client.call_async(Trigger.Request(data=True))
-        rclpy.spin_until_future_complete(self, future)
-        if future.result().success:
+        if self.failsafe_trigger_client is None or not rclpy.ok():
+            return
+        if not self.failsafe_trigger_client.wait_for_service(timeout_sec=1.0):
+            self.get_logger().error("Failsafe service is not available.")
+            return
+        future = self.failsafe_trigger_client.call_async(Trigger.Request())
+        try:
+            rclpy.spin_until_future_complete(self, future)
+        except ExternalShutdownException:
+            return
+        result = future.result()
+        if result is not None and result.success:
             self.get_logger().info("Failsafe triggered.")
         else:
             self.get_logger().error("Failed to trigger failsafe.")

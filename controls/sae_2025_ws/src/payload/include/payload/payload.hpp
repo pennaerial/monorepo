@@ -16,6 +16,7 @@
 class Payload : public rclcpp::Node {
 public:
     Payload(const std::string& payload_name);
+    ~Payload() override;
     void init();
 
 private:

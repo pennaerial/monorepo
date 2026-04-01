@@ -36,40 +36,52 @@ const LAUNCH_PARAM_FIELDS = [
     help: 'Preset or valid PX4 airframe ID (e.g., quadcopter, tiltrotor_vtol, fixed_wing, standard_vtol, quadtailsitter, 4014).',
   },
   {
-    key: 'use_camera',
-    label: 'Use camera',
-    type: 'boolean',
-    help: 'Enable camera node and camera-driven functionality.',
-  },
-  {
     key: 'custom_airframe_model',
     label: 'Custom airframe model',
     type: 'string',
-    help: 'Leave blank for default PX4 model, or provide custom model file name.',
+    help: 'Leave blank for the default PX4 model, or provide a custom model file name.',
   },
   {
-    key: 'save_vision',
-    label: 'Save vision',
-    type: 'boolean',
-    help: 'Save vision output artifacts for debugging.',
+    key: 'payload_name',
+    label: 'Payload name',
+    type: 'string',
+    help: 'Payload entity name used by payload-target missions in sim.',
   },
   {
-    key: 'servo_only',
-    label: 'Servo only',
-    type: 'boolean',
-    help: 'Run servo-only behavior without full mission flow.',
+    key: 'payload_controller',
+    label: 'Payload controller',
+    type: 'string',
+    help: 'Optional payload controller override. Leave blank to use the default controller.',
   },
   {
-    key: 'camera_offsets',
-    label: 'Camera offsets (x,y,z)',
+    key: 'save_vision_milliseconds',
+    label: 'Save vision interval (ms)',
+    type: 'integer',
+    help: 'Milliseconds between saved vision frames. Set to 0 to disable image capture.',
+  },
+  {
+    key: 'uav_camera_offsets',
+    label: 'UAV camera offsets (x,y,z)',
     type: 'array3',
-    help: 'Camera position relative to payload mechanism (meters, NED: x forward, y right, z down).',
+    help: 'Camera position offsets in meters (NED: x forward, y right, z down).',
   },
   {
     key: 'sim',
     label: 'Simulation mode',
     type: 'boolean',
     help: 'Enable simulation-specific settings.',
+  },
+  {
+    key: 'servo_only',
+    label: 'Servo only',
+    type: 'boolean',
+    help: 'Run servo-only behavior without the rest of the mission flow.',
+  },
+  {
+    key: 'enable_vehicle_camera_pipeline',
+    label: 'Enable vehicle camera pipeline',
+    type: 'boolean',
+    help: 'Launch the camera node and any required vision nodes for the selected mission.',
   },
 ]
 
@@ -81,15 +93,17 @@ const LAUNCH_PARAM_CORE_FIELDS = [
   'mission_name',
   'airframe',
   'custom_airframe_model',
-  'camera_offsets',
+  'payload_name',
+  'payload_controller',
+  'save_vision_milliseconds',
+  'uav_camera_offsets',
 ].map(key => LAUNCH_PARAM_FIELD_MAP[key]).filter(Boolean)
 
 const LAUNCH_PARAM_TOGGLE_FIELDS = [
   'uav_debug',
   'vision_debug',
   'auto_launch',
-  'use_camera',
-  'save_vision',
+  'enable_vehicle_camera_pipeline',
   'servo_only',
   'sim',
 ].map(key => LAUNCH_PARAM_FIELD_MAP[key]).filter(Boolean)
@@ -152,6 +166,10 @@ function parseYamlScalar(raw, type) {
   if (type === 'boolean') {
     return value.toLowerCase() === 'true'
   }
+  if (type === 'integer') {
+    const parsed = Number.parseInt(value, 10)
+    return Number.isFinite(parsed) ? parsed : 0
+  }
   if (type === 'array3') {
     const stripped = value.replace(/^\[/, '').replace(/\]$/, '')
     const parts = stripped.split(',').map(p => p.trim()).filter(Boolean)
@@ -164,6 +182,10 @@ function parseYamlScalar(raw, type) {
 function serializeYamlScalar(value, type) {
   if (type === 'boolean') {
     return value ? 'true' : 'false'
+  }
+  if (type === 'integer') {
+    const parsed = Number.parseInt(`${value ?? 0}`, 10)
+    return `${Number.isFinite(parsed) ? parsed : 0}`
   }
   if (type === 'array3') {
     const arr = Array.isArray(value) ? value : [0, 0, 0]
@@ -231,6 +253,14 @@ function launchStateClass(status) {
   if (launchState === 'stopped') return 'pill-stopped'
   if (launchState === 'not_prepared') return 'pill-not-prepared'
   return 'pill-not-prepared'
+}
+
+function displayWorkspacePath(path, workspaceRoot) {
+  if (!path) return ''
+  if (workspaceRoot && path.startsWith(`${workspaceRoot}/`)) {
+    return path.slice(workspaceRoot.length + 1)
+  }
+  return path
 }
 
 function StatusBar({ connected, wifiStatus, buildInfo }) {
@@ -617,7 +647,7 @@ function SettingsPanel({ onRefresh }) {
   )
 }
 
-function MissionControl({ connected, buildInfo, onRefresh }) {
+function MissionControl({ connected, buildInfo, onRefresh, workspacePaths }) {
   const [paramsMode, setParamsMode] = useState('form')
   const {
     terminalHostRef,
@@ -652,6 +682,19 @@ function MissionControl({ connected, buildInfo, onRefresh }) {
   }
 
   const selectedMissionName = `${getYamlFieldValue(paramsText, 'mission_name', 'string') || ''}`.trim()
+  const workspaceRoot = workspacePaths?.workspace_root || ''
+  const launchParamsDisplayPath =
+    displayWorkspacePath(workspacePaths?.launch_params, workspaceRoot) ||
+    'install/uav/share/uav/launch/launch_params.yaml'
+  const missionsDirDisplayPath =
+    displayWorkspacePath(workspacePaths?.missions_dir, workspaceRoot) ||
+    'install/uav/share/uav/missions'
+  const uavModesDisplayPath =
+    displayWorkspacePath(workspacePaths?.uav_modes_dir, workspaceRoot) ||
+    'uav.modes.uav'
+  const payloadModesDisplayPath =
+    displayWorkspacePath(workspacePaths?.payload_modes_dir, workspaceRoot) ||
+    'uav.modes.payload'
 
   useEffect(() => {
     if (!connected || !selectedMissionName) {
@@ -705,7 +748,7 @@ function MissionControl({ connected, buildInfo, onRefresh }) {
           <p className="param-help">{field.help}</p>
           {connected && missionNamesError && (
             <p className="param-help param-help-warn">
-              Mission file list unavailable from `src/uav/uav/missions`: {missionNamesError}
+              Mission file list unavailable from `{missionsDirDisplayPath}`: {missionNamesError}
             </p>
           )}
         </div>
@@ -726,6 +769,23 @@ function MissionControl({ connected, buildInfo, onRefresh }) {
               updateField(field, normalized)
             }}
             placeholder="0, 0, 0"
+            disabled={!connected}
+          />
+          <p className="param-help">{field.help}</p>
+        </div>
+      )
+    }
+
+    if (field.type === 'integer') {
+      return (
+        <div key={field.key} className="param-field">
+          <label>{field.label}</label>
+          <input
+            type="number"
+            value={Number.isFinite(value) ? value : 0}
+            onChange={e =>
+              updateField(field, Number.parseInt(e.target.value || '0', 10) || 0)
+            }
             disabled={!connected}
           />
           <p className="param-help">{field.help}</p>
@@ -812,7 +872,7 @@ function MissionControl({ connected, buildInfo, onRefresh }) {
       </div>
 
       <div className="card card-full">
-        <h2 className="card-title">Launch Params (uav/launch/launch_params.yaml)</h2>
+        <h2 className="card-title">Launch Params ({launchParamsDisplayPath})</h2>
         <div className="card-content">
           <div className="mini-tabs">
             <button className={`mini-tab ${paramsMode === 'form' ? 'mini-tab-active' : ''}`} onClick={() => setParamsMode('form')}>Form View</button>
@@ -857,6 +917,9 @@ function MissionControl({ connected, buildInfo, onRefresh }) {
             </button>
           </div>
           <p className="subtext left-note">Reload discards unsaved local edits and re-reads the file from the Pi.</p>
+          <p className="subtext left-note">
+            Mode class references use the Python module roots `{uavModesDisplayPath}` and `{payloadModesDisplayPath}`.
+          </p>
           {connected && <Result data={paramsResult} />}
         </div>
       </div>
@@ -879,8 +942,8 @@ function MissionControl({ connected, buildInfo, onRefresh }) {
         <h2 className="card-title">
           Mission View (
           {selectedMissionName
-            ? `uav/uav/missions/${selectedMissionName}.yaml`
-            : 'uav/uav/missions/<mission>.yaml'}
+            ? `${missionsDirDisplayPath}/${selectedMissionName}.yaml`
+            : `${missionsDirDisplayPath}/<mission>.yaml`}
           )
         </h2>
         <div className="card-content">
@@ -916,7 +979,7 @@ function MissionControl({ connected, buildInfo, onRefresh }) {
                 </button>
               </div>
               <p className="subtext left-note">
-                Edits are saved on the Pi inside `src/uav/uav/missions` for the selected mission name.
+                Edits are saved on the Pi inside `{missionsDirDisplayPath}` for the selected mission name.
               </p>
               <Result data={missionFileResult} />
             </>
@@ -984,33 +1047,38 @@ function App() {
   const [wifiStatus, setWifiStatus] = useState(null)
   const [buildInfo, setBuildInfo] = useState(null)
   const [sshCommand, setSshCommand] = useState('')
+  const [workspacePaths, setWorkspacePaths] = useState(null)
   const [pollError, setPollError] = useState(null)
 
   const refreshAll = useCallback(async () => {
     const conn = await api('/api/connection/status')
     const sshPromise = api('/api/connection/ssh-command')
+    const configPromise = api('/api/config')
 
     const isConnected = Boolean(conn?.connected)
     setConnected(isConnected)
 
     if (!isConnected) {
-      const ssh = await sshPromise
+      const [ssh, config] = await Promise.all([sshPromise, configPromise])
       if (ssh.success) setSshCommand(ssh.command)
+      if (config.success) setWorkspacePaths(config.workspace_paths || null)
       setWifiStatus(null)
       setBuildInfo(null)
       setPollError(conn?.error ? { success: false, error: conn.error } : null)
       return
     }
 
-    const [wifi, build, ssh] = await Promise.all([
+    const [wifi, build, ssh, config] = await Promise.all([
       api('/api/wifi/status'),
       api('/api/builds/current'),
       sshPromise,
+      configPromise,
     ])
 
     setWifiStatus(wifi.success ? wifi : null)
     setBuildInfo(build.success ? build : null)
     if (ssh.success) setSshCommand(ssh.command)
+    if (config.success) setWorkspacePaths(config.workspace_paths || null)
 
     const err = (!wifi.success ? wifi?.error : null) || (!build.success ? build?.error : null) || null
     setPollError(err ? { success: false, error: err } : null)
@@ -1064,7 +1132,12 @@ function App() {
       </div>
 
       {page === 'mission' ? (
-        <MissionControl connected={connected} buildInfo={buildInfo} onRefresh={refreshAll} />
+        <MissionControl
+          connected={connected}
+          buildInfo={buildInfo}
+          onRefresh={refreshAll}
+          workspacePaths={workspacePaths}
+        />
       ) : (
         <DeployPage connected={connected} sshCommand={sshCommand} wifiStatus={wifiStatus} buildInfo={buildInfo} onRefresh={refreshAll} />
       )}

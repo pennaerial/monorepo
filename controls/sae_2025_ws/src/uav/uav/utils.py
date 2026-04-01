@@ -1,9 +1,9 @@
 import os
-import re
-import yaml
 import glob
-from enum import IntEnum
+import re
 from pathlib import Path
+
+from uav.vehicles.AirframeClass import AirframeClass
 
 R_earth = 6378137.0  # Earth's radius in meters (WGS84)
 
@@ -35,16 +35,6 @@ vehicle_camera_map = {
     "gz_quadtailsitter": False,
     # Custom/Team Models (Add custom model names below)
 }
-
-
-class Vehicle(IntEnum):
-    """Vehicle class enumeration."""
-
-    MULTICOPTER = 0
-    PLANE = 1
-    VTOL = 2
-    OTHER = 3
-    UNKNOWN = 4
 
 
 def camel_to_snake(name):
@@ -95,49 +85,11 @@ def find_folder_with_heuristic(folder_name, home_dir=None, keywords=("penn", "ai
     return find_folder(folder_name, home_dir)
 
 
-def extract_vision_nodes(yaml_path):
-    """
-    Reads the mission YAML file, retrieves the vision node source files from
-    os.getcwd()/src/uav/uav/autonomous_modes/, searches for imports from uav.vision_nodes,
-    and returns a set of vision node class names.
-    """
-    vision_nodes = set()
-    with open(yaml_path, "r") as f:
-        mission_config = yaml.safe_load(f)
-
-    for mode, config in mission_config.items():
-        class_path = config.get("class")
-        if class_path:
-            # Extract the class name from the fully qualified path.
-            _, _, class_name = class_path.rpartition(".")
-            # Build the file path assuming the file is located at:
-            # os.getcwd()/src/uav/uav/autonomous_modes/{class_name}.py
-            file_path = os.path.join(
-                os.getcwd(), "src", "uav", "uav", "autonomous_modes", f"{class_name}.py"
-            )
-            try:
-                with open(file_path, "r", encoding="utf-8") as source_file:
-                    source = source_file.read()
-                    # Look for any "from uav.vision_nodes import ..." lines.
-                    matches = re.findall(
-                        r"from\s+uav\.vision_nodes\s+import\s+([^\n]+)", source
-                    )
-                    for match in matches:
-                        # Allow for multiple imports on the same line, e.g., "A, B"
-                        imported_nodes = [n.strip() for n in match.split(",")]
-                        for node in imported_nodes:
-                            if node:
-                                vision_nodes.add(node)
-            except Exception as e:
-                print(f"Error processing {file_path}: {e}")
-    return vision_nodes
-
-
 def get_airframe_details(px4_path, airframe_id):
     """
     Parses PX4 airframe files to find vehicle type and model name from an ID.
     Returns: (vehicle_class, model_name)
-    Example: (4001) -> (Vehicle.MULTICOPTER, 'x500')
+    Example: (4001) -> (AirframeClass.MULTICOPTER, 'x500')
     """
     # 1. Locate the Airframe File
     # PX4 stores these in ROMFS/px4fmu_common/init.d-posix/airframes
@@ -151,7 +103,7 @@ def get_airframe_details(px4_path, airframe_id):
 
     if not matches:
         print(f"Warning: Airframe ID {airframe_id} not found in {airframes_dir}")
-        return Vehicle.UNKNOWN, "gz_ERROR"
+        return AirframeClass.UNKNOWN, "gz_ERROR"
 
     # 2. Extract Model Name from Filename
     filename = os.path.basename(matches[0])
@@ -163,23 +115,15 @@ def get_airframe_details(px4_path, airframe_id):
         content = f.read()
 
         if "rc.mc_defaults" in content:
-            vehicle_class = Vehicle.MULTICOPTER
+            vehicle_class = AirframeClass.MULTICOPTER
         elif "rc.fw_defaults" in content:
-            vehicle_class = Vehicle.PLANE
+            vehicle_class = AirframeClass.PLANE
         elif "rc.vtol_defaults" in content:
-            vehicle_class = Vehicle.VTOL
+            vehicle_class = AirframeClass.VTOL
         else:
-            vehicle_class = Vehicle.OTHER
+            vehicle_class = AirframeClass.OTHER
 
     return vehicle_class, model_name
-
-
-def load_launch_parameters():
-    params_file = os.path.join(
-        os.getcwd(), "src", "uav", "launch", "launch_params.yaml"
-    )
-    with open(params_file, "r", encoding="utf-8") as f:
-        return yaml.safe_load(f)
 
 
 def clean_text(text):

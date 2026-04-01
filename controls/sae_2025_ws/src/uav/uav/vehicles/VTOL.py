@@ -10,7 +10,7 @@ from rclpy.qos import (
     QoSDurabilityPolicy,
 )
 import numpy as np
-from uav.UAV import UAV
+from .UAV import UAV
 
 
 class VTOL(UAV):

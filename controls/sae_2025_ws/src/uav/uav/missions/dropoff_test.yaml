@@ -1,2 +1,3 @@
-start:
-  class: uav.autonomous_modes.ServoDropoffMode
+modes:
+  start:
+    class: uav.modes.uav.ServoDropoffMode

@@ -5,7 +5,12 @@ from typing import Annotated
 from fastapi import APIRouter, Form
 
 from ..context import AppContext
-from ..models import ConfigPayload, ConfigResponse, MessageResponse
+from ..models import (
+    ConfigPayload,
+    ConfigResponse,
+    MessageResponse,
+    WorkspacePathsPayload,
+)
 
 
 def build_router(ctx: AppContext) -> APIRouter:
@@ -14,7 +19,10 @@ def build_router(ctx: AppContext) -> APIRouter:
     @router.get("", response_model=ConfigResponse)
     async def get_config() -> ConfigResponse:
         return ConfigResponse(
-            config=ConfigPayload.model_validate(ctx.config.to_safe_dict())
+            config=ConfigPayload.model_validate(ctx.config.to_safe_dict()),
+            workspace_paths=WorkspacePathsPayload.model_validate(
+                ctx.config.workspace_paths()
+            ),
         )
 
     @router.post("", response_model=MessageResponse)

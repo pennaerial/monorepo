@@ -25,9 +25,18 @@ class ConfigPayload(BaseModel):
     hotspot_name: str
 
 
+class WorkspacePathsPayload(BaseModel):
+    workspace_root: str
+    launch_params: str
+    missions_dir: str
+    uav_modes_dir: str
+    payload_modes_dir: str
+
+
 class ConfigResponse(BaseModel):
     success: Literal[True] = True
     config: ConfigPayload
+    workspace_paths: WorkspacePathsPayload
 
 
 class ConnectionStatusResponse(BaseModel):

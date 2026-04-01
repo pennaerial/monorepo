@@ -10,7 +10,6 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(payload_interfaces REQUIRED)
 find_package(pluginlib REQUIRED)
-find_package(generate_parameter_library REQUIRED)
 
 option(BUILD_SIM "Build simulation controller (OFF builds GPIO controller instead)" ON)
 if(BUILD_SIM)
@@ -23,14 +22,9 @@ endif()
 
 include_directories(include)
 
-#Generate Parameter Library
-generate_parameter_library(
-  payload_parameters
-  config/payload_params.schema.yaml
-)
-
 # --- Controller plugin shared library ---
 add_library(payload_controllers SHARED
+  src/payload_parameters.cpp
   $<IF:$<BOOL:${BUILD_SIM}>,src/sim_controller.cpp,src/gpio_controller.cpp>
 )
 
@@ -38,10 +32,6 @@ ament_target_dependencies(payload_controllers
   rclcpp
   payload_interfaces
   pluginlib
-)
-
-target_link_libraries(payload_controllers
-  payload_parameters
 )
 
 if(BUILD_SIM)
@@ -77,6 +67,7 @@ pluginlib_export_plugin_description_file(payload plugins.xml)
 
 # --- Payload executable ---
 add_executable(payload
+  src/payload_parameters.cpp
   src/payload.cpp
   src/main.cpp
 )
@@ -85,10 +76,6 @@ ament_target_dependencies(payload
   rclcpp
   payload_interfaces
   pluginlib
-)
-
-target_link_libraries(payload
-  payload_parameters
 )
 
 install(TARGETS payload_controllers
