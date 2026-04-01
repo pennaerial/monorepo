@@ -22,12 +22,13 @@
       //RIGHT_IN1: 15
       //RIGHT_IN2: 14
 //
-static constexpr int SN_A_PWM = 13;
-static constexpr int SN_AIN1  = 20;
-static constexpr int SN_AIN2  = 16;
-static constexpr int SN_B_PWM = 18;
-static constexpr int SN_BIN1  = 15;
-static constexpr int SN_BIN2  = 14;
+static constexpr int SN_A_PWM = 18;
+static constexpr int SN_AIN1  = 15;
+static constexpr int SN_AIN2  = 14;
+static constexpr int SN_B_PWM = 13;
+static constexpr int SN_BIN1  = 20;
+static constexpr int SN_BIN2  = 16;
+
 
 
 //ENCODER PINS
