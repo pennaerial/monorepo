@@ -8,8 +8,8 @@
       # Preferred explicit left/right mapping.
       # On this hardware: A* pins are RIGHT motor, B* pins are LEFT motor.
       LEFT_PWM: 13
-      LEFT_IN1: 16
-      LEFT_IN2: 20
+      LEFT_IN1: 20
+      LEFT_IN2: 16
       RIGHT_PWM: 18
       RIGHT_IN1: 15
       RIGHT_IN2: 14
