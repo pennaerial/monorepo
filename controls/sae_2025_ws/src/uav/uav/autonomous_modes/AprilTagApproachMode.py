@@ -3,7 +3,7 @@ from typing import Optional
 import cv2
 import numpy as np
 from rclpy.node import Node
-from sensor_msgs.msg import Image, CameraInfo
+from sensor_msgs.msg import CompressedImage, Image, CameraInfo
 from payload_interfaces.msg import DriveCommand
 from cv_bridge import CvBridge
 
@@ -63,6 +63,7 @@ class AprilTagApproachMode(Mode):
         tag_lost_coast_s: float = 0.5,
         # Show a live cv2 debug window with tag overlay, steering arrow, and pose info.
         camera_debug: bool = False,
+        compressed_image: bool = False,  # Whether the camera topic is compressed (affects CvBridge encoding)
     ):
         super().__init__(node, uav)
         self.payload_name = payload_name
@@ -73,6 +74,7 @@ class AprilTagApproachMode(Mode):
         self.stop_distance_m = stop_distance_m
         self.tag_lost_coast_s = tag_lost_coast_s
         self.camera_debug = camera_debug
+        self.compressed_image = compressed_image
 
         self._bridge = CvBridge()
         self._camera_info: Optional[CameraInfo] = None
@@ -108,13 +110,23 @@ class AprilTagApproachMode(Mode):
         self._camera_info = None
         self._last_tag_time = None
 
-        cam_topic = f"/{self.payload_name}/camera"
+        # Compressed images live on a /compressed sub-topic (image_transport convention).
+        # Sim always uses raw Image — compressed_image should be False in sim.
+        if self.compressed_image:
+            cam_topic = f"/{self.payload_name}/camera/compressed"
+        else:
+            cam_topic = f"/{self.payload_name}/camera"
         info_topic = f"/{self.payload_name}/camera_info"
         drive_topic = f"/{self.payload_name}/cmd_drive"
 
-        self._image_sub = self.node.create_subscription(
-            Image, cam_topic, self._image_cb, 10
-        )
+        if self.compressed_image:
+            self._image_sub = self.node.create_subscription(
+                CompressedImage, cam_topic, self._image_cb, 10
+            )
+        else:
+            self._image_sub = self.node.create_subscription(
+                Image, cam_topic, self._image_cb, 10
+            )
         self._info_sub = self.node.create_subscription(
             CameraInfo, info_topic, self._info_cb, 10
         )
@@ -160,18 +172,28 @@ class AprilTagApproachMode(Mode):
         # In real: provided by v4l2_camera or a calibration node.
         self._camera_info = msg
 
-    def _image_cb(self, msg: Image) -> None:
+    def _image_cb(self, msg) -> None:
         if self._detector is None or self._camera_info is None:
             return
 
-        # In debug mode, decode as BGR to preserve color for the display window,
-        # then convert to mono for the detector. Otherwise decode as mono directly.
-        if self.camera_debug:
-            frame = self._bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        # Decode the incoming message into a BGR color frame and a grayscale frame.
+        # CompressedImage (real hardware) uses np.frombuffer + cv2.imdecode.
+        # Raw Image (sim) uses CvBridge.
+        if self.compressed_image:
+            buf = np.frombuffer(msg.data, dtype=np.uint8)
+            if self.camera_debug:
+                frame = cv2.imdecode(buf, cv2.IMREAD_COLOR)
+                gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            else:
+                frame = None
+                gray = cv2.imdecode(buf, cv2.IMREAD_GRAYSCALE)
         else:
-            frame = None
-            gray = self._bridge.imgmsg_to_cv2(msg, desired_encoding="mono8")
+            if self.camera_debug:
+                frame = self._bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
+                gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            else:
+                frame = None
+                gray = self._bridge.imgmsg_to_cv2(msg, desired_encoding="mono8")
         detections = self._detector.detect(gray)
 
         # Filter to the target tag id if one was specified.
