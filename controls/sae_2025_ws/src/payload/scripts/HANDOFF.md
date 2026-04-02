@@ -72,17 +72,45 @@ hooked:    HOOKED -> DRIVING_OFF -> CLEAR
 
 The operator only interacts with the incoming agent (2 commands). Everything else is automated through peer-to-peer messaging.
 
-## How to Run
+## How to Build
 
 ```bash
-# Build (once)
 cd ~/monorepo/controls/sae_2025_ws
 source /opt/ros/humble/setup.bash
 colcon build --packages-select payload_interfaces --cmake-clean-first
 source install/setup.bash
-colcon build --packages-select payload
+colcon build --packages-select payload --cmake-clean-first
+source install/setup.bash
+```
+
+## Testing (Python agents only, no C++ nodes)
+
+No hardware needed. Validates state machine logic and peer-to-peer communication.
+
+```bash
+# Source the workspace in every terminal first
+cd ~/monorepo/controls/sae_2025_ws
+source /opt/ros/humble/setup.bash
 source install/setup.bash
 
+# Terminal 1 -- incoming agent
+ros2 run payload payload_agent --ros-args -p payload_name:=payload_incoming -p role:=incoming
+
+# Terminal 2 -- hooked agent
+ros2 run payload payload_agent --ros-args -p payload_name:=payload_hooked -p role:=hooked
+
+# Terminal 3 -- step through the handoff
+ros2 service call /payload_incoming/agent/command payload_interfaces/srv/PayloadCommand "{command: 'start'}"
+ros2 service call /payload_incoming/agent/command payload_interfaces/srv/PayloadCommand "{command: 'near_plane'}"
+
+# Terminal 4 -- monitor mode changes and agent communication
+ros2 topic echo /payload/mode
+ros2 topic echo /payload/agent_comm
+```
+
+## Full Launch (2 C++ payloads + 2 Python agents)
+
+```bash
 # Terminal 1 -- launch all 4 nodes
 ros2 launch payload handoff.launch.py domain_id:=5
 
