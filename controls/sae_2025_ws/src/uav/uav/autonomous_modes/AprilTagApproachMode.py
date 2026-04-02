@@ -140,7 +140,9 @@ class AprilTagApproachMode(Mode):
             self._publish_drive(0.0, 0.0)
 
     def check_status(self) -> str:
-        return "done" if self._done else "running"
+        # ModeManager convention: "continue" = stay in this mode.
+        # "complete" must match the transition key in the mission YAML.
+        return "complete" if self._done else "continue"
 
     # ------------------------------------------------------------------
     # ROS callbacks
@@ -205,7 +207,7 @@ class AprilTagApproachMode(Mode):
 
         # --- Stop condition ---
         if distance <= self.stop_distance_m:
-            self.log(f"Reached tag (distance={distance:.2f}m) — done")
+            self.log(f"Reached tag (distance={distance:.2f}m) — complete")
             self._publish_drive(0.0, 0.0)
             self._done = True
             return
