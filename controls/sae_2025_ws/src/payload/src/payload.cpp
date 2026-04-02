@@ -1,9 +1,20 @@
 #include "payload/payload.hpp"
+#include <payload_interfaces/msg/detail/servo_command__struct.hpp>
 
 Payload::Payload(const std::string& payload_name)
 : rclcpp::Node(payload_name),
   controller_loader_("payload", "Controller") {
+
+}
+
+void Payload::init() {
     payload_name_ = this->get_name(); //allows for override from launch file node name
+    std::string timed_drive_name = "/" + payload_name_ + "/timed_drive";
+    timed_drive_srv_ = this->create_service<payload_interfaces::srv::TimedDrive>(
+        timed_drive_name,
+        std::bind(&Payload::timed_drive_callback, this,
+                  std::placeholders::_1, std::placeholders::_2));
+    RCLCPP_INFO(this->get_logger(), "Timed drive service: %s", timed_drive_name.c_str());
 
     payload_params_listener_ = std::make_shared<payload::ParamListener>(this);
     payload_params_ = payload_params_listener_->get_params();
@@ -13,18 +24,14 @@ Payload::Payload(const std::string& payload_name)
         ros_drive_topic, 10, std::bind(&Payload::drive_callback, this, std::placeholders::_1));
     RCLCPP_INFO(this->get_logger(), "Listening on: %s", ros_drive_topic.c_str());
 
+
+    std::string servo_topic = "/" + payload_name_ + "/servo";
+    servo_subscriber_ = this->create_subscription<payload_interfaces::msg::ServoCommand>(
+            servo_topic, 10, std::bind(&Payload::servo_callback, this, std::placeholders::_1));
+    RCLCPP_INFO(this->get_logger(), "Servo listening on: %s", servo_topic.c_str());
+
     controller_ = controller_loader_.createSharedInstance(payload_params_.controller);
-}
-
-void Payload::init() {
     controller_->initialize(shared_from_this());
-
-    std::string timed_drive_name = "/" + payload_name_ + "/timed_drive";
-    timed_drive_srv_ = this->create_service<payload_interfaces::srv::TimedDrive>(
-        timed_drive_name,
-        std::bind(&Payload::timed_drive_callback, this,
-                  std::placeholders::_1, std::placeholders::_2));
-    RCLCPP_INFO(this->get_logger(), "Timed drive service: %s", timed_drive_name.c_str());
 }
 
 void Payload::drive_callback(const payload_interfaces::msg::DriveCommand::SharedPtr msg) {
@@ -64,5 +71,7 @@ void Payload::timed_drive_callback(
     response->message = "Timed drive started";
 }
 
-
-
+void Payload::servo_callback(const payload_interfaces::msg::ServoCommand::SharedPtr msg) {
+    RCLCPP_INFO(this->get_logger(), "Servo command: %.2f deg", msg->degree);
+    controller_->servo_command(msg->degree);
+}

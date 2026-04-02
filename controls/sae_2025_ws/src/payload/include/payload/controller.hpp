@@ -14,7 +14,7 @@ class Controller {
         virtual ~Controller() = default;
         virtual void initialize(std::shared_ptr<rclcpp::Node> node) = 0;
         virtual void drive_command(double linear, double angular) = 0;
-        // TODO: add servo command functionality
+        virtual void servo_command(double degree) = 0;
         // TODO: add position_setpoint functionality
 };
 

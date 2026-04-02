@@ -1,6 +1,7 @@
 #ifndef GPIO_CONTROLLER_HPP
 #define GPIO_CONTROLLER_HPP
 
+#include <algorithm>
 #include <rclcpp/rclcpp.hpp>
 
 #include <atomic>
@@ -13,6 +14,7 @@
 #include "payload/encoder.hpp"
 #include "payload/motor.hpp"
 #include "payload/payload_parameters.hpp"
+#include "payload/servo.hpp"
 #include "payload_interfaces/msg/motor_state.hpp"
 #include "payload_interfaces/srv/compute_pid_ziegler_nichols.hpp"
 
@@ -23,6 +25,7 @@ public:
 
     void initialize(std::shared_ptr<rclcpp::Node> node) override;
     void drive_command(double linear, double angular) override;
+    void servo_command(double degree) override;
 
 private:
     void compute_pid_zn_callback(
@@ -54,6 +57,8 @@ private:
     double right_filtered_rpm_ {0.0};
     payload::control_math::PidState left_pid_state_  {};
     payload::control_math::PidState right_pid_state_ {};
+
+    std::unique_ptr<Servo> servo_;
 
     std::thread control_thread_;
 

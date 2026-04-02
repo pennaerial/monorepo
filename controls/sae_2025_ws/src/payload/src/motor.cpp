@@ -90,24 +90,25 @@ void SNMotor::set_speed(float speed) {
     }
 }
 
-void SNMotor::forward(float duty) { 
+void SNMotor::forward(float duty) {
     in1_.write_low();
     in2_.write_high();
     pwm_.write_pwm(frequency_, duty, 0, 0);
 }
-void SNMotor::reverse(float duty) { 
+
+void SNMotor::reverse(float duty) {
     in1_.write_high();
     in2_.write_low();
     pwm_.write_pwm(frequency_, duty, 0, 0);
 }
 
-void SNMotor::coast() { 
+void SNMotor::coast() {
     in1_.write_low();
     in2_.write_low();
     pwm_.write_pwm(frequency_, 0.0f, 0, 0);
 }
 
-void SNMotor::hard_brake() { 
+void SNMotor::hard_brake() {
     in1_.write_high();
     in2_.write_high();
     pwm_.write_pwm(frequency_, 0.0f, 0, 0);
