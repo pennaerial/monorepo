@@ -164,8 +164,15 @@ class AprilTagApproachMode(Mode):
         if self._detector is None or self._camera_info is None:
             return
 
-        frame = self._bridge.imgmsg_to_cv2(msg, desired_encoding="mono8")
-        detections = self._detector.detect(frame)
+        # In debug mode, decode as BGR to preserve color for the display window,
+        # then convert to mono for the detector. Otherwise decode as mono directly.
+        if self.camera_debug:
+            frame = self._bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        else:
+            frame = None
+            gray = self._bridge.imgmsg_to_cv2(msg, desired_encoding="mono8")
+        detections = self._detector.detect(gray)
 
         # Filter to the target tag id if one was specified.
         if self.tag_id is not None:
@@ -213,7 +220,7 @@ class AprilTagApproachMode(Mode):
         self._last_tag_time = self.node.get_clock().now().nanoseconds * 1e-9
 
         if self.camera_debug:
-            self._draw_debug(frame, det, rvec, tvec, camera_matrix, cx, cy, lateral_error_px, angular, distance)
+            self._draw_debug(frame, gray, det, rvec, tvec, camera_matrix, cx, cy, lateral_error_px, angular, distance)
 
         # --- Stop condition ---
         if distance <= self.stop_distance_m:
@@ -221,6 +228,10 @@ class AprilTagApproachMode(Mode):
             self._publish_drive(0.0, 0.0)
             self._done = True
             return
+
+
+        self.node.get_logger().info(f"forward_speed={self.forward_speed:.3f} m/s, angular_gain={self.angular_gain:.6f} rad/s per pixel")
+
 
         self._publish_drive(self.forward_speed, angular)
 
@@ -230,6 +241,7 @@ class AprilTagApproachMode(Mode):
 
     def _draw_debug(
         self,
+        color_frame: Optional[np.ndarray],
         gray: np.ndarray,
         det,
         rvec: np.ndarray,
@@ -241,8 +253,8 @@ class AprilTagApproachMode(Mode):
         angular: float,
         distance: float,
     ) -> None:
-        # Convert the grayscale frame to BGR so we can draw in color.
-        vis = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
+        # Use the color frame if available (real camera), otherwise convert gray to BGR.
+        vis = color_frame.copy() if color_frame is not None else cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
         h, w = vis.shape[:2]
 
         corners = det.corners.astype(int)
