@@ -1,5 +1,5 @@
 # launch_params.yaml
-mission_name: payload_drive_to_apriltag
+mission_name: straight_waypoints
 uav_debug: false
 vision_debug: false
 auto_launch: true
