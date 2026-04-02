@@ -116,6 +116,9 @@ install(DIRECTORY
   DESTINATION share/${PROJECT_NAME}
 )
 
+# --- Python payload agent script ---
+install(PROGRAMS scripts/payload_agent.py DESTINATION lib/${PROJECT_NAME} RENAME payload_agent)
+
 
 
 

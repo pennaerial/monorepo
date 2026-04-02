@@ -1,0 +1,11 @@
+string agent_name
+uint8 mode
+
+uint8 IDLE=0
+uint8 DRIVING_TO_PLANE=1
+uint8 NEAR_PLANE=2
+uint8 READY_FOR_PICKUP=3
+uint8 HOOKED=10
+uint8 UNHOOKING=11
+uint8 DRIVING_OFF=12
+uint8 CLEAR=13
