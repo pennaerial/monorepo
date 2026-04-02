@@ -199,14 +199,20 @@ void GPIOController::control_loop()
         const auto right_terms = payload::control_math::pid_step(
             setpoints.right_rpm, right_filtered_rpm_, dt_s, config.right_pid, right_pid_state_);
 
-        left_motor_->set_speed(static_cast<float>(left_terms.output));
-        right_motor_->set_speed(static_cast<float>(right_terms.output));
+        const float left_duty  = static_cast<float>(std::abs(left_terms.output)  * 100.0);
+        const float right_duty = static_cast<float>(std::abs(right_terms.output) * 100.0);
+
+        if (left_terms.output > 0.0)       left_motor_->forward(left_duty);
+        else if (left_terms.output < 0.0)  left_motor_->reverse(left_duty);
+        else                               left_motor_->coast();
+
+        if (right_terms.output > 0.0)      right_motor_->forward(right_duty);
+        else if (right_terms.output < 0.0) right_motor_->reverse(right_duty);
+        else                               right_motor_->coast();
 
         if (motor_state_pub_) {
-            const float left_pwm_percent  = static_cast<float>(
-                std::clamp(std::abs(left_terms.output)  * 100.0, 0.0, 100.0));
-            const float right_pwm_percent = static_cast<float>(
-                std::clamp(std::abs(right_terms.output) * 100.0, 0.0, 100.0));
+            const float left_pwm_percent  = std::clamp(left_duty,  0.0f, 100.0f);
+            const float right_pwm_percent = std::clamp(right_duty, 0.0f, 100.0f);
 
             payload_interfaces::msg::MotorState msg;
             msg.linear_setpoint_mps    = linear;

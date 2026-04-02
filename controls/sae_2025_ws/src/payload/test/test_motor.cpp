@@ -112,58 +112,145 @@ int main(int argc, char** argv)
 
     std::cout << "RIGHT MOTOR FORWARD 70%" << std::endl;
     motor_right->forward(70.0f);
-    pause_print(2000, enc_a, enc_b);
+    pause_print(1000, enc_a, enc_b);
 
     std::cout << "RIGHT MOTOR FORWARD 20%" << std::endl;
     motor_right->forward(20.0f);
-    pause_print(2000, enc_a, enc_b);
+    pause_print(1000, enc_a, enc_b);
 
     std::cout << "RIGHT MOTOR REVERSE 100%" << std::endl;
     motor_right->reverse(100.0f);
-    pause_print(2000, enc_a, enc_b);
+    pause_print(1000, enc_a, enc_b);
 
     std::cout << "RIGHT MOTOR REVERSE 50%" << std::endl;
     motor_right->reverse(50.0f);
-    pause_print(2000, enc_a, enc_b);
+    pause_print(1000, enc_a, enc_b);
 
     std::cout << "RIGHT MOTOR STOPPING:" << std::endl;
     motor_right->coast();
-    pause_print(2000, enc_a, enc_b);
+    pause_print(1000, enc_a, enc_b);
 
     std::cout << "LEFT MOTOR FORWARD 70%" << std::endl;
     motor_left->forward(70.0f);
-    pause_print(2000, enc_a, enc_b);
+    pause_print(1000, enc_a, enc_b);
 
     std::cout << "LEFT MOTOR FORWARD 20%" << std::endl;
     motor_left->forward(20.0f);
-    pause_print(2000, enc_a, enc_b);
+    pause_print(1000, enc_a, enc_b);
 
     std::cout << "LEFT MOTOR REVERSE 100%" << std::endl;
     motor_left->reverse(100.0f);
-    pause_print(2000, enc_a, enc_b);
+    pause_print(1000, enc_a, enc_b);
 
     std::cout << "LEFT MOTOR B REVERSE 50%" << std::endl;
     motor_left->reverse(50.0f);
-    pause_print(2000, enc_a, enc_b);
+    pause_print(1000, enc_a, enc_b);
 
     std::cout << "Stopping motors" << std::endl;
     motor_right->coast();
     motor_left->coast();
-    pause_print(2000, enc_a, enc_b);
+    pause_print(1000, enc_a, enc_b);
 
     std::cout << "BOTH FORWARD" << std::endl;
     motor_right->forward(100.0f);
     motor_left->forward(100.0f);
-    pause_print(2000, enc_a, enc_b);
+    pause_print(1000, enc_a, enc_b);
 
     std::cout << "BOTH REVERSE" << std::endl;
     motor_right->reverse(100.0f);
     motor_left->reverse(100.0f);
-    pause_print(2000, enc_a, enc_b);
+    pause_print(1000, enc_a, enc_b);
 
     std::cout << "Stopping motors" << std::endl;
     motor_right->coast();
     motor_left->coast();
+
+    // ---- set_speed tests (normalized [-1, 1], mirrors gpio_controller usage) ----
+    printf("\n=== set_speed tests ===\n");
+
+    printf("\n--- RIGHT motor set_speed ---\n");
+
+    printf("RIGHT set_speed(+0.7) — forward 70%%\n");
+    motor_right->set_speed(0.7f);
+    pause_print(2000, enc_a, enc_b);
+
+    printf("RIGHT set_speed(+0.2) — forward 20%%\n");
+    motor_right->set_speed(0.2f);
+    pause_print(2000, enc_a, enc_b);
+
+    printf("RIGHT set_speed(-1.0) — reverse 100%%\n");
+    motor_right->set_speed(-1.0f);
+    pause_print(2000, enc_a, enc_b);
+
+    printf("RIGHT set_speed(-0.5) — reverse 50%%\n");
+    motor_right->set_speed(-0.5f);
+    pause_print(2000, enc_a, enc_b);
+
+    printf("RIGHT set_speed(0.0) — coast\n");
+    motor_right->set_speed(0.0f);
+    pause_print(2000, enc_a, enc_b);
+
+    printf("\n--- LEFT motor set_speed ---\n");
+
+    printf("LEFT set_speed(+0.7) — forward 70%%\n");
+    motor_left->set_speed(0.7f);
+    pause_print(2000, enc_a, enc_b);
+
+    printf("LEFT set_speed(+0.2) — forward 20%%\n");
+    motor_left->set_speed(0.2f);
+    pause_print(2000, enc_a, enc_b);
+
+    printf("LEFT set_speed(-1.0) — reverse 100%%\n");
+    motor_left->set_speed(-1.0f);
+    pause_print(2000, enc_a, enc_b);
+
+    printf("LEFT set_speed(-0.5) — reverse 50%%\n");
+    motor_left->set_speed(-0.5f);
+    pause_print(2000, enc_a, enc_b);
+
+    printf("LEFT set_speed(0.0) — coast\n");
+    motor_left->set_speed(0.0f);
+    pause_print(2000, enc_a, enc_b);
+
+    printf("\n--- Both motors: straight drive via set_speed ---\n");
+
+    printf("BOTH set_speed(+1.0) — full forward\n");
+    motor_right->set_speed(1.0f);
+    motor_left->set_speed(1.0f);
+    pause_print(2000, enc_a, enc_b);
+
+    printf("BOTH set_speed(-1.0) — full reverse\n");
+    motor_right->set_speed(-1.0f);
+    motor_left->set_speed(-1.0f);
+    pause_print(2000, enc_a, enc_b);
+
+    motor_right->set_speed(0.0f);
+    motor_left->set_speed(0.0f);
+    pause(500);
+
+    // These are the critical cases — opposite signs per side, matching what
+    // gpio_controller sends during a turn command.
+    printf("\n--- Turn simulation: opposite-sign set_speed (key test) ---\n");
+
+    printf("TURN LEFT: right set_speed(+0.7), left set_speed(-0.7)\n");
+    printf("  Expected: enc_a (right) positive, enc_b (left) negative\n");
+    motor_right->set_speed(0.7f);
+    motor_left->set_speed(-0.7f);
+    pause_print(3000, enc_a, enc_b);
+
+    motor_right->set_speed(0.0f);
+    motor_left->set_speed(0.0f);
+    pause(500);
+
+    printf("TURN RIGHT: right set_speed(-0.7), left set_speed(+0.7)\n");
+    printf("  Expected: enc_a (right) negative, enc_b (left) positive\n");
+    motor_right->set_speed(-0.7f);
+    motor_left->set_speed(0.7f);
+    pause_print(3000, enc_a, enc_b);
+
+    motor_right->set_speed(0.0f);
+    motor_left->set_speed(0.0f);
+
     printf("\nDone.\n");
 
     pause(500);

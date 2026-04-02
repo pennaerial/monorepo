@@ -68,16 +68,10 @@ for pkg in "${PACKAGES[@]}"; do
     fi
     SOURCES+=("$pkg_path")
 done
-# Sync the Pi's clock to avoid "file modified in the future" warnings
-# which cause CMake to invalidate its build cache unnecessarily.
-echo "Syncing clock on $REMOTE..."
-read -rsp "Sudo password for $REMOTE: " SUDO_PASSWORD
-echo
-echo "$SUDO_PASSWORD" | $SSH_CMD "$REMOTE" "sudo -S date -s '$(date -u +"%Y-%m-%dT%H:%M:%S")' > /dev/null 2>&1" \
-    || echo "Warning: clock sync failed. Build cache may be unreliable." >&2
-
 echo "Syncing packages: ${PACKAGES[*]}"
-rsync -rv \
+# -c (checksum) compares file contents rather than timestamps, so clock skew
+# between laptop and Pi does not cause unnecessary transfers or rebuilds.
+rsync -rvc \
     --no-perms --no-owner --no-group \
     --delete \
     "${SSH_OPTS[@]}" \
