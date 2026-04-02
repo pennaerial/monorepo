@@ -15,30 +15,31 @@
 // SN754410 pins
 //
 //
-      //LEFT_PWM: 13
-      //LEFT_IN1: 20
-      //LEFT_IN2: 16
-      //RIGHT_PWM: 18
-      //RIGHT_IN1: 15
-      //RIGHT_IN2: 14
+// LEFT_PWM: 13
+// LEFT_IN1: 20
+// LEFT_IN2: 16
+// RIGHT_PWM: 18
+// RIGHT_IN1: 15
+// RIGHT_IN2: 14
 //
-static constexpr int SN_A_PWM = 18;
-static constexpr int SN_AIN1  = 15;
-static constexpr int SN_AIN2  = 14;
-static constexpr int SN_B_PWM = 13;
-static constexpr int SN_BIN1  = 20;
-static constexpr int SN_BIN2  = 16;
+//
+static constexpr int SN_LEFT_PWM = 13;
+static constexpr int SN_LEFT_IN1  = 20;
+static constexpr int SN_LEFT_IN2  = 16;
+static constexpr int SN_RIGHT_PWM = 18;
+static constexpr int SN_RIGHT_IN1  = 15;
+static constexpr int SN_RIGHT_IN2  = 14;
 
 
 
 //ENCODER PINS
-// static constexpr int ENCA1  = 10;
-// static constexpr int ENCA2  = 9;
-// static constexpr int ENCB1  = 5;
-// static constexpr int ENCB2  = 6;
+// ENCA_CH1: 6
+// ENCA_CH2: 5
+// ENCB_CH1: 10
+// ENCB_CH2: 9
 
-static constexpr int ENCA1  = 5;
-static constexpr int ENCA2  = 6;
+static constexpr int ENCA1  = 6;
+static constexpr int ENCA2  = 5;
 static constexpr int ENCB1  = 10;
 static constexpr int ENCB2  = 9;
 
@@ -97,72 +98,72 @@ int main(int argc, char** argv)
     }
     g_handle = h;
 
-    std::unique_ptr<Motor> motor_a;
-    std::unique_ptr<Motor> motor_b;
+    std::unique_ptr<Motor> motor_right;
+    std::unique_ptr<Motor> motor_left;
     printf("Running SNMotor test\n");
-    motor_a = std::make_unique<SNMotor>(h, SN_A_PWM, SN_AIN1, SN_AIN2, FREQ, MotorType::RIGHT);
-    motor_b = std::make_unique<SNMotor>(h, SN_B_PWM, SN_BIN1, SN_BIN2, FREQ, MotorType::LEFT);
-    g_motor_a = motor_a.get();
-    g_motor_b = motor_b.get();
+    motor_left = std::make_unique<SNMotor>(h, SN_RIGHT_PWM, SN_RIGHT_IN1, SN_RIGHT_IN2, FREQ, MotorType::RIGHT);
+    motor_right = std::make_unique<SNMotor>(h, SN_LEFT_PWM, SN_LEFT_IN1, SN_LEFT_IN2, FREQ, MotorType::LEFT);
+    g_motor_a = motor_right.get();
+    g_motor_b = motor_left.get();
     std::signal(SIGINT, on_sigint);
 
     QuadratureEncoder enc_a(h, ENCA1, ENCA2, ENC_CPR, MotorType::RIGHT);
     QuadratureEncoder enc_b(h, ENCB1, ENCB2, ENC_CPR, MotorType::LEFT);
 
-    std::cout << "MOTOR A FORWARD 70%" << std::endl;
-    motor_a->forward(70.0f);
+    std::cout << "RIGHT MOTOR FORWARD 70%" << std::endl;
+    motor_right->forward(70.0f);
     pause_print(2000, enc_a, enc_b);
 
-    std::cout << "MOTOR A FORWARD 20%" << std::endl;
-    motor_a->forward(20.0f);
+    std::cout << "RIGHT MOTOR FORWARD 20%" << std::endl;
+    motor_right->forward(20.0f);
     pause_print(2000, enc_a, enc_b);
 
-    std::cout << "MOTOR A REVERSE 100%" << std::endl;
-    motor_a->reverse(100.0f);
+    std::cout << "RIGHT MOTOR REVERSE 100%" << std::endl;
+    motor_right->reverse(100.0f);
     pause_print(2000, enc_a, enc_b);
 
-    std::cout << "MOTOR A REVERSE 50%" << std::endl;
-    motor_a->reverse(50.0f);
+    std::cout << "RIGHT MOTOR REVERSE 50%" << std::endl;
+    motor_right->reverse(50.0f);
     pause_print(2000, enc_a, enc_b);
 
-    std::cout << "MOTOR A STOPPING:" << std::endl;
-    motor_a->coast();
+    std::cout << "RIGHT MOTOR STOPPING:" << std::endl;
+    motor_right->coast();
     pause_print(2000, enc_a, enc_b);
 
-    std::cout << "MOTOR B FORWARD 70%" << std::endl;
-    motor_b->forward(70.0f);
+    std::cout << "LEFT MOTOR FORWARD 70%" << std::endl;
+    motor_left->forward(70.0f);
     pause_print(2000, enc_a, enc_b);
 
-    std::cout << "MOTOR B FORWARD 20%" << std::endl;
-    motor_b->forward(20.0f);
+    std::cout << "LEFT MOTOR FORWARD 20%" << std::endl;
+    motor_left->forward(20.0f);
     pause_print(2000, enc_a, enc_b);
 
-    std::cout << "MOTOR B REVERSE 100%" << std::endl;
-    motor_b->reverse(100.0f);
+    std::cout << "LEFT MOTOR REVERSE 100%" << std::endl;
+    motor_left->reverse(100.0f);
     pause_print(2000, enc_a, enc_b);
 
-    std::cout << "MOTOR B REVERSE 50%" << std::endl;
-    motor_b->reverse(50.0f);
+    std::cout << "LEFT MOTOR B REVERSE 50%" << std::endl;
+    motor_left->reverse(50.0f);
     pause_print(2000, enc_a, enc_b);
 
     std::cout << "Stopping motors" << std::endl;
-    motor_a->coast();
-    motor_b->coast();
+    motor_right->coast();
+    motor_left->coast();
     pause_print(2000, enc_a, enc_b);
 
     std::cout << "BOTH FORWARD" << std::endl;
-    motor_a->forward(100.0f);
-    motor_b->forward(100.0f);
+    motor_right->forward(100.0f);
+    motor_left->forward(100.0f);
     pause_print(2000, enc_a, enc_b);
 
     std::cout << "BOTH REVERSE" << std::endl;
-    motor_a->reverse(100.0f);
-    motor_b->reverse(100.0f);
+    motor_right->reverse(100.0f);
+    motor_left->reverse(100.0f);
     pause_print(2000, enc_a, enc_b);
 
     std::cout << "Stopping motors" << std::endl;
-    motor_a->coast();
-    motor_b->coast();
+    motor_right->coast();
+    motor_left->coast();
     printf("\nDone.\n");
 
     pause(500);

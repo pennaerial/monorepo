@@ -1,5 +1,7 @@
 #include "payload/motor.hpp"
 
+#include <cmath>
+
 //DRVMotor
 DRVMotor::DRVMotor(int handle, int in1, int in2, int frequency, MotorType motor_type) 
 : handle_(handle),
@@ -14,7 +16,7 @@ void DRVMotor::set_speed(float speed) {
         RCLCPP_WARN(rclcpp::get_logger("motor"), "Clamped speed from %f to %f", speed, norm_speed);
     }
 
-    float pwm_duty_cycle = abs(norm_speed * 100.0f); //percentage
+    float pwm_duty_cycle = std::abs(norm_speed * 100.0f); //percentage
     if (norm_speed > 0) { //forward, set phase to 0
         forward(pwm_duty_cycle);
     } else if (norm_speed < 0){ //reverse
@@ -78,7 +80,7 @@ void SNMotor::set_speed(float speed) {
         RCLCPP_WARN(rclcpp::get_logger("motor"), "Clamped speed from %f to %f", speed, norm_speed);
     }
 
-    float pwm_duty_cycle = abs(norm_speed * 100.0f); //percentage
+    float pwm_duty_cycle = std::abs(norm_speed * 100.0f); //percentage
     if (norm_speed > 0) { //forward, set phase to 0
         forward(pwm_duty_cycle);
     } else if (norm_speed < 0){ //reverse

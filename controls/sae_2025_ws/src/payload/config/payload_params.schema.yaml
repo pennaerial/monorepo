@@ -132,58 +132,40 @@ payload:
         bounds<>: [0.0, 10.0]
 
   pid:
-    kp:
-      type: double
-      default_value: 0.02
-      description: "Shared velocity proportional gain applied to both wheels"
-      validation:
-        bounds<>: [0.0, 100000.0]
-    ki:
-      type: double
-      default_value: 0.0
-      description: "Shared velocity integral gain applied to both wheels"
-      validation:
-        bounds<>: [0.0, 100000.0]
-    kd:
-      type: double
-      default_value: 0.0
-      description: "Shared velocity derivative gain applied to both wheels"
-      validation:
-        bounds<>: [0.0, 100000.0]
     left_kp:
       type: double
       default_value: 0.02
-      description: "Left wheel velocity proportional gain override"
+      description: "Left wheel velocity proportional gain"
       validation:
         bounds<>: [0.0, 100000.0]
     left_ki:
       type: double
       default_value: 0.0
-      description: "Left wheel velocity integral gain override"
+      description: "Left wheel velocity integral gain"
       validation:
         bounds<>: [0.0, 100000.0]
     left_kd:
       type: double
       default_value: 0.0
-      description: "Left wheel velocity derivative gain override"
+      description: "Left wheel velocity derivative gain"
       validation:
         bounds<>: [0.0, 100000.0]
     right_kp:
       type: double
       default_value: 0.02
-      description: "Right wheel velocity proportional gain override"
+      description: "Right wheel velocity proportional gain"
       validation:
         bounds<>: [0.0, 100000.0]
     right_ki:
       type: double
       default_value: 0.0
-      description: "Right wheel velocity integral gain override"
+      description: "Right wheel velocity integral gain"
       validation:
         bounds<>: [0.0, 100000.0]
     right_kd:
       type: double
       default_value: 0.0
-      description: "Right wheel velocity derivative gain override"
+      description: "Right wheel velocity derivative gain"
       validation:
         bounds<>: [0.0, 100000.0]
     i_clamp:

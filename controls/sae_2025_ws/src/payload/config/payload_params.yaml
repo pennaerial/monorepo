@@ -14,8 +14,8 @@
       RIGHT_IN1: 15
       RIGHT_IN2: 14
 
-      ENCA_CH1: 5
-      ENCA_CH2: 6
+      ENCA_CH1: 6
+      ENCA_CH2: 5
       ENCB_CH1: 10
       ENCB_CH2: 9
       SERVO: 23
@@ -35,15 +35,12 @@
       wheel_separation_m: 0.12132
 
     pid:
-      kp: 0.3
-      ki: 0.68
-      kd: 0.01
-      left_kp: 0.2955
-      left_ki: 0.6715
-      left_kd: 0.0094
-      right_kp: 0.3045
-      right_ki: 0.6921
-      right_kd: 0.0097
+      left_kp: 0.07
+      left_ki: 0.0
+      left_kd: 0.0
+      right_kp: 0.07
+      right_ki: 0.0
+      right_kd: 0.0
       i_clamp: 1.0
       output_limit_norm: 1.0
       stop_deadband_rpm: 1.0

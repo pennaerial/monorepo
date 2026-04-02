@@ -54,6 +54,8 @@ else()
   target_sources(payload_controllers PRIVATE
     src/encoder.cpp
     src/control_math.cpp
+    src/motor.cpp
+    src/gpio.cpp
   )
   target_link_libraries(payload_controllers ${LGPIO_LIBRARY})
   target_include_directories(payload_controllers PUBLIC ${LGPIO_INCLUDE_DIR})

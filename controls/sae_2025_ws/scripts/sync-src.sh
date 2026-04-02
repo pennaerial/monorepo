@@ -6,10 +6,8 @@
 #   ./sync-src.sh <user@host> --packages-select pkg_a pkg_b   # Deploy specific packages
 #   ./sync-src.sh <user@host> --password                       # Prompt for SSH password
 set -euo pipefail
-
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 SRC_DIR="$SCRIPT_DIR/../src"
-
 # Packages copied in a normal deploy — no sim, no Gazebo, no bridges.
 DEPLOY_PACKAGES=(
     actuator_msgs
@@ -19,7 +17,6 @@ DEPLOY_PACKAGES=(
     uav
     uav_interfaces
 )
-
 # --- Argument parsing ---
 if [[ $# -eq 0 || "$1" == --* ]]; then
     echo "Usage: $0 <user@host> [--packages-select pkg...] [--password]" >&2
@@ -27,10 +24,9 @@ if [[ $# -eq 0 || "$1" == --* ]]; then
 fi
 REMOTE="$1"
 shift
-
 PACKAGES=("${DEPLOY_PACKAGES[@]}")
 SSH_OPTS=()
-
+SSH_CMD="ssh"
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --packages-select)
@@ -48,7 +44,8 @@ while [[ $# -gt 0 ]]; do
             fi
             read -rsp "SSH password for $REMOTE: " SSH_PASSWORD
             echo
-            SSH_OPTS=(-e "sshpass -p '$SSH_PASSWORD' ssh")
+            SSH_CMD="sshpass -p '$SSH_PASSWORD' ssh"
+            SSH_OPTS=(-e "$SSH_CMD")
             shift
             ;;
         *)
@@ -57,12 +54,10 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
-
 if [[ ${#PACKAGES[@]} -eq 0 ]]; then
     echo "No packages selected." >&2
     exit 1
 fi
-
 # Build source list, verifying each package exists locally.
 SOURCES=()
 for pkg in "${PACKAGES[@]}"; do
@@ -73,11 +68,16 @@ for pkg in "${PACKAGES[@]}"; do
     fi
     SOURCES+=("$pkg_path")
 done
+# Sync the Pi's clock to avoid "file modified in the future" warnings
+# which cause CMake to invalidate its build cache unnecessarily.
+echo "Syncing clock on $REMOTE..."
+read -rsp "Sudo password for $REMOTE: " SUDO_PASSWORD
+echo
+echo "$SUDO_PASSWORD" | $SSH_CMD "$REMOTE" "sudo -S date -s '$(date -u +"%Y-%m-%dT%H:%M:%S")' > /dev/null 2>&1" \
+    || echo "Warning: clock sync failed. Build cache may be unreliable." >&2
 
 echo "Syncing packages: ${PACKAGES[*]}"
-
 rsync -rv \
-    --no-times \
     --no-perms --no-owner --no-group \
     --delete \
     "${SSH_OPTS[@]}" \
