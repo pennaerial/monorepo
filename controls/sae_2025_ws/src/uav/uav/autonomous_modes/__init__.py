@@ -1,6 +1,7 @@
 from .Mode import (
     Mode as Mode,
 )  # make sure to import the parent class FIRST (to avoid circular imports)
+from .AprilTagApproachMode import AprilTagApproachMode as AprilTagApproachMode
 from .LandingMode import LandingMode as LandingMode
 from .PayloadDropoffMode import PayloadDropoffMode as PayloadDropoffMode
 from .PayloadPickupMode import PayloadPickupMode as PayloadPickupMode
