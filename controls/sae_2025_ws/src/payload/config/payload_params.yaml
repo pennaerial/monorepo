@@ -68,5 +68,10 @@
       slowdown_deg: 10.0
       tolerance_deg: 5.0
 
+    servo:
+      pulse_min_us: 700.0
+      pulse_max_us: 2300.0
+      frequency: 50
+
     sim:
       world_name: "sae"
