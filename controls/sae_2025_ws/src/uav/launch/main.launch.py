@@ -358,20 +358,20 @@ def launch_setup(context, *args, **kwargs):
             )
     else:
         actions = [
-            *vision_node_actions,
-            LogInfo(msg="Vision nodes started."),
-            middleware,
+            # *vision_node_actions,
+            # LogInfo(msg="Vision nodes started."),
+            # middleware,
             mission,
         ]
-        if auto_launch:
-            actions.append(
-                RegisterEventHandler(
-                    OnProcessIO(
-                        target_action=middleware,
-                        on_stderr=make_io_handler("middleware"),
-                    )
-                )
-            )
+        # if auto_launch:
+        #     actions.append(
+        #         RegisterEventHandler(
+        #             OnProcessIO(
+        #                 target_action=middleware,
+        #                 on_stderr=make_io_handler("middleware"),
+        #             )
+        #         )
+        #     )
     return actions
 
 

@@ -4,9 +4,11 @@ start:
   class: uav.autonomous_modes.AprilTagApproachMode
   params:
     payload_name: 'payload_0'
+    tag_id: '0'
     tag_size_m: '0.1'   # 100 mm x 100 mm (string so ModeManager literal_eval works)
     stop_distance_m: '0.1'
     camera_debug: 'True'
+    compressed_image: 'True' 
   transitions:
     complete: land
 

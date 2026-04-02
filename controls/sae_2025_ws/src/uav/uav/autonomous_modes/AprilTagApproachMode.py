@@ -49,15 +49,15 @@ class AprilTagApproachMode(Mode):
         payload_name: str = "payload_0",
         # Set to a specific tag ID to track only that tag; None = any visible tag.
         tag_id: Optional[int] = None,
-        tag_size_m: float = 0.1,
+        tag_size_m: float = 0.0508,
         tag_family: str = "tag36h11",
         # Forward speed in m/s while approaching.
-        forward_speed: float = 0.15,
+        forward_speed: float = 0.1,
         # Steering gain: rad/s of yaw rate per pixel of lateral error.
         # Tune this to reduce oscillation — lower = smoother but slower correction.
         angular_gain: float = 0.003,
         # Distance (meters) at which to declare "arrived" and stop.
-        stop_distance_m: float = 0.3,
+        stop_distance_m: float = 0.05,
         # How long (seconds) to coast after losing the tag before stopping.
         # Gives the detector a moment to recover from a brief dropout.
         tag_lost_coast_s: float = 0.5,
@@ -112,10 +112,7 @@ class AprilTagApproachMode(Mode):
 
         # Compressed images live on a /compressed sub-topic (image_transport convention).
         # Sim always uses raw Image — compressed_image should be False in sim.
-        if self.compressed_image:
-            cam_topic = f"/{self.payload_name}/camera/compressed"
-        else:
-            cam_topic = f"/{self.payload_name}/camera"
+        cam_topic = f"/{self.payload_name}/camera"
         info_topic = f"/{self.payload_name}/camera_info"
         drive_topic = f"/{self.payload_name}/cmd_drive"
 
@@ -252,9 +249,10 @@ class AprilTagApproachMode(Mode):
             return
 
 
-        self.node.get_logger().info(f"forward_speed={self.forward_speed:.3f} m/s, angular_gain={self.angular_gain:.6f} rad/s per pixel")
+        self.node.get_logger().info(f"forward_speed={self.forward_speed:.3f} m/s, angular={angular:.6f} rad/s per pixel")
 
 
+        # angular = max(angular, 0.6)
         self._publish_drive(self.forward_speed, angular)
 
     # ------------------------------------------------------------------
