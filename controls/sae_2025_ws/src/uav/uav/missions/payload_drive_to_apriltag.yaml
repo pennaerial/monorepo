@@ -5,7 +5,8 @@ start:
   params:
     payload_name: 'payload_0'
     tag_size_m: '0.1'   # 100 mm x 100 mm (string so ModeManager literal_eval works)
-    stop_distance_m: '0.01'
+    stop_distance_m: '0.001'
+    camera_debug: 'True'
   transitions:
     complete: land
 

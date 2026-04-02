@@ -12,7 +12,7 @@ world:
       rpy: [0.0, 0.0, 0.0]
     payload_0:
       path_to_sdf: "~/.simulation-gazebo/models/payload/model.sdf"
-      position: [4.0, 0.5, 0.1]
+      position: [4.0, 0, 0.1]
       rpy: [0.0, 0.0, 0.0]
     # payload_1:
     #   path_to_sdf: "~/.simulation-gazebo/models/payload/model.sdf"
