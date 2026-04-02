@@ -277,44 +277,44 @@ class ModeManager(Node):
                 elif state != "continue":
                     self.switch_mode(self.transition(state))
         else:
-            if not self.uav.origin_set:
-                self.uav.set_origin()
-            if self.uav.arm_state != VehicleStatus.ARMING_STATE_ARMED:
-                self.get_logger().info(
-                    f"UAV is not armed. Current arm state: {self.uav.arm_state}"
-                )
-                # Successfully landed - terminate mission
-                if (
-                    self.active_mode is not None
-                    and self.get_active_mode() == LandingMode
-                    and self.uav.nav_state != VehicleStatus.NAVIGATION_STATE_AUTO_LAND
-                ):
-                    self.get_logger().info("Successfully Landed UAV")
-                    self.get_logger().info("Finishing Mission")
-                    self.destroy_node()
-                    return
+            # if not self.uav.origin_set:
+            #     self.uav.set_origin()
+            # if self.uav.arm_state != VehicleStatus.ARMING_STATE_ARMED:
+            #     self.get_logger().info(
+            #         f"UAV is not armed. Current arm state: {self.uav.arm_state}"
+            #     )
+            #     # Successfully landed - terminate mission
+            #     if (
+            #         self.active_mode is not None
+            #         and self.get_active_mode() == LandingMode
+            #         and self.uav.nav_state != VehicleStatus.NAVIGATION_STATE_AUTO_LAND
+            #     ):
+            #         self.get_logger().info("Successfully Landed UAV")
+            #         self.get_logger().info("Finishing Mission")
+            #         self.destroy_node()
+            #         return
 
-                # If we attempted takeoff but became disarmed (not during landing), something went wrong
-                # Terminate instead of cycling
-                if self.uav.attempted_takeoff and self.active_mode is not None:
-                    self.get_logger().error(
-                        "UAV disarmed unexpectedly after takeoff attempt. Terminating to prevent infinite cycle."
-                    )
-                    self.get_logger().error(
-                        "This usually indicates preflight check failures or PX4 safety triggers."
-                    )
-                    self.destroy_node()
-                    return
+            #     # If we attempted takeoff but became disarmed (not during landing), something went wrong
+            #     # Terminate instead of cycling
+            #     if self.uav.attempted_takeoff and self.active_mode is not None:
+            #         self.get_logger().error(
+            #             "UAV disarmed unexpectedly after takeoff attempt. Terminating to prevent infinite cycle."
+            #         )
+            #         self.get_logger().error(
+            #             "This usually indicates preflight check failures or PX4 safety triggers."
+            #         )
+            #         self.destroy_node()
+            #         return
 
-                self.uav.arm()
-                self.get_logger().info("Arming UAV")
-                self.start_time = current_time
-                return  # Wait for arm to complete
+            #     self.uav.arm()
+            #     self.get_logger().info("Arming UAV")
+            #     self.start_time = current_time
+            #     # return  # Wait for arm to complete
 
-            if self.uav.local_position is None or self.uav.global_position is None:
-                return  # Wait for position data
+            # if self.uav.local_position is None or self.uav.global_position is None:
+            #     return  # Wait for position data
 
-            self.uav.publish_offboard_control_heartbeat_signal()
+            # self.uav.publish_offboard_control_heartbeat_signal()
 
             # Start mission - TakeoffMode handles takeoff, heartbeat, and offboard engagement
             if self.active_mode is None:
