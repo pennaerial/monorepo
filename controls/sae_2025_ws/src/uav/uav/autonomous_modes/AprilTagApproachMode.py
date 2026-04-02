@@ -135,10 +135,11 @@ class AprilTagApproachMode(Mode):
         # Always stop the payload when leaving this mode.
         self._publish_drive(0.0, 0.0)
 
-        if self.camera_debug:
+        if self.camera_debug and not self._done:
             cv2.destroyWindow("AprilTagApproachMode")
 
-        self.node.destroy_subscription(self._image_sub)
+        if not self._done:
+            self.node.destroy_subscription(self._image_sub)
         self.node.destroy_subscription(self._info_sub)
         self.node.destroy_publisher(self._drive_pub)
 
@@ -243,14 +244,13 @@ class AprilTagApproachMode(Mode):
 
         # --- Stop condition ---
         if distance <= self.stop_distance_m:
-            self.log(f"Reached tag (distance={distance:.3f}m) — complete")
-            self._publish_drive(0.0, 0.0)
-            self._done = True
-            return
-
+            if not self._done:
+                self.log(f"Reached tag (distance={distance:.3f}m) — complete")
+                self._publish_drive(0.0, 0.0)
+                self._done = True
+            return  # Keep debug feed running, just don't drive
 
         self.node.get_logger().info(f"forward_speed={self.forward_speed:.3f} m/s, angular={angular:.6f} rad/s per pixel")
-
 
         # angular = max(angular, 0.6)
         self._publish_drive(self.forward_speed, angular)
@@ -326,14 +326,15 @@ class AprilTagApproachMode(Mode):
 
         # --- HUD: distance, lateral error, angular command ---
         tx, ty, tz = float(tvec[0]), float(tvec[1]), float(tvec[2])
-        lines = [
-            f"dist:    {distance:.3f} m  (stop @ {self.stop_distance_m:.3f} m)",
+        cv2.putText(vis, f"dist: {distance:.3f} m  (stop @ {self.stop_distance_m:.3f} m)",
+                    (8, 36), cv2.FONT_HERSHEY_SIMPLEX, 1.1, (0, 255, 255), 2)
+        small_lines = [
             f"tvec:    x={tx:.3f}  y={ty:.3f}  z={tz:.3f}",
             f"lat err: {lateral_error_px:+.1f} px",
             f"angular: {angular:+.4f} rad/s",
         ]
-        for i, line in enumerate(lines):
-            cv2.putText(vis, line, (8, 20 + i * 18),
+        for i, line in enumerate(small_lines):
+            cv2.putText(vis, line, (8, 60 + i * 18),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
 
         cv2.imshow("AprilTagApproachMode", vis)
