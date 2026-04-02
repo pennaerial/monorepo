@@ -52,12 +52,12 @@ class AprilTagApproachMode(Mode):
         tag_size_m: float = 0.0508,
         tag_family: str = "tag36h11",
         # Forward speed in m/s while approaching.
-        forward_speed: float = 0.1,
+        forward_speed: float = 0.2,
         # Steering gain: rad/s of yaw rate per pixel of lateral error.
         # Tune this to reduce oscillation — lower = smoother but slower correction.
         angular_gain: float = 0.003,
         # Distance (meters) at which to declare "arrived" and stop.
-        stop_distance_m: float = 0.05,
+        stop_distance_m: float = 0.2,
         # How long (seconds) to coast after losing the tag before stopping.
         # Gives the detector a moment to recover from a brief dropout.
         tag_lost_coast_s: float = 0.5,
