@@ -25,6 +25,7 @@ setup(
         "console_scripts": [
             "keyboard_teleop = payload_teleop.keyboard_teleop:main",
             "apriltag_debug = apriltag_debug.apriltag_debug:main",
+            "image_rotate = image_rotate.image_rotate:main",
         ],
     },
 )
