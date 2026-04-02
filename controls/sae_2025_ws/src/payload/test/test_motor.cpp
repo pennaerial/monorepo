@@ -23,12 +23,12 @@
 // RIGHT_IN2: 14
 //
 //
-static constexpr int SN_LEFT_PWM = 13;
-static constexpr int SN_LEFT_IN1  = 20;
-static constexpr int SN_LEFT_IN2  = 16;
-static constexpr int SN_RIGHT_PWM = 18;
-static constexpr int SN_RIGHT_IN1  = 15;
-static constexpr int SN_RIGHT_IN2  = 14;
+static constexpr int SN_LEFT_PWM = 18;
+static constexpr int SN_LEFT_IN1  = 15;
+static constexpr int SN_LEFT_IN2  = 14;
+static constexpr int SN_RIGHT_PWM = 13;
+static constexpr int SN_RIGHT_IN1  = 20;
+static constexpr int SN_RIGHT_IN2  = 16;
 
 
 
@@ -101,8 +101,8 @@ int main(int argc, char** argv)
     std::unique_ptr<Motor> motor_right;
     std::unique_ptr<Motor> motor_left;
     printf("Running SNMotor test\n");
-    motor_left = std::make_unique<SNMotor>(h, SN_RIGHT_PWM, SN_RIGHT_IN1, SN_RIGHT_IN2, FREQ, MotorType::RIGHT);
-    motor_right = std::make_unique<SNMotor>(h, SN_LEFT_PWM, SN_LEFT_IN1, SN_LEFT_IN2, FREQ, MotorType::LEFT);
+    motor_right = std::make_unique<SNMotor>(h, SN_RIGHT_PWM, SN_RIGHT_IN1, SN_RIGHT_IN2, FREQ, MotorType::RIGHT);
+    motor_left = std::make_unique<SNMotor>(h, SN_LEFT_PWM, SN_LEFT_IN1, SN_LEFT_IN2, FREQ, MotorType::LEFT);
     g_motor_a = motor_right.get();
     g_motor_b = motor_left.get();
     std::signal(SIGINT, on_sigint);
