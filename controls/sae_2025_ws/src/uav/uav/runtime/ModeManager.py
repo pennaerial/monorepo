@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import inspect
 import importlib
+import math
 from time import time
 from typing import Any, get_type_hints
 
@@ -17,7 +18,7 @@ VISION_NODE_PATH = "uav.vision_nodes"
 class ModeManager(Node):
     """Shared mission manager plumbing for a single bound vehicle."""
 
-    def __init__(self, node_name: str) -> None:
+    def __init__(self, node_name: str, *, vision_service_timeout_sec: float = 30.0) -> None:
         super().__init__(node_name)
         self.vehicle = None
         self.modes = {}
@@ -25,6 +26,7 @@ class ModeManager(Node):
         self.active_mode = None
         self.last_update_time = time()
         self._vision_clients = {}
+        self.vision_service_timeout_sec = float(vision_service_timeout_sec)
 
     def get_active_mode(self) -> Mode:
         return self.modes[self.active_mode]
@@ -54,14 +56,41 @@ class ModeManager(Node):
 
     def _connect_vision_client(self, vision_class):
         service_name = self.vehicle.vision_service_name(vision_class)
+        timeout_sec = self.vision_service_timeout_sec
+        deadline = time() + timeout_sec if math.isfinite(timeout_sec) and timeout_sec > 0.0 else None
+
         while True:
             client = self.create_client(vision_class.srv, service_name)
             if client.wait_for_service(timeout_sec=1.0):
                 return client, service_name
             self.destroy_client(client)
+
+            if deadline is not None and time() >= deadline:
+                raise TimeoutError(
+                    self._vision_service_timeout_message(
+                        vision_class=vision_class,
+                        service_name=service_name,
+                        timeout_sec=timeout_sec,
+                    )
+                )
             self.get_logger().info(
                 f"Service {service_name} not available yet, waiting again..."
             )
+
+    def _vision_service_timeout_message(
+        self, *, vision_class, service_name: str, timeout_sec: float
+    ) -> str:
+        camera_service_name = getattr(self.vehicle, "camera_service_name", None)
+        image_topic = getattr(self.vehicle, "image_topic", None)
+        camera_info_topic = getattr(self.vehicle, "camera_info_topic", None)
+        vehicle_name = getattr(self.vehicle, "name", "<unknown>")
+        return (
+            f"Timed out after {timeout_sec:.1f}s waiting for vision service {service_name} "
+            f"for vehicle '{vehicle_name}'. Expected vision node '{vision_class.__name__}' "
+            f"to come up after camera transport becomes available. "
+            f"Camera contract: service={camera_service_name}, image_topic={image_topic}, "
+            f"camera_info_topic={camera_info_topic}."
+        )
 
     def get_vision_client(self, vision_node):
         key = vision_node.__name__

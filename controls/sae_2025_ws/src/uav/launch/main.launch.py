@@ -477,6 +477,8 @@ def launch_setup(context, *args, **kwargs):
         startup_actions.extend(camera_actions)
         if middleware is not None:
             startup_actions.append(middleware)
+        if mission_spec.is_payload:
+            startup_actions.append(mission_node)
 
         startup_trigger = "World generation successful"
 
@@ -491,8 +493,9 @@ def launch_setup(context, *args, **kwargs):
             sim_launch,
             RegisterEventHandler(OnProcessIO(on_stdout=maybe_start_sim_runtime)),
             RegisterEventHandler(OnProcessIO(on_stderr=maybe_start_sim_runtime)),
-            mission_node,
         ]
+        if not mission_spec.is_payload:
+            actions.append(mission_node)
         if auto_launch and mission_spec.is_uav and px4_sitl is not None:
             actions.extend(
                 [
