@@ -62,7 +62,7 @@ sudo apt-get upgrade
     ```bash
     export GZ_VERSION=harmonic
     ```
-    This is because the build process of `ros_gz` requires the gazebo version to be specified in shell variable `GZ_VERSION`.
+    This workspace targets Gazebo Harmonic. If `GZ_VERSION` is unset, Gazebo-related packages will warn and continue with `harmonic`. If it is set to a conflicting value, the build will fail fast.
 
 3. Make sure you have all of your ROS dependencies installed:
    ```bash
@@ -78,6 +78,7 @@ sudo apt-get upgrade
 
     ```bash
     cd ~/{path_to_monorepo}/controls/sae_2025_ws
+    export GZ_VERSION=harmonic
     colcon build
     ```
 

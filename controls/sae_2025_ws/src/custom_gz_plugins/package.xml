@@ -8,6 +8,7 @@
   <license>Apache-2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>sae_gz_cmake</buildtool_depend>
 
   <depend>custom_gz_msgs</depend>
 
