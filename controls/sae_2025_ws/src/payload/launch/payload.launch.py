@@ -19,6 +19,7 @@ def launch_setup(context):
     )
 
     payload_name = LaunchConfiguration("payload_name").perform(context)
+    use_camera_bool = LaunchConfiguration("use_camera").perform(context).lower() == "true"
     controller_override = LaunchConfiguration("controller").perform(context)
 
     payload_params = load_param_file(payload_params_path)
@@ -76,17 +77,39 @@ def launch_setup(context):
         )
         actions.append(camera_bridge)
 
-    elif controller == "GPIOController":
-        # v4l2_camera for real hardware — uncomment and configure when ready
-        # v4l2 = Node(
-        #     package="v4l2_camera",
-        #     executable="v4l2_camera_node",
-        #     parameters=[{"image_size": [640, 1600]}],
-        #     remappings=[("/image_raw", f"/{payload_name}/camera")],
-        #     output="screen",
-        # )
-        # actions.append(v4l2)
-        pass
+    if use_camera_bool:
+        camera_info_path = os.path.join(
+            payload_share_dir, "config", f"{payload_name}_camera_info.yaml"
+        )
+        v4l2_cam = Node(
+            package="v4l2_camera",
+            executable="v4l2_camera_node",
+            parameters=[{
+                "image_size": [640, 480],
+                "camera_info_url": f"file://{camera_info_path}",
+            }],
+            remappings=[
+                ("/image_raw", f"/{payload_name}/image_raw"),
+                ("/image_raw/compressed", f"/{payload_name}/image_raw/compressed"),
+                ("/camera_info", f"/{payload_name}/camera_info"),
+            ],
+            output="screen",
+        )
+        image_rotate = Node(
+            package="tools",
+            executable="image_rotate",
+            parameters=[
+                {
+                    "input_topic": f"/{payload_name}/image_raw/compressed",
+                    "output_topic": f"/{payload_name}/camera",
+                    "compressed": True,
+                    "degrees": 180.0,
+                }
+            ],
+            output="screen",
+        )
+        actions.append(v4l2_cam)
+        actions.append(image_rotate)
 
     return actions
 
@@ -96,6 +119,7 @@ def generate_launch_description():
         [
             DeclareLaunchArgument("payload_name", default_value="payload_0"),
             DeclareLaunchArgument("controller", default_value=""),
+            DeclareLaunchArgument("use_camera", default_value="false"),
             OpaqueFunction(function=launch_setup),
         ]
     )

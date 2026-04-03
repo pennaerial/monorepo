@@ -42,11 +42,11 @@
       wheel_separation_m: 0.12132
 
     pid:
-      left_kp: 0.07
-      left_ki: 0.0
+      left_kp: 0.005
+      left_ki: 0.003
       left_kd: 0.0
-      right_kp: 0.07
-      right_ki: 0.0
+      right_kp: 0.005
+      right_ki: 0.003
       right_kd: 0.0
       i_clamp: 1.0
       output_limit_norm: 1.0
@@ -67,6 +67,11 @@
       min_ang_speed_rad_s: 0.25
       slowdown_deg: 10.0
       tolerance_deg: 5.0
+
+    servo:
+      pulse_min_us: 700.0
+      pulse_max_us: 2300.0
+      frequency: 50
 
     sim:
       world_name: "sae"

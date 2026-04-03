@@ -13,6 +13,7 @@ class SimController : public Controller {
         SimController();
         void initialize(std::shared_ptr<rclcpp::Node> node) override;
         void drive_command(double linear, double angular) override;
+        void servo_command(double degree) override;
 
     private:
         std::shared_ptr<rclcpp::Node> node_;

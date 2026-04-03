@@ -73,3 +73,35 @@ Each detected tag is annotated with:
 | `camera_cy` | double | `240.0` | Camera intrinsic — principal point Y |
 
 > **Note:** The default intrinsics are a rough estimate for a 640×480 camera. For accurate pose estimation, supply the real values from your camera's calibration.
+
+---
+
+## image_rotate
+
+Subscribes to a camera topic, rotates each frame clockwise by a configurable number of degrees, and republishes the result. Supports both raw (`sensor_msgs/Image`) and compressed (`sensor_msgs/CompressedImage`) streams.
+
+### Run
+
+```bash
+# Raw image, 90° clockwise
+ros2 run tools image_rotate --ros-args \
+  -p input_topic:=/payload_0/camera_raw \
+  -p output_topic:=/payload_0/camera \
+  -p degrees:=90.0
+
+# Compressed image
+ros2 run tools image_rotate --ros-args \
+  -p input_topic:=/payload_0/camera_raw/compressed \
+  -p output_topic:=/payload_0/camera/compressed \
+  -p compressed:=true \
+  -p degrees:=180.0
+```
+
+### Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `input_topic` | string | `/camera/image_raw` | Topic to subscribe to |
+| `output_topic` | string | `/camera/image_rotated` | Topic to publish the rotated image on |
+| `compressed` | bool | `false` | Set `true` to use `sensor_msgs/CompressedImage` on both ends |
+| `degrees` | double | `0.0` | Clockwise rotation in degrees. The output canvas is expanded to fit the rotated image so no corners are clipped |

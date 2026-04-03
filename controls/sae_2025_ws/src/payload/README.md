@@ -13,34 +13,49 @@ Payload for SAE Advanced Class 2026
 
 If running multiple instances of payload, they should differ by launch arguments, but share the same node parameters
 
-### Launch configuration:
-The defined launch arguments are:
-- `payload_name`: node name of the payload to launch. The node name is used to determine the name of the ros topics that the payload node listens to, and also the gazebo topics/services that the node sends messages to (sim controller). **This must match the name of the entity name of the gazebo payload model (sim mode)** \
-DEFAULT VALUE: `payload_0`
+### Launch Arguments
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `payload_name` | `payload_0` | Node name and topic namespace for this payload. Must match the Gazebo entity name when using `SimController`. |
+| `controller` | `""` | Override the controller from `payload_params.yaml`. Leave empty to use the value in the config. Options: `GPIOController`, `SimController`. |
+| `use_camera` | `true` | Launch camera-related nodes. When `false`, no camera nodes are started. |
+| `camera_rotation` | `0.0` | Clockwise degrees to rotate the camera image before publishing to `/<payload_name>/camera`. |
 
 ### Payload Parameters
 Defined payload parameters (defined in `config/payload_params.schema.yaml`):
-- controller: defines the controller to use. The available options are `sim` and `gpio`. Use `sim` when testing in sitl and `gpio` when running on the pi \
-DEFAULT VALUE: `sim`
+- `controller`: defines the controller to use. Options are `GPIOController` (real hardware) and `SimController` (Gazebo). \
+DEFAULT VALUE: `GPIOController`
 
-### Launch:
-Running the launch file will run one instance of the payload and also links payload_params
-from ws directory, run 
+### Launch
 
 ```bash
+# Default — single payload with camera
 ros2 launch payload payload.launch.py
-```
-- this will launch the payload node with the params found in `config/payload_params.yaml`
-- this will also use the default launch configuration
 
-You can override the launch configuration via command line \
-Example: overriding the `payload_name` launch argument:
-```bash
+# Override payload name
 ros2 launch payload payload.launch.py payload_name:=payload_1
+
+# Rotate camera 90° clockwise
+ros2 launch payload payload.launch.py camera_rotation:=90.0
+
+# Disable camera
+ros2 launch payload payload.launch.py use_camera:=false
 ```
-- This will launch a payload node called with name `payload_1`
-- This will listen to a ros topic called `/payload_1/cmd_drive` for drive commands
-- This will publish drive commands to a gazebo topic called `/model/payload_1/cmd_vel` to control the sim payload 
 
+### Camera Pipeline (GPIOController)
 
+When `use_camera:=true` and `controller=GPIOController`, two extra nodes are launched:
 
+```
+v4l2_camera  →  /<payload_name>/camera_raw  →  image_rotate  →  /<payload_name>/camera
+```
+
+- `v4l2_camera` captures at 640×480 and publishes to `camera_raw`
+- `image_rotate` (from the `tools` package) rotates by `camera_rotation` degrees and publishes the final stream to `/<payload_name>/camera`
+
+### Sim Camera Pipeline (SimController)
+
+A `ros_gz_bridge` node bridges the Gazebo camera and camera_info topics into:
+- `/<payload_name>/camera`
+- `/<payload_name>/camera_info`

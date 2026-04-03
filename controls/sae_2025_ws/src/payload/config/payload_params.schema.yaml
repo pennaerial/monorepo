@@ -5,7 +5,6 @@ payload:
     description: "Controller type"
     validation:
       one_of<>: [["SimController", "GPIOController"]]
-  
 
   pins:
     LEFT_PWM:
@@ -200,9 +199,27 @@ payload:
       description: "Control-loop period in milliseconds"
       validation:
         bounds<>: [1, 1000]
-  
+
+  servo:
+    pulse_min_us:
+      type: double
+      default_value: 1000.0
+      description: "Servo pulse width in microseconds corresponding to 0 degrees"
+      validation:
+        bounds<>: [0.0, 10000.0]
+    pulse_max_us:
+      type: double
+      default_value: 2000.0
+      description: "Servo pulse width in microseconds corresponding to 180 degrees"
+      validation:
+        bounds<>: [0.0, 10000.0]
+    frequency:
+      type: int
+      default_value: 50
+      description: "Servo pulse frequency"
+
   sim:
     world_name:
-      type: string 
+      type: string
       default_value: "sae"
       description: "Simulation World name"
