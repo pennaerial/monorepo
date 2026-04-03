@@ -1,3 +1,4 @@
+import math
 from typing import Optional
 
 import cv2
@@ -56,6 +57,10 @@ class AprilTagApproachMode(Mode):
         # Steering gain: rad/s of yaw rate per pixel of lateral error.
         # Tune this to reduce oscillation — lower = smoother but slower correction.
         angular_gain: float = 0.003,
+        # Orthogonal-approach gain: rad/s per radian of yaw misalignment vs tag normal.
+        # Set to 0.0 to disable (pure lateral correction only). Start at 0 to verify signs
+        # in the HUD before enabling. Negate if correction curves the wrong direction.
+        yaw_gain: float = 0.0,
         # Distance (meters) at which to declare "arrived" and stop.
         stop_distance_m: float = 0.2,
         # How long (seconds) to coast after losing the tag before stopping.
@@ -71,6 +76,7 @@ class AprilTagApproachMode(Mode):
         self.tag_size_m = tag_size_m
         self.forward_speed = forward_speed
         self.angular_gain = angular_gain
+        self.yaw_gain = yaw_gain
         self.stop_distance_m = stop_distance_m
         self.tag_lost_coast_s = tag_lost_coast_s
         self.camera_debug = camera_debug
@@ -235,12 +241,24 @@ class AprilTagApproachMode(Mode):
         # DriveCommand.angular > 0 turns left, so we negate to steer toward the tag.
         tag_center_x = det.center[0]
         lateral_error_px = tag_center_x - cx
-        angular = -self.angular_gain * lateral_error_px
+        lateral_correction = -self.angular_gain * lateral_error_px
+
+        # --- Yaw (orthogonal approach) correction ---
+        # Compute the tag's surface normal in camera frame from the rotation matrix.
+        # When facing the tag head-on, the normal points toward -Z of camera → nx ≈ 0.
+        # nx > 0: approaching from payload's left → turn right (negative correction).
+        # nx < 0: approaching from payload's right → turn left (positive correction).
+        # yaw_gain defaults to 0.0 so this has no effect until you verify signs in the HUD.
+        R, _ = cv2.Rodrigues(rvec)
+        yaw_error = math.atan2(R[0, 2], -R[2, 2])  # radians; 0 = perfectly orthogonal
+        yaw_correction = -self.yaw_gain * yaw_error
+
+        angular = lateral_correction + yaw_correction
 
         self._last_tag_time = self.node.get_clock().now().nanoseconds * 1e-9
 
         if self.camera_debug:
-            self._draw_debug(frame, gray, det, rvec, tvec, camera_matrix, cx, cy, lateral_error_px, angular, distance)
+            self._draw_debug(frame, gray, det, rvec, tvec, camera_matrix, cx, cy, lateral_error_px, angular, distance, yaw_error, yaw_correction)
 
         # --- Stop condition ---
         if distance <= self.stop_distance_m:
@@ -250,7 +268,9 @@ class AprilTagApproachMode(Mode):
                 self._done = True
             return  # Keep debug feed running, just don't drive
 
+
         self.node.get_logger().info(f"forward_speed={self.forward_speed:.3f} m/s, angular={angular:.6f} rad/s per pixel")
+
 
         # angular = max(angular, 0.6)
         self._publish_drive(self.forward_speed, angular)
@@ -272,6 +292,8 @@ class AprilTagApproachMode(Mode):
         lateral_error_px: float,
         angular: float,
         distance: float,
+        yaw_error: float = 0.0,
+        yaw_correction: float = 0.0,
     ) -> None:
         # Use the color frame if available (real camera), otherwise convert gray to BGR.
         vis = color_frame.copy() if color_frame is not None else cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
@@ -324,18 +346,20 @@ class AprilTagApproachMode(Mode):
         cv2.arrowedLine(vis, origin, tuple(projected[2]), (0, 255, 0), 2, tipLength=0.3)   # Y green
         cv2.arrowedLine(vis, origin, tuple(projected[3]), (255, 0, 0), 2, tipLength=0.3)   # Z blue
 
-        # --- HUD: distance, lateral error, angular command ---
+        # --- HUD: distance (large), then small detail lines ---
         tx, ty, tz = float(tvec[0]), float(tvec[1]), float(tvec[2])
         cv2.putText(vis, f"dist: {distance:.3f} m  (stop @ {self.stop_distance_m:.3f} m)",
                     (8, 36), cv2.FONT_HERSHEY_SIMPLEX, 1.1, (0, 255, 255), 2)
         small_lines = [
-            f"tvec:    x={tx:.3f}  y={ty:.3f}  z={tz:.3f}",
-            f"lat err: {lateral_error_px:+.1f} px",
-            f"angular: {angular:+.4f} rad/s",
+            f"tvec:     x={tx:.3f}  y={ty:.3f}  z={tz:.3f}",
+            f"lat err:  {lateral_error_px:+.1f} px",
+            f"angular:  {angular:+.4f} rad/s",
+            f"yaw err:  {yaw_error:+.3f} rad  (0=orthogonal)",
+            f"yaw cmd:  {yaw_correction:+.4f} rad/s  (gain={self.yaw_gain})",
         ]
         for i, line in enumerate(small_lines):
             cv2.putText(vis, line, (8, 60 + i * 18),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
 
         cv2.imshow("AprilTagApproachMode", vis)
         cv2.waitKey(1)
