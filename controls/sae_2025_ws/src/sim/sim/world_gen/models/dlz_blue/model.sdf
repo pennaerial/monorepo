@@ -3,6 +3,8 @@
   <model name="dlz_blue">
   <static>true</static>
     <link name="dlz_blue_link">
+      <!-- Recenter the model frame on the landing zone so spawn position matches world position. -->
+      <pose>-5.0192 0.0192 0 0 0 0</pose>
       <inertial>
         <mass>2</mass>
       </inertial>
