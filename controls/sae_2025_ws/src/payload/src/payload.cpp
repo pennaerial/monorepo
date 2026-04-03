@@ -1,37 +1,37 @@
 #include "payload/payload.hpp"
 #include <payload_interfaces/msg/detail/servo_command__struct.hpp>
 
-Payload::Payload(const std::string& payload_name)
-: rclcpp::Node(payload_name),
+Payload::Payload(std::shared_ptr<rclcpp::Node> node)
+: node_(node),
   controller_loader_("payload", "Controller") {
 
 }
 
 void Payload::init() {
-    payload_name_ = this->get_name(); //allows for override from launch file node name
-    std::string timed_drive_name = "/" + payload_name_ + "/timed_drive";
-    timed_drive_srv_ = this->create_service<payload_interfaces::srv::TimedDrive>(
+    const std::string payload_name = node_->get_name();
+    std::string timed_drive_name = "/" + payload_name + "/timed_drive";
+    timed_drive_srv_ = node_->create_service<payload_interfaces::srv::TimedDrive>(
         timed_drive_name,
         std::bind(&Payload::timed_drive_callback, this,
                   std::placeholders::_1, std::placeholders::_2));
-    RCLCPP_INFO(this->get_logger(), "Timed drive service: %s", timed_drive_name.c_str());
+    RCLCPP_INFO(node_->get_logger(), "Timed drive service: %s", timed_drive_name.c_str());
 
-    payload_params_listener_ = std::make_shared<payload::ParamListener>(this);
+    payload_params_listener_ = std::make_shared<payload::ParamListener>(node_);
     payload_params_ = payload_params_listener_->get_params();
 
-    std::string ros_drive_topic = "/" + payload_name_ + "/cmd_drive";
-    ros_drive_subscriber_ = this->create_subscription<payload_interfaces::msg::DriveCommand>(
+    std::string ros_drive_topic = "/" + payload_name + "/cmd_drive";
+    ros_drive_subscriber_ = node_->create_subscription<payload_interfaces::msg::DriveCommand>(
         ros_drive_topic, 10, std::bind(&Payload::drive_callback, this, std::placeholders::_1));
-    RCLCPP_INFO(this->get_logger(), "Listening on: %s", ros_drive_topic.c_str());
+    RCLCPP_INFO(node_->get_logger(), "Listening on: %s", ros_drive_topic.c_str());
 
 
-    std::string servo_topic = "/" + payload_name_ + "/servo";
-    servo_subscriber_ = this->create_subscription<payload_interfaces::msg::ServoCommand>(
+    std::string servo_topic = "/" + payload_name + "/servo";
+    servo_subscriber_ = node_->create_subscription<payload_interfaces::msg::ServoCommand>(
             servo_topic, 10, std::bind(&Payload::servo_callback, this, std::placeholders::_1));
-    RCLCPP_INFO(this->get_logger(), "Servo listening on: %s", servo_topic.c_str());
+    RCLCPP_INFO(node_->get_logger(), "Servo listening on: %s", servo_topic.c_str());
 
     controller_ = controller_loader_.createSharedInstance(payload_params_.controller);
-    controller_->initialize(shared_from_this());
+    controller_->initialize(node_);
 }
 
 void Payload::drive_callback(const payload_interfaces::msg::DriveCommand::SharedPtr msg) {
@@ -64,7 +64,7 @@ void Payload::timed_drive_callback(
     }
     timed_override_active_.store(true);
     controller_->drive_command(request->linear, request->angular);
-    timed_drive_timer_ = this->create_wall_timer(
+    timed_drive_timer_ = node_->create_wall_timer(
         std::chrono::duration<double>(request->duration_sec),
         [this]() { clear_timed_override(); });
     response->success = true;
@@ -72,6 +72,6 @@ void Payload::timed_drive_callback(
 }
 
 void Payload::servo_callback(const payload_interfaces::msg::ServoCommand::SharedPtr msg) {
-    RCLCPP_INFO(this->get_logger(), "Servo command: %.2f deg", msg->degree);
+    RCLCPP_INFO(node_->get_logger(), "Servo command: %.2f deg", msg->degree);
     controller_->servo_command(msg->degree);
 }

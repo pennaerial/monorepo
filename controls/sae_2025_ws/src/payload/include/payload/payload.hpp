@@ -15,13 +15,13 @@
 #include "payload/payload_parameters.hpp"
 #include "payload/controller.hpp"
 
-class Payload : public rclcpp::Node {
+class Payload {
 public:
-    Payload(const std::string& payload_name);
+    explicit Payload(std::shared_ptr<rclcpp::Node> node);
     void init();
 
 private:
-    std::string payload_name_;
+    std::shared_ptr<rclcpp::Node> node_;
     rclcpp::Subscription<payload_interfaces::msg::DriveCommand>::SharedPtr ros_drive_subscriber_;
 
     pluginlib::ClassLoader<Controller> controller_loader_;

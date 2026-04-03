@@ -4,6 +4,7 @@
 #include <chrono>
 #include <cmath>
 #include <memory>
+#include <rclcpp/logging.hpp>
 #include <string>
 
 #include <lgpio.h>
@@ -17,19 +18,32 @@ GPIOController::GPIOController() {}
 
 GPIOController::~GPIOController()
 {
+    RCLCPP_INFO(node_->get_logger(), "SHUTTING DOWN GPIO CONTROLLER");
     running_ = false;
     if (control_thread_.joinable()) {
+        RCLCPP_INFO(node_->get_logger(), "Joining control loop");
         control_thread_.join();
     }
 
-    if (left_motor_)  left_motor_->coast();
-    if (right_motor_) right_motor_->coast();
+    if (left_motor_) {
+        RCLCPP_INFO(node_->get_logger(), "Coasting left motor");
+        left_motor_->coast();
+    }
+
+    if (right_motor_) {
+        RCLCPP_INFO(node_->get_logger(), "Coasting right motor");
+        right_motor_->coast();
+    }
 
     left_encoder_.reset();
     right_encoder_.reset();
     left_motor_.reset();
     right_motor_.reset();
-    if (servo_) servo_->degree_setpoint(0.0f);
+
+    if (servo_) {
+        RCLCPP_INFO(node_->get_logger(), "Resetting servo");
+        servo_->degree_setpoint(0.0f);
+    }
 
     if (handle_ >= 0) {
         lgGpiochipClose(handle_);
