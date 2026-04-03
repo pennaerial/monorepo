@@ -6,10 +6,11 @@ start:
     payload_name: 'payload_0'
     tag_id: '0' 
     tag_size_m: '0.0508'   # 100 mm x 100 mm (string so ModeManager literal_eval works)
-    forward_speed: '0.2'   # m/s
+    max_forward_speed: '0.2'  # hard cap in m/s
+    forward_gain: '0.5'       # m/s per meter — tune for desired slow-down curve
     angular_gain: '0.003'  # rad/s of yaw rate per pixel of lateral error
     yaw_gain: '1'        # rad/s per radian of yaw mis
-    stop_distance_m: '0.1' # m
+    stop_distance_m: '0.07' # m
     camera_debug: 'True'
     compressed_image: 'False' 
   transitions:

@@ -52,8 +52,11 @@ class AprilTagApproachMode(Mode):
         tag_id: Optional[int] = None,
         tag_size_m: float = 0.0508,
         tag_family: str = "tag36h11",
-        # Forward speed in m/s while approaching.
-        forward_speed: float = 0.2,
+        # Maximum forward speed in m/s — hard cap regardless of distance.
+        max_forward_speed: float = 0.2,
+        # Proportional forward gain: speed = forward_gain * distance, capped at max_forward_speed.
+        # Gives smooth slow-down as the payload closes in on the tag.
+        forward_gain: float = 0.5,
         # Steering gain: rad/s of yaw rate per pixel of lateral error.
         # Tune this to reduce oscillation — lower = smoother but slower correction.
         angular_gain: float = 0.003,
@@ -74,7 +77,8 @@ class AprilTagApproachMode(Mode):
         self.payload_name = payload_name
         self.tag_id = tag_id
         self.tag_size_m = tag_size_m
-        self.forward_speed = forward_speed
+        self.max_forward_speed = max_forward_speed
+        self.forward_gain = forward_gain
         self.angular_gain = angular_gain
         self.yaw_gain = yaw_gain
         self.stop_distance_m = stop_distance_m
@@ -269,11 +273,10 @@ class AprilTagApproachMode(Mode):
             return  # Keep debug feed running, just don't drive
 
 
-        self.node.get_logger().info(f"forward_speed={self.forward_speed:.3f} m/s, angular={angular:.6f} rad/s per pixel")
+        linear = min(self.forward_gain * distance, self.max_forward_speed)
+        self.node.get_logger().info(f"linear={linear:.3f} m/s, angular={angular:.6f} rad/s")
 
-
-        # angular = max(angular, 0.6)
-        self._publish_drive(self.forward_speed, angular)
+        self._publish_drive(linear, angular)
 
     # ------------------------------------------------------------------
     # Helpers
