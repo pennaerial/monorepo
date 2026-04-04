@@ -10,57 +10,98 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(payload_interfaces REQUIRED)
 find_package(pluginlib REQUIRED)
-find_package(generate_parameter_library REQUIRED)
 
-option(BUILD_SIM "Build simulation controller (OFF builds GPIO controller instead)" ON)
-if(BUILD_SIM)
-  find_package(gz-transport13 REQUIRED)
-  find_package(gz-msgs10 REQUIRED)
-else()
-  find_library(LGPIO_LIBRARY NAMES lgpio REQUIRED)
-  find_path(LGPIO_INCLUDE_DIR NAMES lgpio.h REQUIRED)
-endif()
+set(PAYLOAD_BUILD_SIM_CONTROLLER "AUTO" CACHE STRING
+  "Build the SimController backend (AUTO, ON, OFF)")
+set_property(CACHE PAYLOAD_BUILD_SIM_CONTROLLER PROPERTY STRINGS AUTO ON OFF)
+
+set(PAYLOAD_BUILD_GPIO_CONTROLLER "AUTO" CACHE STRING
+  "Build the GPIOController backend (AUTO, ON, OFF)")
+set_property(CACHE PAYLOAD_BUILD_GPIO_CONTROLLER PROPERTY STRINGS AUTO ON OFF)
+
+string(TOUPPER "${PAYLOAD_BUILD_SIM_CONTROLLER}" PAYLOAD_BUILD_SIM_CONTROLLER)
+string(TOUPPER "${PAYLOAD_BUILD_GPIO_CONTROLLER}" PAYLOAD_BUILD_GPIO_CONTROLLER)
 
 include_directories(include)
 
-#Generate Parameter Library
-generate_parameter_library(
-  payload_parameters
-  config/payload_params.schema.yaml
-)
+set(payload_controller_targets "")
+set(build_payload_sim_controller FALSE)
+set(build_payload_gpio_controller FALSE)
 
-# --- Controller plugin shared library ---
-add_library(payload_controllers SHARED
-  $<IF:$<BOOL:${BUILD_SIM}>,src/sim_controller.cpp,src/gpio_controller.cpp>
-)
+if(PAYLOAD_BUILD_SIM_CONTROLLER STREQUAL "ON")
+  find_package(gz-transport13 REQUIRED)
+  find_package(gz-msgs10 REQUIRED)
+  set(build_payload_sim_controller TRUE)
+elseif(PAYLOAD_BUILD_SIM_CONTROLLER STREQUAL "AUTO")
+  find_package(gz-transport13 QUIET)
+  find_package(gz-msgs10 QUIET)
+  if(TARGET gz-transport13::gz-transport13 AND TARGET gz-msgs10::gz-msgs10)
+    set(build_payload_sim_controller TRUE)
+  else()
+    message(STATUS
+      "Skipping SimController because Gazebo development packages were not found.")
+  endif()
+elseif(NOT PAYLOAD_BUILD_SIM_CONTROLLER STREQUAL "OFF")
+  message(FATAL_ERROR
+    "PAYLOAD_BUILD_SIM_CONTROLLER must be one of: AUTO, ON, OFF")
+endif()
 
-ament_target_dependencies(payload_controllers
-  rclcpp
-  payload_interfaces
-  pluginlib
-)
-
-target_link_libraries(payload_controllers
-  payload_parameters
-)
-
-if(BUILD_SIM)
-  target_link_libraries(payload_controllers
+if(build_payload_sim_controller)
+  add_library(payload_sim_controller SHARED
+    src/payload_parameters.cpp
+    src/sim_controller.cpp
+  )
+  ament_target_dependencies(payload_sim_controller
+    rclcpp
+    payload_interfaces
+    pluginlib
+  )
+  target_link_libraries(payload_sim_controller
     gz-transport13::gz-transport13
     gz-msgs10::gz-msgs10
   )
-  target_compile_definitions(payload_controllers PRIVATE BUILD_SIM)
-else()
-  target_sources(payload_controllers PRIVATE
+  target_compile_definitions(payload_sim_controller PRIVATE BUILD_SIM)
+  list(APPEND payload_controller_targets payload_sim_controller)
+endif()
+
+if(PAYLOAD_BUILD_GPIO_CONTROLLER STREQUAL "ON")
+  find_library(LGPIO_LIBRARY NAMES lgpio REQUIRED)
+  find_path(LGPIO_INCLUDE_DIR NAMES lgpio.h REQUIRED)
+  set(build_payload_gpio_controller TRUE)
+elseif(PAYLOAD_BUILD_GPIO_CONTROLLER STREQUAL "AUTO")
+  find_library(LGPIO_LIBRARY NAMES lgpio)
+  find_path(LGPIO_INCLUDE_DIR NAMES lgpio.h)
+  if(LGPIO_LIBRARY AND LGPIO_INCLUDE_DIR)
+    set(build_payload_gpio_controller TRUE)
+  else()
+    message(STATUS
+      "Skipping GPIOController because lgpio development files were not found. "
+      "Install liblgpio-dev to enable the hardware backend.")
+  endif()
+elseif(NOT PAYLOAD_BUILD_GPIO_CONTROLLER STREQUAL "OFF")
+  message(FATAL_ERROR
+    "PAYLOAD_BUILD_GPIO_CONTROLLER must be one of: AUTO, ON, OFF")
+endif()
+
+if(build_payload_gpio_controller)
+  add_library(payload_gpio_controller SHARED
+    src/payload_parameters.cpp
+    src/gpio_controller.cpp
     src/encoder.cpp
     src/control_math.cpp
     src/motor.cpp
     src/servo.cpp
     src/gpio.cpp
   )
-  target_link_libraries(payload_controllers ${LGPIO_LIBRARY})
-  target_include_directories(payload_controllers PUBLIC ${LGPIO_INCLUDE_DIR})
-  target_compile_definitions(payload_controllers PRIVATE BUILD_GPIO)
+  ament_target_dependencies(payload_gpio_controller
+    rclcpp
+    payload_interfaces
+    pluginlib
+  )
+  target_link_libraries(payload_gpio_controller ${LGPIO_LIBRARY})
+  target_include_directories(payload_gpio_controller PUBLIC ${LGPIO_INCLUDE_DIR})
+  target_compile_definitions(payload_gpio_controller PRIVATE BUILD_GPIO)
+  list(APPEND payload_controller_targets payload_gpio_controller)
 
   # --- Motor test executable (hardware only) ---
   add_executable(test_motor
@@ -87,10 +128,18 @@ else()
   install(TARGETS test_servo DESTINATION lib/${PROJECT_NAME})
 endif()
 
+if(NOT payload_controller_targets)
+  message(FATAL_ERROR
+    "payload requires at least one controller backend. Enable the simulation "
+    "backend by installing Gazebo development packages, or enable the hardware "
+    "backend by installing liblgpio-dev.")
+endif()
+
 pluginlib_export_plugin_description_file(payload plugins.xml)
 
 # --- Payload executable ---
 add_executable(payload
+  src/payload_parameters.cpp
   src/payload.cpp
   src/main.cpp
 )
@@ -101,11 +150,7 @@ ament_target_dependencies(payload
   pluginlib
 )
 
-target_link_libraries(payload
-  payload_parameters
-)
-
-install(TARGETS payload_controllers
+install(TARGETS ${payload_controller_targets}
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin

@@ -1,16 +1,17 @@
-start:
-  class: uav.autonomous_modes.TakeoffMode
-  params:
-    takeoff_type: horizontal
-  transitions:
-    complete: transition_to_mc
+modes:
+  start:
+    class: uav.modes.uav.TakeoffMode
+    params:
+      takeoff_type: horizontal
+    transitions:
+      complete: transition_to_mc
 
-transition_to_mc:
-  class: uav.autonomous_modes.TransitionMode
-  params:
-    to_mode: MC
-  transitions:
-    complete: land
+  transition_to_mc:
+    class: uav.modes.uav.TransitionMode
+    params:
+      to_mode: MC
+    transitions:
+      complete: land
 
-land:
-  class: uav.autonomous_modes.LandingMode
+  land:
+    class: uav.modes.uav.LandingMode

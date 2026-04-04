@@ -8,6 +8,7 @@
   <license>TODO: License declaration</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>sae_gz_cmake</buildtool_depend>
   <build_depend>gz-cmake3</build_depend>
   <depend>gz-msgs10</depend>
 

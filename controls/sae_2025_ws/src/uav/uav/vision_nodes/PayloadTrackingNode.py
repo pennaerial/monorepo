@@ -5,6 +5,7 @@ from uav.cv.tracking import find_payload, compute_3d_vector, rotate_image
 from uav.vision_nodes import VisionNode
 from uav_interfaces.srv import PayloadTracking
 import rclpy
+from rclpy.executors import ExternalShutdownException
 from uav.utils import pink, green, blue, yellow
 
 
@@ -16,7 +17,7 @@ class PayloadTrackingNode(VisionNode):
     srv = PayloadTracking
 
     def __init__(self):
-        super().__init__("payload_tracking", self.__class__.srv)
+        super().__init__(self.__class__.srv, node_name=self.node_name())
 
         self.color_map = {"pink": pink, "green": green, "blue": blue, "yellow": yellow}
 
@@ -24,7 +25,11 @@ class PayloadTrackingNode(VisionNode):
         self.kalman = cv2.KalmanFilter(4, 2)
         self._setup_kalman_filter()
 
-        self.create_service(PayloadTracking, self.service_name(), self.service_callback)
+        self.create_service(
+            PayloadTracking,
+            self.vision_service,
+            self.service_callback,
+        )
 
     def _setup_kalman_filter(self):
         """Initialize Kalman filter matrices"""
@@ -50,6 +55,8 @@ class PayloadTrackingNode(VisionNode):
     ):
         """Process tracking service request with Kalman filtering"""
         image, camera_info = self.request_data(cam_image=True, cam_info=True)
+        if image is None or camera_info is None:
+            return response
         image = self.convert_image_msg_to_frame(image)
         image = rotate_image(image, -np.rad2deg(request.yaw))
 
@@ -100,11 +107,18 @@ class PayloadTrackingNode(VisionNode):
 
 def main():
     rclpy.init()
-    node = PayloadTrackingNode()
+    node = None
     try:
+        node = PayloadTrackingNode()
         rclpy.spin(node)
+    except (KeyboardInterrupt, ExternalShutdownException):
+        pass
     except Exception as e:
         print(e)
-        node.publish_failsafe()
-
-    rclpy.shutdown()
+        if node is not None and rclpy.ok():
+            node.publish_failsafe()
+    finally:
+        if node is not None:
+            node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()

@@ -67,9 +67,8 @@ async def _extract_artifact_on_pi(ctx: AppContext, artifact_name: str) -> None:
         set -e
         cd {ctx.ssh.q(ctx.config.remote_dir)}
         if [ -d install ]; then
-            rm -rf install.bak src.bak
+            rm -rf install.bak
             mv install install.bak 2>/dev/null || true
-            mv src src.bak 2>/dev/null || true
         fi
         tar -xzf {ctx.ssh.q(artifact_name)}
         rm -f {ctx.ssh.q(artifact_name)}

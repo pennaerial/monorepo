@@ -2,6 +2,10 @@ cmake_minimum_required(VERSION 3.10.2 FATAL_ERROR)
 project(custom_gz_msgs VERSION 1.0.0)
 
 find_package(ament_cmake REQUIRED)
+find_package(sae_gz_cmake REQUIRED)
+
+sae_require_gazebo_harmonic()
+
 find_package(gz-cmake3 REQUIRED)
 find_package(gz-msgs10 REQUIRED)
 

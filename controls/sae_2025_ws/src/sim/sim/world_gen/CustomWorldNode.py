@@ -1,10 +1,12 @@
 from sim.world_gen import WorldNode
 from sim.world_gen.entity import Entity
-from typing import Optional
-import rclpy
-from ros_gz_interfaces.srv import SpawnEntity
-import sys
 import json
+import sys
+from typing import Optional
+
+import rclpy
+from rclpy.executors import ExternalShutdownException
+from ros_gz_interfaces.srv import SpawnEntity
 
 
 class CustomWorldNode(WorldNode):
@@ -57,9 +59,16 @@ class CustomWorldNode(WorldNode):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = CustomWorldNode(**json.loads(sys.argv[1]))
+    node = None
     try:
+        node = CustomWorldNode(**json.loads(sys.argv[1]))
         rclpy.spin(node)
+    except (KeyboardInterrupt, ExternalShutdownException):
+        pass
     except Exception as e:
         print(e)
-    rclpy.shutdown()
+    finally:
+        if node is not None:
+            node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()

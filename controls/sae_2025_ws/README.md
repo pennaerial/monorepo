@@ -62,7 +62,7 @@ sudo apt-get upgrade
     ```bash
     export GZ_VERSION=harmonic
     ```
-    This is because the build process of `ros_gz` requires the gazebo version to be specified in shell variable `GZ_VERSION`.
+    This workspace targets Gazebo Harmonic. If `GZ_VERSION` is unset, Gazebo-related packages will warn and continue with `harmonic`. If it is set to a conflicting value, the build will fail fast.
 
 3. Make sure you have all of your ROS dependencies installed:
    ```bash
@@ -78,6 +78,7 @@ sudo apt-get upgrade
 
     ```bash
     cd ~/{path_to_monorepo}/controls/sae_2025_ws
+    export GZ_VERSION=harmonic
     colcon build
     ```
 
@@ -132,86 +133,124 @@ You might run into the following issues during the build process. Here are solut
 
 ## Launching Components
 
-### Launch Order (All in Separate Terminals)
+### Recommended Unified Launch
+The current entry point is `ros2 launch uav main.launch.py`. This launch file brings up the selected mission, Gazebo, PX4 SITL, the camera bridge, and the relevant vision / payload nodes.
+
+```bash
+source /opt/ros/humble/setup.bash
+export GZ_VERSION=harmonic
+cd ~/{path_to_monorepo}/controls/sae_2025_ws
+colcon build --packages-select payload sim uav --symlink-install
+source install/setup.bash
+ros2 launch uav main.launch.py
+```
+
+The default launch behavior in simulation is now GUI-on. To run headless instead, use either of these:
+
+```bash
+export SAE_SIM_GUI=0
+ros2 launch uav main.launch.py
+```
+
+```bash
+export SAE_SIM_HEADLESS=1
+ros2 launch uav main.launch.py
+```
+
+Useful launch overrides:
+
+- `mission_name:=...` overrides the mission configured in `src/uav/launch/launch_params.yaml`
+- `payload_name:=...` selects which payload entity a payload mission binds to
+- `px4_path:=...` points the launch at a non-default PX4 checkout
+
+Example:
+
+```bash
+ros2 launch uav main.launch.py mission_name:=payload_drive_to_apriltag payload_name:=payload_0
+```
+
+### Legacy Manual Launch
+The older separate-terminal workflow below is kept for reference, but it is no longer the recommended path for SAE sim bringup.
+
 0. Follow Setup instructions [here](../../sim/sae%20aero/gazebo%20harmonic/README.md). This should involve copying over our custom setup scripts into your local `PX4-Autopilot` folder.
 1. **From PX4-Autopilot**: 
 
-    Launch PX4 in standalone mode (this spawns the simulator drone):
+   Launch PX4 in standalone mode (this spawns the simulator drone):
 
-    ```bash
-    bash standalone_px4_cmd.sh
-    ```
+   ```bash
+   bash standalone_px4_cmd.sh
+   ```
 
 2. **From PX4-Autopilot**: 
 
-    Launch Gazebo:
+   Launch Gazebo:
 
-    ```bash
-    bash standalone_gazebo_cmd.sh
-    ```
+   ```bash
+   bash standalone_gazebo_cmd.sh
+   ```
 
 3. **From Anywhere**:
 
-    Start Micro XRCE Agent for communication:
+   Start Micro XRCE Agent for communication:
 
-    ```bash
-    MicroXRCEAgent udp4 -p 8888
-    ```
+   ```bash
+   MicroXRCEAgent udp4 -p 8888
+   ```
 
 4. **From Anywhere**: 
 
-    Check ROS 2 topics to ensure that you see a long list of topics, not just the default ones:
+   Check ROS 2 topics to ensure that you see a long list of topics, not just the default ones:
 
-    ```bash
-    ros2 topic list
-    ```
+   ```bash
+   ros2 topic list
+   ```
 
 5. **From Where You Have QGroundControl Installed**:
 
-    Launch QGroundControl:
+   Launch QGroundControl:
 
-    ```bash
-    ./QGroundControl.AppImage
-    ```
+   ```bash
+   ./QGroundControl.AppImage
+   ```
 
 6. **From `sae_2025_ws`**:
 
-    Source the workspace setup script (this ensure that ros2 has the most recently-built versions of our workspace packages):
+   Source the workspace setup script (this ensure that ros2 has the most recently-built versions of our workspace packages):
 
-    ```bash
-    source install/setup.bash
-    ```
+   ```bash
+   source install/setup.bash
+   ```
 
-    Bridge the camera feed:
+   Bridge the camera feed:
 
-    ```bash
-    ros2 run ros_gz_bridge parameter_bridge /camera@sensor_msgs/msg/Image[gz.msgs.Image
-    ```
-    For information about the `ros_gz_bridge` package and its `parameter_bridge` executable, see https://gazebosim.org/docs/harmonic/ros2_integration/.
+   ```bash
+   ros2 run ros_gz_bridge parameter_bridge /camera@sensor_msgs/msg/Image[gz.msgs.Image
+   ```
+   For information about the `ros_gz_bridge` package and its `parameter_bridge` executable, see https://gazebosim.org/docs/harmonic/ros2_integration/.
 
 7. **From Anywhere**: 
 
-    Ensure the `/camera` topic is available:
+   Ensure the `/camera` topic is available:
 
-    ```bash
-    ros2 topic list
-    ```
+   ```bash
+   ros2 topic list
+   ```
 
-    Ensure the `/camera` topic is publishing correctly:
+   Ensure the `/camera` topic is publishing correctly:
 
-    ```bash
-    ros2 topic echo /camera
-    ```
+   ```bash
+   ros2 topic echo /camera
+   ```
 
-    You should see a bunch of numbers between 0 and 255, representing the image data.
+   You should see a bunch of numbers between 0 and 255, representing the image data.
 
 8. **From `sae_2025_ws`**:
 
-    Launch the UAV node:
+   Launch the UAV node:
 
-    ```bash
-    ros2 launch uav launch.py
-    ```
+   ```bash
+   ros2 launch uav launch.py
+   ```
 
 ---
 

@@ -6,6 +6,10 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 find_package(ament_cmake REQUIRED)
+find_package(sae_gz_cmake REQUIRED)
+
+sae_require_gazebo_harmonic()
+
 find_package(gz-sim8 REQUIRED)
 find_package(gz-plugin2 REQUIRED)
 find_package(gz-transport13 REQUIRED)

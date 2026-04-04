@@ -7,6 +7,10 @@ endif()
 
 # --- Dependencies ---
 find_package(ament_cmake REQUIRED)
+find_package(sae_gz_cmake REQUIRED)
+
+sae_require_gazebo_harmonic()
+
 find_package(rclcpp REQUIRED)
 find_package(sim_interfaces REQUIRED)
 find_package(pluginlib REQUIRED)

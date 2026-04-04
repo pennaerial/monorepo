@@ -1,20 +1,11 @@
-# VTOL stationary; payload finds any AprilTag, drives to it, stops 1 cm in front.
-# AprilTag size: 100 mm x 100 mm. Mode returns "terminate" when done.
-start:
-  class: uav.autonomous_modes.AprilTagApproachMode
-  params:
-    payload_name: 'payload_0'
-    tag_id: '0' 
-    tag_size_m: '0.0508'   # 100 mm x 100 mm (string so ModeManager literal_eval works)
-    max_forward_speed: '0.2'  # hard cap in m/s
-    forward_gain: '0.5'       # m/s per meter — tune for desired slow-down curve
-    angular_gain: '0.003'  # rad/s of yaw rate per pixel of lateral error
-    yaw_gain: '0.65'        # rad/s per radian of yaw mis
-    stop_distance_m: '0.07' # m
-    camera_debug: 'True'
-    compressed_image: 'True' 
-  transitions:
-    complete: land
-
-land:
-  class: uav.autonomous_modes.LandingMode
+# VTOL stationary; payload finds the front AprilTag, drives to it, and terminates.
+# Keeps this branch's closer tag size / distance tuning on the current payload mission runtime.
+modes:
+  start:
+    class: uav.modes.payload.PayloadDriveToAprilTagMode
+    params:
+      tag_id: 0
+      tag_size_m: 0.0508
+      stop_distance_m: 0.07
+      linear_gain: 0.5
+      angular_gain: 0.003

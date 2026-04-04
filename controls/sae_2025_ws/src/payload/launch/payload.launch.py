@@ -1,15 +1,16 @@
-from launch import LaunchDescription
-from launch.actions import OpaqueFunction, DeclareLaunchArgument
-from launch.substitutions import LaunchConfiguration
-from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory
 import os
 import yaml
 
+from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument, OpaqueFunction
+from launch.substitutions import LaunchConfiguration
+from launch_ros.actions import Node
+
 
 def load_param_file(path):
-    with open(path, "r", encoding="utf-8") as f:
-        return yaml.safe_load(f)
+    with open(path, "r", encoding="utf-8") as param_file:
+        return yaml.safe_load(param_file) or {}
 
 
 def launch_setup(context):
@@ -19,7 +20,9 @@ def launch_setup(context):
     )
 
     payload_name = LaunchConfiguration("payload_name").perform(context)
-    use_camera_bool = LaunchConfiguration("use_camera").perform(context).lower() == "true"
+    use_camera_bool = (
+        LaunchConfiguration("use_camera").perform(context).lower() == "true"
+    )
     controller_override = LaunchConfiguration("controller").perform(context)
 
     payload_params = load_param_file(payload_params_path)
@@ -27,7 +30,7 @@ def launch_setup(context):
     controller = (
         controller_override
         if controller_override
-        else ros_params.get("controller", "GPIOController")
+        else ros_params.get("controller", "SimController")
     )
     world_name = ros_params.get("sim", {}).get("world_name", "default")
 
@@ -45,11 +48,6 @@ def launch_setup(context):
 
     actions = [payload]
 
-    # TODO: completely get rid of coupled simcontroller and gpio controller
-    # Create a custom sim bridge from DriveCommand -> gz twist, then we can
-    # Create a payload sim controller launch that takes in payload_name and world and
-    # spawns in the correct bridges, all of the sim controlling will be done from the bridges
-    # DriveCommand bridge and camera/camerainfo bridges
     if controller == "SimController":
         gz_camera_topic = (
             f"/world/{world_name}/model/{payload_name}"
@@ -77,17 +75,19 @@ def launch_setup(context):
         )
         actions.append(camera_bridge)
 
-    if use_camera_bool:
+    if use_camera_bool and controller != "SimController":
         camera_info_path = os.path.join(
             payload_share_dir, "config", f"{payload_name}_camera_info.yaml"
         )
         v4l2_cam = Node(
             package="v4l2_camera",
             executable="v4l2_camera_node",
-            parameters=[{
-                "image_size": [640, 480],
-                "camera_info_url": f"file://{camera_info_path}",
-            }],
+            parameters=[
+                {
+                    "image_size": [640, 480],
+                    "camera_info_url": f"file://{camera_info_path}",
+                }
+            ],
             remappings=[
                 ("/image_raw", f"/{payload_name}/image_raw"),
                 ("/image_raw/compressed", f"/{payload_name}/image_raw/compressed"),
@@ -108,8 +108,7 @@ def launch_setup(context):
             ],
             output="screen",
         )
-        actions.append(v4l2_cam)
-        actions.append(image_rotate)
+        actions.extend([v4l2_cam, image_rotate])
 
     return actions
 
