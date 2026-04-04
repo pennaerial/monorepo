@@ -649,6 +649,7 @@ function SettingsPanel({ onRefresh }) {
 
 function MissionControl({ connected, buildInfo, onRefresh, workspacePaths }) {
   const [paramsMode, setParamsMode] = useState('form')
+  const [integerDrafts, setIntegerDrafts] = useState({})
   const {
     terminalHostRef,
     missionState,
@@ -677,8 +678,22 @@ function MissionControl({ connected, buildInfo, onRefresh, workspacePaths }) {
     refreshLaunchData,
   } = useMissionControl({ connected, onRefresh })
 
+  useEffect(() => {
+    setIntegerDrafts({})
+  }, [paramsText])
+
   const updateField = (field, value) => {
     setParamsText(prev => setYamlFieldValue(prev, field.key, field.type, value))
+  }
+
+  const commitIntegerField = (field, rawValue) => {
+    const parsed = Number.parseInt(`${rawValue ?? ''}`.trim(), 10)
+    updateField(field, Number.isFinite(parsed) ? parsed : 0)
+    setIntegerDrafts(prev => {
+      const next = { ...prev }
+      delete next[field.key]
+      return next
+    })
   }
 
   const selectedMissionName = `${getYamlFieldValue(paramsText, 'mission_name', 'string') || ''}`.trim()
@@ -777,15 +792,22 @@ function MissionControl({ connected, buildInfo, onRefresh, workspacePaths }) {
     }
 
     if (field.type === 'integer') {
+      const draftValue = integerDrafts[field.key]
+      const displayValue = draftValue ?? `${Number.isFinite(value) ? value : 0}`
       return (
         <div key={field.key} className="param-field">
           <label>{field.label}</label>
           <input
-            type="number"
-            value={Number.isFinite(value) ? value : 0}
-            onChange={e =>
-              updateField(field, Number.parseInt(e.target.value || '0', 10) || 0)
-            }
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            value={displayValue}
+            onChange={e => {
+              const nextValue = e.target.value
+              if (!/^\d*$/.test(nextValue)) return
+              setIntegerDrafts(prev => ({ ...prev, [field.key]: nextValue }))
+            }}
+            onBlur={e => commitIntegerField(field, e.target.value)}
             disabled={!connected}
           />
           <p className="param-help">{field.help}</p>
