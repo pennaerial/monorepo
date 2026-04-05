@@ -1,5 +1,7 @@
 bool cam_info
-bool cam_image
+bool cam_image_raw
+bool cam_image_compressed
 ---
-sensor_msgs/Image image
+sensor_msgs/Image image_raw
+sensor_msgs/CompressedImage image_compressed
 sensor_msgs/CameraInfo camera_info

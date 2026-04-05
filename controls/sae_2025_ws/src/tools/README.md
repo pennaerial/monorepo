@@ -47,10 +47,10 @@ Subscribes to a camera topic, runs AprilTag detection, and opens a live `cv2.ims
 
 ```bash
 # Raw image
-ros2 run tools apriltag_debug --ros-args -p topic:=/camera/image_raw -p compressed:=false
+ros2 run tools apriltag_debug --ros-args -p topic:=/camera -p compressed:=false
 
 # Compressed image
-ros2 run tools apriltag_debug --ros-args -p topic:=/camera/image_raw/compressed -p compressed:=true
+ros2 run tools apriltag_debug --ros-args -p topic:=/camera/compressed -p compressed:=true
 ```
 
 ### Visualization
@@ -66,7 +66,7 @@ Each detected tag is annotated with:
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `topic` | string | `""` | Camera topic to subscribe to. Defaults to `/camera/image_raw` (raw) or `/camera/image_raw/compressed` (compressed) if left empty |
+| `topic` | string | `""` | Camera topic to subscribe to. Defaults to `/camera` (raw) or `/camera/compressed` (compressed) if left empty |
 | `compressed` | bool | `false` | Set `true` to subscribe to `sensor_msgs/CompressedImage` instead of `sensor_msgs/Image` |
 | `tag_size_m` | double | `0.1` | Physical side length of the AprilTag in meters (used for pose estimation) |
 | `camera_fx` | double | `600.0` | Camera intrinsic — focal length X |

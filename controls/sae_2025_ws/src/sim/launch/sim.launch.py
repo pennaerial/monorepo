@@ -105,7 +105,14 @@ def _camera_bridge_nodes(
             package="ros_gz_bridge",
             executable="parameter_bridge",
             arguments=[f"{gz_image_topic}@sensor_msgs/msg/Image[gz.msgs.Image"],
-            remappings=[(gz_image_topic, f"{ros_namespace}/camera")],
+            remappings=[
+                (
+                    gz_image_topic,
+                    f"{ros_namespace}/camera_source"
+                    if vehicle_type == "payload"
+                    else f"{ros_namespace}/camera",
+                )
+            ],
             output="screen",
             name=f"{vehicle_name}_camera_bridge",
             cwd=cwd,
@@ -116,7 +123,14 @@ def _camera_bridge_nodes(
             arguments=[
                 f"{gz_camera_info_topic}@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo"
             ],
-            remappings=[(gz_camera_info_topic, f"{ros_namespace}/camera_info")],
+            remappings=[
+                (
+                    gz_camera_info_topic,
+                    f"{ros_namespace}/camera_info_source"
+                    if vehicle_type == "payload"
+                    else f"{ros_namespace}/camera_info",
+                )
+            ],
             output="screen",
             name=f"{vehicle_name}_camera_info_bridge",
             cwd=cwd,

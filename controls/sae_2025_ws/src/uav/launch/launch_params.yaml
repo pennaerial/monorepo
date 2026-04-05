@@ -17,6 +17,9 @@ custom_airframe_model: "" # Leave blank if using default PX4 model or enter file
 enable_vehicle_camera_pipeline: true
 save_vision_milliseconds: 0 # Interval between saving vision images in milliseconds, set to 0 to disable saving.
 uav_camera_offsets: [0.0, 0.0, 0.0]
+payload_camera_input_transport: raw
+payload_camera_rotate_degrees: 0.0
+payload_camera_preprocess_hook: ""
 
 # Mission runtime knobs.
 servo_only: false

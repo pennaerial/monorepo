@@ -63,8 +63,13 @@ def _gz_entity_name_for_model(model: str) -> str:
 
 
 def _camera_contract_for(
-    mission_spec: MissionSpec, payload_name: str
-) -> dict[str, str]:
+    mission_spec: MissionSpec,
+    payload_name: str,
+    *,
+    input_transport: str | None = None,
+    rotate_degrees: float | None = None,
+    preprocess_hook: str | None = None,
+) -> dict[str, object]:
     if mission_spec.is_uav:
         vehicle_name = "uav"
         namespace = "/uav"
@@ -79,6 +84,12 @@ def _camera_contract_for(
         "image_topic": f"{namespace}/camera",
         "camera_info_topic": f"{namespace}/camera_info",
         "camera_service_name": f"{namespace}/camera_data",
+        "input_transport": input_transport or "",
+        "input_raw_topic": f"{namespace}/camera_source",
+        "input_compressed_topic": f"{namespace}/camera_source/compressed",
+        "input_camera_info_topic": f"{namespace}/camera_info_source",
+        "rotate_degrees": 0.0 if rotate_degrees is None else rotate_degrees,
+        "preprocess_hook": "" if preprocess_hook is None else preprocess_hook,
     }
 
 
@@ -114,7 +125,7 @@ def _build_runtime_parameters(
 def _build_camera_actions(
     *,
     mission_spec: MissionSpec,
-    camera_contract: dict[str, str],
+    camera_contract: dict[str, object],
     vision_nodes: list[str],
     sim: bool,
     vision_debug: bool,
@@ -138,9 +149,23 @@ def _build_camera_actions(
                     "-p",
                     "image_size:=[640,480]",
                     "--remap",
-                    f"/image_raw:={camera_contract['image_topic']}",
+                    (
+                        f"/image_raw:={camera_contract['input_raw_topic']}"
+                        if mission_spec.is_payload
+                        else f"/image_raw:={camera_contract['image_topic']}"
+                    ),
                     "--remap",
-                    f"/camera_info:={camera_contract['camera_info_topic']}",
+                    (
+                        f"/image_raw/compressed:={camera_contract['input_compressed_topic']}"
+                        if mission_spec.is_payload
+                        else f"/image_raw/compressed:={camera_contract['image_topic']}/compressed"
+                    ),
+                    "--remap",
+                    (
+                        f"/camera_info:={camera_contract['input_camera_info_topic']}"
+                        if mission_spec.is_payload
+                        else f"/camera_info:={camera_contract['camera_info_topic']}"
+                    ),
                 ],
                 output="screen",
                 name=f"{camera_contract['vehicle_name']}_camera_device",
@@ -159,6 +184,22 @@ def _build_camera_actions(
                     "image_topic": camera_contract["image_topic"],
                     "camera_info_topic": camera_contract["camera_info_topic"],
                     "camera_service_name": camera_contract["camera_service_name"],
+                    **(
+                        {
+                            "input_transport": camera_contract["input_transport"],
+                            "input_raw_topic": camera_contract["input_raw_topic"],
+                            "input_compressed_topic": camera_contract[
+                                "input_compressed_topic"
+                            ],
+                            "input_camera_info_topic": camera_contract[
+                                "input_camera_info_topic"
+                            ],
+                            "rotate_degrees": camera_contract["rotate_degrees"],
+                            "preprocess_hook": camera_contract["preprocess_hook"],
+                        }
+                        if mission_spec.is_payload
+                        else {}
+                    ),
                     "display": False,
                     "debug": vision_debug,
                     "save_vision_milliseconds": save_vision_milliseconds,
@@ -167,7 +208,15 @@ def _build_camera_actions(
         )
     )
 
+    preferred_image_transport = (
+        "compressed"
+        if mission_spec.is_payload
+        and str(camera_contract["input_transport"]).strip().lower() == "compressed"
+        else "raw"
+    )
+
     for vision_node in vision_nodes:
+        use_camera_service = vision_node != "PayloadAprilTagNode"
         actions.append(
             Node(
                 package="uav",
@@ -179,7 +228,8 @@ def _build_camera_actions(
                         "vehicle_name": camera_contract["vehicle_name"],
                         "camera_namespace": camera_contract["camera_namespace"],
                         "camera_service_name": camera_contract["camera_service_name"],
-                        "use_camera_service": True,
+                        "use_camera_service": use_camera_service,
+                        "preferred_image_transport": preferred_image_transport,
                         "debug": vision_debug,
                         "sim": sim,
                         "save_vision": save_vision,
@@ -215,6 +265,18 @@ def launch_setup(context, *args, **kwargs):
         context, "payload_name", params.get("payload_name", "")
     )
     payload_controller = str(params.get("payload_controller", "")).strip()
+    payload_camera_input_transport = str(
+        params.get(
+            "payload_camera_input_transport",
+            "raw" if sim else "compressed",
+        )
+    ).strip()
+    payload_camera_rotate_degrees = float(
+        params.get("payload_camera_rotate_degrees", 0.0 if sim else 180.0)
+    )
+    payload_camera_preprocess_hook = str(
+        params.get("payload_camera_preprocess_hook", "")
+    ).strip()
 
     mission_path = mission_path_for_name(mission_name)
     mission_spec = MissionSpec.load(mission_path)
@@ -232,7 +294,15 @@ def launch_setup(context, *args, **kwargs):
         )
 
     camera_contract = (
-        _camera_contract_for(mission_spec, payload_name) if requires_vision else None
+        _camera_contract_for(
+            mission_spec,
+            payload_name,
+            input_transport=payload_camera_input_transport,
+            rotate_degrees=payload_camera_rotate_degrees,
+            preprocess_hook=payload_camera_preprocess_hook,
+        )
+        if requires_vision
+        else None
     )
     camera_actions = (
         _build_camera_actions(
