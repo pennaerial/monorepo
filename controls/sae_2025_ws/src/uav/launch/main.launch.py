@@ -380,7 +380,6 @@ def launch_setup(context, *args, **kwargs):
     mission_node = Node(
         package="uav",
         executable=runtime_executable,
-        name="mission",
         output="screen",
         parameters=[
             _build_runtime_parameters(

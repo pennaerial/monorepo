@@ -18,7 +18,7 @@ class UAVMissionBootstrap(Node):
         self.declare_parameter("vehicle_class", AirframeClass.MULTICOPTER.name)
         self.declare_parameter("uav_camera_offsets", [0.0, 0.0, 0.0])
 
-    def build_manager(self) -> UAVModeManager:
+    def manager_kwargs(self) -> dict:
         mission_path = str(self.get_parameter("mode_map").value)
         if not mission_path:
             raise ValueError("uav_mission requires a non-empty 'mode_map'.")
@@ -29,16 +29,16 @@ class UAVMissionBootstrap(Node):
                 f"uav_mission requires a UAV mission spec, received target '{mission_spec.target}'."
             )
 
-        return UAVModeManager(
-            mission_spec=mission_spec,
-            debug=bool(self.get_parameter("debug").value),
-            servo_only=bool(self.get_parameter("servo_only").value),
-            vehicle_class=AirframeClass.parse(
+        return {
+            "mission_spec": mission_spec,
+            "debug": bool(self.get_parameter("debug").value),
+            "servo_only": bool(self.get_parameter("servo_only").value),
+            "vehicle_class": AirframeClass.parse(
                 self.get_parameter("vehicle_class").value
             ),
-            camera_offsets=list(self.get_parameter("uav_camera_offsets").value),
-            node_name="mission",
-        )
+            "camera_offsets": list(self.get_parameter("uav_camera_offsets").value),
+            "node_name": "mission",
+        }
 
 
 def main(args=None) -> None:
@@ -47,9 +47,10 @@ def main(args=None) -> None:
     mission_node = None
 
     try:
-        mission_node = bootstrap.build_manager()
+        manager_kwargs = bootstrap.manager_kwargs()
         bootstrap.destroy_node()
         bootstrap = None
+        mission_node = UAVModeManager(**manager_kwargs)
         rclpy.spin(mission_node)
     except (KeyboardInterrupt, ExternalShutdownException):
         pass

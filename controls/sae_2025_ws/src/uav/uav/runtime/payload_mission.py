@@ -14,7 +14,7 @@ class PayloadMissionBootstrap(Node):
         self.declare_parameter("mode_map", mission_path_for_name("basic"))
         self.declare_parameter("payload_name", "")
 
-    def build_manager(self) -> PayloadModeManager:
+    def manager_kwargs(self) -> dict:
         mission_path = str(self.get_parameter("mode_map").value)
         if not mission_path:
             raise ValueError("payload_mission requires a non-empty 'mode_map'.")
@@ -29,11 +29,11 @@ class PayloadMissionBootstrap(Node):
                 f"payload_mission requires a payload mission spec, received target '{mission_spec.target}'."
             )
 
-        return PayloadModeManager(
-            mission_spec=mission_spec,
-            payload_name=payload_name,
-            node_name="mission",
-        )
+        return {
+            "mission_spec": mission_spec,
+            "payload_name": payload_name,
+            "node_name": "mission",
+        }
 
 
 def main(args=None) -> None:
@@ -42,9 +42,10 @@ def main(args=None) -> None:
     mission_node = None
 
     try:
-        mission_node = bootstrap.build_manager()
+        manager_kwargs = bootstrap.manager_kwargs()
         bootstrap.destroy_node()
         bootstrap = None
+        mission_node = PayloadModeManager(**manager_kwargs)
         rclpy.spin(mission_node)
     except (KeyboardInterrupt, ExternalShutdownException):
         pass
