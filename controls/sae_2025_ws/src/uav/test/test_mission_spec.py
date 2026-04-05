@@ -32,6 +32,9 @@ MODE_METADATA = {
     "uav.modes.uav.PayloadDropoffMode": _fake_mode("uav", ("PayloadTrackingNode",)),
     "uav.modes.uav.ServoDropoffMode": _fake_mode("uav"),
     "uav.modes.uav.WaypointMission": _fake_mode("uav"),
+    "uav.modes.payload.PayloadAprilTagApproachMode": _fake_mode(
+        "payload", ("PayloadAprilTagNode",)
+    ),
     "uav.modes.payload.PayloadDriveToAprilTagMode": _fake_mode(
         "payload", ("PayloadAprilTagNode",)
     ),
@@ -96,6 +99,27 @@ modes:
         self.assertTrue(mission_spec.is_payload)
         self.assertEqual(mission_spec.vision_nodes, ("PayloadAprilTagNode",))
         self.assertEqual(mission_spec.modes["start"].params["stop_distance_m"], 0.05)
+
+    @patch("uav.runtime.mission_spec.load_mode_class", side_effect=_resolve_fake_mode)
+    def test_load_payload_apriltag_approach_mission_spec(self, _resolver) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            mission_path = _write_mission(
+                tmpdir,
+                """
+modes:
+  start:
+    class: uav.modes.payload.PayloadAprilTagApproachMode
+    params:
+      tag_size_m: 0.0508
+      stop_distance_m: 0.07
+""".strip(),
+            )
+
+            mission_spec = load_mission_spec(mission_path)
+
+        self.assertTrue(mission_spec.is_payload)
+        self.assertEqual(mission_spec.vision_nodes, ("PayloadAprilTagNode",))
+        self.assertEqual(mission_spec.modes["start"].params["stop_distance_m"], 0.07)
 
     @patch("uav.runtime.mission_spec.load_mode_class", side_effect=_resolve_fake_mode)
     def test_mode_derived_metadata_rejects_mixed_targets(self, _resolver) -> None:

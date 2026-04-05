@@ -1,0 +1,12 @@
+# Payload approaches a single AprilTag and terminates cleanly once close enough.
+modes:
+  start:
+    class: uav.modes.payload.PayloadAprilTagApproachMode
+    params:
+      tag_id: 0
+      tag_size_m: 0.0508
+      max_forward_speed: 0.2
+      forward_gain: 0.5
+      angular_gain: 0.003
+      yaw_gain: 0.65
+      stop_distance_m: 0.07

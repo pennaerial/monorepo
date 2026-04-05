@@ -35,14 +35,16 @@ VTOL_TAG_POSES = {
 @dataclass(frozen=True)
 class AprilTagObservation:
     tag_id: int
-    pose_x: float
-    pose_y: float
-    pose_yaw: float
+    center_x: float
+    center_y: float
     tvec_x: float
     tvec_y: float
     tvec_z: float
-    center_x: float
-    center_y: float
+    yaw_error: float
+    area: float
+    pose_x: Optional[float] = None
+    pose_y: Optional[float] = None
+    pose_yaw: Optional[float] = None
 
 
 class AprilTagDetectorCache:
@@ -91,6 +93,7 @@ class _DetectionAdapter:
     tag_id: int
     corners: np.ndarray
     center: tuple[float, float]
+    area: float
 
 
 def _iter_detections(gray: np.ndarray, detector, backend: Optional[str]):
@@ -109,6 +112,7 @@ def _iter_detections(gray: np.ndarray, detector, backend: Optional[str]):
                     tag_id=int(marker_id),
                     corners=corners_array,
                     center=(float(center[0]), float(center[1])),
+                    area=float(abs(cv2.contourArea(corners_array))),
                 )
             )
         return detections
@@ -290,6 +294,108 @@ def _estimate_camera_pose_in_vtol(
     return (float(position_v[0]), float(position_v[1]), float(yaw_v))
 
 
+def _yaw_error_from_rvec(rvec: np.ndarray) -> float:
+    rotation_c_t, _ = cv2.Rodrigues(np.asarray(rvec, dtype=np.float64).reshape(3, 1))
+    return math.atan2(float(rotation_c_t[0, 2]), float(-rotation_c_t[2, 2]))
+
+
+def _solve_detection_pose(
+    detection,
+    object_points: np.ndarray,
+    camera_matrix: np.ndarray,
+    dist_coeffs: np.ndarray,
+    *,
+    flags: int | None = None,
+    min_forward_distance_m: float | None = None,
+) -> Optional[tuple[int, np.ndarray, np.ndarray, np.ndarray, float, float, float, float]]:
+    tag_id = int(getattr(detection, "tag_id", -1))
+    corners = np.asarray(detection.corners, dtype=np.float32)
+    if len(corners) != 4:
+        return None
+
+    solve_kwargs = {}
+    if flags is not None:
+        solve_kwargs["flags"] = flags
+    ok, rvec, tvec = cv2.solvePnP(
+        object_points,
+        corners,
+        camera_matrix,
+        dist_coeffs,
+        **solve_kwargs,
+    )
+    if not ok:
+        return None
+
+    tvec_flat = np.asarray(tvec, dtype=np.float64).reshape(-1)
+    if len(tvec_flat) < 3:
+        return None
+    if (
+        min_forward_distance_m is not None
+        and float(tvec_flat[2]) <= float(min_forward_distance_m)
+    ):
+        return None
+
+    return (
+        tag_id,
+        np.asarray(rvec, dtype=np.float64),
+        tvec_flat,
+        float(detection.center[0]),
+        float(detection.center[1]),
+        float(_yaw_error_from_rvec(rvec)),
+        float(
+            abs(cv2.contourArea(corners.reshape(-1, 1, 2).astype(np.float32)))
+        ),
+        float(tvec_flat[2]),
+    )
+
+
+def detect_payload_apriltags(
+    gray: np.ndarray,
+    camera_info: CameraInfo,
+    detector,
+    detector_backend: Optional[str],
+    tag_size_m: float,
+) -> list[AprilTagObservation]:
+    if detector is None:
+        return []
+
+    camera_matrix = np.array(camera_info.k, dtype=np.float64).reshape(3, 3)
+    donor_dist_coeffs = np.zeros((4, 1), dtype=np.float64)
+    object_points = _object_points_for_tag_size(float(tag_size_m))
+    observations: list[AprilTagObservation] = []
+
+    for detection in _iter_detections(gray, detector, detector_backend):
+        solved = _solve_detection_pose(
+            detection,
+            object_points,
+            camera_matrix,
+            donor_dist_coeffs,
+        )
+        if solved is None:
+            continue
+
+        tag_id, rvec, tvec_flat, center_x, center_y, yaw_error, area, _ = solved
+        pose = _estimate_camera_pose_in_vtol(tag_id, rvec, tvec_flat)
+
+        observations.append(
+            AprilTagObservation(
+                tag_id=tag_id,
+                center_x=float(center_x),
+                center_y=float(center_y),
+                tvec_x=float(tvec_flat[0]),
+                tvec_y=float(tvec_flat[1]),
+                tvec_z=float(tvec_flat[2]),
+                yaw_error=float(yaw_error),
+                area=float(area),
+                pose_x=float(pose[0]) if pose is not None else None,
+                pose_y=float(pose[1]) if pose is not None else None,
+                pose_yaw=float(pose[2]) if pose is not None else None,
+            )
+        )
+
+    return observations
+
+
 def solve_payload_apriltags(
     gray: np.ndarray,
     camera_info: CameraInfo,
@@ -305,43 +411,35 @@ def solve_payload_apriltags(
     observations: list[AprilTagObservation] = []
 
     for detection in _iter_detections(gray, detector, detector_backend):
-        tag_id = int(getattr(detection, "tag_id", -1))
-        if tag_id not in VTOL_TAG_POSES:
-            continue
-
-        corners = np.array(detection.corners, dtype=np.float32)
-        if len(corners) != 4:
-            continue
-
-        ok, rvec, tvec = cv2.solvePnP(
+        solved = _solve_detection_pose(
+            detection,
             object_points,
-            corners,
             camera_matrix,
             dist_coeffs,
             flags=cv2.SOLVEPNP_IPPE_SQUARE,
+            min_forward_distance_m=0.05,
         )
-        if not ok:
+        if solved is None:
             continue
 
-        tvec_flat = np.asarray(tvec, dtype=np.float64).reshape(-1)
-        if len(tvec_flat) < 3 or float(tvec_flat[2]) <= 0.05:
-            continue
-
-        pose = _estimate_camera_pose_in_vtol(tag_id, rvec, tvec)
+        tag_id, rvec, tvec_flat, center_x, center_y, yaw_error, area, _ = solved
+        pose = _estimate_camera_pose_in_vtol(tag_id, rvec, tvec_flat)
         if pose is None:
             continue
 
         observations.append(
             AprilTagObservation(
                 tag_id=tag_id,
-                pose_x=pose[0],
-                pose_y=pose[1],
-                pose_yaw=pose[2],
+                center_x=float(center_x),
+                center_y=float(center_y),
                 tvec_x=float(tvec_flat[0]),
                 tvec_y=float(tvec_flat[1]),
                 tvec_z=float(tvec_flat[2]),
-                center_x=float(detection.center[0]),
-                center_y=float(detection.center[1]),
+                yaw_error=float(yaw_error),
+                area=float(area),
+                pose_x=float(pose[0]),
+                pose_y=float(pose[1]),
+                pose_yaw=float(pose[2]),
             )
         )
 
