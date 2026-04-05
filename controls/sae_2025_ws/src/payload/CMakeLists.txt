@@ -89,6 +89,9 @@ if(build_payload_gpio_controller)
     src/gpio_controller.cpp
     src/encoder.cpp
     src/control_math.cpp
+    src/motor.cpp
+    src/servo.cpp
+    src/gpio.cpp
   )
   ament_target_dependencies(payload_gpio_controller
     rclcpp
@@ -112,6 +115,16 @@ if(build_payload_gpio_controller)
   ament_target_dependencies(test_motor rclcpp)
   target_link_libraries(test_motor ${LGPIO_LIBRARY})
   install(TARGETS test_motor DESTINATION lib/${PROJECT_NAME})
+
+  add_executable(test_servo
+    test/test_servo.cpp
+    src/servo.cpp
+    src/gpio.cpp
+  )
+  target_include_directories(test_servo PRIVATE include ${LGPIO_INCLUDE_DIR})
+  ament_target_dependencies(test_servo rclcpp)
+  target_link_libraries(test_servo ${LGPIO_LIBRARY})
+  install(TARGETS test_servo DESTINATION lib/${PROJECT_NAME})
 endif()
 
 if(NOT payload_controller_targets)

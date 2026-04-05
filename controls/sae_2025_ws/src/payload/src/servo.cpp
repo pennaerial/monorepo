@@ -1,20 +1,32 @@
 #include "payload/servo.hpp"
 
-Servo::Servo(int handle, int pin, int frequency) : 
-    handle_(handle), 
-    frequency_(frequency), 
-    servo_pin_(handle, pin, Direction::Output) { }
+#include <algorithm>
+
+Servo::Servo(int handle, int pin, int frequency, float pulse_min_u, float pulse_max_u) :
+    handle_(handle),
+    frequency_(frequency),
+    servo_pin_(handle, pin, Direction::Output),
+    pulse_min_u_(pulse_min_u),
+    pulse_max_u_(pulse_max_u) {}
 
 void Servo::degree_setpoint(float degree) {
     int pulse = angle_to_pulse(degree);
     RCLCPP_DEBUG(logger(), "Outputting pulse: %d", pulse);
-    servo_pin_.write_servo(pulse, frequency_, 0, 0); 
+    servo_pin_.write_servo(pulse, frequency_, 0, 0);
 }
 
+void Servo::normalized_setpoint(float t) {
+    const float clamped = std::clamp(t, 0.0f, 1.0f);
+    const int pulse = static_cast<int>(
+        pulse_min_u_ + clamped * (pulse_max_u_ - pulse_min_u_));
+    RCLCPP_DEBUG(logger(), "Normalized %.2f -> pulse: %d", clamped, pulse);
+    servo_pin_.write_servo(pulse, frequency_, 0, 0);
+}
 
 int Servo::angle_to_pulse(float degree) {
-    float clamped = std::clamp(degree, 0.0f, 180.0f);
-    return static_cast<int>(1000.0f + (clamped * 1000.0f) / 180.0f);
+    const float clamped = std::clamp(degree, 0.0f, 180.0f);
+    return static_cast<int>(
+        pulse_min_u_ + (clamped / 180.0f) * (pulse_max_u_ - pulse_min_u_));
 }
 
 

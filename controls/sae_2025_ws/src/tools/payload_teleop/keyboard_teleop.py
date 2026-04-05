@@ -7,7 +7,7 @@ import termios
 
 import rclpy
 from rclpy.node import Node
-from payload_interfaces.msg import DriveCommand
+from payload_interfaces.msg import DriveCommand, ServoCommand
 
 
 def get_key(settings, timeout):
@@ -70,41 +70,44 @@ class PublishThread(threading.Thread):
 class KeyboardTeleop(Node):
     def __init__(self):
         super().__init__("keyboard_teleop")
-        self.declare_parameter("topic", "")
-        self.topic = self.get_parameter("topic").get_parameter_value().string_value
-        if self.topic == "":
+        self.declare_parameter("payload_name", "")
+        payload_name = self.get_parameter("payload_name").get_parameter_value().string_value
+        if payload_name == "":
             raise RuntimeError(
-                "topic parameter must not be an empty string!\n"
-                "set with this flag: --ros-args -p topic:=/my/topic/name"
+                "payload_name parameter must not be an empty string!\n"
+                "set with this flag: --ros-args -p payload_name:=payload_0"
             )
 
         self.linear = 0.5
         self.angular = 1.0
+        self.servo_degree = 90.0
+        self.servo_step = 10.0
+        self.topic = f"/{payload_name}/cmd_drive"
+        self.servo_topic = f"/{payload_name}/servo"
         self.pub = self.create_publisher(DriveCommand, self.topic, 10)
+        self.servo_pub = self.create_publisher(ServoCommand, self.servo_topic, 10)
+
+    def publish_servo(self):
+        msg = ServoCommand()
+        msg.degree = self.servo_degree
+        self.servo_pub.publish(msg)
 
     def _print_status(self, key, linear, angular):
-        G = "\033[92m"
-        R = "\033[0m"
-
-        def k(letter):
-            return f"{G}{letter}{R}" if letter == key else letter
-
         sys.stdout.write("\033[2J\033[H")
         sys.stdout.write(
             "\n".join(
                 [
-                    "┌─────────────────────────────────────────────┐",
-                    "│           Keyboard Teleop  (DriveCommand)    │",
-                    "├─────────────────────────────────────────────┤",
-                    f"│  topic : {self.topic:<36s}│",
-                    f"│  cmd   : lin={linear:+6.2f}  ang={angular:+6.2f}              │",
-                    "├──────────────┬──────────────────────────────┤",
-                    "│  Movement    │  Speed Adjust                │",
-                    f"│  {k('w')}  forward  │  {k('m')} / {k('M')}  linear  +/- 0.1  {self.linear:.2f}│",
-                    f"│  {k('s')}  reverse  │  {k('n')} / {k('N')}  angular +/- 0.1  {self.angular:.2f}│",
-                    f"│  {k('a')}  left     │                              │",
-                    f"│  {k('d')}  right    │  Ctrl-C to quit              │",
-                    "└──────────────┴──────────────────────────────┘",
+                    "+---------------------------------------------------------------+",
+                    "| Keyboard Teleop (DriveCommand + ServoCommand)                |",
+                    "+---------------------------------------------------------------+",
+                    f"| drive topic : {self.topic:<45s}|",
+                    f"| servo topic : {self.servo_topic:<45s}|",
+                    f"| drive cmd   : lin={linear:+6.2f}  ang={angular:+6.2f}                     |",
+                    f"| servo cmd   : {self.servo_degree:6.1f} deg  step {self.servo_step:4.1f}          |",
+                    "+---------------------------------------------------------------+",
+                    "| w/s/a/d drive, m/M linear, n/N angular                      |",
+                    "| [/ ] servo angle, p/P servo step, Ctrl-C quit               |",
+                    "+---------------------------------------------------------------+",
                 ]
             )
             + "\n"
@@ -154,6 +157,16 @@ def main():
                 node.angular = round(node.angular + 0.1, 2)
             elif key == "N":
                 node.angular = round(node.angular - 0.1, 2)
+            elif key == "]":
+                node.servo_degree = min(180.0, node.servo_degree + node.servo_step)
+                node.publish_servo()
+            elif key == "[":
+                node.servo_degree = max(0.0, node.servo_degree - node.servo_step)
+                node.publish_servo()
+            elif key == "p":
+                node.servo_step = min(45.0, round(node.servo_step + 5.0, 1))
+            elif key == "P":
+                node.servo_step = max(1.0, round(node.servo_step - 5.0, 1))
             else:
                 if key == "" and linear == 0.0 and angular == 0.0:
                     node._print_status(key, linear, angular)

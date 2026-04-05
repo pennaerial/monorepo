@@ -3,9 +3,10 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
-#include <functional>
+#include <memory>
 #include <string>
 
+#include <lgpio.h>
 #include <pluginlib/class_list_macros.hpp>
 
 namespace {
@@ -16,27 +17,39 @@ GPIOController::GPIOController() {}
 
 GPIOController::~GPIOController()
 {
+    if (node_ != nullptr) {
+        RCLCPP_INFO(node_->get_logger(), "SHUTTING DOWN GPIO CONTROLLER");
+    }
+
     running_ = false;
     if (control_thread_.joinable()) {
+        if (node_ != nullptr) {
+            RCLCPP_INFO(node_->get_logger(), "Joining control loop");
+        }
         control_thread_.join();
     }
 
-    ControllerConfig config;
-    {
-        std::lock_guard<std::mutex> lock(config_mutex_);
-        config = config_;
+    if (left_motor_) {
+        left_motor_->coast();
+    }
+
+    if (right_motor_) {
+        right_motor_->coast();
+    }
+
+    if (servo_) {
+        servo_->degree_setpoint(0.0f);
     }
 
     left_encoder_.reset();
     right_encoder_.reset();
+    left_motor_.reset();
+    right_motor_.reset();
+    servo_.reset();
 
+    motor_state_pub_.reset();
+    zn_service_.reset();
     if (handle_ >= 0) {
-        lgTxPwm(handle_, config.left_pwm_pin, 0, 0.0f, 0, 0);
-        lgTxPwm(handle_, config.right_pwm_pin, 0, 0.0f, 0, 0);
-        lgGpioWrite(handle_, config.left_in1_pin, 0);
-        lgGpioWrite(handle_, config.left_in2_pin, 0);
-        lgGpioWrite(handle_, config.right_in1_pin, 0);
-        lgGpioWrite(handle_, config.right_in2_pin, 0);
         lgGpiochipClose(handle_);
         handle_ = -1;
     }
@@ -44,54 +57,59 @@ GPIOController::~GPIOController()
 
 void GPIOController::initialize(rclcpp::Node* node)
 {
-    RCLCPP_INFO(node->get_logger(), "GPIO | Starting initialization...");
+    node_ = node;
+    RCLCPP_INFO(node_->get_logger(), "GPIO | Starting initialization...");
 
-    load_initial_config_from_parameters();
+    param_listener_ = std::make_shared<payload::ParamListener>(node_);
+    const auto p = param_listener_->get_params();
 
     handle_ = lgGpiochipOpen(kGpioChip);
     if (handle_ < 0) {
-        RCLCPP_FATAL(node->get_logger(),
+        RCLCPP_FATAL(
+            node_->get_logger(),
             "GPIO | lgGpiochipOpen(%d) failed (err=%d)",
-            kGpioChip, handle_);
+            kGpioChip,
+            handle_);
         return;
     }
 
-    ControllerConfig config;
-    {
-        std::lock_guard<std::mutex> lock(config_mutex_);
-        config = config_;
-    }
+    const int pwm_hz = std::max(
+        1, static_cast<int>(std::lround(p.motor.pwm_frequency)));
 
-    RCLCPP_INFO(node->get_logger(), "LEFT PINS: PWM: %d, IN1: %d, IN2: %d", config.left_pwm_pin, config.left_in1_pin, config.left_in2_pin);
-    RCLCPP_INFO(node->get_logger(), "RIGHT PINS: PWM: %d, IN1: %d, IN2: %d", config.right_pwm_pin, config.right_in1_pin, config.right_in2_pin);
-    const int rc_left_in1 = lgGpioClaimOutput(handle_, 0, config.left_in1_pin, 0);
-    const int rc_left_in2 = lgGpioClaimOutput(handle_, 0, config.left_in2_pin, 0);
-    const int rc_right_in1 = lgGpioClaimOutput(handle_, 0, config.right_in1_pin, 0);
-    const int rc_right_in2 = lgGpioClaimOutput(handle_, 0, config.right_in2_pin, 0);
-    const int rc_left_pwm = lgGpioClaimOutput(handle_, 0, config.left_pwm_pin, 0);
-    const int rc_right_pwm = lgGpioClaimOutput(handle_, 0, config.right_pwm_pin, 0);
-
-    if (rc_left_in1 < 0 || rc_left_in2 < 0 ||
-        rc_right_in1 < 0 || rc_right_in2 < 0 ||
-        rc_left_pwm < 0 || rc_right_pwm < 0) {
-        RCLCPP_FATAL(node->get_logger(),
-            "GPIO | Failed claiming motor pins: LIN1=%d LIN2=%d RIN1=%d RIN2=%d LPWM=%d RPWM=%d",
-            rc_left_in1, rc_left_in2, rc_right_in1, rc_right_in2, rc_left_pwm, rc_right_pwm);
-        return;
-    }
-
-    const int rc_pwm_l = lgTxPwm(handle_, config.left_pwm_pin, config.pwm_hz, 0.0f, 0, 0);
-    const int rc_pwm_r = lgTxPwm(handle_, config.right_pwm_pin, config.pwm_hz, 0.0f, 0, 0);
-    if (rc_pwm_l < 0 || rc_pwm_r < 0) {
-        RCLCPP_FATAL(node->get_logger(),
-            "GPIO | Failed starting PWM: left_rc=%d right_rc=%d", rc_pwm_l, rc_pwm_r);
-        return;
-    }
+    left_motor_ = std::make_unique<SNMotor>(
+        handle_,
+        p.pins.LEFT_PWM,
+        p.pins.LEFT_IN1,
+        p.pins.LEFT_IN2,
+        pwm_hz,
+        MotorType::LEFT);
+    right_motor_ = std::make_unique<SNMotor>(
+        handle_,
+        p.pins.RIGHT_PWM,
+        p.pins.RIGHT_IN1,
+        p.pins.RIGHT_IN2,
+        pwm_hz,
+        MotorType::RIGHT);
 
     left_encoder_ = std::make_unique<QuadratureEncoder>(
-        handle_, config.enc_left_a, config.enc_left_b, config.encoder_output_cpr, MotorType::LEFT);
+        handle_,
+        p.pins.ENCB_CH1,
+        p.pins.ENCB_CH2,
+        p.encoder.output_cpr,
+        MotorType::LEFT);
     right_encoder_ = std::make_unique<QuadratureEncoder>(
-        handle_, config.enc_right_a, config.enc_right_b, config.encoder_output_cpr, MotorType::RIGHT);
+        handle_,
+        p.pins.ENCA_CH1,
+        p.pins.ENCA_CH2,
+        p.encoder.output_cpr,
+        MotorType::RIGHT);
+
+    servo_ = std::make_unique<Servo>(
+        handle_,
+        p.pins.SERVO,
+        p.servo.frequency,
+        static_cast<float>(p.servo.pulse_min_us),
+        static_cast<float>(p.servo.pulse_max_us));
 
     prev_left_count_ = left_encoder_->count();
     prev_right_count_ = right_encoder_->count();
@@ -102,28 +120,188 @@ void GPIOController::initialize(rclcpp::Node* node)
     left_pid_state_ = payload::control_math::PidState{};
     right_pid_state_ = payload::control_math::PidState{};
 
-    const std::string node_name = node->get_name();
+    const std::string node_name = node_->get_name();
     const std::string state_topic = "/" + node_name + "/motor_state";
     const std::string zn_service_name = "/" + node_name + "/compute_pid_zn";
 
-    motor_state_pub_ = node->create_publisher<payload_interfaces::msg::MotorState>(state_topic, 10);
-    zn_service_ = node->create_service<payload_interfaces::srv::ComputePidZieglerNichols>(
+    motor_state_pub_ =
+        node_->create_publisher<payload_interfaces::msg::MotorState>(state_topic, 10);
+    zn_service_ =
+        node_->create_service<payload_interfaces::srv::ComputePidZieglerNichols>(
         zn_service_name,
-        std::bind(&GPIOController::compute_pid_zn_callback, this, std::placeholders::_1, std::placeholders::_2));
-
-    parameter_callback_handle_ = node->add_on_set_parameters_callback(
-        std::bind(&GPIOController::on_parameters_set, this, std::placeholders::_1));
+        [this](
+            const std::shared_ptr<payload_interfaces::srv::ComputePidZieglerNichols::Request>
+                request,
+            std::shared_ptr<payload_interfaces::srv::ComputePidZieglerNichols::Response>
+                response) { compute_pid_zn_callback(request, response); });
 
     running_ = true;
     control_thread_ = std::thread(&GPIOController::control_loop, this);
 
-    RCLCPP_INFO(node->get_logger(),
+    RCLCPP_INFO(node_->get_logger(),
         "GPIO | Ready. state_topic=%s zn_service=%s",
         state_topic.c_str(), zn_service_name.c_str());
 }
 
 void GPIOController::drive_command(double linear, double angular)
 {
-    (void)linear;
-    (void)angular;
+    cmd_linear_.store(linear);
+    cmd_angular_.store(angular);
 }
+
+void GPIOController::servo_command(double degree)
+{
+    if (servo_) {
+        servo_->degree_setpoint(static_cast<float>(degree));
+    }
+}
+
+void GPIOController::compute_pid_zn_callback(
+    const std::shared_ptr<payload_interfaces::srv::ComputePidZieglerNichols::Request> request,
+    std::shared_ptr<payload_interfaces::srv::ComputePidZieglerNichols::Response> response)
+{
+    payload::control_math::PidGains gains;
+    std::string error;
+
+    const bool ok = payload::control_math::compute_ziegler_nichols_classic(
+        request->ku, request->pu, gains, error);
+
+    response->success = ok;
+    if (ok) {
+        response->message = "OK";
+        response->kp = gains.kp;
+        response->ki = gains.ki;
+        response->kd = gains.kd;
+    } else {
+        response->message = error;
+        response->kp = 0.0;
+        response->ki = 0.0;
+        response->kd = 0.0;
+    }
+}
+
+void GPIOController::control_loop()
+{
+    while (running_) {
+        const auto loop_start = std::chrono::steady_clock::now();
+        const auto p = param_listener_->get_params();
+
+        const double linear = cmd_linear_.load();
+        const double angular = cmd_angular_.load();
+        const auto setpoints = payload::control_math::compute_wheel_setpoints(
+            linear,
+            angular,
+            p.kinematics.wheel_separation_m,
+            p.kinematics.wheel_radius_m,
+            p.motor.max_wheel_rpm);
+
+        const int64_t left_count = left_encoder_ ? left_encoder_->count() : 0;
+        const int64_t right_count = right_encoder_ ? right_encoder_->count() : 0;
+
+        const auto now = std::chrono::steady_clock::now();
+        double dt_s = std::chrono::duration<double>(now - prev_loop_time_).count();
+        if (dt_s <= 0.0) {
+            dt_s = static_cast<double>(p.control.loop_ms) / 1000.0;
+        }
+        prev_loop_time_ = now;
+
+        const int64_t left_delta =
+            (left_count - prev_left_count_) * static_cast<int64_t>(p.encoder.left_sign);
+        const int64_t right_delta =
+            (right_count - prev_right_count_) * static_cast<int64_t>(p.encoder.right_sign);
+
+        prev_left_count_ = left_count;
+        prev_right_count_ = right_count;
+
+        const double left_raw_rpm = payload::control_math::rpm_from_count_delta(
+            left_delta, p.encoder.output_cpr, dt_s);
+        const double right_raw_rpm = payload::control_math::rpm_from_count_delta(
+            right_delta, p.encoder.output_cpr, dt_s);
+
+        left_filtered_rpm_ = payload::control_math::low_pass_filter(
+            left_raw_rpm, left_filtered_rpm_, p.pid.velocity_alpha);
+        right_filtered_rpm_ = payload::control_math::low_pass_filter(
+            right_raw_rpm, right_filtered_rpm_, p.pid.velocity_alpha);
+
+        const payload::control_math::PidConfig left_pid_cfg {
+            p.pid.left_kp,
+            p.pid.left_ki,
+            p.pid.left_kd,
+            p.pid.i_clamp,
+            p.pid.output_limit_norm,
+            p.pid.stop_deadband_rpm,
+        };
+        const payload::control_math::PidConfig right_pid_cfg {
+            p.pid.right_kp,
+            p.pid.right_ki,
+            p.pid.right_kd,
+            p.pid.i_clamp,
+            p.pid.output_limit_norm,
+            p.pid.stop_deadband_rpm,
+        };
+
+        const auto left_terms = payload::control_math::pid_step(
+            setpoints.left_rpm,
+            left_filtered_rpm_,
+            dt_s,
+            left_pid_cfg,
+            left_pid_state_);
+        const auto right_terms = payload::control_math::pid_step(
+            setpoints.right_rpm,
+            right_filtered_rpm_,
+            dt_s,
+            right_pid_cfg,
+            right_pid_state_);
+
+        const float left_duty =
+            static_cast<float>(std::abs(left_terms.output) * 100.0);
+        const float right_duty =
+            static_cast<float>(std::abs(right_terms.output) * 100.0);
+
+        if (left_terms.output > 0.0) {
+            left_motor_->forward(left_duty);
+        } else if (left_terms.output < 0.0) {
+            left_motor_->reverse(left_duty);
+        } else {
+            left_motor_->coast();
+        }
+
+        if (right_terms.output > 0.0) {
+            right_motor_->forward(right_duty);
+        } else if (right_terms.output < 0.0) {
+            right_motor_->reverse(right_duty);
+        } else {
+            right_motor_->coast();
+        }
+
+        if (motor_state_pub_) {
+            payload_interfaces::msg::MotorState msg;
+            msg.linear_setpoint_mps = linear;
+            msg.angular_setpoint_rad_s = angular;
+            msg.left_setpoint_rpm = setpoints.left_rpm;
+            msg.right_setpoint_rpm = setpoints.right_rpm;
+            msg.left_measured_rpm = left_filtered_rpm_;
+            msg.right_measured_rpm = right_filtered_rpm_;
+            msg.left_pid_error_rpm = left_terms.error;
+            msg.right_pid_error_rpm = right_terms.error;
+            msg.left_pid_p = left_terms.p;
+            msg.left_pid_i = left_terms.i;
+            msg.left_pid_d = left_terms.d;
+            msg.right_pid_p = right_terms.p;
+            msg.right_pid_i = right_terms.i;
+            msg.right_pid_d = right_terms.d;
+            msg.left_output_norm = left_terms.output;
+            msg.right_output_norm = right_terms.output;
+            msg.left_pwm_percent = std::clamp(left_duty, 0.0f, 100.0f);
+            msg.right_pwm_percent = std::clamp(right_duty, 0.0f, 100.0f);
+            msg.left_encoder_count = left_count;
+            msg.right_encoder_count = right_count;
+            motor_state_pub_->publish(msg);
+        }
+
+        std::this_thread::sleep_until(
+            loop_start + std::chrono::milliseconds(p.control.loop_ms));
+    }
+}
+
+PLUGINLIB_EXPORT_CLASS(GPIOController, Controller)

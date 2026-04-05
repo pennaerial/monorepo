@@ -25,5 +25,9 @@ void SimController::drive_command(double linear, double angular) {
     gz_drive_publisher_.Publish(msg);
 }
 
+void SimController::servo_command(double degree) {
+    (void)degree;
+}
+
 #include <pluginlib/class_list_macros.hpp>
 PLUGINLIB_EXPORT_CLASS(SimController, Controller)

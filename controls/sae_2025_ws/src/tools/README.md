@@ -6,15 +6,15 @@ Developer tools for the SAE 2025 workspace.
 
 ## keyboard_teleop
 
-Keyboard-driven teleoperation for a payload. Publishes `payload_interfaces/DriveCommand` messages at 10 Hz.
+Keyboard-driven teleoperation for a payload. Publishes `payload_interfaces/DriveCommand` and `payload_interfaces/ServoCommand` messages at 10 Hz.
 
 ### Run
 
 ```bash
-ros2 run tools keyboard_teleop --ros-args -p topic:=/payload_0/drive_command
+ros2 run tools keyboard_teleop --ros-args -p payload_name:=payload_0
 ```
 
-The `topic` parameter is **required** — the node will error out if it is left empty.
+The `payload_name` parameter is **required** — the node will error out if it is left empty.
 
 ### Controls
 
@@ -27,13 +27,15 @@ The `topic` parameter is **required** — the node will error out if it is left 
 | Any other key | Stop (zero command) |
 | `m` / `M` | Increase / decrease linear speed by 0.1 |
 | `n` / `N` | Increase / decrease angular speed by 0.1 |
+| `[` / `]` | Decrease / increase servo angle |
+| `p` / `P` | Increase / decrease servo step by 5.0 |
 | `Ctrl-C` | Quit |
 
 ### Parameters
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `topic` | string | `""` | Topic to publish `DriveCommand` on (**required**) |
+| `payload_name` | string | `""` | Payload name used to derive `/{payload_name}/cmd_drive` and `/{payload_name}/servo` (**required**) |
 
 ---
 

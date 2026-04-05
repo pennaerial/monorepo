@@ -13,6 +13,11 @@ Payload::Payload(const std::string& payload_name)
         ros_drive_topic, 10, std::bind(&Payload::drive_callback, this, std::placeholders::_1));
     RCLCPP_INFO(this->get_logger(), "Listening on: %s", ros_drive_topic.c_str());
 
+    std::string servo_topic = "/" + payload_name_ + "/servo";
+    servo_subscriber_ = this->create_subscription<payload_interfaces::msg::ServoCommand>(
+        servo_topic, 10, std::bind(&Payload::servo_callback, this, std::placeholders::_1));
+    RCLCPP_INFO(this->get_logger(), "Servo listening on: %s", servo_topic.c_str());
+
     controller_ = controller_loader_.createSharedInstance(payload_params_.controller);
 }
 
@@ -24,6 +29,7 @@ Payload::~Payload() {
     timed_override_active_.store(false);
     timed_drive_srv_.reset();
     ros_drive_subscriber_.reset();
+    servo_subscriber_.reset();
     if (controller_) {
         controller_->drive_command(0.0, 0.0);
         controller_.reset();
@@ -46,6 +52,11 @@ void Payload::drive_callback(const payload_interfaces::msg::DriveCommand::Shared
         return;
     }
     controller_->drive_command(msg->linear, msg->angular);
+}
+
+void Payload::servo_callback(const payload_interfaces::msg::ServoCommand::SharedPtr msg) {
+    RCLCPP_INFO(this->get_logger(), "Servo command: %.2f deg", msg->degree);
+    controller_->servo_command(msg->degree);
 }
 
 void Payload::clear_timed_override() {
@@ -77,5 +88,3 @@ void Payload::timed_drive_callback(
     response->success = true;
     response->message = "Timed drive started";
 }
-
-
