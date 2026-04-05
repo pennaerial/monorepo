@@ -264,14 +264,11 @@ def launch_setup(context, *args, **kwargs):
 
     trigger_world_gen = ExecuteProcess(
         cmd=[
-            "bash",
-            "-lc",
-            (
-                "set -e; "
-                f"until ros2 service list | grep -Fx '/{world_node_name}/trigger_world_gen' >/dev/null; do sleep 0.2; done; "
-                f"until ros2 service list | grep -Fx '/world/{competition}/create' >/dev/null; do sleep 0.2; done; "
-                f"ros2 service call /{world_node_name}/trigger_world_gen std_srvs/srv/Trigger"
-            ),
+            "ros2",
+            "service",
+            "call",
+            f"/{world_node_name}/trigger_world_gen",
+            "std_srvs/srv/Trigger",
         ],
         cwd=cwd,
         output="screen",
