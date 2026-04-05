@@ -192,6 +192,20 @@ class WorldNode(Node, ABC):
             )
         )
 
+    def _wait_for_spawn_service(self, timeout_sec: float = 10.0) -> bool:
+        if self.spawn_entity_client.service_is_ready():
+            return True
+
+        self.get_logger().info(
+            f"Waiting for spawn service /world/{self.competition_name}/create..."
+        )
+        ready = self.spawn_entity_client.wait_for_service(timeout_sec=timeout_sec)
+        if not ready:
+            self.get_logger().error(
+                f"Spawn service /world/{self.competition_name}/create not ready after {timeout_sec:.1f}s"
+            )
+        return ready
+
     def _log_spawn_result(self, name: str, future) -> None:
         try:
             response = future.result()
@@ -208,6 +222,10 @@ class WorldNode(Node, ABC):
 
     def trigger_world_gen_req(self, request, response):
         self.get_logger().info("Starting Dynamic World Generation!")
+        if not self._wait_for_spawn_service():
+            response.success = False
+            response.message = "Spawn service not ready"
+            return response
         response.success = self.generate_world()
         response.message = (
             "World generation successful"
