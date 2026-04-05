@@ -1,6 +1,6 @@
 from rclpy.node import Node
 
-from payload_interfaces.msg import DriveCommand
+from payload_interfaces.msg import DriveCommand, ServoCommand
 from payload_interfaces.srv import TimedDrive
 
 from .Vehicle import Vehicle
@@ -24,6 +24,9 @@ class Payload(Vehicle):
         self.drive_publisher = self.node.create_publisher(
             DriveCommand, self.namespaced_path("cmd_drive", namespace=namespace), 10
         )
+        self.servo_publisher = self.node.create_publisher(
+            ServoCommand, self.namespaced_path("servo", namespace=namespace), 10
+        )
         self.timed_drive_client = self.node.create_client(
             TimedDrive, self.namespaced_path("timed_drive", namespace=namespace)
         )
@@ -35,6 +38,9 @@ class Payload(Vehicle):
 
     def stop(self) -> None:
         self.drive(0.0, 0.0)
+
+    def set_servo(self, degree: float) -> None:
+        self.servo_publisher.publish(ServoCommand(degree=float(degree)))
 
     def timed_drive(self, linear: float, angular: float, duration_sec: float):
         request = TimedDrive.Request()
