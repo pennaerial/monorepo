@@ -82,15 +82,14 @@ sudo apt-get upgrade
     colcon build
     ```
 
-2. Install OpenCV for both python and ROS2:
+2. Install camera and AprilTag dependencies:
 
     ```bash
     sudo apt-get update
-    sudo apt install ros-humble-cv-bridge
-    sudo apt-get install python3-opencv
-    pip install opencv-python
+    sudo apt install ros-humble-cv-bridge python3-opencv python3-pip build-essential cmake
+    python3 -m pip install apriltag
     ```
-    You may also need to uninstall your previous OpenCV.
+    AprilTag missions now always use the Python `apriltag` package for detection. Use the distro `python3-opencv` package for `cv2`; do not install `opencv-python` just to get AprilTag support.
 ---
 
 ## Solving Common Issues

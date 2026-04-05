@@ -25,7 +25,7 @@ setup(
             glob(os.path.join(package_name, "missions", "*.yaml")),
         ),
     ],
-    install_requires=["setuptools"],
+    install_requires=["setuptools", "apriltag"],
     zip_safe=True,
     maintainer="ubuntu",
     maintainer_email="ubuntu@todo.todo",

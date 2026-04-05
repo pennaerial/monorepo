@@ -5,6 +5,12 @@ The main entry point for the integrated SAE stack is:
 ros2 launch uav main.launch.py
 ```
 
+AprilTag-based payload missions require the Python `apriltag` package on the machine running the vision nodes:
+
+```bash
+python3 -m pip install apriltag
+```
+
 Useful overrides:
 - `mission_name:=...` to override the mission configured in `launch/launch_params.yaml`
 - `payload_name:=...` to bind payload missions to a different payload entity

@@ -14,15 +14,9 @@ except ImportError:
     apriltag = None
 
 DEFAULT_TAG_FAMILY = "tag36h11"
-_CV2_APRILTAG_DICTIONARIES = {
-    "tag16h5": cv2.aruco.DICT_APRILTAG_16h5,
-    "tag25h9": cv2.aruco.DICT_APRILTAG_25h9,
-    "tag36h10": cv2.aruco.DICT_APRILTAG_36h10,
-    "tag36h11": cv2.aruco.DICT_APRILTAG_36h11,
-}
 
 # Standard VTOL AprilTag layout in simulation (from `sim/world_gen/models/standard_vtol/model.sdf`).
-# IDs (DICT_APRILTAG_36h11): front=0, back=1, left=2, right=3.
+# IDs (`tag36h11`): front=0, back=1, left=2, right=3.
 # Poses are relative_to="base_link" in SDF: (x, y, z, roll, pitch, yaw).
 VTOL_TAG_POSES = {
     0: (-0.023, 0.0, 0.0, -1.5707, 3.141592, 1.5707),  # front
@@ -70,13 +64,6 @@ class AprilTagDetectorCache:
             except (AttributeError, TypeError):
                 detector = apriltag.Detector()
             backend = "apriltag"
-        else:
-            dictionary_id = _CV2_APRILTAG_DICTIONARIES.get(normalized_family)
-            if dictionary_id is not None and hasattr(cv2, "aruco"):
-                detector = cv2.aruco.ArucoDetector(
-                    cv2.aruco.getPredefinedDictionary(dictionary_id)
-                )
-                backend = "opencv"
 
         self._family = normalized_family
         self._detector = detector
@@ -88,34 +75,9 @@ class AprilTagDetectorCache:
         return self._backend
 
 
-@dataclass(frozen=True)
-class _DetectionAdapter:
-    tag_id: int
-    corners: np.ndarray
-    center: tuple[float, float]
-    area: float
-
-
 def _iter_detections(gray: np.ndarray, detector, backend: Optional[str]):
-    if detector is None:
+    if detector is None or backend != "apriltag":
         return []
-    if backend == "opencv":
-        corners, ids, _ = detector.detectMarkers(gray)
-        if ids is None:
-            return []
-        detections: list[_DetectionAdapter] = []
-        for marker_corners, marker_id in zip(corners, ids.flatten(), strict=False):
-            corners_array = np.asarray(marker_corners, dtype=np.float32).reshape(4, 2)
-            center = tuple(np.mean(corners_array, axis=0).tolist())
-            detections.append(
-                _DetectionAdapter(
-                    tag_id=int(marker_id),
-                    corners=corners_array,
-                    center=(float(center[0]), float(center[1])),
-                    area=float(abs(cv2.contourArea(corners_array))),
-                )
-            )
-        return detections
     return detector.detect(gray) or []
 
 

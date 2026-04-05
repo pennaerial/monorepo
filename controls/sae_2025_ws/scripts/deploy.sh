@@ -29,11 +29,42 @@ error() { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
 
 # Check dependencies
 check_deps() {
-    for cmd in curl jq tar; do
+    for cmd in curl jq tar python3; do
         if ! command -v $cmd &> /dev/null; then
             error "$cmd is required but not installed. Install with: sudo apt install $cmd"
         fi
     done
+}
+
+ensure_apriltag_runtime() {
+    if python3 -c "import apriltag" >/dev/null 2>&1; then
+        info "apriltag Python package already installed"
+        return
+    fi
+
+    warn "apriltag Python package not found; installing it into the user site"
+
+    if ! python3 -m pip --version >/dev/null 2>&1; then
+        if ! command -v sudo >/dev/null 2>&1; then
+            error "python3-pip is required to install apriltag. Install with: sudo apt-get install -y python3-pip build-essential cmake"
+        fi
+        info "Installing python3-pip and build prerequisites..."
+        sudo apt-get update
+        sudo apt-get install -y python3-pip build-essential cmake
+    fi
+
+    if ! python3 -m pip install --user apriltag; then
+        if ! command -v sudo >/dev/null 2>&1; then
+            error "apriltag install failed. Install build prerequisites with: sudo apt-get install -y build-essential cmake"
+        fi
+        info "Installing build prerequisites for apriltag..."
+        sudo apt-get update
+        sudo apt-get install -y build-essential cmake
+        python3 -m pip install --user apriltag || error "Failed to install apriltag. Try: sudo apt-get install -y build-essential cmake && python3 -m pip install --user apriltag"
+    fi
+
+    python3 -c "import apriltag; print(apriltag.__file__)" >/dev/null || error "apriltag was installed but cannot be imported"
+    info "apriltag Python package is ready"
 }
 
 # List available builds
@@ -90,6 +121,8 @@ deploy_build() {
     # Extract
     info "Extracting..."
     tar -xzvf "$asset_name"
+
+    ensure_apriltag_runtime
     
     # Cleanup
     rm "$asset_name"

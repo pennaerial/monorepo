@@ -163,6 +163,35 @@ echo "Extracting $filename..."
 tar -xzf "$filename"
 rm "$filename"
 
+# Ensure the AprilTag runtime dependency exists on the target
+if python3 -c "import apriltag" >/dev/null 2>&1; then
+    echo "apriltag Python package already installed."
+else
+    echo "Installing apriltag Python package..."
+    if ! python3 -m pip --version >/dev/null 2>&1; then
+        if command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y python3-pip build-essential cmake
+        else
+            echo "python3-pip/build prerequisites are missing. Install them on the Pi with: sudo apt-get install -y python3-pip build-essential cmake" >&2
+            exit 1
+        fi
+    fi
+
+    if ! python3 -m pip install --user apriltag; then
+        if command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y build-essential cmake
+            python3 -m pip install --user apriltag
+        else
+            echo "Failed to install apriltag automatically. Run on the Pi: sudo apt-get install -y build-essential cmake && python3 -m pip install --user apriltag" >&2
+            exit 1
+        fi
+    fi
+
+    python3 -c "import apriltag; print(apriltag.__file__)" >/dev/null
+fi
+
 # Create activation script
 cat > activate.sh << 'EOF'
 #!/bin/bash
@@ -310,4 +339,3 @@ main() {
 }
 
 main "$@"
-
