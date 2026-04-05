@@ -130,7 +130,7 @@
 
       <!-- <pose>-0.01 0 0 0 -1.5707 0 </pose> -->
       <visual name='apriltag_front_visual'>
-        <pose relative_to="base_link">-0.023 0 0 -1.5707 3.141592 1.5707</pose>
+        <pose relative_to="base_link">-0.3 0 0 -1.5707 3.141592 1.5707</pose>
         <geometry>
           <plane>
             <normal>0 0 1</normal>
@@ -353,6 +353,8 @@
           </friction>
         </surface>
       </collision>
+      <!-- Propeller visuals commented out — they occlude AprilTags on the VTOL body -->
+      <!--
       <visual name='rotor_0_visual'>
         <pose>0 0 0 0 0 0</pose>
         <geometry>
@@ -366,6 +368,7 @@
           <diffuse>0 0 1 1.0</diffuse>
         </material>
       </visual>
+      -->
       <gravity>1</gravity>
       <velocity_decay />
       <self_collide>0</self_collide>
@@ -416,6 +419,7 @@
           </friction>
         </surface>
       </collision>
+      <!--
       <visual name='rotor_1_visual'>
         <pose>0 0 0 0 0 0</pose>
         <geometry>
@@ -429,6 +433,7 @@
           <diffuse>0 0 1 1.0</diffuse>
         </material>
       </visual>
+      -->
       <gravity>1</gravity>
       <velocity_decay />
       <self_collide>0</self_collide>
@@ -479,6 +484,7 @@
           </friction>
         </surface>
       </collision>
+      <!--
       <visual name='rotor_2_visual'>
         <pose>0 0 0 0 0 0</pose>
         <geometry>
@@ -492,6 +498,7 @@
           <diffuse>0 0 1 1.0</diffuse>
         </material>
       </visual>
+      -->
       <gravity>1</gravity>
       <velocity_decay />
       <self_collide>0</self_collide>
@@ -542,6 +549,7 @@
           </friction>
         </surface>
       </collision>
+      <!--
       <visual name='rotor_3_visual'>
         <pose>0 0 0 0 0 0</pose>
         <geometry>
@@ -555,6 +563,7 @@
           <diffuse>0 0 1 1.0</diffuse>
         </material>
       </visual>
+      -->
       <gravity>1</gravity>
       <velocity_decay />
       <self_collide>0</self_collide>
@@ -606,6 +615,7 @@
           </friction>
         </surface>
       </collision>
+      <!--
       <visual name='rotor_puller_visual'>
         <pose>0 0 -0.04 0 0 0</pose>
         <geometry>
@@ -619,6 +629,7 @@
           <diffuse>0 0 1 1.0</diffuse>
         </material>
       </visual>
+      -->
       <gravity>1</gravity>
       <velocity_decay />
       <self_collide>0</self_collide>

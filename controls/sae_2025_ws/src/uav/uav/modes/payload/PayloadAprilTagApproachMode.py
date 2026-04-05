@@ -190,9 +190,7 @@ class PayloadAprilTagApproachMode(Mode):
         if distance <= self.stop_distance_m:
             self.vehicle.stop()
             self._done = True
-            self.log(
-                f"PayloadAprilTagApproachMode: done, stopped at {distance:.3f}m"
-            )
+            self.log(f"PayloadAprilTagApproachMode: done, stopped at {distance:.3f}m")
             return
 
         image_width = self._image_width if self._image_width > 0.0 else 640.0

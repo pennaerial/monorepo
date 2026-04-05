@@ -167,7 +167,9 @@ class Camera(Node):
         self.compressed_publisher = (
             None
             if self._compressed_passthrough
-            else self.create_publisher(CompressedImage, self.compressed_topic, queue_size)
+            else self.create_publisher(
+                CompressedImage, self.compressed_topic, queue_size
+            )
         )
         self.camera_info_publisher = (
             None
@@ -303,7 +305,9 @@ class Camera(Node):
         module = importlib.import_module(module_path)
         hook = getattr(module, attr_name)
         if not callable(hook):
-            raise TypeError(f"Configured preprocess_hook '{hook_path}' is not callable.")
+            raise TypeError(
+                f"Configured preprocess_hook '{hook_path}' is not callable."
+            )
         return hook
 
     def _rotate_frame(self, frame: np.ndarray) -> np.ndarray:
@@ -366,7 +370,10 @@ class Camera(Node):
         return image
 
     def _raw_subscribers_present(self) -> bool:
-        return self.raw_publisher is not None and self.raw_publisher.get_subscription_count() > 0
+        return (
+            self.raw_publisher is not None
+            and self.raw_publisher.get_subscription_count() > 0
+        )
 
     def _compressed_subscribers_present(self) -> bool:
         return (
@@ -394,12 +401,19 @@ class Camera(Node):
     def raw_image_callback(self, msg: Image):
         self.raw_image = msg
 
-        needs_frame = self._preprocess_active or self.display or (
-            self.save_vision_milliseconds > 0
-        ) or (self.input_transport == "raw" and self._compressed_subscribers_present())
+        needs_frame = (
+            self._preprocess_active
+            or self.display
+            or (self.save_vision_milliseconds > 0)
+            or (
+                self.input_transport == "raw" and self._compressed_subscribers_present()
+            )
+        )
         frame = self._to_bgr_from_raw(msg) if needs_frame else None
         processed_frame = (
-            self._apply_preprocessing(frame.copy()) if self._preprocess_active and frame is not None else frame
+            self._apply_preprocessing(frame.copy())
+            if self._preprocess_active and frame is not None
+            else frame
         )
 
         canonical_raw = (
@@ -429,12 +443,19 @@ class Camera(Node):
     def compressed_image_callback(self, msg: CompressedImage):
         self.compressed_image = msg
 
-        needs_frame = self._preprocess_active or self.display or (
-            self.save_vision_milliseconds > 0
-        ) or (self.input_transport == "compressed" and self._raw_subscribers_present())
+        needs_frame = (
+            self._preprocess_active
+            or self.display
+            or (self.save_vision_milliseconds > 0)
+            or (
+                self.input_transport == "compressed" and self._raw_subscribers_present()
+            )
+        )
         frame = self._to_bgr_from_compressed(msg) if needs_frame else None
         processed_frame = (
-            self._apply_preprocessing(frame.copy()) if self._preprocess_active and frame is not None else frame
+            self._apply_preprocessing(frame.copy())
+            if self._preprocess_active and frame is not None
+            else frame
         )
 
         canonical_compressed = (

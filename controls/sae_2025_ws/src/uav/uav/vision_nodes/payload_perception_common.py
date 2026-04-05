@@ -307,7 +307,9 @@ def _solve_detection_pose(
     *,
     flags: int | None = None,
     min_forward_distance_m: float | None = None,
-) -> Optional[tuple[int, np.ndarray, np.ndarray, np.ndarray, float, float, float, float]]:
+) -> Optional[
+    tuple[int, np.ndarray, np.ndarray, np.ndarray, float, float, float, float]
+]:
     tag_id = int(getattr(detection, "tag_id", -1))
     corners = np.asarray(detection.corners, dtype=np.float32)
     if len(corners) != 4:
@@ -329,9 +331,8 @@ def _solve_detection_pose(
     tvec_flat = np.asarray(tvec, dtype=np.float64).reshape(-1)
     if len(tvec_flat) < 3:
         return None
-    if (
-        min_forward_distance_m is not None
-        and float(tvec_flat[2]) <= float(min_forward_distance_m)
+    if min_forward_distance_m is not None and float(tvec_flat[2]) <= float(
+        min_forward_distance_m
     ):
         return None
 
@@ -342,9 +343,7 @@ def _solve_detection_pose(
         float(detection.center[0]),
         float(detection.center[1]),
         float(_yaw_error_from_rvec(rvec)),
-        float(
-            abs(cv2.contourArea(corners.reshape(-1, 1, 2).astype(np.float32)))
-        ),
+        float(abs(cv2.contourArea(corners.reshape(-1, 1, 2).astype(np.float32)))),
         float(tvec_flat[2]),
     )
 

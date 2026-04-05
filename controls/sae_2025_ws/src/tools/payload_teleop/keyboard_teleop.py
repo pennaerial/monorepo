@@ -71,7 +71,9 @@ class KeyboardTeleop(Node):
     def __init__(self):
         super().__init__("keyboard_teleop")
         self.declare_parameter("payload_name", "")
-        payload_name = self.get_parameter("payload_name").get_parameter_value().string_value
+        payload_name = (
+            self.get_parameter("payload_name").get_parameter_value().string_value
+        )
         if payload_name == "":
             raise RuntimeError(
                 "payload_name parameter must not be an empty string!\n"
