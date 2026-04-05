@@ -39,6 +39,7 @@ class SAEWorldNode(WorldNode):
         )
 
     def generate_world(self):
+        success = True
         named_entities = [
             ("dlz", self.dlz),
             ("payload_0", self.payload_0),
@@ -47,11 +48,11 @@ class SAEWorldNode(WorldNode):
         for name, cfg in named_entities:
             if cfg is not None:
                 self.get_logger().info(f"Spawning entity: {name}")
-                self.spawn_entity(name, cfg)
+                success = self.spawn_entity(name, cfg) and success
             else:
                 self.get_logger().info(f"Skipping entity (not defined): {name}")
 
-        return super().generate_world()
+        return super().generate_world() and success
 
 
 def main(args=None):

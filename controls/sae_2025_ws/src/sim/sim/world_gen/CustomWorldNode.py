@@ -6,7 +6,6 @@ from typing import Optional
 
 import rclpy
 from rclpy.executors import ExternalShutdownException
-from ros_gz_interfaces.srv import SpawnEntity
 
 
 class CustomWorldNode(WorldNode):
@@ -32,6 +31,7 @@ class CustomWorldNode(WorldNode):
         )
 
     def generate_world(self):
+        success = True
         payload_0 = Entity(
             name="payload_0",
             path_to_sdf="~/.simulation-gazebo/models/payload/model.sdf",
@@ -39,9 +39,7 @@ class CustomWorldNode(WorldNode):
             rpy=(0.0, 0.0, 0.0),
             world=self.world_name,
         )
-        req = SpawnEntity.Request()
-        req.entity_factory = payload_0.to_entity_factory_msg()
-        self.spawn_entity_client.call_async(req)
+        success = self.spawn_entity_object(payload_0) and success
 
         # payload_1 = Entity(
         #     name="payload_1",
@@ -54,7 +52,7 @@ class CustomWorldNode(WorldNode):
         # req1.entity_factory = payload_1.to_entity_factory_msg()
         # self.spawn_entity_client.call_async(req1)
 
-        return super().generate_world()
+        return super().generate_world() and success
 
 
 def main(args=None):

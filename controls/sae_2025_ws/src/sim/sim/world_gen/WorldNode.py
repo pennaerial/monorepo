@@ -172,7 +172,25 @@ class WorldNode(Node, ABC):
         except Exception as e:
             raise RuntimeError(f"Failed to write output SDF to {out_path}: {e}")
 
-    def spawn_entity(self, name: str, cfg: dict) -> None:
+    def spawn_entity_object(self, entity: Entity) -> bool:
+        if not self.spawn_entity_client.service_is_ready():
+            self.get_logger().error(
+                f"Cannot spawn entity '{entity.name}': "
+                f"/world/{self.competition_name}/create is not ready"
+            )
+            return False
+
+        req = SpawnEntity.Request()
+        req.entity_factory = entity.to_entity_factory_msg()
+        future = self.spawn_entity_client.call_async(req)
+        future.add_done_callback(
+            lambda completed_future, entity_name=entity.name: self._log_spawn_result(
+                entity_name, completed_future
+            )
+        )
+        return True
+
+    def spawn_entity(self, name: str, cfg: dict) -> bool:
         """
         Spawn a named entity from a config dict with keys: path_to_sdf, position, rpy.
         """
@@ -183,14 +201,7 @@ class WorldNode(Node, ABC):
             rpy=tuple(cfg["rpy"]),
             world=self.competition_name,
         )
-        req = SpawnEntity.Request()
-        req.entity_factory = entity.to_entity_factory_msg()
-        future = self.spawn_entity_client.call_async(req)
-        future.add_done_callback(
-            lambda completed_future, entity_name=name: self._log_spawn_result(
-                entity_name, completed_future
-            )
-        )
+        return self.spawn_entity_object(entity)
 
     def _wait_for_spawn_service(self, timeout_sec: float = 10.0) -> bool:
         if self.spawn_entity_client.service_is_ready():
@@ -248,7 +259,8 @@ class WorldNode(Node, ABC):
         """
         for name, cfg in self.entities.items():
             self.get_logger().info(f"Spawning entity: {name}")
-            self.spawn_entity(name, cfg)
+            if not self.spawn_entity(name, cfg):
+                return False
         return True
 
     def get_world_path(self) -> Path:
