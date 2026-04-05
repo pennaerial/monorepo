@@ -4,7 +4,6 @@ from sim.world_gen.entity import Entity
 from abc import ABC, abstractmethod
 from typing import List, Tuple, Optional
 from sim_interfaces.srv import HoopList
-from ros_gz_interfaces.srv import SpawnEntity
 import math
 import rclpy
 from rclpy.executors import ExternalShutdownException
