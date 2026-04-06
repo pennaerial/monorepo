@@ -4,6 +4,7 @@
 #include <chrono>
 #include <cmath>
 #include <memory>
+#include <stdexcept>
 #include <string>
 
 #include <lgpio.h>
@@ -70,7 +71,8 @@ void GPIOController::initialize(rclcpp::Node* node)
             "GPIO | lgGpiochipOpen(%d) failed (err=%d)",
             kGpioChip,
             handle_);
-        return;
+        throw std::runtime_error(
+            "GPIOController failed to open gpiochip. Check lgpio access and hardware wiring.");
     }
 
     const int pwm_hz = std::max(

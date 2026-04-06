@@ -18,7 +18,20 @@ Payload::Payload(const std::string& payload_name)
         servo_topic, 10, std::bind(&Payload::servo_callback, this, std::placeholders::_1));
     RCLCPP_INFO(this->get_logger(), "Servo listening on: %s", servo_topic.c_str());
 
-    controller_ = controller_loader_.createSharedInstance(payload_params_.controller);
+    RCLCPP_INFO(
+        this->get_logger(),
+        "Loading payload controller plugin: %s",
+        payload_params_.controller.c_str());
+    try {
+        controller_ = controller_loader_.createSharedInstance(payload_params_.controller);
+    } catch (const std::exception& ex) {
+        RCLCPP_FATAL(
+            this->get_logger(),
+            "Failed to create payload controller '%s': %s",
+            payload_params_.controller.c_str(),
+            ex.what());
+        throw;
+    }
 }
 
 Payload::~Payload() {
@@ -37,7 +50,20 @@ Payload::~Payload() {
 }
 
 void Payload::init() {
-    controller_->initialize(this);
+    try {
+        controller_->initialize(this);
+    } catch (const std::exception& ex) {
+        RCLCPP_FATAL(
+            this->get_logger(),
+            "Failed to initialize payload controller '%s': %s",
+            payload_params_.controller.c_str(),
+            ex.what());
+        throw;
+    }
+    RCLCPP_INFO(
+        this->get_logger(),
+        "Payload controller initialized: %s",
+        payload_params_.controller.c_str());
 
     std::string timed_drive_name = "/" + payload_name_ + "/timed_drive";
     timed_drive_srv_ = this->create_service<payload_interfaces::srv::TimedDrive>(
