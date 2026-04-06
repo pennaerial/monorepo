@@ -56,7 +56,7 @@ jobs:
           . /opt/ros/humble/setup.sh
           rosdep install -r -i -y --rosdistro humble \
             --from-paths src/uav src/uav_interfaces src/px4_msgs src/actuator_msgs \
-              src/payload src/payload_interfaces
+              src/payload src/payload_interfaces src/tools
 
       - name: Build shared hardware dependencies
         working-directory: controls/sae_2025_ws
@@ -81,6 +81,13 @@ jobs:
           . install/setup.sh
           colcon build --packages-select uav
 
+      - name: Build tools package
+        working-directory: controls/sae_2025_ws
+        run: |
+          . /opt/ros/humble/setup.sh
+          . install/setup.sh
+          colcon build --packages-select tools
+
       - name: Build sim package
         working-directory: controls/sae_2025_ws
         run: |
@@ -90,7 +97,7 @@ jobs:
       - name: Compile Python sources
         working-directory: controls/sae_2025_ws
         run: |
-          python3 -m py_compile $(find src/uav src/sim -name '*.py' | sort)
+          python3 -m py_compile $(find src/uav src/sim src/tools -name '*.py' | sort)
 
       - name: Validate mission schema tests
         working-directory: controls/sae_2025_ws
@@ -166,7 +173,7 @@ jobs:
           . /opt/ros/humble/setup.sh
           rosdep install -r -i -y --rosdistro humble \
             --from-paths src/uav src/uav_interfaces src/px4_msgs src/actuator_msgs \
-              src/payload src/payload_interfaces
+              src/payload src/payload_interfaces src/tools
 
       - name: Build shared hardware dependencies
         working-directory: controls/sae_2025_ws
@@ -190,6 +197,13 @@ jobs:
           . /opt/ros/humble/setup.sh
           . install/setup.sh
           colcon build --packages-select uav
+
+      - name: Build tools package
+        working-directory: controls/sae_2025_ws
+        run: |
+          . /opt/ros/humble/setup.sh
+          . install/setup.sh
+          colcon build --packages-select tools
 
       - name: Get short SHA
         id: sha

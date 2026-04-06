@@ -91,13 +91,13 @@ void SNMotor::set_speed(float speed) {
 }
 
 void SNMotor::forward(float duty) { 
-    in1_.write_low();
-    in2_.write_high();
+    in1_.write_high();
+    in2_.write_low();
     pwm_.write_pwm(frequency_, duty, 0, 0);
 }
 void SNMotor::reverse(float duty) { 
-    in1_.write_high();
-    in2_.write_low();
+    in1_.write_low();
+    in2_.write_high();
     pwm_.write_pwm(frequency_, duty, 0, 0);
 }
 
