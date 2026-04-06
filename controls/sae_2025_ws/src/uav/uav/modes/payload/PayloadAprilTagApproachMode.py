@@ -46,6 +46,7 @@ class PayloadAprilTagApproachMode(Mode):
         tag_lost_coast_s: float = 0.5,
     ):
         super().__init__(node, vehicle)
+        self.vehicle: Payload = vehicle
         self.tag_id = None if tag_id is None else int(tag_id)
         self.tag_size_m = float(tag_size_m)
         self.tag_family = str(tag_family) if tag_family else DEFAULT_TAG_FAMILY
@@ -72,7 +73,8 @@ class PayloadAprilTagApproachMode(Mode):
         self._last_wait_log_time = 0.0
         self._last_no_tag_log_time = 0.0
         self._last_drive_log_time = 0.0
-        self.log("PayloadAprilTagApproachMode: using PayloadAprilTagNode service")
+        self.vehicle.set_servo(180.0)
+        self.log("PayloadAprilTagApproachMode: servo set to 180, using PayloadAprilTagNode service")
 
     def _request_state(self) -> Optional[PayloadAprilTagState.Response]:
         request = PayloadAprilTagState.Request()
@@ -188,9 +190,10 @@ class PayloadAprilTagApproachMode(Mode):
 
         distance = float(target.tvec_z)
         if distance <= self.stop_distance_m:
+            self.vehicle.set_servo(0.0)
             self.vehicle.stop()
             self._done = True
-            self.log(f"PayloadAprilTagApproachMode: done, stopped at {distance:.3f}m")
+            self.log(f"PayloadAprilTagApproachMode: servo set to 0, stopped at {distance:.3f}m")
             return
 
         image_width = self._image_width if self._image_width > 0.0 else 640.0
