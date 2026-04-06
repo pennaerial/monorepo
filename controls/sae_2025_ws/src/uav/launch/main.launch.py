@@ -32,8 +32,12 @@ from uav.utils import (
 )
 
 
-def _load_launch_parameters() -> dict:
-    params_path = Path(__file__).resolve().with_name("launch_params.yaml")
+def _load_launch_parameters(context) -> dict:
+    params_path_override = LaunchConfiguration("params_file").perform(context).strip()
+    if params_path_override:
+        params_path = Path(os.path.expanduser(params_path_override)).resolve()
+    else:
+        params_path = Path(__file__).resolve().with_name("launch_params.yaml")
     with params_path.open("r", encoding="utf-8") as params_file:
         return yaml.safe_load(params_file) or {}
 
@@ -69,6 +73,7 @@ def _camera_contract_for(
     input_transport: str | None = None,
     rotate_degrees: float | None = None,
     preprocess_hook: str | None = None,
+    camera_info_url: str | None = None,
 ) -> dict[str, object]:
     if mission_spec.is_uav:
         vehicle_name = "uav"
@@ -90,7 +95,20 @@ def _camera_contract_for(
         "input_camera_info_topic": f"{namespace}/camera_info_source",
         "rotate_degrees": 0.0 if rotate_degrees is None else rotate_degrees,
         "preprocess_hook": "" if preprocess_hook is None else preprocess_hook,
+        "camera_info_url": "" if camera_info_url is None else camera_info_url,
     }
+
+
+def _payload_camera_info_url_for(payload_name: str) -> str:
+    payload_share = Path(get_package_share_directory("payload"))
+    candidates = [
+        payload_share / "config" / f"{payload_name}_camera_info.yaml",
+        payload_share / "config" / "payload_0_camera_info.yaml",
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return f"file://{candidate}"
+    return ""
 
 
 def _build_runtime_parameters(
@@ -138,35 +156,47 @@ def _build_camera_actions(
     actions = []
 
     if not sim:
+        v4l2_cmd = [
+            "ros2",
+            "run",
+            "v4l2_camera",
+            "v4l2_camera_node",
+            "--ros-args",
+            "-p",
+            "image_size:=[640,480]",
+        ]
+        if mission_spec.is_payload and str(camera_contract["camera_info_url"]).strip():
+            v4l2_cmd.extend(
+                [
+                    "-p",
+                    f"camera_info_url:={camera_contract['camera_info_url']}",
+                ]
+            )
+        v4l2_cmd.extend(
+            [
+                "--remap",
+                (
+                    f"/image_raw:={camera_contract['input_raw_topic']}"
+                    if mission_spec.is_payload
+                    else f"/image_raw:={camera_contract['image_topic']}"
+                ),
+                "--remap",
+                (
+                    f"/image_raw/compressed:={camera_contract['input_compressed_topic']}"
+                    if mission_spec.is_payload
+                    else f"/image_raw/compressed:={camera_contract['image_topic']}/compressed"
+                ),
+                "--remap",
+                (
+                    f"/camera_info:={camera_contract['input_camera_info_topic']}"
+                    if mission_spec.is_payload
+                    else f"/camera_info:={camera_contract['camera_info_topic']}"
+                ),
+            ]
+        )
         actions.append(
             ExecuteProcess(
-                cmd=[
-                    "ros2",
-                    "run",
-                    "v4l2_camera",
-                    "v4l2_camera_node",
-                    "--ros-args",
-                    "-p",
-                    "image_size:=[640,480]",
-                    "--remap",
-                    (
-                        f"/image_raw:={camera_contract['input_raw_topic']}"
-                        if mission_spec.is_payload
-                        else f"/image_raw:={camera_contract['image_topic']}"
-                    ),
-                    "--remap",
-                    (
-                        f"/image_raw/compressed:={camera_contract['input_compressed_topic']}"
-                        if mission_spec.is_payload
-                        else f"/image_raw/compressed:={camera_contract['image_topic']}/compressed"
-                    ),
-                    "--remap",
-                    (
-                        f"/camera_info:={camera_contract['input_camera_info_topic']}"
-                        if mission_spec.is_payload
-                        else f"/camera_info:={camera_contract['camera_info_topic']}"
-                    ),
-                ],
+                cmd=v4l2_cmd,
                 output="screen",
                 name=f"{camera_contract['vehicle_name']}_camera_device",
             )
@@ -247,7 +277,7 @@ def _build_camera_actions(
 
 def launch_setup(context, *args, **kwargs):
     logger = get_logger("main.launch")
-    params = _load_launch_parameters()
+    params = _load_launch_parameters(context)
 
     mission_name = _yaml_or_launch_string(
         context, "mission_name", params.get("mission_name", "basic")
@@ -300,10 +330,25 @@ def launch_setup(context, *args, **kwargs):
             input_transport=payload_camera_input_transport,
             rotate_degrees=payload_camera_rotate_degrees,
             preprocess_hook=payload_camera_preprocess_hook,
+            camera_info_url=(
+                _payload_camera_info_url_for(payload_name)
+                if mission_spec.is_payload and not sim
+                else ""
+            ),
         )
         if requires_vision
         else None
     )
+    if (
+        camera_contract is not None
+        and mission_spec.is_payload
+        and not sim
+        and not str(camera_contract["camera_info_url"]).strip()
+    ):
+        logger.warning(
+            "No packaged payload camera calibration file was found; "
+            "v4l2_camera will fall back to its default camera_info behavior."
+        )
     camera_actions = (
         _build_camera_actions(
             mission_spec=mission_spec,
@@ -621,6 +666,7 @@ def generate_launch_description():
     return LaunchDescription(
         [
             DeclareLaunchArgument("px4_path", default_value="~/PX4-Autopilot"),
+            DeclareLaunchArgument("params_file", default_value=""),
             DeclareLaunchArgument("mission_name", default_value=""),
             DeclareLaunchArgument("payload_name", default_value=""),
             OpaqueFunction(function=launch_setup),
