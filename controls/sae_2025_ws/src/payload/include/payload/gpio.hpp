@@ -11,15 +11,14 @@ enum class Direction {
 
 class GPIO {
     public:
-        GPIO(int handle, int pin, Direction direction);
+        GPIO(int pin, Direction direction);
         void write_high();
         void write_low();
-        void write_pwm(float frequency, float duty_cycle, int offset, int cycles);
-        void write_servo(int pulse_width, int frequency, int offset, int cycles);
+        void write_pwm(float frequency, float duty_cycle);
+        void write_servo(int pulse_width);
 
 
     private:
-        int handle_{}; //handle for gpiochip
         int pin_{};
         Direction direction_;
         

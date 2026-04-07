@@ -2,17 +2,16 @@
 
 #include <algorithm>
 
-Servo::Servo(int handle, int pin, int frequency, float pulse_min_u, float pulse_max_u) :
-    handle_(handle),
+Servo::Servo(int pin, int frequency, float pulse_min_u, float pulse_max_u) :
     frequency_(frequency),
-    servo_pin_(handle, pin, Direction::Output),
+    servo_pin_(pin, Direction::Output),
     pulse_min_u_(pulse_min_u),
     pulse_max_u_(pulse_max_u) {}
 
 void Servo::degree_setpoint(float degree) {
     int pulse = angle_to_pulse(degree);
     RCLCPP_DEBUG(logger(), "Outputting pulse: %d", pulse);
-    servo_pin_.write_servo(pulse, frequency_, 0, 0);
+    servo_pin_.write_servo(pulse);
 }
 
 void Servo::normalized_setpoint(float t) {
@@ -20,7 +19,7 @@ void Servo::normalized_setpoint(float t) {
     const int pulse = static_cast<int>(
         pulse_min_u_ + clamped * (pulse_max_u_ - pulse_min_u_));
     RCLCPP_DEBUG(logger(), "Normalized %.2f -> pulse: %d", clamped, pulse);
-    servo_pin_.write_servo(pulse, frequency_, 0, 0);
+    servo_pin_.write_servo(pulse);
 }
 
 int Servo::angle_to_pulse(float degree) {

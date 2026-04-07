@@ -65,18 +65,18 @@ if(build_payload_sim_controller)
 endif()
 
 if(PAYLOAD_BUILD_GPIO_CONTROLLER STREQUAL "ON")
-  find_library(LGPIO_LIBRARY NAMES lgpio REQUIRED)
-  find_path(LGPIO_INCLUDE_DIR NAMES lgpio.h REQUIRED)
+  find_library(PIGPIO_LIBRARY NAMES pigpio REQUIRED)
+  find_path(PIGPIO_INCLUDE_DIR NAMES pigpio.h REQUIRED)
   set(build_payload_gpio_controller TRUE)
 elseif(PAYLOAD_BUILD_GPIO_CONTROLLER STREQUAL "AUTO")
-  find_library(LGPIO_LIBRARY NAMES lgpio)
-  find_path(LGPIO_INCLUDE_DIR NAMES lgpio.h)
-  if(LGPIO_LIBRARY AND LGPIO_INCLUDE_DIR)
+  find_library(PIGPIO_LIBRARY NAMES pigpio)
+  find_path(PIGPIO_INCLUDE_DIR NAMES pigpio.h)
+  if(PIGPIO_LIBRARY AND PIGPIO_INCLUDE_DIR)
     set(build_payload_gpio_controller TRUE)
   else()
     message(STATUS
-      "Skipping GPIOController because lgpio development files were not found. "
-      "Install liblgpio-dev to enable the hardware backend.")
+      "Skipping GPIOController because pigpio development files were not found. "
+      "Install pigpio to enable the hardware backend.")
   endif()
 elseif(NOT PAYLOAD_BUILD_GPIO_CONTROLLER STREQUAL "OFF")
   message(FATAL_ERROR
@@ -98,8 +98,8 @@ if(build_payload_gpio_controller)
     payload_interfaces
     pluginlib
   )
-  target_link_libraries(payload_gpio_controller ${LGPIO_LIBRARY})
-  target_include_directories(payload_gpio_controller PUBLIC ${LGPIO_INCLUDE_DIR})
+  target_link_libraries(payload_gpio_controller ${PIGPIO_LIBRARY})
+  target_include_directories(payload_gpio_controller PUBLIC ${PIGPIO_INCLUDE_DIR})
   target_compile_definitions(payload_gpio_controller PRIVATE BUILD_GPIO)
   list(APPEND payload_controller_targets payload_gpio_controller)
 
@@ -111,9 +111,9 @@ if(build_payload_gpio_controller)
     src/gpio.cpp
     src/encoder.cpp
   )
-  target_include_directories(test_motor PRIVATE include ${LGPIO_INCLUDE_DIR})
+  target_include_directories(test_motor PRIVATE include ${PIGPIO_INCLUDE_DIR})
   ament_target_dependencies(test_motor rclcpp)
-  target_link_libraries(test_motor ${LGPIO_LIBRARY})
+  target_link_libraries(test_motor ${PIGPIO_LIBRARY})
   install(TARGETS test_motor DESTINATION lib/${PROJECT_NAME})
 
   add_executable(test_servo
@@ -121,9 +121,9 @@ if(build_payload_gpio_controller)
     src/servo.cpp
     src/gpio.cpp
   )
-  target_include_directories(test_servo PRIVATE include ${LGPIO_INCLUDE_DIR})
+  target_include_directories(test_servo PRIVATE include ${PIGPIO_INCLUDE_DIR})
   ament_target_dependencies(test_servo rclcpp)
-  target_link_libraries(test_servo ${LGPIO_LIBRARY})
+  target_link_libraries(test_servo ${PIGPIO_LIBRARY})
   install(TARGETS test_servo DESTINATION lib/${PROJECT_NAME})
 endif()
 
@@ -131,7 +131,7 @@ if(NOT payload_controller_targets)
   message(FATAL_ERROR
     "payload requires at least one controller backend. Enable the simulation "
     "backend by installing Gazebo development packages, or enable the hardware "
-    "backend by installing liblgpio-dev.")
+    "backend by installing pigpio.")
 endif()
 
 pluginlib_export_plugin_description_file(payload plugins.xml)

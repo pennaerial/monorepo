@@ -42,7 +42,7 @@ jobs:
             ros-humble-gps-msgs \
             ros-humble-pluginlib \
             ros-humble-vision-msgs \
-            liblgpio-dev \
+            pigpio \
             git
 
           rosdep init 2>/dev/null || true
@@ -159,7 +159,7 @@ jobs:
             ros-humble-gps-msgs \
             ros-humble-pluginlib \
             ros-humble-vision-msgs \
-            liblgpio-dev \
+            pigpio \
             git
 
           rosdep init 2>/dev/null || true

@@ -1,5 +1,5 @@
 #include <rclcpp/rclcpp.hpp>
-#include <lgpio.h>
+#include <pigpio.h>
 
 #include <chrono>
 #include <csignal>
@@ -44,7 +44,6 @@ static void pause_print(int ms, QuadratureEncoder& enc_a, QuadratureEncoder& enc
 }
 
 // ---- Signal handling ----
-static int       g_handle  = -1;
 static Motor*    g_motor_a = nullptr;
 static Motor*    g_motor_b = nullptr;
 
@@ -53,7 +52,7 @@ static void on_sigint(int)
     printf("\nCaught SIGINT — coasting motors and cleaning up\n");
     if (g_motor_a) g_motor_a->coast();
     if (g_motor_b) g_motor_b->coast();
-    if (g_handle >= 0) lgGpiochipClose(g_handle);
+    gpioTerminate();
     rclcpp::shutdown();
     std::exit(0);
 }
@@ -65,33 +64,27 @@ int main(int argc, char** argv)
 {
     rclcpp::init(argc, argv);
 
-    // Open gpiochip — try RPi 5 (chip4) then RPi 4 (chip0)
-    int h = -1;
-    for (int chip : {4, 0}) {
-        h = lgGpiochipOpen(chip);
-        if (h >= 0) { printf("Opened gpiochip%d (handle=%d)\n", chip, h); break; }
-        printf("gpiochip%d failed: %d\n", chip, h);
-    }
-    if (h < 0) {
-        printf("ERROR: Could not open any gpiochip\n");
+    int rc = gpioInitialise();
+    if (rc < 0) {
+        printf("ERROR: gpioInitialise() failed (err=%d)\n", rc);
         rclcpp::shutdown();
         return 1;
     }
-    g_handle = h;
+    printf("pigpio initialised (version=%d)\n", rc);
 
     std::unique_ptr<Motor> motor_right;
     std::unique_ptr<Motor> motor_left;
     printf("Running SNMotor test\n");
     motor_right = std::make_unique<SNMotor>(
-        h, SN_RIGHT_PWM, SN_RIGHT_IN1, SN_RIGHT_IN2, FREQ, MotorType::RIGHT);
+        SN_RIGHT_PWM, SN_RIGHT_IN1, SN_RIGHT_IN2, FREQ, MotorType::RIGHT);
     motor_left = std::make_unique<SNMotor>(
-        h, SN_LEFT_PWM, SN_LEFT_IN1, SN_LEFT_IN2, FREQ, MotorType::LEFT);
+        SN_LEFT_PWM, SN_LEFT_IN1, SN_LEFT_IN2, FREQ, MotorType::LEFT);
     g_motor_a = motor_right.get();
     g_motor_b = motor_left.get();
     std::signal(SIGINT, on_sigint);
 
-    QuadratureEncoder enc_a(h, ENCA1, ENCA2, ENC_CPR, MotorType::RIGHT);
-    QuadratureEncoder enc_b(h, ENCB1, ENCB2, ENC_CPR, MotorType::LEFT);
+    QuadratureEncoder enc_a(ENCA1, ENCA2, ENC_CPR, MotorType::RIGHT);
+    QuadratureEncoder enc_b(ENCB1, ENCB2, ENC_CPR, MotorType::LEFT);
 
     std::cout << "RIGHT MOTOR FORWARD 70%" << std::endl;
     motor_right->forward(70.0f);
@@ -230,7 +223,7 @@ int main(int argc, char** argv)
     printf("\nDone.\n");
 
     pause(500);
-    lgGpiochipClose(h);
+    gpioTerminate();
     rclcpp::shutdown();
     return 0;
 }

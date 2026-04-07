@@ -13,51 +13,41 @@ static const int8_t QEM[16] = {
 };
 
 // TODO: Use GPIO classes instead
-QuadratureEncoder::QuadratureEncoder(int handle, int pin_a, int pin_b, int cpr, MotorType motor_type)
-: handle_(handle), pin_a_(pin_a), pin_b_(pin_b), cpr_(cpr), motor_type_(motor_type)
+QuadratureEncoder::QuadratureEncoder(int pin_a, int pin_b, int cpr, MotorType motor_type)
+: pin_a_(pin_a), pin_b_(pin_b), cpr_(cpr), motor_type_(motor_type)
 {
-    // Claim both pins for edge alerts (supersedes any prior input claim)
-    lgGpioClaimAlert(handle_, 0, LG_BOTH_EDGES, pin_a_, -1);
-    lgGpioClaimAlert(handle_, 0, LG_BOTH_EDGES, pin_b_, -1);
+    gpioSetMode(pin_a_, PI_INPUT);
+    gpioSetMode(pin_b_, PI_INPUT);
 
     // Read initial state so the first edge is decoded correctly
-    int a = lgGpioRead(handle_, pin_a_);
-    int b = lgGpioRead(handle_, pin_b_);
+    int a = gpioRead(pin_a_);
+    int b = gpioRead(pin_b_);
     prev_ab_ = (a << 1) | b;
 
     // Register callback on each channel pin.
-    lgGpioSetAlertsFunc(handle_, pin_a_, alert_cb, this);
-    lgGpioSetAlertsFunc(handle_, pin_b_, alert_cb, this);
+    gpioSetAlertFuncEx(pin_a_, alert_cb, this);
+    gpioSetAlertFuncEx(pin_b_, alert_cb, this);
 }
 
 QuadratureEncoder::~QuadratureEncoder()
 {
-    lgGpioSetAlertsFunc(handle_, pin_a_, nullptr, nullptr);
-    lgGpioSetAlertsFunc(handle_, pin_b_, nullptr, nullptr);
-    lgGpioFree(handle_, pin_a_);
-    lgGpioFree(handle_, pin_b_);
+    gpioSetAlertFuncEx(pin_a_, nullptr, nullptr);
+    gpioSetAlertFuncEx(pin_b_, nullptr, nullptr);
 }
 
-void QuadratureEncoder::alert_cb(int num_alerts, lgGpioAlert_p alerts, void* userdata)
+void QuadratureEncoder::alert_cb(int gpio, int level, uint32_t /*tick*/, void* userdata)
 {
     auto* self = static_cast<QuadratureEncoder*>(userdata);
     if (!self) {
         return;
     }
-
-    for (int i = 0; i < num_alerts; ++i) {
-        int gpio  = alerts[i].report.gpio;
-        int level = alerts[i].report.level;
-        if (gpio == self->pin_a_ || gpio == self->pin_b_) {
-            self->on_edge(gpio, level);
-        }
-    }
+    self->on_edge(gpio, level);
 }
 
 void QuadratureEncoder::on_edge(int gpio, int level)
 {
-    int a = (gpio == pin_a_) ? level : lgGpioRead(handle_, pin_a_);
-    int b = (gpio == pin_b_) ? level : lgGpioRead(handle_, pin_b_);
+    int a = (gpio == pin_a_) ? level : gpioRead(pin_a_);
+    int b = (gpio == pin_b_) ? level : gpioRead(pin_b_);
     int curr_ab = (a << 1) | b;
 
     int8_t step = QEM[(prev_ab_ << 2) | curr_ab];

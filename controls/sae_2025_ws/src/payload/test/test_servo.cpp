@@ -5,7 +5,7 @@
 #include <iostream>
 #include <thread>
 
-#include <lgpio.h>
+#include <pigpio.h>
 #include <rclcpp/rclcpp.hpp>
 
 #include "payload/servo.hpp"
@@ -17,14 +17,10 @@ constexpr int FREQ = 50;
 
 static void pause(int ms) { std::this_thread::sleep_for(std::chrono::milliseconds(ms)); }
 
-static int g_handle = -1;
-
 static void on_sigint(int)
 {
     std::printf("\nCaught SIGINT -- closing servo and cleaning up\n");
-    if (g_handle >= 0) {
-        lgGpiochipClose(g_handle);
-    }
+    gpioTerminate();
     rclcpp::shutdown();
     std::exit(0);
 }
@@ -34,24 +30,15 @@ int main(int argc, char** argv)
     rclcpp::init(argc, argv);
     std::signal(SIGINT, on_sigint);
 
-    int h = -1;
-    for (int chip : {4, 0}) {
-        h = lgGpiochipOpen(chip);
-        if (h >= 0) {
-            std::printf("Opened gpiochip%d (handle=%d)\n", chip, h);
-            break;
-        }
-        std::printf("gpiochip%d failed: %d\n", chip, h);
-    }
-
-    if (h < 0) {
-        std::printf("ERROR: Could not open any gpiochip\n");
+    int rc = gpioInitialise();
+    if (rc < 0) {
+        std::printf("ERROR: gpioInitialise() failed (err=%d)\n", rc);
         rclcpp::shutdown();
         return 1;
     }
-    g_handle = h;
+    std::printf("pigpio initialised (version=%d)\n", rc);
 
-    Servo servo(h, SERVO_PIN, FREQ, PULSE_MIN, PULSE_MAX);
+    Servo servo(SERVO_PIN, FREQ, PULSE_MIN, PULSE_MAX);
 
     std::cout << "NORMALIZED 0.0 (pulse_min=" << PULSE_MIN << "us)" << std::endl;
     servo.normalized_setpoint(0.0f);
@@ -78,7 +65,7 @@ int main(int argc, char** argv)
     pause(2000);
 
     pause(500);
-    lgGpiochipClose(h);
+    gpioTerminate();
     rclcpp::shutdown();
     return 0;
 }

@@ -3,11 +3,10 @@
 #include <cmath>
 
 //DRVMotor
-DRVMotor::DRVMotor(int handle, int in1, int in2, int frequency, MotorType motor_type) 
-: handle_(handle),
-  frequency_(frequency),
-  in1_(handle, in1, Direction::Output),
-  in2_(handle, in2, Direction::Output),
+DRVMotor::DRVMotor(int in1, int in2, int frequency, MotorType motor_type) 
+: frequency_(frequency),
+  in1_(in1, Direction::Output),
+  in2_(in2, Direction::Output),
   motor_type_(motor_type) { }
 
 void DRVMotor::set_speed(float speed) {
@@ -30,10 +29,10 @@ void DRVMotor::forward(float duty) {
     switch(motor_type_){
         case MotorType::LEFT:
             in1_.write_low();
-            in2_.write_pwm(frequency_, duty, 0, 0);
+            in2_.write_pwm(frequency_, duty);
             break;
         case MotorType::RIGHT:
-            in1_.write_pwm(frequency_, duty, 0, 0);
+            in1_.write_pwm(frequency_, duty);
             in2_.write_low();
             break;
     }
@@ -42,19 +41,19 @@ void DRVMotor::forward(float duty) {
 void DRVMotor::reverse(float duty) {
     switch(motor_type_){
         case MotorType::LEFT:
-            in1_.write_pwm(frequency_, duty, 0, 0);
+            in1_.write_pwm(frequency_, duty);
             in2_.write_low();
             break;
         case MotorType::RIGHT:
             in1_.write_low();
-            in2_.write_pwm(frequency_, duty, 0, 0);
+            in2_.write_pwm(frequency_, duty);
             break;
     }
 }
 
 void DRVMotor::coast() {
-    in1_.write_pwm(frequency_, 0, 0, 0);
-    in2_.write_pwm(frequency_, 0, 0, 0);
+    in1_.write_pwm(frequency_, 0);
+    in2_.write_pwm(frequency_, 0);
 }
 
 void DRVMotor::hard_brake() {
@@ -65,12 +64,11 @@ void DRVMotor::hard_brake() {
 
 //SNMotor
 
-SNMotor::SNMotor(int handle, int pwm_pin, int in1, int in2, int frequency, MotorType motor_type): 
-    handle_(handle), 
+SNMotor::SNMotor(int pwm_pin, int in1, int in2, int frequency, MotorType motor_type): 
     frequency_(frequency), 
-    pwm_(handle, pwm_pin, Direction::Output),
-    in1_(handle, in1, Direction::Output),
-    in2_(handle, in2, Direction::Output),
+    pwm_(pwm_pin, Direction::Output),
+    in1_(in1, Direction::Output),
+    in2_(in2, Direction::Output),
     motor_type_(motor_type) { }
 
 
@@ -93,22 +91,22 @@ void SNMotor::set_speed(float speed) {
 void SNMotor::forward(float duty) { 
     in1_.write_high();
     in2_.write_low();
-    pwm_.write_pwm(frequency_, duty, 0, 0);
+    pwm_.write_pwm(frequency_, duty);
 }
 void SNMotor::reverse(float duty) { 
     in1_.write_low();
     in2_.write_high();
-    pwm_.write_pwm(frequency_, duty, 0, 0);
+    pwm_.write_pwm(frequency_, duty);
 }
 
 void SNMotor::coast() { 
     in1_.write_low();
     in2_.write_low();
-    pwm_.write_pwm(frequency_, 0.0f, 0, 0);
+    pwm_.write_pwm(frequency_, 0.0f);
 }
 
 void SNMotor::hard_brake() { 
     in1_.write_high();
     in2_.write_high();
-    pwm_.write_pwm(frequency_, 0.0f, 0, 0);
+    pwm_.write_pwm(frequency_, 0.0f);
 }
