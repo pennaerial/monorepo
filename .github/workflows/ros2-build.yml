@@ -42,13 +42,22 @@ jobs:
             ros-humble-gps-msgs \
             ros-humble-pluginlib \
             ros-humble-vision-msgs \
-            pigpio \
             git
 
           rosdep init 2>/dev/null || true
           rosdep update --rosdistro humble
           python3 -m pip install --no-cache-dir apriltag
           python3 -c "import apriltag; print(apriltag.__file__)"
+
+      - name: Install pigpio from source
+        run: |
+          cd /tmp
+          git clone --depth 1 https://github.com/joan2937/pigpio.git
+          cd pigpio
+          cmake . -DBUILD_SHARED_LIBS=ON
+          make -j$(nproc)
+          make install
+          ldconfig
 
       - name: Install hardware package dependencies via rosdep
         working-directory: controls/sae_2025_ws
@@ -159,13 +168,22 @@ jobs:
             ros-humble-gps-msgs \
             ros-humble-pluginlib \
             ros-humble-vision-msgs \
-            pigpio \
             git
 
           rosdep init 2>/dev/null || true
           rosdep update --rosdistro humble
           python3 -m pip install --no-cache-dir apriltag
           python3 -c "import apriltag; print(apriltag.__file__)"
+
+      - name: Install pigpio from source
+        run: |
+          cd /tmp
+          git clone --depth 1 https://github.com/joan2937/pigpio.git
+          cd pigpio
+          cmake . -DBUILD_SHARED_LIBS=ON
+          make -j$(nproc)
+          make install
+          ldconfig
 
       - name: Install workspace dependencies via rosdep
         working-directory: controls/sae_2025_ws
