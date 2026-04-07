@@ -53,7 +53,7 @@ pi = pigpio.pi()
 if not pi.connected:
     print("ERROR: Could not connect to pigpiod — is the daemon running? (sudo pigpiod)")
     exit(1)
-print(f"Connected to pigpiod")
+print("Connected to pigpiod")
 
 # --- Claim all four pins as outputs, initially LOW ---
 for label, pin in [

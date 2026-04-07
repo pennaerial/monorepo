@@ -74,7 +74,9 @@ class PayloadAprilTagApproachMode(Mode):
         self._last_no_tag_log_time = 0.0
         self._last_drive_log_time = 0.0
         self.vehicle.set_servo(180.0)
-        self.log("PayloadAprilTagApproachMode: servo set to 180, using PayloadAprilTagNode service")
+        self.log(
+            "PayloadAprilTagApproachMode: servo set to 180, using PayloadAprilTagNode service"
+        )
 
     def _request_state(self) -> Optional[PayloadAprilTagState.Response]:
         request = PayloadAprilTagState.Request()
@@ -193,7 +195,9 @@ class PayloadAprilTagApproachMode(Mode):
             self.vehicle.set_servo(0.0)
             self.vehicle.stop()
             self._done = True
-            self.log(f"PayloadAprilTagApproachMode: servo set to 0, stopped at {distance:.3f}m")
+            self.log(
+                f"PayloadAprilTagApproachMode: servo set to 0, stopped at {distance:.3f}m"
+            )
             return
 
         image_width = self._image_width if self._image_width > 0.0 else 640.0
