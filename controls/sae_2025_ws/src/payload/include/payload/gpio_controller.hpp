@@ -1,7 +1,7 @@
 #ifndef GPIO_CONTROLLER_HPP
 #define GPIO_CONTROLLER_HPP
 
-#include <pigpio.h>
+#include <pigpiod_if2.h>
 #include <rclcpp/rclcpp.hpp>
 
 #include <atomic>
@@ -36,6 +36,7 @@ private:
 
     rclcpp::Node* node_ {nullptr};
     bool initialized_ {false};
+    int pi_ {-1};
 
     std::shared_ptr<payload::ParamListener> param_listener_;
 

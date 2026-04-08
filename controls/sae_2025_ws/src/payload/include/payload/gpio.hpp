@@ -3,7 +3,6 @@
 
 #include <rclcpp/rclcpp.hpp>
 
-
 enum class Direction {
     Input,
     Output
@@ -11,20 +10,18 @@ enum class Direction {
 
 class GPIO {
     public:
-        GPIO(int pin, Direction direction);
+        GPIO(int pi, int pin, Direction direction);
         void write_high();
         void write_low();
         void write_pwm(float frequency, float duty_cycle);
         void write_servo(int pulse_width);
 
-
     private:
+        int pi_{};
         int pin_{};
         Direction direction_;
-        
-        static rclcpp::Logger logger();
-        bool allowed();
 
+        static rclcpp::Logger logger();
 };
 
 #endif

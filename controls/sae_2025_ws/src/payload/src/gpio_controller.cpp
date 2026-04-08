@@ -7,7 +7,7 @@
 #include <stdexcept>
 #include <string>
 
-#include <pigpio.h>
+#include <pigpiod_if2.h>
 #include <pluginlib/class_list_macros.hpp>
 
 GPIOController::GPIOController() {}
@@ -46,8 +46,9 @@ GPIOController::~GPIOController()
 
     motor_state_pub_.reset();
     zn_service_.reset();
-    if (initialized_) {
-        gpioTerminate();
+    if (initialized_ && pi_ >= 0) {
+        pigpio_stop(pi_);
+        pi_ = -1;
         initialized_ = false;
     }
 }
@@ -60,14 +61,14 @@ void GPIOController::initialize(rclcpp::Node* node)
     param_listener_ = std::make_shared<payload::ParamListener>(node_);
     const auto p = param_listener_->get_params();
 
-    int rc = gpioInitialise();
-    if (rc < 0) {
+    pi_ = pigpio_start(nullptr, nullptr);
+    if (pi_ < 0) {
         RCLCPP_FATAL(
             node_->get_logger(),
-            "GPIO | gpioInitialise() failed (err=%d)",
-            rc);
+            "GPIO | pigpio_start() failed (err=%d). Is pigpiod running? Try: sudo systemctl start pigpiod",
+            pi_);
         throw std::runtime_error(
-            "GPIOController failed to initialise pigpio. Check permissions and hardware wiring.");
+            "GPIOController failed to connect to pigpiod daemon.");
     }
     initialized_ = true;
 
@@ -75,12 +76,14 @@ void GPIOController::initialize(rclcpp::Node* node)
         1, static_cast<int>(std::lround(p.motor.pwm_frequency)));
 
     left_motor_ = std::make_unique<SNMotor>(
+        pi_,
         p.pins.LEFT_PWM,
         p.pins.LEFT_IN1,
         p.pins.LEFT_IN2,
         pwm_hz,
         MotorType::LEFT);
     right_motor_ = std::make_unique<SNMotor>(
+        pi_,
         p.pins.RIGHT_PWM,
         p.pins.RIGHT_IN1,
         p.pins.RIGHT_IN2,
@@ -88,17 +91,20 @@ void GPIOController::initialize(rclcpp::Node* node)
         MotorType::RIGHT);
 
     left_encoder_ = std::make_unique<QuadratureEncoder>(
+        pi_,
         p.pins.ENCB_CH1,
         p.pins.ENCB_CH2,
         p.encoder.output_cpr,
         MotorType::LEFT);
     right_encoder_ = std::make_unique<QuadratureEncoder>(
+        pi_,
         p.pins.ENCA_CH1,
         p.pins.ENCA_CH2,
         p.encoder.output_cpr,
         MotorType::RIGHT);
 
     servo_ = std::make_unique<Servo>(
+        pi_,
         p.pins.SERVO,
         p.servo.frequency,
         static_cast<float>(p.servo.pulse_min_us),

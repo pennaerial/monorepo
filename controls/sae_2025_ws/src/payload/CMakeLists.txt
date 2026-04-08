@@ -65,17 +65,17 @@ if(build_payload_sim_controller)
 endif()
 
 if(PAYLOAD_BUILD_GPIO_CONTROLLER STREQUAL "ON")
-  find_library(PIGPIO_LIBRARY NAMES pigpio REQUIRED)
-  find_path(PIGPIO_INCLUDE_DIR NAMES pigpio.h REQUIRED)
+  find_library(PIGPIO_LIBRARY NAMES pigpiod_if2 REQUIRED)
+  find_path(PIGPIO_INCLUDE_DIR NAMES pigpiod_if2.h REQUIRED)
   set(build_payload_gpio_controller TRUE)
 elseif(PAYLOAD_BUILD_GPIO_CONTROLLER STREQUAL "AUTO")
-  find_library(PIGPIO_LIBRARY NAMES pigpio)
-  find_path(PIGPIO_INCLUDE_DIR NAMES pigpio.h)
+  find_library(PIGPIO_LIBRARY NAMES pigpiod_if2)
+  find_path(PIGPIO_INCLUDE_DIR NAMES pigpiod_if2.h)
   if(PIGPIO_LIBRARY AND PIGPIO_INCLUDE_DIR)
     set(build_payload_gpio_controller TRUE)
   else()
     message(STATUS
-      "Skipping GPIOController because pigpio development files were not found. "
+      "Skipping GPIOController because pigpiod_if2 development files were not found. "
       "Install pigpio to enable the hardware backend.")
   endif()
 elseif(NOT PAYLOAD_BUILD_GPIO_CONTROLLER STREQUAL "OFF")

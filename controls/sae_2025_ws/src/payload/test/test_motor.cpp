@@ -1,5 +1,5 @@
 #include <rclcpp/rclcpp.hpp>
-#include <pigpio.h>
+#include <pigpiod_if2.h>
 
 #include <chrono>
 #include <csignal>
@@ -10,26 +10,31 @@
 
 #include "payload/encoder.hpp"
 #include "payload/motor.hpp"
+
 // ---- Pins from payload_params.yaml ----
-// SN754410 pins
-static constexpr int SN_LEFT_PWM = 18;
-static constexpr int SN_LEFT_IN1 = 15;
-static constexpr int SN_LEFT_IN2 = 14;
-static constexpr int SN_RIGHT_PWM = 13;
-static constexpr int SN_RIGHT_IN1 = 20;
-static constexpr int SN_RIGHT_IN2 = 16;
+// static constexpr int SN_LEFT_PWM  = 18;
+// static constexpr int SN_LEFT_IN1  = 15;
+// static constexpr int SN_LEFT_IN2  = 14;
+// static constexpr int SN_RIGHT_PWM = 13;
+// static constexpr int SN_RIGHT_IN1 = 20;
+// static constexpr int SN_RIGHT_IN2 = 16;
 
+static constexpr int SN_RIGHT_PWM  = 18;
+static constexpr int SN_RIGHT_IN1  = 15;
+static constexpr int SN_RIGHT_IN2  = 14;
+static constexpr int SN_LEFT_PWM = 13;
+static constexpr int SN_LEFT_IN1 = 20;
+static constexpr int SN_LEFT_IN2 = 16;
 
-//ENCODER PINS
-static constexpr int ENCA1  = 6;
-static constexpr int ENCA2  = 5;
-static constexpr int ENCB1  = 10;
-static constexpr int ENCB2  = 9;
+static constexpr int ENCA1 = 5;
+static constexpr int ENCA2 = 6;
+static constexpr int ENCB1 = 10;
+static constexpr int ENCB2 = 9;
 
-constexpr float FREQ = 200.0; //200 Hz
+constexpr float FREQ = 200.0f;
+static constexpr int ENC_CPR = 2400;
 
-static constexpr int ENC_CPR = 2400; // counts per rev after 4x decode
-
+static int g_pi = -1;
 static void pause(int ms) { std::this_thread::sleep_for(std::chrono::milliseconds(ms)); }
 
 static void pause_print(int ms, QuadratureEncoder& enc_a, QuadratureEncoder& enc_b)
@@ -43,48 +48,44 @@ static void pause_print(int ms, QuadratureEncoder& enc_a, QuadratureEncoder& enc
     }
 }
 
-// ---- Signal handling ----
-static Motor*    g_motor_a = nullptr;
-static Motor*    g_motor_b = nullptr;
+static Motor* g_motor_a = nullptr;
+static Motor* g_motor_b = nullptr;
 
 static void on_sigint(int)
 {
     printf("\nCaught SIGINT — coasting motors and cleaning up\n");
     if (g_motor_a) g_motor_a->coast();
     if (g_motor_b) g_motor_b->coast();
-    gpioTerminate();
+    if (g_pi >= 0) pigpio_stop(g_pi);
     rclcpp::shutdown();
     std::exit(0);
 }
 
-// ---- Test sequences ----
-
-// ---- Main ----
 int main(int argc, char** argv)
 {
     rclcpp::init(argc, argv);
 
-    int rc = gpioInitialise();
-    if (rc < 0) {
-        printf("ERROR: gpioInitialise() failed (err=%d)\n", rc);
+    g_pi = pigpio_start(nullptr, nullptr);
+    if (g_pi < 0) {
+        printf("ERROR: pigpio_start() failed (err=%d). Is pigpiod running?\n", g_pi);
         rclcpp::shutdown();
         return 1;
     }
-    printf("pigpio initialised (version=%d)\n", rc);
+    printf("Connected to pigpiod\n");
 
     std::unique_ptr<Motor> motor_right;
     std::unique_ptr<Motor> motor_left;
     printf("Running SNMotor test\n");
     motor_right = std::make_unique<SNMotor>(
-        SN_RIGHT_PWM, SN_RIGHT_IN1, SN_RIGHT_IN2, FREQ, MotorType::RIGHT);
+        g_pi, SN_RIGHT_PWM, SN_RIGHT_IN1, SN_RIGHT_IN2, static_cast<int>(FREQ), MotorType::RIGHT);
     motor_left = std::make_unique<SNMotor>(
-        SN_LEFT_PWM, SN_LEFT_IN1, SN_LEFT_IN2, FREQ, MotorType::LEFT);
+        g_pi, SN_LEFT_PWM, SN_LEFT_IN1, SN_LEFT_IN2, static_cast<int>(FREQ), MotorType::LEFT);
     g_motor_a = motor_right.get();
     g_motor_b = motor_left.get();
     std::signal(SIGINT, on_sigint);
 
-    QuadratureEncoder enc_a(ENCA1, ENCA2, ENC_CPR, MotorType::RIGHT);
-    QuadratureEncoder enc_b(ENCB1, ENCB2, ENC_CPR, MotorType::LEFT);
+    QuadratureEncoder enc_a(g_pi, ENCA1, ENCA2, ENC_CPR, MotorType::RIGHT);
+    QuadratureEncoder enc_b(g_pi, ENCB1, ENCB2, ENC_CPR, MotorType::LEFT);
 
     std::cout << "RIGHT MOTOR FORWARD 70%" << std::endl;
     motor_right->forward(70.0f);
@@ -143,55 +144,36 @@ int main(int argc, char** argv)
 
     printf("\n=== set_speed tests ===\n");
 
-    printf("\n--- RIGHT motor set_speed ---\n");
-    printf("RIGHT set_speed(+0.7) -- forward 70%%\n");
+    printf("RIGHT set_speed(+0.7)\n");
     motor_right->set_speed(0.7f);
     pause_print(2000, enc_a, enc_b);
 
-    printf("RIGHT set_speed(+0.2) -- forward 20%%\n");
-    motor_right->set_speed(0.2f);
-    pause_print(2000, enc_a, enc_b);
-
-    printf("RIGHT set_speed(-1.0) -- reverse 100%%\n");
+    printf("RIGHT set_speed(-1.0)\n");
     motor_right->set_speed(-1.0f);
     pause_print(2000, enc_a, enc_b);
 
-    printf("RIGHT set_speed(-0.5) -- reverse 50%%\n");
-    motor_right->set_speed(-0.5f);
-    pause_print(2000, enc_a, enc_b);
-
-    printf("RIGHT set_speed(0.0) -- coast\n");
+    printf("RIGHT set_speed(0.0)\n");
     motor_right->set_speed(0.0f);
     pause_print(2000, enc_a, enc_b);
 
-    printf("\n--- LEFT motor set_speed ---\n");
-    printf("LEFT set_speed(+0.7) -- forward 70%%\n");
+    printf("LEFT set_speed(+0.7)\n");
     motor_left->set_speed(0.7f);
     pause_print(2000, enc_a, enc_b);
 
-    printf("LEFT set_speed(+0.2) -- forward 20%%\n");
-    motor_left->set_speed(0.2f);
-    pause_print(2000, enc_a, enc_b);
-
-    printf("LEFT set_speed(-1.0) -- reverse 100%%\n");
+    printf("LEFT set_speed(-1.0)\n");
     motor_left->set_speed(-1.0f);
     pause_print(2000, enc_a, enc_b);
 
-    printf("LEFT set_speed(-0.5) -- reverse 50%%\n");
-    motor_left->set_speed(-0.5f);
-    pause_print(2000, enc_a, enc_b);
-
-    printf("LEFT set_speed(0.0) -- coast\n");
+    printf("LEFT set_speed(0.0)\n");
     motor_left->set_speed(0.0f);
     pause_print(2000, enc_a, enc_b);
 
-    printf("\n--- Both motors: straight drive via set_speed ---\n");
-    printf("BOTH set_speed(+1.0) -- full forward\n");
+    printf("BOTH set_speed(+1.0)\n");
     motor_right->set_speed(1.0f);
     motor_left->set_speed(1.0f);
     pause_print(2000, enc_a, enc_b);
 
-    printf("BOTH set_speed(-1.0) -- full reverse\n");
+    printf("BOTH set_speed(-1.0)\n");
     motor_right->set_speed(-1.0f);
     motor_left->set_speed(-1.0f);
     pause_print(2000, enc_a, enc_b);
@@ -200,9 +182,7 @@ int main(int argc, char** argv)
     motor_left->set_speed(0.0f);
     pause(500);
 
-    printf("\n--- Turn simulation: opposite-sign set_speed (key test) ---\n");
-    printf("TURN LEFT: right set_speed(+0.7), left set_speed(-0.7)\n");
-    printf("  Expected: enc_a (right) positive, enc_b (left) negative\n");
+    printf("TURN LEFT: right +0.7, left -0.7\n");
     motor_right->set_speed(0.7f);
     motor_left->set_speed(-0.7f);
     pause_print(3000, enc_a, enc_b);
@@ -211,8 +191,7 @@ int main(int argc, char** argv)
     motor_left->set_speed(0.0f);
     pause(500);
 
-    printf("TURN RIGHT: right set_speed(-0.7), left set_speed(+0.7)\n");
-    printf("  Expected: enc_a (right) negative, enc_b (left) positive\n");
+    printf("TURN RIGHT: right -0.7, left +0.7\n");
     motor_right->set_speed(-0.7f);
     motor_left->set_speed(0.7f);
     pause_print(3000, enc_a, enc_b);
@@ -221,9 +200,8 @@ int main(int argc, char** argv)
     motor_left->set_speed(0.0f);
 
     printf("\nDone.\n");
-
     pause(500);
-    gpioTerminate();
+    pigpio_stop(g_pi);
     rclcpp::shutdown();
     return 0;
 }

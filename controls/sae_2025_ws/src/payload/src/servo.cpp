@@ -2,11 +2,11 @@
 
 #include <algorithm>
 
-Servo::Servo(int pin, int frequency, float pulse_min_u, float pulse_max_u) :
-    frequency_(frequency),
-    servo_pin_(pin, Direction::Output),
-    pulse_min_u_(pulse_min_u),
-    pulse_max_u_(pulse_max_u) {}
+Servo::Servo(int pi, int pin, int frequency, float pulse_min_u, float pulse_max_u)
+: frequency_(frequency),
+  servo_pin_(pi, pin, Direction::Output),
+  pulse_min_u_(pulse_min_u),
+  pulse_max_u_(pulse_max_u) {}
 
 void Servo::degree_setpoint(float degree) {
     int pulse = angle_to_pulse(degree);
@@ -27,7 +27,6 @@ int Servo::angle_to_pulse(float degree) {
     return static_cast<int>(
         pulse_min_u_ + (clamped / 180.0f) * (pulse_max_u_ - pulse_min_u_));
 }
-
 
 rclcpp::Logger Servo::logger() {
     return rclcpp::get_logger("servo");
