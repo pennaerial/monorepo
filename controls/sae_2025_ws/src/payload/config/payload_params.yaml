@@ -7,22 +7,22 @@
     pins:
       # Preferred explicit left/right mapping.
       # On this hardware: A* pins are RIGHT motor, B* pins are LEFT motor.
-      LEFT_PWM: 18
-      LEFT_IN1: 14
-      LEFT_IN2: 15
-      RIGHT_PWM: 13
-      RIGHT_IN1: 16
-      RIGHT_IN2: 20
+      LEFT_PWM: 13
+      LEFT_IN1: 20
+      LEFT_IN2: 16
+      RIGHT_PWM: 18
+      RIGHT_IN1: 15
+      RIGHT_IN2: 14
 
-      ENCA_CH1: 6
-      ENCA_CH2: 5
+      ENCA_CH1: 5
+      ENCA_CH2: 6
       ENCB_CH1: 10
       ENCB_CH2: 9
       SERVO: 23
 
     motor:
       pwm_frequency: 200.0
-      max_wheel_rpm: 270.0
+      max_wheel_rpm: 200.0
       max_norm_speed: 1.0
 
     encoder:
