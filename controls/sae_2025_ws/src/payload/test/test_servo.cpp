@@ -5,22 +5,23 @@
 #include <iostream>
 #include <thread>
 
-#include <pigpio.h>
+#include <pigpiod_if2.h>
 #include <rclcpp/rclcpp.hpp>
 
 #include "payload/servo.hpp"
 
 constexpr int SERVO_PIN = 23;
-constexpr float PULSE_MIN = 700.0f;
-constexpr float PULSE_MAX = 2300.0f;
+constexpr float PULSE_MIN = 1000.0f; // used to be 700.0f, but that was too low for the servo to reliably reach 0 degrees. Adjusted after testing with an oscilloscope.
+constexpr float PULSE_MAX = 2500.0f;
 constexpr int FREQ = 50;
 
+static int g_pi = -1;
 static void pause(int ms) { std::this_thread::sleep_for(std::chrono::milliseconds(ms)); }
 
 static void on_sigint(int)
 {
     std::printf("\nCaught SIGINT -- closing servo and cleaning up\n");
-    gpioTerminate();
+    if (g_pi >= 0) pigpio_stop(g_pi);
     rclcpp::shutdown();
     std::exit(0);
 }
@@ -30,15 +31,15 @@ int main(int argc, char** argv)
     rclcpp::init(argc, argv);
     std::signal(SIGINT, on_sigint);
 
-    int rc = gpioInitialise();
-    if (rc < 0) {
-        std::printf("ERROR: gpioInitialise() failed (err=%d)\n", rc);
+    g_pi = pigpio_start(nullptr, nullptr);
+    if (g_pi < 0) {
+        std::printf("ERROR: pigpio_start() failed (err=%d). Is pigpiod running?\n", g_pi);
         rclcpp::shutdown();
         return 1;
     }
-    std::printf("pigpio initialised (version=%d)\n", rc);
+    std::printf("Connected to pigpiod\n");
 
-    Servo servo(SERVO_PIN, FREQ, PULSE_MIN, PULSE_MAX);
+    Servo servo(g_pi, SERVO_PIN, FREQ, PULSE_MIN, PULSE_MAX);
 
     std::cout << "NORMALIZED 0.0 (pulse_min=" << PULSE_MIN << "us)" << std::endl;
     servo.normalized_setpoint(0.0f);
@@ -65,7 +66,7 @@ int main(int argc, char** argv)
     pause(2000);
 
     pause(500);
-    gpioTerminate();
+    pigpio_stop(g_pi);
     rclcpp::shutdown();
     return 0;
 }
