@@ -1,0 +1,31 @@
+# Payload spawned on wrong side of VTOL; navigate around to front, then approach front tag (ID0).
+# VTOL tag layout (tag36h11): front=ID0, back=ID1, left=ID2, right=ID3.
+# start: PayloadNavigateAroundPlaneMode (SCAN -> NAVIGATE -> DONE)
+# apriltag_approach: PayloadAprilTagApproachMode targeting front tag.
+modes:
+  start:
+    class: uav.modes.payload.PayloadNavigateAroundPlaneMode
+    params:
+      orbit_radius_m: 1.5
+      approach_tag_id: 0
+      tag_size_m: 0.1
+      nav_speed_mps: 0.15
+      nav_angular_gain: 2.0
+      max_angular_rps: 0.6
+      waypoint_reach_dist_m: 0.4
+      scan_spin_rps: 0.3
+      scan_timeout_s: 8.0
+      tag_lost_coast_s: 1.0
+    transitions:
+      approach: apriltag_approach
+
+  apriltag_approach:
+    class: uav.modes.payload.PayloadAprilTagApproachMode
+    params:
+      tag_id: 0
+      tag_size_m: 0.0508
+      max_forward_speed: 0.2
+      forward_gain: 0.5
+      angular_gain: 0.003
+      yaw_gain: 0.65
+      stop_distance_m: 0.07

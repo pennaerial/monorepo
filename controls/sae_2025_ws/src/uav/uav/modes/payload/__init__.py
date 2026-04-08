@@ -4,6 +4,7 @@ __all__ = [
     "PayloadAprilTagApproachMode",
     "PayloadDriveToAprilTagMode",
     "PayloadColorOrbitToRearMode",
+    "PayloadNavigateAroundPlaneMode",
 ]
 
 
