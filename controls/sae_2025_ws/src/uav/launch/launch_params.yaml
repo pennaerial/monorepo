@@ -1,7 +1,7 @@
 # launch_params.yaml
-mission_name: payload_drive_to_apriltag
+mission_name: payload_apriltag_approach
 uav_debug: false
-vision_debug: false
+vision_debug: true
 auto_launch: true
 
 # PX4 / airframe settings for UAV missions and sim-backed payload missions.
