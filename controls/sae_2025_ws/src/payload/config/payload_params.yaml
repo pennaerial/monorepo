@@ -35,11 +35,11 @@
       wheel_separation_m: 0.12132
 
     pid:
-      left_kp: 0.005
-      left_ki: 0.003
+      left_kp: 0.004
+      left_ki: 0.0036
       left_kd: 0.0
-      right_kp: 0.005
-      right_ki: 0.003
+      right_kp: 0.004
+      right_ki: 0.0036
       right_kd: 0.0
       i_clamp: 1.0
       output_limit_norm: 1.0
