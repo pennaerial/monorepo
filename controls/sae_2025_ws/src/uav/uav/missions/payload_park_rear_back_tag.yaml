@@ -22,9 +22,6 @@ modes:
       dock_orbit_radial_k: 0.8
       dock_orbit_yaw_k: 2.0
       dock_orbit_peek_blend: 0.4
-      dock_recovery_timeout_s: 5.0
       dock_heading_rate_limit: 0.3
       dock_align_angle_deg: 30.0
       dock_align_hold_s: 0.4
-      dock_recovery_flip_window_s: 15.0
-      dock_recovery_flip_count: 3

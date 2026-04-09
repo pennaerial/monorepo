@@ -104,7 +104,6 @@ class PayloadAprilTagNode(VisionNode):
 
         return response
 
-
     def _debug_timer_callback(self) -> None:
         image_msg = self.image
         camera_info = self.camera_info
@@ -116,12 +115,28 @@ class PayloadAprilTagNode(VisionNode):
         bgr = self.convert_image_msg_to_frame(image_msg)
         gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
         all_observations = detect_payload_apriltags(
-            gray, camera_info, detector, self._detector_cache.backend, self._last_tag_size_m
+            gray,
+            camera_info,
+            detector,
+            self._detector_cache.backend,
+            self._last_tag_size_m,
         )
         observations = solve_payload_apriltags(
-            gray, camera_info, detector, self._detector_cache.backend, self._last_tag_size_m
+            gray,
+            camera_info,
+            detector,
+            self._detector_cache.backend,
+            self._last_tag_size_m,
         )
-        self._draw_debug(bgr, gray, camera_info, all_observations, observations, self._last_tag_size_m, detector)
+        self._draw_debug(
+            bgr,
+            gray,
+            camera_info,
+            all_observations,
+            observations,
+            self._last_tag_size_m,
+            detector,
+        )
 
     def _draw_debug(
         self,
@@ -142,10 +157,14 @@ class PayloadAprilTagNode(VisionNode):
         solved_ids = {obs.tag_id for obs in observations}
 
         # Image center crosshair
-        cv2.drawMarker(vis, (int(img_cx), int(img_cy)), (255, 255, 255), cv2.MARKER_CROSS, 20, 1)
+        cv2.drawMarker(
+            vis, (int(img_cx), int(img_cy)), (255, 255, 255), cv2.MARKER_CROSS, 20, 1
+        )
 
         # Primary tag for HUD = largest area among all_observations
-        primary = max(all_observations, key=lambda o: o.area) if all_observations else None
+        primary = (
+            max(all_observations, key=lambda o: o.area) if all_observations else None
+        )
 
         for det in _iter_detections(gray, detector, self._detector_cache.backend):
             tag_id = int(getattr(det, "tag_id", -1))
@@ -156,25 +175,53 @@ class PayloadAprilTagNode(VisionNode):
 
             # Tag border
             for i in range(4):
-                cv2.line(vis, tuple(corners[i]), tuple(corners[(i + 1) % 4]), border_color, 2)
+                cv2.line(
+                    vis, tuple(corners[i]), tuple(corners[(i + 1) % 4]), border_color, 2
+                )
 
             # Corner pixel labels
             for px, py in corners:
                 cv2.circle(vis, (px, py), 4, border_color, -1)
-                cv2.putText(vis, f"({px},{py})", (px + 4, py - 4),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.35, border_color, 1)
+                cv2.putText(
+                    vis,
+                    f"({px},{py})",
+                    (px + 4, py - 4),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.35,
+                    border_color,
+                    1,
+                )
 
             # Tag center dot and ID
             cv2.circle(vis, (tag_cx, tag_cy), 6, (0, 0, 255), -1)
-            cv2.putText(vis, f"id={tag_id}", (tag_cx + 8, tag_cy - 8),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
+            cv2.putText(
+                vis,
+                f"id={tag_id}",
+                (tag_cx + 8, tag_cy - 8),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.6,
+                (255, 255, 0),
+                2,
+            )
 
             # Steering arrow: image center → tag center
-            cv2.arrowedLine(vis, (int(img_cx), int(img_cy)), (tag_cx, tag_cy),
-                            (0, 165, 255), 2, tipLength=0.15)
-            cv2.putText(vis, "steer",
-                        ((int(img_cx) + tag_cx) // 2 + 4, (int(img_cy) + tag_cy) // 2),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 165, 255), 1)
+            cv2.arrowedLine(
+                vis,
+                (int(img_cx), int(img_cy)),
+                (tag_cx, tag_cy),
+                (0, 165, 255),
+                2,
+                tipLength=0.15,
+            )
+            cv2.putText(
+                vis,
+                "steer",
+                ((int(img_cx) + tag_cx) // 2 + 4, (int(img_cy) + tag_cy) // 2),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.45,
+                (0, 165, 255),
+                1,
+            )
 
             # solvePnP for 3D axes
             ok, rvec, tvec = cv2.solvePnP(
@@ -186,13 +233,23 @@ class PayloadAprilTagNode(VisionNode):
             )
             if ok:
                 axis_len = tag_size_m * 0.5
-                axes_3d = np.float32([[0, 0, 0], [axis_len, 0, 0], [0, axis_len, 0], [0, 0, axis_len]])
-                projected, _ = cv2.projectPoints(axes_3d, rvec, tvec, camera_matrix, np.zeros((4, 1)))
+                axes_3d = np.float32(
+                    [[0, 0, 0], [axis_len, 0, 0], [0, axis_len, 0], [0, 0, axis_len]]
+                )
+                projected, _ = cv2.projectPoints(
+                    axes_3d, rvec, tvec, camera_matrix, np.zeros((4, 1))
+                )
                 projected = projected.reshape(-1, 2).astype(int)
                 origin = tuple(projected[0])
-                cv2.arrowedLine(vis, origin, tuple(projected[1]), (0, 0, 255), 2, tipLength=0.3)   # X red
-                cv2.arrowedLine(vis, origin, tuple(projected[2]), (0, 255, 0), 2, tipLength=0.3)   # Y green
-                cv2.arrowedLine(vis, origin, tuple(projected[3]), (255, 0, 0), 2, tipLength=0.3)   # Z blue
+                cv2.arrowedLine(
+                    vis, origin, tuple(projected[1]), (0, 0, 255), 2, tipLength=0.3
+                )  # X red
+                cv2.arrowedLine(
+                    vis, origin, tuple(projected[2]), (0, 255, 0), 2, tipLength=0.3
+                )  # Y green
+                cv2.arrowedLine(
+                    vis, origin, tuple(projected[3]), (255, 0, 0), 2, tipLength=0.3
+                )  # Z blue
 
         # HUD overlay for primary tag
         if primary is not None:
@@ -200,8 +257,15 @@ class PayloadAprilTagNode(VisionNode):
             lateral_error_px = primary.center_x - img_cx
 
             # Distance — large text top-left
-            cv2.putText(vis, f"dist: {tz:.3f} m",
-                        (8, 36), cv2.FONT_HERSHEY_SIMPLEX, 1.1, (0, 255, 255), 2)
+            cv2.putText(
+                vis,
+                f"dist: {tz:.3f} m",
+                (8, 36),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                1.1,
+                (0, 255, 255),
+                2,
+            )
 
             # Detail lines
             lines = [
@@ -210,23 +274,60 @@ class PayloadAprilTagNode(VisionNode):
                 f"yaw err: {primary.yaw_error:+.3f} rad  (0=orthogonal)",
             ]
             if primary.pose_x is not None:
-                lines.append(f"pose:    x={primary.pose_x:.3f}  y={primary.pose_y:.3f}  yaw={math.degrees(primary.pose_yaw):.1f} deg")
+                lines.append(
+                    f"pose:    x={primary.pose_x:.3f}  y={primary.pose_y:.3f}  yaw={math.degrees(primary.pose_yaw):.1f} deg"
+                )
             for i, line in enumerate(lines):
-                cv2.putText(vis, line, (8, 60 + i * 18),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
-                cv2.putText(vis, line, (8, 60 + i * 18),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
+                cv2.putText(
+                    vis,
+                    line,
+                    (8, 60 + i * 18),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.5,
+                    (0, 0, 0),
+                    2,
+                )
+                cv2.putText(
+                    vis,
+                    line,
+                    (8, 60 + i * 18),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.5,
+                    (200, 200, 200),
+                    1,
+                )
 
             # Tag count top-right
             label = f"{len(all_observations)} tag(s) detected"
             (lw, lh), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
-            cv2.putText(vis, label, (w - lw - 8, 24),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
-            cv2.putText(vis, label, (w - lw - 8, 24),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
+            cv2.putText(
+                vis,
+                label,
+                (w - lw - 8, 24),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                (0, 0, 0),
+                2,
+            )
+            cv2.putText(
+                vis,
+                label,
+                (w - lw - 8, 24),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                (200, 200, 200),
+                1,
+            )
         else:
-            cv2.putText(vis, "no tags detected", (8, 36),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+            cv2.putText(
+                vis,
+                "no tags detected",
+                (8, 36),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.8,
+                (0, 0, 255),
+                2,
+            )
 
         self.display_frame(vis, "PayloadAprilTagNode")
 

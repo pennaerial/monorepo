@@ -111,7 +111,9 @@ class PayloadRetreatMode(Mode):
                 Image, cam_topic, self._image_cb, 10
             )
         self._drive_pub = self.node.create_publisher(DriveCommand, drive_topic, 10)
-        self.log(f"PayloadRetreatMode: subscribed to {cam_topic}, publishing to {drive_topic}")
+        self.log(
+            f"PayloadRetreatMode: subscribed to {cam_topic}, publishing to {drive_topic}"
+        )
 
     def on_exit(self) -> None:
         self._publish_drive(0.0, 0.0)
@@ -131,7 +133,9 @@ class PayloadRetreatMode(Mode):
             else:
                 bgr = self._bridge.imgmsg_to_cv2(self._image, desired_encoding="bgr8")
         except Exception as exc:
-            self.node.get_logger().warn(f"PayloadRetreatMode: image decode failed: {exc}")
+            self.node.get_logger().warn(
+                f"PayloadRetreatMode: image decode failed: {exc}"
+            )
             return
 
         if bgr is None:
@@ -141,7 +145,7 @@ class PayloadRetreatMode(Mode):
         if self._phase == "drive_to_edge":
             white_ratio, white_count = self._edge_metrics(bgr)
             self.node.get_logger().info(
-                f"white={white_ratio*100:.1f}%  count={white_count}"
+                f"white={white_ratio * 100:.1f}%  count={white_count}"
             )
 
             if white_count < self.edge_min_pixels:
@@ -162,7 +166,7 @@ class PayloadRetreatMode(Mode):
                     self._publish_drive(0.0, 0.0)
                     self._phase = "turn_180"
                     self.log(
-                        f"PayloadRetreatMode: edge confirmed (white={white_ratio*100:.1f}%) — starting 180° turn"
+                        f"PayloadRetreatMode: edge confirmed (white={white_ratio * 100:.1f}%) — starting 180° turn"
                     )
                     if self.camera_debug:
                         self._draw_debug(bgr, white_ratio, white_count, at_edge=True)
@@ -212,7 +216,7 @@ class PayloadRetreatMode(Mode):
         to the surrounding ground — the payload has reached the zone edge.
         """
         h, w = bgr.shape[:2]
-        lower = bgr[h // 2:, :]
+        lower = bgr[h // 2 :, :]
         hsv = cv2.cvtColor(lower, cv2.COLOR_BGR2HSV)
         white_mask = cv2.inRange(hsv, _WHITE_LOWER, _WHITE_UPPER)
         white_count = int(np.count_nonzero(white_mask))
@@ -230,23 +234,44 @@ class PayloadRetreatMode(Mode):
         vis = bgr.copy()
         h, w = vis.shape[:2]
 
-        lower = vis[h // 2:, :]
+        lower = vis[h // 2 :, :]
         hsv = cv2.cvtColor(lower, cv2.COLOR_BGR2HSV)
         white_mask = cv2.inRange(hsv, _WHITE_LOWER, _WHITE_UPPER)
         lower[white_mask > 0] = (255, 100, 0)
-        vis[h // 2:, :] = lower
+        vis[h // 2 :, :] = lower
 
         cv2.line(vis, (0, h // 2), (w, h // 2), (255, 255, 0), 1)
 
         edge_color = (0, 0, 255) if at_edge else (0, 255, 255)
         label = "AT EDGE" if at_edge else "driving"
-        cv2.putText(vis, f"{label}  white={white_ratio*100:.1f}%  stable={self._edge_stable_count}/{self.edge_stable_frames}",
-                    (8, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, edge_color, 2)
-        cv2.putText(vis, f"phase={self._phase}  white={white_count}",
-                    (8, 56), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
+        cv2.putText(
+            vis,
+            f"{label}  white={white_ratio * 100:.1f}%  stable={self._edge_stable_count}/{self.edge_stable_frames}",
+            (8, 30),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.6,
+            edge_color,
+            2,
+        )
+        cv2.putText(
+            vis,
+            f"phase={self._phase}  white={white_count}",
+            (8, 56),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            (200, 200, 200),
+            1,
+        )
         if self._phase == "turn_180":
-            cv2.putText(vis, f"turned={math.degrees(self._turned_rad):.1f}/180°",
-                        (8, 78), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 165, 255), 1)
+            cv2.putText(
+                vis,
+                f"turned={math.degrees(self._turned_rad):.1f}/180°",
+                (8, 78),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                (0, 165, 255),
+                1,
+            )
 
         cv2.imshow("PayloadRetreatMode", vis)
         cv2.waitKey(1)
@@ -254,4 +279,6 @@ class PayloadRetreatMode(Mode):
     def _publish_drive(self, linear: float, angular: float) -> None:
         if self._drive_pub is None:
             return
-        self._drive_pub.publish(DriveCommand(linear=float(linear), angular=float(angular)))
+        self._drive_pub.publish(
+            DriveCommand(linear=float(linear), angular=float(angular))
+        )

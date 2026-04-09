@@ -2,8 +2,12 @@
 # Regenerate border/hash block: flat on ground (no roll). Pink pose = bottom-left of 8ft×8ft pad.
 # Hardcoded 8 ft × 8 ft: half_8ft = 1.2192 m, inner square half = 3 ft = 0.9144 m.
 import sys
-sys.path.insert(0, "/home/ubuntu/monorepo/controls/sae_2025_ws/src/sim/sim/world_gen/models/dlz")
+
+sys.path.insert(
+    0, "/home/ubuntu/monorepo/controls/sae_2025_ws/src/sim/sim/world_gen/models/dlz"
+)
 import os
+
 os.chdir("/home/ubuntu/monorepo/controls/sae_2025_ws/src/sim/sim/world_gen/models/dlz")
 
 # Pink visual pose in model.sdf = bottom-left corner of 8 ft × 8 ft pad
@@ -20,8 +24,10 @@ start = round(-half + step, 4)
 px = pink_bottom_left_x + half_8ft
 py = pink_bottom_left_y - half_8ft
 
+
 def to_link(lx, ly):
     return (round(px + lx, 4), round(py + ly, 4), round(pz + eps_y, 4))
+
 
 borders = [
     ("inner_border_top", (0, half), (1.8288, 0.02, 0.001)),
@@ -41,7 +47,9 @@ for name, (lx, ly), size in borders:
     lines.append("        <cast_shadows>false</cast_shadows>")
     lines.append(f"        <pose>{x} {y} {z} {rot}</pose>")
     lines.append(f"        <geometry><box><size>{sx} {sy} {sz}</size></box></geometry>")
-    lines.append("        <material><ambient>0.1 0.1 0.1 1</ambient><diffuse>0.1 0.1 0.1 1</diffuse></material>")
+    lines.append(
+        "        <material><ambient>0.1 0.1 0.1 1</ambient><diffuse>0.1 0.1 0.1 1</diffuse></material>"
+    )
     lines.append("      </visual>")
 
 for side, lx_val, ly_val, size_x, size_y in [
@@ -61,11 +69,18 @@ for side, lx_val, ly_val, size_x, size_y in [
         lines.append(f'      <visual name="hash_{side}_{i:02d}">')
         lines.append("        <cast_shadows>false</cast_shadows>")
         lines.append(f"        <pose>{x} {y} {z} {rot}</pose>")
-        lines.append(f"        <geometry><box><size>{size_x} {size_y} {hash_h}</size></box></geometry>")
-        lines.append(f"        <material><ambient>{crgb}</ambient><diffuse>{crgb}</diffuse></material>")
+        lines.append(
+            f"        <geometry><box><size>{size_x} {size_y} {hash_h}</size></box></geometry>"
+        )
+        lines.append(
+            f"        <material><ambient>{crgb}</ambient><diffuse>{crgb}</diffuse></material>"
+        )
         lines.append("      </visual>")
 
-new_block = "      <!-- Inner square: 6 ft × 6 ft inside 8 ft × 8 ft pad. Flat on ground, rot=0 0 0. -->\n" + "\n".join(lines)
+new_block = (
+    "      <!-- Inner square: 6 ft × 6 ft inside 8 ft × 8 ft pad. Flat on ground, rot=0 0 0. -->\n"
+    + "\n".join(lines)
+)
 
 with open("model.sdf") as f:
     content = f.read()

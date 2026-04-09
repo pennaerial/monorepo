@@ -129,7 +129,7 @@ class PayloadNavigateAroundPlaneMode(Mode):
         side_y = r if pose_y >= 0 else -r
         return [
             (0.0, side_y),  # cross mid-fuselage at wing clearance
-            (-r, 0.0),      # arrive in front of plane
+            (-r, 0.0),  # arrive in front of plane
         ]
 
     def _publish_drive(self, linear: float, angular: float) -> None:
@@ -154,7 +154,9 @@ class PayloadNavigateAroundPlaneMode(Mode):
 
         if not self._first_response_logged:
             self._first_response_logged = True
-            self.log("PayloadNavigateAroundPlaneMode: first perception response received")
+            self.log(
+                "PayloadNavigateAroundPlaneMode: first perception response received"
+            )
 
         observations = self._decode_observations(response)
         now = _time.time()
@@ -213,7 +215,9 @@ class PayloadNavigateAroundPlaneMode(Mode):
             )
         self._publish_drive(0.0, spin_w)
 
-    def _run_navigate(self, observations: dict[int, TagObservation], now: float) -> None:
+    def _run_navigate(
+        self, observations: dict[int, TagObservation], now: float
+    ) -> None:
         best = self._best_observation(observations)
 
         if best is None:
@@ -226,7 +230,9 @@ class PayloadNavigateAroundPlaneMode(Mode):
             else:
                 if now - self._last_log_time >= 2.0:
                     self._last_log_time = now
-                    self.log("PayloadNavigateAroundPlaneMode: NAVIGATE tag lost, stopping")
+                    self.log(
+                        "PayloadNavigateAroundPlaneMode: NAVIGATE tag lost, stopping"
+                    )
                 self._publish_drive(0.0, 0.0)
             return
 
