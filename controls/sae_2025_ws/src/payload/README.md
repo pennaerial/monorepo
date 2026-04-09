@@ -1,32 +1,42 @@
 # Payload Package
-Payload node responsible for receiving and converting drive commands to movement (in real and sim)
 
-Payload for SAE Advanced Class 2026
+Payload runs the SAE ground payload in simulation and on Raspberry Pi hardware.
+
+Payload for SAE Advanced Class 2026:
 - two wheel diff drive payload
-- cam mounted in front
-- ball caster in back
+- front-mounted camera
+- rear ball caster
 
-### Extra Dependencies
-`sudo apt install ros-humble-generate-parameter-library`
-- uses `generate_parameter_library` to load in node parameters as C++ structs
+## Parameters And Controllers
 
-### Raspberry Pi Hardware Setup (pigpiod)
+`payload` uses the checked-in local parameter layer in `include/payload/payload_parameters.hpp`.
 
-The GPIO controller backend uses the `pigpiod` daemon (pigpiod_if2 library) for hardware PWM and encoder interrupts. This must be set up on **every Pi** before running the payload node in hardware mode.
+Available controller plugin names:
+- `SimController` for Gazebo-backed simulation
+- `GPIOController` for Raspberry Pi hardware via `pigpio`
 
-#### 1. Install pigpio from source
+`config/payload_params.yaml` currently defaults `controller` to `GPIOController`. Simulation launch flows override that to `SimController`, or you can do it manually with `controller:=SimController`.
+
+## Raspberry Pi Hardware Setup (`pigpiod`)
+
+The `GPIOController` backend and the hardware test binaries (`test_motor`, `test_servo`) require the `pigpiod_if2` headers/library at build time and a running `pigpiod` daemon at runtime. This must be set up on every Pi before running the payload node in hardware mode.
+
+### 1. Install pigpio from source
+
 `pigpio` is not available via `apt` on Ubuntu 22.04. Build and install from source:
 
 ```bash
 cd ~
-git clone https://github.com/joan2937/pigpio.git
+git clone --depth 1 https://github.com/joan2937/pigpio.git
 cd pigpio
-make
+cmake . -DBUILD_SHARED_LIBS=ON
+make -j$(nproc)
 sudo make install
 sudo ldconfig
 ```
 
-#### 2. Create the systemd service
+### 2. Create the systemd service
+
 ```bash
 sudo tee /etc/systemd/system/pigpiod.service > /dev/null << 'EOF'
 [Unit]
@@ -42,7 +52,8 @@ WantedBy=multi-user.target
 EOF
 ```
 
-#### 3. Enable and start the daemon
+### 3. Enable and start the daemon
+
 ```bash
 sudo systemctl daemon-reload
 sudo systemctl enable pigpiod
@@ -52,17 +63,18 @@ sudo systemctl status pigpiod
 
 Look for `Active: active (running)`. The daemon will now start automatically on boot.
 
-#### 4. Verify
+### 4. Verify
+
 ```bash
 source install/setup.bash
 ros2 run payload test_servo
 ```
 
-This should run without `sudo` and without errors. If you see `pigpio_start() failed`, check that pigpiod is running: `sudo systemctl status pigpiod`.
+`test_servo` should run without `sudo` and without `pigpio_start() failed`. `test_motor` uses the same pigpio runtime path when you are ready to validate motors on hardware.
 
-#### Each-session setup (after one-time setup is done)
+#### Each-Session Setup
 
-pigpiod is enabled as a systemd service and starts automatically on boot — no manual steps are needed each session. Just SSH in and run your launch file normally:
+After the one-time setup, `pigpiod` should start automatically on boot. A normal hardware bringup looks like:
 
 ```bash
 ssh penn@penn-desktop.local
@@ -71,43 +83,29 @@ source install/setup.bash
 ros2 launch uav main.launch.py params_file:=$(pwd)/src/uav/launch/launch_params_hardware.yaml
 ```
 
-If the Pi was not rebooted and pigpiod somehow stopped, restart it with:
+If `pigpiod` ever stops, restart it with:
 
 ```bash
 sudo systemctl restart pigpiod
 ```
 
+## Launch
 
-If running multiple instances of payload, they should differ by launch arguments, but share the same node parameters
+`payload.launch.py` accepts these launch arguments:
+- `payload_name`: payload node name. In simulation, this must match the Gazebo payload model name. Default: `payload_0`
+- `controller`: optional plugin override. Leave it empty to use `config/payload_params.yaml`
 
-### Launch configuration:
-The defined launch arguments are:
-- `payload_name`: node name of the payload to launch. The node name is used to determine the name of the ros topics that the payload node listens to, and also the gazebo topics/services that the node sends messages to (sim controller). **This must match the name of the entity name of the gazebo payload model (sim mode)** \
-DEFAULT VALUE: `payload_0`
-
-### Payload Parameters
-Defined payload parameters (defined in `config/payload_params.schema.yaml`):
-- controller: defines the controller to use. The available options are `sim` and `gpio`. Use `sim` when testing in sitl and `gpio` when running on the pi \
-DEFAULT VALUE: `sim`
-
-### Launch:
-Running the launch file will run one instance of the payload and also links payload_params
-from ws directory, run 
+Examples:
 
 ```bash
+# Hardware / default config
 ros2 launch payload payload.launch.py
+
+# Standalone simulation
+ros2 launch payload payload.launch.py controller:=SimController
+
+# Alternate payload name in simulation
+ros2 launch payload payload.launch.py payload_name:=payload_1 controller:=SimController
 ```
-- this will launch the payload node with the params found in `config/payload_params.yaml`
-- this will also use the default launch configuration
 
-You can override the launch configuration via command line \
-Example: overriding the `payload_name` launch argument:
-```bash
-ros2 launch payload payload.launch.py payload_name:=payload_1
-```
-- This will launch a payload node called with name `payload_1`
-- This will listen to a ros topic called `/payload_1/cmd_drive` for drive commands
-- This will publish drive commands to a gazebo topic called `/model/payload_1/cmd_vel` to control the sim payload 
-
-
-
+Standalone `payload.launch.py` loads the installed `config/payload_params.yaml` from the package share directory. If you launch payload through `uav main.launch.py`, the UAV launch stack handles the mission and camera wiring. On hardware, make sure `pigpiod` is already running first.

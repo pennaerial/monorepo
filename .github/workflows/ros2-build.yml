@@ -255,11 +255,21 @@ jobs:
           Deployment Instructions:
           1. Extract to your Raspberry Pi
           2. cd to the extracted directory
-          3. Install runtime Python deps:
-             sudo apt-get install -y python3-pip build-essential cmake
+          3. Install runtime deps:
+             sudo apt-get update
+             sudo apt-get install -y python3-pip build-essential cmake git
              python3 -m pip install --user apriltag
-          4. Source the setup: source install/setup.bash
-          5. Run: ros2 launch uav main.launch.py
+          4. Install pigpio and start pigpiod:
+             cd /tmp
+             git clone --depth 1 https://github.com/joan2937/pigpio.git
+             cd pigpio
+             cmake . -DBUILD_SHARED_LIBS=ON
+             make -j\$(nproc)
+             sudo make install
+             sudo ldconfig
+             sudo /usr/local/bin/pigpiod
+          5. Source the setup: source install/setup.bash
+          6. Run: ros2 launch uav main.launch.py
 
           Configuration:
           - Integration edits the installed launch params and mission YAMLs under install/uav/share/uav/
@@ -311,10 +321,20 @@ jobs:
             tar -xzvf ros2-build-${{ steps.sha.outputs.short_sha }}.tar.gz
             rm ros2-build-${{ steps.sha.outputs.short_sha }}.tar.gz
 
-            # Install the AprilTag runtime dependency once on the Pi
+            # Install runtime deps for payload missions once on the Pi
             sudo apt-get update
-            sudo apt-get install -y python3-pip build-essential cmake
+            sudo apt-get install -y python3-pip build-essential cmake git
             python3 -m pip install --user apriltag
+
+            # Install pigpio and start pigpiod
+            cd /tmp
+            git clone --depth 1 https://github.com/joan2937/pigpio.git
+            cd pigpio
+            cmake . -DBUILD_SHARED_LIBS=ON
+            make -j$(nproc)
+            sudo make install
+            sudo ldconfig
+            sudo /usr/local/bin/pigpiod
 
             # Source ROS 2 and the workspace
             source /opt/ros/humble/setup.bash

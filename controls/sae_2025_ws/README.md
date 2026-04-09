@@ -82,7 +82,7 @@ sudo apt-get upgrade
     colcon build
     ```
 
-2. Install camera and AprilTag dependencies:
+2. Install camera and AprilTag dependencies used by the vision stack:
 
     ```bash
     sudo apt-get update
@@ -90,6 +90,8 @@ sudo apt-get upgrade
     python3 -m pip install apriltag
     ```
     AprilTag missions now always use the Python `apriltag` package for detection. Use the distro `python3-opencv` package for `cv2`; do not install `opencv-python` just to get AprilTag support.
+
+3. If you are running payload hardware on a Raspberry Pi, also complete the one-time `pigpio` / `pigpiod` setup in [src/payload/README.md](src/payload/README.md). The payload GPIO controller will not start unless `pigpiod` is running.
 ---
 
 ## Solving Common Issues
@@ -167,6 +169,8 @@ Example:
 ```bash
 ros2 launch uav main.launch.py mission_name:=payload_drive_to_apriltag payload_name:=payload_0
 ```
+
+For hardware payload missions, make sure `pigpiod` is already running or enabled as a service before launching.
 
 ### Legacy Manual Launch
 The older separate-terminal workflow below is kept for reference, but it is no longer the recommended path for SAE sim bringup.

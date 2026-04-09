@@ -11,6 +11,8 @@ AprilTag-based payload missions require the Python `apriltag` package on the mac
 python3 -m pip install apriltag
 ```
 
+Hardware payload missions launched through this entry point also require the payload-side `pigpiod` setup on the Pi that runs `GPIOController`. Follow [../payload/README.md](../payload/README.md) once before the first hardware run.
+
 Useful overrides:
 - `mission_name:=...` to override the mission configured in `launch/launch_params.yaml`
 - `payload_name:=...` to bind payload missions to a different payload entity
