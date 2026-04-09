@@ -42,7 +42,7 @@ class UAVModeManager(ModeManager):
         vehicle_class = AirframeClass.parse(vehicle_class)
 
         self.start_mission_trigger = self.create_service(
-            Trigger, "/mode_manager/start_mission", self.trigger_world_gen_req
+            Trigger, "/mode_manager/start_mission", self.start_mission
         )
         self.failsafe_trigger_service = self.create_service(
             Trigger, "/mode_manager/failsafe", self.trigger_failsafe
@@ -57,12 +57,15 @@ class UAVModeManager(ModeManager):
         self.setup_vision(list(mission_spec.vision_nodes))
         self.setup_modes(mission_spec)
 
-    def trigger_world_gen_req(self, request, response):
+    def start_mission(self, request, response):
         self.get_logger().info("MODE MANAGER | Starting Mission!")
         if self.timer is None:
             self.timer = self.create_timer(0.1, self.spin_once)
-        response.success = True
-        response.message = "Starting Mission!"
+            response.success = True
+            response.message = "Starting Mission!"
+        else:
+            response.success = False
+            response.message = "Mission Already in Progress"
         return response
 
     def trigger_failsafe(self, request, response):
