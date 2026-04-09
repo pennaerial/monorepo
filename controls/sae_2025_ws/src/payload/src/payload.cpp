@@ -8,12 +8,12 @@ Payload::Payload(const std::string& payload_name)
     payload_params_listener_ = std::make_shared<payload::ParamListener>(this);
     payload_params_ = payload_params_listener_->get_params();
 
-    std::string ros_drive_topic = "/" + payload_name_ + "/cmd_drive";
+    std::string ros_drive_topic = "cmd_drive";
     ros_drive_subscriber_ = this->create_subscription<payload_interfaces::msg::DriveCommand>(
         ros_drive_topic, 10, std::bind(&Payload::drive_callback, this, std::placeholders::_1));
     RCLCPP_INFO(this->get_logger(), "Listening on: %s", ros_drive_topic.c_str());
 
-    std::string servo_topic = "/" + payload_name_ + "/servo";
+    std::string servo_topic = "servo";
     servo_subscriber_ = this->create_subscription<payload_interfaces::msg::ServoCommand>(
         servo_topic, 10, std::bind(&Payload::servo_callback, this, std::placeholders::_1));
     RCLCPP_INFO(this->get_logger(), "Servo listening on: %s", servo_topic.c_str());
@@ -65,7 +65,7 @@ void Payload::init() {
         "Payload controller initialized: %s",
         payload_params_.controller.c_str());
 
-    std::string timed_drive_name = "/" + payload_name_ + "/timed_drive";
+    std::string timed_drive_name = "timed_drive";
     timed_drive_srv_ = this->create_service<payload_interfaces::srv::TimedDrive>(
         timed_drive_name,
         std::bind(&Payload::timed_drive_callback, this,

@@ -16,6 +16,7 @@ class UAVMissionBootstrap(Node):
         self.declare_parameter("auto_launch", True)
         self.declare_parameter("debug", False)
         self.declare_parameter("servo_only", False)
+        self.declare_parameter("vehicle_name", "uav")
         self.declare_parameter("vehicle_class", AirframeClass.MULTICOPTER.name)
         self.declare_parameter("uav_camera_offsets", [0.0, 0.0, 0.0])
 
@@ -43,6 +44,8 @@ class UAVMissionBootstrap(Node):
             "auto_launch": self._bool_parameter("auto_launch"),
             "debug": bool(self.get_parameter("debug").value),
             "servo_only": bool(self.get_parameter("servo_only").value),
+            "vehicle_name": str(self.get_parameter("vehicle_name").value).strip()
+            or "uav",
             "vehicle_class": AirframeClass.parse(
                 self.get_parameter("vehicle_class").value
             ),

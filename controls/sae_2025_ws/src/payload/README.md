@@ -98,7 +98,7 @@ sudo systemctl restart pigpiod
 ## Launch
 
 `payload.launch.py` accepts these launch arguments:
-- `payload_name`: payload node name. In simulation, this must match the Gazebo payload model name. Default: `payload_0`
+- `payload_name`: payload node name and ROS namespace prefix. In simulation, this must match the Gazebo payload model name. Default: `payload_0`
 - `controller`: optional plugin override. Leave it empty to use `config/payload_params.yaml`
 
 Examples:
@@ -114,4 +114,4 @@ ros2 launch payload payload.launch.py controller:=SimController
 ros2 launch payload payload.launch.py payload_name:=payload_1 controller:=SimController
 ```
 
-Standalone `payload.launch.py` loads the installed `config/payload_params.yaml` from the package share directory. If you launch payload through `uav main.launch.py`, the UAV launch stack handles the mission and camera wiring. On hardware, make sure `pigpiod` is already running first.
+Standalone `payload.launch.py` loads the installed `config/payload_params.yaml` from the package share directory. It launches payload ROS topics and services under `/<payload_name>/...` so multi-payload orchestration can target each payload independently. If you launch payload through `uav main.launch.py`, the UAV launch stack handles the mission and camera wiring. On hardware, make sure `pigpiod` is already running first.

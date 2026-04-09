@@ -1,9 +1,11 @@
 # launch_params.yaml
 mission_name: payload_retreat
+# Vehicle namespace for UAV mission-facing topics/services.
+uav_name: uav
 uav_debug: false
 vision_debug: true
 # Automatically start the mission manager once its runtime is ready.
-# Set false to leave the mission idle until /mode_manager/start_mission is called.
+# Set false to leave the mission idle until /<vehicle>/mode_manager/start_mission is called.
 auto_launch: true
 
 # PX4 / airframe settings for UAV missions and sim-backed payload missions.

@@ -20,6 +20,7 @@ class UAVModeManager(ModeManager):
         mission_spec: MissionSpec,
         debug: bool = False,
         servo_only: bool = False,
+        vehicle_name: str = "uav",
         vehicle_class: AirframeClass = AirframeClass.MULTICOPTER,
         camera_offsets=None,
         auto_launch: bool = True,
@@ -41,13 +42,23 @@ class UAVModeManager(ModeManager):
         vehicle_class = AirframeClass.parse(vehicle_class)
 
         self.failsafe_trigger_service = self.create_service(
-            Trigger, "/mode_manager/failsafe", self.trigger_failsafe
+            Trigger, "mode_manager/failsafe", self.trigger_failsafe
         )
 
         if vehicle_class == AirframeClass.VTOL:
-            self.vehicle = VTOL(self, DEBUG=debug, camera_offsets=camera_offsets)
+            self.vehicle = VTOL(
+                self,
+                DEBUG=debug,
+                camera_offsets=camera_offsets,
+                vehicle_name=vehicle_name,
+            )
         else:
-            self.vehicle = Multicopter(self, DEBUG=debug, camera_offsets=camera_offsets)
+            self.vehicle = Multicopter(
+                self,
+                DEBUG=debug,
+                camera_offsets=camera_offsets,
+                vehicle_name=vehicle_name,
+            )
 
         self.get_logger().info("Mission Node has started.")
         self.setup_vision(list(mission_spec.vision_nodes))

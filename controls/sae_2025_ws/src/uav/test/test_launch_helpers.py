@@ -114,17 +114,18 @@ def test_camera_contract_for_uav_and_payload(launch_module):
     uav_contract = launch_module._camera_contract_for(
         SimpleNamespace(is_uav=True, is_payload=False),
         payload_name="",
+        uav_name="uav_7",
     )
     assert uav_contract == {
-        "vehicle_name": "uav",
-        "camera_namespace": "/uav",
-        "image_topic": "/uav/camera",
-        "camera_info_topic": "/uav/camera_info",
-        "camera_service_name": "/uav/camera_data",
+        "vehicle_name": "uav_7",
+        "camera_namespace": "/uav_7",
+        "image_topic": "/uav_7/camera",
+        "camera_info_topic": "/uav_7/camera_info",
+        "camera_service_name": "/uav_7/camera_data",
         "input_transport": "",
-        "input_raw_topic": "/uav/camera_source",
-        "input_compressed_topic": "/uav/camera_source/compressed",
-        "input_camera_info_topic": "/uav/camera_info_source",
+        "input_raw_topic": "/uav_7/camera_source",
+        "input_compressed_topic": "/uav_7/camera_source/compressed",
+        "input_camera_info_topic": "/uav_7/camera_info_source",
         "rotate_degrees": 0.0,
         "preprocess_hook": "",
         "camera_info_url": "",
@@ -218,12 +219,14 @@ def test_build_runtime_parameters_for_uav(launch_module):
         servo_only=0,
         vehicle_class_name="MULTICOPTER",
         payload_name="",
+        uav_name="uav_3",
         uav_camera_offsets=[0.1, 0.2, 0.3],
     )
 
     assert parameters == {
         "mode_map": "/tmp/mission.yaml",
         "auto_launch": True,
+        "vehicle_name": "uav_3",
         "debug": True,
         "servo_only": False,
         "vehicle_class": "MULTICOPTER",
@@ -240,6 +243,7 @@ def test_build_runtime_parameters_for_payload(launch_module):
         servo_only=True,
         vehicle_class_name=None,
         payload_name="payload_0",
+        uav_name="uav_ignored",
         uav_camera_offsets=[],
     )
 
@@ -260,6 +264,7 @@ def test_build_runtime_parameters_rejects_missing_vehicle_class(launch_module):
             servo_only=False,
             vehicle_class_name=None,
             payload_name="",
+            uav_name="uav",
             uav_camera_offsets=[0.0, 0.0, 0.0],
         )
 
@@ -274,5 +279,6 @@ def test_build_runtime_parameters_rejects_bad_camera_offsets(launch_module):
             servo_only=False,
             vehicle_class_name="MULTICOPTER",
             payload_name="",
+            uav_name="uav",
             uav_camera_offsets=[0.0, 0.0],
         )

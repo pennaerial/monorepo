@@ -20,7 +20,12 @@ class VTOL(UAV):
     """
 
     def __init__(
-        self, node: Node, takeoff_amount=5.0, DEBUG=False, camera_offsets=[0, 0, 0]
+        self,
+        node: Node,
+        takeoff_amount=5.0,
+        DEBUG=False,
+        camera_offsets=[0, 0, 0],
+        vehicle_name: str = "uav",
     ):
         # Initialize VTOL-specific attributes before calling super().__init__
         self.vehicle_type = None  # 'MC' or 'FW' from VtolVehicleStatus
@@ -28,7 +33,13 @@ class VTOL(UAV):
         self._fw_takeoff_phase = 0  # state machine phase for FW takeoff
         self.attempted_takeoff = False
 
-        super().__init__(node, takeoff_amount, DEBUG, camera_offsets)
+        super().__init__(
+            node,
+            takeoff_amount,
+            DEBUG,
+            camera_offsets,
+            vehicle_name=vehicle_name,
+        )
 
     @property
     def is_vtol(self) -> bool:

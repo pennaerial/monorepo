@@ -66,6 +66,25 @@ def _runtime_executable_for(mission_spec: MissionSpec) -> str:
     raise ValueError(f"Unsupported mission target '{mission_spec.target}'.")
 
 
+def _vehicle_name_for(
+    mission_spec: MissionSpec, *, payload_name: str, uav_name: str
+) -> str:
+    if mission_spec.is_uav:
+        return str(uav_name).strip() or "uav"
+    if mission_spec.is_payload:
+        if not payload_name:
+            raise ValueError("Payload missions require an explicit payload_name.")
+        return str(payload_name).strip()
+    raise ValueError(f"Unsupported mission target '{mission_spec.target}'.")
+
+
+def _vehicle_namespace_for(vehicle_name: str) -> str:
+    clean_name = str(vehicle_name).strip().strip("/")
+    if not clean_name:
+        raise ValueError("Vehicle namespace requires a non-empty vehicle_name.")
+    return f"/{clean_name}"
+
+
 def _sim_requires_px4_sitl(mission_spec: MissionSpec, *, sim: bool) -> bool:
     return bool(sim and mission_spec.is_uav)
 
@@ -79,14 +98,15 @@ def _camera_contract_for(
     mission_spec: MissionSpec,
     payload_name: str,
     *,
+    uav_name: str = "uav",
     input_transport: str | None = None,
     rotate_degrees: float | None = None,
     preprocess_hook: str | None = None,
     camera_info_url: str | None = None,
 ) -> dict[str, object]:
     if mission_spec.is_uav:
-        vehicle_name = "uav"
-        namespace = "/uav"
+        vehicle_name = str(uav_name).strip() or "uav"
+        namespace = f"/{vehicle_name}"
     else:
         if not payload_name:
             raise ValueError("Payload missions require an explicit payload_name.")
@@ -108,18 +128,6 @@ def _camera_contract_for(
     }
 
 
-def _payload_camera_info_url_for(payload_name: str) -> str:
-    payload_share = Path(get_package_share_directory("payload"))
-    candidates = [
-        payload_share / "config" / f"{payload_name}_camera_info.yaml",
-        payload_share / "config" / "payload_0_camera_info.yaml",
-    ]
-    for candidate in candidates:
-        if candidate.exists():
-            return f"file://{candidate}"
-    return ""
-
-
 def _build_runtime_parameters(
     mission_path: str,
     mission_spec: MissionSpec,
@@ -129,6 +137,7 @@ def _build_runtime_parameters(
     servo_only: bool,
     vehicle_class_name: str | None,
     payload_name: str,
+    uav_name: str,
     uav_camera_offsets: list[float],
 ) -> dict:
     parameters = {"mode_map": mission_path, "auto_launch": bool(auto_launch)}
@@ -143,6 +152,7 @@ def _build_runtime_parameters(
             f"uav_camera_offsets must have exactly 3 values. Received: {uav_camera_offsets}"
         )
 
+    parameters["vehicle_name"] = str(uav_name).strip() or "uav"
     parameters["debug"] = bool(debug)
     parameters["servo_only"] = bool(servo_only)
     parameters["vehicle_class"] = vehicle_class_name
@@ -150,10 +160,23 @@ def _build_runtime_parameters(
     return parameters
 
 
+def _payload_camera_info_url_for(payload_name: str) -> str:
+    payload_share = Path(get_package_share_directory("payload"))
+    candidates = [
+        payload_share / "config" / f"{payload_name}_camera_info.yaml",
+        payload_share / "config" / "payload_0_camera_info.yaml",
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return f"file://{candidate}"
+    return ""
+
+
 def _build_camera_actions(
     *,
     mission_spec: MissionSpec,
     camera_contract: dict[str, object],
+    vehicle_namespace: str,
     vision_nodes: list[str],
     sim: bool,
     vision_debug: bool,
@@ -216,14 +239,16 @@ def _build_camera_actions(
         Node(
             package="uav",
             executable="camera",
+            namespace=camera_contract["vehicle_name"],
             name=f"{camera_contract['vehicle_name']}_camera",
             output="screen",
             parameters=[
                 {
                     "vehicle_name": camera_contract["vehicle_name"],
-                    "image_topic": camera_contract["image_topic"],
-                    "camera_info_topic": camera_contract["camera_info_topic"],
-                    "camera_service_name": camera_contract["camera_service_name"],
+                    "vehicle_namespace": vehicle_namespace,
+                    "image_topic": "",
+                    "camera_info_topic": "",
+                    "camera_service_name": "",
                     **(
                         {
                             "input_transport": camera_contract["input_transport"],
@@ -261,20 +286,21 @@ def _build_camera_actions(
             Node(
                 package="uav",
                 executable=camel_to_snake(vision_node),
+                namespace=camera_contract["vehicle_name"],
                 name=f"{camera_contract['vehicle_name']}_{camel_to_snake(vision_node)}",
                 output="screen",
                 parameters=[
                     {
                         "vehicle_name": camera_contract["vehicle_name"],
-                        "camera_namespace": camera_contract["camera_namespace"],
-                        "camera_service_name": camera_contract["camera_service_name"],
+                        "vehicle_namespace": vehicle_namespace,
+                        "camera_service_name": "",
                         "use_camera_service": use_camera_service,
                         "preferred_image_transport": preferred_image_transport,
                         "debug": vision_debug,
                         "sim": sim,
                         "save_vision": save_vision,
                         "enable_failsafe_service": mission_spec.is_uav,
-                        "failsafe_service_name": "/mode_manager/failsafe"
+                        "failsafe_service_name": "mode_manager/failsafe"
                         if mission_spec.is_uav
                         else "",
                     }
@@ -303,6 +329,9 @@ def launch_setup(context, *args, **kwargs):
     auto_launch = _yaml_bool_value(
         params.get("auto_launch", True), name="auto_launch", default=True
     )
+    uav_name = _yaml_or_launch_string(
+        context, "uav_name", params.get("uav_name", "uav")
+    )
     payload_name = _yaml_or_launch_string(
         context, "payload_name", params.get("payload_name", "")
     )
@@ -323,12 +352,11 @@ def launch_setup(context, *args, **kwargs):
     mission_path = mission_path_for_name(mission_name)
     mission_spec = MissionSpec.load(mission_path)
     runtime_executable = _runtime_executable_for(mission_spec)
+    vehicle_name = _vehicle_name_for(
+        mission_spec, payload_name=payload_name, uav_name=uav_name
+    )
+    vehicle_namespace = _vehicle_namespace_for(vehicle_name)
     requires_vision = bool(mission_spec.vision_nodes)
-
-    if mission_spec.is_payload and not payload_name:
-        raise ValueError(
-            f"Payload mission '{mission_name}' requires an explicit non-empty payload_name."
-        )
     if requires_vision and not enable_vehicle_camera_pipeline:
         raise ValueError(
             f"Mission '{mission_name}' requires vision nodes {list(mission_spec.vision_nodes)}, "
@@ -339,6 +367,7 @@ def launch_setup(context, *args, **kwargs):
         _camera_contract_for(
             mission_spec,
             payload_name,
+            uav_name=uav_name,
             input_transport=payload_camera_input_transport,
             rotate_degrees=payload_camera_rotate_degrees,
             preprocess_hook=payload_camera_preprocess_hook,
@@ -365,6 +394,7 @@ def launch_setup(context, *args, **kwargs):
         _build_camera_actions(
             mission_spec=mission_spec,
             camera_contract=camera_contract,
+            vehicle_namespace=vehicle_namespace,
             vision_nodes=list(mission_spec.vision_nodes),
             sim=sim,
             vision_debug=vision_debug,
@@ -437,6 +467,7 @@ def launch_setup(context, *args, **kwargs):
     mission_node = Node(
         package="uav",
         executable=runtime_executable,
+        namespace=vehicle_name,
         output="screen",
         parameters=[
             _build_runtime_parameters(
@@ -449,6 +480,7 @@ def launch_setup(context, *args, **kwargs):
                 if vehicle_class is not None
                 else None,
                 payload_name=payload_name,
+                uav_name=uav_name,
                 uav_camera_offsets=uav_camera_offsets,
             )
         ],
@@ -612,6 +644,7 @@ def generate_launch_description():
             DeclareLaunchArgument("px4_path", default_value="~/PX4-Autopilot"),
             DeclareLaunchArgument("params_file", default_value=""),
             DeclareLaunchArgument("mission_name", default_value=""),
+            DeclareLaunchArgument("uav_name", default_value=""),
             DeclareLaunchArgument("payload_name", default_value=""),
             OpaqueFunction(function=launch_setup),
         ]

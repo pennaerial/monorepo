@@ -279,7 +279,7 @@ def test_uav_manager_waits_for_service_when_auto_launch_false(monkeypatch):
     monkeypatch.setattr(
         uav_manager_module,
         "Multicopter",
-        lambda node, DEBUG=False, camera_offsets=None: SimpleNamespace(
+        lambda node, DEBUG=False, camera_offsets=None, vehicle_name="uav": SimpleNamespace(
             vehicle_status=None,
             vehicle_attitude=None,
             yaw=None,
@@ -321,7 +321,7 @@ def test_uav_manager_auto_launches_only_after_readiness(monkeypatch):
     monkeypatch.setattr(
         uav_manager_module,
         "Multicopter",
-        lambda node, DEBUG=False, camera_offsets=None: SimpleNamespace(
+        lambda node, DEBUG=False, camera_offsets=None, vehicle_name="uav": SimpleNamespace(
             vehicle_status=None,
             vehicle_attitude=None,
             yaw=None,
@@ -373,6 +373,7 @@ def test_uav_bootstrap_forwards_auto_launch(monkeypatch, auto_launch):
         "auto_launch": auto_launch,
         "debug": False,
         "servo_only": False,
+        "vehicle_name": "uav_2",
         "vehicle_class": "MULTICOPTER",
         "uav_camera_offsets": [0.0, 0.0, 0.0],
     }
@@ -384,6 +385,7 @@ def test_uav_bootstrap_forwards_auto_launch(monkeypatch, auto_launch):
     manager_kwargs = bootstrap.manager_kwargs()
 
     assert manager_kwargs["auto_launch"] is auto_launch
+    assert manager_kwargs["vehicle_name"] == "uav_2"
 
 
 @pytest.mark.parametrize("auto_launch", [True, False])

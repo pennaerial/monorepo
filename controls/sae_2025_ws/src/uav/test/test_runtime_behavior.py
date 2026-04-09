@@ -545,6 +545,7 @@ def test_uav_bootstrap_bool_parameter_and_manager_validation(monkeypatch):
             "auto_launch": True,
             "debug": False,
             "servo_only": False,
+            "vehicle_name": "uav_5",
             "vehicle_class": "MULTICOPTER",
             "uav_camera_offsets": [0.0, 0.0, 0.0],
         },

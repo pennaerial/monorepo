@@ -25,6 +25,7 @@ def launch_setup(context):
         parameters=parameters,
         output="screen",
         name=payload_name,
+        namespace=payload_name,
     )
 
     actions = [payload]

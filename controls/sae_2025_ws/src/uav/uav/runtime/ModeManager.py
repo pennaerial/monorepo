@@ -30,7 +30,7 @@ class ModeManager(Node):
         self.auto_launch = bool(auto_launch)
         self._auto_launch_timer = None
         self.start_mission_service = self.create_service(
-            Trigger, "/mode_manager/start_mission", self._start_mission_callback
+            Trigger, "mode_manager/start_mission", self._start_mission_callback
         )
         if self.auto_launch:
             self._auto_launch_timer = self.create_timer(0.1, self._maybe_auto_launch)

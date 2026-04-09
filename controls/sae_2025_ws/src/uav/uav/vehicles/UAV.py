@@ -43,16 +43,21 @@ class UAV(Vehicle):
     """
 
     def __init__(
-        self, node: Node, takeoff_amount=5.0, DEBUG=False, camera_offsets=[0, 0, 0]
+        self,
+        node: Node,
+        takeoff_amount=5.0,
+        DEBUG=False,
+        camera_offsets=[0, 0, 0],
+        vehicle_name: str = "uav",
     ):
         super().__init__(
             node,
-            "uav",
+            str(vehicle_name),
             has_camera=True,
-            camera_namespace="/uav",
-            image_topic="/uav/camera",
-            camera_info_topic="/uav/camera_info",
-            camera_service_name="/uav/camera_data",
+            camera_namespace=f"/{vehicle_name}",
+            image_topic=f"/{vehicle_name}/camera",
+            camera_info_topic=f"/{vehicle_name}/camera_info",
+            camera_service_name=f"/{vehicle_name}/camera_data",
         )
         self.node = node
         self.DEBUG = DEBUG
