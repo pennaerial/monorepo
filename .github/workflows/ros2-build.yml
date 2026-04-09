@@ -111,7 +111,9 @@ jobs:
       - name: Validate mission schema tests
         working-directory: controls/sae_2025_ws
         run: |
-          PYTHONPATH=$PWD/src/uav python3 -m pytest src/uav/test/test_mission_spec.py
+          . /opt/ros/humble/setup.sh
+          . install/setup.sh
+          PYTHONPATH=$PWD/src/uav:$PYTHONPATH python3 -m pytest src/uav/test/test_mission_spec.py
 
   validate_integration:
     name: Validate Integration Package
