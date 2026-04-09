@@ -12,7 +12,16 @@ class PayloadMissionBootstrap(Node):
     def __init__(self) -> None:
         super().__init__("payload_mission_bootstrap")
         self.declare_parameter("mode_map", mission_path_for_name("basic"))
+        self.declare_parameter("auto_launch", True)
         self.declare_parameter("payload_name", "")
+
+    def _bool_parameter(self, name: str) -> bool:
+        value = self.get_parameter(name).value
+        if not isinstance(value, bool):
+            raise ValueError(
+                f"payload_mission requires boolean parameter '{name}', received {value!r}."
+            )
+        return value
 
     def manager_kwargs(self) -> dict:
         mission_path = str(self.get_parameter("mode_map").value)
@@ -31,6 +40,7 @@ class PayloadMissionBootstrap(Node):
 
         return {
             "mission_spec": mission_spec,
+            "auto_launch": self._bool_parameter("auto_launch"),
             "payload_name": payload_name,
             "node_name": "mission",
         }
