@@ -33,6 +33,15 @@ def _install_ros_test_doubles() -> None:
         clock_mod = types.ModuleType("rclpy.clock")
         clock_mod.Clock = _placeholder("Clock")
 
+        parameter_mod = types.ModuleType("rclpy.parameter")
+        parameter_mod.Parameter = _placeholder("Parameter")
+
+        validate_namespace_mod = types.ModuleType("rclpy.validate_namespace")
+        validate_namespace_mod.validate_namespace = lambda namespace: None
+
+        validate_node_name_mod = types.ModuleType("rclpy.validate_node_name")
+        validate_node_name_mod.validate_node_name = lambda node_name: None
+
         qos_mod = types.ModuleType("rclpy.qos")
         qos_mod.QoSProfile = _placeholder("QoSProfile")
         qos_mod.QoSReliabilityPolicy = _placeholder("QoSReliabilityPolicy")
@@ -42,6 +51,9 @@ def _install_ros_test_doubles() -> None:
         rclpy.node = node_mod
         rclpy.executors = executors_mod
         rclpy.clock = clock_mod
+        rclpy.parameter = parameter_mod
+        rclpy.validate_namespace = validate_namespace_mod
+        rclpy.validate_node_name = validate_node_name_mod
         rclpy.qos = qos_mod
         sys.modules.update(
             {
@@ -49,6 +61,9 @@ def _install_ros_test_doubles() -> None:
                 "rclpy.node": node_mod,
                 "rclpy.executors": executors_mod,
                 "rclpy.clock": clock_mod,
+                "rclpy.parameter": parameter_mod,
+                "rclpy.validate_namespace": validate_namespace_mod,
+                "rclpy.validate_node_name": validate_node_name_mod,
                 "rclpy.qos": qos_mod,
             }
         )
@@ -116,14 +131,13 @@ def _install_ros_test_doubles() -> None:
 
 _install_ros_test_doubles()
 
-from uav.modes.Mode import Mode
-from uav.runtime.ModeManager import ModeManager
-import uav.runtime.ModeManager as mode_manager_module
-import uav.runtime.uav_mission as uav_mission_module
-import uav.runtime.UAVModeManager as uav_manager_module
-from uav.runtime.UAVModeManager import UAVModeManager
-import uav.runtime.payload_mission as payload_mission_module
-import uav.runtime.PayloadModeManager as payload_manager_module
+from uav.modes.Mode import Mode  # noqa: E402
+from uav.runtime.ModeManager import ModeManager  # noqa: E402
+import uav.runtime.ModeManager as mode_manager_module  # noqa: E402
+import uav.runtime.uav_mission as uav_mission_module  # noqa: E402
+from uav.runtime.UAVModeManager import UAVModeManager  # noqa: E402
+import uav.runtime.payload_mission as payload_mission_module  # noqa: E402
+import uav.runtime.PayloadModeManager as payload_manager_module  # noqa: E402
 
 
 class _ExpectedVehicle:
@@ -161,7 +175,9 @@ class _FakeTimer:
 
 
 class _TrackingMode:
-    def __init__(self, label: str, *, status: str = "continue", raises: Exception | None = None) -> None:
+    def __init__(
+        self, label: str, *, status: str = "continue", raises: Exception | None = None
+    ) -> None:
         self.label = label
         self.status = status
         self.raises = raises
@@ -241,7 +257,9 @@ def _fake_mission_spec(*, target: str, is_uav: bool, is_payload: bool, vision_no
 
 def _require_runtime_support() -> None:
     if Mode is None or ModeManager is None or mode_manager_module is None:
-        pytest.skip("ROS runtime Python modules are not available in this test environment")
+        pytest.skip(
+            "ROS runtime Python modules are not available in this test environment"
+        )
 
 
 def test_initialize_mode_happy_path(monkeypatch):
@@ -392,8 +410,9 @@ def test_setup_vision_deduplicates_clients(monkeypatch):
     monkeypatch.setattr(
         manager,
         "create_client",
-        lambda service, service_name: created_clients.append((service, service_name))
-        or client,
+        lambda service, service_name: (
+            created_clients.append((service, service_name)) or client
+        ),
     )
 
     ModeManager.setup_vision(manager, ["FakeVisionNode", "FakeVisionNode"])
@@ -407,7 +426,9 @@ def test_setup_vision_rejects_vehicle_without_camera():
 
     manager = _make_mode_manager(vehicle=SimpleNamespace(has_camera=False))
 
-    with pytest.raises(ValueError, match="Vision nodes require an active vehicle camera contract"):
+    with pytest.raises(
+        ValueError, match="Vision nodes require an active vehicle camera contract"
+    ):
         ModeManager.setup_vision(manager, ["FakeVisionNode"])
 
 
@@ -438,7 +459,10 @@ def test_switch_mode_missing_mode_logs_error_and_keeps_current_mode():
     ModeManager.switch_mode(manager, "missing")
 
     assert manager.active_mode == "start"
-    assert any(level == "error" and "Mode missing not found." in msg for level, msg in manager._logger.messages)
+    assert any(
+        level == "error" and "Mode missing not found." in msg
+        for level, msg in manager._logger.messages
+    )
 
 
 def test_run_active_mode_transitions_on_status():
@@ -498,7 +522,11 @@ def test_uav_mode_manager_rejects_payload_spec(monkeypatch):
     monkeypatch.setattr(ModeManager, "__init__", _stub_mode_manager_init)
 
     with pytest.raises(ValueError, match="requires a UAV mission spec"):
-        UAVModeManager(mission_spec=_fake_mission_spec(target="payload", is_uav=False, is_payload=True))
+        UAVModeManager(
+            mission_spec=_fake_mission_spec(
+                target="payload", is_uav=False, is_payload=True
+            )
+        )
 
 
 def test_payload_mode_manager_rejects_uav_spec(monkeypatch):
@@ -513,8 +541,10 @@ def test_payload_mode_manager_rejects_uav_spec(monkeypatch):
 
     with pytest.raises(ValueError, match="requires a payload mission spec"):
         payload_manager_module.PayloadModeManager(
-            mission_spec=_fake_mission_spec(target="uav", is_uav=True, is_payload=False),
-            payload_name="payload_0",
+            mission_spec=_fake_mission_spec(
+                target="uav", is_uav=True, is_payload=False
+            ),
+            vehicle_name="payload_0",
         )
 
 
@@ -545,8 +575,9 @@ def test_uav_bootstrap_bool_parameter_and_manager_validation(monkeypatch):
             "auto_launch": True,
             "debug": False,
             "servo_only": False,
+            "vehicle_name": "uav_5",
             "vehicle_class": "MULTICOPTER",
-            "uav_camera_offsets": [0.0, 0.0, 0.0],
+            "camera_mount_offsets": [0.0, 0.0, 0.0],
         },
     )
 
@@ -574,16 +605,14 @@ def test_payload_bootstrap_bool_parameter_and_manager_validation(monkeypatch):
     monkeypatch.setattr(
         payload_mission_module.MissionSpec,
         "load",
-        lambda _path: _fake_mission_spec(
-            target="uav", is_uav=True, is_payload=False
-        ),
+        lambda _path: _fake_mission_spec(target="uav", is_uav=True, is_payload=False),
     )
     bootstrap = _make_bootstrap(
         payload_mission_module.PayloadMissionBootstrap,
         {
             "mode_map": "mission.yaml",
             "auto_launch": True,
-            "payload_name": "payload_0",
+            "vehicle_name": "payload_0",
         },
     )
 

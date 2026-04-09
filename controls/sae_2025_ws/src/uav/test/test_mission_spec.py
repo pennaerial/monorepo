@@ -350,7 +350,10 @@ def test_mission_root_uses_package_share(monkeypatch, tmp_path):
     )
 
     assert mission_root() == package_share / "missions"
-    assert Path(mission_path_for_name("basic")) == package_share / "missions" / "basic.yaml"
+    assert (
+        Path(mission_path_for_name("basic"))
+        == package_share / "missions" / "basic.yaml"
+    )
 
 
 def test_mission_root_falls_back_to_source_tree(monkeypatch):

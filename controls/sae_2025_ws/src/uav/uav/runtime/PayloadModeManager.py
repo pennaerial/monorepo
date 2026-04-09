@@ -13,7 +13,7 @@ class PayloadModeManager(ModeManager):
         self,
         *,
         mission_spec: MissionSpec,
-        payload_name: str,
+        vehicle_name: str,
         auto_launch: bool = True,
         node_name: str = "mission",
     ) -> None:
@@ -23,7 +23,7 @@ class PayloadModeManager(ModeManager):
                 f"PayloadModeManager requires a payload mission spec, received target '{mission_spec.target}'."
             )
 
-        self.vehicle = Payload(self, str(payload_name))
+        self.vehicle = Payload(self, str(vehicle_name))
         self.setup_vision(list(mission_spec.vision_nodes))
         self.setup_modes(mission_spec)
 

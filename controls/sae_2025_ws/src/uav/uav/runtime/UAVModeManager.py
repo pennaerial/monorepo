@@ -20,6 +20,8 @@ class UAVModeManager(ModeManager):
         mission_spec: MissionSpec,
         debug: bool = False,
         servo_only: bool = False,
+        vehicle_name: str = "uav",
+        px4_namespace: str = "",
         vehicle_class: AirframeClass = AirframeClass.MULTICOPTER,
         camera_offsets=None,
         auto_launch: bool = True,
@@ -34,20 +36,29 @@ class UAVModeManager(ModeManager):
         camera_offsets = list(camera_offsets or [0.0, 0.0, 0.0])
         if len(camera_offsets) != 3:
             raise ValueError(
-                f"'uav_camera_offsets' must have exactly 3 values. Received: {camera_offsets}"
+                f"'camera_mount_offsets' must have exactly 3 values. Received: {camera_offsets}"
             )
 
         self.servo_only = bool(servo_only)
         vehicle_class = AirframeClass.parse(vehicle_class)
 
         self.failsafe_trigger_service = self.create_service(
-            Trigger, "/mode_manager/failsafe", self.trigger_failsafe
+            Trigger, "mode_manager/failsafe", self.trigger_failsafe
         )
 
+        vehicle_kwargs = {
+            "DEBUG": debug,
+            "camera_offsets": camera_offsets,
+            "vehicle_name": vehicle_name,
+        }
+        normalized_px4_namespace = str(px4_namespace).strip()
+        if normalized_px4_namespace:
+            vehicle_kwargs["px4_namespace"] = normalized_px4_namespace
+
         if vehicle_class == AirframeClass.VTOL:
-            self.vehicle = VTOL(self, DEBUG=debug, camera_offsets=camera_offsets)
+            self.vehicle = VTOL(self, **vehicle_kwargs)
         else:
-            self.vehicle = Multicopter(self, DEBUG=debug, camera_offsets=camera_offsets)
+            self.vehicle = Multicopter(self, **vehicle_kwargs)
 
         self.get_logger().info("Mission Node has started.")
         self.setup_vision(list(mission_spec.vision_nodes))

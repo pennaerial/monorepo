@@ -113,7 +113,7 @@ jobs:
         run: |
           . /opt/ros/humble/setup.sh
           . install/setup.sh
-          PYTHONPATH=$PWD/src/uav:$PYTHONPATH python3 -m pytest src/uav/test/test_mission_spec.py src/uav/test/test_auto_launch.py src/uav/test/test_runtime_behavior.py src/uav/test/test_launch_helpers.py
+          PYTHONPATH=$PWD/src/uav:$PWD/src/sim:$PYTHONPATH python3 -m pytest src/uav/test/test_mission_spec.py src/uav/test/test_auto_launch.py src/uav/test/test_runtime_behavior.py src/uav/test/test_launch_helpers.py src/uav/test/test_fleet_launch.py src/sim/test/test_orchestration.py
 
   validate_integration:
     name: Validate Integration Package

@@ -192,7 +192,7 @@ def test_payload_manager_waits_for_service_when_auto_launch_false(monkeypatch):
 
     manager = payload_manager_module.PayloadModeManager(
         mission_spec=SimpleNamespace(is_payload=True, vision_nodes=[]),
-        payload_name="payload_0",
+        vehicle_name="payload_0",
         auto_launch=False,
     )
 
@@ -218,7 +218,9 @@ def test_payload_auto_launch_readiness_requires_timed_drive_service():
         timed_drive_client=_FakeServiceClient(ready=False),
     )
 
-    assert payload_manager_module.PayloadModeManager._auto_launch_ready(manager) is False
+    assert (
+        payload_manager_module.PayloadModeManager._auto_launch_ready(manager) is False
+    )
 
     manager.vehicle.timed_drive_client.ready = True
 
@@ -247,7 +249,7 @@ def test_payload_manager_auto_launches_when_service_is_ready(monkeypatch):
 
     manager = payload_manager_module.PayloadModeManager(
         mission_spec=SimpleNamespace(is_payload=True, vision_nodes=[]),
-        payload_name="payload_0",
+        vehicle_name="payload_0",
         auto_launch=True,
     )
 
@@ -279,17 +281,19 @@ def test_uav_manager_waits_for_service_when_auto_launch_false(monkeypatch):
     monkeypatch.setattr(
         uav_manager_module,
         "Multicopter",
-        lambda node, DEBUG=False, camera_offsets=None: SimpleNamespace(
-            vehicle_status=None,
-            vehicle_attitude=None,
-            yaw=None,
-            local_position=None,
-            global_position=None,
-            flight_check=False,
-            failsafe=False,
-            emergency_landing=False,
-            nav_state=None,
-            arm_state=None,
+        lambda node, DEBUG=False, camera_offsets=None, vehicle_name="uav": (
+            SimpleNamespace(
+                vehicle_status=None,
+                vehicle_attitude=None,
+                yaw=None,
+                local_position=None,
+                global_position=None,
+                flight_check=False,
+                failsafe=False,
+                emergency_landing=False,
+                nav_state=None,
+                arm_state=None,
+            )
         ),
     )
     monkeypatch.setattr(uav_manager_module.AirframeClass, "parse", lambda value: value)
@@ -321,17 +325,19 @@ def test_uav_manager_auto_launches_only_after_readiness(monkeypatch):
     monkeypatch.setattr(
         uav_manager_module,
         "Multicopter",
-        lambda node, DEBUG=False, camera_offsets=None: SimpleNamespace(
-            vehicle_status=None,
-            vehicle_attitude=None,
-            yaw=None,
-            local_position=None,
-            global_position=None,
-            flight_check=False,
-            failsafe=False,
-            emergency_landing=False,
-            nav_state=None,
-            arm_state=None,
+        lambda node, DEBUG=False, camera_offsets=None, vehicle_name="uav": (
+            SimpleNamespace(
+                vehicle_status=None,
+                vehicle_attitude=None,
+                yaw=None,
+                local_position=None,
+                global_position=None,
+                flight_check=False,
+                failsafe=False,
+                emergency_landing=False,
+                nav_state=None,
+                arm_state=None,
+            )
         ),
     )
     monkeypatch.setattr(uav_manager_module.AirframeClass, "parse", lambda value: value)
@@ -373,8 +379,9 @@ def test_uav_bootstrap_forwards_auto_launch(monkeypatch, auto_launch):
         "auto_launch": auto_launch,
         "debug": False,
         "servo_only": False,
+        "vehicle_name": "uav_2",
         "vehicle_class": "MULTICOPTER",
-        "uav_camera_offsets": [0.0, 0.0, 0.0],
+        "camera_mount_offsets": [0.0, 0.0, 0.0],
     }
     bootstrap.get_parameter = lambda name: _FakeParameter(parameters[name])
 
@@ -384,6 +391,7 @@ def test_uav_bootstrap_forwards_auto_launch(monkeypatch, auto_launch):
     manager_kwargs = bootstrap.manager_kwargs()
 
     assert manager_kwargs["auto_launch"] is auto_launch
+    assert manager_kwargs["vehicle_name"] == "uav_2"
 
 
 @pytest.mark.parametrize("auto_launch", [True, False])
@@ -398,7 +406,7 @@ def test_payload_bootstrap_forwards_auto_launch(monkeypatch, auto_launch):
     parameters = {
         "mode_map": "/tmp/test_payload_mission.yaml",
         "auto_launch": auto_launch,
-        "payload_name": "payload_0",
+        "vehicle_name": "payload_0",
     }
     bootstrap.get_parameter = lambda name: _FakeParameter(parameters[name])
 
