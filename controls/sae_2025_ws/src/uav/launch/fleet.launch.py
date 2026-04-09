@@ -157,7 +157,9 @@ def _resolve_bool(value, *, key: str, default: bool) -> bool:
             return True
         if normalized in {"0", "false", "no", "off"}:
             return False
-    raise ValueError(f"Fleet vehicle field '{key}' must be boolean, received {value!r}.")
+    raise ValueError(
+        f"Fleet vehicle field '{key}' must be boolean, received {value!r}."
+    )
 
 
 def _vehicle_stack_configs(fleet: dict) -> tuple[dict, list[dict]]:
@@ -216,13 +218,13 @@ def _vehicle_stack_configs(fleet: dict) -> tuple[dict, list[dict]]:
             "auto_launch": _resolve_bool(
                 vehicle.get("auto_launch", True), key="auto_launch", default=True
             ),
-            "debug": _resolve_bool(vehicle.get("debug", False), key="debug", default=False),
+            "debug": _resolve_bool(
+                vehicle.get("debug", False), key="debug", default=False
+            ),
             "vision_debug": _resolve_bool(
                 vehicle.get("vision_debug", False), key="vision_debug", default=False
             ),
-            "save_vision_milliseconds": int(
-                vehicle.get("save_vision_milliseconds", 0)
-            ),
+            "save_vision_milliseconds": int(vehicle.get("save_vision_milliseconds", 0)),
             "servo_only": _resolve_bool(
                 vehicle.get("servo_only", False), key="servo_only", default=False
             ),
@@ -230,16 +232,16 @@ def _vehicle_stack_configs(fleet: dict) -> tuple[dict, list[dict]]:
             "camera_input_transport": str(
                 vehicle.get("camera_input_transport", "raw")
             ).strip(),
-            "camera_rotate_degrees": float(
-                vehicle.get("camera_rotate_degrees", 0.0)
-            ),
+            "camera_rotate_degrees": float(vehicle.get("camera_rotate_degrees", 0.0)),
             "camera_preprocess_hook": str(
                 vehicle.get("camera_preprocess_hook", "")
             ).strip(),
             "camera_mount_offsets": list(
                 vehicle.get("camera_mount_offsets", [0.0, 0.0, 0.0])
             ),
-            "px4_path": os.path.expanduser(str(backend.get("px4_path", "~/PX4-Autopilot"))),
+            "px4_path": os.path.expanduser(
+                str(backend.get("px4_path", "~/PX4-Autopilot"))
+            ),
             "sim_world_name": backend["world_name"],
             "sim_entity_name": controllable_name,
             "launch_middleware": False if kind == "uav" else False,
@@ -281,7 +283,11 @@ def launch_setup(context, *args, **kwargs):
             launch_arguments={
                 "px4_path": str(backend.get("px4_path", "~/PX4-Autopilot")),
                 "backend_json": json.dumps(
-                    {key: value for key, value in backend.items() if not key.startswith("_")}
+                    {
+                        key: value
+                        for key, value in backend.items()
+                        if not key.startswith("_")
+                    }
                 ),
             }.items(),
         )

@@ -180,7 +180,9 @@ class ModeManager(Node):
     def _start_mission_callback(self, request, response):
         started = self.start_mission()
         response.success = True
-        response.message = "Starting Mission!" if started else "Mission already started."
+        response.message = (
+            "Starting Mission!" if started else "Mission already started."
+        )
         return response
 
     def start_mission(self) -> bool:

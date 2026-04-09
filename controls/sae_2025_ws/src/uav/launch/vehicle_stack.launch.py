@@ -143,12 +143,8 @@ def _sim_camera_bridge_actions(
     sim_entity_name: str,
     mission_target: str,
 ) -> list:
-    gz_image_topic = (
-        f"/world/{world_name}/model/{sim_entity_name}/link/camera_link/sensor/camera/image"
-    )
-    gz_camera_info_topic = (
-        f"/world/{world_name}/model/{sim_entity_name}/link/camera_link/sensor/camera/camera_info"
-    )
+    gz_image_topic = f"/world/{world_name}/model/{sim_entity_name}/link/camera_link/sensor/camera/image"
+    gz_camera_info_topic = f"/world/{world_name}/model/{sim_entity_name}/link/camera_link/sensor/camera/camera_info"
     namespace = _vehicle_namespace_for(vehicle_name)
     image_target = (
         f"{namespace}/camera_source"
@@ -361,9 +357,7 @@ def _build_runtime_parameters(
     return parameters
 
 
-def _payload_launch_action(
-    *, vehicle_name: str, controller: str, sim_entity_name: str
-):
+def _payload_launch_action(*, vehicle_name: str, controller: str, sim_entity_name: str):
     launch_arguments = {"vehicle_name": vehicle_name}
     if controller:
         launch_arguments["controller"] = controller
@@ -483,7 +477,9 @@ def launch_setup(context, *args, **kwargs):
     camera_input_transport = str(
         config.get("camera_input_transport", "raw" if sim else "compressed")
     ).strip()
-    camera_rotate_degrees = float(config.get("camera_rotate_degrees", 0.0 if sim else 180.0))
+    camera_rotate_degrees = float(
+        config.get("camera_rotate_degrees", 0.0 if sim else 180.0)
+    )
     camera_preprocess_hook = str(config.get("camera_preprocess_hook", "")).strip()
 
     requires_vision = bool(mission_spec.vision_nodes)

@@ -245,7 +245,10 @@ def launch_setup(context, *args, **kwargs):
 
     def maybe_start_sim(event):
         text = event.text.decode() if isinstance(event.text, bytes) else event.text
-        if sim_startup_started["value"] or "Successfully generated world file:" not in text:
+        if (
+            sim_startup_started["value"]
+            or "Successfully generated world file:" not in text
+        ):
             return None
         sim_startup_started["value"] = True
         startup_actions = [spawn_world, LogInfo(msg="Simulation world node started.")]

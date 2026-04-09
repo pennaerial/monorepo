@@ -55,7 +55,9 @@ def test_yaml_or_launch_string_prefers_launch_override(monkeypatch, main_launch_
     )
 
 
-def test_yaml_or_launch_string_falls_back_to_yaml_value(monkeypatch, main_launch_module):
+def test_yaml_or_launch_string_falls_back_to_yaml_value(
+    monkeypatch, main_launch_module
+):
     monkeypatch.setattr(
         main_launch_module,
         "LaunchConfiguration",
@@ -67,7 +69,9 @@ def test_yaml_or_launch_string_falls_back_to_yaml_value(monkeypatch, main_launch
         == "7"
     )
     assert (
-        main_launch_module._yaml_or_launch_string(SimpleNamespace(), "vehicle_name", None)
+        main_launch_module._yaml_or_launch_string(
+            SimpleNamespace(), "vehicle_name", None
+        )
         == ""
     )
 
@@ -113,7 +117,9 @@ def test_runtime_executable_for_supported_targets(
 
 
 def test_runtime_executable_for_rejects_unsupported_target(stack_launch_module):
-    mission_spec = SimpleNamespace(is_uav=False, is_payload=False, target="experimental")
+    mission_spec = SimpleNamespace(
+        is_uav=False, is_payload=False, target="experimental"
+    )
     with pytest.raises(ValueError, match="Unsupported mission target 'experimental'"):
         stack_launch_module._runtime_executable_for(mission_spec)
 
@@ -129,7 +135,9 @@ def test_runtime_executable_for_rejects_unsupported_target(stack_launch_module):
     ],
 )
 def test_resolve_bool(stack_launch_module, value, default, expected):
-    assert stack_launch_module._resolve_bool({"flag": value}, "flag", default) is expected
+    assert (
+        stack_launch_module._resolve_bool({"flag": value}, "flag", default) is expected
+    )
 
 
 def test_resolve_bool_rejects_invalid_value(stack_launch_module):
@@ -287,7 +295,9 @@ def test_build_runtime_parameters_rejects_missing_vehicle_class(stack_launch_mod
 
 
 def test_build_runtime_parameters_rejects_bad_camera_offsets(stack_launch_module):
-    with pytest.raises(ValueError, match="camera_mount_offsets must have exactly 3 values"):
+    with pytest.raises(
+        ValueError, match="camera_mount_offsets must have exactly 3 values"
+    ):
         stack_launch_module._build_runtime_parameters(
             mission_path="/tmp/mission.yaml",
             mission_spec=SimpleNamespace(is_payload=False, is_uav=True),
@@ -391,7 +401,10 @@ def test_sim_camera_bridge_actions_use_entity_name_for_payload(
     )
     image_bridge = actions[0]
     info_bridge = actions[1]
-    assert "/world/sae/model/payload_model_7/link/camera_link/sensor/camera/image" in image_bridge.arguments[0]
+    assert (
+        "/world/sae/model/payload_model_7/link/camera_link/sensor/camera/image"
+        in image_bridge.arguments[0]
+    )
     assert image_bridge.remappings == [
         (
             "/world/sae/model/payload_model_7/link/camera_link/sensor/camera/image",
@@ -409,7 +422,9 @@ def test_sim_camera_bridge_actions_use_entity_name_for_payload(
 def test_legacy_backend_override_returns_stage_based_backend_for_uav(
     monkeypatch, main_launch_module
 ):
-    monkeypatch.setattr(main_launch_module, "_resolved_sim_world_name", lambda params: "sae")
+    monkeypatch.setattr(
+        main_launch_module, "_resolved_sim_world_name", lambda params: "sae"
+    )
     monkeypatch.setattr(
         main_launch_module,
         "resolve_stage_world",

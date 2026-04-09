@@ -8,7 +8,11 @@ import yaml
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
+from launch.actions import (
+    DeclareLaunchArgument,
+    IncludeLaunchDescription,
+    OpaqueFunction,
+)
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 
@@ -120,7 +124,9 @@ def _legacy_backend_override(
             rpy = list(legacy_uav.get("rpy", [0.0, 0.0, 0.0]))
             vehicle_pose = position[:3] + rpy[:3]
         if px4_airframe_id is None:
-            raise ValueError("Single-vehicle UAV sim launch requires a PX4 airframe ID.")
+            raise ValueError(
+                "Single-vehicle UAV sim launch requires a PX4 airframe ID."
+            )
         injected_params = {}
         _inject_single_uav_controllable(
             world_params=injected_params,
@@ -202,9 +208,7 @@ def _single_vehicle_config(context, params: dict) -> tuple[dict, dict | None]:
         "camera_rotate_degrees": float(
             params.get("camera_rotate_degrees", 0.0 if sim else 180.0)
         ),
-        "camera_preprocess_hook": str(
-            params.get("camera_preprocess_hook", "")
-        ).strip(),
+        "camera_preprocess_hook": str(params.get("camera_preprocess_hook", "")).strip(),
         "camera_mount_offsets": list(
             params.get("camera_mount_offsets", [0.0, 0.0, 0.0])
         ),
@@ -262,7 +266,9 @@ def launch_setup(context, *args, **kwargs):
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 os.path.join(
-                    get_package_share_directory("uav"), "launch", "vehicle_stack.launch.py"
+                    get_package_share_directory("uav"),
+                    "launch",
+                    "vehicle_stack.launch.py",
                 )
             ),
             launch_arguments={"vehicle_json": json.dumps(vehicle_config)}.items(),

@@ -37,7 +37,9 @@ class CustomWorldNode(WorldNode):
     def generate_world(self):
         success = True
         if self.entities or self.controllables:
-            success = self.spawn_entities(self.entities, label="static entity") and success
+            success = (
+                self.spawn_entities(self.entities, label="static entity") and success
+            )
             success = (
                 self.spawn_entities(self.controllables, label="controllable")
                 and success

@@ -27,7 +27,9 @@ def _load_fleet_module():
     if str(sim_package_root) not in sys.path:
         sys.path.insert(0, str(sim_package_root))
     launch_path = package_root / "launch" / "fleet.launch.py"
-    spec = importlib.util.spec_from_file_location("uav_fleet_launch_helpers", launch_path)
+    spec = importlib.util.spec_from_file_location(
+        "uav_fleet_launch_helpers", launch_path
+    )
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
     spec.loader.exec_module(module)

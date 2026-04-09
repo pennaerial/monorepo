@@ -66,12 +66,8 @@ class Vehicle(ABC):
             return None
         return self.namespaced_path(suffix)
 
-    def px4_transport_path(
-        self, suffix: str, *, namespace: str | None = None
-    ) -> str:
-        resolved_namespace = (
-            self._normalize_px4_prefix(namespace) or self.px4_namespace
-        )
+    def px4_transport_path(self, suffix: str, *, namespace: str | None = None) -> str:
+        resolved_namespace = self._normalize_px4_prefix(namespace) or self.px4_namespace
         clean_suffix = suffix.lstrip("/")
         if not resolved_namespace:
             return f"/fmu/{clean_suffix}"

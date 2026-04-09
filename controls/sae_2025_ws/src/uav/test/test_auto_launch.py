@@ -218,7 +218,9 @@ def test_payload_auto_launch_readiness_requires_timed_drive_service():
         timed_drive_client=_FakeServiceClient(ready=False),
     )
 
-    assert payload_manager_module.PayloadModeManager._auto_launch_ready(manager) is False
+    assert (
+        payload_manager_module.PayloadModeManager._auto_launch_ready(manager) is False
+    )
 
     manager.vehicle.timed_drive_client.ready = True
 
@@ -279,17 +281,19 @@ def test_uav_manager_waits_for_service_when_auto_launch_false(monkeypatch):
     monkeypatch.setattr(
         uav_manager_module,
         "Multicopter",
-        lambda node, DEBUG=False, camera_offsets=None, vehicle_name="uav": SimpleNamespace(
-            vehicle_status=None,
-            vehicle_attitude=None,
-            yaw=None,
-            local_position=None,
-            global_position=None,
-            flight_check=False,
-            failsafe=False,
-            emergency_landing=False,
-            nav_state=None,
-            arm_state=None,
+        lambda node, DEBUG=False, camera_offsets=None, vehicle_name="uav": (
+            SimpleNamespace(
+                vehicle_status=None,
+                vehicle_attitude=None,
+                yaw=None,
+                local_position=None,
+                global_position=None,
+                flight_check=False,
+                failsafe=False,
+                emergency_landing=False,
+                nav_state=None,
+                arm_state=None,
+            )
         ),
     )
     monkeypatch.setattr(uav_manager_module.AirframeClass, "parse", lambda value: value)
@@ -321,17 +325,19 @@ def test_uav_manager_auto_launches_only_after_readiness(monkeypatch):
     monkeypatch.setattr(
         uav_manager_module,
         "Multicopter",
-        lambda node, DEBUG=False, camera_offsets=None, vehicle_name="uav": SimpleNamespace(
-            vehicle_status=None,
-            vehicle_attitude=None,
-            yaw=None,
-            local_position=None,
-            global_position=None,
-            flight_check=False,
-            failsafe=False,
-            emergency_landing=False,
-            nav_state=None,
-            arm_state=None,
+        lambda node, DEBUG=False, camera_offsets=None, vehicle_name="uav": (
+            SimpleNamespace(
+                vehicle_status=None,
+                vehicle_attitude=None,
+                yaw=None,
+                local_position=None,
+                global_position=None,
+                flight_check=False,
+                failsafe=False,
+                emergency_landing=False,
+                nav_state=None,
+                arm_state=None,
+            )
         ),
     )
     monkeypatch.setattr(uav_manager_module.AirframeClass, "parse", lambda value: value)
