@@ -2,7 +2,7 @@ world:
   name: SAEWorldNode
   params:
     template_world: "src/sim/sim/world_gen/worlds/template.sdf"   # Gazebo world template
-    vehicle_pose: [0.0, 0.0, 0.1, 0.0, 0.0, 0.0]  # [x, y, z, roll, pitch, yaw]
+    vehicle_pose: [0.0, 0.0, 0.1, 0.0, 0.0, 3.14159]  # [x, y, z, roll, pitch, yaw]
 
     physics:
       friction: 0.6 # friction coefficient for the ground plane

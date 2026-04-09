@@ -50,6 +50,7 @@ class PayloadDLZNavigateMode(Mode):
         k_lat: float = 0.003,
         k_ang: float = 0.4,
         max_angular: float = 0.5,
+        skip_initial_turn: bool = False,
     ):
         super().__init__(node, vehicle)
         direction = str(direction).lower().strip()
@@ -62,6 +63,7 @@ class PayloadDLZNavigateMode(Mode):
         self.k_lat = float(k_lat)
         self.k_ang = float(k_ang)
         self.max_angular = float(max_angular)
+        self.skip_initial_turn = bool(skip_initial_turn)
 
     # ------------------------------------------------------------------
     # helpers
@@ -88,7 +90,7 @@ class PayloadDLZNavigateMode(Mode):
     # ------------------------------------------------------------------
 
     def on_enter(self) -> None:
-        self._phase = "turn_onto_tape"
+        self._phase = "line_follow" if self.skip_initial_turn else "turn_onto_tape"
         self._angle_turned = 0.0
 
         # LINE_FOLLOW state

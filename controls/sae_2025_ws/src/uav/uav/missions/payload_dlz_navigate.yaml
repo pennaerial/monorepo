@@ -1,23 +1,69 @@
-# Payload line-following test on the dlz_alternating_border DLZ.
+# Payload line-following + scan + dock on the dlz_alternating_border DLZ.
 # Use with line_following.yaml world (payload starts at DLZ corner, facing inward at 45°).
 #
 # direction: "cw"  → turn left 45°, travel clockwise  (CW:  B→A = corner)
 #            "ccw" → turn right 45°, travel CCW        (CCW: A→B = corner)
 #
-# target_transitions: how many colour changes to travel before stopping
-#   0 = just do the alignment turn and stop
+# target_transitions: how many colour changes to travel before scanning
 #   1 = cross one colour boundary (half a side)
 #   2 = cross two boundaries (one full side)
 #   4 = half the square
 #   8 = full lap
+#
+# Flow:
+#   start ──done──► scan ──found──► apriltag_approach
+#                    │
+#                 not_found
+#                    │
+#                  retry  (skip_initial_turn=true, advances more transitions)
+#                    │
+#                  done──► scan  (loops back)
 modes:
   start:
     class: uav.modes.payload.PayloadDLZNavigateMode
     params:
       direction: "ccw"
       target_transitions: 3
+      skip_initial_turn: false
       turn_angular_speed: 0.5
       line_follow_speed_mps: 0.2
       k_lat: 0.01
       k_ang: 0.4
       max_angular: 0.5
+    transitions:
+      done: scan
+
+  scan:
+    class: uav.modes.payload.PayloadScanForTagMode
+    params:
+      tag_id: 0
+      tag_size_m: 0.0508
+      spin_angular_speed: 0.4
+    transitions:
+      found: apriltag_approach
+      not_found: retry
+
+  retry:
+    class: uav.modes.payload.PayloadDLZNavigateMode
+    params:
+      direction: "ccw"
+      target_transitions: 2
+      skip_initial_turn: true   # already on tape, skip the 45° alignment turn
+      turn_angular_speed: 0.5
+      line_follow_speed_mps: 0.2
+      k_lat: 0.01
+      k_ang: 0.4
+      max_angular: 0.5
+    transitions:
+      done: scan
+
+  apriltag_approach:
+    class: uav.modes.payload.PayloadAprilTagApproachMode
+    params:
+      tag_id: 0
+      tag_size_m: 0.0508
+      max_forward_speed: 0.2
+      forward_gain: 0.5
+      angular_gain: 0.003
+      yaw_gain: 0.65
+      stop_distance_m: 0.08
