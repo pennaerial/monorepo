@@ -194,10 +194,12 @@ class PayloadDLZNavigateMode(Mode):
         self.vehicle.drive(self.line_follow_speed_mps, angular)
 
     def _do_corner_turn(self, time_delta: float) -> None:
-        angular = self._turn_angular()
+        # Corner turns are opposite to the initial alignment turn:
+        #   CCW travel → turn left (+), CW travel → turn right (-)
+        angular = -self._turn_angular()
         self._corner_turned += abs(angular) * time_delta
 
-        if self._corner_turned >= _QUARTER_TURN - _ANGLE_TOL:
+        if self._corner_turned >= _EIGHTH_TURN - _ANGLE_TOL:
             self._lf_phase = "following"
             self.vehicle.drive(0.0, 0.0)
             self.log("PayloadDLZNavigateMode: corner turn complete → FOLLOWING")
