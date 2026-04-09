@@ -24,11 +24,7 @@ def parse_json_config(raw_value: str | None, *, field_name: str) -> dict[str, An
 def deep_merge_dicts(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
     merged = deepcopy(base)
     for key, value in override.items():
-        if (
-            key in merged
-            and isinstance(merged[key], dict)
-            and isinstance(value, dict)
-        ):
+        if key in merged and isinstance(merged[key], dict) and isinstance(value, dict):
             merged[key] = deep_merge_dicts(merged[key], value)
         else:
             merged[key] = deepcopy(value)
@@ -78,7 +74,23 @@ def normalized_stage_name(mission_stage: str | None) -> str:
     return stage_name or "base"
 
 
-def normalize_stage_world_params(raw_world_params: dict[str, Any] | None) -> dict[str, Any]:
+def _looks_like_spawnable_record(value: Any) -> bool:
+    return isinstance(value, dict) and any(
+        field in value
+        for field in {
+            "path_to_sdf",
+            "position",
+            "rpy",
+            "kind",
+            "model",
+            "px4_airframe_id",
+        }
+    )
+
+
+def normalize_stage_world_params(
+    raw_world_params: dict[str, Any] | None,
+) -> dict[str, Any]:
     world_params = {} if raw_world_params is None else deepcopy(raw_world_params)
     if not isinstance(world_params, dict):
         raise ValueError("Resolved stage world params must be a mapping.")
@@ -88,16 +100,18 @@ def normalize_stage_world_params(raw_world_params: dict[str, Any] | None) -> dic
         world_params.get("controllables", {}),
         record_type="controllable",
     )
-    entities = normalize_named_records(world_params.get("entities", {}), record_type="entity")
+    entities = normalize_named_records(
+        world_params.get("entities", {}), record_type="entity"
+    )
 
     for key, value in world_params.items():
         if key in {"vehicle_pose", "entities", "controllables"}:
             continue
-        if key.startswith("payload_") and isinstance(value, dict):
-            payload_spec = deepcopy(value)
-            payload_spec.setdefault("kind", "payload")
-            controllables[key] = payload_spec
-            continue
+        if _looks_like_spawnable_record(value):
+            raise ValueError(
+                f"Spawnable stage record '{key}' must live under "
+                "world.params.entities or world.params.controllables."
+            )
         translated[key] = deepcopy(value)
 
     if entities:
@@ -132,7 +146,9 @@ def resolve_stage_world(
         mission_stage=resolved_stage,
     )
     if "world" not in sim_stage_params:
-        raise ValueError(f"Missing 'world' section in simulation config: {sim_config_path}")
+        raise ValueError(
+            f"Missing 'world' section in simulation config: {sim_config_path}"
+        )
 
     world_spec = deep_merge_dicts(sim_stage_params["world"], resolved_overrides)
     if not isinstance(world_spec, dict):

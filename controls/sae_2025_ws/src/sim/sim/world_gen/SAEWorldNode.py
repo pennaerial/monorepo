@@ -22,9 +22,6 @@ class SAEWorldNode(WorldNode):
         seed: Optional[int] = None,
         entities: Optional[dict] = None,
         controllables: Optional[dict] = None,
-        dlz: Optional[dict] = None,
-        payload_0: Optional[dict] = None,
-        payload_1: Optional[dict] = None,
         **kwargs,
     ):
         super().__init__(
@@ -40,33 +37,16 @@ class SAEWorldNode(WorldNode):
         self.physics = physics
         self.entities = entities or {}
         self.controllables = controllables or {}
-        self.dlz = dlz
-        self.payload_0 = payload_0
-        self.payload_1 = payload_1
         self.instantiate_static_world(
             template_world_path=template_world, physics=physics
         )
 
     def generate_world(self):
         success = True
-        if self.entities or self.controllables:
-            success = self.spawn_entities(self.entities, label="static entity") and success
-            success = (
-                self.spawn_entities(self.controllables, label="controllable")
-                and success
-            )
-        else:
-            named_entities = [
-                ("dlz", self.dlz),
-                ("payload_0", self.payload_0),
-                ("payload_1", self.payload_1),
-            ]
-            for name, cfg in named_entities:
-                if cfg is not None:
-                    self.get_logger().info(f"Spawning entity: {name}")
-                    success = self.spawn_entity(name, cfg) and success
-                else:
-                    self.get_logger().info(f"Skipping entity (not defined): {name}")
+        success = self.spawn_entities(self.entities, label="static entity") and success
+        success = (
+            self.spawn_entities(self.controllables, label="controllable") and success
+        )
 
         return super().generate_world() and success
 
