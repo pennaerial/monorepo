@@ -1,0 +1,6 @@
+float64 linear      # distance to travel in meters (0.0 for pure angular)
+float64 angular   # angle to rotate in radians (0.0 for pure linear)
+float64 speed         # magnitude: m/s for linear, rad/s for angular; must be > 0
+---
+bool success
+string message

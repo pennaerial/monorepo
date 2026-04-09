@@ -40,9 +40,6 @@ class UAVModeManager(ModeManager):
         self.servo_only = bool(servo_only)
         vehicle_class = AirframeClass.parse(vehicle_class)
 
-        self.start_mission_trigger = self.create_service(
-            Trigger, "/mode_manager/start_mission", self.start_mission
-        )
         self.failsafe_trigger_service = self.create_service(
             Trigger, "/mode_manager/failsafe", self.trigger_failsafe
         )

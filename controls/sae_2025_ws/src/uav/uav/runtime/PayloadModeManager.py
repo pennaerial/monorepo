@@ -28,20 +28,6 @@ class PayloadModeManager(ModeManager):
         self.setup_vision(list(mission_spec.vision_nodes))
         self.setup_modes(mission_spec)
         self.timer = None
-        self.start_mission_trigger = self.create_service(
-            Trigger, f"{payload_name}/mode_manager/start_mission", self.start_mission
-        )
-
-    def start_mission(self, request, response):
-        self.get_logger().info("PAYLOAD MODE MANAGER | Starting Mission!")
-        if self.timer is None:
-            self.timer = self.create_timer(0.1, self.spin_once)
-            response.success = True
-            response.message = "Starting Mission!"
-        else:
-            response.success = False
-            response.message = "Mission Already in Progress"
-        return response
 
     def spin_once(self) -> None:
         current_time = time()
