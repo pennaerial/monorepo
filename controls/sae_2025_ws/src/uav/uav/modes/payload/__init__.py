@@ -7,6 +7,7 @@ __all__ = [
     "PayloadColorOrbitToRearMode",
     "PayloadNavigateAroundPlaneMode",
     "PayloadRetreatMode",
+    "PayloadScanForTagMode",
 ]
 
 
