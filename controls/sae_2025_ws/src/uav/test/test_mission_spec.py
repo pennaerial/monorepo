@@ -1,278 +1,368 @@
-import inspect
-import tempfile
-import unittest
-from pathlib import Path
+from __future__ import annotations
 
+from pathlib import Path
+import textwrap
+
+import pytest
+
+from uav.modes.Mode import Mode
+import uav.runtime.mission_spec as mission_spec_module
 from uav.runtime.mission_spec import (
-    load_mission_spec,
+    MissionSpec,
     load_mode_class,
+    load_mission_spec,
     mission_path_for_name,
+    mission_root,
 )
 
 
-def _write_mission(contents: str) -> str:
-    with tempfile.NamedTemporaryFile(
-        "w", suffix=".yaml", delete=False, encoding="utf-8"
-    ) as mission_file:
-        mission_file.write(contents)
-        return mission_file.name
+def _write_mission(tmp_path: Path, contents: str) -> Path:
+    mission_path = tmp_path / "mission.yaml"
+    mission_path.write_text(textwrap.dedent(contents), encoding="utf-8")
+    return mission_path
 
 
-class _FakeLogger:
-    def debug(self, *args, **kwargs):
-        pass
-
-    def info(self, *args, **kwargs):
-        pass
-
-    def warn(self, *args, **kwargs):
-        pass
-
-    def warning(self, *args, **kwargs):
-        pass
-
-    def error(self, *args, **kwargs):
-        pass
-
-
-class _FakeTimer:
-    def cancel(self):
-        pass
+def _write_mode_module(
+    tmp_path: Path,
+    *,
+    package_name: str,
+    module_name: str,
+    body: str,
+) -> str:
+    package_dir = tmp_path / package_name
+    package_dir.mkdir(parents=True, exist_ok=True)
+    (package_dir / "__init__.py").write_text("", encoding="utf-8")
+    (package_dir / f"{module_name}.py").write_text(
+        textwrap.dedent(body), encoding="utf-8"
+    )
+    return f"{package_name}.{module_name}"
 
 
-class _FakeClockTime:
-    nanoseconds = 0
+def test_load_uav_mission_spec(tmp_path):
+    mission_path = _write_mission(
+        tmp_path,
+        """
+        modes:
+          start:
+            class: uav.modes.uav.TakeoffMode
+            params:
+              altitude: 3.0
+            transitions:
+              complete: cruise
+          cruise:
+            class: uav.modes.uav.NavGPSMode
+            params:
+              target_waypoint: [1.0, 2.0, 3.0]
+              acceptance_radius: 0.2
+            transitions:
+              complete: land
+          land:
+            class: uav.modes.uav.LandingMode
+        """,
+    )
+
+    mission_spec = load_mission_spec(mission_path)
+
+    assert mission_spec.target == "uav"
+    assert mission_spec.is_uav is True
+    assert mission_spec.is_payload is False
+    assert mission_spec.vision_nodes == ()
+    assert mission_spec.path == mission_path
+    assert mission_spec.modes["start"].class_path == "uav.modes.uav.TakeoffMode"
+    assert mission_spec.modes["start"].params == {"altitude": 3.0}
+    assert mission_spec.modes["start"].transitions == {"complete": "cruise"}
 
 
-class _FakeClock:
-    def now(self):
-        return _FakeClockTime()
+def test_load_payload_mission_spec(tmp_path):
+    mission_path = _write_mission(
+        tmp_path,
+        """
+        modes:
+          start:
+            class: uav.modes.payload.PayloadDriveToAprilTagMode
+            params:
+              tag_id: 1
+              stop_distance_m: 0.2
+            transitions:
+              complete: approach
+          approach:
+            class: uav.modes.payload.PayloadAprilTagApproachMode
+            params:
+              tag_id: 1
+              stop_distance_m: 0.07
+        """,
+    )
+
+    mission_spec = load_mission_spec(mission_path)
+
+    assert mission_spec.target == "payload"
+    assert mission_spec.is_payload is True
+    assert mission_spec.is_uav is False
+    assert mission_spec.vision_nodes == ("PayloadAprilTagNode",)
+    assert mission_spec.modes["start"].class_path == (
+        "uav.modes.payload.PayloadDriveToAprilTagMode"
+    )
+    assert mission_spec.modes["start"].params["tag_id"] == 1
+    assert mission_spec.modes["approach"].class_path == (
+        "uav.modes.payload.PayloadAprilTagApproachMode"
+    )
 
 
-class _FakeNode:
-    def __init__(self):
-        self._logger = _FakeLogger()
-        self._clock = _FakeClock()
+def test_mission_spec_from_dict():
+    mission_spec = MissionSpec.from_dict(
+        {
+            "modes": {
+                "start": {
+                    "class": "uav.modes.payload.PayloadAprilTagApproachMode",
+                    "params": {"tag_id": 0, "stop_distance_m": 0.05},
+                }
+            }
+        }
+    )
 
-    def get_logger(self):
-        return self._logger
-
-    def create_timer(self, *_args, **_kwargs):
-        return _FakeTimer()
-
-    def get_clock(self):
-        return self._clock
-
-
-class _FakeUAVVehicle:
-    camera_offsets = (0.0, 0.0, 0.0)
-
-
-class _FakePayloadVehicle:
-    pass
+    assert mission_spec.target == "payload"
+    assert mission_spec.path is None
+    assert mission_spec.vision_nodes == ("PayloadAprilTagNode",)
+    assert mission_spec.modes["start"].params["tag_id"] == 0
 
 
-def _vehicle_for_class_path(class_path: str):
-    if ".modes.payload." in class_path:
-        return _FakePayloadVehicle()
-    return _FakeUAVVehicle()
-
-
-def _instantiate_mode(class_path: str, params: dict):
-    mode_class = load_mode_class(class_path)
-    signature = inspect.signature(mode_class.__init__)
-    kwargs = {}
-    accepted = set()
-
-    for name, parameter in signature.parameters.items():
-        if name == "self":
-            continue
-        accepted.add(name)
-        if name == "node":
-            kwargs[name] = _FakeNode()
-            continue
-        if name == "vehicle":
-            kwargs[name] = _vehicle_for_class_path(class_path)
-            continue
-        if name in params:
-            kwargs[name] = params[name]
-            continue
-        if parameter.default is not inspect.Parameter.empty:
-            continue
-        raise AssertionError(
-            f"Mode '{class_path}' requires unsupported constructor argument '{name}'."
-        )
-
-    unexpected = sorted(set(params) - (accepted - {"node", "vehicle"}))
-    if unexpected:
-        raise AssertionError(
-            f"Mode '{class_path}' received unexpected params: {unexpected}"
-        )
-
-    return mode_class(**kwargs)
-
-
-def _instantiate_all_modes(mission_spec) -> None:
-    for mode_spec in mission_spec.modes.values():
-        _instantiate_mode(mode_spec.class_path, mode_spec.params)
-
-
-class MissionSpecLoadingTests(unittest.TestCase):
-    def test_load_uav_mission_spec(self):
-        mission_path = _write_mission(
+@pytest.mark.parametrize(
+    ("contents", "pattern"),
+    [
+        ("[1]", "must define a mapping at the top level"),
+        ("modes: {}", "must define a non-empty modes mapping"),
+        ("modes: []", "must define a non-empty modes mapping"),
+        (
             """
-modes:
-  start:
-    class: uav.modes.uav.TakeoffMode
-    params:
-      target_altitude: 3.0
-    transitions:
-      complete: cruise
-  cruise:
-    class: uav.modes.uav.NavGPSMode
-    params:
-      target_waypoint: [1.0, 2.0, 3.0]
-      acceptance_radius: 0.2
-    transitions:
-      complete: land
-  land:
-    class: uav.modes.uav.LandingMode
-"""
-        )
+            modes:
+              cruise:
+                class: uav.modes.uav.NavGPSMode
+            """,
+            "must define a start mode",
+        ),
+        (
+            """
+            target: uav
+            modes:
+              start:
+                class: uav.modes.uav.TakeoffMode
+            """,
+            "unsupported top-level keys",
+        ),
+        (
+            """
+            modes:
+              start: []
+            """,
+            "must be a mapping",
+        ),
+        (
+            """
+            modes:
+              start:
+                class: uav.modes.uav.TakeoffMode
+              "":
+                class: uav.modes.uav.TakeoffMode
+            """,
+            "contains an invalid mode name",
+        ),
+        (
+            """
+            modes:
+              start:
+                class: uav.modes.uav.TakeoffMode
+                extra: true
+            """,
+            "contains unsupported keys",
+        ),
+        (
+            """
+            modes:
+              start:
+                class: 3
+            """,
+            "must define a non-empty class path",
+        ),
+        (
+            """
+            modes:
+              start:
+                class: uav.modes.uav.TakeoffMode
+                params: []
+            """,
+            "must define params as a mapping",
+        ),
+        (
+            """
+            modes:
+              start:
+                class: uav.modes.uav.TakeoffMode
+                transitions: []
+            """,
+            "must define transitions as a string-to-string mapping",
+        ),
+        (
+            """
+            modes:
+              start:
+                class: uav.modes.uav.TakeoffMode
+                transitions:
+                  complete: 1
+            """,
+            "must define transitions as a string-to-string mapping",
+        ),
+    ],
+)
+def test_invalid_mission_schema_is_rejected(tmp_path, contents, pattern):
+    mission_path = _write_mission(tmp_path, contents)
 
+    with pytest.raises(ValueError, match=pattern):
+        load_mission_spec(mission_path)
+
+
+def test_mode_derived_metadata_rejects_mixed_targets(tmp_path):
+    mission_path = _write_mission(
+        tmp_path,
+        """
+        modes:
+          start:
+            class: uav.modes.uav.TakeoffMode
+            transitions:
+              complete: payload
+          payload:
+            class: uav.modes.payload.PayloadDriveToAprilTagMode
+        """,
+    )
+
+    with pytest.raises(ValueError, match="mixes incompatible mode targets"):
+        load_mission_spec(mission_path)
+
+
+def test_undefined_transition_target_is_rejected(tmp_path):
+    mission_path = _write_mission(
+        tmp_path,
+        """
+        modes:
+          start:
+            class: uav.modes.uav.TakeoffMode
+            transitions:
+              complete: missing
+        """,
+    )
+
+    with pytest.raises(ValueError, match="transitions to undefined mode"):
+        load_mission_spec(mission_path)
+
+
+@pytest.mark.parametrize("mission_target", [None, "boat"])
+def test_invalid_mode_target_is_rejected(monkeypatch, mission_target):
+    def _on_update(self, time_delta: float) -> None:
+        pass
+
+    def _check_status(self) -> str:
+        return "continue"
+
+    FakeMode = type(
+        "FakeMode",
+        (Mode,),
+        {
+            "mission_target": mission_target,
+            "on_update": _on_update,
+            "check_status": _check_status,
+        },
+    )
+
+    monkeypatch.setattr(mission_spec_module, "load_mode_class", lambda _path: FakeMode)
+
+    with pytest.raises(ValueError, match="must declare mission_target"):
+        load_mission_spec({"modes": {"start": {"class": "fake.module.FakeMode"}}})
+
+
+def test_load_mode_class_accepts_module_path():
+    mode_class = load_mode_class("uav.modes.payload.PayloadAprilTagApproachMode")
+
+    assert mode_class.__name__ == "PayloadAprilTagApproachMode"
+    assert mode_class.mission_target == "payload"
+
+
+def test_load_mode_class_falls_back_from_class_path(tmp_path, monkeypatch):
+    module_path = _write_mode_module(
+        tmp_path,
+        package_name="test_modes",
+        module_name="fake_mode",
+        body="""
+        from uav.modes.Mode import Mode
+
+        class FakeMode(Mode):
+            mission_target = "uav"
+
+            def __init__(self, node, vehicle):
+                super().__init__(node, vehicle)
+
+            def on_update(self, time_delta: float) -> None:
+                pass
+
+            def check_status(self) -> str:
+                return "continue"
+        """,
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+
+    mode_class = load_mode_class(f"{module_path}.FakeMode")
+
+    assert mode_class.__name__ == "FakeMode"
+    assert issubclass(mode_class, Mode)
+
+
+def test_load_mode_class_rejects_non_mode_subclass(tmp_path, monkeypatch):
+    module_path = _write_mode_module(
+        tmp_path,
+        package_name="test_modes_invalid",
+        module_name="not_a_mode",
+        body="""
+        class NotAMode:
+            pass
+        """,
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+
+    with pytest.raises(TypeError, match="did not resolve to a Mode subclass"):
+        load_mode_class(f"{module_path}.NotAMode")
+
+
+def test_all_repo_missions_load_with_explicit_schema():
+    missions_dir = Path(__file__).resolve().parent.parent / "uav" / "missions"
+    assert missions_dir.is_dir()
+
+    for mission_path in sorted(missions_dir.glob("*.yaml")):
         mission_spec = load_mission_spec(mission_path)
-        _instantiate_all_modes(mission_spec)
-
-        self.assertEqual(mission_spec.target, "uav")
-        self.assertTrue(mission_spec.is_uav)
-        self.assertFalse(mission_spec.is_payload)
-        self.assertEqual(mission_spec.vision_nodes, ())
-        self.assertEqual(mission_spec.path, Path(mission_path))
-
-        start_mode = mission_spec.modes["start"]
-        self.assertEqual(start_mode.class_path, "uav.modes.uav.TakeoffMode")
-        self.assertEqual(start_mode.params["target_altitude"], 3.0)
-        self.assertEqual(start_mode.transitions["complete"], "cruise")
-
-    def test_load_payload_mission_spec(self):
-        mission_path = _write_mission(
-            """
-modes:
-  start:
-    class: uav.modes.payload.PayloadDriveToAprilTagMode
-    params:
-      target_tag_id: 1
-      approach_speed: 0.2
-"""
-        )
-
-        mission_spec = load_mission_spec(mission_path)
-        _instantiate_all_modes(mission_spec)
-
-        self.assertEqual(mission_spec.target, "payload")
-        self.assertTrue(mission_spec.is_payload)
-        self.assertFalse(mission_spec.is_uav)
-        self.assertEqual(mission_spec.vision_nodes, ("PayloadAprilTagNode",))
-
-        start_mode = mission_spec.modes["start"]
-        self.assertEqual(
-            start_mode.class_path, "uav.modes.payload.PayloadDriveToAprilTagMode"
-        )
-        self.assertEqual(start_mode.params["target_tag_id"], 1)
-        self.assertEqual(start_mode.params["approach_speed"], 0.2)
-
-    def test_load_payload_apriltag_approach_mission_spec(self):
-        mission_path = _write_mission(
-            """
-modes:
-  start:
-    class: uav.modes.payload.PayloadAprilTagApproachMode
-    params:
-      tag_id: 0
-      tag_size_m: 0.0508
-      max_forward_speed: 0.2
-      forward_gain: 0.5
-      angular_gain: 0.003
-      yaw_gain: 0.65
-      stop_distance_m: 0.07
-"""
-        )
-
-        mission_spec = load_mission_spec(mission_path)
-        _instantiate_all_modes(mission_spec)
-
-        self.assertEqual(mission_spec.target, "payload")
-        self.assertEqual(mission_spec.vision_nodes, ("PayloadAprilTagNode",))
-
-        start_mode = mission_spec.modes["start"]
-        self.assertEqual(
-            start_mode.class_path, "uav.modes.payload.PayloadAprilTagApproachMode"
-        )
-        self.assertEqual(start_mode.params["tag_id"], 0)
-        self.assertEqual(start_mode.params["stop_distance_m"], 0.07)
-
-    def test_mode_derived_metadata_rejects_mixed_targets(self):
-        mission_path = _write_mission(
-            """
-modes:
-  start:
-    class: uav.modes.uav.TakeoffMode
-    transitions:
-      complete: payload
-  payload:
-    class: uav.modes.payload.PayloadDriveToAprilTagMode
-"""
-        )
-
-        with self.assertRaisesRegex(ValueError, "mixes incompatible mode targets"):
-            load_mission_spec(mission_path)
-
-    def test_target_key_is_rejected(self):
-        mission_path = _write_mission(
-            """
-target: uav
-modes:
-  start:
-    class: uav.modes.uav.TakeoffMode
-"""
-        )
-
-        with self.assertRaisesRegex(ValueError, "unsupported top-level keys"):
-            load_mission_spec(mission_path)
-
-    def test_undefined_transition_target_is_rejected(self):
-        mission_path = _write_mission(
-            """
-modes:
-  start:
-    class: uav.modes.uav.TakeoffMode
-    transitions:
-      complete: missing
-"""
-        )
-
-        with self.assertRaisesRegex(ValueError, "transitions to undefined mode"):
-            load_mission_spec(mission_path)
-
-    def test_all_repo_missions_use_explicit_schema(self):
-        missions_dir = Path(__file__).resolve().parent.parent / "uav" / "missions"
-        self.assertTrue(missions_dir.is_dir())
-
-        for mission_path in sorted(missions_dir.glob("*.yaml")):
-            with self.subTest(mission=mission_path.name):
-                mission_spec = load_mission_spec(mission_path)
-                _instantiate_all_modes(mission_spec)
-
-                self.assertIn(mission_spec.target, {"uav", "payload"})
-                self.assertIn("start", mission_spec.modes)
-                self.assertEqual(mission_spec.path, mission_path)
-
-    def test_named_mission_path_resolves_inside_package(self):
-        expected_path = (
-            Path(__file__).resolve().parent.parent / "uav" / "missions" / "basic.yaml"
-        )
-        self.assertEqual(Path(mission_path_for_name("basic")), expected_path)
+        assert mission_spec.target in {"uav", "payload"}
+        assert "start" in mission_spec.modes
+        assert mission_spec.path == mission_path
 
 
-if __name__ == "__main__":
-    unittest.main()
+def test_mission_root_uses_package_share(monkeypatch, tmp_path):
+    package_share = tmp_path / "install_share"
+    monkeypatch.setattr(
+        mission_spec_module,
+        "get_package_share_directory",
+        lambda package_name: str(package_share),
+    )
+
+    assert mission_root() == package_share / "missions"
+    assert Path(mission_path_for_name("basic")) == package_share / "missions" / "basic.yaml"
+
+
+def test_mission_root_falls_back_to_source_tree(monkeypatch):
+    def _raise_package_not_found(_package_name: str) -> str:
+        raise mission_spec_module.PackageNotFoundError
+
+    monkeypatch.setattr(
+        mission_spec_module,
+        "get_package_share_directory",
+        _raise_package_not_found,
+    )
+
+    expected = Path(mission_spec_module.__file__).resolve().parent.parent / "missions"
+    assert mission_root() == expected
+    assert Path(mission_path_for_name("basic")) == expected / "basic.yaml"

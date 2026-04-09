@@ -3,9 +3,11 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <functional>
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <thread>
 
 #include <pigpiod_if2.h>
 #include <pluginlib/class_list_macros.hpp>
@@ -134,16 +136,29 @@ void GPIOController::initialize(rclcpp::Node* node)
             std::shared_ptr<payload_interfaces::srv::ComputePidZieglerNichols::Response>
                 response) { compute_pid_zn_callback(request, response); });
 
+    dead_reckon_cbg_ = node_->create_callback_group(
+        rclcpp::CallbackGroupType::MutuallyExclusive);
+    const std::string dr_service_name = "/" + node_name + "/dead_reckon";
+    dead_reckon_srv_ = node_->create_service<payload_interfaces::srv::DeadReckon>(
+        dr_service_name,
+        std::bind(&GPIOController::dead_reckon_callback, this,
+                  std::placeholders::_1, std::placeholders::_2),
+        rmw_qos_profile_services_default,
+        dead_reckon_cbg_);
+
     running_ = true;
     control_thread_ = std::thread(&GPIOController::control_loop, this);
 
     RCLCPP_INFO(node_->get_logger(),
-        "GPIO | Ready. state_topic=%s zn_service=%s",
-        state_topic.c_str(), zn_service_name.c_str());
+        "GPIO | Ready. state_topic=%s zn_service=%s dr_service=%s",
+        state_topic.c_str(), zn_service_name.c_str(), dr_service_name.c_str());
 }
 
 void GPIOController::drive_command(double linear, double angular)
 {
+    if (control_mode_.load() == ControlMode::DEAD_RECKONING) {
+        return;
+    }
     cmd_linear_.store(linear);
     cmd_angular_.store(angular);
 }
@@ -179,6 +194,66 @@ void GPIOController::compute_pid_zn_callback(
     }
 }
 
+void GPIOController::dead_reckon_callback(
+    const std::shared_ptr<payload_interfaces::srv::DeadReckon::Request> request,
+    std::shared_ptr<payload_interfaces::srv::DeadReckon::Response> response)
+{
+    const bool has_linear  = std::abs(request->linear)  > 1e-9;
+    const bool has_angular = std::abs(request->angular) > 1e-9;
+
+    if (has_linear && has_angular) {
+        response->success = false;
+        response->message = "Provide only linear OR angular, not both";
+        return;
+    }
+    if (!has_linear && !has_angular) {
+        response->success = false;
+        response->message = "Both linear and angular are zero";
+        return;
+    }
+    if (request->speed <= 0.0) {
+        response->success = false;
+        response->message = "speed must be > 0";
+        return;
+    }
+
+    const auto p   = param_listener_->get_params();
+    const double cpr = static_cast<double>(p.encoder.output_cpr);
+    const double r   = p.kinematics.wheel_radius_m;
+    const double L   = p.kinematics.wheel_separation_m;
+
+    int64_t target_counts;
+    double linear_cmd  = 0.0;
+    double angular_cmd = 0.0;
+
+    if (has_linear) {
+        target_counts = static_cast<int64_t>(
+            std::ceil(std::abs(request->linear) * cpr / (2.0 * M_PI * r)));
+        linear_cmd = std::copysign(request->speed, request->linear);
+    } else {
+        target_counts = static_cast<int64_t>(
+            std::ceil((L / 2.0) * std::abs(request->angular) * cpr / (2.0 * M_PI * r)));
+        angular_cmd = std::copysign(request->speed, request->angular);
+    }
+
+    RCLCPP_INFO(node_->get_logger(),
+        "DeadReckon | target=%ld counts  linear_cmd=%.3f  angular_cmd=%.3f",
+        target_counts, linear_cmd, angular_cmd);
+
+    dr_left_remaining_.store(target_counts);
+    dr_right_remaining_.store(target_counts);
+    cmd_linear_.store(linear_cmd);
+    cmd_angular_.store(angular_cmd);
+    control_mode_.store(ControlMode::DEAD_RECKONING);
+
+    while (control_mode_.load() == ControlMode::DEAD_RECKONING) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+
+    response->success = true;
+    response->message = "Dead reckoning complete";
+}
+
 void GPIOController::control_loop()
 {
     while (running_) {
@@ -211,6 +286,22 @@ void GPIOController::control_loop()
 
         prev_left_count_ = left_count;
         prev_right_count_ = right_count;
+
+        if (control_mode_.load() == ControlMode::DEAD_RECKONING) {
+            dr_left_remaining_.fetch_sub(std::abs(left_delta));
+            dr_right_remaining_.fetch_sub(std::abs(right_delta));
+
+            RCLCPP_INFO_THROTTLE(node_->get_logger(), *node_->get_clock(), 200,
+                "DR | left_remaining=%ld  right_remaining=%ld  left_delta=%ld  right_delta=%ld",
+                dr_left_remaining_.load(), dr_right_remaining_.load(), left_delta, right_delta);
+
+            if (dr_left_remaining_.load() <= 0 && dr_right_remaining_.load() <= 0) {
+                cmd_linear_.store(0.0);
+                cmd_angular_.store(0.0);
+                control_mode_.store(ControlMode::NORMAL);
+                RCLCPP_INFO(node_->get_logger(), "DR | Complete — stopping motors");
+            }
+        }
 
         const double left_raw_rpm = payload::control_math::rpm_from_count_delta(
             left_delta, p.encoder.output_cpr, dt_s);

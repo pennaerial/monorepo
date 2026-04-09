@@ -24,7 +24,6 @@ from launch_ros.actions import Node
 from uav.runtime.mission_spec import MissionSpec, mission_path_for_name
 from uav.utils import (
     camel_to_snake,
-    clean_text,
     find_folder_with_heuristic,
     get_airframe_details,
     vehicle_camera_map,
@@ -47,6 +46,16 @@ def _yaml_or_launch_string(context, name: str, config_value) -> str:
     if override:
         return override
     return "" if config_value is None else str(config_value).strip()
+
+
+def _yaml_bool_value(config_value, *, name: str, default: bool) -> bool:
+    if config_value is None:
+        return bool(default)
+    if isinstance(config_value, bool):
+        return config_value
+    raise ValueError(
+        f"Launch parameter '{name}' must be a YAML boolean, received {config_value!r}."
+    )
 
 
 def _runtime_executable_for(mission_spec: MissionSpec) -> str:
@@ -115,13 +124,14 @@ def _build_runtime_parameters(
     mission_path: str,
     mission_spec: MissionSpec,
     *,
+    auto_launch: bool,
     debug: bool,
     servo_only: bool,
     vehicle_class_name: str | None,
     payload_name: str,
     uav_camera_offsets: list[float],
 ) -> dict:
-    parameters = {"mode_map": mission_path}
+    parameters = {"mode_map": mission_path, "auto_launch": bool(auto_launch)}
     if mission_spec.is_payload:
         parameters["payload_name"] = payload_name
         return parameters
@@ -290,7 +300,9 @@ def launch_setup(context, *args, **kwargs):
     save_vision_milliseconds = int(params.get("save_vision_milliseconds", 0))
     servo_only = bool(params.get("servo_only", False))
     sim = bool(params.get("sim", False))
-    auto_launch = bool(params.get("auto_launch", True))
+    auto_launch = _yaml_bool_value(
+        params.get("auto_launch", True), name="auto_launch", default=True
+    )
     payload_name = _yaml_or_launch_string(
         context, "payload_name", params.get("payload_name", "")
     )
@@ -430,6 +442,7 @@ def launch_setup(context, *args, **kwargs):
             _build_runtime_parameters(
                 mission_path,
                 mission_spec,
+                auto_launch=auto_launch,
                 debug=uav_debug,
                 servo_only=servo_only,
                 vehicle_class_name=vehicle_class.name
@@ -440,49 +453,6 @@ def launch_setup(context, *args, **kwargs):
             )
         ],
     )
-
-    start_mission_trigger = ExecuteProcess(
-        cmd=[
-            "ros2",
-            "service",
-            "call",
-            "/mode_manager/start_mission",
-            "std_srvs/srv/Trigger",
-        ],
-        output="screen",
-        name="start_mission_trigger",
-    )
-
-    def make_io_handler(process_name: str):
-        trigger = (
-            "INFO  [commander] Ready for takeoff!"
-            if process_name == "uav"
-            else (
-                "INFO  [uxrce_dds_client] synchronized with time offset"
-                if sim
-                else "session established"
-            )
-        )
-
-        def handler(event: ProcessIO):
-            text = clean_text(
-                event.text.decode() if isinstance(event.text, bytes) else event.text
-            )
-            if trigger not in text:
-                return None
-            mission_ready_flags[process_name] = True
-            if not mission_started["value"] and all(mission_ready_flags.values()):
-                mission_started["value"] = True
-                return [
-                    LogInfo(msg="[launcher] Processes ready, starting mission"),
-                    start_mission_trigger,
-                ]
-            return None
-
-        return handler
-
-    mission_ready_flags = {key: False for key in ("uav", "middleware")}
-    mission_started = {"value": False}
     sim_startup_started = {"value": False}
 
     if sim:
@@ -607,23 +577,6 @@ def launch_setup(context, *args, **kwargs):
             RegisterEventHandler(OnProcessIO(on_stderr=maybe_start_sim_runtime)),
             mission_node,
         ]
-        if auto_launch and mission_spec.is_uav and px4_sitl is not None:
-            actions.extend(
-                [
-                    RegisterEventHandler(
-                        OnProcessIO(
-                            target_action=px4_sitl,
-                            on_stdout=make_io_handler("middleware"),
-                        )
-                    ),
-                    RegisterEventHandler(
-                        OnProcessIO(
-                            target_action=px4_sitl,
-                            on_stdout=make_io_handler("uav"),
-                        )
-                    ),
-                ]
-            )
         return actions
 
     payload_launch_actions = []
@@ -650,15 +603,6 @@ def launch_setup(context, *args, **kwargs):
         *([middleware] if middleware is not None else []),
         mission_node,
     ]
-    if auto_launch and mission_spec.is_uav and middleware is not None:
-        actions.append(
-            RegisterEventHandler(
-                OnProcessIO(
-                    target_action=middleware,
-                    on_stderr=make_io_handler("middleware"),
-                )
-            )
-        )
     return actions
 
 

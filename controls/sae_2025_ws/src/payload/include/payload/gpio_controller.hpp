@@ -17,6 +17,9 @@
 #include "payload/servo.hpp"
 #include "payload_interfaces/msg/motor_state.hpp"
 #include "payload_interfaces/srv/compute_pid_ziegler_nichols.hpp"
+#include "payload_interfaces/srv/dead_reckon.hpp"
+
+enum class ControlMode { NORMAL, DEAD_RECKONING };
 
 class GPIOController : public Controller {
 public:
@@ -31,6 +34,10 @@ private:
     void compute_pid_zn_callback(
         const std::shared_ptr<payload_interfaces::srv::ComputePidZieglerNichols::Request> request,
         std::shared_ptr<payload_interfaces::srv::ComputePidZieglerNichols::Response> response);
+
+    void dead_reckon_callback(
+        const std::shared_ptr<payload_interfaces::srv::DeadReckon::Request> request,
+        std::shared_ptr<payload_interfaces::srv::DeadReckon::Response> response);
 
     void control_loop();
 
@@ -63,8 +70,15 @@ private:
 
     std::thread control_thread_;
 
+    // Dead reckoning state
+    std::atomic<ControlMode> control_mode_ {ControlMode::NORMAL};
+    std::atomic<int64_t>     dr_left_remaining_  {0};
+    std::atomic<int64_t>     dr_right_remaining_ {0};
+
     rclcpp::Publisher<payload_interfaces::msg::MotorState>::SharedPtr motor_state_pub_;
     rclcpp::Service<payload_interfaces::srv::ComputePidZieglerNichols>::SharedPtr zn_service_;
+    rclcpp::CallbackGroup::SharedPtr dead_reckon_cbg_;
+    rclcpp::Service<payload_interfaces::srv::DeadReckon>::SharedPtr dead_reckon_srv_;
 };
 
 #endif

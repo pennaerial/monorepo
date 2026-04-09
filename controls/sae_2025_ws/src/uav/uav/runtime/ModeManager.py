@@ -6,6 +6,7 @@ from typing import Any, get_type_hints
 
 import rclpy
 from rclpy.node import Node
+from std_srvs.srv import Trigger
 
 from uav.vehicles.Vehicle import Vehicle
 from uav.modes.Mode import Mode
@@ -17,7 +18,7 @@ VISION_NODE_PATH = "uav.vision_nodes"
 class ModeManager(Node):
     """Shared mission manager plumbing for a single bound vehicle."""
 
-    def __init__(self, node_name: str) -> None:
+    def __init__(self, node_name: str, *, auto_launch: bool = True) -> None:
         super().__init__(node_name)
         self.vehicle = None
         self.modes = {}
@@ -25,6 +26,14 @@ class ModeManager(Node):
         self.active_mode = None
         self.last_update_time = time()
         self._vision_clients = {}
+        self.timer = None
+        self.auto_launch = bool(auto_launch)
+        self._auto_launch_timer = None
+        self.start_mission_service = self.create_service(
+            Trigger, "/mode_manager/start_mission", self._start_mission_callback
+        )
+        if self.auto_launch:
+            self._auto_launch_timer = self.create_timer(0.1, self._maybe_auto_launch)
 
     def get_active_mode(self) -> Mode:
         return self.modes[self.active_mode]
@@ -167,6 +176,41 @@ class ModeManager(Node):
                 stop_method()
             except Exception as exc:
                 self.get_logger().warn(f"Failed to stop vehicle during shutdown: {exc}")
+
+    def _start_mission_callback(self, request, response):
+        started = self.start_mission()
+        response.success = True
+        response.message = "Starting Mission!" if started else "Mission already started."
+        return response
+
+    def start_mission(self) -> bool:
+        if self.timer is not None:
+            return False
+        self._cancel_auto_launch_timer()
+        self.last_update_time = time()
+        self.get_logger().info("MODE MANAGER | Starting Mission!")
+        self.timer = self.create_timer(0.1, self.spin_once)
+        return True
+
+    def _cancel_auto_launch_timer(self) -> None:
+        if self._auto_launch_timer is None:
+            return
+        cancel = getattr(self._auto_launch_timer, "cancel", None)
+        if callable(cancel):
+            cancel()
+        self._auto_launch_timer = None
+
+    def _auto_launch_ready(self) -> bool:
+        return True
+
+    def _maybe_auto_launch(self) -> None:
+        if self.timer is not None:
+            self._cancel_auto_launch_timer()
+            return
+        if not self._auto_launch_ready():
+            return
+        self.get_logger().info("MODE MANAGER | Auto-launch conditions satisfied.")
+        self.start_mission()
 
     def handle_mode_state(self, state: str) -> None:
         if state == "error":
