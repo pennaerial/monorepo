@@ -28,4 +28,4 @@ servo_only: false
 payload_name: "payload_0"
 payload_controller: ""
 
-sim: true
+sim: false
