@@ -49,12 +49,14 @@ class UAV(Vehicle):
         DEBUG=False,
         camera_offsets=[0, 0, 0],
         vehicle_name: str = "uav",
+        px4_namespace: str = "",
     ):
         super().__init__(
             node,
             str(vehicle_name),
             has_camera=True,
             camera_namespace=f"/{vehicle_name}",
+            px4_namespace=px4_namespace,
             image_topic=f"/{vehicle_name}/camera",
             camera_info_topic=f"/{vehicle_name}/camera_info",
             camera_service_name=f"/{vehicle_name}/camera_data",
@@ -574,50 +576,52 @@ class UAV(Vehicle):
 
         # Publishers
         self.offboard_mode_publisher = self.node.create_publisher(
-            OffboardControlMode, "/fmu/in/offboard_control_mode", 10
+            OffboardControlMode,
+            self.px4_transport_path("in/offboard_control_mode"),
+            10,
         )
         self.trajectory_publisher = self.node.create_publisher(
-            TrajectorySetpoint, "/fmu/in/trajectory_setpoint", 10
+            TrajectorySetpoint, self.px4_transport_path("in/trajectory_setpoint"), 10
         )
         self.vehicle_command_publisher = self.node.create_publisher(
-            VehicleCommand, "/fmu/in/vehicle_command", 10
+            VehicleCommand, self.px4_transport_path("in/vehicle_command"), 10
         )
         self.target_position_publisher = self.node.create_publisher(
-            VehicleLocalPosition, "/fmu/in/target_position", 10
+            VehicleLocalPosition, self.px4_transport_path("in/target_position"), 10
         )
 
         # Subscribers
         self.status_sub = self.node.create_subscription(
             VehicleStatus,
-            "/fmu/out/vehicle_status_v1",
+            self.px4_transport_path("out/vehicle_status_v1"),
             self._vehicle_status_callback,
             qos_profile,
         )
 
         self.attitude_sub = self.node.create_subscription(
             VehicleAttitude,
-            "/fmu/out/vehicle_attitude",
+            self.px4_transport_path("out/vehicle_attitude"),
             self._attitude_callback,
             qos_profile,
         )
 
         self.global_position_sub = self.node.create_subscription(
             VehicleGlobalPosition,
-            "fmu/out/vehicle_global_position",
+            self.px4_transport_path("out/vehicle_global_position"),
             self._global_position_callback,
             qos_profile,
         )
 
         self.vehicle_gps_sub = self.node.create_subscription(
             SensorGps,
-            "/fmu/out/vehicle_gps_position",
+            self.px4_transport_path("out/vehicle_gps_position"),
             self._vehicle_gps_callback,
             qos_profile,
         )
 
         self.vehicle_local_position_subscriber = self.node.create_subscription(
             VehicleLocalPosition,
-            "/fmu/out/vehicle_local_position_v1",
+            self.px4_transport_path("out/vehicle_local_position_v1"),
             self._vehicle_local_position_callback,
             qos_profile,
         )

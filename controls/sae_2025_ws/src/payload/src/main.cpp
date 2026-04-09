@@ -18,7 +18,7 @@ int main(int argc, char **argv){
     bool interrupted_shutdown = false;
 
     {
-        auto node = std::make_shared<Payload>("payload_main");
+        auto node = std::make_shared<Payload>("vehicle_main");
         node->init();
         rclcpp::spin(node);
         interrupted_shutdown = !rclcpp::ok();

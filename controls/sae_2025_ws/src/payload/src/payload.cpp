@@ -1,10 +1,8 @@
 #include "payload/payload.hpp"
 
-Payload::Payload(const std::string& payload_name)
-: rclcpp::Node(payload_name),
+Payload::Payload(const std::string& vehicle_name)
+: rclcpp::Node(vehicle_name),
   controller_loader_("payload", "Controller") {
-    payload_name_ = this->get_name(); //allows for override from launch file node name
-
     payload_params_listener_ = std::make_shared<payload::ParamListener>(this);
     payload_params_ = payload_params_listener_->get_params();
 

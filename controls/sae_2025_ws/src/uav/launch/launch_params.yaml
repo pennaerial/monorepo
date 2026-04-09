@@ -1,8 +1,9 @@
 # launch_params.yaml
 mission_name: payload_retreat
-# Vehicle namespace for UAV mission-facing topics/services.
-uav_name: uav
-uav_debug: false
+# Vehicle namespace for mission-facing topics/services.
+# Leave blank to use the mission-target default (`uav` for UAV missions, `payload_0` for payload missions).
+vehicle_name: ""
+debug: false
 vision_debug: true
 # Automatically start the mission manager once its runtime is ready.
 # Set false to leave the mission idle until /<vehicle>/mode_manager/start_mission is called.
@@ -16,18 +17,20 @@ airframe: standard_vtol # Enter a preset below or a valid airframe ID (integer),
 # These IDs load an airframe file and the corresponding model file in PX4-Autopilot/Tools/simulation/gz/models
 # Note: takeoff type (horizontal or vertical) is set in the mission yaml file
 custom_airframe_model: "" # Leave blank if using default PX4 model or enter file name of custom model
+# Optional PX4 uXRCE-DDS transport namespace. Leave blank to keep the legacy /fmu/... transport shape.
+px4_namespace: ""
+# Optional explicit PX4 multi-instance index for sim. Fleet orchestration assigns this automatically.
+px4_instance: 0
 
-# Vehicle camera pipeline settings. Only used when the mission modes require vision nodes.
-enable_vehicle_camera_pipeline: true
+# Vehicle camera settings. Only used when the mission modes require vision nodes.
 save_vision_milliseconds: 0 # Interval between saving vision images in milliseconds, set to 0 to disable saving.
-uav_camera_offsets: [0.0, 0.0, 0.0]
-# payload_camera_input_transport: raw
-# payload_camera_rotate_degrees: 0.0
-payload_camera_preprocess_hook: ""
+camera_mount_offsets: [0.0, 0.0, 0.0]
+# camera_input_transport: raw
+# camera_rotate_degrees: 0.0
+camera_preprocess_hook: ""
 
 # Mission runtime knobs.
 servo_only: false
-payload_name: "payload_0"
 payload_controller: ""
 
 sim: false

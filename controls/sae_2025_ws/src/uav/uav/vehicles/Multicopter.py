@@ -15,6 +15,7 @@ class Multicopter(UAV):
         DEBUG=False,
         camera_offsets=[0, 0, 0],
         vehicle_name: str = "uav",
+        px4_namespace: str = "",
     ):
         super().__init__(
             node,
@@ -22,6 +23,7 @@ class Multicopter(UAV):
             DEBUG,
             camera_offsets,
             vehicle_name=vehicle_name,
+            px4_namespace=px4_namespace,
         )
 
     @property

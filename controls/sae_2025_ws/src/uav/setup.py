@@ -8,7 +8,7 @@ setup(
     name=package_name,
     version="0.0.0",
     packages=find_packages(exclude=["test"]),
-    package_data={package_name: ["missions/*.yaml"]},
+    package_data={package_name: ["missions/*.yaml", "fleets/*.yaml"]},
     data_files=[
         ("share/ament_index/resource_index/packages", ["resource/" + package_name]),
         ("share/" + package_name, ["package.xml"]),
@@ -23,6 +23,10 @@ setup(
         (
             os.path.join("share", package_name, "missions"),
             glob(os.path.join(package_name, "missions", "*.yaml")),
+        ),
+        (
+            os.path.join("share", package_name, "fleets"),
+            glob(os.path.join(package_name, "fleets", "*.yaml")),
         ),
     ],
     install_requires=["setuptools", "apriltag"],

@@ -1,0 +1,22 @@
+backend:
+  kind: sim
+  px4_path: ~/PX4-Autopilot
+  world_name: sae
+  mission_stage: payload_docking
+
+defaults:
+  auto_launch: true
+  debug: false
+  vision_debug: false
+  save_vision_milliseconds: 0
+  servo_only: false
+  camera_mount_offsets: [0.0, 0.0, 0.0]
+  camera_input_transport: raw
+  camera_rotate_degrees: 0.0
+  camera_preprocess_hook: ""
+
+vehicles:
+  - name: payload
+    controllable: payload_0
+    mission: payload_apriltag_approach
+    camera_mount_offsets: [0.2, 0.0, 0.0]

@@ -11,8 +11,8 @@ void SimController::initialize(rclcpp::Node* node) {
     payload_params_listener_ = std::make_shared<payload::ParamListener>(node);
     payload_params_ = payload_params_listener_->get_params();
 
-    std::string payload_name = node->get_name();
-    std::string gz_drive_topic = "/model/" + payload_name + "/cmd_vel";
+    std::string sim_entity_name = node->get_name();
+    std::string gz_drive_topic = "/model/" + sim_entity_name + "/cmd_vel";
 
     gz_drive_publisher_ = gz_node_->Advertise<gz::msgs::Twist>(gz_drive_topic);
     RCLCPP_INFO(node->get_logger(), "SIM | Publishing gz drive commands to %s", gz_drive_topic.c_str());

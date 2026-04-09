@@ -9,8 +9,16 @@ from rclpy.qos import (
 )
 
 
+def _px4_transport_path(suffix: str, px4_namespace: str = "") -> str:
+    clean_namespace = str(px4_namespace).strip().strip("/")
+    clean_suffix = suffix.lstrip("/")
+    if not clean_namespace:
+        return f"/fmu/{clean_suffix}"
+    return f"/{clean_namespace}/fmu/{clean_suffix}"
+
+
 class OscillatoryServoCommandNode(Node):
-    def __init__(self):
+    def __init__(self, px4_namespace: str = ""):
         super().__init__("oscillatory_servo_command_node")
         qos_profile = QoSProfile(
             reliability=QoSReliabilityPolicy.BEST_EFFORT,
@@ -19,7 +27,9 @@ class OscillatoryServoCommandNode(Node):
             depth=1,
         )
         self.vehicle_command_pub = self.create_publisher(
-            VehicleCommand, "/fmu/in/vehicle_command", qos_profile
+            VehicleCommand,
+            _px4_transport_path("in/vehicle_command", px4_namespace),
+            qos_profile,
         )
         self.timer = self.create_timer(0.1, self.timer_callback)
         self.timer1 = 0

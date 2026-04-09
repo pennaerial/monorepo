@@ -33,6 +33,15 @@ def _install_ros_test_doubles() -> None:
         clock_mod = types.ModuleType("rclpy.clock")
         clock_mod.Clock = _placeholder("Clock")
 
+        parameter_mod = types.ModuleType("rclpy.parameter")
+        parameter_mod.Parameter = _placeholder("Parameter")
+
+        validate_namespace_mod = types.ModuleType("rclpy.validate_namespace")
+        validate_namespace_mod.validate_namespace = lambda namespace: None
+
+        validate_node_name_mod = types.ModuleType("rclpy.validate_node_name")
+        validate_node_name_mod.validate_node_name = lambda node_name: None
+
         qos_mod = types.ModuleType("rclpy.qos")
         qos_mod.QoSProfile = _placeholder("QoSProfile")
         qos_mod.QoSReliabilityPolicy = _placeholder("QoSReliabilityPolicy")
@@ -42,6 +51,9 @@ def _install_ros_test_doubles() -> None:
         rclpy.node = node_mod
         rclpy.executors = executors_mod
         rclpy.clock = clock_mod
+        rclpy.parameter = parameter_mod
+        rclpy.validate_namespace = validate_namespace_mod
+        rclpy.validate_node_name = validate_node_name_mod
         rclpy.qos = qos_mod
         sys.modules.update(
             {
@@ -49,6 +61,9 @@ def _install_ros_test_doubles() -> None:
                 "rclpy.node": node_mod,
                 "rclpy.executors": executors_mod,
                 "rclpy.clock": clock_mod,
+                "rclpy.parameter": parameter_mod,
+                "rclpy.validate_namespace": validate_namespace_mod,
+                "rclpy.validate_node_name": validate_node_name_mod,
                 "rclpy.qos": qos_mod,
             }
         )
@@ -514,7 +529,7 @@ def test_payload_mode_manager_rejects_uav_spec(monkeypatch):
     with pytest.raises(ValueError, match="requires a payload mission spec"):
         payload_manager_module.PayloadModeManager(
             mission_spec=_fake_mission_spec(target="uav", is_uav=True, is_payload=False),
-            payload_name="payload_0",
+            vehicle_name="payload_0",
         )
 
 
@@ -547,7 +562,7 @@ def test_uav_bootstrap_bool_parameter_and_manager_validation(monkeypatch):
             "servo_only": False,
             "vehicle_name": "uav_5",
             "vehicle_class": "MULTICOPTER",
-            "uav_camera_offsets": [0.0, 0.0, 0.0],
+            "camera_mount_offsets": [0.0, 0.0, 0.0],
         },
     )
 
@@ -584,7 +599,7 @@ def test_payload_bootstrap_bool_parameter_and_manager_validation(monkeypatch):
         {
             "mode_map": "mission.yaml",
             "auto_launch": True,
-            "payload_name": "payload_0",
+            "vehicle_name": "payload_0",
         },
     )
 

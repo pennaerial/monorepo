@@ -192,7 +192,7 @@ def test_payload_manager_waits_for_service_when_auto_launch_false(monkeypatch):
 
     manager = payload_manager_module.PayloadModeManager(
         mission_spec=SimpleNamespace(is_payload=True, vision_nodes=[]),
-        payload_name="payload_0",
+        vehicle_name="payload_0",
         auto_launch=False,
     )
 
@@ -247,7 +247,7 @@ def test_payload_manager_auto_launches_when_service_is_ready(monkeypatch):
 
     manager = payload_manager_module.PayloadModeManager(
         mission_spec=SimpleNamespace(is_payload=True, vision_nodes=[]),
-        payload_name="payload_0",
+        vehicle_name="payload_0",
         auto_launch=True,
     )
 
@@ -375,7 +375,7 @@ def test_uav_bootstrap_forwards_auto_launch(monkeypatch, auto_launch):
         "servo_only": False,
         "vehicle_name": "uav_2",
         "vehicle_class": "MULTICOPTER",
-        "uav_camera_offsets": [0.0, 0.0, 0.0],
+        "camera_mount_offsets": [0.0, 0.0, 0.0],
     }
     bootstrap.get_parameter = lambda name: _FakeParameter(parameters[name])
 
@@ -400,7 +400,7 @@ def test_payload_bootstrap_forwards_auto_launch(monkeypatch, auto_launch):
     parameters = {
         "mode_map": "/tmp/test_payload_mission.yaml",
         "auto_launch": auto_launch,
-        "payload_name": "payload_0",
+        "vehicle_name": "payload_0",
     }
     bootstrap.get_parameter = lambda name: _FakeParameter(parameters[name])
 

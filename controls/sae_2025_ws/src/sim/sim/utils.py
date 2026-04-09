@@ -61,14 +61,14 @@ def load_sim_parameters(
     Find simulation configuration file, checking source location first (for development),
     then falling back to installed location.
 
-    When *mission_stage* is provided the loader looks for
-    ``{competition}.{mission_stage}.yaml`` (e.g. ``sae.horizontal_takeoff.yaml``)
-    and validates that the file's prefix matches the competition name.
-    When *mission_stage* is empty/omitted the original ``{competition}.yaml`` is used.
+    Simulation stages live under ``simulations/<competition_name>/``. When
+    *mission_stage* is provided the loader looks for ``<mission_stage>.yaml``.
+    When *mission_stage* is empty/omitted the loader uses ``base.yaml``.
 
     Args:
-        competition: Competition name (e.g., 'sae')
+        competition: Legacy competition selector retained for compatibility
         logger: Logger instance
+        competition_name: Directory under ``simulations/`` to resolve from
         mission_stage: Optional mission stage name (e.g., 'horizontal_takeoff')
 
     Returns:
@@ -77,22 +77,10 @@ def load_sim_parameters(
     Raises:
         FileNotFoundError: If config file cannot be found
     """
-    # if mission_stage:
-    #     config_filename = f"{competition}.{mission_stage}.yaml"
-    # else:
-    #     config_filename = f"{competition}.yaml"
-
     if mission_stage:
         config_filename = f"{mission_stage}.yaml"
     else:
         config_filename = "base.yaml"
-
-    # # Validate that the filename starts with the expected competition prefix.
-    # expected_prefix = f"{competition}."
-    # if not config_filename.startswith(expected_prefix):
-    #     logger.error(
-    #         "Config filename '{config_filename}' does not start with expected competition prefix '{expected_prefix}'."
-    #     )
 
     config_path = find_package_resource(
         relative_path=f"simulations/{competition_name}/{config_filename}",

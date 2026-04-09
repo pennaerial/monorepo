@@ -8,12 +8,22 @@ from types import SimpleNamespace
 import pytest
 
 
-def _load_launch_module():
+def _load_launch_module(filename: str, module_name: str):
     package_root = Path(__file__).resolve().parents[1]
     if str(package_root) not in sys.path:
         sys.path.insert(0, str(package_root))
-    launch_path = Path(__file__).resolve().parents[1] / "launch" / "main.launch.py"
-    spec = importlib.util.spec_from_file_location("uav_main_launch_helpers", launch_path)
+    sim_package_root = Path(__file__).resolve().parents[2] / "sim"
+    if str(sim_package_root) not in sys.path:
+        sys.path.insert(0, str(sim_package_root))
+    # test_runtime_behavior installs lightweight rclpy stubs into sys.modules.
+    # launch_ros needs the real ROS Python packages here.
+    fake_rclpy = sys.modules.get("rclpy")
+    if fake_rclpy is not None and not hasattr(fake_rclpy, "__path__"):
+        for module_name_key in list(sys.modules):
+            if module_name_key == "rclpy" or module_name_key.startswith("rclpy."):
+                del sys.modules[module_name_key]
+    launch_path = package_root / "launch" / filename
+    spec = importlib.util.spec_from_file_location(module_name, launch_path)
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
     spec.loader.exec_module(module)
@@ -21,47 +31,69 @@ def _load_launch_module():
 
 
 @pytest.fixture(scope="module")
-def launch_module():
-    return _load_launch_module()
+def main_launch_module():
+    return _load_launch_module("main.launch.py", "uav_main_launch_helpers")
 
 
-def test_yaml_or_launch_string_prefers_launch_override(monkeypatch, launch_module):
+@pytest.fixture(scope="module")
+def stack_launch_module():
+    return _load_launch_module("vehicle_stack.launch.py", "uav_vehicle_stack_helpers")
+
+
+def test_yaml_or_launch_string_prefers_launch_override(monkeypatch, main_launch_module):
     monkeypatch.setattr(
-        launch_module,
+        main_launch_module,
         "LaunchConfiguration",
         lambda name: SimpleNamespace(perform=lambda context: "  override-value  "),
     )
 
     assert (
-        launch_module._yaml_or_launch_string(SimpleNamespace(), "mission_name", "basic")
+        main_launch_module._yaml_or_launch_string(
+            SimpleNamespace(), "mission_name", "basic"
+        )
         == "override-value"
     )
 
 
-def test_yaml_or_launch_string_falls_back_to_yaml_value(monkeypatch, launch_module):
+def test_yaml_or_launch_string_falls_back_to_yaml_value(monkeypatch, main_launch_module):
     monkeypatch.setattr(
-        launch_module,
+        main_launch_module,
         "LaunchConfiguration",
         lambda name: SimpleNamespace(perform=lambda context: "   "),
     )
 
-    assert launch_module._yaml_or_launch_string(SimpleNamespace(), "payload_name", 7) == "7"
     assert (
-        launch_module._yaml_or_launch_string(SimpleNamespace(), "payload_name", None)
+        main_launch_module._yaml_or_launch_string(SimpleNamespace(), "vehicle_name", 7)
+        == "7"
+    )
+    assert (
+        main_launch_module._yaml_or_launch_string(SimpleNamespace(), "vehicle_name", None)
         == ""
     )
 
 
-def test_yaml_bool_value_accepts_boolean_and_default(launch_module):
-    assert launch_module._yaml_bool_value(True, name="auto_launch", default=False) is True
-    assert launch_module._yaml_bool_value(False, name="auto_launch", default=True) is False
-    assert launch_module._yaml_bool_value(None, name="auto_launch", default=True) is True
-    assert launch_module._yaml_bool_value(None, name="auto_launch", default=False) is False
+def test_yaml_bool_value_accepts_boolean_and_default(main_launch_module):
+    assert (
+        main_launch_module._yaml_bool_value(True, name="auto_launch", default=False)
+        is True
+    )
+    assert (
+        main_launch_module._yaml_bool_value(False, name="auto_launch", default=True)
+        is False
+    )
+    assert (
+        main_launch_module._yaml_bool_value(None, name="auto_launch", default=True)
+        is True
+    )
+    assert (
+        main_launch_module._yaml_bool_value(None, name="auto_launch", default=False)
+        is False
+    )
 
 
-def test_yaml_bool_value_rejects_non_boolean(launch_module):
+def test_yaml_bool_value_rejects_non_boolean(main_launch_module):
     with pytest.raises(ValueError, match="must be a YAML boolean"):
-        launch_module._yaml_bool_value("false", name="auto_launch", default=True)
+        main_launch_module._yaml_bool_value("false", name="auto_launch", default=True)
 
 
 @pytest.mark.parametrize(
@@ -74,47 +106,46 @@ def test_yaml_bool_value_rejects_non_boolean(launch_module):
         ),
     ],
 )
-def test_runtime_executable_for_supported_targets(launch_module, mission_spec, expected):
-    assert launch_module._runtime_executable_for(mission_spec) == expected
+def test_runtime_executable_for_supported_targets(
+    stack_launch_module, mission_spec, expected
+):
+    assert stack_launch_module._runtime_executable_for(mission_spec) == expected
 
 
-def test_runtime_executable_for_rejects_unsupported_target(launch_module):
+def test_runtime_executable_for_rejects_unsupported_target(stack_launch_module):
     mission_spec = SimpleNamespace(is_uav=False, is_payload=False, target="experimental")
-
     with pytest.raises(ValueError, match="Unsupported mission target 'experimental'"):
-        launch_module._runtime_executable_for(mission_spec)
+        stack_launch_module._runtime_executable_for(mission_spec)
 
 
 @pytest.mark.parametrize(
-    ("mission_spec", "sim", "expected"),
+    ("value", "default", "expected"),
     [
-        (SimpleNamespace(is_uav=True, is_payload=False), True, True),
-        (SimpleNamespace(is_uav=True, is_payload=False), False, False),
-        (SimpleNamespace(is_uav=False, is_payload=True), True, False),
-        (SimpleNamespace(is_uav=False, is_payload=True), False, False),
+        (True, False, True),
+        (False, True, False),
+        ("true", False, True),
+        ("no", True, False),
+        (None, True, True),
     ],
 )
-def test_sim_requires_px4_sitl(launch_module, mission_spec, sim, expected):
-    assert launch_module._sim_requires_px4_sitl(mission_spec, sim=sim) is expected
+def test_resolve_bool(stack_launch_module, value, default, expected):
+    assert stack_launch_module._resolve_bool({"flag": value}, "flag", default) is expected
 
 
-@pytest.mark.parametrize(
-    ("model", "expected"),
-    [
-        ("gz_multicopter", "multicopter_0"),
-        ("payload", "payload_0"),
-        ("gz_payload_0", "payload_0_0"),
-    ],
-)
-def test_gz_entity_name_for_model(launch_module, model, expected):
-    assert launch_module._gz_entity_name_for_model(model) == expected
+def test_resolve_bool_rejects_invalid_value(stack_launch_module):
+    with pytest.raises(ValueError, match="expected boolean 'flag'"):
+        stack_launch_module._resolve_bool({"flag": "maybe"}, "flag", True)
 
 
-def test_camera_contract_for_uav_and_payload(launch_module):
-    uav_contract = launch_module._camera_contract_for(
-        SimpleNamespace(is_uav=True, is_payload=False),
-        payload_name="",
-        uav_name="uav_7",
+def test_vehicle_namespace_for_rejects_empty(stack_launch_module):
+    with pytest.raises(ValueError, match="non-empty vehicle_name"):
+        stack_launch_module._vehicle_namespace_for(" / ")
+
+
+def test_camera_contract_for_uav_and_payload(stack_launch_module):
+    uav_contract = stack_launch_module._camera_contract_for(
+        SimpleNamespace(is_uav=True, is_payload=False, target="uav"),
+        vehicle_name="uav_7",
     )
     assert uav_contract == {
         "vehicle_name": "uav_7",
@@ -129,11 +160,12 @@ def test_camera_contract_for_uav_and_payload(launch_module):
         "rotate_degrees": 0.0,
         "preprocess_hook": "",
         "camera_info_url": "",
+        "mission_target": "uav",
     }
 
-    payload_contract = launch_module._camera_contract_for(
-        SimpleNamespace(is_uav=False, is_payload=True),
-        payload_name="payload_2",
+    payload_contract = stack_launch_module._camera_contract_for(
+        SimpleNamespace(is_uav=False, is_payload=True, target="payload"),
+        vehicle_name="payload_2",
         input_transport="compressed",
         rotate_degrees=180.0,
         preprocess_hook="rotate_then_crop",
@@ -152,18 +184,13 @@ def test_camera_contract_for_uav_and_payload(launch_module):
         "rotate_degrees": 180.0,
         "preprocess_hook": "rotate_then_crop",
         "camera_info_url": "file:///tmp/payload.yaml",
+        "mission_target": "payload",
     }
 
 
-def test_camera_contract_for_requires_payload_name(launch_module):
-    with pytest.raises(ValueError, match="Payload missions require an explicit payload_name"):
-        launch_module._camera_contract_for(
-            SimpleNamespace(is_uav=False, is_payload=True),
-            payload_name="",
-        )
-
-
-def test_payload_camera_info_url_for_prefers_named_file(monkeypatch, tmp_path, launch_module):
+def test_payload_camera_info_url_for_prefers_named_file(
+    monkeypatch, tmp_path, stack_launch_module
+):
     payload_share = tmp_path / "payload_share"
     (payload_share / "config").mkdir(parents=True)
     preferred = payload_share / "config" / "payload_2_camera_info.yaml"
@@ -172,55 +199,44 @@ def test_payload_camera_info_url_for_prefers_named_file(monkeypatch, tmp_path, l
     preferred.write_text("preferred", encoding="utf-8")
 
     monkeypatch.setattr(
-        launch_module,
+        stack_launch_module,
         "get_package_share_directory",
         lambda package_name: str(payload_share),
     )
 
     expected = f"file://{preferred}"
-    assert launch_module._payload_camera_info_url_for("payload_2") == expected
+    assert stack_launch_module._payload_camera_info_url_for("payload_2") == expected
 
 
-def test_payload_camera_info_url_for_falls_back_to_payload_0(monkeypatch, tmp_path, launch_module):
+def test_payload_camera_info_url_for_falls_back_to_payload_0(
+    monkeypatch, tmp_path, stack_launch_module
+):
     payload_share = tmp_path / "payload_share"
     (payload_share / "config").mkdir(parents=True)
     fallback = payload_share / "config" / "payload_0_camera_info.yaml"
     fallback.write_text("fallback", encoding="utf-8")
 
     monkeypatch.setattr(
-        launch_module,
+        stack_launch_module,
         "get_package_share_directory",
         lambda package_name: str(payload_share),
     )
 
     expected = f"file://{fallback}"
-    assert launch_module._payload_camera_info_url_for("payload_2") == expected
+    assert stack_launch_module._payload_camera_info_url_for("payload_2") == expected
 
 
-def test_payload_camera_info_url_for_missing_files_returns_empty(monkeypatch, tmp_path, launch_module):
-    payload_share = tmp_path / "payload_share"
-    (payload_share / "config").mkdir(parents=True)
-
-    monkeypatch.setattr(
-        launch_module,
-        "get_package_share_directory",
-        lambda package_name: str(payload_share),
-    )
-
-    assert launch_module._payload_camera_info_url_for("payload_2") == ""
-
-
-def test_build_runtime_parameters_for_uav(launch_module):
-    parameters = launch_module._build_runtime_parameters(
-        "/tmp/mission.yaml",
-        SimpleNamespace(is_payload=False, is_uav=True),
+def test_build_runtime_parameters_for_uav(stack_launch_module):
+    parameters = stack_launch_module._build_runtime_parameters(
+        mission_path="/tmp/mission.yaml",
+        mission_spec=SimpleNamespace(is_payload=False, is_uav=True),
+        vehicle_name="uav_3",
+        px4_namespace="px4_uav_3",
         auto_launch=True,
         debug=1,
         servo_only=0,
         vehicle_class_name="MULTICOPTER",
-        payload_name="",
-        uav_name="uav_3",
-        uav_camera_offsets=[0.1, 0.2, 0.3],
+        camera_mount_offsets=[0.1, 0.2, 0.3],
     )
 
     assert parameters == {
@@ -230,55 +246,208 @@ def test_build_runtime_parameters_for_uav(launch_module):
         "debug": True,
         "servo_only": False,
         "vehicle_class": "MULTICOPTER",
-        "uav_camera_offsets": [0.1, 0.2, 0.3],
+        "camera_mount_offsets": [0.1, 0.2, 0.3],
+        "px4_namespace": "px4_uav_3",
     }
 
 
-def test_build_runtime_parameters_for_payload(launch_module):
-    parameters = launch_module._build_runtime_parameters(
-        "/tmp/payload.yaml",
-        SimpleNamespace(is_payload=True, is_uav=False),
+def test_build_runtime_parameters_for_payload(stack_launch_module):
+    parameters = stack_launch_module._build_runtime_parameters(
+        mission_path="/tmp/payload.yaml",
+        mission_spec=SimpleNamespace(is_payload=True, is_uav=False),
+        vehicle_name="payload_0",
+        px4_namespace="",
         auto_launch=False,
         debug=True,
         servo_only=True,
         vehicle_class_name=None,
-        payload_name="payload_0",
-        uav_name="uav_ignored",
-        uav_camera_offsets=[],
+        camera_mount_offsets=[],
     )
 
     assert parameters == {
         "mode_map": "/tmp/payload.yaml",
         "auto_launch": False,
-        "payload_name": "payload_0",
+        "vehicle_name": "payload_0",
     }
 
 
-def test_build_runtime_parameters_rejects_missing_vehicle_class(launch_module):
+def test_build_runtime_parameters_rejects_missing_vehicle_class(stack_launch_module):
     with pytest.raises(ValueError, match="UAV missions require a vehicle class"):
-        launch_module._build_runtime_parameters(
-            "/tmp/mission.yaml",
-            SimpleNamespace(is_payload=False, is_uav=True),
+        stack_launch_module._build_runtime_parameters(
+            mission_path="/tmp/mission.yaml",
+            mission_spec=SimpleNamespace(is_payload=False, is_uav=True),
+            vehicle_name="uav",
+            px4_namespace="",
             auto_launch=True,
             debug=False,
             servo_only=False,
             vehicle_class_name=None,
-            payload_name="",
-            uav_name="uav",
-            uav_camera_offsets=[0.0, 0.0, 0.0],
+            camera_mount_offsets=[0.0, 0.0, 0.0],
         )
 
 
-def test_build_runtime_parameters_rejects_bad_camera_offsets(launch_module):
-    with pytest.raises(ValueError, match="uav_camera_offsets must have exactly 3 values"):
-        launch_module._build_runtime_parameters(
-            "/tmp/mission.yaml",
-            SimpleNamespace(is_payload=False, is_uav=True),
+def test_build_runtime_parameters_rejects_bad_camera_offsets(stack_launch_module):
+    with pytest.raises(ValueError, match="camera_mount_offsets must have exactly 3 values"):
+        stack_launch_module._build_runtime_parameters(
+            mission_path="/tmp/mission.yaml",
+            mission_spec=SimpleNamespace(is_payload=False, is_uav=True),
+            vehicle_name="uav",
+            px4_namespace="",
             auto_launch=True,
             debug=False,
             servo_only=False,
             vehicle_class_name="MULTICOPTER",
-            payload_name="",
-            uav_name="uav",
-            uav_camera_offsets=[0.0, 0.0],
+            camera_mount_offsets=[0.0, 0.0],
         )
+
+
+def test_legacy_backend_override_uses_stage_contract_for_uav(
+    monkeypatch, main_launch_module
+):
+    monkeypatch.setattr(
+        main_launch_module,
+        "resolve_stage_world",
+        lambda **kwargs: {
+            "mission_stage": "payload_retreat",
+            "sim_stage_params": {
+                "world": {"params": {"vehicle_pose": [1.0, 2.0, 3.0, 0.0, 0.0, 0.5]}}
+            },
+            "world": {
+                "params": {
+                    "controllables": {"payload_0": {"kind": "payload"}},
+                }
+            },
+        },
+    )
+
+    backend, world_name = main_launch_module._legacy_backend_override(
+        mission_spec=SimpleNamespace(is_uav=True, is_payload=False),
+        sim_params={"competition": 3, "mission_stage": "payload_retreat"},
+        vehicle_name="uav_alpha",
+        model="gz_x500_mono_cam",
+        px4_airframe_id=4010,
+    )
+
+    assert world_name == "sae"
+    assert backend == {
+        "kind": "sim",
+        "world_name": "sae",
+        "mission_stage": "payload_retreat",
+        "world_overrides": {
+            "params": {
+                "controllables": {
+                    "uav_alpha": {
+                        "kind": "uav",
+                        "px4_airframe_id": 4010,
+                        "path_to_sdf": "~/.simulation-gazebo/models/x500_mono_cam/model.sdf",
+                        "model": "gz_x500_mono_cam",
+                        "position": [1.0, 2.0, 3.0],
+                        "rpy": [0.0, 0.0, 0.5],
+                    }
+                }
+            }
+        },
+        "scoring": False,
+    }
+
+
+def test_legacy_backend_override_rejects_unknown_payload(
+    monkeypatch, main_launch_module
+):
+    monkeypatch.setattr(
+        main_launch_module,
+        "resolve_stage_world",
+        lambda **kwargs: {
+            "mission_stage": "base",
+            "sim_stage_params": {"world": {"params": {}}},
+            "world": {"params": {"controllables": {"payload_1": {"kind": "payload"}}}},
+        },
+    )
+
+    with pytest.raises(ValueError, match="Configured vehicle_name 'payload_0'"):
+        main_launch_module._legacy_backend_override(
+            mission_spec=SimpleNamespace(is_uav=False, is_payload=True),
+            sim_params={"competition": 3},
+            vehicle_name="payload_0",
+            model="",
+        )
+
+
+def test_sim_camera_bridge_actions_use_entity_name_for_payload(
+    monkeypatch, stack_launch_module
+):
+    class FakeNode:
+        def __init__(self, **kwargs):
+            self.arguments = kwargs.get("arguments", [])
+            self.remappings = kwargs.get("remappings", [])
+
+    monkeypatch.setattr(stack_launch_module, "Node", FakeNode)
+
+    actions = stack_launch_module._sim_camera_bridge_actions(
+        world_name="sae",
+        vehicle_name="payload_ns",
+        sim_entity_name="payload_model_7",
+        mission_target="payload",
+    )
+    image_bridge = actions[0]
+    info_bridge = actions[1]
+    assert "/world/sae/model/payload_model_7/link/camera_link/sensor/camera/image" in image_bridge.arguments[0]
+    assert image_bridge.remappings == [
+        (
+            "/world/sae/model/payload_model_7/link/camera_link/sensor/camera/image",
+            "/payload_ns/camera_source",
+        )
+    ]
+    assert info_bridge.remappings == [
+        (
+            "/world/sae/model/payload_model_7/link/camera_link/sensor/camera/camera_info",
+            "/payload_ns/camera_info_source",
+        )
+    ]
+
+
+def test_legacy_backend_override_returns_stage_based_backend_for_uav(
+    monkeypatch, main_launch_module
+):
+    monkeypatch.setattr(main_launch_module, "_resolved_sim_world_name", lambda params: "sae")
+    monkeypatch.setattr(
+        main_launch_module,
+        "resolve_stage_world",
+        lambda **kwargs: {
+            "mission_stage": "payload_retreat",
+            "sim_stage_params": {
+                "world": {"params": {"vehicle_pose": [5.0, 0.0, 0.1, 0.0, 0.0, 0.0]}}
+            },
+            "world": {"params": {"controllables": {"payload_0": {"kind": "payload"}}}},
+        },
+    )
+
+    backend, world_name = main_launch_module._legacy_backend_override(
+        mission_spec=SimpleNamespace(is_uav=True, is_payload=False),
+        sim_params={"mission_stage": "payload_retreat"},
+        vehicle_name="uav_0",
+        model="gz_x500_mono_cam",
+        px4_airframe_id=4010,
+    )
+
+    assert world_name == "sae"
+    assert backend == {
+        "kind": "sim",
+        "world_name": "sae",
+        "mission_stage": "payload_retreat",
+        "world_overrides": {
+            "params": {
+                "controllables": {
+                    "uav_0": {
+                        "kind": "uav",
+                        "px4_airframe_id": 4010,
+                        "path_to_sdf": "~/.simulation-gazebo/models/x500_mono_cam/model.sdf",
+                        "model": "gz_x500_mono_cam",
+                        "position": [5.0, 0.0, 0.1],
+                        "rpy": [0.0, 0.0, 0.0],
+                    }
+                }
+            }
+        },
+        "scoring": False,
+    }

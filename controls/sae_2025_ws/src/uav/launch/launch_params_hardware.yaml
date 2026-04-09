@@ -2,9 +2,10 @@
 # Configuration for running on real hardware.
 
 mission_name: basic
-# Vehicle namespace for UAV mission-facing topics/services.
-uav_name: uav
-uav_debug: false
+# Vehicle namespace for mission-facing topics/services.
+# Leave blank to use the mission-target default (`uav` for UAV missions, `payload_0` for payload missions).
+vehicle_name: ""
+debug: false
 vision_debug: false
 # Automatically start the mission manager once its runtime is ready.
 # Set false to leave the mission idle until /<vehicle>/mode_manager/start_mission is called.
@@ -13,18 +14,20 @@ auto_launch: true
 # PX4 / airframe settings for UAV missions.
 airframe: standard_vtol
 custom_airframe_model: ""
+# Optional PX4 uXRCE-DDS transport namespace. Leave blank to keep the legacy /fmu/... transport shape.
+px4_namespace: ""
+# Optional explicit PX4 instance index. Multi-vehicle simulation assigns this automatically.
+px4_instance: 0
 
-# Vehicle camera pipeline settings. Only used when the mission modes require vision nodes.
-enable_vehicle_camera_pipeline: true
+# Vehicle camera settings. Only used when the mission modes require vision nodes.
 save_vision_milliseconds: 0
-uav_camera_offsets: [0.0, 0.0, 0.0]
-payload_camera_input_transport: compressed
-payload_camera_rotate_degrees: 180.0
-payload_camera_preprocess_hook: ""
+camera_mount_offsets: [0.0, 0.0, 0.0]
+camera_input_transport: compressed
+camera_rotate_degrees: 180.0
+camera_preprocess_hook: ""
 
 # Mission runtime knobs.
 servo_only: false
-payload_name: payload_0
 payload_controller: GPIOController
 
 sim: false
