@@ -24,14 +24,14 @@ modes:
         # Fill in with your actual mappings.
         # Key: visible tag combo (OR groups with |, AND groups with ,)
         # Value: transitions to travel and direction to travel
-        "0|4|5":   {transitions: 0, direction: ccw}  # front only (already at dock)
         "0|4|5,2": {transitions: 1, direction: ccw}  # front + left
         "0|4|5,3": {transitions: 1, direction: cw}   # front + right
-        "2":       {transitions: 2, direction: ccw}  # left only
-        "3":       {transitions: 2, direction: cw}   # right only
+        "0|4|5":   {transitions: 0, direction: ccw}  # front only (already at dock)
         "1|6|7,2": {transitions: 3, direction: ccw}  # back + left
         "1|6|7,3": {transitions: 3, direction: cw}   # back + right
         "1|6|7":   {transitions: 4, direction: ccw}  # back only
+        "2":       {transitions: 2, direction: ccw}  # left only
+        "3":       {transitions: 2, direction: cw}   # right only
       tag_size_m: 0.0508
       turn_angular_speed: 0.5
       line_follow_speed_mps: 0.3
