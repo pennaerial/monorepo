@@ -22,7 +22,7 @@
         </material>
       </visual>
       <!-- Square alternating border: 8 segments (2 per side) -->
-      <!-- Color A = orange (1.0 0.5 0.0), Color B = blue (0.0 0.0 1.0) -->
+      <!-- Color A = red (1.0 0.0 0.0), Color B = blue (0.0 0.0 1.0) -->
       <!-- Border centerline at 1.0668m from DLZ center (6 inches inset from 8ft pad edge) -->
       <!-- DLZ center in link space: (5.0192, -0.0192) -->
       <!-- Each segment: 1.0668m long x 0.10m wide -->
@@ -47,7 +47,7 @@
         <cast_shadows>false</cast_shadows>
         <pose>4.4858 1.0476 0.112 0 0 0</pose>
         <geometry><box><size>1.0668 0.10 0.001</size></box></geometry>
-        <material><ambient>1.0 0.5 0.0 1</ambient><diffuse>1.0 0.5 0.0 1</diffuse></material>
+        <material><ambient>1.0 0.0 0.0 1</ambient><diffuse>1.0 0.0 0.0 1</diffuse></material>
       </visual>
 
       <!-- LEFT SIDE -->
@@ -61,7 +61,7 @@
         <cast_shadows>false</cast_shadows>
         <pose>3.9524 -0.5526 0.112 0 0 0</pose>
         <geometry><box><size>0.10 1.0668 0.001</size></box></geometry>
-        <material><ambient>1.0 0.5 0.0 1</ambient><diffuse>1.0 0.5 0.0 1</diffuse></material>
+        <material><ambient>1.0 0.0 0.0 1</ambient><diffuse>1.0 0.0 0.0 1</diffuse></material>
       </visual>
 
       <!-- BOTTOM SIDE -->
@@ -75,7 +75,7 @@
         <cast_shadows>false</cast_shadows>
         <pose>5.5526 -1.0860 0.112 0 0 0</pose>
         <geometry><box><size>1.0668 0.10 0.001</size></box></geometry>
-        <material><ambient>1.0 0.5 0.0 1</ambient><diffuse>1.0 0.5 0.0 1</diffuse></material>
+        <material><ambient>1.0 0.0 0.0 1</ambient><diffuse>1.0 0.0 0.0 1</diffuse></material>
       </visual>
 
       <!-- RIGHT SIDE -->
@@ -89,7 +89,7 @@
         <cast_shadows>false</cast_shadows>
         <pose>6.0860 0.5142 0.112 0 0 0</pose>
         <geometry><box><size>0.10 1.0668 0.001</size></box></geometry>
-        <material><ambient>1.0 0.5 0.0 1</ambient><diffuse>1.0 0.5 0.0 1</diffuse></material>
+        <material><ambient>1.0 0.0 0.0 1</ambient><diffuse>1.0 0.0 0.0 1</diffuse></material>
       </visual>
     </link>
   </model>

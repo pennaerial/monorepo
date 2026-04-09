@@ -1,5 +1,5 @@
 # launch_params.yaml
-mission_name: payload_retreat
+mission_name: payload_dlz_navigate
 uav_debug: false
 vision_debug: true
 # Automatically start the mission manager once its runtime is ready.
@@ -28,4 +28,4 @@ servo_only: false
 payload_name: "payload_0"
 payload_controller: ""
 
-sim: false
+sim: true

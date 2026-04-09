@@ -1,0 +1,23 @@
+# Payload line-following test on the dlz_alternating_border DLZ.
+# Use with line_following.yaml world (payload starts at DLZ corner, facing inward at 45°).
+#
+# direction: "cw"  → turn left 45°, travel clockwise  (CW:  B→A = corner)
+#            "ccw" → turn right 45°, travel CCW        (CCW: A→B = corner)
+#
+# target_transitions: how many colour changes to travel before stopping
+#   0 = just do the alignment turn and stop
+#   1 = cross one colour boundary (half a side)
+#   2 = cross two boundaries (one full side)
+#   4 = half the square
+#   8 = full lap
+modes:
+  start:
+    class: uav.modes.payload.PayloadDLZNavigateMode
+    params:
+      direction: "ccw"
+      target_transitions: 3
+      turn_angular_speed: 0.5
+      line_follow_speed_mps: 0.2
+      k_lat: 0.01
+      k_ang: 0.4
+      max_angular: 0.5
