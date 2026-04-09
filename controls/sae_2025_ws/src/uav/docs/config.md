@@ -47,6 +47,11 @@ backend:
   mission_stage: payload_retreat
   world_overrides:
     params:
+      entities:
+        dlz:
+          path_to_sdf: ~/.simulation-gazebo/models/dlz/model.sdf
+          position: [0.0, 0.0, -0.1]
+          rpy: [0.0, 0.0, 0.0]
       controllables:
         uav_0:
           kind: uav
@@ -86,7 +91,7 @@ Runtime-owned:
 - camera transport/rotation/preprocess settings
 - namespace and PX4 instance in the single-vehicle compatibility path
 
-The backend should define UAV controllables under `world.params.controllables`, including `px4_airframe_id`. The fleet layer attaches to those controllables; it should not redefine their PX4 identity.
+The backend should define spawnable props under `world.params.entities` and UAV/payload vehicles under `world.params.controllables`. UAV controllables should include `px4_airframe_id`. The fleet layer attaches to those controllables; it should not redefine their PX4 identity.
 
 ## Unsupported Fleet Keys
 

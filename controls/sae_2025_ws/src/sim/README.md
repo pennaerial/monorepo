@@ -50,8 +50,9 @@ Recommended shape:
 
 Notes:
 - omitting `mission_stage` resolves `base.yaml`
-- the canonical stage YAML should define UAV controllables under `world.params.controllables`
+- the canonical stage YAML should define spawnable props under `world.params.entities` and vehicles under `world.params.controllables`
 - UAV controllables should carry an explicit `px4_airframe_id`; for valid values, inspect `PX4-Autopilot/ROMFS/px4fmu_common/init.d-posix/airframes`
-- `world_overrides` is still available for incidental stage tweaks, but it should not be used to supply PX4 airframe identity
+- `world_overrides` should follow the same `entities` / `controllables` split and is still available for incidental stage tweaks, but it should not be used to supply PX4 airframe identity
 - legacy embedded `backend.world` input is intentionally no longer supported
+- legacy top-level spawnable records are no longer supported; use `world.params.entities`
 - legacy single-UAV spawning remains available for older launch paths that still pass `spawn_uav_model:=true`

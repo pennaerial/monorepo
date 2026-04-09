@@ -21,11 +21,15 @@ backend:
   middleware_port: 8888
 
   # Optional deep-merge overrides applied on top of the canonical stage world.
-  # Use this to tweak spawn poses or add/adjust controllables without copying
-  # the entire stage YAML into the fleet file.
+  # Use this to tweak spawn poses or add/adjust `entities` and `controllables`
+  # without copying the entire stage YAML into the fleet file.
   #
   # world_overrides:
   #   params:
+  #     entities:
+  #       dlz:
+  #         position: [0.0, 0.0, 0.0]
+  #         rpy: [0.0, 0.0, 0.0]
   #     controllables:
   #       uav_0:
   #         position: [5.0, 0.0, 0.1]
