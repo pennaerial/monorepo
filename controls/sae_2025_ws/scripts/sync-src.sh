@@ -81,9 +81,11 @@ fi
 echo "Syncing packages: ${PACKAGES[*]}"
 # -c (checksum) compares file contents rather than timestamps, so clock skew
 # between laptop and Pi does not cause unnecessary transfers or rebuilds.
+#Made a change to work with bash versions <4.4
+# ...existing code...
 rsync -rvc \
-	--no-perms --no-owner --no-group \
-	--delete \
-	"${SSH_OPTS[@]}" \
-	"${SOURCES[@]}" \
-	"$REMOTE:~/monorepo/controls/sae_2025_ws/src/"
+    --no-perms --no-owner --no-group \
+    --delete \
+    ${SSH_OPTS[@]+"${SSH_OPTS[@]}"} \
+    "${SOURCES[@]}" \
+    "$REMOTE:~/monorepo/controls/sae_2025_ws/src/"
