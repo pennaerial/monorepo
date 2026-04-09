@@ -1,5 +1,5 @@
 # launch_params.yaml
-mission_name: payload_apriltag_approach
+mission_name: payload_retreat
 uav_debug: false
 vision_debug: true
 auto_launch: true

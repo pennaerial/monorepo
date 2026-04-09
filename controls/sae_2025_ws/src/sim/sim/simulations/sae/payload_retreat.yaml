@@ -1,0 +1,16 @@
+world:
+  name: SAEWorldNode
+  params:
+    template_world: "src/sim/sim/world_gen/worlds/template.sdf"
+    vehicle_pose: [5.0, 0.0, 0.1, 0.0, 0.0, 0.0]
+
+    physics:
+      friction: 0.6
+    dlz:
+      path_to_sdf: "~/.simulation-gazebo/models/dlz_white/model.sdf"
+      position: [0.0, 0.0, 0.0]
+      rpy: [0.0, 0.0, 0.0]
+    payload_0:
+      path_to_sdf: "~/.simulation-gazebo/models/payload/model.sdf"
+      position: [0.0, 0.0, 0.1]   # center of the white DLZ
+      rpy: [0.0, 0.0, 0.0]
