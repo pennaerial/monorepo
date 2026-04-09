@@ -9,13 +9,19 @@ Payload for SAE Advanced Class 2026:
 
 ## Parameters And Controllers
 
-`payload` uses the checked-in local parameter layer in `include/payload/payload_parameters.hpp`.
+`payload` generates `payload/payload_parameters.hpp` from `config/payload_params.schema.yaml` at build time using `generate_parameter_library`.
+
+If you are building manually without `rosdep`, install the generator first:
+
+```bash
+sudo apt-get install ros-humble-generate-parameter-library
+```
 
 Available controller plugin names:
 - `SimController` for Gazebo-backed simulation
 - `GPIOController` for Raspberry Pi hardware via `pigpio`
 
-`config/payload_params.yaml` currently defaults `controller` to `GPIOController`. Simulation launch flows override that to `SimController`, or you can do it manually with `controller:=SimController`.
+`config/payload_params.schema.yaml` defines the supported parameter surface, and `config/payload_params.yaml` provides the shipped runtime values. `payload_params.yaml` currently defaults `controller` to `GPIOController`. Simulation launch flows override that to `SimController`, or you can do it manually with `controller:=SimController`.
 
 ## Raspberry Pi Hardware Setup (`pigpiod`)
 

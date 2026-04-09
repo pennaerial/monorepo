@@ -7,6 +7,7 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
+find_package(generate_parameter_library REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(payload_interfaces REQUIRED)
 find_package(pluginlib REQUIRED)
@@ -23,6 +24,11 @@ string(TOUPPER "${PAYLOAD_BUILD_SIM_CONTROLLER}" PAYLOAD_BUILD_SIM_CONTROLLER)
 string(TOUPPER "${PAYLOAD_BUILD_GPIO_CONTROLLER}" PAYLOAD_BUILD_GPIO_CONTROLLER)
 
 include_directories(include)
+
+generate_parameter_library(
+  payload_parameters
+  config/payload_params.schema.yaml
+)
 
 set(payload_controller_targets "")
 set(build_payload_sim_controller FALSE)
@@ -48,7 +54,6 @@ endif()
 
 if(build_payload_sim_controller)
   add_library(payload_sim_controller SHARED
-    src/payload_parameters.cpp
     src/sim_controller.cpp
   )
   ament_target_dependencies(payload_sim_controller
@@ -57,6 +62,7 @@ if(build_payload_sim_controller)
     pluginlib
   )
   target_link_libraries(payload_sim_controller
+    payload_parameters
     gz-transport13::gz-transport13
     gz-msgs10::gz-msgs10
   )
@@ -85,7 +91,6 @@ endif()
 
 if(build_payload_gpio_controller)
   add_library(payload_gpio_controller SHARED
-    src/payload_parameters.cpp
     src/gpio_controller.cpp
     src/encoder.cpp
     src/control_math.cpp
@@ -98,7 +103,10 @@ if(build_payload_gpio_controller)
     payload_interfaces
     pluginlib
   )
-  target_link_libraries(payload_gpio_controller ${PIGPIO_LIBRARY})
+  target_link_libraries(payload_gpio_controller
+    payload_parameters
+    ${PIGPIO_LIBRARY}
+  )
   target_include_directories(payload_gpio_controller PUBLIC ${PIGPIO_INCLUDE_DIR})
   target_compile_definitions(payload_gpio_controller PRIVATE BUILD_GPIO)
   list(APPEND payload_controller_targets payload_gpio_controller)
@@ -138,7 +146,6 @@ pluginlib_export_plugin_description_file(payload plugins.xml)
 
 # --- Payload executable ---
 add_executable(payload
-  src/payload_parameters.cpp
   src/payload.cpp
   src/main.cpp
 )
@@ -147,6 +154,9 @@ ament_target_dependencies(payload
   rclcpp
   payload_interfaces
   pluginlib
+)
+target_link_libraries(payload
+  payload_parameters
 )
 
 install(TARGETS ${payload_controller_targets}
