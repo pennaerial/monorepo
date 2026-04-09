@@ -1,0 +1,96 @@
+<?xml version="1.0" ?>
+<sdf version="1.4">
+  <model name="dlz_alternating_border">
+    <static>true</static>
+    <link name="dlz_alternating_border_link">
+      <!-- Same link offset as dlz model so this can be spawned at the same world position -->
+      <pose>-5.0192 0.0192 0 0 0 0</pose>
+      <inertial>
+        <mass>2</mass>
+      </inertial>
+      <!-- Pink DLZ mesh -->
+      <visual name="visual">
+        <pose> 3.8 1.2 .1 1.5708 0 0 </pose>
+        <geometry>
+          <mesh>
+            <uri>model://dlz/meshes/dlz.STL</uri>
+            <scale>  0.001000164 0.001000164 0.001000164 </scale>
+          </mesh>
+        </geometry>
+        <material>
+          <diffuse>1 0 1 1</diffuse>
+        </material>
+      </visual>
+      <!-- Square alternating border: 8 segments (2 per side) -->
+      <!-- Color A = orange (1.0 0.5 0.0), Color B = blue (0.0 0.0 1.0) -->
+      <!-- Border centerline at 1.0668m from DLZ center (6 inches inset from 8ft pad edge) -->
+      <!-- DLZ center in link space: (5.0192, -0.0192) -->
+      <!-- Each segment: 1.0668m long x 0.10m wide -->
+      <!--                                                                          -->
+      <!-- CCW order per side: [B, A]. Corner rule:                                -->
+      <!--   Going CCW: A->B transition = corner (B is on the perpendicular side)  -->
+      <!--   Going CW:  B->A transition = corner (A is on the perpendicular side)  -->
+      <!--                                                                          -->
+      <!--   Top side (y=1.0476):  B=right-half, A=left-half  (CCW travels left)  -->
+      <!--   Left side (x=3.9524): B=top-half,   A=bot-half   (CCW travels down)  -->
+      <!--   Bot side (y=-1.0860): B=left-half,  A=right-half (CCW travels right) -->
+      <!--   Right side (x=6.086): B=bot-half,   A=top-half   (CCW travels up)    -->
+
+      <!-- TOP SIDE -->
+      <visual name="border_top_B">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.5526 1.0476 0.112 0 0 0</pose>
+        <geometry><box><size>1.0668 0.10 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 1.0 1</ambient><diffuse>0.0 0.0 1.0 1</diffuse></material>
+      </visual>
+      <visual name="border_top_A">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.4858 1.0476 0.112 0 0 0</pose>
+        <geometry><box><size>1.0668 0.10 0.001</size></box></geometry>
+        <material><ambient>1.0 0.5 0.0 1</ambient><diffuse>1.0 0.5 0.0 1</diffuse></material>
+      </visual>
+
+      <!-- LEFT SIDE -->
+      <visual name="border_left_B">
+        <cast_shadows>false</cast_shadows>
+        <pose>3.9524 0.5142 0.112 0 0 0</pose>
+        <geometry><box><size>0.10 1.0668 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 1.0 1</ambient><diffuse>0.0 0.0 1.0 1</diffuse></material>
+      </visual>
+      <visual name="border_left_A">
+        <cast_shadows>false</cast_shadows>
+        <pose>3.9524 -0.5526 0.112 0 0 0</pose>
+        <geometry><box><size>0.10 1.0668 0.001</size></box></geometry>
+        <material><ambient>1.0 0.5 0.0 1</ambient><diffuse>1.0 0.5 0.0 1</diffuse></material>
+      </visual>
+
+      <!-- BOTTOM SIDE -->
+      <visual name="border_bottom_B">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.4858 -1.0860 0.112 0 0 0</pose>
+        <geometry><box><size>1.0668 0.10 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 1.0 1</ambient><diffuse>0.0 0.0 1.0 1</diffuse></material>
+      </visual>
+      <visual name="border_bottom_A">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.5526 -1.0860 0.112 0 0 0</pose>
+        <geometry><box><size>1.0668 0.10 0.001</size></box></geometry>
+        <material><ambient>1.0 0.5 0.0 1</ambient><diffuse>1.0 0.5 0.0 1</diffuse></material>
+      </visual>
+
+      <!-- RIGHT SIDE -->
+      <visual name="border_right_B">
+        <cast_shadows>false</cast_shadows>
+        <pose>6.0860 -0.5526 0.112 0 0 0</pose>
+        <geometry><box><size>0.10 1.0668 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 1.0 1</ambient><diffuse>0.0 0.0 1.0 1</diffuse></material>
+      </visual>
+      <visual name="border_right_A">
+        <cast_shadows>false</cast_shadows>
+        <pose>6.0860 0.5142 0.112 0 0 0</pose>
+        <geometry><box><size>0.10 1.0668 0.001</size></box></geometry>
+        <material><ambient>1.0 0.5 0.0 1</ambient><diffuse>1.0 0.5 0.0 1</diffuse></material>
+      </visual>
+    </link>
+  </model>
+</sdf>

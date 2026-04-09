@@ -7,7 +7,7 @@ world:
     physics:
       friction: 0.6 # friction coefficient for the ground plane
     dlz:
-      path_to_sdf: "~/.simulation-gazebo/models/dlz_nav_ring/model.sdf"
+      path_to_sdf: "~/.simulation-gazebo/models/dlz_alternating_border/model.sdf"
       position: [0.0, 0.0, -0.1]
       rpy: [0.0, 0.0, 0.0]
     payload_0:
