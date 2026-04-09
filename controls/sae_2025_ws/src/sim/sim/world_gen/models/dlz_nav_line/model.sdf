@@ -1,0 +1,451 @@
+<?xml version="1.0" ?>
+<sdf version="1.4">
+  <model name="dlz_nav_line">
+    <static>true</static>
+    <link name="dlz_nav_line_link">
+      <!-- Same link offset as dlz model so this can be spawned at the same world position -->
+      <pose>-5.0192 0.0192 0 0 0 0</pose>
+      <inertial>
+        <mass>0.1</mass>
+      </inertial>
+      <!-- Navigation circle: radius=1.05m, 72 segments (5 deg each), 4 colored quadrants -->
+      <!-- Red:    segments 000-017 (  0- 89 deg) -->
+      <!-- Blue:   segments 018-035 ( 90-179 deg) -->
+      <!-- Yellow: segments 036-053 (180-269 deg) -->
+      <!-- Green:  segments 054-071 (270-359 deg) -->
+      <visual name="nav_circle_000">
+        <cast_shadows>false</cast_shadows>
+        <pose>6.068201 0.026600 0.112 0 0 1.614430</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>1.0 0.0 0.0 1.0</ambient><diffuse>1.0 0.0 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_001">
+        <cast_shadows>false</cast_shadows>
+        <pose>6.060217 0.117853 0.112 0 0 1.701696</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>1.0 0.0 0.0 1.0</ambient><diffuse>1.0 0.0 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_002">
+        <cast_shadows>false</cast_shadows>
+        <pose>6.044311 0.208062 0.112 0 0 1.788962</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>1.0 0.0 0.0 1.0</ambient><diffuse>1.0 0.0 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_003">
+        <cast_shadows>false</cast_shadows>
+        <pose>6.020603 0.296541 0.112 0 0 1.876229</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>1.0 0.0 0.0 1.0</ambient><diffuse>1.0 0.0 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_004">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.989274 0.382618 0.112 0 0 1.963495</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>1.0 0.0 0.0 1.0</ambient><diffuse>1.0 0.0 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_005">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.950561 0.465636 0.112 0 0 2.050762</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>1.0 0.0 0.0 1.0</ambient><diffuse>1.0 0.0 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_006">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.904761 0.544965 0.112 0 0 2.138028</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>1.0 0.0 0.0 1.0</ambient><diffuse>1.0 0.0 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_007">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.852221 0.620000 0.112 0 0 2.225295</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>1.0 0.0 0.0 1.0</ambient><diffuse>1.0 0.0 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_008">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.793341 0.690170 0.112 0 0 2.312561</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>1.0 0.0 0.0 1.0</ambient><diffuse>1.0 0.0 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_009">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.728570 0.754941 0.112 0 0 2.399828</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>1.0 0.0 0.0 1.0</ambient><diffuse>1.0 0.0 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_010">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.658400 0.813821 0.112 0 0 2.487094</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>1.0 0.0 0.0 1.0</ambient><diffuse>1.0 0.0 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_011">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.583365 0.866361 0.112 0 0 2.574361</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>1.0 0.0 0.0 1.0</ambient><diffuse>1.0 0.0 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_012">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.504036 0.912161 0.112 0 0 2.661627</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>1.0 0.0 0.0 1.0</ambient><diffuse>1.0 0.0 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_013">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.421018 0.950874 0.112 0 0 2.748894</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>1.0 0.0 0.0 1.0</ambient><diffuse>1.0 0.0 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_014">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.334941 0.982203 0.112 0 0 2.836160</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>1.0 0.0 0.0 1.0</ambient><diffuse>1.0 0.0 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_015">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.246462 1.005911 0.112 0 0 2.923426</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>1.0 0.0 0.0 1.0</ambient><diffuse>1.0 0.0 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_016">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.156253 1.021817 0.112 0 0 3.010693</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>1.0 0.0 0.0 1.0</ambient><diffuse>1.0 0.0 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_017">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.065000 1.029801 0.112 0 0 3.097959</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>1.0 0.0 0.0 1.0</ambient><diffuse>1.0 0.0 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_018">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.973400 1.029801 0.112 0 0 3.185226</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 1.0 1.0</ambient><diffuse>0.0 0.0 1.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_019">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.882147 1.021817 0.112 0 0 3.272492</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 1.0 1.0</ambient><diffuse>0.0 0.0 1.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_020">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.791938 1.005911 0.112 0 0 3.359759</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 1.0 1.0</ambient><diffuse>0.0 0.0 1.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_021">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.703459 0.982203 0.112 0 0 3.447025</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 1.0 1.0</ambient><diffuse>0.0 0.0 1.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_022">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.617382 0.950874 0.112 0 0 3.534292</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 1.0 1.0</ambient><diffuse>0.0 0.0 1.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_023">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.534364 0.912161 0.112 0 0 3.621558</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 1.0 1.0</ambient><diffuse>0.0 0.0 1.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_024">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.455035 0.866361 0.112 0 0 3.708825</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 1.0 1.0</ambient><diffuse>0.0 0.0 1.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_025">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.380000 0.813821 0.112 0 0 3.796091</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 1.0 1.0</ambient><diffuse>0.0 0.0 1.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_026">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.309830 0.754941 0.112 0 0 3.883358</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 1.0 1.0</ambient><diffuse>0.0 0.0 1.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_027">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.245059 0.690170 0.112 0 0 3.970624</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 1.0 1.0</ambient><diffuse>0.0 0.0 1.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_028">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.186179 0.620000 0.112 0 0 4.057891</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 1.0 1.0</ambient><diffuse>0.0 0.0 1.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_029">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.133639 0.544965 0.112 0 0 4.145157</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 1.0 1.0</ambient><diffuse>0.0 0.0 1.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_030">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.087839 0.465636 0.112 0 0 4.232423</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 1.0 1.0</ambient><diffuse>0.0 0.0 1.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_031">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.049126 0.382618 0.112 0 0 4.319690</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 1.0 1.0</ambient><diffuse>0.0 0.0 1.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_032">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.017797 0.296541 0.112 0 0 4.406956</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 1.0 1.0</ambient><diffuse>0.0 0.0 1.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_033">
+        <cast_shadows>false</cast_shadows>
+        <pose>3.994089 0.208062 0.112 0 0 4.494223</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 1.0 1.0</ambient><diffuse>0.0 0.0 1.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_034">
+        <cast_shadows>false</cast_shadows>
+        <pose>3.978183 0.117853 0.112 0 0 4.581489</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 1.0 1.0</ambient><diffuse>0.0 0.0 1.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_035">
+        <cast_shadows>false</cast_shadows>
+        <pose>3.970199 0.026600 0.112 0 0 4.668756</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>0.0 0.0 1.0 1.0</ambient><diffuse>0.0 0.0 1.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_036">
+        <cast_shadows>false</cast_shadows>
+        <pose>3.970199 -0.065000 0.112 0 0 4.756022</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>1.0 1.0 0.0 1.0</ambient><diffuse>1.0 1.0 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_037">
+        <cast_shadows>false</cast_shadows>
+        <pose>3.978183 -0.156253 0.112 0 0 4.843289</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>1.0 1.0 0.0 1.0</ambient><diffuse>1.0 1.0 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_038">
+        <cast_shadows>false</cast_shadows>
+        <pose>3.994089 -0.246462 0.112 0 0 4.930555</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>1.0 1.0 0.0 1.0</ambient><diffuse>1.0 1.0 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_039">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.017797 -0.334941 0.112 0 0 5.017822</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>1.0 1.0 0.0 1.0</ambient><diffuse>1.0 1.0 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_040">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.049126 -0.421018 0.112 0 0 5.105088</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>1.0 1.0 0.0 1.0</ambient><diffuse>1.0 1.0 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_041">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.087839 -0.504036 0.112 0 0 5.192355</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>1.0 1.0 0.0 1.0</ambient><diffuse>1.0 1.0 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_042">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.133639 -0.583365 0.112 0 0 5.279621</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>1.0 1.0 0.0 1.0</ambient><diffuse>1.0 1.0 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_043">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.186179 -0.658400 0.112 0 0 5.366887</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>1.0 1.0 0.0 1.0</ambient><diffuse>1.0 1.0 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_044">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.245059 -0.728570 0.112 0 0 5.454154</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>1.0 1.0 0.0 1.0</ambient><diffuse>1.0 1.0 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_045">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.309830 -0.793341 0.112 0 0 5.541420</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>1.0 1.0 0.0 1.0</ambient><diffuse>1.0 1.0 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_046">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.380000 -0.852221 0.112 0 0 5.628687</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>1.0 1.0 0.0 1.0</ambient><diffuse>1.0 1.0 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_047">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.455035 -0.904761 0.112 0 0 5.715953</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>1.0 1.0 0.0 1.0</ambient><diffuse>1.0 1.0 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_048">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.534364 -0.950561 0.112 0 0 5.803220</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>1.0 1.0 0.0 1.0</ambient><diffuse>1.0 1.0 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_049">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.617382 -0.989274 0.112 0 0 5.890486</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>1.0 1.0 0.0 1.0</ambient><diffuse>1.0 1.0 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_050">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.703459 -1.020603 0.112 0 0 5.977753</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>1.0 1.0 0.0 1.0</ambient><diffuse>1.0 1.0 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_051">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.791938 -1.044311 0.112 0 0 6.065019</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>1.0 1.0 0.0 1.0</ambient><diffuse>1.0 1.0 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_052">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.882147 -1.060217 0.112 0 0 6.152286</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>1.0 1.0 0.0 1.0</ambient><diffuse>1.0 1.0 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_053">
+        <cast_shadows>false</cast_shadows>
+        <pose>4.973400 -1.068201 0.112 0 0 6.239552</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>1.0 1.0 0.0 1.0</ambient><diffuse>1.0 1.0 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_054">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.065000 -1.068201 0.112 0 0 6.326819</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>0.0 0.8 0.0 1.0</ambient><diffuse>0.0 0.8 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_055">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.156253 -1.060217 0.112 0 0 6.414085</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>0.0 0.8 0.0 1.0</ambient><diffuse>0.0 0.8 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_056">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.246462 -1.044311 0.112 0 0 6.501351</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>0.0 0.8 0.0 1.0</ambient><diffuse>0.0 0.8 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_057">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.334941 -1.020603 0.112 0 0 6.588618</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>0.0 0.8 0.0 1.0</ambient><diffuse>0.0 0.8 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_058">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.421018 -0.989274 0.112 0 0 6.675884</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>0.0 0.8 0.0 1.0</ambient><diffuse>0.0 0.8 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_059">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.504036 -0.950561 0.112 0 0 6.763151</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>0.0 0.8 0.0 1.0</ambient><diffuse>0.0 0.8 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_060">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.583365 -0.904761 0.112 0 0 6.850417</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>0.0 0.8 0.0 1.0</ambient><diffuse>0.0 0.8 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_061">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.658400 -0.852221 0.112 0 0 6.937684</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>0.0 0.8 0.0 1.0</ambient><diffuse>0.0 0.8 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_062">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.728570 -0.793341 0.112 0 0 7.024950</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>0.0 0.8 0.0 1.0</ambient><diffuse>0.0 0.8 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_063">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.793341 -0.728570 0.112 0 0 7.112217</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>0.0 0.8 0.0 1.0</ambient><diffuse>0.0 0.8 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_064">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.852221 -0.658400 0.112 0 0 7.199483</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>0.0 0.8 0.0 1.0</ambient><diffuse>0.0 0.8 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_065">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.904761 -0.583365 0.112 0 0 7.286750</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>0.0 0.8 0.0 1.0</ambient><diffuse>0.0 0.8 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_066">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.950561 -0.504036 0.112 0 0 7.374016</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>0.0 0.8 0.0 1.0</ambient><diffuse>0.0 0.8 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_067">
+        <cast_shadows>false</cast_shadows>
+        <pose>5.989274 -0.421018 0.112 0 0 7.461283</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>0.0 0.8 0.0 1.0</ambient><diffuse>0.0 0.8 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_068">
+        <cast_shadows>false</cast_shadows>
+        <pose>6.020603 -0.334941 0.112 0 0 7.548549</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>0.0 0.8 0.0 1.0</ambient><diffuse>0.0 0.8 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_069">
+        <cast_shadows>false</cast_shadows>
+        <pose>6.044311 -0.246462 0.112 0 0 7.635815</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>0.0 0.8 0.0 1.0</ambient><diffuse>0.0 0.8 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_070">
+        <cast_shadows>false</cast_shadows>
+        <pose>6.060217 -0.156253 0.112 0 0 7.723082</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>0.0 0.8 0.0 1.0</ambient><diffuse>0.0 0.8 0.0 1.0</diffuse></material>
+      </visual>
+      <visual name="nav_circle_071">
+        <cast_shadows>false</cast_shadows>
+        <pose>6.068201 -0.065000 0.112 0 0 7.810348</pose>
+        <geometry><box><size>0.091601 0.05 0.001</size></box></geometry>
+        <material><ambient>0.0 0.8 0.0 1.0</ambient><diffuse>0.0 0.8 0.0 1.0</diffuse></material>
+      </visual>
+    </link>
+  </model>
+</sdf>
+
