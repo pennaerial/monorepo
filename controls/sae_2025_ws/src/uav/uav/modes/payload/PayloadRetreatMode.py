@@ -55,7 +55,7 @@ class PayloadRetreatMode(Mode):
         forward_speed_mps: float = 0.12,
         edge_threshold: float = 0.30,
         edge_stable_frames: int = 5,
-        edge_min_pixels: int = 500,
+        edge_min_pixels: int = 10,
         edge_invalid_max_frames: int = 30,
         turn_angular_speed: float = 0.5,
         turn_direction: int = 1,
@@ -96,8 +96,10 @@ class PayloadRetreatMode(Mode):
         self._edge_stable_count = 0
         self._edge_invalid_count = 0
         self._turned_rad = 0.0
+        self._turn_future = None      # <-- add this
         self._done = False
         self._image = None
+    # ... rest of on_enter
 
         cam_topic = f"/{self.payload_name}/camera"
         drive_topic = f"/{self.payload_name}/cmd_drive"
@@ -179,19 +181,18 @@ class PayloadRetreatMode(Mode):
             self._publish_drive(self.forward_speed_mps, 0.0)
             return
 
-        # ---- Phase 2: turn 180° in place ----
+        # ---- Phase 2: turn 180° in place, timed drive ----
         if self._phase == "turn_180":
-            if self._turned_rad >= math.pi - 0.1:
-                self._publish_drive(0.0, 0.0)
-                self._done = True
-                self.log("PayloadRetreatMode: 180° turn complete — done")
+            if self._turn_future is None:
+                w = self.turn_angular_speed * self.turn_direction
+                duration = math.pi / self.turn_angular_speed
+                self._turn_future = self.vehicle.timed_drive(0.0, w, duration)
+                self.log(f"PayloadRetreatMode: sent timed_drive for 180° turn (duration={duration:.2f}s)")
                 return
-            w = self.turn_angular_speed * self.turn_direction
-            self._turned_rad += abs(w) * time_delta
-            self.node.get_logger().debug(
-                f"PayloadRetreatMode: turning {math.degrees(self._turned_rad):.1f}/180°"
-            )
-            self._publish_drive(0.0, w)
+            if self._turn_future.done():
+                self._done = True
+                self.log("PayloadRetreatMode: 180° timed_drive complete — done")
+            return
 
     def check_status(self) -> str:
         return "terminate" if self._done else "continue"
