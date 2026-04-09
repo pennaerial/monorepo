@@ -18,6 +18,12 @@ Useful overrides:
 - `payload_name:=...` to bind payload missions to a different payload entity
 - `px4_path:=...` to use a non-default PX4 checkout
 
+Mission start behavior:
+- `launch/launch_params.yaml` and `launch/launch_params_hardware.yaml` both support `auto_launch: true|false`
+- `auto_launch: true` lets the mission manager start itself when ready
+- `auto_launch: false` brings up the stack but leaves the mission idle until `/mode_manager/start_mission` is called
+- `/mode_manager/start_mission` now works for both UAV and payload missions
+
 Simulation launch behavior:
 - GUI is now the default
 - `SAE_SIM_GUI=0` forces headless mode

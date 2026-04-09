@@ -4,6 +4,8 @@
 mission_name: basic
 uav_debug: false
 vision_debug: false
+# Automatically start the mission manager once its runtime is ready.
+# Set false to leave the mission idle until /mode_manager/start_mission is called.
 auto_launch: true
 
 # PX4 / airframe settings for UAV missions.
