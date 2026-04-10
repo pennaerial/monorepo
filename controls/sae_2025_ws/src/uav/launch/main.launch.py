@@ -171,7 +171,7 @@ def _single_vehicle_config(context, params: dict) -> tuple[dict, dict | None]:
     )
     default_vehicle_name = "uav" if mission_spec.is_uav else "payload_0"
     vehicle_name = _yaml_or_launch_string(
-        context, "vehicle_name", params.get("vehicle_name", default_vehicle_name)
+        context, "vehicle_name", params.get("vehicle_name") or default_vehicle_name
     )
     if not vehicle_name:
         raise ValueError("Single-vehicle launch requires a non-empty vehicle name.")
