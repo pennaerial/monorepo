@@ -166,8 +166,15 @@ class PayloadColorSquareNode(VisionNode):
             orange_mask, blue_mask
         )
         self.draw_debug(
-            bgr, strip, strip_start, orange_mask, blue_mask,
-            current_color, detected, lateral_error_px, boundary_angle,
+            bgr,
+            strip,
+            strip_start,
+            orange_mask,
+            blue_mask,
+            current_color,
+            detected,
+            lateral_error_px,
+            boundary_angle,
         )
 
     def draw_debug(
@@ -208,8 +215,10 @@ class PayloadColorSquareNode(VisionNode):
             cv2.line(debug, (cx, strip_start), (cx, bgr.shape[0]), (0, 255, 0), 2)
             cv2.line(
                 debug,
-                (strip_w // 2, strip_start), (strip_w // 2, bgr.shape[0]),
-                (255, 255, 255), 1,
+                (strip_w // 2, strip_start),
+                (strip_w // 2, bgr.shape[0]),
+                (255, 255, 255),
+                1,
             )
 
         # Pixel counts (full strip)
@@ -223,8 +232,18 @@ class PayloadColorSquareNode(VisionNode):
             if boundary_detected
             else "boundary=none"
         )
-        cv2.putText(debug, color_label, (8, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
-        cv2.putText(debug, err_label,   (8, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (200, 200, 200), 1)
+        cv2.putText(
+            debug, color_label, (8, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2
+        )
+        cv2.putText(
+            debug,
+            err_label,
+            (8, 50),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.55,
+            (200, 200, 200),
+            1,
+        )
 
         self.display_frame(debug, self.node_name())
 

@@ -14,9 +14,9 @@ from uav_interfaces.srv import PayloadAprilTagState, PayloadColorSquareState
 from ..Mode import Mode
 
 # Angle thresholds
-_QUARTER_TURN = math.pi / 2.0   # 90 degrees
-_EIGHTH_TURN  = math.pi / 4.0   # 45 degrees
-_ANGLE_TOL    = 0.05             # radians, stop slightly early to avoid overshoot
+_QUARTER_TURN = math.pi / 2.0  # 90 degrees
+_EIGHTH_TURN = math.pi / 4.0  # 45 degrees
+_ANGLE_TOL = 0.05  # radians, stop slightly early to avoid overshoot
 
 _VALID_START_PHASES = ("wait_for_plane", "scan_tags", "line_follow")
 
@@ -113,7 +113,11 @@ class PayloadDLZNavigateMode(Mode):
         """Signed angular speed for the initial tape-alignment turn.
         CW direction → turn left (positive). CCW direction → turn right (negative).
         """
-        return self.turn_angular_speed if self.direction == "cw" else -self.turn_angular_speed
+        return (
+            self.turn_angular_speed
+            if self.direction == "cw"
+            else -self.turn_angular_speed
+        )
 
     def _corner_transition(self, prev: str, curr: str) -> bool:
         """True when the A↔B transition is a corner for the current travel direction."""
@@ -123,7 +127,9 @@ class PayloadDLZNavigateMode(Mode):
             return prev == "B" and curr == "A"
 
     def _request_color_state(self) -> Optional[PayloadColorSquareState.Response]:
-        return self.send_request(PayloadColorSquareNode, PayloadColorSquareState.Request())
+        return self.send_request(
+            PayloadColorSquareNode, PayloadColorSquareState.Request()
+        )
 
     def _request_apriltag_state(self) -> Optional[PayloadAprilTagState.Response]:
         req = PayloadAprilTagState.Request()
@@ -168,7 +174,7 @@ class PayloadDLZNavigateMode(Mode):
         # LINE_FOLLOW state
         self._prev_color = "A" if self.direction == "cw" else "B"
         self._transitions = 0
-        self._lf_phase = "following"   # "following" | "corner_turn"
+        self._lf_phase = "following"  # "following" | "corner_turn"
         self._corner_turned = 0.0
         self._done = False
 
@@ -225,7 +231,9 @@ class PayloadDLZNavigateMode(Mode):
                     f"→ SCAN_TAGS"
                 )
         else:
-            self.log("PayloadDLZNavigateMode: WAIT_FOR_PLANE — no tags visible, resetting counter")
+            self.log(
+                "PayloadDLZNavigateMode: WAIT_FOR_PLANE — no tags visible, resetting counter"
+            )
             self._consecutive_tag_frames = 0
 
     # ------------------------------------------------------------------
@@ -268,11 +276,15 @@ class PayloadDLZNavigateMode(Mode):
 
         if self.target_transitions == 0:
             self._done = True
-            self.log("PayloadDLZNavigateMode: target_transitions=0 → already at dock → done")
+            self.log(
+                "PayloadDLZNavigateMode: target_transitions=0 → already at dock → done"
+            )
             return
 
         # start_phase=="scan_tags" means we're already on the tape → skip the alignment turn
-        next_phase = "line_follow" if self.start_phase == "scan_tags" else "turn_onto_tape"
+        next_phase = (
+            "line_follow" if self.start_phase == "scan_tags" else "turn_onto_tape"
+        )
         self._phase = next_phase
         self.log(f"PayloadDLZNavigateMode: → {next_phase.upper()}")
 
@@ -337,11 +349,14 @@ class PayloadDLZNavigateMode(Mode):
         # Boundary following
         if response.boundary_detected:
             # lateral_error_px > 0 → tape is right of centre → steer right (negative angular)
-            angular = float(np.clip(
-                -self.k_lat * response.lateral_error_px + self.k_ang * response.boundary_angle,
-                -self.max_angular,
-                self.max_angular,
-            ))
+            angular = float(
+                np.clip(
+                    -self.k_lat * response.lateral_error_px
+                    + self.k_ang * response.boundary_angle,
+                    -self.max_angular,
+                    self.max_angular,
+                )
+            )
         else:
             angular = 0.0
 
