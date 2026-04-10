@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck disable=SC1091
+. "$SCRIPT_DIR/common.sh"
+
+WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(ci_workspace_root)}"
+ROS_DISTRO="${ROS_DISTRO:-humble}"
+PYTEST_TARGETS="${PYTEST_TARGETS:-src/uav/test/test_mission_spec.py src/uav/test/test_auto_launch.py src/uav/test/test_runtime_behavior.py src/uav/test/test_launch_helpers.py src/uav/test/test_fleet_launch.py src/sim/test/test_orchestration.py}"
+INSTALL_DEPS="${INSTALL_DEPS:-1}"
+
+cd "$WORKSPACE_ROOT"
+
+if [[ "$INSTALL_DEPS" != "0" ]]; then
+    "$SCRIPT_DIR/install_ros_ci_deps.sh"
+fi
+
+ci_source_ros
+
+ci_log "Installing workspace dependencies via rosdep"
+rosdep update --rosdistro "$ROS_DISTRO"
+rosdep install -r -i -y --rosdistro "$ROS_DISTRO" \
+    --from-paths src/uav src/uav_interfaces src/px4_msgs src/actuator_msgs \
+    src/payload src/payload_interfaces src/tools
+
+ci_log "Building shared hardware dependencies"
+colcon build \
+    --packages-select payload_interfaces px4_msgs uav_interfaces actuator_msgs
+
+ci_log "Building hardware payload package"
+. install/setup.sh
+colcon build \
+    --packages-select payload \
+    --cmake-args -DBUILD_SIM=OFF
+
+ci_log "Building uav package"
+. install/setup.sh
+colcon build --packages-select uav
+
+ci_log "Building tools package"
+. install/setup.sh
+colcon build --packages-select tools
+
+ci_log "Building sim package"
+ci_source_ros
+colcon build --packages-select sim
+
+ci_log "Compiling Python sources"
+mapfile -t python_files < <(ci_py_files)
+python3 -m py_compile "${python_files[@]}"
+
+ci_log "Running pytest suite"
+. install/setup.sh
+PYTHONPATH="$WORKSPACE_ROOT/src/uav:$WORKSPACE_ROOT/src/sim:${PYTHONPATH:-}" \
+    python3 -m pytest $PYTEST_TARGETS

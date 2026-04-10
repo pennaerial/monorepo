@@ -1,0 +1,57 @@
+name: ROS Validate
+
+on:
+  push:
+    branches: [main, master, integration]
+    paths:
+      - ".github/workflows/ros-validate.yml"
+      - ".github/workflows/ci-image.yml"
+      - ".github/ci/**"
+      - "controls/sae_2025_ws/**"
+      - "!controls/sae_2025_ws/src/integration/**"
+  pull_request:
+    branches: [main, master]
+    paths:
+      - ".github/workflows/ros-validate.yml"
+      - ".github/workflows/ci-image.yml"
+      - ".github/ci/**"
+      - "controls/sae_2025_ws/**"
+      - "!controls/sae_2025_ws/src/integration/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: ros-validate-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ROS_VALIDATE_IMAGE: ${{ vars.ROS_CI_IMAGE_AMD64 || 'ros:humble-ros-base' }}
+  ROS_VALIDATE_USES_PREBUILT_DEPS: ${{ vars.ROS_CI_IMAGE_AMD64 != '' && 'true' || 'false' }}
+
+jobs:
+  validate_ros2_workspace:
+    name: Validate ROS 2 Workspace
+    runs-on: ubuntu-22.04
+    container:
+      image: ${{ env.ROS_VALIDATE_IMAGE }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install stable CI dependencies
+        if: env.ROS_VALIDATE_USES_PREBUILT_DEPS != 'true'
+        run: bash controls/sae_2025_ws/scripts/ci/install_ros_ci_deps.sh
+
+      - name: Build and validate ROS workspace
+        env:
+          INSTALL_DEPS: "0"
+        run: bash controls/sae_2025_ws/scripts/ci/validate_ros_workspace.sh

@@ -1,6 +1,24 @@
 name: Ruff Checks
 
-on: [pull_request, push]
+on:
+  push:
+    branches: [main, master, integration]
+    paths:
+      - ".github/workflows/lint.yml"
+      - "controls/sae_2025_ws/**"
+  pull_request:
+    branches: [main, master]
+    paths:
+      - ".github/workflows/lint.yml"
+      - "controls/sae_2025_ws/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ruff-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   ruff:
