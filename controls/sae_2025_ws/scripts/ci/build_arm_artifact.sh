@@ -24,15 +24,15 @@ colcon build \
     --packages-select payload_interfaces px4_msgs uav_interfaces actuator_msgs
 
 ci_log "Building hardware payload package"
-. install/setup.sh
+ci_source_workspace "$WORKSPACE_ROOT"
 colcon build \
     --packages-select payload \
     --cmake-args -DBUILD_SIM=OFF
 
 ci_log "Building uav package"
-. install/setup.sh
+ci_source_workspace "$WORKSPACE_ROOT"
 colcon build --packages-select uav
 
 ci_log "Building tools package"
-. install/setup.sh
+ci_source_workspace "$WORKSPACE_ROOT"
 colcon build --packages-select tools
