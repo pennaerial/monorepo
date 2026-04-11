@@ -30,7 +30,7 @@ concurrency:
 jobs:
   validate_ros2_workspace:
     if: vars.ROS_CI_IMAGE_AMD64 == ''
-    name: Validate ROS 2 Workspace (runner)
+    name: Validate ROS 2 Workspace (fallback container)
     runs-on: ubuntu-22.04
     container:
       image: ros:humble-ros-base
@@ -51,7 +51,7 @@ jobs:
 
   validate_ros2_workspace_ci_image:
     if: vars.ROS_CI_IMAGE_AMD64 != ''
-    name: Validate ROS 2 Workspace (CI image)
+    name: Validate ROS 2 Workspace (GHCR CI image)
     runs-on: ubuntu-22.04
     container:
       image: ${{ vars.ROS_CI_IMAGE_AMD64 }}
