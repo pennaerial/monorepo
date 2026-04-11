@@ -20,6 +20,7 @@ fi
 ci_source_ros
 
 ci_log "Installing workspace dependencies via rosdep"
+ci_refresh_apt_lists
 rosdep update --rosdistro "$ROS_DISTRO"
 rosdep install -r -i -y --rosdistro "$ROS_DISTRO" \
     --from-paths src/uav src/uav_interfaces src/px4_msgs src/actuator_msgs \

@@ -60,6 +60,11 @@ ci_install_system_packages() {
     ci_root_or_sudo apt-get install -y --no-install-recommends "$@"
 }
 
+ci_refresh_apt_lists() {
+    ci_log "Refreshing apt package lists"
+    ci_root_or_sudo apt-get update
+}
+
 ci_install_apriltag() {
     ci_log "Installing apriltag Python package"
     python3 -m pip install --no-cache-dir apriltag
