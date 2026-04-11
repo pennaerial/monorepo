@@ -1,121 +1,23 @@
 from __future__ import annotations
 
+import os
+import subprocess
 import sys
 import types
 from pathlib import Path
 
-import pytest
-
-
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
-UAV_PACKAGE_ROOT = PACKAGE_ROOT.parent / "uav"
 
-for path in (PACKAGE_ROOT, UAV_PACKAGE_ROOT):
+for path in (PACKAGE_ROOT,):
     if str(path) not in sys.path:
         sys.path.insert(0, str(path))
-
-for module_name in [
-    "pydantic",
-    "rclpy",
-    "px4_msgs",
-    "sensor_msgs",
-    "cv_bridge",
-    "payload_interfaces",
-    "uav_interfaces",
-    "cv2",
-]:
-    pytest.importorskip(module_name)
-
-if "pydantic" not in sys.modules:
-
-    class _FieldInfo:
-        def __init__(self, *, default=..., default_factory=None, alias=None):
-            self.default = default
-            self.default_factory = default_factory
-            self.alias = alias
-
-    class _FakeBaseModel:
-        def __init__(self, **data):
-            annotations = {}
-            for base in reversed(self.__class__.__mro__):
-                annotations.update(getattr(base, "__annotations__", {}))
-            for name, annotation in annotations.items():
-                if name.startswith("_"):
-                    continue
-                if name in data:
-                    value = data.pop(name)
-                else:
-                    class_value = getattr(self.__class__, name, _FieldInfo())
-                    if isinstance(class_value, _FieldInfo):
-                        if class_value.default_factory is not None:
-                            value = class_value.default_factory()
-                        elif class_value.default is not ...:
-                            value = class_value.default
-                        else:
-                            raise TypeError(f"Missing required field '{name}'.")
-                    else:
-                        value = class_value
-                setattr(self, name, value)
-            for name, value in data.items():
-                setattr(self, name, value)
-
-        @classmethod
-        def model_validate(cls, value):
-            if isinstance(value, cls):
-                return value
-            if isinstance(value, dict):
-                return cls(**value)
-            if hasattr(value, "__dict__"):
-                return cls(**value.__dict__)
-            raise TypeError(f"Cannot validate {value!r} as {cls.__name__}.")
-
-        def model_dump(self, mode: str = "python"):
-            def _dump(value):
-                if isinstance(value, _FakeBaseModel):
-                    return value.model_dump(mode=mode)
-                if isinstance(value, list):
-                    return [_dump(item) for item in value]
-                if isinstance(value, tuple):
-                    return [_dump(item) for item in value]
-                if isinstance(value, dict):
-                    return {key: _dump(item) for key, item in value.items()}
-                return value
-
-            return {
-                key: _dump(value)
-                for key, value in self.__dict__.items()
-                if not key.startswith("_")
-            }
-
-        @classmethod
-        def model_json_schema(cls):
-            return {"title": cls.__name__, "type": "object"}
-
-    def _fake_field(*, default=..., default_factory=None, alias=None):
-        return _FieldInfo(default=default, default_factory=default_factory, alias=alias)
-
-    def _fake_config_dict(**kwargs):
-        return dict(kwargs)
-
-    def _fake_create_model(name, __config__=None, __module__=None, **field_defs):
-        namespace = {"__module__": __module__ or __name__}
-        annotations = {}
-        for field_name, (annotation, default) in field_defs.items():
-            annotations[field_name] = annotation
-            namespace[field_name] = _FieldInfo(default=default)
-        namespace["__annotations__"] = annotations
-        return type(name, (_FakeBaseModel,), namespace)
-
-    pydantic_stub = types.ModuleType("pydantic")
-    pydantic_stub.BaseModel = _FakeBaseModel
-    pydantic_stub.ConfigDict = _fake_config_dict
-    pydantic_stub.Field = _fake_field
-    pydantic_stub.create_model = _fake_create_model
-    sys.modules["pydantic"] = pydantic_stub
 
 backend_pkg = types.ModuleType("backend")
 backend_pkg.__path__ = [str(PACKAGE_ROOT / "backend")]
 sys.modules.setdefault("backend", backend_pkg)
+services_pkg = types.ModuleType("backend.services")
+services_pkg.__path__ = [str(PACKAGE_ROOT / "backend" / "services")]
+sys.modules.setdefault("backend.services", services_pkg)
 
 from backend.schema import (  # noqa: E402
     fleet_schema,
@@ -124,6 +26,93 @@ from backend.schema import (  # noqa: E402
     mode_registry,
     schema_index,
 )
+
+_BLOCKED_IMPORT_PREFIXES = (
+    "rclpy",
+    "px4_msgs",
+    "sensor_msgs",
+    "cv_bridge",
+    "payload_interfaces",
+    "uav_interfaces",
+    "uav.modes",
+    "uav.vehicles",
+    "uav.vision_nodes",
+)
+
+
+def _run_clean_import(script: str) -> subprocess.CompletedProcess[str]:
+    env = os.environ.copy()
+    uav_root = PACKAGE_ROOT.parent / "uav"
+    env["PYTHONPATH"] = os.pathsep.join(
+        [str(PACKAGE_ROOT), str(uav_root), env.get("PYTHONPATH", "")]
+    ).rstrip(os.pathsep)
+    return subprocess.run(
+        [sys.executable, "-c", script],
+        capture_output=True,
+        text=True,
+        env=env,
+        check=False,
+    )
+
+
+def test_backend_schema_imports_without_ros_runtime_dependencies():
+    script = f"""
+import builtins
+import types
+import sys
+from pathlib import Path
+
+package_root = Path({str(PACKAGE_ROOT)!r})
+backend_pkg = types.ModuleType("backend")
+backend_pkg.__path__ = [str(package_root / "backend")]
+sys.modules.setdefault("backend", backend_pkg)
+
+blocked_prefixes = {tuple(_BLOCKED_IMPORT_PREFIXES)!r}
+real_import = builtins.__import__
+
+def guarded_import(name, globals=None, locals=None, fromlist=(), level=0):
+    if name.startswith(blocked_prefixes):
+        raise RuntimeError(f"blocked import: {{name}}")
+    return real_import(name, globals, locals, fromlist, level)
+
+builtins.__import__ = guarded_import
+from backend.schema import schema_index
+schema_index()
+"""
+    result = _run_clean_import(script)
+    assert result.returncode == 0, result.stderr or result.stdout
+
+
+def test_backend_services_import_without_ros_runtime_dependencies():
+    script = f"""
+import builtins
+import importlib
+import types
+import sys
+from pathlib import Path
+
+package_root = Path({str(PACKAGE_ROOT)!r})
+backend_pkg = types.ModuleType("backend")
+backend_pkg.__path__ = [str(package_root / "backend")]
+sys.modules.setdefault("backend", backend_pkg)
+services_pkg = types.ModuleType("backend.services")
+services_pkg.__path__ = [str(package_root / "backend" / "services")]
+sys.modules.setdefault("backend.services", services_pkg)
+
+blocked_prefixes = {tuple(_BLOCKED_IMPORT_PREFIXES)!r}
+real_import = builtins.__import__
+
+def guarded_import(name, globals=None, locals=None, fromlist=(), level=0):
+    if name.startswith(blocked_prefixes):
+        raise RuntimeError(f"blocked import: {{name}}")
+    return real_import(name, globals, locals, fromlist, level)
+
+builtins.__import__ = guarded_import
+importlib.import_module("backend.services.deploy")
+importlib.import_module("backend.services.mission")
+"""
+    result = _run_clean_import(script)
+    assert result.returncode == 0, result.stderr or result.stdout
 
 
 def test_schema_index_exposes_missions_fleet_and_modes():

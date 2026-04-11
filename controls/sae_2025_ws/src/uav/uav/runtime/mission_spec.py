@@ -171,7 +171,6 @@ def load_mission_spec(path: str | Path | dict[str, Any]) -> MissionSpec:
                 f"Mode '{mode_name}' in '{mission_label}' must define transitions as a string-to-string mapping."
             )
 
-        mode_class = load_mode_class(class_path)
         from .schema import mode_entry_for_class_path, validate_mode_params
 
         mode_entry = mode_entry_for_class_path(class_path)
@@ -184,7 +183,7 @@ def load_mission_spec(path: str | Path | dict[str, Any]) -> MissionSpec:
         vision_nodes.update(mode_entry.required_vision_nodes)
 
         try:
-            validated_params = validate_mode_params(mode_class, dict(params))
+            validated_params = validate_mode_params(class_path, dict(params))
         except Exception as exc:
             raise ValueError(
                 f"Mode '{mode_name}' in '{mission_label}' has invalid params for '{class_path}': {exc}"
