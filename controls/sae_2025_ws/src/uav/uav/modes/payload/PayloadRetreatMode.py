@@ -94,10 +94,9 @@ class PayloadRetreatMode(Mode):
         self._edge_stable_count = 0
         self._edge_invalid_count = 0
         self._turned_rad = 0.0
-        self._turn_future = None  # <-- add this
+        self._turn_future = None
         self._done = False
         self._image = None
-        # ... rest of on_enter
 
         cam_topic = self.vehicle.namespaced_path("camera")
         drive_topic = self.vehicle.namespaced_path("cmd_drive")
@@ -189,9 +188,13 @@ class PayloadRetreatMode(Mode):
                     f"PayloadRetreatMode: sent timed_drive for 180° turn (duration={duration:.2f}s)"
                 )
                 return
-            if self._turn_future.done():
-                self._done = True
-                self.log("PayloadRetreatMode: 180° timed_drive complete — done")
+            if not self._turn_future.done():
+                self._turned_rad = min(
+                    self._turned_rad + self.turn_angular_speed * time_delta, math.pi
+                )
+                return
+            self._done = True
+            self.log("PayloadRetreatMode: 180° timed_drive complete — done")
             return
 
     def check_status(self) -> str:
