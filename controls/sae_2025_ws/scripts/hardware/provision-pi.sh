@@ -148,6 +148,29 @@ install_base_services() {
     run_root systemctl enable --now avahi-daemon
 }
 
+install_avahi_ssh_service() {
+    local service_path="/etc/avahi/services/ssh.service"
+    local tmpfile
+    tmpfile="$(mktemp)"
+    cat > "$tmpfile" <<'EOF'
+<?xml version="1.0" standalone='no'?>
+<!DOCTYPE service-group SYSTEM "avahi-service.dtd">
+<service-group>
+  <name replace-wildcards="yes">%h</name>
+  <service>
+    <type>_ssh._tcp</type>
+    <port>22</port>
+  </service>
+</service-group>
+EOF
+
+    deploy_info "Installing Avahi SSH service advertisement"
+    run_root install -d -m 0755 /etc/avahi/services
+    run_root install -m 0644 "$tmpfile" "$service_path"
+    rm -f "$tmpfile"
+    run_root systemctl restart avahi-daemon
+}
+
 configure_hostname() {
     local new_hostname="$1"
     local current_hostname
@@ -315,6 +338,7 @@ if [[ -z "$DEPLOY_ROOT" ]]; then
 fi
 
 install_base_services
+install_avahi_ssh_service
 configure_hostname "$HOSTNAME_VALUE"
 
 if key_text="$(read_authorized_key)"; then

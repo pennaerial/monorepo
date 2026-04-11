@@ -92,6 +92,7 @@ scripts/hardware/provision-pi.sh \
 That script configures:
 - hostname / mDNS identity
 - `openssh-server` and `avahi-daemon`
+- explicit Avahi `_ssh._tcp` service advertisement for dashboard discovery
 - the deploy user (default: `penn`)
 - SSH authorized keys
 - optional passwordless sudo for the deploy user
@@ -107,5 +108,6 @@ Notes:
 - run the provisioning script on the Pi itself
 - ROS 2 Humble still needs to exist on the Pi at `/opt/ros/humble`
 - the script now attempts NTP time sync before any `apt` work and falls back to an HTTP `Date` header if NTP is unreachable, but broken third-party apt repos on the Pi can still block provisioning
+- if an existing Pi was provisioned before this change, rerun `provision-pi.sh` once so `/etc/avahi/services/ssh.service` is installed
 - `--no-bootstrap` skips the deploy-root/systemd install if you only want hostname/user/SSH setup
 - if you do not want a hosted public key, use `--authorized-key-file` or `--authorized-key` instead
