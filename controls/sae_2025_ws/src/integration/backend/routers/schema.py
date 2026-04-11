@@ -12,13 +12,6 @@ from ..models import (
     ModeRegistryResponse,
     SchemaIndexResponse,
 )
-from ..schema import (
-    fleet_schema,
-    mode_registry,
-    mission_catalog,
-    mission_schema_for_name,
-    mission_schema_for_path,
-)
 
 
 def build_router(ctx: AppContext) -> APIRouter:
@@ -26,6 +19,8 @@ def build_router(ctx: AppContext) -> APIRouter:
 
     @router.get("", response_model=SchemaIndexResponse)
     async def schema_index() -> SchemaIndexResponse:
+        from ..schema import fleet_schema, mode_registry, mission_catalog
+
         return SchemaIndexResponse(
             missions=mission_catalog(),
             fleet=fleet_schema(),
@@ -36,12 +31,16 @@ def build_router(ctx: AppContext) -> APIRouter:
     async def get_mode_registry(
         target: Annotated[str | None, Query()] = None,
     ) -> ModeRegistryResponse:
+        from ..schema import mode_registry
+
         return mode_registry(target=target)
 
     @router.get("/missions", response_model=MissionCatalogResponse)
     async def get_missions(
         target: Annotated[str | None, Query()] = None,
     ) -> MissionCatalogResponse:
+        from ..schema import mission_catalog
+
         return mission_catalog(target=target)
 
     @router.get("/mission", response_model=MissionSchemaResponse)
@@ -49,6 +48,8 @@ def build_router(ctx: AppContext) -> APIRouter:
         name: Annotated[str | None, Query()] = None,
         path: Annotated[str | None, Query()] = None,
     ) -> MissionSchemaResponse:
+        from ..schema import mission_schema_for_name, mission_schema_for_path
+
         if path:
             return mission_schema_for_path(path)
         if not name:
@@ -60,6 +61,8 @@ def build_router(ctx: AppContext) -> APIRouter:
 
     @router.get("/fleet", response_model=FleetSchemaResponse)
     async def get_fleet_schema() -> FleetSchemaResponse:
+        from ..schema import fleet_schema
+
         return fleet_schema()
 
     return router

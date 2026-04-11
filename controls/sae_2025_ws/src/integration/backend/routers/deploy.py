@@ -6,7 +6,6 @@ from fastapi import APIRouter, File, Form, UploadFile
 
 from ..context import AppContext
 from ..models import BuildCurrentResponse, BuildListResponse, MessageResponse
-from ..services import deploy as deploy_service
 
 
 def build_router(ctx: AppContext) -> APIRouter:
@@ -14,6 +13,8 @@ def build_router(ctx: AppContext) -> APIRouter:
 
     @router.get("/current", response_model=BuildCurrentResponse)
     async def current_build(target_id: str | None = None) -> BuildCurrentResponse:
+        from ..services import deploy as deploy_service
+
         return BuildCurrentResponse.model_validate(
             await deploy_service.current_build(ctx, target_id=target_id)
         )
@@ -23,6 +24,8 @@ def build_router(ctx: AppContext) -> APIRouter:
         file: UploadFile = File(...),
         target_id: Annotated[str | None, Form()] = None,
     ):
+        from ..services import deploy as deploy_service
+
         result = await deploy_service.upload_build(
             ctx,
             target_id=target_id,
@@ -38,6 +41,8 @@ def build_router(ctx: AppContext) -> APIRouter:
         file: UploadFile = File(...),
         target_id: Annotated[str | None, Form()] = None,
     ):
+        from ..services import deploy as deploy_service
+
         result = await deploy_service.upload_source_bundle(
             ctx,
             target_id=target_id,
@@ -50,6 +55,8 @@ def build_router(ctx: AppContext) -> APIRouter:
 
     @router.get("/list", response_model=BuildListResponse)
     async def list_builds() -> BuildListResponse:
+        from ..services import deploy as deploy_service
+
         return BuildListResponse.model_validate(await deploy_service.list_builds(ctx))
 
     @router.post("/download", response_model=MessageResponse | BuildListResponse)
@@ -59,6 +66,8 @@ def build_router(ctx: AppContext) -> APIRouter:
         artifact_id: Annotated[str, Form()] = "",
         target_id: Annotated[str | None, Form()] = None,
     ):
+        from ..services import deploy as deploy_service
+
         result = await deploy_service.download_build(
             ctx,
             target_id=target_id,
@@ -72,6 +81,8 @@ def build_router(ctx: AppContext) -> APIRouter:
 
     @router.post("/rollback", response_model=MessageResponse | BuildListResponse)
     async def rollback_build(target_id: Annotated[str | None, Form()] = None):
+        from ..services import deploy as deploy_service
+
         result = await deploy_service.rollback_build(ctx, target_id=target_id)
         if result.get("success"):
             return MessageResponse.model_validate(result)
