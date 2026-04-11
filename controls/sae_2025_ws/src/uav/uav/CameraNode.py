@@ -311,8 +311,17 @@ class Camera(Node):
         return hook
 
     def _rotate_frame(self, frame: np.ndarray) -> np.ndarray:
-        if abs(self.rotate_degrees) <= 1e-9:
+        normalized_degrees = self.rotate_degrees % 360.0
+        if abs(normalized_degrees) <= 1e-9:
             return frame
+        # Right-angle rotations are common on hardware and much cheaper than a
+        # generic affine warp.
+        if abs(normalized_degrees - 90.0) <= 1e-9:
+            return cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
+        if abs(normalized_degrees - 180.0) <= 1e-9:
+            return cv2.rotate(frame, cv2.ROTATE_180)
+        if abs(normalized_degrees - 270.0) <= 1e-9:
+            return cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
         height, width = frame.shape[:2]
         center = (width / 2.0, height / 2.0)
         matrix = cv2.getRotationMatrix2D(center, -self.rotate_degrees, 1.0)
