@@ -74,6 +74,11 @@ _UPPER_A2 = np.array(red[1][1], dtype=np.uint8)
 _LOWER_B = np.array(blue[0], dtype=np.uint8)
 _UPPER_B = np.array(blue[1], dtype=np.uint8)
 
+# Mirrors PayloadColorSquareNode._COLOR_RATIO: when one tape colour has at
+# least this many times more pixels than the other in the line-follow strip,
+# we treat it as the new dominant colour and trigger a transition.
+_COLOR_DOMINANCE_RATIO = 1.5
+
 
 class PayloadCornerNavigateMode(Mode):
     mission_target = "payload"
@@ -553,36 +558,56 @@ class PayloadCornerNavigateMode(Mode):
         other = "B" if current == "A" else "A"
 
         cur_count, cur_lateral_px = self._single_color_strip_metrics(bgr, current)
-        other_count, _ = self._single_color_strip_metrics(bgr, other)
+        other_count, other_lateral_px = self._single_color_strip_metrics(bgr, other)
 
-        # Detect the corner colour: the *other* colour appearing in the strip
-        # only counts as a corner if (current → other) matches the corner
-        # signature for our travel direction. Otherwise it's a mid-side
-        # transition we ignore (we keep tracking the current colour).
-        if (
-            not self._corner_color_seen
-            and other_count >= self.line_follow_min_pixels
-            and self._corner_transition(current, other)
-        ):
-            self._corner_color_seen = True
-            self.log(
-                f"PayloadCornerNavigateMode: corner colour {other} seen "
-                f"({other_count}px) — will stop when {current} disappears"
-            )
+        # A "transition" is observed when the OTHER colour dominates the strip
+        # over the current colour. We use the same dominance rule that
+        # PayloadColorSquareNode._detect_current_color uses: one colour must
+        # be at least 1.5× the other (and clear the visibility floor) to
+        # count as the new dominant. Waiting for the current colour to fully
+        # disappear is too strict — by the time both conditions hold, the
+        # payload has often already drifted off the line.
+        transitioned = (
+            other_count >= self.line_follow_min_pixels
+            and other_count > cur_count * _COLOR_DOMINANCE_RATIO
+        )
 
-        # Stop condition: corner colour seen AND current colour has dropped
-        # below the visibility threshold (we've driven into the corner past
-        # the end of our side's segment).
+        if transitioned and not self._corner_color_seen:
+            if self._corner_transition(current, other):
+                # CORNER. Latch the flag but keep tracking the current colour
+                # (which is now disappearing) so we drive straight on through
+                # the end of our side's segment into the corner.
+                self._corner_color_seen = True
+                self.log(
+                    f"PayloadCornerNavigateMode: corner {current}→{other} "
+                    f"({other_count}px) — driving into corner until {current} disappears"
+                )
+            else:
+                # Mid-side transition. Switch the tracked colour to the new
+                # segment we are now physically over and continue line
+                # following along the same border. The next transition we
+                # see will be the corner.
+                self.log(
+                    f"PayloadCornerNavigateMode: mid-side {current}→{other} "
+                    f"({other_count}px) — switching tracked colour to {other}"
+                )
+                self._prev_color = other
+                current, other = other, current
+                cur_count, cur_lateral_px = other_count, other_lateral_px
+
+        # Stop condition: corner has been detected and the colour we are
+        # following has dropped below the visibility threshold (we've driven
+        # past the end of our side's segment into the corner).
         if self._corner_color_seen and cur_count < self.line_follow_min_pixels:
             self.vehicle.stop()
             self._done = True
             self.log(
                 f"PayloadCornerNavigateMode: current colour {current} lost "
-                f"after corner detected ({cur_count}px) → done"
+                f"after corner detected → done"
             )
             return
 
-        # Steer purely on the current colour's centroid so the corner colour
+        # Steer purely on the current colour's centroid so the other colour
         # cannot pull the centroid off the side we're following.
         if cur_count >= self.line_follow_min_pixels:
             angular = float(
