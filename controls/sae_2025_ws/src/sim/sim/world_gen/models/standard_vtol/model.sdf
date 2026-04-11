@@ -21,7 +21,8 @@
         <pose>0.126 0 -0.07 0 0 0</pose>
         <geometry>
           <box>
-            <size>0.298 2.144 0.05</size>
+            <!-- <size>0.298 2.144 0.05</size> -->
+            <size>0.298 0.5 0.05</size>
           </box>
         </geometry>
         <surface>
@@ -129,7 +130,7 @@
 
 
       <!-- <pose>-0.01 0 0 0 -1.5707 0 </pose> -->
-      <visual name='apriltag_front_visual'>
+      <visual name='apriltag_front_center_visual'>
         <pose relative_to="base_link">-0.023 0 0 -1.5707 3.141592 1.5707</pose>
         <geometry>
           <plane>
@@ -142,7 +143,49 @@
           <specular>0.02 0.02 0.02 1</specular>
           <pbr>
             <metal>
-              <albedo_map>model://standard_vtol/materials/apriltag_front.png</albedo_map>
+              <albedo_map>model://standard_vtol/materials/apriltag_front_id_0.png</albedo_map>
+              <metalness>0.0</metalness>
+              <roughness>0.9</roughness>
+            </metal>
+          </pbr>
+        </material>
+      </visual>
+
+      <visual name='apriltag_front_left_visual'>
+        <pose relative_to="base_link">-0.023 0.45 0.05 -1.5707 3.141592 1.5707</pose>
+        <geometry>
+          <plane>
+            <normal>0 0 1</normal>
+            <size>0.1 0.1</size>
+          </plane>
+        </geometry>
+        <material>
+          <diffuse>1 1 1 1</diffuse>
+          <specular>0.02 0.02 0.02 1</specular>
+          <pbr>
+            <metal>
+              <albedo_map>model://standard_vtol/materials/apriltag_front_left_id_4.png</albedo_map>
+              <metalness>0.0</metalness>
+              <roughness>0.9</roughness>
+            </metal>
+          </pbr>
+        </material>
+      </visual>
+
+      <visual name='apriltag_front_right_visual'>
+        <pose relative_to="base_link">-0.023 -0.45 0.05 -1.5707 3.141592 1.5707</pose>
+        <geometry>
+          <plane>
+            <normal>0 0 1</normal>
+            <size>0.1 0.1</size>
+          </plane>
+        </geometry>
+        <material>
+          <diffuse>1 1 1 1</diffuse>
+          <specular>0.02 0.02 0.02 1</specular>
+          <pbr>
+            <metal>
+              <albedo_map>model://standard_vtol/materials/apriltag_front_right_id_5.png</albedo_map>
               <metalness>0.0</metalness>
               <roughness>0.9</roughness>
             </metal>
@@ -163,7 +206,49 @@
           <specular>0.02 0.02 0.02 1</specular>
           <pbr>
             <metal>
-              <albedo_map>model://standard_vtol/materials/apriltag_back.png</albedo_map>
+              <albedo_map>model://standard_vtol/materials/apriltag_back_id_1.png</albedo_map>
+              <metalness>0.0</metalness>
+              <roughness>0.9</roughness>
+            </metal>
+          </pbr>
+        </material>
+      </visual>
+
+      <visual name='apriltag_back_left_visual'>
+        <pose relative_to="base_link">0.03 0.45 0.05 1.5707 0 1.5707</pose>
+        <geometry>
+          <plane>
+            <normal>0 0 1</normal>
+            <size>0.1 0.1</size>
+          </plane>
+        </geometry>
+        <material>
+          <diffuse>1 1 1 1</diffuse>
+          <specular>0.02 0.02 0.02 1</specular>
+          <pbr>
+            <metal>
+              <albedo_map>model://standard_vtol/materials/apriltag_back_left_id_6.png</albedo_map>
+              <metalness>0.0</metalness>
+              <roughness>0.9</roughness>
+            </metal>
+          </pbr>
+        </material>
+      </visual>
+
+      <visual name='apriltag_back_right_visual'>
+        <pose relative_to="base_link">0.03 -0.45 0.05 1.5707 0 1.5707</pose>
+        <geometry>
+          <plane>
+            <normal>0 0 1</normal>
+            <size>0.1 0.1</size>
+          </plane>
+        </geometry>
+        <material>
+          <diffuse>1 1 1 1</diffuse>
+          <specular>0.02 0.02 0.02 1</specular>
+          <pbr>
+            <metal>
+              <albedo_map>model://standard_vtol/materials/apriltag_back_right_id_7.png</albedo_map>
               <metalness>0.0</metalness>
               <roughness>0.9</roughness>
             </metal>
@@ -185,7 +270,7 @@
           <specular>0.02 0.02 0.02 1</specular>
           <pbr>
             <metal>
-              <albedo_map>model://standard_vtol/materials/apriltag_left.png</albedo_map>
+              <albedo_map>model://standard_vtol/materials/apriltag_left_id_2.png</albedo_map>
               <metalness>0.0</metalness>
               <roughness>0.9</roughness>
             </metal>
@@ -206,7 +291,7 @@
           <specular>0.02 0.02 0.02 1</specular>
           <pbr>
             <metal>
-              <albedo_map>model://standard_vtol/materials/apriltag_right.png</albedo_map>
+              <albedo_map>model://standard_vtol/materials/apriltag_right_id_3.png</albedo_map>
               <metalness>0.0</metalness>
               <roughness>0.9</roughness>
             </metal>

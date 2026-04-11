@@ -13,7 +13,7 @@ class PayloadMissionBootstrap(Node):
         super().__init__("payload_mission_bootstrap")
         self.declare_parameter("mode_map", mission_path_for_name("basic"))
         self.declare_parameter("auto_launch", True)
-        self.declare_parameter("payload_name", "")
+        self.declare_parameter("vehicle_name", "")
 
     def _bool_parameter(self, name: str) -> bool:
         value = self.get_parameter(name).value
@@ -28,9 +28,9 @@ class PayloadMissionBootstrap(Node):
         if not mission_path:
             raise ValueError("payload_mission requires a non-empty 'mode_map'.")
 
-        payload_name = str(self.get_parameter("payload_name").value).strip()
-        if not payload_name:
-            raise ValueError("payload_mission requires a non-empty 'payload_name'.")
+        vehicle_name = str(self.get_parameter("vehicle_name").value).strip()
+        if not vehicle_name:
+            raise ValueError("payload_mission requires a non-empty 'vehicle_name'.")
 
         mission_spec = MissionSpec.load(mission_path)
         if not mission_spec.is_payload:
@@ -41,7 +41,7 @@ class PayloadMissionBootstrap(Node):
         return {
             "mission_spec": mission_spec,
             "auto_launch": self._bool_parameter("auto_launch"),
-            "payload_name": payload_name,
+            "vehicle_name": vehicle_name,
             "node_name": "mission",
         }
 

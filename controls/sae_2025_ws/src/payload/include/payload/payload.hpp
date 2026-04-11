@@ -16,12 +16,11 @@
 
 class Payload : public rclcpp::Node {
 public:
-    Payload(const std::string& payload_name);
+    Payload(const std::string& vehicle_name);
     ~Payload() override;
     void init();
 
 private:
-    std::string payload_name_;
     rclcpp::Subscription<payload_interfaces::msg::DriveCommand>::SharedPtr ros_drive_subscriber_;
     rclcpp::Subscription<payload_interfaces::msg::ServoCommand>::SharedPtr servo_subscriber_;
 

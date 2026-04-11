@@ -41,7 +41,7 @@ class PayloadRetreatMode(Mode):
     Phase 2 (turn_180): spin in place at turn_angular_speed rad/s (direction set
     by turn_direction: +1 = CCW, -1 = CW) until π radians are accumulated.
 
-    Publishes DriveCommand to /{payload_name}/cmd_drive.
+    Publishes DriveCommand to the payload's own namespaced command topic.
     """
 
     mission_target = "payload"
@@ -51,7 +51,6 @@ class PayloadRetreatMode(Mode):
         self,
         node: Node,
         vehicle: Payload,
-        payload_name: str = "payload_0",
         forward_speed_mps: float = 0.12,
         edge_threshold: float = 0.30,
         edge_stable_frames: int = 5,
@@ -63,7 +62,6 @@ class PayloadRetreatMode(Mode):
         camera_debug: bool = False,
     ):
         super().__init__(node, vehicle)
-        self.payload_name = str(payload_name)
         self.forward_speed_mps = float(forward_speed_mps)
         self.edge_threshold = float(edge_threshold)
         self.edge_stable_frames = int(edge_stable_frames)
@@ -96,13 +94,12 @@ class PayloadRetreatMode(Mode):
         self._edge_stable_count = 0
         self._edge_invalid_count = 0
         self._turned_rad = 0.0
-        self._turn_future = None      # <-- add this
+        self._turn_future = None
         self._done = False
         self._image = None
-    # ... rest of on_enter
 
-        cam_topic = f"/{self.payload_name}/camera"
-        drive_topic = f"/{self.payload_name}/cmd_drive"
+        cam_topic = self.vehicle.namespaced_path("camera")
+        drive_topic = self.vehicle.namespaced_path("cmd_drive")
 
         if self.compressed_image:
             self._image_sub = self.node.create_subscription(

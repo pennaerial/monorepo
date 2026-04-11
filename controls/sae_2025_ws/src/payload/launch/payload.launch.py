@@ -12,8 +12,10 @@ def launch_setup(context):
         payload_share_dir, "config", "payload_params.yaml"
     )
 
-    payload_name = LaunchConfiguration("payload_name").perform(context)
+    vehicle_name = LaunchConfiguration("vehicle_name").perform(context)
+    sim_entity_name = LaunchConfiguration("sim_entity_name").perform(context).strip()
     controller_override = LaunchConfiguration("controller").perform(context)
+    payload_node_name = sim_entity_name or vehicle_name
 
     parameters = [payload_params_path]
     if controller_override:
@@ -24,7 +26,8 @@ def launch_setup(context):
         executable="payload",
         parameters=parameters,
         output="screen",
-        name=payload_name,
+        name=payload_node_name,
+        namespace=vehicle_name,
     )
 
     actions = [payload]
@@ -35,7 +38,8 @@ def launch_setup(context):
 def generate_launch_description():
     return LaunchDescription(
         [
-            DeclareLaunchArgument("payload_name", default_value="payload_0"),
+            DeclareLaunchArgument("vehicle_name", default_value="payload_0"),
+            DeclareLaunchArgument("sim_entity_name", default_value=""),
             DeclareLaunchArgument("controller", default_value=""),
             OpaqueFunction(function=launch_setup),
         ]

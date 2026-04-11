@@ -1,0 +1,45 @@
+name: ROS Validate
+
+on:
+  push:
+    branches: [main, master, integration]
+    paths:
+      - ".github/workflows/ros-validate.yml"
+      - "controls/sae_2025_ws/**"
+      - "!controls/sae_2025_ws/src/integration/**"
+  pull_request:
+    branches: [main, master]
+    paths:
+      - ".github/workflows/ros-validate.yml"
+      - "controls/sae_2025_ws/**"
+      - "!controls/sae_2025_ws/src/integration/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: ros-validate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate_ros2_workspace_ci_image:
+    name: Validate ROS 2 Workspace
+    runs-on: ubuntu-22.04
+    container:
+      image: ${{ vars.ROS_CI_IMAGE_AMD64 }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build and validate ROS workspace
+        env:
+          INSTALL_DEPS: "0"
+        run: bash controls/sae_2025_ws/scripts/ci/validate_ros_workspace.sh

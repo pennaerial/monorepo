@@ -13,6 +13,7 @@ from typing import Optional
 from abc import ABC, abstractmethod
 from rclpy.impl.rcutils_logger import RcutilsLogger
 from rclpy.node import Node
+from sim.orchestration import normalize_named_records
 from sim.utils import camel_to_snake, find_package_resource, copy_models_to_gazebo
 import xml.etree.ElementTree as ET
 import random
@@ -36,6 +37,7 @@ class WorldNode(Node, ABC):
         output_filename: Optional[str] = None,
         seed: Optional[int] = None,
         entities: Optional[dict] = None,
+        controllables: Optional[dict] = None,
     ):
         """
         Initialize the WorldNode.
@@ -63,6 +65,7 @@ class WorldNode(Node, ABC):
         self.output_path = self.output_dir / output_filename
 
         self.entities = entities or {}
+        self.controllables = controllables or {}
 
         self.get_logger().info(
             f"Initializing world node for competition: {competition_name}"
@@ -203,6 +206,14 @@ class WorldNode(Node, ABC):
         )
         return self.spawn_entity_object(entity)
 
+    def spawn_entities(self, entries: dict | list | None, *, label: str) -> bool:
+        normalized_entries = normalize_named_records(entries, record_type=label)
+        success = True
+        for name, cfg in normalized_entries.items():
+            self.get_logger().info(f"Spawning {label}: {name}")
+            success = self.spawn_entity(name, cfg) and success
+        return success
+
     def _wait_for_spawn_service(self, timeout_sec: float = 10.0) -> bool:
         if self.spawn_entity_client.service_is_ready():
             return True
@@ -257,10 +268,6 @@ class WorldNode(Node, ABC):
 
         return True if dynamic generation is successful, False otherwise
         """
-        for name, cfg in self.entities.items():
-            self.get_logger().info(f"Spawning entity: {name}")
-            if not self.spawn_entity(name, cfg):
-                return False
         return True
 
     def get_world_path(self) -> Path:

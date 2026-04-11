@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-import importlib
 import json
 import logging
 import os
@@ -24,11 +23,11 @@ from sim.constants import (
     DEFAULT_USE_SCORING,
     Competition,
 )
+from sim.orchestration import parse_json_config, resolve_stage_world
 from sim.utils import (
     build_node_arguments,
     camel_to_snake,
     load_sim_launch_parameters,
-    load_sim_parameters,
 )
 
 
@@ -65,7 +64,7 @@ def initialize_mode(logger: logging.Logger, node_path: str, params: dict) -> Nod
             f"Invalid node path format: '{node_path}'. Expected 'module.ClassName'"
         ) from exc
 
-    module = importlib.import_module(module_name)
+    module = __import__(module_name, fromlist=[class_name])
     if not hasattr(module, class_name):
         raise AttributeError(
             f"Class '{class_name}' not found in module '{module_name}'"
@@ -75,89 +74,49 @@ def initialize_mode(logger: logging.Logger, node_path: str, params: dict) -> Nod
     return node_class(**args)
 
 
-def _camera_bridge_nodes(
-    *,
-    competition: str,
-    model: str,
-    vehicle_type: str,
-    vehicle_name: str,
-    cwd: str,
-):
-    if not vehicle_type or not vehicle_name:
-        return []
-
-    if vehicle_type == "uav":
-        if not model:
-            raise ValueError("UAV camera bridging requires a non-empty model name.")
-        sim_model_name = model[3:] if model.startswith("gz_") else model
-        gz_image_topic = f"/world/{competition}/model/{sim_model_name}_0/link/camera_link/sensor/camera/image"
-        gz_camera_info_topic = f"/world/{competition}/model/{sim_model_name}_0/link/camera_link/sensor/camera/camera_info"
-        ros_namespace = f"/{vehicle_name}"
-    elif vehicle_type == "payload":
-        gz_image_topic = f"/world/{competition}/model/{vehicle_name}/link/camera_link/sensor/camera/image"
-        gz_camera_info_topic = f"/world/{competition}/model/{vehicle_name}/link/camera_link/sensor/camera/camera_info"
-        ros_namespace = f"/{vehicle_name}"
-    else:
-        raise ValueError(f"Unsupported camera_vehicle_type '{vehicle_type}'.")
-
-    return [
-        Node(
-            package="ros_gz_bridge",
-            executable="parameter_bridge",
-            arguments=[f"{gz_image_topic}@sensor_msgs/msg/Image[gz.msgs.Image"],
-            remappings=[
-                (
-                    gz_image_topic,
-                    f"{ros_namespace}/camera_source"
-                    if vehicle_type == "payload"
-                    else f"{ros_namespace}/camera",
-                )
-            ],
-            output="screen",
-            name=f"{vehicle_name}_camera_bridge",
-            cwd=cwd,
-        ),
-        Node(
-            package="ros_gz_bridge",
-            executable="parameter_bridge",
-            arguments=[
-                f"{gz_camera_info_topic}@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo"
-            ],
-            remappings=[
-                (
-                    gz_camera_info_topic,
-                    f"{ros_namespace}/camera_info_source"
-                    if vehicle_type == "payload"
-                    else f"{ros_namespace}/camera_info",
-                )
-            ],
-            output="screen",
-            name=f"{vehicle_name}_camera_info_bridge",
-            cwd=cwd,
-        ),
-    ]
+def _load_backend_override(context) -> dict:
+    return parse_json_config(
+        LaunchConfiguration("backend_json").perform(context),
+        field_name="backend_json",
+    )
 
 
-def launch_setup(context, *args, **kwargs):
-    logger = launch.logging.get_logger("sim.launch")
-    sim_params = load_sim_launch_parameters()
+def _competition_name(legacy_params: dict, backend_override: dict) -> str:
+    explicit_world_name = str(backend_override.get("world_name", "")).strip()
+    if explicit_world_name:
+        return explicit_world_name
 
-    competition_num = sim_params.get("competition", DEFAULT_COMPETITION.value)
+    competition_num = backend_override.get(
+        "competition", legacy_params.get("competition", DEFAULT_COMPETITION.value)
+    )
     try:
         competition_type = Competition(competition_num)
-        competition = COMPETITION_NAMES[competition_type]
+        return COMPETITION_NAMES[competition_type]
     except (ValueError, KeyError) as exc:
         valid_values = [entry.value for entry in Competition]
         raise ValueError(
             f"Invalid competition: {competition_num}. Must be one of {valid_values}"
         ) from exc
+
+
+def launch_setup(context, *args, **kwargs):
+    logger = launch.logging.get_logger("sim.launch")
+    legacy_params = load_sim_launch_parameters()
+    backend_override = _load_backend_override(context)
+
+    competition = _competition_name(legacy_params, backend_override)
     logger.info(f"Running Competition: {competition}")
 
-    mission_stage = str(sim_params.get("mission_stage", "")).strip()
-    if mission_stage:
-        logger.info(f"Mission stage: {mission_stage}")
+    mission_stage = str(
+        backend_override.get("mission_stage", legacy_params.get("mission_stage", ""))
+    ).strip()
 
-    scoring_param = sim_params.get("scoring", DEFAULT_USE_SCORING)
+    if backend_override:
+        scoring_param = backend_override.get(
+            "use_scoring", backend_override.get("scoring", False)
+        )
+    else:
+        scoring_param = legacy_params.get("scoring", DEFAULT_USE_SCORING)
     use_scoring = (
         scoring_param.lower() == "true"
         if isinstance(scoring_param, str)
@@ -181,9 +140,6 @@ def launch_setup(context, *args, **kwargs):
         gz_sim_env["LIBGL_ALWAYS_SOFTWARE"] = "1"
         gz_sim_env["QT_QPA_PLATFORM"] = "offscreen"
     else:
-        # OpenCV's Python package mutates QT_QPA_* env vars at import time.
-        # Gazebo GUI inheriting those points it at cv2's bundled Qt plugins,
-        # which crashes the GUI startup on this machine.
         gz_sim_env["QT_QPA_PLATFORM_PLUGIN_PATH"] = ""
         gz_sim_env["QT_QPA_FONTDIR"] = ""
 
@@ -213,50 +169,49 @@ def launch_setup(context, *args, **kwargs):
     spawn_uav_model = LaunchConfiguration("spawn_uav_model").perform(
         context
     ).strip().lower() in {"1", "true", "yes", "on"}
-    camera_vehicle_type = LaunchConfiguration("camera_vehicle_type").perform(context)
-    camera_vehicle_name = LaunchConfiguration("camera_vehicle_name").perform(context)
-    camera_bridge_actions = _camera_bridge_nodes(
-        competition=competition,
-        model=model,
-        vehicle_type=str(camera_vehicle_type).strip(),
-        vehicle_name=str(camera_vehicle_name).strip(),
-        cwd=cwd,
-    )
 
-    sim_stage_params, sim_config_path = load_sim_parameters(
-        competition, logger, competition, mission_stage
-    )
-    if "world" not in sim_stage_params:
+    if "world" in backend_override:
         raise ValueError(
-            f"Missing 'world' section in simulation config: {sim_config_path}"
+            "backend_json no longer supports 'world'. Use 'world_name', optional "
+            "'mission_stage', and optional 'world_overrides' instead."
         )
 
-    world_params = sim_stage_params["world"].copy()
-    world_node_params = world_params["params"].copy()
+    resolved_world = resolve_stage_world(
+        world_name=competition,
+        mission_stage=mission_stage,
+        world_overrides=backend_override.get("world_overrides"),
+        logger=logger,
+    )
+    resolved_stage = resolved_world["mission_stage"]
+    logger.info(f"Mission stage: {resolved_stage}")
+
+    sim_stage_params = resolved_world["sim_stage_params"]
+    world_spec = resolved_world["world"]
+    world_params = dict(world_spec["params"])
     if spawn_uav_model:
         if not model:
             raise ValueError("spawn_uav_model requires a non-empty model name.")
         sim_model_name = model[3:] if model.startswith("gz_") else model
-        vehicle_pose = world_node_params.get(
+        vehicle_pose = sim_stage_params["world"]["params"].get(
             "vehicle_pose", [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         )
         if len(vehicle_pose) != 6:
             raise ValueError(
                 f"vehicle_pose must contain exactly 6 values. Received: {vehicle_pose}"
             )
-        entities = dict(world_node_params.get("entities", {}))
+        entities = dict(world_params.get("entities", {}))
         entities[f"{sim_model_name}_0"] = {
             "path_to_sdf": f"~/.simulation-gazebo/models/{sim_model_name}/model.sdf",
             "position": vehicle_pose[:3],
             "rpy": vehicle_pose[3:],
         }
-        world_node_params["entities"] = entities
+        world_params["entities"] = entities
 
-    world_node_name = camel_to_snake(world_params["name"])
+    world_node_name = camel_to_snake(world_spec["name"])
     world = Node(
         package="sim",
-        executable=camel_to_snake(world_params["name"]),
-        arguments=[json.dumps(world_node_params)],
+        executable=camel_to_snake(world_spec["name"]),
+        arguments=[json.dumps(world_params)],
         output="screen",
         name=world_node_name,
         cwd=cwd,
@@ -276,15 +231,30 @@ def launch_setup(context, *args, **kwargs):
     )
 
     scoring = None
-    if use_scoring and "scoring" in sim_params:
+    if use_scoring and "scoring" in sim_stage_params:
         scoring = Node(
             package="sim",
-            executable=camel_to_snake(sim_params["scoring"]["name"]),
-            arguments=[sim_params["scoring"]["params"]],
+            executable=camel_to_snake(sim_stage_params["scoring"]["name"]),
+            arguments=[sim_stage_params["scoring"]["params"]],
             output="screen",
-            name=sim_params["scoring"]["name"],
+            name=sim_stage_params["scoring"]["name"],
             cwd=cwd,
         )
+
+    sim_startup_started = {"value": False}
+
+    def maybe_start_sim(event):
+        text = event.text.decode() if isinstance(event.text, bytes) else event.text
+        if (
+            sim_startup_started["value"]
+            or "Successfully generated world file:" not in text
+        ):
+            return None
+        sim_startup_started["value"] = True
+        startup_actions = [spawn_world, LogInfo(msg="Simulation world node started.")]
+        if scoring is not None:
+            startup_actions.append(scoring)
+        return startup_actions
 
     actions = [
         download_gz_models,
@@ -297,25 +267,13 @@ def launch_setup(context, *args, **kwargs):
         RegisterEventHandler(
             OnProcessIO(
                 target_action=world,
-                on_stderr=lambda event: (
-                    [
-                        spawn_world,
-                        LogInfo(msg="Simulation world node started."),
-                        scoring,
-                    ]
-                    if b"Successfully generated world file:" in event.text
-                    else None
-                ),
+                on_stderr=maybe_start_sim,
             )
         ),
         RegisterEventHandler(
             OnProcessStart(
                 target_action=spawn_world,
-                on_start=[
-                    LogInfo(msg="spawn_world started, creating bridges"),
-                    gz_ros_bridge_create,
-                    *camera_bridge_actions,
-                ],
+                on_start=[LogInfo(msg="spawn_world started"), gz_ros_bridge_create],
             )
         ),
         RegisterEventHandler(
@@ -345,8 +303,7 @@ def generate_launch_description():
             DeclareLaunchArgument("px4_path", default_value="~/PX4-Autopilot"),
             DeclareLaunchArgument("model", default_value=""),
             DeclareLaunchArgument("spawn_uav_model", default_value="false"),
-            DeclareLaunchArgument("camera_vehicle_type", default_value=""),
-            DeclareLaunchArgument("camera_vehicle_name", default_value=""),
+            DeclareLaunchArgument("backend_json", default_value=""),
             OpaqueFunction(function=launch_setup),
         ]
     )

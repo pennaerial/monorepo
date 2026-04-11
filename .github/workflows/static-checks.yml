@@ -1,0 +1,45 @@
+name: Static Checks
+
+on:
+  push:
+    branches: [main, master, integration]
+    paths:
+      - ".github/workflows/**"
+      - ".github/ci/**"
+      - "controls/sae_2025_ws/**"
+  pull_request:
+    branches: [main, master]
+    paths:
+      - ".github/workflows/**"
+      - ".github/ci/**"
+      - "controls/sae_2025_ws/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: static-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static_checks:
+    name: Static Checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check Ruff formatting
+        uses: astral-sh/ruff-action@v3
+        with:
+          args: "--config controls/sae_2025_ws/.ruff.toml format --check --diff controls/sae_2025_ws"
+
+      - name: Check Ruff lint
+        uses: astral-sh/ruff-action@v3
+        with:
+          args: "--config controls/sae_2025_ws/.ruff.toml check controls/sae_2025_ws"
+
+      - name: Run actionlint
+        uses: rhysd/actionlint@v1.7.8

@@ -1,0 +1,63 @@
+name: ARM Fallback
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: arm-fallback-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build_hardware_artifact:
+    name: Build Raspberry Pi Artifact (fallback container)
+    runs-on: ubuntu-22.04-arm
+    container:
+      image: ros:humble-ros-base
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Mark checkout as safe
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE" || true
+
+      - name: Install stable CI dependencies
+        run: bash controls/sae_2025_ws/scripts/ci/install_ros_ci_deps.sh
+
+      - name: Build ARM workspace packages
+        run: bash controls/sae_2025_ws/scripts/ci/build_arm_artifact.sh
+
+      - name: Get short SHA
+        id: sha
+        run: |
+          SHORT_SHA=$(git rev-parse --short HEAD 2>/dev/null || echo "${GITHUB_SHA:0:7}")
+          echo "short_sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
+          echo "artifact_name=ros2-build-$SHORT_SHA.tar.gz" >> "$GITHUB_OUTPUT"
+
+      - name: Get build info
+        id: info
+        run: |
+          echo "timestamp=$(date -u +%Y%m%d-%H%M%S)" >> "$GITHUB_OUTPUT"
+          echo "full_sha=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+
+      - name: Package ARM runtime artifact
+        env:
+          SHORT_SHA: ${{ steps.sha.outputs.short_sha }}
+          BUILD_TIME: ${{ steps.info.outputs.timestamp }}
+          GITHUB_SHA: ${{ steps.info.outputs.full_sha }}
+          BRANCH_NAME: ${{ github.ref_name }}
+          ARTIFACT_NAME: ${{ steps.sha.outputs.artifact_name }}
+        run: bash controls/sae_2025_ws/scripts/ci/package_arm_artifact.sh
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ros2-build-${{ steps.sha.outputs.short_sha }}
+          path: controls/sae_2025_ws/${{ steps.sha.outputs.artifact_name }}
+          retention-days: 30

@@ -9,9 +9,22 @@ class Multicopter(UAV):
     """
 
     def __init__(
-        self, node: Node, takeoff_amount=5.0, DEBUG=False, camera_offsets=[0, 0, 0]
+        self,
+        node: Node,
+        takeoff_amount=5.0,
+        DEBUG=False,
+        camera_offsets=[0, 0, 0],
+        vehicle_name: str = "uav",
+        px4_namespace: str = "",
     ):
-        super().__init__(node, takeoff_amount, DEBUG, camera_offsets)
+        super().__init__(
+            node,
+            takeoff_amount,
+            DEBUG,
+            camera_offsets,
+            vehicle_name=vehicle_name,
+            px4_namespace=px4_namespace,
+        )
 
     @property
     def is_vtol(self) -> bool:

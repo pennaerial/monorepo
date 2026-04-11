@@ -9,11 +9,11 @@ from .Vehicle import Vehicle
 class Payload(Vehicle):
     """Mission-side adapter for one payload node namespace."""
 
-    def __init__(self, node: Node, payload_name: str):
-        namespace = f"/{payload_name}"
+    def __init__(self, node: Node, vehicle_name: str):
+        namespace = f"/{vehicle_name}"
         super().__init__(
             node,
-            payload_name,
+            vehicle_name,
             has_camera=True,
             camera_namespace=namespace,
             image_topic=f"{namespace}/camera",

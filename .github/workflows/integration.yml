@@ -1,0 +1,49 @@
+name: Integration Validate
+
+on:
+  push:
+    branches: [main, master, integration]
+    paths:
+      - ".github/workflows/integration.yml"
+      - "controls/sae_2025_ws/src/integration/**"
+  pull_request:
+    branches: [main, master]
+    paths:
+      - ".github/workflows/integration.yml"
+      - "controls/sae_2025_ws/src/integration/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: integration-validate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate_integration:
+    name: Validate Integration Package
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: controls/sae_2025_ws/src/integration/frontend/package-lock.json
+
+      - name: Compile integration backend
+        working-directory: controls/sae_2025_ws/src/integration
+        run: |
+          mapfile -t py_files < <(find backend -name '*.py' | sort)
+          python3 -m py_compile "${py_files[@]}" app.py
+
+      - name: Build integration frontend
+        working-directory: controls/sae_2025_ws/src/integration/frontend
+        run: |
+          npm ci
+          npm run build
