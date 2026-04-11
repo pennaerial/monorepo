@@ -130,7 +130,7 @@ def test_schema_index_exposes_missions_fleet_and_modes():
         for section in payload["fleet"]["sections"]
         if section["name"] == "backend"
     )
-    assert backend_section["applies_to"] == ["sim", "hardware"]
+    assert backend_section["applies_to"] == ["sim", "hardware", "real"]
 
     vehicle_sim = next(
         section
@@ -204,7 +204,7 @@ def test_fleet_schema_exposes_section_shapes():
     payload = fleet_schema().model_dump()
 
     assert payload["success"] is True
-    assert payload["backend_kinds"] == ["sim", "hardware"]
+    assert payload["backend_kinds"] == ["sim", "hardware", "real"]
     assert "airframe" in payload["excluded_keys"]
     assert any(section["name"] == "defaults" for section in payload["sections"])
     assert payload["document_schema"]["type"] == "object"

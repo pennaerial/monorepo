@@ -142,3 +142,21 @@ def test_fleet_document_rejects_unknown_fields(tmp_path):
 
     with pytest.raises(ValueError, match="unsupported_knob"):
         load_fleet_document(fleet_path)
+
+
+def test_fleet_document_accepts_real_backend_alias(tmp_path):
+    fleet_path = _write_yaml(
+        tmp_path,
+        "real_fleet.yaml",
+        """
+        backend:
+          kind: real
+        vehicles:
+          - name: uav_0
+            mission: hover
+        """,
+    )
+
+    document = load_fleet_document(fleet_path)
+
+    assert document.backend.kind == "hardware"

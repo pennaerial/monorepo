@@ -42,7 +42,7 @@ Fleet launch reads one file with three top-level sections:
 
 ```yaml
 backend:
-  kind: sim
+  kind: sim  # use `hardware` or `real` on real hardware
   world_name: sae
   mission_stage: payload_retreat
   world_overrides:
@@ -91,7 +91,7 @@ Runtime-owned:
 - camera transport/rotation/preprocess settings
 - namespace and PX4 instance in the single-vehicle compatibility path
 
-The backend should define spawnable props under `world.params.entities` and UAV/payload vehicles under `world.params.controllables`. UAV controllables should include `px4_airframe_id`. The fleet layer attaches to those controllables; it should not redefine their PX4 identity.
+The backend should define spawnable props under `world.params.entities` and UAV/payload vehicles under `world.params.controllables`. UAV controllables should include `px4_airframe_id`. The fleet layer attaches to those controllables; it should not redefine their PX4 identity. For real hardware fleets, `backend.kind` may be either `hardware` or `real`; both map to the same runtime path.
 
 ## Unsupported Fleet Keys
 

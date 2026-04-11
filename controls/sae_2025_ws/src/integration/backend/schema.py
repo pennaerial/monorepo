@@ -34,7 +34,7 @@ from .models import (
     SchemaIndexResponse,
 )
 
-_FLEET_BACKEND_KINDS = ["sim", "hardware"]
+_FLEET_BACKEND_KINDS = ["sim", "hardware", "real"]
 _FLEET_EXCLUDED_KEYS = [
     "airframe",
     "custom_airframe_model",
@@ -245,7 +245,7 @@ def fleet_schema() -> FleetSchemaResponse:
     hardware_backend_fields = {
         field.name: field
         for field in _fields_from_model(
-            hardware_backend_schema, applies_to=["hardware"]
+            hardware_backend_schema, applies_to=["hardware", "real"]
         )
     }
 
@@ -259,16 +259,18 @@ def fleet_schema() -> FleetSchemaResponse:
             if name in sim_backend_fields:
                 applies.append("sim")
             if name in hardware_backend_fields:
-                applies.append("hardware")
+                applies.extend(["hardware", "real"])
             backend_fields.append(field.model_copy(update={"applies_to": applies}))
             seen_backend.add(name)
 
     defaults_fields = _fields_from_model(
-        defaults_schema, applies_to=["sim", "hardware"]
+        defaults_schema, applies_to=["sim", "hardware", "real"]
     )
     vehicle_fields = {
         field.name: field
-        for field in _fields_from_model(vehicle_schema, applies_to=["sim", "hardware"])
+        for field in _fields_from_model(
+            vehicle_schema, applies_to=["sim", "hardware", "real"]
+        )
     }
 
     return FleetSchemaResponse(
@@ -278,9 +280,10 @@ def fleet_schema() -> FleetSchemaResponse:
             FleetSectionSchemaResponse(
                 name="backend",
                 description="Backend configuration shared by every vehicle in the fleet.",
-                applies_to=["sim", "hardware"],
+                applies_to=["sim", "hardware", "real"],
                 constraints=[
-                    "kind must be sim or hardware.",
+                    "kind must be sim, hardware, or real.",
+                    "real is an alias for the hardware backend path.",
                     "Sim backends use world_name, optional mission_stage, and optional world_overrides.",
                 ],
                 fields=backend_fields,
@@ -288,13 +291,13 @@ def fleet_schema() -> FleetSchemaResponse:
             FleetSectionSchemaResponse(
                 name="defaults",
                 description="Shared per-vehicle knobs merged into every fleet entry.",
-                applies_to=["sim", "hardware"],
+                applies_to=["sim", "hardware", "real"],
                 fields=defaults_fields,
             ),
             FleetSectionSchemaResponse(
                 name="vehicle.common",
                 description="Per-vehicle fleet fields shared across backends.",
-                applies_to=["sim", "hardware"],
+                applies_to=["sim", "hardware", "real"],
                 constraints=[
                     "Provide mission or mission_path after defaults are merged.",
                     "kind is optional and must match the mission target when present.",
@@ -322,9 +325,9 @@ def fleet_schema() -> FleetSchemaResponse:
             FleetSectionSchemaResponse(
                 name="vehicle.hardware",
                 description="Hardware-only fleet fields for target-specific runtime wiring.",
-                applies_to=["hardware"],
+                applies_to=["hardware", "real"],
                 constraints=[
-                    "UAV hardware entries require px4_airframe_id.",
+                    "UAV hardware/real entries require px4_airframe_id.",
                 ],
                 fields=[
                     vehicle_fields[name]

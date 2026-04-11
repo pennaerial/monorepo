@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import builtins
 import importlib.util
 import sys
 from pathlib import Path
@@ -128,6 +129,63 @@ def test_backend_config_accepts_hardware_backend(fleet_launch_module):
 
     assert backend["kind"] == "hardware"
     assert backend["px4_path"] == "~/PX4-Autopilot"
+
+
+def test_backend_config_accepts_real_backend(fleet_launch_module):
+    fleet = {
+        "backend": {"kind": "real", "px4_path": "~/PX4-Autopilot"},
+        "vehicles": [
+            {
+                "name": "uav_alpha",
+                "mission_path": "/tmp/hover.yaml",
+                "kind": "uav",
+                "px4_airframe_id": 4004,
+            }
+        ],
+    }
+
+    backend = fleet_launch_module._backend_config(fleet)
+
+    assert backend["kind"] == "hardware"
+    assert backend["px4_path"] == "~/PX4-Autopilot"
+
+
+def test_real_backend_does_not_import_sim(monkeypatch):
+    package_root = Path(__file__).resolve().parents[1]
+    if str(package_root) not in sys.path:
+        sys.path.insert(0, str(package_root))
+    launch_path = package_root / "launch" / "fleet.launch.py"
+    spec = importlib.util.spec_from_file_location(
+        "uav_fleet_launch_hardware_only", launch_path
+    )
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+
+    real_import = builtins.__import__
+
+    def _import(name, globals=None, locals=None, fromlist=(), level=0):
+        if name == "sim" or name.startswith("sim."):
+            raise ModuleNotFoundError("No module named 'sim'")
+        return real_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", _import)
+    spec.loader.exec_module(module)
+
+    backend = module._backend_config(
+        {
+            "backend": {"kind": "real"},
+            "vehicles": [
+                {
+                    "name": "uav_alpha",
+                    "mission_path": "/tmp/hover.yaml",
+                    "kind": "uav",
+                    "px4_airframe_id": 4004,
+                }
+            ],
+        }
+    )
+
+    assert backend["kind"] == "hardware"
 
 
 def test_backend_config_rejects_embedded_world(fleet_launch_module):
@@ -266,6 +324,34 @@ def test_vehicle_stack_configs_support_hardware_uav(
 ):
     fleet = {
         "backend": {"kind": "hardware", "px4_path": "~/PX4-Autopilot"},
+        "vehicles": [
+            {
+                "name": "uav_alpha",
+                "mission_path": "/tmp/hover.yaml",
+                "kind": "uav",
+                "px4_airframe_id": 4004,
+                "px4_namespace": "uav_alpha",
+                "auto_launch": False,
+            }
+        ],
+    }
+
+    backend, vehicles = fleet_launch_module._vehicle_stack_configs(fleet)
+
+    assert backend["kind"] == "hardware"
+    assert vehicles[0]["sim"] is False
+    assert vehicles[0]["launch_px4_sitl"] is False
+    assert vehicles[0]["launch_middleware"] is True
+    assert vehicles[0]["px4_airframe_id"] == 4004
+    assert vehicles[0]["px4_namespace"] == "uav_alpha"
+    assert vehicles[0]["auto_launch"] is False
+
+
+def test_vehicle_stack_configs_support_real_uav_alias(
+    fleet_launch_module, fake_mission_loader
+):
+    fleet = {
+        "backend": {"kind": "real", "px4_path": "~/PX4-Autopilot"},
         "vehicles": [
             {
                 "name": "uav_alpha",

@@ -5,7 +5,7 @@
 # PX4 namespaces, PX4 instance indices, or payload controller plugins.
 
 backend:
-  # Backend kind. Only `sim` is supported today.
+  # Backend kind. Use `sim` for simulation; `hardware` or `real` for hardware runtime.
   kind: sim
 
   # PX4 checkout used for any managed UAVs in this fleet.

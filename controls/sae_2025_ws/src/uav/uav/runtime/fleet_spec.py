@@ -4,7 +4,14 @@ from pathlib import Path
 from typing import Any, Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 
 
 class FleetDefaultsModel(BaseModel):
@@ -48,8 +55,13 @@ class FleetVehicleModel(FleetDefaultsModel):
 class HardwareBackendModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    kind: Literal["hardware"]
+    kind: Literal["hardware", "real"]
     px4_path: str | None = "~/PX4-Autopilot"
+
+    @field_validator("kind")
+    @classmethod
+    def _normalize_kind(cls, value: str) -> str:
+        return "hardware" if value == "real" else value
 
 
 class SimBackendModel(BaseModel):

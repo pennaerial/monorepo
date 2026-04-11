@@ -19,7 +19,6 @@ from launch.logging import get_logger
 from launch.substitutions import LaunchConfiguration
 
 from uav.runtime.fleet_spec import load_fleet_document
-from sim.orchestration import resolve_stage_world
 from uav.runtime.mission_spec import MissionSpec, mission_path_for_name
 
 _SHARED_DEFAULT_KEYS = {
@@ -45,6 +44,11 @@ _EXCLUDED_FLEET_KEYS = {
 }
 
 
+def _normalize_backend_kind(kind: str) -> str:
+    normalized = str(kind).strip()
+    return "hardware" if normalized == "real" else normalized
+
+
 def _prevalidate_raw_fleet_keys(fleet: dict) -> None:
     if not isinstance(fleet, dict):
         return
@@ -52,7 +56,7 @@ def _prevalidate_raw_fleet_keys(fleet: dict) -> None:
     backend = fleet.get("backend", {})
     backend_kind = ""
     if isinstance(backend, dict):
-        backend_kind = str(backend.get("kind", "")).strip()
+        backend_kind = _normalize_backend_kind(backend.get("kind", ""))
 
     _defaults_config(fleet)
     for raw_vehicle in _vehicles_config(fleet):
@@ -82,14 +86,16 @@ def _backend_config(fleet: dict) -> dict:
     backend = deepcopy(fleet.get("backend", {}))
     if not isinstance(backend, dict):
         raise ValueError("Fleet file backend section must be a mapping.")
-    kind = str(backend.get("kind", "")).strip()
+    kind = _normalize_backend_kind(backend.get("kind", ""))
     if kind == "hardware":
         return {
             "kind": "hardware",
             "px4_path": backend.get("px4_path", "~/PX4-Autopilot"),
         }
     if kind != "sim":
-        raise ValueError(f"Unsupported backend kind '{kind}'.")
+        raise ValueError(
+            f"Unsupported backend kind '{kind}'. Expected one of: sim, hardware, real."
+        )
     world_name = str(backend.get("world_name", "")).strip()
     if not world_name:
         raise ValueError("Sim backend requires a non-empty backend.world_name.")
@@ -98,6 +104,8 @@ def _backend_config(fleet: dict) -> dict:
             "Fleet sim backends no longer support 'backend.world'. Use 'world_name', "
             "optional 'mission_stage', and optional 'world_overrides'."
         )
+
+    from sim.orchestration import resolve_stage_world
 
     resolved_world = resolve_stage_world(
         world_name=world_name,
