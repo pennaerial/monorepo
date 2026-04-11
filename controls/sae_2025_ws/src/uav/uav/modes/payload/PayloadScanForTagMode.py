@@ -27,6 +27,7 @@ class PayloadScanForTagMode(Mode):
 
     mission_target = "payload"
     required_vision_nodes = (PayloadAprilTagNode,)
+    transition_labels = ("found", "not_found")
 
     def __init__(
         self,

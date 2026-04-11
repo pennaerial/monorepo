@@ -38,14 +38,15 @@ class PayloadWaitForDriveOutMode(Mode):
 
     mission_target = "payload"
     required_vision_nodes = (PayloadDriveOutNode,)
+    transition_labels = ("complete",)
 
     def __init__(
         self,
         node: Node,
         vehicle: Payload,
         confirm_frames: int = 5,
-        lower_hsv: list = (0, 0, 180),
-        upper_hsv: list = (180, 20, 255),
+        lower_hsv: tuple[int, int, int] = (0, 0, 180),
+        upper_hsv: tuple[int, int, int] = (180, 20, 255),
     ):
         super().__init__(node, vehicle)
         self.vehicle: Payload = vehicle

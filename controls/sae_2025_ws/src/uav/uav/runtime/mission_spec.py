@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from pydantic import BaseModel, ConfigDict, Field
 
 try:
     from ament_index_python.packages import (
@@ -24,6 +25,20 @@ except ModuleNotFoundError:
 VALID_MISSION_TARGETS = {"uav", "payload"}
 _TOP_LEVEL_KEYS = {"modes"}
 _MODE_KEYS = {"class", "params", "transitions"}
+
+
+class MissionModeDocumentModel(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    class_path: str = Field(alias="class")
+    params: dict[str, Any] = Field(default_factory=dict)
+    transitions: dict[str, str] = Field(default_factory=dict)
+
+
+class MissionDocumentModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    modes: dict[str, MissionModeDocumentModel]
 
 
 def mission_root() -> Path:
@@ -157,17 +172,37 @@ def load_mission_spec(path: str | Path | dict[str, Any]) -> MissionSpec:
             )
 
         mode_class = load_mode_class(class_path)
-        mission_target = getattr(mode_class, "mission_target", None)
+        from .schema import mode_entry_for_class_path, validate_mode_params
+
+        mode_entry = mode_entry_for_class_path(class_path)
+        mission_target = mode_entry.mission_target
         if mission_target not in VALID_MISSION_TARGETS:
             raise ValueError(
                 f"Mode '{class_path}' must declare mission_target as one of {sorted(VALID_MISSION_TARGETS)}."
             )
         mode_targets.add(mission_target)
-        vision_nodes.update(mode_class.required_vision_node_names())
+        vision_nodes.update(mode_entry.required_vision_nodes)
+
+        try:
+            validated_params = validate_mode_params(mode_class, dict(params))
+        except Exception as exc:
+            raise ValueError(
+                f"Mode '{mode_name}' in '{mission_label}' has invalid params for '{class_path}': {exc}"
+            ) from exc
+
+        unknown_transition_labels = sorted(
+            state
+            for state in transitions
+            if state not in set(mode_entry.transition_labels)
+        )
+        if unknown_transition_labels:
+            raise ValueError(
+                f"Mode '{mode_name}' in '{mission_label}' uses unsupported transition label(s) for '{class_path}': {unknown_transition_labels}"
+            )
 
         modes[mode_name] = ModeSpec(
             class_path=class_path,
-            params=dict(params),
+            params=validated_params,
             transitions=dict(transitions),
         )
 

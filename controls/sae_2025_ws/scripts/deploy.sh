@@ -1,215 +1,199 @@
-#!/bin/bash
-# deploy.sh - Download and deploy the latest ROS 2 build to Raspberry Pi
+#!/usr/bin/env bash
+# deploy.sh - Deploy a hardware release into a local deploy root
 #
 # Usage:
-#   ./deploy.sh              # Get latest build
-#   ./deploy.sh abc123f      # Get specific build by short SHA
-#   ./deploy.sh --list       # List available builds
+#   ./deploy.sh                 # Deploy latest build
+#   ./deploy.sh abc123f         # Deploy specific build by short SHA
+#   ./deploy.sh --list          # List available builds
+#   ./deploy.sh --status        # Show current/previous release state
 #
-# Requirements:
-#   - curl, jq, tar
-#   - ROS 2 Humble installed on the Pi
+# Environment:
+#   GITHUB_REPO    Repository (default: auto-detect from git remote)
+#   DEPLOY_ROOT    Deploy root (default: ~/pennair-deploy)
 #
 
-set -e
+set -euo pipefail
 
-# Configuration - Update these for your repo
-GITHUB_REPO="${GITHUB_REPO:-your-org/your-repo}"  # Override with env var or edit here
-INSTALL_DIR="${INSTALL_DIR:-$HOME/ros2_ws}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+. "$SCRIPT_DIR/hardware/deploy-lib.sh"
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
-
-info() { echo -e "${GREEN}[INFO]${NC} $1"; }
-warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
-error() { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
-
-# Check dependencies
 check_deps() {
-    for cmd in curl jq tar python3; do
-        if ! command -v $cmd &> /dev/null; then
-            error "$cmd is required but not installed. Install with: sudo apt install $cmd"
-        fi
-    done
+    deploy_require_cmds curl jq tar python3
 }
 
 ensure_apriltag_runtime() {
     if python3 -c "import apriltag" >/dev/null 2>&1; then
-        info "apriltag Python package already installed"
+        deploy_info "apriltag Python package already installed"
         return
     fi
 
-    warn "apriltag Python package not found; installing it into the user site"
+    deploy_warn "apriltag Python package not found; installing it into the user site"
 
     if ! python3 -m pip --version >/dev/null 2>&1; then
-        if ! command -v sudo >/dev/null 2>&1; then
-            error "python3-pip is required to install apriltag. Install with: sudo apt-get install -y python3-pip build-essential cmake"
-        fi
-        info "Installing python3-pip and build prerequisites..."
+        deploy_info "Installing python3-pip and build prerequisites"
         sudo apt-get update
         sudo apt-get install -y python3-pip build-essential cmake
     fi
 
     if ! python3 -m pip install --user apriltag; then
-        if ! command -v sudo >/dev/null 2>&1; then
-            error "apriltag install failed. Install build prerequisites with: sudo apt-get install -y build-essential cmake"
-        fi
-        info "Installing build prerequisites for apriltag..."
+        deploy_info "Retrying apriltag install after ensuring build prerequisites"
         sudo apt-get update
         sudo apt-get install -y build-essential cmake
-        python3 -m pip install --user apriltag || error "Failed to install apriltag. Try: sudo apt-get install -y build-essential cmake && python3 -m pip install --user apriltag"
+        python3 -m pip install --user apriltag
     fi
 
-    python3 -c "import apriltag; print(apriltag.__file__)" >/dev/null || error "apriltag was installed but cannot be imported"
-    info "apriltag Python package is ready"
+    python3 -c "import apriltag" >/dev/null 2>&1 || deploy_error "apriltag install failed"
+    deploy_info "apriltag Python package is ready"
 }
 
-# List available builds
+print_help() {
+    cat <<EOF
+Usage: $0 [OPTIONS] [SHORT_SHA]
+
+Deploy a build artifact into the local deploy root.
+
+Options:
+  --list, -l     List available builds
+  --status, -s   Show deploy-root release state
+  --help, -h     Show this help
+
+Examples:
+  $0             Deploy latest build
+  $0 abc123f     Deploy specific build
+  $0 --list      List available builds
+  $0 --status    Show current and previous release links
+
+Bootstrap on the Pi with:
+  scripts/hardware/bootstrap-pi.sh
+
+Environment:
+  GITHUB_REPO    Repository (default: auto-detected from git)
+  DEPLOY_ROOT    Deploy root (default: ~/pennair-deploy)
+EOF
+}
+
+print_release_table() {
+    local releases="$1"
+    if command -v column >/dev/null 2>&1; then
+        printf '%s\n' "$releases" | column -t -s $'\t'
+    else
+        printf 'TAG\tPUBLISHED\tNAME\n'
+        printf '%s\n' "$releases"
+    fi
+}
+
 list_builds() {
-    info "Fetching available builds from $GITHUB_REPO..."
-    curl -s "https://api.github.com/repos/$GITHUB_REPO/releases" | \
-        jq -r '.[] | select(.tag_name | startswith("build-")) | "\(.tag_name)\t\(.published_at)\t\(.name)"' | \
-        head -20 | \
-        column -t -s $'\t'
+    local repo releases
+    repo="$(deploy_detect_repo)"
+    deploy_info "Fetching builds from $repo"
+    releases="$(deploy_fetch_release_list "$repo" | deploy_release_list_from_json)"
+    if [[ -z "$releases" ]]; then
+        deploy_warn "No build releases found"
+        return 0
+    fi
+    print_release_table "$releases"
 }
 
-# Get latest release info
-get_latest() {
-    curl -s "https://api.github.com/repos/$GITHUB_REPO/releases" | \
-        jq -r '[.[] | select(.tag_name | startswith("build-"))][0]'
+show_status() {
+    deploy_init_paths
+    deploy_prepare_root
+    deploy_status_lines
 }
 
-# Get release by tag
-get_release_by_tag() {
-    local tag="build-$1"
-    curl -s "https://api.github.com/repos/$GITHUB_REPO/releases/tags/$tag"
+get_latest_release_json() {
+    local repo
+    repo="$(deploy_detect_repo)"
+    deploy_fetch_release_list "$repo" | jq -r '[.[] | select(.tag_name | startswith("build-"))][0]'
 }
 
-# Download and extract build
-deploy_build() {
+get_release_json_by_sha() {
+    local repo release_name
+    repo="$(deploy_detect_repo)"
+    release_name="$(deploy_release_name_for_sha "${1:-}")"
+    deploy_fetch_release_by_tag "$repo" "$release_name"
+}
+
+install_release_from_json() {
     local release_json="$1"
-    local tag=$(echo "$release_json" | jq -r '.tag_name')
-    local download_url=$(echo "$release_json" | jq -r '.assets[0].browser_download_url')
-    local asset_name=$(echo "$release_json" | jq -r '.assets[0].name')
-    
-    if [ "$download_url" == "null" ] || [ -z "$download_url" ]; then
-        error "No download URL found for release"
+    local release_tag asset_name download_url release_dir stage_dir tarball_path
+
+    release_tag="$(printf '%s' "$release_json" | deploy_release_name_from_json)"
+    asset_name="$(printf '%s' "$release_json" | deploy_release_asset_name_from_json)"
+    download_url="$(printf '%s' "$release_json" | deploy_release_download_url_from_json)"
+
+    if [[ -z "$release_tag" || "$release_tag" == "null" || -z "$asset_name" || "$asset_name" == "null" || -z "$download_url" || "$download_url" == "null" ]]; then
+        deploy_error "Release metadata is missing an artifact download URL"
     fi
-    
-    info "Deploying $tag"
-    info "Download URL: $download_url"
-    
-    # Create install directory
-    mkdir -p "$INSTALL_DIR"
-    cd "$INSTALL_DIR"
-    
-    # Download
-    info "Downloading $asset_name..."
-    curl -L -o "$asset_name" "$download_url"
-    
-    # Backup existing install if present
-    if [ -d "install" ]; then
-        warn "Backing up existing workspace to backup/"
-        rm -rf backup
-        mkdir -p backup
-        mv install backup/ 2>/dev/null || true
+
+    deploy_init_paths
+    deploy_prepare_root
+
+    release_dir="$(deploy_release_dir_for_name "$release_tag")"
+    stage_dir="$(mktemp -d "${RELEASES_DIR}/.staging.${release_tag}.XXXXXX")"
+    tarball_path="$stage_dir/$asset_name"
+
+    deploy_info "Deploying $release_tag into $release_dir"
+    deploy_info "Downloading $asset_name"
+    curl -fL "$download_url" -o "$tarball_path"
+
+    deploy_info "Extracting artifact"
+    tar -xzf "$tarball_path" -C "$stage_dir"
+    rm -f "$tarball_path"
+
+    rm -rf "$release_dir"
+    mv "$stage_dir" "$release_dir"
+    deploy_update_release_links "$release_dir"
+
+    if [[ -f "$SCRIPT_DIR/hardware/runtime_fleet.sh" ]]; then
+        deploy_install_runtime_helper "$SCRIPT_DIR/hardware/runtime_fleet.sh"
     fi
-    
-    # Extract
-    info "Extracting..."
-    tar -xzvf "$asset_name"
 
     ensure_apriltag_runtime
-    
-    # Cleanup
-    rm "$asset_name"
-    
-    # Create activation script
-    cat > activate.sh << 'ACTIVATE_EOF'
-#!/bin/bash
-# Source this file to activate the ROS 2 workspace
-# Usage: source activate.sh
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
+    if command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files pennair-autonomy.service >/dev/null 2>&1; then
+        if command -v sudo >/dev/null 2>&1; then
+            if sudo -n systemctl restart pennair-autonomy.service >/dev/null 2>&1; then
+                deploy_info "Activated pennair-autonomy.service"
+            else
+                deploy_warn "Release installed, but automatic restart of pennair-autonomy.service failed"
+            fi
+        else
+            deploy_warn "Release installed, but sudo is unavailable for restarting pennair-autonomy.service"
+        fi
+    else
+        deploy_warn "Release installed, but pennair-autonomy.service is not installed yet"
+    fi
 
-source /opt/ros/humble/setup.bash
-source install/setup.bash
-
-echo "ROS 2 workspace activated!"
-echo ""
-echo "Build info:"
-cat install/BUILD_INFO.txt 2>/dev/null || echo "No build info available"
-echo ""
-echo "To run: ros2 launch uav main.launch.py"
-echo "Config: edit install/uav/share/uav/launch/launch_params.yaml"
-echo "Missions: edit install/uav/share/uav/missions/*.yaml"
-echo "Override launch args like: mission_name:=basic payload_name:=payload_0 px4_path:=~/PX4-Autopilot"
-ACTIVATE_EOF
-    chmod +x activate.sh
-    
-    # Create a run script for convenience
-    cat > run.sh << 'RUN_EOF'
-#!/bin/bash
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
-source activate.sh
-ros2 launch uav main.launch.py "$@"
-RUN_EOF
-    chmod +x run.sh
-    
-    info "Deployment complete!"
-    echo ""
-    info "To use the workspace:"
-    echo "  cd $INSTALL_DIR"
-    echo "  source activate.sh"
-    echo ""
-    info "Build info:"
-    cat install/BUILD_INFO.txt 2>/dev/null || warn "No build info found"
+    deploy_info "Deployment complete"
+    deploy_status_lines
+    printf '\n'
+    deploy_info "Next steps:"
+    printf '  %s/bin/runtime_fleet\n' "$DEPLOY_ROOT"
+    printf '  sudo systemctl restart pennair-autonomy.service\n'
 }
 
-# Main
 main() {
-    check_deps
-    
     case "${1:-}" in
+        --help|-h)
+            print_help
+            ;;
+        --status|-s)
+            show_status
+            ;;
         --list|-l)
+            check_deps
             list_builds
             ;;
-        --help|-h)
-            echo "Usage: $0 [OPTIONS] [SHORT_SHA]"
-            echo ""
-            echo "Options:"
-            echo "  --list, -l    List available builds"
-            echo "  --help, -h    Show this help"
-            echo ""
-            echo "Examples:"
-            echo "  $0              Deploy latest build"
-            echo "  $0 abc123f      Deploy specific build"
-            echo "  $0 --list       List available builds"
-            echo ""
-            echo "Environment variables:"
-            echo "  GITHUB_REPO    Repository (default: $GITHUB_REPO)"
-            echo "  INSTALL_DIR    Install directory (default: $INSTALL_DIR)"
-            ;;
         "")
-            info "Fetching latest build..."
-            release=$(get_latest)
-            if [ "$(echo "$release" | jq -r '.tag_name')" == "null" ]; then
-                error "No builds found. Check GITHUB_REPO is set correctly: $GITHUB_REPO"
-            fi
-            deploy_build "$release"
+            check_deps
+            deploy_info "Fetching latest build"
+            install_release_from_json "$(get_latest_release_json)"
             ;;
         *)
-            info "Fetching build $1..."
-            release=$(get_release_by_tag "$1")
-            if [ "$(echo "$release" | jq -r '.tag_name')" == "null" ]; then
-                error "Build $1 not found. Use --list to see available builds."
-            fi
-            deploy_build "$release"
+            check_deps
+            deploy_info "Fetching build ${1}"
+            install_release_from_json "$(get_release_json_by_sha "$1")"
             ;;
     esac
 }

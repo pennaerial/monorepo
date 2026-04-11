@@ -46,6 +46,7 @@ class PayloadRetreatMode(Mode):
 
     mission_target = "payload"
     required_vision_nodes = (PayloadAprilTagNode,)
+    transition_labels = ()
 
     def __init__(
         self,

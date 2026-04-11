@@ -12,7 +12,6 @@ modes:
   retreat:
     class: uav.modes.payload.PayloadRetreatMode
     params:
-      payload_name: payload_0
       forward_speed_mps: 0.12
       edge_threshold: 0.30
       edge_stable_frames: 5
@@ -21,5 +20,4 @@ modes:
       turn_direction: 1
       camera_debug: false
       compressed_image: false
-
 

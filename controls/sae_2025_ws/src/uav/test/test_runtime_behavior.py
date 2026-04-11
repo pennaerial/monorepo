@@ -117,7 +117,11 @@ def _install_ros_test_doubles() -> None:
         class TimedDrive:
             Request = _placeholder("Request")
 
+        class DeadReckon:
+            Request = _placeholder("Request")
+
         payload_interfaces_srv.TimedDrive = TimedDrive
+        payload_interfaces_srv.DeadReckon = DeadReckon
         payload_interfaces.msg = payload_interfaces_msg
         payload_interfaces.srv = payload_interfaces_srv
         sys.modules.update(
@@ -498,6 +502,32 @@ def test_run_active_mode_handles_update_error():
 
     assert start_mode.updates == [9.0]
     assert handled == ["error"]
+
+
+def test_handle_mode_state_requires_exact_transition_label():
+    _require_runtime_support()
+
+    start_mode = _TrackingMode("start", status="complete")
+    next_mode = _TrackingMode("next")
+    manager = _make_mode_manager()
+    manager.modes = {"start": start_mode, "next": next_mode}
+    manager.transitions = {"start": {"complete": "next"}}
+    manager.active_mode = "start"
+
+    ModeManager.handle_mode_state(manager, "complete")
+
+    assert manager.active_mode == "next"
+    assert start_mode.deactivated == 1
+    assert next_mode.activated == 1
+
+    manager = _make_mode_manager()
+    manager.modes = {"start": _TrackingMode("start"), "next": _TrackingMode("next")}
+    manager.transitions = {"start": {"complete": "next"}}
+    manager.active_mode = "start"
+
+    with pytest.raises(KeyError):
+        ModeManager.handle_mode_state(manager, "Complete")
+    assert manager.active_mode == "start"
 
 
 def test_start_mission_callback_reports_already_started():

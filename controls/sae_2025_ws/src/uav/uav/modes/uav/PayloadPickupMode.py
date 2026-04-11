@@ -15,6 +15,7 @@ class PayloadPickupMode(Mode):
 
     mission_target = "uav"
     required_vision_nodes = (PayloadTrackingNode,)
+    transition_labels = ("complete",)
 
     def __init__(self, node: Node, vehicle: UAV, color: str = "green"):
         """
