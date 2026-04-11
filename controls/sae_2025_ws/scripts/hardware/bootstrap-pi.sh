@@ -12,6 +12,10 @@ _default_home="$(getent passwd "$DEPLOY_USER" | awk -F: 'NR==1 {print $6}')"
 if [[ -z "${_default_home:-}" ]]; then
     _default_home="${HOME:-/home/$DEPLOY_USER}"
 fi
+DEPLOY_ROOT_EXPLICIT=0
+if [[ -n "${DEPLOY_ROOT:-}" ]]; then
+    DEPLOY_ROOT_EXPLICIT=1
+fi
 DEPLOY_ROOT="${DEPLOY_ROOT:-${_default_home%/}/pennair-deploy}"
 ENABLE_SERVICE="${ENABLE_SERVICE:-1}"
 START_SERVICE="${START_SERVICE:-0}"
@@ -67,7 +71,7 @@ install_pigpio() {
     deploy_info "Building and installing pigpio from source"
     local tmpdir
     tmpdir="$(mktemp -d)"
-    trap 'rm -rf "$tmpdir"' EXIT
+    trap 'rm -rf -- '"$(printf '%q' "$tmpdir")" EXIT
 
     git clone --depth 1 https://github.com/joan2937/pigpio.git "$tmpdir/pigpio"
     pushd "$tmpdir/pigpio" >/dev/null
@@ -156,6 +160,7 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --deploy-root)
             DEPLOY_ROOT="$2"
+            DEPLOY_ROOT_EXPLICIT=1
             shift 2
             ;;
         --user)
@@ -203,6 +208,16 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+if [[ "$DEPLOY_ROOT_EXPLICIT" != "1" ]]; then
+    _default_home="$(getent passwd "$DEPLOY_USER" | awk -F: 'NR==1 {print $6}')"
+    if [[ -z "${_default_home:-}" ]]; then
+        _default_home="${HOME:-/home/$DEPLOY_USER}"
+    fi
+    DEPLOY_ROOT="${_default_home%/}/pennair-deploy"
+fi
+
+deploy_init_paths
 
 if [[ "$INSTALL_PIGPIO" == "1" ]]; then
     install_prereqs
