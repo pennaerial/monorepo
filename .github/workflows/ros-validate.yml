@@ -5,16 +5,12 @@ on:
     branches: [main, master, integration]
     paths:
       - ".github/workflows/ros-validate.yml"
-      - ".github/workflows/ci-image.yml"
-      - ".github/ci/**"
       - "controls/sae_2025_ws/**"
       - "!controls/sae_2025_ws/src/integration/**"
   pull_request:
     branches: [main, master]
     paths:
       - ".github/workflows/ros-validate.yml"
-      - ".github/workflows/ci-image.yml"
-      - ".github/ci/**"
       - "controls/sae_2025_ws/**"
       - "!controls/sae_2025_ws/src/integration/**"
   workflow_dispatch:

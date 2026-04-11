@@ -6,11 +6,15 @@ on:
     paths:
       - ".github/workflows/ci-image.yml"
       - ".github/ci/**"
+      - "controls/sae_2025_ws/scripts/ci/common.sh"
+      - "controls/sae_2025_ws/scripts/ci/install_ros_ci_deps.sh"
   pull_request:
     branches: [main, master]
     paths:
       - ".github/workflows/ci-image.yml"
       - ".github/ci/**"
+      - "controls/sae_2025_ws/scripts/ci/common.sh"
+      - "controls/sae_2025_ws/scripts/ci/install_ros_ci_deps.sh"
   workflow_dispatch:
 
 permissions:
