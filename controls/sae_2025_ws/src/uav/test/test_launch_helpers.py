@@ -196,6 +196,53 @@ def test_camera_contract_for_uav_and_payload(stack_launch_module):
     }
 
 
+def test_resolve_camera_input_transport_prefers_raw_for_payload_preprocessing(
+    stack_launch_module,
+):
+    mission_spec = SimpleNamespace(is_uav=False, is_payload=True, target="payload")
+
+    assert (
+        stack_launch_module._resolve_camera_input_transport(
+            mission_spec=mission_spec,
+            sim=False,
+            configured_transport="compressed",
+            rotate_degrees=180.0,
+            preprocess_hook="",
+        )
+        == "raw"
+    )
+    assert (
+        stack_launch_module._resolve_camera_input_transport(
+            mission_spec=mission_spec,
+            sim=False,
+            configured_transport="compressed",
+            rotate_degrees=0.0,
+            preprocess_hook="pkg.module:hook",
+        )
+        == "raw"
+    )
+    assert (
+        stack_launch_module._resolve_camera_input_transport(
+            mission_spec=mission_spec,
+            sim=False,
+            configured_transport="compressed",
+            rotate_degrees=0.0,
+            preprocess_hook="",
+        )
+        == "compressed"
+    )
+    assert (
+        stack_launch_module._resolve_camera_input_transport(
+            mission_spec=mission_spec,
+            sim=False,
+            configured_transport="raw",
+            rotate_degrees=180.0,
+            preprocess_hook="",
+        )
+        == "raw"
+    )
+
+
 def test_payload_camera_info_url_for_prefers_named_file(
     monkeypatch, tmp_path, stack_launch_module
 ):

@@ -225,11 +225,11 @@ class PayloadCornerNavigateMode(Mode):
         cam_topic = self.vehicle.namespaced_path("camera")
         if self.compressed_image:
             self._image_sub = self.node.create_subscription(
-                CompressedImage, f"{cam_topic}/compressed", self._image_cb, 10
+                CompressedImage, f"{cam_topic}/compressed", self._image_cb, 1
             )
         else:
             self._image_sub = self.node.create_subscription(
-                Image, cam_topic, self._image_cb, 10
+                Image, cam_topic, self._image_cb, 1
             )
 
         self.log(

@@ -76,6 +76,33 @@ def _resolve_bool(config: dict, key: str, default: bool) -> bool:
     raise ValueError(f"Vehicle stack expected boolean '{key}', received {value!r}.")
 
 
+def _resolve_camera_input_transport(
+    *,
+    mission_spec: MissionSpec,
+    sim: bool,
+    configured_transport: str,
+    rotate_degrees: float,
+    preprocess_hook: str,
+    logger=None,
+) -> str:
+    transport = str(configured_transport).strip() or ("raw" if sim else "compressed")
+    if not mission_spec.is_payload or sim:
+        return transport
+
+    preprocess_active = abs(float(rotate_degrees)) > 1e-9 or bool(
+        str(preprocess_hook).strip()
+    )
+    if transport.lower() != "compressed" or not preprocess_active:
+        return transport
+
+    if logger is not None:
+        logger.info(
+            "Payload camera preprocessing is enabled; using raw camera input "
+            "instead of compressed to avoid JPEG decode/re-encode latency."
+        )
+    return "raw"
+
+
 def _resolve_airframe_id(config: dict) -> int:
     if config.get("px4_airframe_id") is not None:
         return int(config["px4_airframe_id"])
@@ -474,13 +501,20 @@ def launch_setup(context, *args, **kwargs):
     sim_entity_name = str(config.get("sim_entity_name", "")).strip() or vehicle_name
     sim_world_name = str(config.get("sim_world_name", "")).strip()
     save_vision_milliseconds = int(config.get("save_vision_milliseconds", 0))
-    camera_input_transport = str(
-        config.get("camera_input_transport", "raw" if sim else "compressed")
-    ).strip()
     camera_rotate_degrees = float(
         config.get("camera_rotate_degrees", 0.0 if sim else 180.0)
     )
     camera_preprocess_hook = str(config.get("camera_preprocess_hook", "")).strip()
+    camera_input_transport = _resolve_camera_input_transport(
+        mission_spec=mission_spec,
+        sim=sim,
+        configured_transport=str(
+            config.get("camera_input_transport", "raw" if sim else "compressed")
+        ),
+        rotate_degrees=camera_rotate_degrees,
+        preprocess_hook=camera_preprocess_hook,
+        logger=logger,
+    )
 
     requires_vision = bool(mission_spec.vision_nodes)
 

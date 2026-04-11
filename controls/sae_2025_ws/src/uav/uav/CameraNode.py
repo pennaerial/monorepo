@@ -29,7 +29,7 @@ class Camera(Node):
         service_name: str | None = None,
         image_topic: str | None = None,
         info_topic: str | None = None,
-        queue_size: int = 10,
+        queue_size: int = 1,
         display: bool = False,
         enable_failsafe: bool | None = None,
         failsafe_topic: str | None = None,

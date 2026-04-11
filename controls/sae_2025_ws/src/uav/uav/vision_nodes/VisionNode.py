@@ -125,14 +125,14 @@ class VisionNode(Node):
                     CompressedImage,
                     self.compressed_image_topic,
                     self.compressed_image_callback,
-                    10,
+                    1,
                 )
             else:
                 self.image_subscription = self.create_subscription(
-                    Image, self.image_topic, self.image_callback, 10
+                    Image, self.image_topic, self.image_callback, 1
                 )
             self.camera_info_subscription = self.create_subscription(
-                CameraInfo, self.camera_info_topic, self.camera_info_callback, 10
+                CameraInfo, self.camera_info_topic, self.camera_info_callback, 1
             )
 
         resolved_enable_failsafe = (

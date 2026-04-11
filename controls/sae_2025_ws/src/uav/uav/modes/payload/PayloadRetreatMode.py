@@ -108,11 +108,11 @@ class PayloadRetreatMode(Mode):
 
         if self.compressed_image:
             self._image_sub = self.node.create_subscription(
-                CompressedImage, cam_topic, self._image_cb, 10
+                CompressedImage, cam_topic, self._image_cb, 1
             )
         else:
             self._image_sub = self.node.create_subscription(
-                Image, cam_topic, self._image_cb, 10
+                Image, cam_topic, self._image_cb, 1
             )
         self._drive_pub = self.node.create_publisher(DriveCommand, drive_topic, 10)
         self.log(
