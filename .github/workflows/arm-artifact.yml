@@ -27,16 +27,12 @@ concurrency:
   group: arm-artifact-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  ARM_ARTIFACT_IMAGE: ${{ vars.ROS_CI_IMAGE_ARM64 || 'ros:humble-ros-base' }}
-  ARM_ARTIFACT_USES_PREBUILT_DEPS: ${{ vars.ROS_CI_IMAGE_ARM64 != '' && 'true' || 'false' }}
-
 jobs:
   build_hardware_artifact:
     name: Build Raspberry Pi Artifact (ARM64)
     runs-on: ubuntu-22.04-arm
     container:
-      image: ${{ env.ARM_ARTIFACT_IMAGE }}
+      image: ${{ vars.ROS_CI_IMAGE_ARM64 != '' && vars.ROS_CI_IMAGE_ARM64 || 'ros:humble-ros-base' }}
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -51,7 +47,7 @@ jobs:
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE" || true
 
       - name: Install stable CI dependencies
-        if: env.ARM_ARTIFACT_USES_PREBUILT_DEPS != 'true'
+        if: vars.ROS_CI_IMAGE_ARM64 == ''
         run: bash controls/sae_2025_ws/scripts/ci/install_ros_ci_deps.sh
 
       - name: Build ARM workspace packages
@@ -88,7 +84,7 @@ jobs:
 
       - name: Create GitHub Release
         if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ steps.sha.outputs.short_sha }}
           name: ROS 2 Build ${{ steps.sha.outputs.short_sha }}

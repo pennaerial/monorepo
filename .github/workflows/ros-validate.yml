@@ -27,16 +27,12 @@ concurrency:
   group: ros-validate-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  ROS_VALIDATE_IMAGE: ${{ vars.ROS_CI_IMAGE_AMD64 || 'ros:humble-ros-base' }}
-  ROS_VALIDATE_USES_PREBUILT_DEPS: ${{ vars.ROS_CI_IMAGE_AMD64 != '' && 'true' || 'false' }}
-
 jobs:
   validate_ros2_workspace:
     name: Validate ROS 2 Workspace
     runs-on: ubuntu-22.04
     container:
-      image: ${{ env.ROS_VALIDATE_IMAGE }}
+      image: ${{ vars.ROS_CI_IMAGE_AMD64 != '' && vars.ROS_CI_IMAGE_AMD64 || 'ros:humble-ros-base' }}
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -48,7 +44,7 @@ jobs:
           submodules: recursive
 
       - name: Install stable CI dependencies
-        if: env.ROS_VALIDATE_USES_PREBUILT_DEPS != 'true'
+        if: vars.ROS_CI_IMAGE_AMD64 == ''
         run: bash controls/sae_2025_ws/scripts/ci/install_ros_ci_deps.sh
 
       - name: Build and validate ROS workspace
