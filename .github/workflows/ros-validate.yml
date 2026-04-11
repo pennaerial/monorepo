@@ -32,6 +32,8 @@ jobs:
     if: vars.ROS_CI_IMAGE_AMD64 == ''
     name: Validate ROS 2 Workspace (runner)
     runs-on: ubuntu-22.04
+    container:
+      image: ros:humble-ros-base
 
     steps:
       - name: Checkout repository
