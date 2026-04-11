@@ -12,34 +12,45 @@ def build_router(ctx: AppContext) -> APIRouter:
     router = APIRouter(prefix="/api/builds", tags=["builds"])
 
     @router.get("/current", response_model=BuildCurrentResponse)
-    async def current_build(target_id: str | None = None) -> BuildCurrentResponse:
+    async def current_build(target_id: str) -> BuildCurrentResponse:
         from ..services import deploy as deploy_service
 
         return BuildCurrentResponse.model_validate(
             await deploy_service.current_build(ctx, target_id=target_id)
         )
 
+    @router.post("/deploy-selected", response_model=MessageResponse | BuildListResponse)
+    async def deploy_selected_source(target_id: Annotated[str, Form(...)]):
+        from ..services import deploy as deploy_service
+
+        result = await deploy_service.deploy_selected_source(ctx, target_id=target_id)
+        if result.get("success"):
+            return MessageResponse.model_validate(result)
+        return BuildListResponse.model_validate({**result, "builds": []})
+
     @router.post("/upload", response_model=MessageResponse | BuildListResponse)
     async def upload_build(
+        target_id: Annotated[str, Form(...)],
         file: UploadFile = File(...),
-        target_id: Annotated[str | None, Form()] = None,
     ):
         from ..services import deploy as deploy_service
 
-        result = await deploy_service.upload_build(
+        source_result = await deploy_service.set_local_artifact_build_source(
             ctx,
-            target_id=target_id,
             filename=file.filename or "",
             file_bytes=await file.read(),
         )
+        if not source_result.get("success"):
+            return BuildListResponse.model_validate({**source_result, "builds": []})
+        result = await deploy_service.deploy_selected_source(ctx, target_id=target_id)
         if result.get("success"):
             return MessageResponse.model_validate(result)
         return BuildListResponse.model_validate({**result, "builds": []})
 
     @router.post("/upload-source", response_model=MessageResponse | BuildListResponse)
     async def upload_source_bundle(
+        target_id: Annotated[str, Form(...)],
         file: UploadFile = File(...),
-        target_id: Annotated[str | None, Form()] = None,
     ):
         from ..services import deploy as deploy_service
 
@@ -61,29 +72,59 @@ def build_router(ctx: AppContext) -> APIRouter:
 
     @router.post("/download", response_model=MessageResponse | BuildListResponse)
     async def download_build(
+        target_id: Annotated[str, Form(...)],
         tag: Annotated[str, Form()] = "",
         source: Annotated[str, Form()] = "release",
         artifact_id: Annotated[str, Form()] = "",
-        target_id: Annotated[str | None, Form()] = None,
+        run_id: Annotated[str, Form()] = "",
+        sha: Annotated[str, Form()] = "",
+        name: Annotated[str, Form()] = "",
+        date: Annotated[str, Form()] = "",
+        download_url: Annotated[str, Form()] = "",
+        size_mb: Annotated[float | None, Form()] = None,
+        branch: Annotated[str, Form()] = "",
+        artifact_name: Annotated[str, Form()] = "",
     ):
         from ..services import deploy as deploy_service
 
-        result = await deploy_service.download_build(
+        source_result = await deploy_service.set_github_build_source(
             ctx,
-            target_id=target_id,
-            tag=tag,
             source=source,
+            tag=tag,
             artifact_id=artifact_id,
+            run_id=run_id,
+            sha=sha,
+            name=name,
+            date=date,
+            download_url=download_url,
+            size_mb=size_mb,
+            branch=branch,
+            artifact_name=artifact_name,
         )
+        if not source_result.get("success"):
+            return BuildListResponse.model_validate({**source_result, "builds": []})
+        result = await deploy_service.deploy_selected_source(ctx, target_id=target_id)
         if result.get("success"):
             return MessageResponse.model_validate(result)
         return BuildListResponse.model_validate({**result, "builds": []})
 
     @router.post("/rollback", response_model=MessageResponse | BuildListResponse)
-    async def rollback_build(target_id: Annotated[str | None, Form()] = None):
+    async def rollback_build(target_id: Annotated[str, Form(...)]):
         from ..services import deploy as deploy_service
 
         result = await deploy_service.rollback_build(ctx, target_id=target_id)
+        if result.get("success"):
+            return MessageResponse.model_validate(result)
+        return BuildListResponse.model_validate({**result, "builds": []})
+
+    @router.post("/deploy-local", response_model=MessageResponse | BuildListResponse)
+    async def deploy_local_code(target_id: Annotated[str, Form(...)]):
+        from ..services import deploy as deploy_service
+
+        source_result = await deploy_service.set_local_codebase_build_source(ctx)
+        if not source_result.get("success"):
+            return BuildListResponse.model_validate({**source_result, "builds": []})
+        result = await deploy_service.deploy_selected_source(ctx, target_id=target_id)
         if result.get("success"):
             return MessageResponse.model_validate(result)
         return BuildListResponse.model_validate({**result, "builds": []})

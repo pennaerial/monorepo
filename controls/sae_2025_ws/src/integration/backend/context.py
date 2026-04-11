@@ -4,9 +4,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .config import (
+    BuildSourceStore,
     InventoryStore,
     OperatorConfig,
     TargetRecord,
+    build_source_store_paths,
     default_fleet_file,
     seed_target_from_env,
 )
@@ -26,6 +28,7 @@ class AppContext:
     base_dir: Path
     operator_config: OperatorConfig
     inventory: InventoryStore
+    build_source_store: BuildSourceStore
     _target_cache: dict[str, TargetContext] = field(default_factory=dict)
 
     def resolve_target(self, target_id: str | None = None) -> TargetContext:
@@ -57,4 +60,16 @@ def create_context(base_dir: Path) -> AppContext:
         default_fleet_file=default_fleet_file(base_dir),
         seed_target=seed_target,
     )
-    return AppContext(base_dir=base_dir, operator_config=operator, inventory=inventory)
+    build_source_path, build_source_cache_dir = build_source_store_paths(
+        operator.inventory_path
+    )
+    build_source_store = BuildSourceStore(
+        build_source_path,
+        cache_dir=build_source_cache_dir,
+    )
+    return AppContext(
+        base_dir=base_dir,
+        operator_config=operator,
+        inventory=inventory,
+        build_source_store=build_source_store,
+    )

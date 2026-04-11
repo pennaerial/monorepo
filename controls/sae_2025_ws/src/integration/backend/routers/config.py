@@ -16,11 +16,8 @@ def build_router(ctx: AppContext) -> APIRouter:
 
     @router.get("", response_model=ConfigResponse)
     async def get_config() -> ConfigResponse:
-        active_target = ctx.resolve_target().target
         return ConfigResponse(
             config=ctx.operator_config.to_safe_dict(),
-            active_target_id=ctx.inventory.active_target_id(),
-            workspace_paths=active_target.workspace_paths(),
         )
 
     @router.post("", response_model=MessageResponse)
@@ -29,6 +26,9 @@ def build_router(ctx: AppContext) -> APIRouter:
         github_token: Annotated[str | None, Form()] = None,
         hotspot_name: Annotated[str | None, Form()] = None,
         default_deploy_root: Annotated[str | None, Form()] = None,
+        default_pi_user: Annotated[str | None, Form()] = None,
+        default_ssh_key: Annotated[str | None, Form()] = None,
+        default_ssh_pass: Annotated[str | None, Form()] = None,
     ) -> MessageResponse:
         updates = ctx.operator_config.update_from_form(
             {
@@ -36,6 +36,9 @@ def build_router(ctx: AppContext) -> APIRouter:
                 "github_token": github_token,
                 "hotspot_name": hotspot_name,
                 "default_deploy_root": default_deploy_root,
+                "default_pi_user": default_pi_user,
+                "default_ssh_key": default_ssh_key,
+                "default_ssh_pass": default_ssh_pass,
             }
         )
         if updates:

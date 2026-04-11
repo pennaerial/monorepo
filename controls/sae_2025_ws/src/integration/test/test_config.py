@@ -17,9 +17,11 @@ backend_pkg.__path__ = [str(PACKAGE_ROOT / "backend")]
 sys.modules.setdefault("backend", backend_pkg)
 
 from backend.config import (  # noqa: E402
+    BuildSourceStore,
     InventoryStore,
     OperatorConfig,
     TargetRecord,
+    build_source_store_paths,
 )
 
 
@@ -30,6 +32,9 @@ def _make_operator(tmp_path: Path) -> OperatorConfig:
         hotspot_name="pennair-hotspot",
         inventory_path=tmp_path / ".integration_inventory.json",
         default_deploy_root="/home/penn/pennair-deploy",
+        default_pi_user="penn",
+        default_ssh_key="~/.ssh/id_ed25519",
+        default_ssh_pass="default-secret",
     )
 
 
@@ -62,6 +67,7 @@ def test_operator_config_masks_tokens_and_updates_from_form(tmp_path):
     safe = operator.to_safe_dict()
     assert safe["github_token"] == "••••"
     assert safe["inventory_path"] == str(tmp_path / ".integration_inventory.json")
+    assert safe["default_ssh_pass"] == "••••"
 
     changed = operator.update_from_form(
         {
@@ -69,6 +75,9 @@ def test_operator_config_masks_tokens_and_updates_from_form(tmp_path):
             "github_token": "new-secret",
             "hotspot_name": "pi-hotspot",
             "default_deploy_root": "/tmp/deploy-root",
+            "default_pi_user": "ubuntu",
+            "default_ssh_key": "/tmp/id_ed25519",
+            "default_ssh_pass": "new-default-secret",
         }
     )
 
@@ -77,11 +86,17 @@ def test_operator_config_masks_tokens_and_updates_from_form(tmp_path):
         "github_token": "(set)",
         "hotspot_name": "pi-hotspot",
         "default_deploy_root": "/tmp/deploy-root",
+        "default_pi_user": "ubuntu",
+        "default_ssh_key": "/tmp/id_ed25519",
+        "default_ssh_pass": "(set)",
     }
     assert operator.github_repo == "other/repo"
     assert operator.github_token == "new-secret"
     assert operator.hotspot_name == "pi-hotspot"
     assert operator.default_deploy_root == "/tmp/deploy-root"
+    assert operator.default_pi_user == "ubuntu"
+    assert operator.default_ssh_key == "/tmp/id_ed25519"
+    assert operator.default_ssh_pass == "new-default-secret"
 
 
 def test_target_record_validates_identity_and_overlay():
@@ -200,6 +215,9 @@ def test_inventory_store_round_trips_through_disk(tmp_path):
         hotspot_name="",
         inventory_path=operator.inventory_path,
         default_deploy_root="/tmp/unused",
+        default_pi_user="",
+        default_ssh_key="",
+        default_ssh_pass="",
     )
     restored = InventoryStore(
         operator.inventory_path,
@@ -214,6 +232,9 @@ def test_inventory_store_round_trips_through_disk(tmp_path):
     assert restored_operator.github_token == "secret-token"
     assert restored_operator.hotspot_name == "pennair-hotspot"
     assert restored_operator.default_deploy_root == "/home/penn/pennair-deploy"
+    assert restored_operator.default_pi_user == "penn"
+    assert restored_operator.default_ssh_key == "~/.ssh/id_ed25519"
+    assert restored_operator.default_ssh_pass == "default-secret"
     assert [target.target_id for target in restored.list_targets()] == [
         "backup",
         "pi-1",
@@ -228,6 +249,30 @@ def test_inventory_store_round_trips_through_disk(tmp_path):
             seed_target=seed_target,
         )
         lone_store.delete_target("pi-1")
+
+
+def test_inventory_store_revalidates_existing_target_updates(tmp_path):
+    operator = _make_operator(tmp_path)
+    seed_target = TargetRecord.from_dict(
+        _make_target(),
+        default_deploy_root=operator.default_deploy_root,
+        default_fleet_file="/tmp/fleet.yaml",
+    )
+    store = InventoryStore(
+        operator.inventory_path,
+        operator_config=operator,
+        default_deploy_root=operator.default_deploy_root,
+        default_fleet_file="/tmp/fleet.yaml",
+        seed_target=seed_target,
+    )
+
+    with pytest.raises(ValueError, match="invalid pi_host"):
+        store.upsert_target(
+            {
+                "target_id": "pi-1",
+                "pi_host": "bad host",
+            }
+        )
 
 
 def test_inventory_store_exports_and_imports(tmp_path):
@@ -246,9 +291,22 @@ def test_inventory_store_exports_and_imports(tmp_path):
         seed_target=seed_target,
     )
 
+    created, was_created = store.upsert_target(
+        {
+            "target_id": "defaults-only",
+            "label": "Defaults Only",
+            "pi_host": "defaults.local",
+            "vehicle_name": "uav_1",
+        }
+    )
+    assert was_created is True
+    assert created.pi_user == "penn"
+    assert created.ssh_key == "~/.ssh/id_ed25519"
+    assert created.ssh_pass == "default-secret"
+
     payload = store.export_payload()
     assert payload["active_target_id"] == "pi-1"
-    assert len(payload["targets"]) == 1
+    assert len(payload["targets"]) == 2
 
     summary = store.import_payload(
         {
@@ -275,7 +333,11 @@ def test_inventory_store_exports_and_imports(tmp_path):
     }
     assert operator.github_repo == "other/repo"
     assert operator.hotspot_name == "alt-hotspot"
-    assert [target.target_id for target in store.list_targets()] == ["pi-1", "pi-2"]
+    assert [target.target_id for target in store.list_targets()] == [
+        "defaults-only",
+        "pi-1",
+        "pi-2",
+    ]
 
     replace_summary = store.import_payload(
         {
@@ -293,3 +355,59 @@ def test_inventory_store_exports_and_imports(tmp_path):
 
     assert replace_summary["active_target_id"] == "only"
     assert [target.target_id for target in store.list_targets()] == ["only"]
+
+
+def test_build_source_store_persists_separately_from_inventory(tmp_path):
+    operator = _make_operator(tmp_path)
+    seed_target = TargetRecord.from_dict(
+        _make_target(),
+        default_deploy_root=operator.default_deploy_root,
+        default_fleet_file="/tmp/fleet.yaml",
+    )
+    inventory = InventoryStore(
+        operator.inventory_path,
+        operator_config=operator,
+        default_deploy_root=operator.default_deploy_root,
+        default_fleet_file="/tmp/fleet.yaml",
+        seed_target=seed_target,
+    )
+    source_path, cache_dir = build_source_store_paths(operator.inventory_path)
+    store = BuildSourceStore(source_path, cache_dir=cache_dir)
+
+    record = store.set_github(
+        github_source="release",
+        tag="build-deadbeef",
+        sha="deadbee",
+        name="build-deadbeef",
+    )
+    assert record.kind == "github"
+    assert source_path.exists()
+
+    inventory_payload = inventory.export_payload()
+    encoded_inventory = json.dumps(inventory_payload)
+    assert "artifact_name" not in encoded_inventory
+    assert "local_artifact_path" not in encoded_inventory
+    assert "codebase_root" not in encoded_inventory
+    assert "github_source" not in encoded_inventory
+
+    restored = BuildSourceStore(source_path, cache_dir=cache_dir)
+    assert restored.current().kind == "github"
+    assert restored.current().tag == "build-deadbeef"
+
+
+def test_build_source_store_local_artifact_clears_cached_file(tmp_path):
+    operator = _make_operator(tmp_path)
+    source_path, cache_dir = build_source_store_paths(operator.inventory_path)
+    store = BuildSourceStore(source_path, cache_dir=cache_dir)
+
+    record = store.set_local_artifact(
+        artifact_name="bundle.tar.gz",
+        file_bytes=b"artifact-bytes",
+    )
+    artifact_path = Path(record.local_artifact_path)
+    assert artifact_path.exists()
+
+    store.clear()
+
+    assert store.current().kind == "none"
+    assert not artifact_path.exists()

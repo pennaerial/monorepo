@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 import os
 import re
 import shutil
+import subprocess
 import tarfile
 import tempfile
 import xml.etree.ElementTree as ET
@@ -19,6 +20,13 @@ from uav.runtime.mission_spec import MissionSpec
 _ARTIFACT_NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 _SOURCE_BUNDLE_EXTENSIONS = (".tar.gz", ".tgz", ".zip")
 _RELEASE_METADATA_NAME = "RELEASE_METADATA.yaml"
+_LOCAL_SOURCE_BASE_PACKAGES = [
+    "actuator_msgs",
+    "payload_interfaces",
+    "px4_msgs",
+    "uav_interfaces",
+    "uav",
+]
 _SHARED_OVERLAY_KEYS = {
     "kind",
     "mission",
@@ -73,6 +81,25 @@ def sanitize_source_bundle_name(filename: str) -> str:
     if not name.endswith(_SOURCE_BUNDLE_EXTENSIONS):
         raise ValueError("Source bundle must be one of: .tar.gz, .tgz, or .zip.")
     return name
+
+
+def _build_source_payload(ctx: AppContext) -> dict[str, object]:
+    return ctx.build_source_store.current().to_payload_dict()
+
+
+def _build_source_response(
+    ctx: AppContext,
+    *,
+    success: bool,
+    output: str | None = None,
+    error: str | None = None,
+) -> dict[str, object]:
+    return {
+        "success": success,
+        "source": _build_source_payload(ctx),
+        "output": output,
+        "error": error,
+    }
 
 
 def _repo_root(ctx: AppContext) -> Path:
@@ -320,6 +347,64 @@ def _normalize_source_bundle(
     except Exception:
         shutil.rmtree(temp_root, ignore_errors=True)
         raise
+
+
+def _local_source_package_names(
+    ctx: AppContext, target_ctx: TargetContext
+) -> list[str]:
+    selected_vehicle = _vehicle_from_fleet(
+        _load_local_yaml(_resolve_local_path(ctx, target_ctx.target.fleet_file)),
+        target_ctx.target.vehicle_name,
+    )
+    overlay = target_ctx.target.overlay_data()
+    merged = deepcopy(selected_vehicle)
+    merged.update(overlay)
+    _, _, mission_spec = _mission_source_for(ctx, merged)
+    packages = list(_LOCAL_SOURCE_BASE_PACKAGES)
+    if mission_spec.target == "payload":
+        packages.append("payload")
+    return packages
+
+
+def _build_local_source_bundle(
+    ctx: AppContext, target_ctx: TargetContext
+) -> tuple[str, list[str], str]:
+    repo_root = _repo_root(ctx)
+    src_root = repo_root / "src"
+    package_names = _local_source_package_names(ctx, target_ctx)
+    temp_root = Path(tempfile.mkdtemp(prefix="integration-local-source-"))
+    staged_src = temp_root / "src"
+    staged_src.mkdir(parents=True, exist_ok=True)
+    short_sha = "workspace"
+    try:
+        git_result = subprocess.run(
+            ["git", "-C", str(repo_root), "rev-parse", "--short", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=3,
+        )
+        if git_result.returncode == 0:
+            candidate = (git_result.stdout or "").strip()
+            if candidate:
+                short_sha = candidate
+    except Exception:
+        pass
+
+    for package_name in package_names:
+        package_dir = src_root / package_name
+        if not package_dir.exists():
+            shutil.rmtree(temp_root, ignore_errors=True)
+            raise ValueError(
+                f"Local codebase source deploy requires '{package_name}' under '{src_root}'."
+            )
+        shutil.copytree(package_dir, staged_src / package_name)
+
+    bundle_name = f"local-codebase-{short_sha}.tar.gz"
+    bundle_path = temp_root / bundle_name
+    with tarfile.open(bundle_path, "w:gz") as archive:
+        archive.add(staged_src, arcname="src")
+    return str(bundle_path), package_names, bundle_name
 
 
 def _render_runtime_fleet(
@@ -1068,6 +1153,99 @@ async def _deploy_artifact_path(
     }
 
 
+async def _deploy_source_bundle_path(
+    ctx: AppContext,
+    *,
+    target_id: str | None,
+    local_bundle_path: str,
+    bundle_name: str,
+    package_names: list[str],
+    source_type: str,
+    source_label: str,
+) -> dict:
+    target_ctx = ctx.resolve_target(target_id)
+    await _ensure_remote_layout(target_ctx)
+    await _ensure_source_build_prereqs(target_ctx)
+    await _copy_file_to_pi(
+        target_ctx, local_path=local_bundle_path, remote_name=bundle_name
+    )
+
+    runtime_fleet_yaml, shared_fleet_yaml, local_mission_path = _render_runtime_fleet(
+        ctx, target_ctx
+    )
+    paths = target_ctx.target.deploy_paths()
+    await _copy_text_to_pi(
+        target_ctx,
+        remote_path=paths["fleet_file"],
+        content=shared_fleet_yaml,
+    )
+    await _copy_text_to_pi(
+        target_ctx,
+        remote_path=paths["overlay_file"],
+        content=target_ctx.target.overlay_yaml or "{}\n",
+    )
+    await _copy_text_to_pi(
+        target_ctx,
+        remote_path=paths["runtime_fleet"],
+        content=runtime_fleet_yaml,
+    )
+    await _seed_repo_missions(ctx, target_ctx)
+
+    mission_name = Path(local_mission_path).name
+    mission_copy = await target_ctx.ssh.scp(
+        local_mission_path,
+        f"{paths['missions_dir']}/{mission_name}",
+        timeout=60,
+    )
+    if mission_copy.returncode != 0:
+        raise RuntimeError(
+            target_ctx.ssh.format_remote_error(
+                mission_copy.stderr, "Upload selected mission failed"
+            )
+        )
+
+    release = await _stage_source_build_on_pi(
+        target_ctx,
+        bundle_name=bundle_name,
+        package_names=package_names,
+    )
+    await _write_release_metadata(
+        target_ctx,
+        release_dir=release["release_dir"],
+        metadata=_release_metadata_payload(
+            target_ctx,
+            release_id=release["release_id"],
+            source_type=source_type,
+            source_label=source_label,
+            package_names=package_names,
+        ),
+    )
+    await _write_build_info(
+        target_ctx,
+        release_dir=release["release_dir"],
+        content=_source_build_info_text(
+            target_ctx=target_ctx,
+            source_label=source_label,
+            package_names=package_names,
+        ),
+    )
+    await _ensure_runtime_service(target_ctx)
+    await _ensure_runtime_prereqs(target_ctx)
+    await _activate_release(
+        target_ctx,
+        release_dir=release["release_dir"],
+        previous_target=release["previous_target"],
+    )
+
+    return {
+        "success": True,
+        "output": (
+            f"Built and deployed source bundle {bundle_name} to "
+            f"{target_ctx.target.target_id} ({release['release_id']})"
+        ),
+    }
+
+
 async def upload_source_bundle(
     ctx: AppContext,
     *,
@@ -1093,86 +1271,15 @@ async def upload_source_bundle(
         normalized_bundle, package_names, sanitized_name = _normalize_source_bundle(
             upload_path, bundle_name
         )
-        target_ctx = ctx.resolve_target(target_id)
-        await _ensure_remote_layout(target_ctx)
-        await _ensure_source_build_prereqs(target_ctx)
-        await _copy_file_to_pi(
-            target_ctx, local_path=normalized_bundle, remote_name=sanitized_name
-        )
-
-        runtime_fleet_yaml, shared_fleet_yaml, local_mission_path = (
-            _render_runtime_fleet(ctx, target_ctx)
-        )
-        paths = target_ctx.target.deploy_paths()
-        await _copy_text_to_pi(
-            target_ctx,
-            remote_path=paths["fleet_file"],
-            content=shared_fleet_yaml,
-        )
-        await _copy_text_to_pi(
-            target_ctx,
-            remote_path=paths["overlay_file"],
-            content=target_ctx.target.overlay_yaml or "{}\n",
-        )
-        await _copy_text_to_pi(
-            target_ctx,
-            remote_path=paths["runtime_fleet"],
-            content=runtime_fleet_yaml,
-        )
-        await _seed_repo_missions(ctx, target_ctx)
-
-        mission_name = Path(local_mission_path).name
-        mission_copy = await target_ctx.ssh.scp(
-            local_mission_path,
-            f"{paths['missions_dir']}/{mission_name}",
-            timeout=60,
-        )
-        if mission_copy.returncode != 0:
-            raise RuntimeError(
-                target_ctx.ssh.format_remote_error(
-                    mission_copy.stderr, "Upload selected mission failed"
-                )
-            )
-
-        release = await _stage_source_build_on_pi(
-            target_ctx,
+        return await _deploy_source_bundle_path(
+            ctx,
+            target_id=target_id,
+            local_bundle_path=normalized_bundle,
             bundle_name=sanitized_name,
             package_names=package_names,
+            source_type="source-build",
+            source_label=sanitized_name,
         )
-        await _write_release_metadata(
-            target_ctx,
-            release_dir=release["release_dir"],
-            metadata=_release_metadata_payload(
-                target_ctx,
-                release_id=release["release_id"],
-                source_type="source-build",
-                source_label=sanitized_name,
-                package_names=package_names,
-            ),
-        )
-        await _write_build_info(
-            target_ctx,
-            release_dir=release["release_dir"],
-            content=_source_build_info_text(
-                target_ctx=target_ctx,
-                source_label=sanitized_name,
-                package_names=package_names,
-            ),
-        )
-        await _ensure_runtime_service(target_ctx)
-        await _ensure_runtime_prereqs(target_ctx)
-        await _activate_release(
-            target_ctx,
-            release_dir=release["release_dir"],
-            previous_target=release["previous_target"],
-        )
-        return {
-            "success": True,
-            "output": (
-                f"Built and deployed source bundle {sanitized_name} to "
-                f"{target_ctx.target.target_id} ({release['release_id']})"
-            ),
-        }
     except RuntimeError as exc:
         return {"success": False, "error": str(exc)}
     except Exception as exc:
@@ -1183,6 +1290,186 @@ async def upload_source_bundle(
         if normalized_bundle:
             normalized_root = Path(normalized_bundle).resolve().parent
             shutil.rmtree(normalized_root, ignore_errors=True)
+
+
+async def deploy_local_codebase(
+    ctx: AppContext,
+    *,
+    target_id: str | None,
+) -> dict:
+    local_bundle = ""
+    try:
+        target_ctx = ctx.resolve_target(target_id)
+        local_bundle, package_names, bundle_name = _build_local_source_bundle(
+            ctx, target_ctx
+        )
+        return await _deploy_source_bundle_path(
+            ctx,
+            target_id=target_id,
+            local_bundle_path=local_bundle,
+            bundle_name=bundle_name,
+            package_names=package_names,
+            source_type="local-codebase",
+            source_label=bundle_name,
+        )
+    except RuntimeError as exc:
+        return {"success": False, "error": str(exc)}
+    except Exception as exc:
+        return {"success": False, "error": str(exc)}
+    finally:
+        if local_bundle:
+            shutil.rmtree(Path(local_bundle).resolve().parent, ignore_errors=True)
+
+
+async def get_build_source(ctx: AppContext) -> dict[str, object]:
+    return _build_source_response(ctx, success=True)
+
+
+async def set_github_build_source(
+    ctx: AppContext,
+    *,
+    source: str,
+    tag: str = "",
+    artifact_id: str = "",
+    run_id: str = "",
+    sha: str = "",
+    name: str = "",
+    date: str = "",
+    download_url: str = "",
+    size_mb: float | None = None,
+    branch: str = "",
+    artifact_name: str = "",
+) -> dict[str, object]:
+    try:
+        ctx.build_source_store.set_github(
+            github_source=source,
+            tag=tag,
+            artifact_id=artifact_id,
+            run_id=run_id,
+            sha=sha,
+            name=name,
+            date=date,
+            download_url=download_url,
+            size_mb=size_mb,
+            branch=branch,
+            artifact_name=artifact_name,
+        )
+        return _build_source_response(
+            ctx,
+            success=True,
+            output="GitHub build source selected",
+        )
+    except Exception as exc:
+        return _build_source_response(
+            ctx,
+            success=False,
+            error=str(exc),
+        )
+
+
+async def set_local_artifact_build_source(
+    ctx: AppContext,
+    *,
+    filename: str,
+    file_bytes: bytes,
+) -> dict[str, object]:
+    try:
+        artifact_name = sanitize_artifact_name(filename)
+        ctx.build_source_store.set_local_artifact(
+            artifact_name=artifact_name,
+            file_bytes=file_bytes,
+        )
+        return _build_source_response(
+            ctx,
+            success=True,
+            output=f"Cached local artifact {artifact_name}",
+        )
+    except Exception as exc:
+        return _build_source_response(
+            ctx,
+            success=False,
+            error=str(exc),
+        )
+
+
+async def set_local_codebase_build_source(ctx: AppContext) -> dict[str, object]:
+    try:
+        ctx.build_source_store.set_local_codebase(
+            codebase_root=str(_repo_root(ctx)),
+        )
+        return _build_source_response(
+            ctx,
+            success=True,
+            output="Local codebase selected",
+        )
+    except Exception as exc:
+        return _build_source_response(
+            ctx,
+            success=False,
+            error=str(exc),
+        )
+
+
+async def clear_build_source(ctx: AppContext) -> dict[str, object]:
+    try:
+        ctx.build_source_store.clear()
+        return _build_source_response(
+            ctx,
+            success=True,
+            output="Cleared build source selection",
+        )
+    except Exception as exc:
+        return _build_source_response(
+            ctx,
+            success=False,
+            error=str(exc),
+        )
+
+
+async def deploy_selected_source(
+    ctx: AppContext,
+    *,
+    target_id: str | None,
+) -> dict:
+    current = ctx.build_source_store.current()
+    if current.kind == "none":
+        return {"success": False, "error": "No build source selected"}
+
+    if current.kind == "github":
+        return await download_build(
+            ctx,
+            target_id=target_id,
+            tag=current.tag,
+            source=current.github_source,
+            artifact_id=current.artifact_id,
+        )
+
+    if current.kind == "local_artifact":
+        artifact_path = Path(current.local_artifact_path)
+        if not artifact_path.exists():
+            return {
+                "success": False,
+                "error": (
+                    "Selected local artifact is no longer available on the backend. "
+                    "Upload it again before deploying."
+                ),
+            }
+        return await _deploy_artifact_path(
+            ctx,
+            target_id=target_id,
+            local_path=str(artifact_path),
+            artifact_name=current.artifact_name,
+            source_type="local-artifact",
+            source_label=current.artifact_name,
+        )
+
+    if current.kind == "local_codebase":
+        return await deploy_local_codebase(ctx, target_id=target_id)
+
+    return {
+        "success": False,
+        "error": f"Unsupported build source kind '{current.kind}'.",
+    }
 
 
 async def current_build(ctx: AppContext, *, target_id: str | None = None) -> dict:

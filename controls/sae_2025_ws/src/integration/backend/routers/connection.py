@@ -13,7 +13,7 @@ def build_router(ctx: AppContext) -> APIRouter:
 
     @router.get("/status", response_model=ConnectionStatusResponse)
     async def connection_status(
-        target_id: str | None = Query(default=None),
+        target_id: str = Query(...),
     ) -> ConnectionStatusResponse:
         session = ctx.resolve_target(target_id)
         try:
@@ -39,9 +39,7 @@ def build_router(ctx: AppContext) -> APIRouter:
             )
 
     @router.get("/ssh-command", response_model=SSHCommandResponse)
-    async def ssh_command(
-        target_id: str | None = Query(default=None),
-    ) -> SSHCommandResponse:
+    async def ssh_command(target_id: str = Query(...)) -> SSHCommandResponse:
         session = ctx.resolve_target(target_id)
         cmd = "ssh"
         if session.target.ssh_key:

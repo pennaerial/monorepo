@@ -655,106 +655,6 @@ function uniqueModeName(doc, baseName = 'mode') {
   return `${baseName}_${index}`
 }
 
-function StatusBar({ connected, wifiStatus, buildInfo, selectedTarget }) {
-  const wifiText = connected
-    ? (wifiStatus?.is_hotspot ? 'Hotspot' : wifiStatus?.current_wifi || 'No client WiFi')
-    : 'Unavailable (target offline)'
-
-  const buildText = connected
-    ? (buildInfo?.installed ? 'Build active' : 'No build')
-    : 'Unavailable (target offline)'
-
-  const targetText = connected
-    ? getTargetLabel(selectedTarget || 'No target selected')
-    : 'Unavailable (target offline)'
-
-  return (
-    <div className="status-bar">
-      <div className="status-item">
-        <span className={`status-dot ${connected ? 'dot-ok' : 'dot-err'}`} />
-        <span>{connected ? 'Target connected' : 'Target unreachable'}</span>
-      </div>
-      <div className="status-item">
-        <span className={`status-dot ${connected && wifiStatus?.current_wifi ? 'dot-ok' : 'dot-warn'}`} />
-        <span>{wifiText}</span>
-      </div>
-      <div className="status-item">
-        <span className={`status-dot ${connected && buildInfo?.installed ? 'dot-ok' : 'dot-warn'}`} />
-        <span>{buildText}</span>
-      </div>
-      <div className="status-item">
-        <span className={`status-dot ${connected && selectedTarget ? 'dot-ok' : 'dot-warn'}`} />
-        <span>{targetText}</span>
-      </div>
-    </div>
-  )
-}
-
-function TargetSelector({ connected, targets, selectedTargetId, onChange, loading }) {
-  const selectedLabel = targets.find(target => target.target_id === selectedTargetId)
-    ? getTargetLabel(targets.find(target => target.target_id === selectedTargetId))
-    : 'No target selected'
-
-  return (
-    <div className="target-selector">
-      <div className="target-selector-head">
-        <label>Target</label>
-        <span className="target-selector-label">{connected ? selectedLabel : 'Offline'}</span>
-      </div>
-      <select
-        value={selectedTargetId}
-        onChange={e => onChange(e.target.value)}
-        disabled={loading || targets.length === 0}
-      >
-        {targets.length === 0 && (
-          <option value="">No targets available</option>
-        )}
-        {targets.map(target => (
-          <option key={target.target_id} value={target.target_id}>
-            {getTargetLabel(target)}
-          </option>
-        ))}
-      </select>
-    </div>
-  )
-}
-
-function ConnectionCard({ sshCommand }) {
-  const [copied, setCopied] = useState(false)
-
-  const copy = () => {
-    if (navigator.clipboard?.writeText) {
-      navigator.clipboard.writeText(sshCommand).catch(() => fallbackCopy(sshCommand))
-    } else {
-      fallbackCopy(sshCommand)
-    }
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
-
-  const fallbackCopy = (text) => {
-    const el = document.createElement('textarea')
-    el.value = text
-    el.style.position = 'fixed'
-    el.style.opacity = '0'
-    document.body.appendChild(el)
-    el.select()
-    document.execCommand('copy')
-    document.body.removeChild(el)
-  }
-
-  return (
-    <div className="card card-full">
-      <h2 className="card-title">Target SSH</h2>
-      <div className="ssh-box" onClick={copy}>
-        <code>{sshCommand || '...'}</code>
-        <span className="copy-tag">{copied ? 'Copied' : 'Copy'}</span>
-      </div>
-      <p className="subtext">Click to copy SSH command</p>
-    </div>
-  )
-}
-
 function WifiCard({ connected, wifiStatus, onRefresh, targetId }) {
   const [networks, setNetworks] = useState([])
   const [scanning, setScanning] = useState(false)
@@ -767,7 +667,7 @@ function WifiCard({ connected, wifiStatus, onRefresh, targetId }) {
     setNetworks([])
     setSelectedSsid('')
     setResult(null)
-  }, [selectedTarget, targetId])
+  }, [targetId])
 
   useEffect(() => {
     if (!connected) {
@@ -866,442 +766,6 @@ function WifiCard({ connected, wifiStatus, onRefresh, targetId }) {
 
         <Result data={result} />
       </div>
-    </div>
-  )
-}
-
-function BuildCard({ connected, buildInfo, onRefresh, targetId }) {
-  const [deployMode, setDeployMode] = useState('artifact')
-  const [artifactFile, setArtifactFile] = useState(null)
-  const [artifactUploading, setArtifactUploading] = useState(false)
-  const [sourceFile, setSourceFile] = useState(null)
-  const [sourceUploading, setSourceUploading] = useState(false)
-  const [builds, setBuilds] = useState([])
-  const [selectedTag, setSelectedTag] = useState('')
-  const [loadingBuilds, setLoadingBuilds] = useState(false)
-  const [downloading, setDownloading] = useState(false)
-  const [buildResult, setBuildResult] = useState(null)
-
-  useEffect(() => {
-    setDeployMode('artifact')
-    setBuildResult(null)
-    setBuilds([])
-    setSelectedTag('')
-    setArtifactFile(null)
-    setSourceFile(null)
-  }, [targetId])
-
-  useEffect(() => {
-    if (!connected) {
-      setBuildResult(null)
-      setBuilds([])
-      setSelectedTag('')
-      setArtifactFile(null)
-      setSourceFile(null)
-    }
-  }, [connected])
-
-  const upload = async (mode) => {
-    const file = mode === 'source' ? sourceFile : artifactFile
-    if (!connected || !file) return
-    const setUploading = mode === 'source' ? setSourceUploading : setArtifactUploading
-
-    setUploading(true)
-    setBuildResult(null)
-    const fd = new FormData()
-    fd.append('file', file)
-    const endpoint = mode === 'source' ? '/api/builds/upload-source' : '/api/builds/upload'
-    const data = await api(withTargetId(endpoint, targetId), {
-      method: 'POST',
-      body: withTargetFormData(fd, targetId),
-    })
-    setBuildResult(
-      data.success && mode === 'source'
-        ? { ...data, output: `Source bundle deployed: ${data.output || 'Done'}` }
-        : data
-    )
-    setUploading(false)
-    if (mode === 'source') {
-      setSourceFile(null)
-    } else {
-      setArtifactFile(null)
-    }
-    onRefresh()
-  }
-
-  const listBuilds = async () => {
-    if (!connected) return
-    setLoadingBuilds(true)
-    setBuildResult(null)
-    const data = await api(withTargetId('/api/builds/list', targetId))
-    if (data.success && data.builds) {
-      setBuilds(data.builds)
-      if (data.builds.length > 0 && !selectedTag) setSelectedTag(data.builds[0].tag)
-    } else {
-      setBuildResult(data)
-    }
-    setLoadingBuilds(false)
-  }
-
-  const selectedBuild = builds.find(build => build.tag === selectedTag) || null
-
-  const download = async () => {
-    if (!connected || !selectedTag) return
-    setDownloading(true)
-    setBuildResult(null)
-    const fd = new FormData()
-    fd.append('tag', selectedTag)
-    if (selectedBuild?.source) fd.append('source', selectedBuild.source)
-    if (selectedBuild?.artifact_id) fd.append('artifact_id', selectedBuild.artifact_id)
-    const data = await api(withTargetId('/api/builds/download', targetId), {
-      method: 'POST',
-      body: withTargetFormData(fd, targetId),
-    })
-    setBuildResult(data)
-    setDownloading(false)
-    onRefresh()
-  }
-
-  const rollback = async () => {
-    if (!connected) return
-    setBuildResult(null)
-    const data = await api(withTargetId('/api/builds/rollback', targetId), {
-      method: 'POST',
-      body: withTargetFormData(new FormData(), targetId),
-    })
-    setBuildResult(data)
-    onRefresh()
-  }
-
-  return (
-    <div className="card">
-      <h2 className="card-title">Target Build</h2>
-      <div className="card-content">
-        {connected && buildInfo?.info && (
-          <div className="info-box">
-            <pre>{buildInfo.info}</pre>
-          </div>
-        )}
-        {!connected && (
-          <p className="subtext left-note">Connect to the target WiFi to view deployed build info and deploy updates.</p>
-        )}
-
-        <div className="mini-tabs build-tabs">
-          <button className={`mini-tab ${deployMode === 'artifact' ? 'mini-tab-active' : ''}`} onClick={() => setDeployMode('artifact')}>
-            Artifact Deploy
-          </button>
-          <button className={`mini-tab ${deployMode === 'source' ? 'mini-tab-active' : ''}`} onClick={() => setDeployMode('source')}>
-            Source Build
-          </button>
-        </div>
-
-        {deployMode === 'artifact' ? (
-          <>
-            <p className="subtext left-note build-hint">
-              Deploy a release tarball from GitHub or upload a local artifact bundle. This replaces the current install on the selected target.
-            </p>
-
-            <label>Upload artifact</label>
-            <div className="file-upload">
-              <input
-                type="file"
-                accept=".tar.gz,.tgz,.tar,.gz,application/gzip,application/x-gzip,application/x-tar,application/octet-stream"
-                onChange={e => setArtifactFile(e.target.files?.[0] || null)}
-                id="artifact-build-file"
-              />
-              <label htmlFor="artifact-build-file" className="file-label">
-                {artifactFile ? artifactFile.name : 'Choose .tar.gz'}
-              </label>
-            </div>
-
-            <button className="btn btn-primary" onClick={() => upload('artifact')} disabled={artifactUploading || !artifactFile || !connected}>
-              {artifactUploading ? 'Uploading...' : 'Upload & replace install'}
-            </button>
-
-            <div className="divider" />
-
-            <label>From GitHub</label>
-            <button className="btn btn-secondary" onClick={listBuilds} disabled={loadingBuilds || !connected}>
-              {loadingBuilds ? 'Loading...' : 'Fetch releases'}
-            </button>
-
-            {builds.length > 0 && (
-              <>
-                <select value={selectedTag} onChange={e => setSelectedTag(e.target.value)}>
-                  {builds.map(b => (
-                    <option key={b.tag} value={b.tag}>
-                      {b.source === 'actions' ? '[Actions] ' : '[Release] '}
-                      {b.sha || b.tag} — {b.date}
-                      {b.branch ? ` · ${b.branch}` : ''}
-                      {b.size_mb ? ` · ${b.size_mb} MB` : ''}
-                    </option>
-                  ))}
-                </select>
-
-                <button className="btn btn-primary" onClick={download} disabled={downloading || !connected}>
-                  {downloading ? 'Downloading...' : 'Download & deploy'}
-                </button>
-              </>
-            )}
-          </>
-        ) : (
-          <>
-            <p className="subtext left-note build-hint">
-              Upload a package bundle archive for the on-target build path. This requires an existing deployed base release on the target and installs through the same release contract as artifact deploys.
-            </p>
-
-            <label>Upload source bundle</label>
-            <div className="file-upload">
-              <input
-                type="file"
-                accept=".tar.gz,.tgz,.zip,application/gzip,application/x-gzip,application/zip,application/x-zip-compressed,application/octet-stream"
-                onChange={e => setSourceFile(e.target.files?.[0] || null)}
-                id="source-build-file"
-              />
-              <label htmlFor="source-build-file" className="file-label">
-                {sourceFile ? sourceFile.name : 'Choose source bundle (.tar.gz or .zip)'}
-              </label>
-            </div>
-
-            <button className="btn btn-primary" onClick={() => upload('source')} disabled={sourceUploading || !sourceFile || !connected}>
-              {sourceUploading ? 'Uploading...' : 'Upload source bundle'}
-            </button>
-
-            <p className="subtext left-note build-hint">
-              The backend installs the uploaded bundle into the same deploy root contract as artifacts, so source-built and artifact-installed releases remain interchangeable on the target.
-            </p>
-          </>
-        )}
-
-        {connected && buildInfo?.installed && (
-          <>
-            <div className="divider" />
-            <button className="btn btn-secondary" onClick={rollback} disabled={!connected}>
-              Rollback
-            </button>
-          </>
-        )}
-
-        <Result data={buildResult} />
-      </div>
-    </div>
-  )
-}
-
-function SettingsPanel({ onRefresh, targetId, selectedTarget }) {
-  const [open, setOpen] = useState(false)
-  const [cfg, setCfg] = useState(null)
-  const [saving, setSaving] = useState(false)
-  const [inventoryFile, setInventoryFile] = useState(null)
-  const [inventoryIoLoading, setInventoryIoLoading] = useState(false)
-  const [result, setResult] = useState(null)
-
-  const load = useCallback(async () => {
-    const [configData, inventoryData] = await Promise.all([
-      api('/api/config'),
-      api('/api/inventory'),
-    ])
-    if (!configData.success) {
-      setResult(configData)
-      return
-    }
-    const targets = Array.isArray(inventoryData?.targets) ? inventoryData.targets : []
-    const nextTarget = targets.find(target => target.target_id === targetId) || selectedTarget || null
-    setCfg({
-      operator: configData.config,
-      target: nextTarget,
-    })
-  }, [targetId])
-
-  const toggle = () => {
-    setOpen(prev => {
-      setResult(null)
-      return !prev
-    })
-  }
-
-  const update = (section, key, value) => {
-    setCfg(prev => ({
-      ...prev,
-      [section]: {
-        ...(prev?.[section] || {}),
-        [key]: value,
-      },
-    }))
-  }
-
-  const save = async () => {
-    if (!cfg) return
-    setSaving(true)
-    setResult(null)
-    let operatorResult = { success: true }
-    let targetResult = { success: true }
-
-    if (cfg.operator) {
-      const fd = new FormData()
-      Object.entries(cfg.operator).forEach(([k, v]) => fd.append(k, v ?? ''))
-      operatorResult = await api('/api/config', { method: 'POST', body: fd })
-    }
-
-    if (cfg.target?.target_id) {
-      const fd = new FormData()
-      ;[
-        'target_id',
-        'label',
-        'pi_user',
-        'pi_host',
-        'deploy_root',
-        'ssh_key',
-        'ssh_pass',
-        'fleet_file',
-        'vehicle_name',
-        'service_unit',
-      ].forEach(key => fd.append(key, cfg.target[key] ?? ''))
-      targetResult = await api('/api/inventory', { method: 'POST', body: fd })
-    }
-
-    const data = !operatorResult.success ? operatorResult : targetResult
-    setResult(data.success ? { success: true, output: 'Settings saved' } : data)
-    setSaving(false)
-    onRefresh()
-  }
-
-  const exportInventory = async () => {
-    setInventoryIoLoading(true)
-    setResult(null)
-    try {
-      const res = await fetch('/api/inventory/export')
-      const raw = await res.text()
-      if (!res.ok) {
-        throw new Error(raw || `HTTP ${res.status}`)
-      }
-      const blob = new Blob([raw], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-      const anchor = document.createElement('a')
-      anchor.href = url
-      anchor.download = 'integration-inventory.json'
-      document.body.appendChild(anchor)
-      anchor.click()
-      anchor.remove()
-      URL.revokeObjectURL(url)
-      setResult({ success: true, output: 'Inventory exported' })
-    } catch (error) {
-      setResult({ success: false, error: error.message || 'Inventory export failed' })
-    } finally {
-      setInventoryIoLoading(false)
-    }
-  }
-
-  const importInventory = async () => {
-    if (!inventoryFile) return
-    setInventoryIoLoading(true)
-    setResult(null)
-    const fd = new FormData()
-    fd.append('file', inventoryFile)
-    const data = await api('/api/inventory/import', { method: 'POST', body: fd })
-    setResult(data)
-    setInventoryIoLoading(false)
-    if (data.success) {
-      setInventoryFile(null)
-      onRefresh()
-      load()
-    }
-  }
-
-  useEffect(() => {
-    if (open) {
-      load()
-    }
-  }, [load, open])
-
-  const operatorFields = [
-    { key: 'github_repo', label: 'GitHub repo', placeholder: 'org/repo' },
-    { key: 'github_token', label: 'GitHub token', placeholder: 'Optional token', type: 'password' },
-    { key: 'hotspot_name', label: 'Hotspot connection name', placeholder: 'penn-desktop' },
-    { key: 'default_deploy_root', label: 'Default deploy root', placeholder: '/home/penn/pennair-deploy' },
-  ]
-
-  const targetFields = [
-    { key: 'label', label: 'Target label', placeholder: 'Payload Pi' },
-    { key: 'pi_host', label: 'Pi host', placeholder: 'penn-desktop.local' },
-    { key: 'pi_user', label: 'Pi user', placeholder: 'penn' },
-    { key: 'ssh_pass', label: 'SSH password', placeholder: 'Leave blank for SSH key auth', type: 'password' },
-    { key: 'ssh_key', label: 'SSH key path', placeholder: '~/.ssh/id_rsa' },
-    { key: 'deploy_root', label: 'Deploy root', placeholder: '/home/penn/pennair-deploy' },
-    { key: 'fleet_file', label: 'Fleet file', placeholder: 'src/uav/uav/fleets/example_fleet.yaml' },
-    { key: 'vehicle_name', label: 'Fleet vehicle', placeholder: 'uav_0' },
-    { key: 'service_unit', label: 'Systemd unit', placeholder: 'pennair-autonomy.service' },
-  ]
-
-  return (
-    <div className="settings-floating">
-      <button className="settings-fab" onClick={toggle}>
-        {open ? 'Close Settings' : 'Settings'}
-      </button>
-
-      {open && cfg && (
-        <div className="card settings-popover">
-          <h2 className="card-title">Settings</h2>
-          <div className="card-content settings-grid">
-            {operatorFields.map(f => (
-              <div key={f.key} className="settings-field">
-                <label>{f.label}</label>
-                <input
-                  type={f.type || 'text'}
-                  value={cfg.operator?.[f.key] || ''}
-                  onChange={e => update('operator', f.key, e.target.value)}
-                  placeholder={f.placeholder}
-                />
-              </div>
-            ))}
-            {targetFields.map(f => (
-              <div key={f.key} className="settings-field">
-                <label>{f.label}</label>
-                <input
-                  type={f.type || 'text'}
-                  value={cfg.target?.[f.key] || ''}
-                  onChange={e => update('target', f.key, e.target.value)}
-                  placeholder={f.placeholder}
-                />
-              </div>
-            ))}
-            <div className="settings-field settings-save">
-              <button className="btn btn-primary" onClick={save} disabled={saving}>
-                {saving ? 'Saving...' : 'Save'}
-              </button>
-            </div>
-            <div className="divider" />
-            <div className="settings-field">
-              <label>Inventory export</label>
-              <button className="btn btn-secondary" onClick={exportInventory} disabled={inventoryIoLoading}>
-                {inventoryIoLoading ? 'Working...' : 'Download inventory JSON'}
-              </button>
-            </div>
-            <div className="settings-field">
-              <label>Inventory import</label>
-              <div className="file-upload">
-                <input
-                  type="file"
-                  accept=".json,application/json"
-                  onChange={e => setInventoryFile(e.target.files?.[0] || null)}
-                  id="inventory-file"
-                />
-                <label htmlFor="inventory-file" className="file-label">
-                  {inventoryFile ? inventoryFile.name : 'Choose inventory JSON'}
-                </label>
-              </div>
-              <button
-                className="btn btn-secondary"
-                onClick={importInventory}
-                disabled={inventoryIoLoading || !inventoryFile}
-              >
-                {inventoryIoLoading ? 'Working...' : 'Import inventory'}
-              </button>
-            </div>
-            <Result data={result} />
-          </div>
-        </div>
-      )}
     </div>
   )
 }
@@ -1700,19 +1164,6 @@ function MissionControl({ connected, buildInfo, onRefresh, workspacePaths, targe
           <div className="placeholder-box">Camera feed placeholder</div>
           <div className="placeholder-box">CV debug stream placeholder</div>
         </div>
-      </div>
-    </>
-  )
-}
-
-function DeployPage({ connected, sshCommand, wifiStatus, buildInfo, onRefresh, targetId }) {
-  return (
-    <>
-      <ConnectionCard sshCommand={sshCommand} />
-
-      <div className="grid">
-        <WifiCard connected={connected} wifiStatus={wifiStatus} onRefresh={onRefresh} targetId={targetId} />
-        <BuildCard connected={connected} buildInfo={buildInfo} onRefresh={onRefresh} targetId={targetId} />
       </div>
     </>
   )
@@ -2170,6 +1621,862 @@ function Result({ data }) {
   )
 }
 
+function normalizeHostname(hostname) {
+  return `${hostname || ''}`.trim().replace(/\.$/, '').replace(/\.local$/i, '').toLowerCase()
+}
+
+function suggestedTargetId(hostname) {
+  const normalized = normalizeHostname(hostname).replace(/[^a-z0-9._-]+/g, '-')
+  return normalized || 'target'
+}
+
+function defaultOverlayYaml() {
+  return 'mission: hover\nauto_launch: false\npx4_airframe_id: 4004\n'
+}
+
+function normalizeBuildRecord(build) {
+  if (!build || typeof build !== 'object') return null
+  return {
+    source: build.source || build.source_type || 'release',
+    tag: build.tag || build.ref || '',
+    sha: build.sha || build.commit || '',
+    name: build.name || build.artifact_name || build.bundle_name || build.tag || 'Build',
+    date: build.date || build.published_at?.slice(0, 10) || build.updated_at?.slice(0, 10) || '',
+    download_url: build.download_url || '',
+    size_mb: build.size_mb ?? null,
+    run_id: build.run_id || '',
+    artifact_id: build.artifact_id || '',
+    artifact_name: build.artifact_name || '',
+    branch: build.branch || '',
+  }
+}
+
+function normalizeBackendBuildSource(raw) {
+  const sourceString = typeof raw?.source === 'string' ? raw.source.trim().toLowerCase() : ''
+  const payload =
+    raw?.build_source
+    || raw?.buildSource
+    || raw?.selected
+    || raw?.selection
+    || raw?.current
+    || raw?.data
+    || (raw?.source && typeof raw.source === 'object' ? raw.source : null)
+    || raw
+  if (!payload || typeof payload !== 'object') {
+    return { kind: 'none' }
+  }
+
+  const kindHint = `${payload.kind || payload.source_kind || payload.source_type || payload.type || sourceString || ''}`.trim().toLowerCase()
+  if (!kindHint || kindHint === 'none' || kindHint === 'null' || kindHint === 'empty') {
+    return { kind: 'none' }
+  }
+
+  if (kindHint === 'github' || kindHint === 'release' || kindHint === 'actions') {
+    const build = normalizeBuildRecord(payload.build || payload.selected_build || payload.build_info || payload)
+    return {
+      kind: 'github',
+      build,
+    }
+  }
+
+  if (
+    kindHint === 'local-artifact'
+    || kindHint === 'artifact'
+    || kindHint === 'upload'
+    || kindHint === 'artifact-file'
+    || kindHint === 'artifact_file'
+    || kindHint.startsWith('artifact')
+  ) {
+    return {
+      kind: 'local-artifact',
+      fileName: payload.file_name || payload.filename || payload.artifact_name || payload.source_label || payload.name || '',
+      sourceLabel: payload.source_label || payload.artifact_name || payload.file_name || payload.filename || 'Local artifact bundle',
+      cached: payload.cached !== false,
+    }
+  }
+
+  if (
+    kindHint === 'local-codebase'
+    || kindHint === 'codebase'
+    || kindHint === 'source-build'
+    || kindHint === 'source'
+  ) {
+    return {
+      kind: 'local-codebase',
+      sourceLabel: payload.source_label || payload.name || 'Current local codebase',
+      packages: Array.isArray(payload.packages) ? payload.packages : [],
+    }
+  }
+
+  return { kind: 'none' }
+}
+
+function describeBuildSource(buildSource, loaded = true) {
+  if (!loaded) {
+    return {
+      title: 'Loading build source...',
+      detail: 'Fetching the backend-selected source.',
+      ready: false,
+    }
+  }
+
+  if (!buildSource || buildSource.kind === 'none') {
+    return {
+      title: 'No build source selected',
+      detail: 'Choose a deploy source before opening a hardware detail page.',
+      ready: false,
+    }
+  }
+  if (buildSource.kind === 'github') {
+    const build = buildSource.build
+    return {
+      title: build?.name || build?.tag || 'GitHub build',
+      detail: `${build?.source === 'actions' ? 'GitHub Actions artifact' : 'GitHub release'}${build?.sha ? ` · ${build.sha}` : ''}${build?.date ? ` · ${build.date}` : ''}`,
+      ready: true,
+    }
+  }
+  if (buildSource.kind === 'local-artifact') {
+    return {
+      title: buildSource.sourceLabel || buildSource.fileName || 'Local artifact bundle',
+      detail: buildSource.cached
+        ? 'Cached by the backend and ready for deployment.'
+        : 'Uploaded from this laptop and cached by the backend.',
+      ready: true,
+    }
+  }
+  if (buildSource.kind === 'local-codebase') {
+    return {
+      title: buildSource.sourceLabel || 'Current local codebase',
+      detail: buildSource.packages?.length
+        ? `Packages the local workspace into a source bundle (${buildSource.packages.length} package(s)).`
+        : 'Packages the local workspace into a source bundle and builds it on the selected Pi.',
+      ready: true,
+    }
+  }
+  return {
+    title: 'Unknown build source',
+    detail: 'Select a supported build source.',
+    ready: false,
+  }
+}
+
+function buildSourceBadge(buildSource, loaded = true) {
+  if (!loaded) return 'Loading...'
+  if (!buildSource || buildSource.kind === 'none') return 'Not Selected'
+  if (buildSource.kind === 'github') {
+    return buildSource.build?.source === 'actions' ? 'Actions Artifact' : 'GitHub Release'
+  }
+  if (buildSource.kind === 'local-artifact') return 'Local Artifact'
+  if (buildSource.kind === 'local-codebase') return 'Local Codebase'
+  return 'Custom Source'
+}
+
+function buildSelectionKey(build) {
+  if (!build) return ''
+  return [
+    build.source || 'release',
+    build.tag || '',
+    build.artifact_id || '',
+  ].join('::')
+}
+
+function hardwareDraftFromSelection(target, liveDevice, operatorConfig) {
+  const hostname = target?.pi_host || liveDevice?.hostname || ''
+  const defaultSshPass = operatorConfig?.default_ssh_pass === '••••'
+    ? ''
+    : operatorConfig?.default_ssh_pass || ''
+  return {
+    target_id: target?.target_id || suggestedTargetId(hostname),
+    label: target?.label || hostname || 'Unnamed device',
+    pi_host: target?.pi_host || hostname,
+    pi_user: target?.pi_user || operatorConfig?.default_pi_user || 'penn',
+    ssh_key: target?.ssh_key || operatorConfig?.default_ssh_key || '',
+    ssh_pass: target?.ssh_pass || defaultSshPass,
+    deploy_root: target?.deploy_root || operatorConfig?.default_deploy_root || '/home/penn/pennair-deploy',
+    fleet_file: target?.fleet_file || '',
+    vehicle_name: target?.vehicle_name || '',
+    service_unit: target?.service_unit || 'pennair-autonomy.service',
+    overlay_yaml: target?.overlay_yaml || defaultOverlayYaml(),
+  }
+}
+
+function EmptyState({ title, message, actionLabel, onAction }) {
+  return (
+    <div className="empty-state card card-full">
+      <div className="empty-state-eyebrow">Integration</div>
+      <h2>{title}</h2>
+      <p>{message}</p>
+      {actionLabel && onAction && (
+        <button className="btn btn-primary empty-state-action" type="button" onClick={onAction}>
+          {actionLabel}
+        </button>
+      )}
+    </div>
+  )
+}
+
+function AppHeader({ page, onPageChange, theme, onToggleTheme, liveCount, buildSource, buildSourceLoaded = true }) {
+  const sourceSummary = describeBuildSource(buildSource, buildSourceLoaded)
+
+  return (
+    <header className="app-header">
+      <div className="app-brand">
+        <div className="app-brand-kicker">PennAiR</div>
+        <h1 className="title">Autonomy Operations</h1>
+        <p className="app-subtitle">Live hardware, one backend-owned build source, and target-scoped runtime control.</p>
+      </div>
+      <div className="app-header-meta">
+        <div className="header-stat">
+          <span className="header-stat-label">Live Hardware</span>
+          <strong>{liveCount}</strong>
+        </div>
+        <div className="header-stat">
+          <span className="header-stat-label">Build Source</span>
+          <strong>{buildSourceBadge(buildSource, buildSourceLoaded)}</strong>
+        </div>
+        <button className="theme-toggle-btn" type="button" onClick={onToggleTheme}>
+          {theme === THEME_DARK ? 'Light Mode' : 'Dark Mode'}
+        </button>
+      </div>
+      <div className="page-tabs nav-tabs">
+        <button className={`tab-btn ${page === 'hardware' ? 'tab-active' : ''}`} onClick={() => onPageChange('hardware')}>
+          Hardware
+        </button>
+        <button className={`tab-btn ${page === 'build-source' ? 'tab-active' : ''}`} onClick={() => onPageChange('build-source')}>
+          Build Source
+        </button>
+        <button className={`tab-btn ${page === 'inventory' ? 'tab-active' : ''}`} onClick={() => onPageChange('inventory')}>
+          Inventory
+        </button>
+      </div>
+      <div className="build-source-banner">
+        <span className={`launch-pill ${sourceSummary.ready ? 'pill-running' : 'pill-not-prepared'}`}>
+          {buildSourceBadge(buildSource, buildSourceLoaded)}
+        </span>
+        <div>
+          <strong>{sourceSummary.title}</strong>
+          <p>{sourceSummary.detail}</p>
+        </div>
+      </div>
+    </header>
+  )
+}
+
+function LiveHardwareCard({ device, buildSource, buildSourceLoaded = true, onOpen }) {
+  const sourceSummary = describeBuildSource(buildSource, buildSourceLoaded)
+  let footerText = buildSourceLoaded ? 'Select build source' : 'Loading build source'
+  if (!device.saved) {
+    footerText = 'Save device setup before deploy'
+  } else if (sourceSummary.ready) {
+    footerText = 'Ready to deploy'
+  }
+  return (
+    <button type="button" className="hardware-card" onClick={() => onOpen(device.hardware_id)}>
+      <div className="hardware-card-top">
+        <div>
+          <div className="hardware-card-kicker">{device.saved ? 'Managed Device' : 'Live Device'}</div>
+          <h3>{device.matched_label || device.hostname}</h3>
+        </div>
+        <span className="launch-pill pill-running">Live</span>
+      </div>
+      <div className="hardware-card-host">{device.hostname}</div>
+      <div className="hardware-card-meta">
+        <span>{device.addresses?.[0] || 'mDNS'}</span>
+        <span>{device.saved ? `Inventory: ${device.matched_target_id}` : 'Needs setup'}</span>
+      </div>
+      <div className="hardware-card-footer">
+        <span className="hardware-card-source">{buildSourceBadge(buildSource, buildSourceLoaded)}</span>
+        <span>{footerText}</span>
+      </div>
+    </button>
+  )
+}
+
+function HardwareGridPage({ devices, buildSource, buildSourceLoaded = true, discoveryResult, onRefresh, onOpenHardware }) {
+  if (devices.length === 0) {
+    return (
+      <EmptyState
+        title="No live hardware detected"
+        message={discoveryResult?.error || 'The dashboard only shows hardware currently visible on the local network. Check mDNS visibility and Pi power before retrying.'}
+        actionLabel="Refresh Discovery"
+        onAction={onRefresh}
+      />
+    )
+  }
+
+  return (
+    <>
+      <div className="section-head">
+        <div>
+          <div className="section-kicker">Live Hardware</div>
+          <h2>Detected devices</h2>
+        </div>
+        <button className="btn btn-secondary btn-inline" type="button" onClick={onRefresh}>
+          Refresh
+        </button>
+      </div>
+      <div className="hardware-grid">
+        {devices.map(device => (
+          <LiveHardwareCard
+            key={device.hardware_id}
+            device={device}
+            buildSource={buildSource}
+            buildSourceLoaded={buildSourceLoaded}
+            onOpen={onOpenHardware}
+          />
+        ))}
+      </div>
+    </>
+  )
+}
+
+function SetupField({ label, value, onChange, placeholder, type = 'text' }) {
+  return (
+    <div className="settings-field">
+      <label>{label}</label>
+      <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} />
+    </div>
+  )
+}
+
+function HardwareSetupCard({ draft, liveDevice, onChange, onSave, saving, saveResult }) {
+  return (
+    <div className="card">
+      <h2 className="card-title">Hardware Setup</h2>
+      <div className="card-content settings-grid">
+        <SetupField label="Target ID" value={draft.target_id} onChange={value => onChange('target_id', value)} placeholder="payload-pi" />
+        <SetupField label="Label" value={draft.label} onChange={value => onChange('label', value)} placeholder="Payload Pi" />
+        <SetupField label="Pi host" value={draft.pi_host} onChange={value => onChange('pi_host', value)} placeholder={liveDevice?.hostname || 'payload-pi.local'} />
+        <SetupField label="Pi user" value={draft.pi_user} onChange={value => onChange('pi_user', value)} placeholder="penn" />
+        <SetupField label="SSH key path" value={draft.ssh_key} onChange={value => onChange('ssh_key', value)} placeholder="~/.ssh/id_ed25519" />
+        <SetupField label="SSH password" value={draft.ssh_pass} onChange={value => onChange('ssh_pass', value)} placeholder="Optional password" type="password" />
+        <SetupField label="Deploy root" value={draft.deploy_root} onChange={value => onChange('deploy_root', value)} placeholder="/home/penn/pennair-deploy" />
+        <SetupField label="Fleet file" value={draft.fleet_file} onChange={value => onChange('fleet_file', value)} placeholder="src/uav/uav/fleets/example_fleet.yaml" />
+        <SetupField label="Desired controllable" value={draft.vehicle_name} onChange={value => onChange('vehicle_name', value)} placeholder="uav_0" />
+        <SetupField label="Systemd unit" value={draft.service_unit} onChange={value => onChange('service_unit', value)} placeholder="pennair-autonomy.service" />
+        <div className="settings-field settings-field-full">
+          <label>Overlay YAML</label>
+          <textarea
+            className="yaml-editor compact-yaml"
+            value={draft.overlay_yaml}
+            onChange={e => onChange('overlay_yaml', e.target.value)}
+            spellCheck={false}
+          />
+          <p className="subtext left-note">This controls mission selection and target-specific launch parameters used during deploy.</p>
+        </div>
+        <div className="settings-field settings-save">
+          <button className="btn btn-primary" type="button" onClick={onSave} disabled={saving}>
+            {saving ? 'Saving...' : 'Save Device Setup'}
+          </button>
+        </div>
+        <Result data={saveResult} />
+      </div>
+    </div>
+  )
+}
+
+function DeployActionCard({
+  buildSource,
+  buildSourceLoaded = true,
+  connected,
+  targetId,
+  buildInfo,
+  deploying,
+  deployResult,
+  onDeploy,
+  onRollback,
+}) {
+  const sourceSummary = describeBuildSource(buildSource, buildSourceLoaded)
+  const canDeploy = Boolean(targetId) && buildSourceLoaded && sourceSummary.ready
+
+  return (
+    <div className="card">
+      <h2 className="card-title">Deploy</h2>
+      <div className="card-content">
+        <div className="info-box compact-info">
+          <strong>{sourceSummary.title}</strong>
+          <p>{sourceSummary.detail}</p>
+        </div>
+        {!targetId && (
+          <p className="subtext left-note">
+            Save this device into inventory first. Deploy and runtime actions are only enabled for managed hardware records.
+          </p>
+        )}
+        {targetId && !sourceSummary.ready && !buildSourceLoaded && (
+          <p className="subtext left-note">
+            Loading the backend-selected build source...
+          </p>
+        )}
+        {targetId && !sourceSummary.ready && buildSourceLoaded && (
+          <p className="subtext left-note">
+            Choose a build source on the Build Source page before deploying to this Pi.
+          </p>
+        )}
+        <button className="btn btn-primary" type="button" onClick={onDeploy} disabled={!canDeploy || deploying}>
+          {deploying ? 'Deploying...' : 'Deploy Selected Source'}
+        </button>
+        <button
+          className="btn btn-secondary"
+          type="button"
+          onClick={onRollback}
+          disabled={!targetId || !connected || !buildInfo?.installed || deploying}
+        >
+          Rollback
+        </button>
+        <Result data={deployResult} />
+      </div>
+    </div>
+  )
+}
+
+function RuntimeOverviewCard({ liveDevice, selectedTarget, connected, buildInfo, sshCommand, pollError }) {
+  const [copied, setCopied] = useState(false)
+  const reachabilityText = !selectedTarget
+    ? 'Save device to enable SSH checks'
+    : connected
+      ? 'SSH reachable'
+      : 'Not reachable'
+
+  const copy = async () => {
+    if (!sshCommand) return
+    if (navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(sshCommand)
+      } catch {
+        // Ignore copy failure and leave the command visible.
+      }
+    }
+    setCopied(true)
+    window.setTimeout(() => setCopied(false), 1500)
+  }
+
+  return (
+    <div className="card">
+      <h2 className="card-title">Runtime Overview</h2>
+      <div className="card-content">
+        <div className="overview-stack">
+          <div className="overview-row">
+            <span>Hostname</span>
+            <strong>{liveDevice?.hostname || selectedTarget?.pi_host || 'Unknown'}</strong>
+          </div>
+          <div className="overview-row">
+            <span>Addresses</span>
+            <strong>{liveDevice?.addresses?.join(', ') || 'Unavailable'}</strong>
+          </div>
+          <div className="overview-row">
+            <span>Inventory</span>
+            <strong>{selectedTarget ? selectedTarget.target_id : 'Not saved'}</strong>
+          </div>
+          <div className="overview-row">
+            <span>Reachability</span>
+            <strong>{reachabilityText}</strong>
+          </div>
+        </div>
+        {sshCommand && (
+          <>
+            <div className="ssh-box" onClick={copy}>
+              <code>{sshCommand}</code>
+              <span className="copy-tag">{copied ? 'Copied' : 'Copy'}</span>
+            </div>
+            <p className="subtext">Click to copy SSH command</p>
+          </>
+        )}
+        {buildInfo?.info && (
+          <div className="info-box compact-info">
+            <pre>{buildInfo.info}</pre>
+          </div>
+        )}
+        <Result data={pollError} />
+      </div>
+    </div>
+  )
+}
+
+function HardwareDetailPage({
+  liveDevice,
+  selectedTarget,
+  connected,
+  wifiStatus,
+  buildInfo,
+  sshCommand,
+  workspacePaths,
+  pollError,
+  buildSource,
+  buildSourceLoaded = true,
+  setupDraft,
+  onSetupChange,
+  onSaveSetup,
+  savingSetup,
+  saveResult,
+  onRefresh,
+  onBack,
+  detailTab,
+  onDetailTabChange,
+  onDeploy,
+  deploying,
+  deployResult,
+  onRollback,
+}) {
+  const sourceSummary = describeBuildSource(buildSource, buildSourceLoaded)
+  const selectedTargetId = selectedTarget?.target_id || ''
+
+  return (
+    <div className="detail-page">
+      <div className="detail-header">
+        <button className="btn btn-secondary btn-inline" type="button" onClick={onBack}>
+          Back to hardware
+        </button>
+        <div className="detail-header-copy">
+          <div className="section-kicker">Hardware Detail</div>
+          <h2>{selectedTarget?.label || liveDevice?.hostname || 'Hardware'}</h2>
+          <p>{selectedTarget ? `${selectedTarget.target_id} · ${selectedTarget.pi_host}` : `${liveDevice?.hostname || 'Unknown host'} · live only`}</p>
+        </div>
+        <div className="detail-header-pills">
+          <span className={`launch-pill ${liveDevice ? 'pill-running' : 'pill-offline'}`}>{liveDevice ? 'Live' : 'Offline'}</span>
+          <span className={`launch-pill ${sourceSummary.ready ? 'pill-running' : 'pill-not-prepared'}`}>{buildSourceBadge(buildSource, buildSourceLoaded)}</span>
+        </div>
+      </div>
+
+      <div className="mini-tabs detail-tabs">
+        <button className={`mini-tab ${detailTab === 'setup' ? 'mini-tab-active' : ''}`} type="button" onClick={() => onDetailTabChange('setup')}>
+          Setup & Deploy
+        </button>
+        <button
+          className={`mini-tab ${detailTab === 'mission' ? 'mini-tab-active' : ''}`}
+          type="button"
+          onClick={() => onDetailTabChange('mission')}
+          disabled={!selectedTargetId}
+        >
+          Mission Control
+        </button>
+      </div>
+
+      {detailTab === 'setup' ? (
+        <>
+          <div className="grid">
+            <HardwareSetupCard
+              draft={setupDraft}
+              liveDevice={liveDevice}
+              onChange={onSetupChange}
+              onSave={onSaveSetup}
+              saving={savingSetup}
+              saveResult={saveResult}
+            />
+            <RuntimeOverviewCard
+              liveDevice={liveDevice}
+              selectedTarget={selectedTarget}
+              connected={connected}
+              buildInfo={buildInfo}
+              sshCommand={sshCommand}
+              pollError={pollError}
+            />
+          </div>
+
+          <div className="grid">
+            <DeployActionCard
+              buildSource={buildSource}
+              buildSourceLoaded={buildSourceLoaded}
+              connected={connected}
+              targetId={selectedTargetId}
+              buildInfo={buildInfo}
+              deploying={deploying}
+              deployResult={deployResult}
+              onDeploy={onDeploy}
+              onRollback={onRollback}
+            />
+            {selectedTargetId ? (
+              <WifiCard connected={connected} wifiStatus={wifiStatus} onRefresh={onRefresh} targetId={selectedTargetId} />
+            ) : (
+              <div className="card">
+                <h2 className="card-title">Target WiFi</h2>
+                <p className="subtext left-note">Save the device first to use SSH-driven WiFi management.</p>
+              </div>
+            )}
+          </div>
+        </>
+      ) : (
+        <MissionControl
+          connected={connected}
+          buildInfo={buildInfo}
+          onRefresh={onRefresh}
+          workspacePaths={workspacePaths}
+          targetId={selectedTargetId}
+          selectedTarget={selectedTarget}
+        />
+      )}
+    </div>
+  )
+}
+
+function BuildSourcePage({
+  buildSource,
+  buildSourceLoaded = true,
+  buildSourceResult,
+  buildSourceWorking,
+  builds,
+  loadingBuilds,
+  buildListResult,
+  onLoadBuilds,
+  onSelectGitHubBuild,
+  onSelectLocalArtifact,
+  onSelectLocalCodebase,
+  onClearBuildSource,
+}) {
+  const [selectedBuildKey, setSelectedBuildKey] = useState('')
+
+  useEffect(() => {
+    if (!selectedBuildKey && builds.length > 0) {
+      setSelectedBuildKey(buildSelectionKey(builds[0]))
+    }
+  }, [builds, selectedBuildKey])
+
+  useEffect(() => {
+    if (!selectedBuildKey) return
+    if (builds.some(build => buildSelectionKey(build) === selectedBuildKey)) return
+    setSelectedBuildKey(builds[0] ? buildSelectionKey(builds[0]) : '')
+  }, [builds, selectedBuildKey])
+
+  useEffect(() => {
+    if (buildSource?.kind === 'github' && buildSource.build) {
+      setSelectedBuildKey(buildSelectionKey(buildSource.build))
+      return
+    }
+    if (!selectedBuildKey || builds.some(build => buildSelectionKey(build) === selectedBuildKey)) return
+    setSelectedBuildKey(builds[0] ? buildSelectionKey(builds[0]) : '')
+  }, [buildSource, builds, selectedBuildKey])
+
+  const selectedBuild = builds.find(build => buildSelectionKey(build) === selectedBuildKey) || null
+  const sourceSummary = describeBuildSource(buildSource, buildSourceLoaded)
+
+  return (
+    <>
+      <div className="section-head">
+        <div>
+          <div className="section-kicker">Global Build Source</div>
+          <h2>Choose what the next deploy uses</h2>
+        </div>
+      </div>
+
+      <div className="card card-full">
+        <h2 className="card-title">Active Selection</h2>
+        <div className="info-box compact-info">
+          <strong>{sourceSummary.title}</strong>
+          <p>{sourceSummary.detail}</p>
+        </div>
+        <div className="settings-actions">
+          <button className="btn btn-secondary" type="button" onClick={onClearBuildSource} disabled={buildSourceWorking || !buildSourceLoaded || buildSource?.kind === 'none'}>
+            {buildSourceWorking ? 'Working...' : 'Clear Selection'}
+          </button>
+        </div>
+        <Result data={buildSourceResult} />
+      </div>
+
+      <div className="grid">
+        <div className="card">
+          <h2 className="card-title">Remote Artifact</h2>
+          <div className="card-content">
+            <p className="subtext left-note">Use a GitHub Release or GitHub Actions artifact as the active deploy source.</p>
+            <button className="btn btn-secondary" type="button" onClick={onLoadBuilds} disabled={loadingBuilds}>
+              {loadingBuilds ? 'Loading...' : 'Fetch GitHub Builds'}
+            </button>
+            {builds.length > 0 && (
+              <>
+                <select value={selectedBuildKey} onChange={e => setSelectedBuildKey(e.target.value)}>
+                  {builds.map(build => (
+                    <option key={buildSelectionKey(build)} value={buildSelectionKey(build)}>
+                      {build.source === 'actions' ? '[Actions]' : '[Release]'} {build.name || build.tag} {build.date ? `· ${build.date}` : ''}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  className="btn btn-primary"
+                  type="button"
+                  onClick={() => onSelectGitHubBuild(selectedBuild)}
+                  disabled={!selectedBuild || buildSourceWorking}
+                >
+                  Use Selected Remote Build
+                </button>
+              </>
+            )}
+            <Result data={buildListResult} />
+          </div>
+        </div>
+
+        <div className="card">
+          <h2 className="card-title">Local Artifact Upload</h2>
+          <div className="card-content">
+            <p className="subtext left-note">Pick a prebuilt release bundle from this laptop. Upload and caching happen immediately, and the backend makes it the active source.</p>
+            <div className="file-upload">
+              <input
+                type="file"
+                accept=".tar.gz,.tgz,.tar,.gz,application/gzip,application/x-gzip,application/x-tar,application/octet-stream"
+                onChange={async e => {
+                  const file = e.target.files?.[0] || null
+                  if (file) {
+                    await onSelectLocalArtifact(file)
+                  }
+                  e.target.value = ''
+                }}
+                id="global-artifact-file"
+                disabled={buildSourceWorking}
+              />
+              <label htmlFor="global-artifact-file" className="file-label">
+                {buildSourceWorking ? 'Uploading...' : 'Choose artifact bundle'}
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
+          <h2 className="card-title">Local Codebase Deploy</h2>
+          <div className="card-content">
+            <p className="subtext left-note">Use this workspace as the source of truth. The backend packages a hardware-scoped source bundle and the selected Pi builds it in place.</p>
+            <button className="btn btn-primary" type="button" onClick={onSelectLocalCodebase} disabled={buildSourceWorking}>
+              Use Current Local Codebase
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
+function InventoryPage({
+  operatorDraft,
+  onOperatorChange,
+  onSaveOperator,
+  operatorSaving,
+  operatorResult,
+  targets,
+  selectedInventoryTargetId,
+  onSelectInventoryTarget,
+  inventoryDraft,
+  onInventoryDraftChange,
+  onSaveInventoryTarget,
+  onDeleteInventoryTarget,
+  inventorySaving,
+  inventoryResult,
+  inventoryFile,
+  onInventoryFileChange,
+  onExportInventory,
+  onImportInventory,
+  inventoryIoLoading,
+  liveLookup,
+}) {
+  return (
+    <>
+      <div className="section-head">
+        <div>
+          <div className="section-kicker">Inventory</div>
+          <h2>Saved device records and operator defaults</h2>
+        </div>
+      </div>
+
+      <div className="grid">
+        <div className="card">
+          <h2 className="card-title">Operator Defaults</h2>
+          <div className="card-content settings-grid">
+            <SetupField label="GitHub repo" value={operatorDraft.github_repo} onChange={value => onOperatorChange('github_repo', value)} placeholder="org/repo" />
+            <SetupField label="GitHub token" value={operatorDraft.github_token} onChange={value => onOperatorChange('github_token', value)} placeholder="Optional token" type="password" />
+            <SetupField label="Hotspot name" value={operatorDraft.hotspot_name} onChange={value => onOperatorChange('hotspot_name', value)} placeholder="penn-desktop" />
+            <SetupField label="Default deploy root" value={operatorDraft.default_deploy_root} onChange={value => onOperatorChange('default_deploy_root', value)} placeholder="/home/penn/pennair-deploy" />
+            <SetupField label="Default Pi user" value={operatorDraft.default_pi_user} onChange={value => onOperatorChange('default_pi_user', value)} placeholder="penn" />
+            <SetupField label="Default SSH key" value={operatorDraft.default_ssh_key} onChange={value => onOperatorChange('default_ssh_key', value)} placeholder="~/.ssh/id_ed25519" />
+            <SetupField label="Default SSH password" value={operatorDraft.default_ssh_pass} onChange={value => onOperatorChange('default_ssh_pass', value)} placeholder="Optional password" type="password" />
+            <div className="settings-field settings-save">
+              <button className="btn btn-primary" type="button" onClick={onSaveOperator} disabled={operatorSaving}>
+                {operatorSaving ? 'Saving...' : 'Save Defaults'}
+              </button>
+            </div>
+            <Result data={operatorResult} />
+          </div>
+        </div>
+
+        <div className="card">
+          <h2 className="card-title">Saved Devices</h2>
+          <div className="inventory-list">
+            {targets.map(target => {
+              const liveDevice = liveLookup.get(normalizeHostname(target.pi_host))
+              return (
+                <button
+                  key={target.target_id}
+                  type="button"
+                  className={`inventory-item ${selectedInventoryTargetId === target.target_id ? 'inventory-item-active' : ''}`}
+                  onClick={() => onSelectInventoryTarget(target.target_id)}
+                >
+                  <div>
+                    <strong>{target.label}</strong>
+                    <div className="subtext">{target.pi_host}</div>
+                  </div>
+                  <span className={`launch-pill ${liveDevice ? 'pill-running' : 'pill-offline'}`}>
+                    {liveDevice ? 'Live' : 'Offline'}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+          <div className="divider" />
+          <div className="card-content">
+            <button className="btn btn-secondary" type="button" onClick={onExportInventory} disabled={inventoryIoLoading}>
+              {inventoryIoLoading ? 'Working...' : 'Export Inventory'}
+            </button>
+            <div className="file-upload">
+              <input
+                type="file"
+                accept=".json,application/json"
+                onChange={e => onInventoryFileChange(e.target.files?.[0] || null)}
+                id="inventory-import-file"
+              />
+              <label htmlFor="inventory-import-file" className="file-label">
+                {inventoryFile ? inventoryFile.name : 'Choose inventory JSON'}
+              </label>
+            </div>
+            <button className="btn btn-secondary" type="button" onClick={onImportInventory} disabled={inventoryIoLoading || !inventoryFile}>
+              {inventoryIoLoading ? 'Working...' : 'Import Inventory'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {inventoryDraft && (
+        <div className="card card-full">
+          <h2 className="card-title">Edit Saved Device</h2>
+          <div className="card-content settings-grid">
+            <SetupField label="Target ID" value={inventoryDraft.target_id} onChange={value => onInventoryDraftChange('target_id', value)} placeholder="payload-pi" />
+            <SetupField label="Label" value={inventoryDraft.label} onChange={value => onInventoryDraftChange('label', value)} placeholder="Payload Pi" />
+            <SetupField label="Pi host" value={inventoryDraft.pi_host} onChange={value => onInventoryDraftChange('pi_host', value)} placeholder="payload-pi.local" />
+            <SetupField label="Pi user" value={inventoryDraft.pi_user} onChange={value => onInventoryDraftChange('pi_user', value)} placeholder="penn" />
+            <SetupField label="SSH key path" value={inventoryDraft.ssh_key} onChange={value => onInventoryDraftChange('ssh_key', value)} placeholder="~/.ssh/id_ed25519" />
+            <SetupField label="SSH password" value={inventoryDraft.ssh_pass} onChange={value => onInventoryDraftChange('ssh_pass', value)} placeholder="Optional password" type="password" />
+            <SetupField label="Deploy root" value={inventoryDraft.deploy_root} onChange={value => onInventoryDraftChange('deploy_root', value)} placeholder="/home/penn/pennair-deploy" />
+            <SetupField label="Fleet file" value={inventoryDraft.fleet_file} onChange={value => onInventoryDraftChange('fleet_file', value)} placeholder="src/uav/uav/fleets/example_fleet.yaml" />
+            <SetupField label="Desired controllable" value={inventoryDraft.vehicle_name} onChange={value => onInventoryDraftChange('vehicle_name', value)} placeholder="uav_0" />
+            <SetupField label="Systemd unit" value={inventoryDraft.service_unit} onChange={value => onInventoryDraftChange('service_unit', value)} placeholder="pennair-autonomy.service" />
+            <div className="settings-field settings-field-full">
+              <label>Overlay YAML</label>
+              <textarea
+                className="yaml-editor compact-yaml"
+                value={inventoryDraft.overlay_yaml}
+                onChange={e => onInventoryDraftChange('overlay_yaml', e.target.value)}
+                spellCheck={false}
+              />
+            </div>
+            <div className="settings-actions">
+              <button className="btn btn-primary" type="button" onClick={onSaveInventoryTarget} disabled={inventorySaving}>
+                {inventorySaving ? 'Saving...' : 'Save Device'}
+              </button>
+              <button className="btn btn-secondary" type="button" onClick={onDeleteInventoryTarget} disabled={inventorySaving}>
+                Delete Device
+              </button>
+            </div>
+            <Result data={inventoryResult} />
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
 const THEME_STORAGE_KEY = 'integration-theme'
 const THEME_DARK = 'dark'
 const THEME_LIGHT = 'light'
@@ -2190,98 +2497,213 @@ function readStoredTheme() {
 }
 
 function App() {
-  const [page, setPage] = useState('mission')
+  const [page, setPage] = useState('hardware')
   const [theme, setTheme] = useState(readStoredTheme)
+  const [operatorConfig, setOperatorConfig] = useState(null)
+  const [targets, setTargets] = useState([])
+  const [liveDevices, setLiveDevices] = useState([])
+  const [selectedHardwareId, setSelectedHardwareId] = useState('')
+  const [selectedInventoryTargetId, setSelectedInventoryTargetId] = useState('')
+  const [detailTab, setDetailTab] = useState('setup')
+  const [buildSource, setBuildSource] = useState({ kind: 'none' })
+  const [buildSourceLoaded, setBuildSourceLoaded] = useState(false)
+  const [buildSourceResult, setBuildSourceResult] = useState(null)
+  const [buildSourceWorking, setBuildSourceWorking] = useState(false)
+  const [builds, setBuilds] = useState([])
+  const [loadingBuilds, setLoadingBuilds] = useState(false)
+  const [buildListResult, setBuildListResult] = useState(null)
 
   const [connected, setConnected] = useState(false)
-  const [targets, setTargets] = useState([])
-  const [selectedTargetId, setSelectedTargetId] = useState('')
   const [wifiStatus, setWifiStatus] = useState(null)
   const [buildInfo, setBuildInfo] = useState(null)
   const [sshCommand, setSshCommand] = useState('')
-  const [workspacePaths, setWorkspacePaths] = useState(null)
   const [inventoryResult, setInventoryResult] = useState(null)
-  const [inventoryLoading, setInventoryLoading] = useState(false)
-  const [targetSwitching, setTargetSwitching] = useState(false)
+  const [discoveryResult, setDiscoveryResult] = useState(null)
   const [pollError, setPollError] = useState(null)
+  const [setupDraft, setSetupDraft] = useState(null)
+  const [setupDirty, setSetupDirty] = useState(false)
+  const [setupSaving, setSetupSaving] = useState(false)
+  const [setupResult, setSetupResult] = useState(null)
+  const [inventoryDraft, setInventoryDraft] = useState(null)
+  const [inventoryDirty, setInventoryDirty] = useState(false)
+  const [operatorDraft, setOperatorDraft] = useState(null)
+  const [operatorDirty, setOperatorDirty] = useState(false)
+  const [operatorSaving, setOperatorSaving] = useState(false)
+  const [operatorResult, setOperatorResult] = useState(null)
+  const [inventorySaving, setInventorySaving] = useState(false)
+  const [inventoryFile, setInventoryFile] = useState(null)
+  const [inventoryIoLoading, setInventoryIoLoading] = useState(false)
+  const [deploying, setDeploying] = useState(false)
+  const [deployResult, setDeployResult] = useState(null)
 
-  const refreshAll = useCallback(async () => {
-    setInventoryLoading(true)
-    const inventory = await api('/api/inventory')
-    const normalizedTargets = uniqueTargets(inventory?.targets || [])
-    const inventoryTargetId = `${inventory?.active_target_id || ''}`.trim()
-    const nextTargetId = normalizedTargets.some(target => target.target_id === inventoryTargetId)
-      ? inventoryTargetId
-      : (normalizedTargets[0]?.target_id || inventoryTargetId || selectedTargetId)
+  const targetMap = useMemo(
+    () => Object.fromEntries(uniqueTargets(targets).map(target => [target.target_id, target])),
+    [targets]
+  )
+  const liveLookup = useMemo(
+    () => new Map(liveDevices.map(device => [normalizeHostname(device.hostname), device])),
+    [liveDevices]
+  )
+  const selectedLiveDevice = useMemo(
+    () => liveDevices.find(device => device.hardware_id === selectedHardwareId) || null,
+    [liveDevices, selectedHardwareId]
+  )
+  const selectedSavedTarget = useMemo(() => {
+    if (!selectedHardwareId) return null
+    return uniqueTargets(targets).find(
+      target => normalizeHostname(target.pi_host) === selectedHardwareId
+    ) || null
+  }, [selectedHardwareId, targets])
+  const selectedTarget = selectedLiveDevice?.matched_target_id
+    ? targetMap[selectedLiveDevice.matched_target_id] || null
+    : selectedSavedTarget
+  const selectedTargetId = selectedTarget?.target_id || ''
+  const workspacePaths = selectedTarget?.workspace_paths || null
 
-    if (inventory.success) {
-      setTargets(normalizedTargets)
-      setSelectedTargetId(nextTargetId)
-      setInventoryResult(null)
-    } else {
-      setInventoryResult(inventory)
+  const refreshBuildSource = useCallback(async ({ preserveResult = false } = {}) => {
+    const data = await api('/api/build-source')
+    if (data.success) {
+      setBuildSource(normalizeBackendBuildSource(data))
+      if (!preserveResult) {
+        setBuildSourceResult(prev => (prev && prev.success === false ? null : prev))
+      }
+    } else if (!buildSourceLoaded) {
+      setBuildSource({ kind: 'none' })
+      if (!preserveResult) {
+        setBuildSourceResult(data)
+      }
+    } else if (!preserveResult) {
+      setBuildSourceResult(data)
+    }
+    setBuildSourceLoaded(true)
+    return data
+  }, [buildSourceLoaded])
+
+  const refreshGlobal = useCallback(async () => {
+    const [configData, inventoryData, liveData, buildSourceData] = await Promise.all([
+      api('/api/config'),
+      api('/api/inventory'),
+      api('/api/hardware/live'),
+      api('/api/build-source'),
+    ])
+
+    if (configData.success) {
+      setOperatorConfig(configData.config)
     }
 
-    const effectiveTargetId = nextTargetId || selectedTargetId
-    const targetUrl = url => withTargetId(url, effectiveTargetId)
+    if (inventoryData.success) {
+      const nextTargets = uniqueTargets(inventoryData.targets || [])
+      const activeTargetId = inventoryData.active_target_id || ''
+      setTargets(nextTargets)
+      setInventoryResult(null)
+      setSelectedInventoryTargetId(prev => {
+        if (!nextTargets.length) return ''
+        if (activeTargetId && nextTargets.some(target => target.target_id === activeTargetId)) {
+          return activeTargetId
+        }
+        if (!prev) return nextTargets[0]?.target_id || ''
+        return nextTargets.some(target => target.target_id === prev)
+          ? prev
+          : nextTargets[0]?.target_id || ''
+      })
+    } else {
+      setInventoryResult(inventoryData)
+    }
 
-    const conn = await api(targetUrl('/api/connection/status'))
-    const sshPromise = api(targetUrl('/api/connection/ssh-command'))
-    const configPromise = api(targetUrl('/api/config'))
+    if (liveData.success) {
+      setLiveDevices(liveData.devices || [])
+      setDiscoveryResult(null)
+    } else {
+      setDiscoveryResult(liveData)
+      setLiveDevices([])
+    }
 
-    const isConnected = Boolean(conn?.connected)
-    setConnected(isConnected)
+    if (buildSourceData.success) {
+      setBuildSource(normalizeBackendBuildSource(buildSourceData))
+      setBuildSourceResult(prev => (prev && prev.success === false ? null : prev))
+    } else if (!buildSourceLoaded) {
+      setBuildSource({ kind: 'none' })
+      setBuildSourceResult(buildSourceData)
+    } else {
+      setBuildSourceResult(buildSourceData)
+    }
+    setBuildSourceLoaded(true)
+  }, [buildSourceLoaded])
 
-    if (!isConnected) {
-      const [ssh, config] = await Promise.all([sshPromise, configPromise])
-      if (ssh.success) setSshCommand(ssh.command)
-      if (config.success) setWorkspacePaths(config.workspace_paths || null)
+  const refreshDetail = useCallback(async (targetId) => {
+    if (!targetId) {
+      setConnected(false)
       setWifiStatus(null)
       setBuildInfo(null)
-      setPollError(conn?.error ? { success: false, error: conn.error } : null)
-      setInventoryLoading(false)
+      setSshCommand('')
+      setPollError(null)
       return
     }
 
-    const [wifi, build, ssh, config] = await Promise.all([
+    const targetUrl = url => withTargetId(url, targetId)
+    const conn = await api(targetUrl('/api/connection/status'))
+    const sshPromise = api(targetUrl('/api/connection/ssh-command'))
+
+    setConnected(Boolean(conn?.connected))
+
+    if (!conn?.connected) {
+      const ssh = await sshPromise
+      if (ssh.success) setSshCommand(ssh.command)
+      setWifiStatus(null)
+      setBuildInfo(null)
+      setPollError(conn?.error ? { success: false, error: conn.error } : null)
+      return
+    }
+
+    const [wifi, build, ssh] = await Promise.all([
       api(targetUrl('/api/wifi/status')),
       api(targetUrl('/api/builds/current')),
       sshPromise,
-      configPromise,
     ])
 
     setWifiStatus(wifi.success ? wifi : null)
     setBuildInfo(build.success ? build : null)
     if (ssh.success) setSshCommand(ssh.command)
-    if (config.success) setWorkspacePaths(config.workspace_paths || null)
 
     const err = (!wifi.success ? wifi?.error : null) || (!build.success ? build?.error : null) || null
     setPollError(err ? { success: false, error: err } : null)
-    setInventoryLoading(false)
-  }, [selectedTargetId])
+  }, [])
 
   useEffect(() => {
-    refreshAll()
-    const interval = setInterval(refreshAll, 5000)
+    refreshGlobal()
+    const interval = setInterval(refreshGlobal, 5000)
     return () => clearInterval(interval)
-  }, [refreshAll])
+  }, [refreshGlobal])
 
-  const selectedTarget = targets.find(target => target.target_id === selectedTargetId) || null
+  useEffect(() => {
+    refreshDetail(selectedTargetId)
+    if (!selectedTargetId) return undefined
+    const interval = setInterval(() => refreshDetail(selectedTargetId), 5000)
+    return () => clearInterval(interval)
+  }, [refreshDetail, selectedTargetId])
 
-  const handleTargetChange = useCallback(async (nextTargetId) => {
-    if (!nextTargetId || nextTargetId === selectedTargetId) return
-    setTargetSwitching(true)
-    setInventoryResult(null)
-    const fd = withTargetFormData(new FormData(), nextTargetId)
-    const data = await api('/api/inventory/active', { method: 'POST', body: fd })
-    if (data.success) {
-      setSelectedTargetId(nextTargetId)
-      await refreshAll()
-    } else {
-      setInventoryResult(data)
+  useEffect(() => {
+    if (!operatorConfig || operatorDirty) return
+    setOperatorDraft(operatorConfig)
+  }, [operatorConfig, operatorDirty])
+
+  useEffect(() => {
+    if (setupDirty) return
+    setSetupDraft(hardwareDraftFromSelection(selectedTarget, selectedLiveDevice, operatorConfig))
+    setSetupResult(null)
+    setDeployResult(null)
+    setDetailTab('setup')
+  }, [operatorConfig, selectedLiveDevice?.hardware_id, selectedTarget?.target_id, setupDirty])
+
+  useEffect(() => {
+    if (!selectedInventoryTargetId) {
+      setInventoryDraft(null)
+      return
     }
-    setTargetSwitching(false)
-  }, [refreshAll, selectedTargetId])
+    const target = targetMap[selectedInventoryTargetId] || null
+    if (inventoryDirty) return
+    setInventoryDraft(target ? hardwareDraftFromSelection(target, null, operatorConfig) : null)
+  }, [operatorConfig, selectedInventoryTargetId, targetMap, inventoryDirty])
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
@@ -2296,53 +2718,332 @@ function App() {
     setTheme(prev => (prev === THEME_DARK ? THEME_LIGHT : THEME_DARK))
   }
 
+  const handleSaveOperator = async () => {
+    if (!operatorDraft) return
+    setOperatorSaving(true)
+    const fd = new FormData()
+    Object.entries(operatorDraft).forEach(([key, value]) => {
+      if (key === 'inventory_path') return
+      fd.append(key, value ?? '')
+    })
+    const data = await api('/api/config', { method: 'POST', body: fd })
+    setOperatorResult(data)
+    setOperatorSaving(false)
+    if (data.success) {
+      setOperatorDirty(false)
+      await refreshGlobal()
+    }
+  }
+
+  const handleSaveTargetDraft = async (draft, setSaving, setResult, scope) => {
+    if (!draft) return
+    setSaving(true)
+    const fd = new FormData()
+    Object.entries(draft).forEach(([key, value]) => fd.append(key, value ?? ''))
+    const data = await api('/api/inventory', { method: 'POST', body: fd })
+    setResult(data)
+    setSaving(false)
+    if (data.success) {
+      if (scope === 'setup') {
+        setSetupDirty(false)
+      }
+      if (scope === 'inventory') {
+        setInventoryDirty(false)
+      }
+      await refreshGlobal()
+      if (draft.pi_host) {
+        setSelectedHardwareId(normalizeHostname(draft.pi_host))
+      }
+      if (draft.target_id) {
+        setSelectedInventoryTargetId(draft.target_id)
+      }
+    }
+  }
+
+  const handleDeleteInventoryTarget = async () => {
+    if (!inventoryDraft?.target_id) return
+    setInventorySaving(true)
+    const fd = new FormData()
+    fd.append('target_id', inventoryDraft.target_id)
+    const data = await api('/api/inventory/delete', { method: 'POST', body: fd })
+    setInventoryResult(data)
+    setInventorySaving(false)
+    if (data.success) {
+      setSelectedInventoryTargetId('')
+      await refreshGlobal()
+    }
+  }
+
+  const handleExportInventory = async () => {
+    setInventoryIoLoading(true)
+    try {
+      const res = await fetch('/api/inventory/export')
+      const raw = await res.text()
+      if (!res.ok) throw new Error(raw || `HTTP ${res.status}`)
+      const blob = new Blob([raw], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = 'integration-inventory.json'
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+      URL.revokeObjectURL(url)
+      setInventoryResult({ success: true, output: 'Inventory exported' })
+    } catch (error) {
+      setInventoryResult({ success: false, error: error.message || 'Inventory export failed' })
+    } finally {
+      setInventoryIoLoading(false)
+    }
+  }
+
+  const handleImportInventory = async () => {
+    if (!inventoryFile) return
+    setInventoryIoLoading(true)
+    const fd = new FormData()
+    fd.append('file', inventoryFile)
+    const data = await api('/api/inventory/import', { method: 'POST', body: fd })
+    setInventoryResult(data)
+    setInventoryIoLoading(false)
+    if (data.success) {
+      setInventoryFile(null)
+      await refreshGlobal()
+    }
+  }
+
+  const loadBuilds = async () => {
+    setLoadingBuilds(true)
+    setBuildListResult(null)
+    const data = await api('/api/builds/list')
+    if (data.success) {
+      setBuilds(data.builds || [])
+    }
+    setBuildListResult(data.success ? { success: true, output: `Loaded ${data.builds?.length || 0} build(s)` } : data)
+    setLoadingBuilds(false)
+  }
+
+  const selectGithubBuildSource = async build => {
+    if (!build) return
+    setBuildSourceWorking(true)
+    try {
+      const fd = new FormData()
+      fd.append('tag', build.tag || '')
+      fd.append('source', build.source || 'release')
+      fd.append('sha', build.sha || '')
+      fd.append('name', build.name || '')
+      fd.append('date', build.date || '')
+      if (build.artifact_id) {
+        fd.append('artifact_id', build.artifact_id)
+      }
+      if (build.artifact_name) {
+        fd.append('artifact_name', build.artifact_name)
+      }
+      if (build.run_id) {
+        fd.append('run_id', build.run_id)
+      }
+      const data = await api('/api/build-source/github', { method: 'POST', body: fd })
+      setBuildSourceResult(data)
+      if (data.success) {
+        await refreshBuildSource({ preserveResult: true })
+      }
+    } finally {
+      setBuildSourceWorking(false)
+    }
+  }
+
+  const selectLocalArtifactSource = async file => {
+    if (!file) return
+    setBuildSourceWorking(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const data = await api('/api/build-source/local-artifact', { method: 'POST', body: fd })
+      setBuildSourceResult(data)
+      if (data.success) {
+        await refreshBuildSource({ preserveResult: true })
+      }
+    } finally {
+      setBuildSourceWorking(false)
+    }
+  }
+
+  const selectLocalCodebaseSource = async () => {
+    setBuildSourceWorking(true)
+    try {
+      const data = await api('/api/build-source/local-codebase', { method: 'POST', body: new FormData() })
+      setBuildSourceResult(data)
+      if (data.success) {
+        await refreshBuildSource({ preserveResult: true })
+      }
+    } finally {
+      setBuildSourceWorking(false)
+    }
+  }
+
+  const clearBuildSource = async () => {
+    setBuildSourceWorking(true)
+    try {
+      const data = await api('/api/build-source/clear', { method: 'POST', body: new FormData() })
+      setBuildSourceResult(data)
+      if (data.success) {
+        await refreshBuildSource({ preserveResult: true })
+      }
+    } finally {
+      setBuildSourceWorking(false)
+    }
+  }
+
+  const handleDeploySelectedSource = async () => {
+    if (!selectedTargetId || !buildSourceLoaded || !buildSource || buildSource.kind === 'none') return
+    setDeploying(true)
+    setDeployResult(null)
+    const data = await api(withTargetId('/api/builds/deploy-selected', selectedTargetId), {
+      method: 'POST',
+      body: withTargetFormData(new FormData(), selectedTargetId),
+    })
+
+    setDeployResult(data)
+    setDeploying(false)
+    if (data.success) {
+      await refreshDetail(selectedTargetId)
+    }
+  }
+
+  const handleRollback = async () => {
+    if (!selectedTargetId) return
+    setDeploying(true)
+    const data = await api(withTargetId('/api/builds/rollback', selectedTargetId), {
+      method: 'POST',
+      body: withTargetFormData(new FormData(), selectedTargetId),
+    })
+    setDeployResult(data)
+    setDeploying(false)
+    if (data.success) {
+      await refreshDetail(selectedTargetId)
+    }
+  }
+
   return (
     <div className="app">
-      <SettingsPanel onRefresh={refreshAll} targetId={selectedTargetId} selectedTarget={selectedTarget} />
+      <AppHeader
+        page={page}
+        onPageChange={setPage}
+        theme={theme}
+        onToggleTheme={toggleTheme}
+        liveCount={liveDevices.length}
+        buildSource={buildSource}
+        buildSourceLoaded={buildSourceLoaded}
+      />
 
-      <h1 className="title">PennAiR Auton Deploy</h1>
-      <StatusBar connected={connected} wifiStatus={wifiStatus} buildInfo={buildInfo} selectedTarget={selectedTarget} />
-      <Result data={pollError} />
-      <Result data={inventoryResult} />
-
-      <div className="top-controls">
-        <div className="page-tabs">
-          <button
-            className={`tab-btn ${page === 'mission' ? 'tab-active' : ''}`}
-            onClick={() => setPage('mission')}
-          >
-            Mission Control
-          </button>
-          <button
-            className={`tab-btn ${page === 'deploy' ? 'tab-active' : ''}`}
-            onClick={() => setPage('deploy')}
-          >
-            Deploy
-          </button>
-        </div>
-        <TargetSelector
-          connected={connected}
-          targets={targets}
-          selectedTargetId={selectedTargetId}
-          onChange={handleTargetChange}
-          loading={inventoryLoading || targetSwitching}
+      {page === 'hardware' && !selectedHardwareId && (
+        <HardwareGridPage
+          devices={liveDevices}
+          buildSource={buildSource}
+          buildSourceLoaded={buildSourceLoaded}
+          discoveryResult={discoveryResult}
+          onRefresh={refreshGlobal}
+          onOpenHardware={hardwareId => {
+            setSetupDirty(false)
+            setSelectedHardwareId(hardwareId)
+          }}
         />
-        <button className="theme-toggle-btn" type="button" onClick={toggleTheme}>
-          {theme === THEME_DARK ? 'Light Mode' : 'Dark Mode'}
-        </button>
-      </div>
+      )}
 
-      {page === 'mission' ? (
-        <MissionControl
-          connected={connected}
-          buildInfo={buildInfo}
-          onRefresh={refreshAll}
-          workspacePaths={workspacePaths}
-          targetId={selectedTargetId}
+      {page === 'hardware' && selectedHardwareId && (
+        <HardwareDetailPage
+          liveDevice={selectedLiveDevice}
           selectedTarget={selectedTarget}
+          connected={connected}
+          wifiStatus={wifiStatus}
+          buildInfo={buildInfo}
+          sshCommand={sshCommand}
+          workspacePaths={workspacePaths}
+          pollError={pollError}
+          buildSource={buildSource}
+          buildSourceLoaded={buildSourceLoaded}
+          setupDraft={setupDraft || hardwareDraftFromSelection(selectedTarget, selectedLiveDevice, operatorConfig)}
+          onSetupChange={(field, value) => {
+            setSetupDirty(true)
+            setSetupDraft(prev => ({ ...(prev || {}), [field]: value }))
+          }}
+          onSaveSetup={() => handleSaveTargetDraft(setupDraft, setSetupSaving, setSetupResult, 'setup')}
+          savingSetup={setupSaving}
+          saveResult={setupResult}
+          onRefresh={() => {
+            refreshGlobal()
+            refreshDetail(selectedTargetId)
+          }}
+          onBack={() => {
+            setSetupDirty(false)
+            setSelectedHardwareId('')
+          }}
+          detailTab={detailTab}
+          onDetailTabChange={setDetailTab}
+          onDeploy={handleDeploySelectedSource}
+          deploying={deploying}
+          deployResult={deployResult}
+          onRollback={handleRollback}
         />
-      ) : (
-        <DeployPage connected={connected} sshCommand={sshCommand} wifiStatus={wifiStatus} buildInfo={buildInfo} onRefresh={refreshAll} targetId={selectedTargetId} />
+      )}
+
+      {page === 'build-source' && (
+        <BuildSourcePage
+          buildSource={buildSource}
+          buildSourceLoaded={buildSourceLoaded}
+          buildSourceResult={buildSourceResult}
+          buildSourceWorking={buildSourceWorking}
+          builds={builds}
+          loadingBuilds={loadingBuilds}
+          buildListResult={buildListResult}
+          onLoadBuilds={loadBuilds}
+          onSelectGitHubBuild={selectGithubBuildSource}
+          onSelectLocalArtifact={selectLocalArtifactSource}
+          onSelectLocalCodebase={selectLocalCodebaseSource}
+          onClearBuildSource={clearBuildSource}
+        />
+      )}
+
+      {page === 'inventory' && (
+        <InventoryPage
+          operatorDraft={operatorDraft || operatorConfig || {
+            github_repo: '',
+            github_token: '',
+            hotspot_name: '',
+            inventory_path: '',
+            default_deploy_root: '/home/penn/pennair-deploy',
+            default_pi_user: 'penn',
+            default_ssh_key: '',
+            default_ssh_pass: '',
+          }}
+          onOperatorChange={(field, value) => {
+            setOperatorDirty(true)
+            setOperatorDraft(prev => ({ ...(prev || {}), [field]: value }))
+          }}
+          onSaveOperator={handleSaveOperator}
+          operatorSaving={operatorSaving}
+          operatorResult={operatorResult}
+          targets={targets}
+          selectedInventoryTargetId={selectedInventoryTargetId}
+          onSelectInventoryTarget={targetId => {
+            setInventoryDirty(false)
+            setSelectedInventoryTargetId(targetId)
+          }}
+          inventoryDraft={inventoryDraft}
+          onInventoryDraftChange={(field, value) => {
+            setInventoryDirty(true)
+            setInventoryDraft(prev => ({ ...(prev || {}), [field]: value }))
+          }}
+          onSaveInventoryTarget={() => handleSaveTargetDraft(inventoryDraft, setInventorySaving, setInventoryResult, 'inventory')}
+          onDeleteInventoryTarget={handleDeleteInventoryTarget}
+          inventorySaving={inventorySaving}
+          inventoryResult={inventoryResult}
+          inventoryFile={inventoryFile}
+          onInventoryFileChange={setInventoryFile}
+          onExportInventory={handleExportInventory}
+          onImportInventory={handleImportInventory}
+          inventoryIoLoading={inventoryIoLoading}
+          liveLookup={liveLookup}
+        />
       )}
     </div>
   )
