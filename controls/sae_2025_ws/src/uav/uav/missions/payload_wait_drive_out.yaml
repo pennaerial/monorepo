@@ -1,8 +1,15 @@
-# Payload starts somewhere inside/near the DLZ, drives to the edge,
-# then turns 180° to face back toward the center. No VTOL or AprilTag needed.
-# PayloadRetreatMode signals "terminate" when the turn finishes.
 modes:
   start:
+    class: uav.modes.payload.PayloadWaitForDriveOutMode.PayloadWaitForDriveOutMode
+    params:
+      confirm_frames: 5
+      lower_hsv: [0, 0, 180]
+      upper_hsv: [180, 46, 255]
+
+    transitions:
+      complete: retreat
+
+  retreat:
     class: uav.modes.payload.PayloadRetreatMode
     params:
       payload_name: payload_0
@@ -14,3 +21,5 @@ modes:
       turn_direction: 1
       camera_debug: false
       compressed_image: false
+
+

@@ -1,0 +1,6 @@
+int32[3] lower_hsv    # HSV lower bound for detection mask e.g. [0, 0, 180]
+int32[3] upper_hsv    # HSV upper bound for detection mask e.g. [180, 20, 255]
+---
+bool has_image
+bool can_drive_out       # true when the path ahead is clear to drive out
+float64 clear_ratio      # fraction of the forward ROI that is unobstructed [0.0, 1.0]

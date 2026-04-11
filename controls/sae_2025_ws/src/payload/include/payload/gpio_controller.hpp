@@ -71,9 +71,11 @@ private:
     std::thread control_thread_;
 
     // Dead reckoning state
-    std::atomic<ControlMode> control_mode_ {ControlMode::NORMAL};
-    std::atomic<int64_t>     dr_left_remaining_  {0};
-    std::atomic<int64_t>     dr_right_remaining_ {0};
+    std::atomic<ControlMode> control_mode_   {ControlMode::NORMAL};
+    std::atomic<int64_t>     dr_left_goal_   {0};  // absolute encoder count to reach
+    std::atomic<int64_t>     dr_right_goal_  {0};
+    std::atomic<int64_t>     dr_left_start_  {0};  // snapshot at service call time
+    std::atomic<int64_t>     dr_right_start_ {0};
 
     rclcpp::Publisher<payload_interfaces::msg::MotorState>::SharedPtr motor_state_pub_;
     rclcpp::Service<payload_interfaces::srv::ComputePidZieglerNichols>::SharedPtr zn_service_;

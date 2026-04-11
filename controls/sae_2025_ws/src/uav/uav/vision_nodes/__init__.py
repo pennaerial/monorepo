@@ -4,3 +4,4 @@ from .VisionNode import (
 from .PayloadAprilTagNode import PayloadAprilTagNode as PayloadAprilTagNode
 from .PayloadColorOrbitNode import PayloadColorOrbitNode as PayloadColorOrbitNode
 from .PayloadTrackingNode import PayloadTrackingNode as PayloadTrackingNode
+from .PayloadDriveOutNode import PayloadDriveOutNode as PayloadDriveOutNode

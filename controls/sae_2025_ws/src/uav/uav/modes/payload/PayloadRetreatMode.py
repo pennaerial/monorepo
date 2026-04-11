@@ -181,17 +181,16 @@ class PayloadRetreatMode(Mode):
             self._publish_drive(self.forward_speed_mps, 0.0)
             return
 
-        # ---- Phase 2: turn 180° in place, timed drive ----
+        # ---- Phase 2: turn 180° in place, dead reckoning ----
         if self._phase == "turn_180":
             if self._turn_future is None:
-                w = self.turn_angular_speed * self.turn_direction
-                duration = math.pi / self.turn_angular_speed
-                self._turn_future = self.vehicle.timed_drive(0.0, w, duration)
-                self.log(f"PayloadRetreatMode: sent timed_drive for 180° turn (duration={duration:.2f}s)")
+                angular = math.pi * self.turn_direction
+                self._turn_future = self.vehicle.dead_reckon(0.0, angular, 1.85)
+                self.log("PayloadRetreatMode: sent dead_reckon for 180° turn at 1.85 rad/s")
                 return
             if self._turn_future.done():
                 self._done = True
-                self.log("PayloadRetreatMode: 180° timed_drive complete — done")
+                self.log("PayloadRetreatMode: 180° dead_reckon complete — done")
             return
 
     def check_status(self) -> str:

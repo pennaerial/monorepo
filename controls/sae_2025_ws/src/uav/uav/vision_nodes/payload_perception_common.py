@@ -405,3 +405,112 @@ def solve_payload_apriltags(
         )
 
     return observations
+
+
+def detect_payload_unreeled(
+    image,
+    lower_hsv: tuple[int, int, int] = (0, 0, 180),
+    upper_hsv: tuple[int, int, int] = (180, 20, 255),
+    debug: bool = False,
+):
+    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    h = image.shape[0]
+    floor_strip = hsv[int(h * 0.75):h, :]  # bottom 25%
+
+    white_mask = cv2.inRange(floor_strip, np.array(lower_hsv), np.array(upper_hsv))
+
+    # Erode to remove small noise specks, then dilate to restore remaining blobs
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
+    white_mask = cv2.erode(white_mask, kernel, iterations=2)
+    white_mask = cv2.dilate(white_mask, kernel, iterations=2)
+
+    white_count = np.sum(white_mask > 0)
+    white_ratio = white_count / white_mask.size
+
+    debug_frame = None
+    if debug:
+        vis = image.copy()
+        h_full = vis.shape[0]
+        cv2.rectangle(vis, (0, int(h_full * 0.75)), (vis.shape[1], h_full), (0, 255, 255), 2)
+        vis[int(h_full * 0.75):h_full, :][white_mask > 0] = (255, 100, 0)
+        cv2.putText(vis, f"white_ratio={white_ratio:.3f}  count={white_count}",
+                    (8, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+        debug_frame = vis
+
+    return white_mask, white_ratio, white_count, debug_frame
+
+
+def _make_camera_info(image: np.ndarray) -> CameraInfo:
+    """Synthesise a plausible pinhole CameraInfo from image dimensions."""
+    h, w = image.shape[:2]
+    fx = fy = float(max(w, h))
+    cx, cy = w / 2.0, h / 2.0
+    info = CameraInfo()
+    info.width = w
+    info.height = h
+    info.k = [fx, 0.0, cx, 0.0, fy, cy, 0.0, 0.0, 1.0]
+    info.d = [0.0, 0.0, 0.0, 0.0, 0.0]
+    return info
+
+
+if __name__ == "__main__":
+    import sys
+
+    USAGE = """
+Usage:
+  python payload_perception_common.py unreeled <image>
+  python payload_perception_common.py apriltag  <image> [tag_size_m] [tag_family]
+
+Examples:
+  python payload_perception_common.py unreeled frame.jpg
+  python payload_perception_common.py apriltag frame.jpg 0.1 tag36h11
+"""
+
+    if len(sys.argv) < 3:
+        print(USAGE)
+        sys.exit(1)
+
+    command = sys.argv[1].lower()
+    image_path = sys.argv[2]
+
+    bgr = cv2.imread(image_path)
+    if bgr is None:
+        print(f"ERROR: could not load image '{image_path}'")
+        sys.exit(1)
+
+    if command == "unreeled":
+        mask, ratio, count, debug_frame = detect_payload_unreeled(bgr, debug=True)
+        print(f"white_ratio={ratio:.4f}  white_count={count}")
+        cv2.imshow("detect_payload_unreeled", debug_frame)
+        cv2.imshow("white_mask", mask)
+        print("Press any key to close.")
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
+    elif command == "apriltag":
+        tag_size_m = float(sys.argv[3]) if len(sys.argv) > 3 else 0.1
+        tag_family = sys.argv[4] if len(sys.argv) > 4 else DEFAULT_TAG_FAMILY
+
+        cache = AprilTagDetectorCache()
+        detector = cache.get(tag_family)
+        if detector is None:
+            print("ERROR: apriltag library not installed.")
+            sys.exit(1)
+
+        camera_info = _make_camera_info(bgr)
+        gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
+
+        all_obs = detect_payload_apriltags(gray, camera_info, detector, cache.backend, tag_size_m)
+        solved_obs = solve_payload_apriltags(gray, camera_info, detector, cache.backend, tag_size_m)
+
+        print(f"detected={len(all_obs)}  solved={len(solved_obs)}")
+        for o in all_obs:
+            pose_str = (f"  pose=({o.pose_x:.3f}, {o.pose_y:.3f}, yaw={o.pose_yaw:.3f})"
+                        if o.pose_x is not None else "")
+            print(f"  id={o.tag_id}  tvec=({o.tvec_x:.3f}, {o.tvec_y:.3f}, {o.tvec_z:.3f})"
+                  f"  yaw_err={o.yaw_error:.3f}  area={o.area:.0f}{pose_str}")
+
+    else:
+        print(f"ERROR: unknown command '{command}'")
+        print(USAGE)
+        sys.exit(1)

@@ -236,12 +236,36 @@ void GPIOController::dead_reckon_callback(
         angular_cmd = std::copysign(request->speed, request->angular);
     }
 
-    RCLCPP_INFO(node_->get_logger(),
-        "DeadReckon | target=%ld counts  linear_cmd=%.3f  angular_cmd=%.3f",
-        target_counts, linear_cmd, angular_cmd);
+    const int64_t left_now  = left_encoder_  ? left_encoder_->count()  : 0;
+    const int64_t right_now = right_encoder_ ? right_encoder_->count() : 0;
 
-    dr_left_remaining_.store(target_counts);
-    dr_right_remaining_.store(target_counts);
+    // Compute per-wheel direction in raw encoder space.
+    // left_sign/right_sign normalise so forward = positive normalised count.
+    // For angular motion the wheels spin opposite each other.
+    int64_t left_dir;
+    int64_t right_dir;
+    if (has_linear) {
+        const int64_t motion_dir = (request->linear > 0) ? 1 : -1;
+        left_dir  = motion_dir * static_cast<int64_t>(p.encoder.left_sign);
+        right_dir = motion_dir * static_cast<int64_t>(p.encoder.right_sign);
+    } else {
+        // angular > 0 → CCW: left wheel backward, right wheel forward (normalised)
+        const int64_t angular_dir = (request->angular > 0) ? 1 : -1;
+        left_dir  = -angular_dir * static_cast<int64_t>(p.encoder.left_sign);
+        right_dir =  angular_dir * static_cast<int64_t>(p.encoder.right_sign);
+    }
+
+    const int64_t left_goal  = left_now  + target_counts * left_dir;
+    const int64_t right_goal = right_now + target_counts * right_dir;
+
+    RCLCPP_INFO(node_->get_logger(),
+        "DeadReckon | target=%ld counts  left_start=%ld goal=%ld  right_start=%ld goal=%ld  linear=%.3f  angular=%.3f",
+        target_counts, left_now, left_goal, right_now, right_goal, linear_cmd, angular_cmd);
+
+    dr_left_start_.store(left_now);
+    dr_right_start_.store(right_now);
+    dr_left_goal_.store(left_goal);
+    dr_right_goal_.store(right_goal);
     cmd_linear_.store(linear_cmd);
     cmd_angular_.store(angular_cmd);
     control_mode_.store(ControlMode::DEAD_RECKONING);
@@ -269,8 +293,8 @@ void GPIOController::control_loop()
             p.kinematics.wheel_radius_m,
             p.motor.max_wheel_rpm);
 
-        const int64_t left_count = left_encoder_ ? left_encoder_->count() : 0;
-        const int64_t right_count = right_encoder_ ? right_encoder_->count() : 0;
+        const int64_t left_count = left_encoder_->count();
+        const int64_t right_count = right_encoder_->count();
 
         const auto now = std::chrono::steady_clock::now();
         double dt_s = std::chrono::duration<double>(now - prev_loop_time_).count();
@@ -288,18 +312,35 @@ void GPIOController::control_loop()
         prev_right_count_ = right_count;
 
         if (control_mode_.load() == ControlMode::DEAD_RECKONING) {
-            dr_left_remaining_.fetch_sub(std::abs(left_delta));
-            dr_right_remaining_.fetch_sub(std::abs(right_delta));
+            const int64_t left_goal   = dr_left_goal_.load();
+            const int64_t right_goal  = dr_right_goal_.load();
+            const int64_t left_start  = dr_left_start_.load();
+            const int64_t right_start = dr_right_start_.load();
+
+            // Done when count has reached or passed goal in the intended direction.
+            // Direction is inferred from goal vs start — no separate sign param needed.
+            const bool left_done  = (left_goal  >= left_start)
+                ? (left_count  >= left_goal)
+                : (left_count  <= left_goal);
+            const bool right_done = (right_goal >= right_start)
+                ? (right_count >= right_goal)
+                : (right_count <= right_goal);
+
+            const int64_t left_rem  = std::abs(left_goal  - left_count);
+            const int64_t right_rem = std::abs(right_goal - right_count);
 
             RCLCPP_INFO_THROTTLE(node_->get_logger(), *node_->get_clock(), 200,
-                "DR | left_remaining=%ld  right_remaining=%ld  left_delta=%ld  right_delta=%ld",
-                dr_left_remaining_.load(), dr_right_remaining_.load(), left_delta, right_delta);
+                "DR | left=%ld goal=%ld rem=%ld done=%d  right=%ld goal=%ld rem=%ld done=%d",
+                left_count, left_goal, left_rem, left_done,
+                right_count, right_goal, right_rem, right_done);
 
-            if (dr_left_remaining_.load() <= 0 && dr_right_remaining_.load() <= 0) {
+            if (left_done && right_done) {
                 cmd_linear_.store(0.0);
                 cmd_angular_.store(0.0);
+                if (left_motor_)  left_motor_->hard_brake();                                                                                                                                     
+                if (right_motor_) right_motor_->hard_brake();
                 control_mode_.store(ControlMode::NORMAL);
-                RCLCPP_INFO(node_->get_logger(), "DR | Complete — stopping motors");
+                RCLCPP_INFO(node_->get_logger(), "DR | Complete —  braking motors");
             }
         }
 
