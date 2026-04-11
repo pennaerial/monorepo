@@ -71,7 +71,7 @@ install_pigpio() {
     deploy_info "Building and installing pigpio from source"
     local tmpdir
     tmpdir="$(mktemp -d)"
-    trap 'rm -rf -- '"$(printf '%q' "$tmpdir")" EXIT
+    trap 'run_root rm -rf -- '"$(printf '%q' "$tmpdir")"' >/dev/null 2>&1 || rm -rf -- '"$(printf '%q' "$tmpdir")"' >/dev/null 2>&1 || true' EXIT
 
     git clone --depth 1 https://github.com/joan2937/pigpio.git "$tmpdir/pigpio"
     pushd "$tmpdir/pigpio" >/dev/null

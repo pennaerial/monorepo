@@ -57,6 +57,61 @@ deploy_clock_is_synchronized() {
     return 1
 }
 
+deploy_fetch_http_time_epoch() {
+    local url="$1"
+
+    if command -v python3 >/dev/null 2>&1; then
+        python3 - "$url" <<'PY'
+import sys
+import urllib.request
+from email.utils import parsedate_to_datetime
+
+url = sys.argv[1]
+req = urllib.request.Request(url, method="GET")
+with urllib.request.urlopen(req, timeout=5) as resp:
+    date_header = resp.headers.get("Date")
+    if not date_header:
+        raise SystemExit(1)
+    dt = parsedate_to_datetime(date_header)
+    print(int(dt.timestamp()))
+PY
+        return $?
+    fi
+
+    return 1
+}
+
+deploy_http_time_fallback() {
+    local runner="${1:-}"
+    local urls="${HTTP_TIME_URLS:-http://connectivity-check.ubuntu.com/ http://ports.ubuntu.com/ubuntu-ports/ http://archive.ubuntu.com/ubuntu/}"
+    local url epoch
+
+    for url in $urls; do
+        epoch="$(deploy_fetch_http_time_epoch "$url" 2>/dev/null || true)"
+        if [[ -z "$epoch" ]]; then
+            continue
+        fi
+
+        deploy_info "Setting system clock from HTTP Date header: $url"
+        if [[ -n "$runner" ]]; then
+            "$runner" timedatectl set-ntp false >/dev/null 2>&1 || true
+            "$runner" date -u -s "@$epoch" >/dev/null
+            "$runner" hwclock --systohc >/dev/null 2>&1 || true
+            "$runner" timedatectl set-ntp true >/dev/null 2>&1 || true
+            "$runner" systemctl restart systemd-timesyncd >/dev/null 2>&1 || true
+        else
+            timedatectl set-ntp false >/dev/null 2>&1 || true
+            date -u -s "@$epoch" >/dev/null
+            hwclock --systohc >/dev/null 2>&1 || true
+            timedatectl set-ntp true >/dev/null 2>&1 || true
+            systemctl restart systemd-timesyncd >/dev/null 2>&1 || true
+        fi
+        return 0
+    done
+
+    return 1
+}
+
 deploy_preflight_time_sync() {
     local runner="${1:-}"
     if ! command -v timedatectl >/dev/null 2>&1; then
@@ -80,6 +135,11 @@ deploy_preflight_time_sync() {
         fi
         sleep 2
     done
+
+    if deploy_http_time_fallback "$runner"; then
+        deploy_warn "NTP did not synchronize the clock, but an HTTP Date fallback was applied. Continuing with the corrected system time."
+        return 0
+    fi
 
     deploy_warn "System clock is not yet reported as synchronized; apt may still fail until time is corrected."
     return 0
