@@ -44,8 +44,8 @@ class PayloadWaitForDriveOutMode(Mode):
         node: Node,
         vehicle: Payload,
         confirm_frames: int = 5,
-        lower_hsv: list = (0, 0, 180),
-        upper_hsv: list = (180, 20, 255),
+        lower_hsv: list[int] = (0, 0, 180),
+        upper_hsv: list[int] = (180, 20, 255),
         turn_angular: float = math.pi,
         turn_speed: float = 1.85,
     ):

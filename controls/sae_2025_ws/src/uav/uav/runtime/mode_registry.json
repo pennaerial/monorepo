@@ -1,193 +1,5 @@
 {
   "modes": {
-    "uav.modes.payload.AprilTagApproachMode": {
-      "class_name": "AprilTagApproachMode",
-      "class_path": "uav.modes.payload.AprilTagApproachMode",
-      "description": "Drives the payload straight toward a visible AprilTag.",
-      "display_name": "AprilTagApproachMode",
-      "mission_target": "payload",
-      "module_path": "uav.modes.payload.AprilTagApproachMode",
-      "param_fields": [
-        {
-          "annotation": {
-            "kind": "union",
-            "options": [
-              {
-                "kind": "int"
-              },
-              {
-                "kind": "none"
-              }
-            ]
-          },
-          "default": null,
-          "default_kind": "none",
-          "name": "tag_id",
-          "required": false
-        },
-        {
-          "annotation": {
-            "kind": "float"
-          },
-          "default": 0.0508,
-          "default_kind": "value",
-          "name": "tag_size_m",
-          "required": false
-        },
-        {
-          "annotation": {
-            "kind": "str"
-          },
-          "default": "tag36h11",
-          "default_kind": "value",
-          "name": "tag_family",
-          "required": false
-        },
-        {
-          "annotation": {
-            "kind": "float"
-          },
-          "default": 0.2,
-          "default_kind": "value",
-          "name": "max_forward_speed",
-          "required": false
-        },
-        {
-          "annotation": {
-            "kind": "float"
-          },
-          "default": 0.5,
-          "default_kind": "value",
-          "name": "forward_gain",
-          "required": false
-        },
-        {
-          "annotation": {
-            "kind": "float"
-          },
-          "default": 0.003,
-          "default_kind": "value",
-          "name": "angular_gain",
-          "required": false
-        },
-        {
-          "annotation": {
-            "kind": "float"
-          },
-          "default": 0.0,
-          "default_kind": "value",
-          "name": "yaw_gain",
-          "required": false
-        },
-        {
-          "annotation": {
-            "kind": "float"
-          },
-          "default": 0.2,
-          "default_kind": "value",
-          "name": "stop_distance_m",
-          "required": false
-        },
-        {
-          "annotation": {
-            "kind": "float"
-          },
-          "default": 0.5,
-          "default_kind": "value",
-          "name": "tag_lost_coast_s",
-          "required": false
-        },
-        {
-          "annotation": {
-            "kind": "bool"
-          },
-          "default": false,
-          "default_kind": "value",
-          "name": "camera_debug",
-          "required": false
-        },
-        {
-          "annotation": {
-            "kind": "bool"
-          },
-          "default": true,
-          "default_kind": "value",
-          "name": "sim",
-          "required": false
-        }
-      ],
-      "params_schema": {
-        "additionalProperties": false,
-        "properties": {
-          "angular_gain": {
-            "default": 0.003,
-            "title": "Angular Gain",
-            "type": "number"
-          },
-          "camera_debug": {
-            "default": false,
-            "title": "Camera Debug",
-            "type": "boolean"
-          },
-          "forward_gain": {
-            "default": 0.5,
-            "title": "Forward Gain",
-            "type": "number"
-          },
-          "max_forward_speed": {
-            "default": 0.2,
-            "title": "Max Forward Speed",
-            "type": "number"
-          },
-          "sim": {
-            "default": true,
-            "title": "Sim",
-            "type": "boolean"
-          },
-          "stop_distance_m": {
-            "default": 0.2,
-            "title": "Stop Distance M",
-            "type": "number"
-          },
-          "tag_family": {
-            "default": "tag36h11",
-            "title": "Tag Family",
-            "type": "string"
-          },
-          "tag_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Tag Id"
-          },
-          "tag_lost_coast_s": {
-            "default": 0.5,
-            "title": "Tag Lost Coast S",
-            "type": "number"
-          },
-          "tag_size_m": {
-            "default": 0.0508,
-            "title": "Tag Size M",
-            "type": "number"
-          },
-          "yaw_gain": {
-            "default": 0.0,
-            "title": "Yaw Gain",
-            "type": "number"
-          }
-        },
-        "title": "AprilTagApproachModeParams",
-        "type": "object"
-      },
-      "required_vision_nodes": [],
-      "transition_labels": []
-    },
     "uav.modes.payload.PayloadAprilTagApproachMode": {
       "class_name": "PayloadAprilTagApproachMode",
       "class_path": "uav.modes.payload.PayloadAprilTagApproachMode",
@@ -602,6 +414,70 @@
         },
         {
           "annotation": {
+            "item": {
+              "kind": "int"
+            },
+            "kind": "list"
+          },
+          "default": [
+            0,
+            80,
+            80
+          ],
+          "default_kind": "value",
+          "name": "ccw_lower_hsv",
+          "required": false
+        },
+        {
+          "annotation": {
+            "item": {
+              "kind": "int"
+            },
+            "kind": "list"
+          },
+          "default": [
+            10,
+            255,
+            255
+          ],
+          "default_kind": "value",
+          "name": "ccw_upper_hsv",
+          "required": false
+        },
+        {
+          "annotation": {
+            "item": {
+              "kind": "int"
+            },
+            "kind": "list"
+          },
+          "default": [
+            85,
+            120,
+            60
+          ],
+          "default_kind": "value",
+          "name": "cw_lower_hsv",
+          "required": false
+        },
+        {
+          "annotation": {
+            "item": {
+              "kind": "int"
+            },
+            "kind": "list"
+          },
+          "default": [
+            140,
+            255,
+            255
+          ],
+          "default_kind": "value",
+          "name": "cw_upper_hsv",
+          "required": false
+        },
+        {
+          "annotation": {
             "kind": "float"
           },
           "default": 0.12,
@@ -799,6 +675,30 @@
             "title": "Align Stable Frames",
             "type": "integer"
           },
+          "ccw_lower_hsv": {
+            "default": [
+              0,
+              80,
+              80
+            ],
+            "items": {
+              "type": "integer"
+            },
+            "title": "Ccw Lower Hsv",
+            "type": "array"
+          },
+          "ccw_upper_hsv": {
+            "default": [
+              10,
+              255,
+              255
+            ],
+            "items": {
+              "type": "integer"
+            },
+            "title": "Ccw Upper Hsv",
+            "type": "array"
+          },
           "center_min_pixels": {
             "default": 150,
             "title": "Center Min Pixels",
@@ -818,6 +718,30 @@
             "default": false,
             "title": "Compressed Image",
             "type": "boolean"
+          },
+          "cw_lower_hsv": {
+            "default": [
+              85,
+              120,
+              60
+            ],
+            "items": {
+              "type": "integer"
+            },
+            "title": "Cw Lower Hsv",
+            "type": "array"
+          },
+          "cw_upper_hsv": {
+            "default": [
+              140,
+              255,
+              255
+            ],
+            "items": {
+              "type": "integer"
+            },
+            "title": "Cw Upper Hsv",
+            "type": "array"
           },
           "detect_frames": {
             "default": 3,
@@ -1899,6 +1823,24 @@
         },
         {
           "annotation": {
+            "kind": "float"
+          },
+          "default": 3.141592653589793,
+          "default_kind": "value",
+          "name": "turn_angular",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 1.85,
+          "default_kind": "value",
+          "name": "turn_speed",
+          "required": false
+        },
+        {
+          "annotation": {
             "kind": "bool"
           },
           "default": false,
@@ -1954,6 +1896,11 @@
             "title": "Forward Speed Mps",
             "type": "number"
           },
+          "turn_angular": {
+            "default": 3.141592653589793,
+            "title": "Turn Angular",
+            "type": "number"
+          },
           "turn_angular_speed": {
             "default": 0.5,
             "title": "Turn Angular Speed",
@@ -1963,6 +1910,11 @@
             "default": 1,
             "title": "Turn Direction",
             "type": "integer"
+          },
+          "turn_speed": {
+            "default": 1.85,
+            "title": "Turn Speed",
+            "type": "number"
           }
         },
         "title": "PayloadRetreatModeParams",
@@ -2072,19 +2024,10 @@
         },
         {
           "annotation": {
-            "items": [
-              {
-                "kind": "int"
-              },
-              {
-                "kind": "int"
-              },
-              {
-                "kind": "int"
-              }
-            ],
-            "kind": "tuple",
-            "variadic": false
+            "item": {
+              "kind": "int"
+            },
+            "kind": "list"
           },
           "default": [
             0,
@@ -2097,19 +2040,10 @@
         },
         {
           "annotation": {
-            "items": [
-              {
-                "kind": "int"
-              },
-              {
-                "kind": "int"
-              },
-              {
-                "kind": "int"
-              }
-            ],
-            "kind": "tuple",
-            "variadic": false
+            "item": {
+              "kind": "int"
+            },
+            "kind": "list"
           },
           "default": [
             180,
@@ -2118,6 +2052,24 @@
           ],
           "default_kind": "value",
           "name": "upper_hsv",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 3.141592653589793,
+          "default_kind": "value",
+          "name": "turn_angular",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 1.85,
+          "default_kind": "value",
+          "name": "turn_speed",
           "required": false
         }
       ],
@@ -2135,21 +2087,21 @@
               0,
               180
             ],
-            "maxItems": 3,
-            "minItems": 3,
-            "prefixItems": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "integer"
-              },
-              {
-                "type": "integer"
-              }
-            ],
+            "items": {
+              "type": "integer"
+            },
             "title": "Lower Hsv",
             "type": "array"
+          },
+          "turn_angular": {
+            "default": 3.141592653589793,
+            "title": "Turn Angular",
+            "type": "number"
+          },
+          "turn_speed": {
+            "default": 1.85,
+            "title": "Turn Speed",
+            "type": "number"
           },
           "upper_hsv": {
             "default": [
@@ -2157,19 +2109,9 @@
               20,
               255
             ],
-            "maxItems": 3,
-            "minItems": 3,
-            "prefixItems": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "integer"
-              },
-              {
-                "type": "integer"
-              }
-            ],
+            "items": {
+              "type": "integer"
+            },
             "title": "Upper Hsv",
             "type": "array"
           }

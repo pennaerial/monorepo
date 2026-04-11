@@ -89,6 +89,11 @@ class PayloadCornerNavigateMode(Mode):
         node: Node,
         vehicle: Payload,
         direction: str = "ccw",
+        # HSV color ranges — ccw=color A (red), cw=color B (blue)
+        ccw_lower_hsv: list[int] = (0, 80, 80),
+        ccw_upper_hsv: list[int] = (10, 255, 255),
+        cw_lower_hsv: list[int] = (85, 120, 60),
+        cw_upper_hsv: list[int] = (140, 255, 255),
         # DRIVE_OUT
         drive_out_speed_mps: float = 0.12,
         detect_frames: int = 3,
@@ -121,6 +126,11 @@ class PayloadCornerNavigateMode(Mode):
         if direction not in ("cw", "ccw"):
             raise ValueError(f"direction must be 'cw' or 'ccw', got {direction!r}")
         self.direction = direction
+
+        self._lower_a = np.array(ccw_lower_hsv, dtype=np.uint8)
+        self._upper_a = np.array(ccw_upper_hsv, dtype=np.uint8)
+        self._lower_b = np.array(cw_lower_hsv, dtype=np.uint8)
+        self._upper_b = np.array(cw_upper_hsv, dtype=np.uint8)
 
         self.drive_out_speed_mps = float(drive_out_speed_mps)
         self.detect_frames = int(detect_frames)
@@ -187,6 +197,7 @@ class PayloadCornerNavigateMode(Mode):
 
     def on_enter(self) -> None:
         self._phase = "drive_out"
+        # self._phase = "line_follow"
         self._done = False
         self._terminate = False
 
@@ -214,7 +225,7 @@ class PayloadCornerNavigateMode(Mode):
         cam_topic = self.vehicle.namespaced_path("camera")
         if self.compressed_image:
             self._image_sub = self.node.create_subscription(
-                CompressedImage, cam_topic, self._image_cb, 10
+                CompressedImage, f"{cam_topic}/compressed", self._image_cb, 10
             )
         else:
             self._image_sub = self.node.create_subscription(
@@ -282,7 +293,7 @@ class PayloadCornerNavigateMode(Mode):
             return None
 
     def _lower_strip_color_counts(self, bgr: np.ndarray) -> Tuple[int, int]:
-        """Return (red_pixels, blue_pixels) in the bottom drive_out_strip_frac
+        """Return (color_a_pixels, color_b_pixels) in the bottom drive_out_strip_frac
         of the frame, cropped horizontally to the middle third so tape that
         only clips the corner of the FOV is ignored."""
         h, w = bgr.shape[:2]
@@ -291,12 +302,9 @@ class PayloadCornerNavigateMode(Mode):
         col_end = w - (w // 3)
         strip = bgr[strip_start:, col_start:col_end]
         hsv = cv2.cvtColor(strip, cv2.COLOR_BGR2HSV)
-        red_mask = cv2.bitwise_or(
-            cv2.inRange(hsv, _LOWER_A1, _UPPER_A1),
-            cv2.inRange(hsv, _LOWER_A2, _UPPER_A2),
-        )
-        blue_mask = cv2.inRange(hsv, _LOWER_B, _UPPER_B)
-        return int(np.count_nonzero(red_mask)), int(np.count_nonzero(blue_mask))
+        mask_a = cv2.inRange(hsv, self._lower_a, self._upper_a)
+        mask_b = cv2.inRange(hsv, self._lower_b, self._upper_b)
+        return int(np.count_nonzero(mask_a)), int(np.count_nonzero(mask_b))
 
     def _middle_third_color_metrics(
         self, bgr: np.ndarray
@@ -304,10 +312,10 @@ class PayloadCornerNavigateMode(Mode):
         """Look at the middle horizontal third of the frame (full height) and
         return ``(total_color_pixels, lateral_error_px, dominant_color)``:
 
-        - ``total_color_pixels`` — combined red+blue pixel count in the crop
+        - ``total_color_pixels`` — combined color_a+color_b pixel count in the crop
         - ``lateral_error_px`` — centroid x of those pixels minus the crop's
           center x; positive means colour is right of center
-        - ``dominant_color`` — ``"A"`` (red), ``"B"`` (blue), or ``None`` if
+        - ``dominant_color`` — ``"A"``, ``"B"``, or ``None`` if
           neither dominates / no colour is found
 
         Returns ``(0, 0.0, None)`` if no colour is found."""
@@ -316,24 +324,21 @@ class PayloadCornerNavigateMode(Mode):
         col_end = w - (w // 3)
         crop = bgr[:, col_start:col_end]
         hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
-        red_mask = cv2.bitwise_or(
-            cv2.inRange(hsv, _LOWER_A1, _UPPER_A1),
-            cv2.inRange(hsv, _LOWER_A2, _UPPER_A2),
-        )
-        blue_mask = cv2.inRange(hsv, _LOWER_B, _UPPER_B)
-        red_count = int(np.count_nonzero(red_mask))
-        blue_count = int(np.count_nonzero(blue_mask))
-        total = red_count + blue_count
+        mask_a = cv2.inRange(hsv, self._lower_a, self._upper_a)
+        mask_b = cv2.inRange(hsv, self._lower_b, self._upper_b)
+        count_a = int(np.count_nonzero(mask_a))
+        count_b = int(np.count_nonzero(mask_b))
+        total = count_a + count_b
         if total == 0:
             return 0, 0.0, None
-        combined = cv2.bitwise_or(red_mask, blue_mask)
+        combined = cv2.bitwise_or(mask_a, mask_b)
         ys, xs = np.nonzero(combined)
         centroid_x = float(xs.mean())
         crop_center_x = combined.shape[1] / 2.0
         dominant: Optional[str]
-        if red_count > blue_count:
+        if count_a > count_b:
             dominant = "A"
-        elif blue_count > red_count:
+        elif count_b > count_a:
             dominant = "B"
         else:
             dominant = None
@@ -343,7 +348,7 @@ class PayloadCornerNavigateMode(Mode):
         self, bgr: np.ndarray, color: str
     ) -> Tuple[int, float]:
         """Return ``(pixel_count, lateral_error_px)`` for a single colour
-        (``"A"`` red or ``"B"`` blue) within the bottom
+        (``"A"`` or ``"B"``) within the bottom
         ``line_follow_strip_frac`` of the frame, full width.
         ``lateral_error_px`` = centroid x of that colour minus the strip's
         center x. Positive = colour is right of center.
@@ -354,12 +359,9 @@ class PayloadCornerNavigateMode(Mode):
         strip = bgr[strip_start:, :]
         hsv = cv2.cvtColor(strip, cv2.COLOR_BGR2HSV)
         if color == "A":
-            mask = cv2.bitwise_or(
-                cv2.inRange(hsv, _LOWER_A1, _UPPER_A1),
-                cv2.inRange(hsv, _LOWER_A2, _UPPER_A2),
-            )
+            mask = cv2.inRange(hsv, self._lower_a, self._upper_a)
         elif color == "B":
-            mask = cv2.inRange(hsv, _LOWER_B, _UPPER_B)
+            mask = cv2.inRange(hsv, self._lower_b, self._upper_b)
         else:
             return 0, 0.0
         count = int(np.count_nonzero(mask))
@@ -391,17 +393,17 @@ class PayloadCornerNavigateMode(Mode):
             self.vehicle.drive(self.drive_out_speed_mps, 0.0)
             return
 
-        red_count, blue_count = self._lower_strip_color_counts(bgr)
+        count_a, count_b = self._lower_strip_color_counts(bgr)
         color_seen = (
-            red_count >= self.drive_out_min_pixels
-            or blue_count >= self.drive_out_min_pixels
+            count_a >= self.drive_out_min_pixels
+            or count_b >= self.drive_out_min_pixels
         )
 
         if self._do_substate == "seeking_tape":
             if color_seen:
                 self._enter_streak += 1
                 # Track the dominant colour each frame.
-                if red_count >= blue_count:
+                if count_a >= count_b:
                     self._first_color = "A"
                 else:
                     self._first_color = "B"
@@ -410,7 +412,7 @@ class PayloadCornerNavigateMode(Mode):
                     self._exit_streak = 0
                     self.log(
                         f"PayloadCornerNavigateMode: DRIVE_OUT line detected "
-                        f"colour={self._first_color} (red={red_count}px blue={blue_count}px) "
+                        f"colour={self._first_color} (A={count_a}px B={count_b}px) "
                         f"→ crossing_tape"
                     )
             else:
@@ -436,9 +438,9 @@ class PayloadCornerNavigateMode(Mode):
             self._exit_streak = 0
             # Refresh dominant colour while still crossing — covers grazing
             # initial detections that misread the side.
-            if red_count > blue_count:
+            if count_a > count_b:
                 self._first_color = "A"
-            elif blue_count > red_count:
+            elif count_b > count_a:
                 self._first_color = "B"
 
         self.vehicle.drive(self.drive_out_speed_mps, 0.0)

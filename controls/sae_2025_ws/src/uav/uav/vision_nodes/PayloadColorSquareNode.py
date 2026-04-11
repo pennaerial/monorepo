@@ -6,6 +6,7 @@ import cv2
 import numpy as np
 import rclpy
 from rclpy.executors import ExternalShutdownException
+from sensor_msgs.msg import CompressedImage
 
 from uav.utils import blue, red
 from uav_interfaces.srv import PayloadColorSquareState
@@ -22,7 +23,7 @@ _LOWER_B = np.array(blue[0], dtype=np.uint8)
 _UPPER_B = np.array(blue[1], dtype=np.uint8)
 
 # Fraction of the full frame height where the processing strip starts (bottom 4/9)
-_STRIP_START_FRAC = 5 / 9
+_STRIP_START_FRAC = 6 / 9
 # Minimum tape pixels in the strip to trust the current_color reading
 _MIN_COLOR_PIXELS = 20
 # Ratio threshold: one color must be at least this many times more than the other
@@ -122,7 +123,11 @@ class PayloadColorSquareNode(VisionNode):
             self.vision_service,
             self.service_callback,
         )
+        self._debug_pub: CompressedImage | None = None
         if self.debug:
+            debug_topic = self.vision_service + "/debug_image/compressed"
+            self._debug_pub = self.create_publisher(CompressedImage, debug_topic, 1)
+            self.get_logger().info(f"Debug image publishing on: {debug_topic}")
             self.create_timer(1.0 / 30.0, self._debug_timer_callback)
 
     def service_callback(
@@ -245,7 +250,10 @@ class PayloadColorSquareNode(VisionNode):
             1,
         )
 
-        self.display_frame(debug, self.node_name())
+        if self._debug_pub is not None:
+            msg = self.bridge.cv2_to_compressed_imgmsg(debug, dst_format="jpeg")
+            msg.header.stamp = self.get_clock().now().to_msg()
+            self._debug_pub.publish(msg)
 
 
 def main() -> None:

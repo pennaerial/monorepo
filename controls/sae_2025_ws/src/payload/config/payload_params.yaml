@@ -35,19 +35,19 @@
       wheel_separation_m: 0.12132
 
     pid:
-      left_kp: 0.004
+      left_kp: 0.003
       left_ki: 0.0036
       left_kd: 0.0
-      right_kp: 0.004
+      right_kp: 0.003
       right_ki: 0.0036
       right_kd: 0.0
       i_clamp: 1.0
       output_limit_norm: 1.0
       stop_deadband_rpm: 1.0
-      velocity_alpha: 0.8
+      velocity_alpha: 0.7
 
     control:
-      loop_ms: 20
+      loop_ms: 50
 
     servo:
       pulse_min_us: 700.0
