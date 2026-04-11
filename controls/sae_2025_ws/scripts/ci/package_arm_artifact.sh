@@ -36,25 +36,16 @@ Target Architecture: arm64 (Raspberry Pi compatible)
 Deployment Instructions:
 1. Extract to your Raspberry Pi
 2. cd to the extracted directory
-3. Install runtime deps:
-   sudo apt-get update
-   sudo apt-get install -y python3-pip build-essential cmake git
-   python3 -m pip install --user apriltag
-4. Install pigpio and start pigpiod:
-   cd /tmp
-   git clone --depth 1 https://github.com/joan2937/pigpio.git
-   cd pigpio
-   cmake . -DBUILD_SHARED_LIBS=ON
-   make -j$(nproc)
-   sudo make install
-   sudo ldconfig
-   sudo /usr/local/bin/pigpiod
-5. Source the setup: source install/setup.bash
-6. Run: ros2 launch uav main.launch.py
+3. Bootstrap the Pi once:
+   scripts/hardware/bootstrap-pi.sh
+4. Install the release into a deploy root:
+   scripts/deploy.sh
+5. Launch the hardware runtime:
+   ~/pennair-deploy/bin/runtime_fleet
 
 Configuration:
-- Integration edits the installed launch params and mission YAMLs under install/uav/share/uav/
-- Launch overrides still use ROS 2 launch arguments such as mission_name:=..., vehicle_name:=..., and px4_path:=...
+- Runtime config lives outside the artifact under DEPLOY_ROOT/config/
+- The hardware entrypoint is fleet-based: runtime_fleet -> ros2 launch uav fleet.launch.py fleet_file:=...
 EOF
 
 ci_log "Preparing runtime files"
@@ -65,6 +56,10 @@ cp "$WORKSPACE_ROOT/src/uav/launch/launch_params_hardware.yaml" \
     "$DEPLOY_DIR/install/uav/share/uav/launch/launch_params.yaml"
 if [[ -f "$WORKSPACE_ROOT/scripts/deploy.sh" ]]; then
     cp "$WORKSPACE_ROOT/scripts/deploy.sh" "$DEPLOY_DIR/"
+fi
+if [[ -d "$WORKSPACE_ROOT/scripts/hardware" ]]; then
+    mkdir -p "$DEPLOY_DIR/hardware"
+    cp -a "$WORKSPACE_ROOT/scripts/hardware/." "$DEPLOY_DIR/hardware/"
 fi
 
 ci_log "Packaging build artifact"

@@ -13,6 +13,7 @@ class ServoDropoffMode(Mode):
     """
 
     mission_target = "uav"
+    transition_labels = ("complete",)
 
     def __init__(
         self,

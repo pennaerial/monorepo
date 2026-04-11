@@ -106,9 +106,28 @@ def fake_mission_loader(monkeypatch, fleet_launch_module):
 
 def test_backend_config_rejects_unsupported_kind(fleet_launch_module):
     fleet = _example_fleet()
-    fleet["backend"]["kind"] = "hardware"
+    fleet["backend"]["kind"] = "unknown"
     with pytest.raises(ValueError, match="Unsupported backend kind"):
         fleet_launch_module._backend_config(fleet)
+
+
+def test_backend_config_accepts_hardware_backend(fleet_launch_module):
+    fleet = {
+        "backend": {"kind": "hardware", "px4_path": "~/PX4-Autopilot"},
+        "vehicles": [
+            {
+                "name": "uav_alpha",
+                "mission_path": "/tmp/hover.yaml",
+                "kind": "uav",
+                "px4_airframe_id": 4004,
+            }
+        ],
+    }
+
+    backend = fleet_launch_module._backend_config(fleet)
+
+    assert backend["kind"] == "hardware"
+    assert backend["px4_path"] == "~/PX4-Autopilot"
 
 
 def test_backend_config_rejects_embedded_world(fleet_launch_module):
@@ -240,3 +259,53 @@ def test_vehicle_stack_configs_rejects_missing_backend_airframe_id(
     ]
     with pytest.raises(ValueError, match="define px4_airframe_id"):
         fleet_launch_module._vehicle_stack_configs(fleet)
+
+
+def test_vehicle_stack_configs_support_hardware_uav(
+    fleet_launch_module, fake_mission_loader
+):
+    fleet = {
+        "backend": {"kind": "hardware", "px4_path": "~/PX4-Autopilot"},
+        "vehicles": [
+            {
+                "name": "uav_alpha",
+                "mission_path": "/tmp/hover.yaml",
+                "kind": "uav",
+                "px4_airframe_id": 4004,
+                "px4_namespace": "uav_alpha",
+                "auto_launch": False,
+            }
+        ],
+    }
+
+    backend, vehicles = fleet_launch_module._vehicle_stack_configs(fleet)
+
+    assert backend["kind"] == "hardware"
+    assert vehicles[0]["sim"] is False
+    assert vehicles[0]["launch_px4_sitl"] is False
+    assert vehicles[0]["launch_middleware"] is True
+    assert vehicles[0]["px4_airframe_id"] == 4004
+    assert vehicles[0]["px4_namespace"] == "uav_alpha"
+    assert vehicles[0]["auto_launch"] is False
+
+
+def test_vehicle_stack_configs_support_hardware_payload(
+    fleet_launch_module, fake_mission_loader
+):
+    fleet = {
+        "backend": {"kind": "hardware"},
+        "vehicles": [
+            {
+                "name": "payload_alpha",
+                "mission_path": "/tmp/payload_retreat.yaml",
+                "kind": "payload",
+                "payload_controller": "GPIOController",
+            }
+        ],
+    }
+
+    _, vehicles = fleet_launch_module._vehicle_stack_configs(fleet)
+
+    assert vehicles[0]["sim"] is False
+    assert vehicles[0]["launch_payload_backend"] is True
+    assert vehicles[0]["payload_controller"] == "GPIOController"

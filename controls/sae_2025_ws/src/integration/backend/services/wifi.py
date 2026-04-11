@@ -7,14 +7,18 @@ import subprocess
 from ..context import AppContext
 
 
-async def wifi_status(ctx: AppContext) -> dict:
+async def wifi_status(ctx: AppContext, *, target_id: str | None = None) -> dict:
+    session = ctx.resolve_target(target_id)
     try:
-        result = await ctx.ssh.run(
+        result = await session.ssh.run(
             "nmcli -f NAME,TYPE,DEVICE,STATE con show --active | tail -n +2",
             timeout=15,
         )
         if result.returncode != 0:
-            return {"success": False, "error": ctx.ssh.friendly_error(result.stderr)}
+            return {
+                "success": False,
+                "error": session.ssh.friendly_error(result.stderr),
+            }
 
         connections = []
         for line in result.stdout.strip().split("\n"):
@@ -31,7 +35,9 @@ async def wifi_status(ctx: AppContext) -> dict:
                     }
                 )
 
-        is_hotspot = any(c["name"] == ctx.config.hotspot_name for c in connections)
+        is_hotspot = any(
+            c["name"] == ctx.operator_config.hotspot_name for c in connections
+        )
         wifi_con = next(
             (c for c in connections if c["type"] == "802-11-wireless"), None
         )
@@ -42,21 +48,22 @@ async def wifi_status(ctx: AppContext) -> dict:
             "connections": connections,
         }
     except subprocess.TimeoutExpired:
-        return {"success": False, "error": ctx.ssh.friendly_timeout()}
+        return {"success": False, "error": session.ssh.friendly_timeout()}
     except Exception as exc:
-        return {"success": False, "error": ctx.ssh.friendly_error(str(exc))}
+        return {"success": False, "error": session.ssh.friendly_error(str(exc))}
 
 
-async def wifi_scan(ctx: AppContext) -> dict:
+async def wifi_scan(ctx: AppContext, *, target_id: str | None = None) -> dict:
+    session = ctx.resolve_target(target_id)
     try:
-        result = await ctx.ssh.run(
+        result = await session.ssh.run(
             r"nmcli -f SSID,SIGNAL,SECURITY dev wifi list --rescan yes | tail -n +2",
             timeout=20,
         )
         if result.returncode != 0:
             return {
                 "success": False,
-                "error": ctx.ssh.friendly_error(result.stderr),
+                "error": session.ssh.friendly_error(result.stderr),
                 "networks": [],
             }
 
@@ -91,47 +98,57 @@ async def wifi_scan(ctx: AppContext) -> dict:
     except Exception as exc:
         return {
             "success": False,
-            "error": ctx.ssh.friendly_error(str(exc)),
+            "error": session.ssh.friendly_error(str(exc)),
             "networks": [],
         }
 
 
-async def wifi_connect(ctx: AppContext, ssid: str, password: str) -> dict:
-    hotspot_name = ctx.ssh.q(ctx.config.hotspot_name)
+async def wifi_connect(
+    ctx: AppContext, *, target_id: str | None = None, ssid: str, password: str
+) -> dict:
+    session = ctx.resolve_target(target_id)
+    hotspot_name = session.ssh.q(ctx.operator_config.hotspot_name)
     try:
-        await ctx.ssh.run(
+        await session.ssh.run(
             f"nmcli con down {hotspot_name} 2>/dev/null; sleep 2", timeout=15
         )
-        pwd_arg = f" password {ctx.ssh.q(password)}" if password else ""
-        result = await ctx.ssh.run(
-            f"nmcli dev wifi connect {ctx.ssh.q(ssid)}{pwd_arg}", timeout=30
+        pwd_arg = f" password {session.ssh.q(password)}" if password else ""
+        result = await session.ssh.run(
+            f"nmcli dev wifi connect {session.ssh.q(ssid)}{pwd_arg}", timeout=30
         )
         if result.returncode != 0:
-            await ctx.ssh.run(f"nmcli con up {hotspot_name}", timeout=15)
+            await session.ssh.run(f"nmcli con up {hotspot_name}", timeout=15)
             return {
                 "success": False,
-                "error": ctx.ssh.format_remote_error(
+                "error": session.ssh.format_remote_error(
                     result.stderr, "Failed to connect"
                 ),
             }
 
         return {"success": True, "output": f"Pi connected to {ssid}"}
     except Exception as exc:
-        await ctx.ssh.run(f"nmcli con up {hotspot_name}", timeout=15)
-        return {"success": False, "error": ctx.ssh.friendly_error(str(exc))}
+        await session.ssh.run(f"nmcli con up {hotspot_name}", timeout=15)
+        return {"success": False, "error": session.ssh.friendly_error(str(exc))}
 
 
-async def wifi_hotspot(ctx: AppContext) -> dict:
+async def wifi_hotspot(ctx: AppContext, *, target_id: str | None = None) -> dict:
+    session = ctx.resolve_target(target_id)
     try:
-        await ctx.ssh.run("nmcli dev disconnect wlan0 2>/dev/null; sleep 1", timeout=15)
-        result = await ctx.ssh.run(
-            f"nmcli con up {ctx.ssh.q(ctx.config.hotspot_name)}", timeout=15
+        await session.ssh.run(
+            "nmcli dev disconnect wlan0 2>/dev/null; sleep 1", timeout=15
+        )
+        result = await session.ssh.run(
+            f"nmcli con up {session.ssh.q(ctx.operator_config.hotspot_name)}",
+            timeout=15,
         )
         if result.returncode != 0:
-            return {"success": False, "error": ctx.ssh.friendly_error(result.stderr)}
+            return {
+                "success": False,
+                "error": session.ssh.friendly_error(result.stderr),
+            }
         return {"success": True, "output": "Hotspot activated"}
     except Exception as exc:
-        return {"success": False, "error": ctx.ssh.friendly_error(str(exc))}
+        return {"success": False, "error": session.ssh.friendly_error(str(exc))}
 
 
 async def switch_local_wifi(ssid: str, password: str) -> dict:

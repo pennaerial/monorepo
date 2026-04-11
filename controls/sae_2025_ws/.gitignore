@@ -3,3 +3,4 @@ build/
 dist/
 __pycache__/
 .pytest_cache/
+src/integration/.integration_inventory.json

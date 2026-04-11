@@ -1,13 +1,40 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import os
 import re
+import shutil
+import tarfile
 import tempfile
+import xml.etree.ElementTree as ET
+import zipfile
+from copy import deepcopy
 from pathlib import Path
 
-from ..context import AppContext
+import yaml
+
+from ..context import AppContext, TargetContext
+from uav.runtime.mission_spec import MissionSpec
 
 _ARTIFACT_NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+_SOURCE_BUNDLE_EXTENSIONS = (".tar.gz", ".tgz", ".zip")
+_RELEASE_METADATA_NAME = "RELEASE_METADATA.yaml"
+_SHARED_OVERLAY_KEYS = {
+    "kind",
+    "mission",
+    "mission_path",
+    "auto_launch",
+    "debug",
+    "vision_debug",
+    "save_vision_milliseconds",
+    "servo_only",
+    "camera_mount_offsets",
+    "camera_input_transport",
+    "camera_rotate_degrees",
+    "camera_preprocess_hook",
+}
+_UAV_OVERLAY_KEYS = _SHARED_OVERLAY_KEYS | {"px4_airframe_id", "px4_namespace"}
+_PAYLOAD_OVERLAY_KEYS = _SHARED_OVERLAY_KEYS | {"payload_controller"}
 
 
 def _require_httpx():
@@ -24,8 +51,8 @@ def _require_httpx():
 
 def _github_headers(ctx: AppContext) -> dict:
     headers = {"Accept": "application/vnd.github+json"}
-    if ctx.config.github_token:
-        headers["Authorization"] = f"Bearer {ctx.config.github_token}"
+    if ctx.operator_config.github_token:
+        headers["Authorization"] = f"Bearer {ctx.operator_config.github_token}"
     return headers
 
 
@@ -41,211 +68,1470 @@ def sanitize_artifact_name(filename: str) -> str:
     return name
 
 
-async def _copy_artifact_to_pi(
-    ctx: AppContext, local_path: str, artifact_name: str
+def sanitize_source_bundle_name(filename: str) -> str:
+    name = sanitize_artifact_name(filename)
+    if not name.endswith(_SOURCE_BUNDLE_EXTENSIONS):
+        raise ValueError(
+            "Source bundle must be one of: .tar.gz, .tgz, or .zip."
+        )
+    return name
+
+
+def _repo_root(ctx: AppContext) -> Path:
+    return ctx.base_dir.parent.parent.resolve()
+
+
+def _missions_root(ctx: AppContext) -> Path:
+    return _repo_root(ctx) / "src" / "uav" / "uav" / "missions"
+
+
+def _resolve_local_path(ctx: AppContext, raw_path: str) -> Path:
+    candidate = Path(os.path.expanduser(raw_path))
+    if candidate.is_absolute():
+        return candidate.resolve()
+    repo_root = _repo_root(ctx)
+    if (repo_root / candidate).exists():
+        return (repo_root / candidate).resolve()
+    return (ctx.base_dir / candidate).resolve()
+
+
+def _load_local_yaml(path: Path) -> dict:
+    with path.open("r", encoding="utf-8") as handle:
+        payload = yaml.safe_load(handle) or {}
+    if not isinstance(payload, dict):
+        raise ValueError(f"YAML file '{path}' must define a mapping.")
+    return payload
+
+
+def _vehicle_from_fleet(fleet: dict, vehicle_name: str) -> dict:
+    vehicles = fleet.get("vehicles", [])
+    if not isinstance(vehicles, list):
+        raise ValueError("Fleet file vehicles must be a list.")
+    for vehicle in vehicles:
+        if (
+            isinstance(vehicle, dict)
+            and str(vehicle.get("name", "")).strip() == vehicle_name
+        ):
+            return deepcopy(vehicle)
+    raise ValueError(f"Fleet file does not define a vehicle named '{vehicle_name}'.")
+
+
+def _mission_source_for(ctx: AppContext, vehicle: dict) -> tuple[str, Path, MissionSpec]:
+    mission_path = str(vehicle.get("mission_path", "")).strip()
+    if mission_path:
+        local_path = _resolve_local_path(ctx, mission_path)
+        mission_name = Path(local_path).stem
+        return mission_name, local_path, MissionSpec.load(local_path)
+
+    mission_name = str(vehicle.get("mission", "")).strip()
+    if not mission_name:
+        raise ValueError("Selected vehicle is missing mission or mission_path.")
+    local_path = (_missions_root(ctx) / f"{mission_name}.yaml").resolve()
+    if not local_path.exists():
+        raise ValueError(f"Mission '{mission_name}' was not found at '{local_path}'.")
+    return mission_name, local_path, MissionSpec.load(local_path)
+
+
+def _normalized_camera_offsets(value: object) -> list[float]:
+    if isinstance(value, list) and len(value) == 3:
+        return [float(component) for component in value]
+    return [0.0, 0.0, 0.0]
+
+
+def _bool_value(value: object, *, default: bool) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _validate_overlay_data(
+    target_ctx: TargetContext,
+    overlay: dict[str, object],
+    *,
+    mission_target: str,
 ) -> None:
-    mkdir_result = await ctx.ssh.run(
-        f"mkdir -p {ctx.ssh.q(ctx.config.remote_dir)}", timeout=10
+    allowed = _UAV_OVERLAY_KEYS if mission_target == "uav" else _PAYLOAD_OVERLAY_KEYS
+    unknown = sorted(set(overlay) - allowed)
+    if unknown:
+        raise ValueError(
+            f"Target '{target_ctx.target.target_id}' overlay has unsupported fields: {unknown}."
+        )
+
+    declared_kind = str(overlay.get("kind", "")).strip()
+    if declared_kind and declared_kind != mission_target:
+        raise ValueError(
+            f"Target '{target_ctx.target.target_id}' overlay declares kind '{declared_kind}', "
+            f"but mission target is '{mission_target}'."
+        )
+
+    if mission_target == "uav" and overlay.get("px4_airframe_id") is None:
+        raise ValueError(
+            f"Target '{target_ctx.target.target_id}' must define px4_airframe_id in its overlay for UAV hardware launch."
+        )
+
+
+def _validate_runtime_vehicle(runtime_vehicle: dict[str, object]) -> None:
+    name = str(runtime_vehicle.get("name", "")).strip() or "<unnamed>"
+    mission_target = str(runtime_vehicle.get("kind", "")).strip()
+    if mission_target not in {"uav", "payload"}:
+        raise ValueError(f"Runtime vehicle '{name}' has unsupported kind '{mission_target}'.")
+    if not str(runtime_vehicle.get("mission_path", "")).strip():
+        raise ValueError(f"Runtime vehicle '{name}' requires a mission_path.")
+    if not isinstance(runtime_vehicle.get("camera_mount_offsets"), list):
+        raise ValueError(
+            f"Runtime vehicle '{name}' camera_mount_offsets must be a 3-element list."
+        )
+    if mission_target == "uav" and runtime_vehicle.get("px4_airframe_id") is None:
+        raise ValueError(
+            f"Runtime vehicle '{name}' requires px4_airframe_id for UAV hardware launch."
+        )
+    if mission_target == "payload" and not str(
+        runtime_vehicle.get("payload_controller", "")
+    ).strip():
+        raise ValueError(
+            f"Runtime vehicle '{name}' requires payload_controller for payload hardware launch."
+        )
+
+
+def _release_metadata_payload(
+    target_ctx: TargetContext,
+    *,
+    release_id: str,
+    source_type: str,
+    source_label: str,
+    package_names: list[str] | None = None,
+) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "release_id": release_id,
+        "source_type": source_type,
+        "source_label": source_label,
+        "target_id": target_ctx.target.target_id,
+        "vehicle_name": target_ctx.target.vehicle_name,
+        "fleet_file": target_ctx.target.fleet_file,
+        "deployed_at_utc": datetime.now(timezone.utc)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z"),
+    }
+    if package_names:
+        payload["packages"] = list(package_names)
+    return payload
+
+
+def _release_metadata_summary(metadata: dict[str, object]) -> str:
+    rows = []
+    for label, key in (
+        ("Release", "release_id"),
+        ("Source", "source_type"),
+        ("Source label", "source_label"),
+        ("Target", "target_id"),
+        ("Vehicle", "vehicle_name"),
+        ("Deployed", "deployed_at_utc"),
+    ):
+        value = metadata.get(key)
+        if value:
+            rows.append(f"{label}: {value}")
+    packages = metadata.get("packages")
+    if isinstance(packages, list) and packages:
+        rows.append(f"Packages: {', '.join(str(pkg) for pkg in packages)}")
+    return "\n".join(rows)
+
+
+def _extract_archive_local(archive_path: Path, destination: Path) -> None:
+    if archive_path.name.endswith(".zip"):
+        with zipfile.ZipFile(archive_path) as bundle:
+            bundle.extractall(destination)
+        return
+    if archive_path.name.endswith(".tar.gz") or archive_path.name.endswith(".tgz"):
+        with tarfile.open(archive_path, "r:gz") as bundle:
+            bundle.extractall(destination)
+        return
+    raise ValueError(
+        f"Unsupported source bundle '{archive_path.name}'. Use .tar.gz, .tgz, or .zip."
+    )
+
+
+def _package_name_for(package_dir: Path) -> str:
+    root = ET.parse(package_dir / "package.xml").getroot()
+    name = root.findtext("name", "").strip()
+    if not name:
+        raise ValueError(f"Package '{package_dir}' is missing a <name> in package.xml.")
+    return name
+
+
+def _normalize_source_bundle(
+    bundle_path: str, bundle_name: str
+) -> tuple[str, list[str], str]:
+    sanitized_name = sanitize_source_bundle_name(bundle_name)
+    source_bundle = Path(bundle_path)
+    package_roots: list[Path] = []
+    package_names: list[str] = []
+    temp_root = Path(tempfile.mkdtemp(prefix="integration-source-bundle-"))
+    extract_dir = temp_root / "extract"
+    normalized_root = temp_root / "normalized"
+    extract_dir.mkdir(parents=True, exist_ok=True)
+    normalized_root.mkdir(parents=True, exist_ok=True)
+
+    try:
+        _extract_archive_local(source_bundle, extract_dir)
+        seen_dirs: set[Path] = set()
+        for package_xml in sorted(extract_dir.rglob("package.xml")):
+            package_dir = package_xml.parent
+            if package_dir in seen_dirs:
+                continue
+            seen_dirs.add(package_dir)
+            package_roots.append(package_dir)
+
+        if not package_roots:
+            raise ValueError(
+                "Source bundle does not contain any ROS packages with package.xml."
+            )
+
+        dest_src = normalized_root / "src"
+        dest_src.mkdir(parents=True, exist_ok=True)
+        seen_package_names: set[str] = set()
+        seen_dest_dirs: set[str] = set()
+        for package_dir in package_roots:
+            package_name = _package_name_for(package_dir)
+            if package_name in seen_package_names:
+                raise ValueError(
+                    f"Source bundle contains duplicate ROS package '{package_name}'."
+                )
+            seen_package_names.add(package_name)
+            dest_name = package_dir.name
+            if dest_name in seen_dest_dirs:
+                raise ValueError(
+                    "Source bundle contains multiple packages with the same directory "
+                    f"name '{dest_name}'. Rename one of them before bundling."
+                )
+            seen_dest_dirs.add(dest_name)
+            shutil.copytree(package_dir, dest_src / dest_name)
+            package_names.append(package_name)
+
+        normalized_tarball = temp_root / "normalized-source-bundle.tar.gz"
+        with tarfile.open(normalized_tarball, "w:gz") as archive:
+            archive.add(dest_src, arcname="src")
+        return str(normalized_tarball), sorted(package_names), sanitized_name
+    except Exception:
+        shutil.rmtree(temp_root, ignore_errors=True)
+        raise
+
+
+def _render_runtime_fleet(
+    ctx: AppContext, target_ctx: TargetContext
+) -> tuple[str, str, str]:
+    target = target_ctx.target
+    fleet_path = _resolve_local_path(ctx, target.fleet_file)
+    shared_fleet = _load_local_yaml(fleet_path)
+    fleet_defaults = deepcopy(shared_fleet.get("defaults", {}))
+    if fleet_defaults is None:
+        fleet_defaults = {}
+    if not isinstance(fleet_defaults, dict):
+        raise ValueError("Shared fleet defaults must be a mapping.")
+
+    selected_vehicle = _vehicle_from_fleet(shared_fleet, target.vehicle_name)
+    overlay = target.overlay_data()
+
+    merged = deepcopy(fleet_defaults)
+    merged.update(selected_vehicle)
+    merged.update(overlay)
+
+    mission_name, local_mission_path, mission_spec = _mission_source_for(ctx, merged)
+    mission_target = mission_spec.target
+    _validate_overlay_data(target_ctx, overlay, mission_target=mission_target)
+    remote_mission_path = (
+        f"{target.deploy_paths()['missions_dir']}/{Path(local_mission_path).name}"
+    )
+
+    runtime_vehicle = {
+        "name": target.vehicle_name,
+        "kind": mission_target,
+        "mission": mission_name,
+        "mission_path": remote_mission_path,
+        "auto_launch": _bool_value(merged.get("auto_launch"), default=False),
+        "debug": _bool_value(merged.get("debug"), default=False),
+        "vision_debug": _bool_value(merged.get("vision_debug"), default=False),
+        "save_vision_milliseconds": int(merged.get("save_vision_milliseconds", 0) or 0),
+        "servo_only": _bool_value(merged.get("servo_only"), default=False),
+        "camera_mount_offsets": _normalized_camera_offsets(
+            merged.get("camera_mount_offsets")
+        ),
+        "camera_input_transport": str(
+            merged.get("camera_input_transport", "compressed")
+        ).strip(),
+        "camera_rotate_degrees": float(
+            merged.get(
+                "camera_rotate_degrees", 180.0 if mission_target == "payload" else 0.0
+            )
+            or 0.0
+        ),
+        "camera_preprocess_hook": str(merged.get("camera_preprocess_hook", "")).strip(),
+    }
+
+    if mission_target == "uav":
+        px4_airframe_id = merged.get("px4_airframe_id")
+        runtime_vehicle["px4_airframe_id"] = int(px4_airframe_id)
+        runtime_vehicle["px4_namespace"] = (
+            str(merged.get("px4_namespace", target.vehicle_name)).strip()
+            or target.vehicle_name
+        )
+    else:
+        runtime_vehicle["payload_controller"] = (
+            str(merged.get("payload_controller", "GPIOController")).strip()
+            or "GPIOController"
+        )
+
+    _validate_runtime_vehicle(runtime_vehicle)
+
+    runtime_fleet = {
+        "backend": {"kind": "hardware"},
+        "vehicles": [runtime_vehicle],
+    }
+    return (
+        yaml.safe_dump(runtime_fleet, sort_keys=False),
+        yaml.safe_dump(shared_fleet, sort_keys=False),
+        str(local_mission_path),
+    )
+
+
+def validate_overlay_preview(
+    ctx: AppContext, target_ctx: TargetContext, content: str
+) -> tuple[dict, str]:
+    original = target_ctx.target.overlay_yaml
+    try:
+        target_ctx.target.overlay_yaml = content
+        parsed = target_ctx.target.overlay_data()
+        _render_runtime_fleet(ctx, target_ctx)
+        return parsed, target_ctx.target.overlay_yaml
+    finally:
+        target_ctx.target.overlay_yaml = original
+
+
+async def _copy_file_to_pi(
+    target_ctx: TargetContext, *, local_path: str, remote_name: str
+) -> None:
+    remote_root = target_ctx.target.deploy_paths()["incoming_dir"]
+    mkdir_result = await target_ctx.ssh.run(
+        f"mkdir -p {target_ctx.ssh.q(remote_root)}", timeout=10
     )
     if mkdir_result.returncode != 0:
         raise RuntimeError(
-            ctx.ssh.format_remote_error(
-                mkdir_result.stderr, "Prepare remote directory failed"
+            target_ctx.ssh.format_remote_error(
+                mkdir_result.stderr, "Prepare remote incoming directory failed"
             )
         )
 
-    remote_path = f"{ctx.config.remote_dir}/{artifact_name}"
-    copy_result = await ctx.ssh.scp(local_path, remote_path, timeout=300)
+    remote_path = f"{remote_root}/{remote_name}"
+    copy_result = await target_ctx.ssh.scp(local_path, remote_path, timeout=300)
     if copy_result.returncode != 0:
         raise RuntimeError(
-            ctx.ssh.format_remote_error(copy_result.stderr, "SCP failed")
+            target_ctx.ssh.format_remote_error(copy_result.stderr, "SCP failed")
         )
 
 
-async def _extract_artifact_on_pi(ctx: AppContext, artifact_name: str) -> None:
+async def _copy_artifact_to_pi(
+    target_ctx: TargetContext, local_path: str, artifact_name: str
+) -> None:
+    await _copy_file_to_pi(
+        target_ctx, local_path=local_path, remote_name=artifact_name
+    )
+
+
+async def _copy_text_to_pi(
+    target_ctx: TargetContext, *, remote_path: str, content: str, suffix: str = ".yaml"
+) -> None:
+    tmp_path = ""
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=suffix, delete=False) as tmp:
+            tmp.write(content)
+            tmp_path = tmp.name
+        result = await target_ctx.ssh.scp(tmp_path, remote_path, timeout=60)
+        if result.returncode != 0:
+            raise RuntimeError(
+                target_ctx.ssh.format_remote_error(result.stderr, "SCP failed")
+            )
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+
+
+async def _ensure_remote_layout(target_ctx: TargetContext) -> None:
+    paths = target_ctx.target.deploy_paths()
+    result = await target_ctx.ssh.run(
+        "mkdir -p "
+        + " ".join(
+            target_ctx.ssh.q(paths[key])
+            for key in (
+                "incoming_dir",
+                "releases_dir",
+                "config_dir",
+                "state_dir",
+                "exports_dir",
+                "missions_dir",
+            )
+        ),
+        timeout=15,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            target_ctx.ssh.format_remote_error(
+                result.stderr, "Prepare deploy root failed"
+            )
+        )
+
+
+async def _seed_repo_missions(ctx: AppContext, target_ctx: TargetContext) -> None:
+    missions_root = _missions_root(ctx)
+    if not missions_root.exists():
+        return
+
+    tmp_archive = ""
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".tar.gz", delete=False) as tmp:
+            tmp_archive = tmp.name
+        import tarfile
+
+        with tarfile.open(tmp_archive, "w:gz") as archive:
+            for mission_path in sorted(missions_root.glob("*.yaml")):
+                archive.add(mission_path, arcname=mission_path.name)
+
+        remote_archive = (
+            f"{target_ctx.target.deploy_paths()['incoming_dir']}/mission-seed.tar.gz"
+        )
+        copy_result = await target_ctx.ssh.scp(tmp_archive, remote_archive, timeout=120)
+        if copy_result.returncode != 0:
+            raise RuntimeError(
+                target_ctx.ssh.format_remote_error(
+                    copy_result.stderr, "Seed mission upload failed"
+                )
+            )
+
+        cmd = f"""
+            set -e
+            missions_dir={target_ctx.ssh.q(target_ctx.target.deploy_paths()["missions_dir"])}
+            archive={target_ctx.ssh.q(remote_archive)}
+            temp_dir="$(mktemp -d)"
+            mkdir -p "$missions_dir"
+            tar -xzf "$archive" -C "$temp_dir"
+            find "$temp_dir" -maxdepth 1 -type f \\( -name '*.yaml' -o -name '*.yml' \\) -print0 | \
+                while IFS= read -r -d '' src; do
+                    base="$(basename "$src")"
+                    if [ ! -e "$missions_dir/$base" ]; then
+                        cp "$src" "$missions_dir/$base"
+                    fi
+                done
+            rm -rf "$temp_dir" "$archive"
+        """
+        result = await target_ctx.ssh.run(
+            f"bash -lc {target_ctx.ssh.q(cmd)}", timeout=60
+        )
+        if result.returncode != 0:
+            raise RuntimeError(
+                target_ctx.ssh.format_remote_error(
+                    result.stderr or result.stdout, "Seed missions failed"
+                )
+            )
+    finally:
+        if tmp_archive and os.path.exists(tmp_archive):
+            os.unlink(tmp_archive)
+
+
+def _parse_stage_output(stdout: str, *, error_prefix: str) -> dict[str, str]:
+    markers: dict[str, str] = {}
+    for line in (stdout or "").splitlines():
+        if line.startswith("__RELEASE_ID__:"):
+            markers["release_id"] = line.split(":", 1)[1].strip()
+        elif line.startswith("__RELEASE_DIR__:"):
+            markers["release_dir"] = line.split(":", 1)[1].strip()
+        elif line.startswith("__PREVIOUS_TARGET__:"):
+            markers["previous_target"] = line.split(":", 1)[1].strip()
+
+    if not markers.get("release_id") or not markers.get("release_dir"):
+        raise RuntimeError(f"{error_prefix}: remote deploy output was incomplete.")
+    markers.setdefault("previous_target", "")
+    return markers
+
+
+async def _extract_release_on_pi(
+    target_ctx: TargetContext, artifact_name: str
+) -> dict[str, str]:
+    paths = target_ctx.target.deploy_paths()
     cmd = f"""
         set -e
-        cd {ctx.ssh.q(ctx.config.remote_dir)}
-        if [ -d install ]; then
-            rm -rf install.bak
-            mv install install.bak 2>/dev/null || true
+        incoming_dir={target_ctx.ssh.q(paths["incoming_dir"])}
+        releases_dir={target_ctx.ssh.q(paths["releases_dir"])}
+        current_link={target_ctx.ssh.q(paths["current_link"])}
+        previous_link={target_ctx.ssh.q(paths["previous_link"])}
+        artifact_name={target_ctx.ssh.q(artifact_name)}
+        artifact_path="$incoming_dir/$artifact_name"
+        if [ ! -f "$artifact_path" ]; then
+            echo "__ERR__:missing_artifact"
+            exit 1
         fi
-        tar -xzf {ctx.ssh.q(artifact_name)}
-        rm -f {ctx.ssh.q(artifact_name)}
-        chmod -R +x install/
+
+        release_slug="${{artifact_name%.tar.gz}}"
+        release_slug="${{release_slug%.tgz}}"
+        release_id="$(date -u +%Y%m%d-%H%M%S)-$release_slug"
+        release_dir="$releases_dir/$release_id"
+        mkdir -p "$release_dir"
+        tar -xzf "$artifact_path" -C "$release_dir"
+        rm -f "$artifact_path"
+
+        previous_target=""
+        if [ -L "$current_link" ]; then
+            previous_target="$(readlink -f "$current_link" || true)"
+        elif [ -d "$current_link" ]; then
+            previous_target="$current_link"
+        fi
+
+        if [ ! -d "$release_dir/install" ]; then
+            echo "__ERR__:missing_install"
+            exit 1
+        fi
+
+        ln -sfn "$release_dir" "$current_link"
+        if [ -n "$previous_target" ] && [ -d "$previous_target" ]; then
+            ln -sfn "$previous_target" "$previous_link"
+        else
+            rm -f "$previous_link"
+        fi
+
+        find "$releases_dir" -mindepth 1 -maxdepth 1 -type d | while read -r candidate; do
+            if [ "$candidate" != "$release_dir" ] && [ "$candidate" != "$previous_target" ]; then
+                rm -rf "$candidate"
+            fi
+        done
+
+        echo "__RELEASE_ID__:$release_id"
+        echo "__RELEASE_DIR__:$release_dir"
+        echo "__PREVIOUS_TARGET__:$previous_target"
     """
-    extract_result = await ctx.ssh.run(cmd, timeout=120)
-    if extract_result.returncode != 0:
+    result = await target_ctx.ssh.run(f"bash -lc {target_ctx.ssh.q(cmd)}", timeout=180)
+    if result.returncode != 0:
         raise RuntimeError(
-            ctx.ssh.format_remote_error(extract_result.stderr, "Extract failed")
+            target_ctx.ssh.format_remote_error(
+                result.stderr or result.stdout, "Extract artifact failed"
+            )
+        )
+    return _parse_stage_output(
+        result.stdout or "", error_prefix="Extract artifact failed"
+    )
+
+
+def _runner_script(target_ctx: TargetContext) -> str:
+    paths = target_ctx.target.deploy_paths()
+    return f"""#!/usr/bin/env bash
+set -euo pipefail
+DEPLOY_ROOT={target_ctx.ssh.q(paths["deploy_root"])}
+cd "$DEPLOY_ROOT"
+mkdir -p "$DEPLOY_ROOT/state/logs"
+export ROS_LOG_DIR="$DEPLOY_ROOT/state/logs"
+source /opt/ros/humble/setup.bash
+source "$DEPLOY_ROOT/current/install/setup.bash"
+exec ros2 launch uav fleet.launch.py fleet_file:="$DEPLOY_ROOT/config/runtime_fleet.yaml"
+"""
+
+
+def _systemd_unit_text(target_ctx: TargetContext) -> str:
+    target = target_ctx.target
+    paths = target.deploy_paths()
+    return f"""[Unit]
+Description=PennAiR autonomy runtime
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={target.pi_user}
+WorkingDirectory={paths["deploy_root"]}
+ExecStart={paths["runner_script"]}
+Restart=on-failure
+RestartSec=2
+KillSignal=SIGINT
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target
+"""
+
+
+async def _ensure_runtime_service(target_ctx: TargetContext) -> None:
+    paths = target_ctx.target.deploy_paths()
+    runner_script = _runner_script(target_ctx)
+    await _copy_text_to_pi(
+        target_ctx,
+        remote_path=paths["runner_script"],
+        content=runner_script,
+        suffix=".sh",
+    )
+    chmod_result = await target_ctx.ssh.run(
+        f"chmod +x {target_ctx.ssh.q(paths['runner_script'])}", timeout=10
+    )
+    if chmod_result.returncode != 0:
+        raise RuntimeError(
+            target_ctx.ssh.format_remote_error(
+                chmod_result.stderr, "Mark runner script executable failed"
+            )
         )
 
-
-async def current_build(ctx: AppContext) -> dict:
+    unit_tmp = ""
     try:
-        build_info_path = f"{ctx.config.remote_dir}/install/BUILD_INFO.txt"
-        install_dir = f"{ctx.config.remote_dir}/install"
-
-        result = await ctx.ssh.run(
-            f"cat {ctx.ssh.q(build_info_path)} 2>/dev/null", timeout=10
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".service", delete=False
+        ) as tmp:
+            tmp.write(_systemd_unit_text(target_ctx))
+            unit_tmp = tmp.name
+        remote_unit_tmp = (
+            f"{paths['incoming_dir']}/{target_ctx.target.service_unit}.tmp"
         )
-        if result.returncode == 0 and result.stdout.strip():
-            return {"success": True, "installed": True, "info": result.stdout.strip()}
+        scp_result = await target_ctx.ssh.scp(unit_tmp, remote_unit_tmp, timeout=60)
+        if scp_result.returncode != 0:
+            raise RuntimeError(
+                target_ctx.ssh.format_remote_error(
+                    scp_result.stderr, "Upload service unit failed"
+                )
+            )
 
-        result = await ctx.ssh.run(
-            f"test -d {ctx.ssh.q(install_dir)} && echo yes || echo no", timeout=10
+        install_cmd = f"""
+            set -e
+            remote_unit={target_ctx.ssh.q(remote_unit_tmp)}
+            sudo -n install -D -m 644 "$remote_unit" /etc/systemd/system/{target_ctx.target.service_unit}
+            rm -f "$remote_unit"
+            sudo -n systemctl daemon-reload
+            sudo -n systemctl enable {target_ctx.target.service_unit}
+        """
+        result = await target_ctx.ssh.run(
+            f"bash -lc {target_ctx.ssh.q(install_cmd)}", timeout=30
+        )
+        if result.returncode != 0:
+            raise RuntimeError(
+                target_ctx.ssh.format_remote_error(
+                    result.stderr or result.stdout,
+                    "Install systemd unit failed. Bootstrap the Pi or grant passwordless sudo for systemctl/install.",
+                )
+            )
+    finally:
+        if unit_tmp and os.path.exists(unit_tmp):
+            os.unlink(unit_tmp)
+
+
+async def _ensure_runtime_prereqs(target_ctx: TargetContext) -> None:
+    checks = """
+        python3 - <<'PY'
+import importlib.util
+missing = [name for name in ('apriltag',) if importlib.util.find_spec(name) is None]
+print(' '.join(missing))
+PY
+    """
+    result = await target_ctx.ssh.run(
+        f"bash -lc {target_ctx.ssh.q(checks)}", timeout=20
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            target_ctx.ssh.format_remote_error(
+                result.stderr or result.stdout, "Runtime prerequisite check failed"
+            )
+        )
+    missing = (result.stdout or "").strip().split()
+    if "apriltag" in missing:
+        install_cmd = """
+            set -e
+            if ! python3 -m pip --version >/dev/null 2>&1; then
+                sudo -n apt-get update
+                sudo -n apt-get install -y python3-pip build-essential cmake
+            fi
+            python3 -m pip install --user apriltag
+        """
+        install = await target_ctx.ssh.run(
+            f"bash -lc {target_ctx.ssh.q(install_cmd)}", timeout=300
+        )
+        if install.returncode != 0:
+            raise RuntimeError(
+                target_ctx.ssh.format_remote_error(
+                    install.stderr or install.stdout,
+                    "Install apriltag runtime failed",
+                )
+            )
+
+
+async def _ensure_source_build_prereqs(target_ctx: TargetContext) -> None:
+    cmd = """
+        set -e
+        missing=""
+        for tool in colcon cmake make gcc g++; do
+            if ! command -v "$tool" >/dev/null 2>&1; then
+                missing=1
+                break
+            fi
+        done
+        if [ -z "$missing" ]; then
+            exit 0
+        fi
+
+        sudo -n apt-get update
+        sudo -n apt-get install -y \
+            python3-colcon-common-extensions \
+            build-essential \
+            cmake \
+            python3-pip
+    """
+    result = await target_ctx.ssh.run(f"bash -lc {target_ctx.ssh.q(cmd)}", timeout=300)
+    if result.returncode != 0:
+        raise RuntimeError(
+            target_ctx.ssh.format_remote_error(
+                result.stderr or result.stdout,
+                "Install source-build prerequisites failed",
+            )
+        )
+
+
+async def _write_release_metadata(
+    target_ctx: TargetContext, *, release_dir: str, metadata: dict[str, object]
+) -> None:
+    await _copy_text_to_pi(
+        target_ctx,
+        remote_path=f"{release_dir}/{_RELEASE_METADATA_NAME}",
+        content=yaml.safe_dump(metadata, sort_keys=False),
+        suffix=".yaml",
+    )
+
+
+async def _write_build_info(
+    target_ctx: TargetContext, *, release_dir: str, content: str
+) -> None:
+    await _copy_text_to_pi(
+        target_ctx,
+        remote_path=f"{release_dir}/install/BUILD_INFO.txt",
+        content=content,
+        suffix=".txt",
+    )
+
+
+def _source_build_info_text(
+    *, target_ctx: TargetContext, source_label: str, package_names: list[str]
+) -> str:
+    package_block = "\n".join(f"- {name}" for name in package_names)
+    return (
+        "Build Information\n"
+        "=================\n"
+        "Source: local package bundle\n"
+        f"Bundle: {source_label}\n"
+        f"Target: {target_ctx.target.target_id}\n"
+        f"Vehicle: {target_ctx.target.vehicle_name}\n"
+        "Build Type: source-build on target Pi\n"
+        "Packages:\n"
+        f"{package_block}\n"
+    )
+
+
+async def _activate_release(
+    target_ctx: TargetContext, *, release_dir: str, previous_target: str = ""
+) -> None:
+    paths = target_ctx.target.deploy_paths()
+    restart_cmd = f"""
+        set -e
+        current_link={target_ctx.ssh.q(paths["current_link"])}
+        runtime_fleet={target_ctx.ssh.q(paths["runtime_fleet"])}
+        release_dir={target_ctx.ssh.q(release_dir)}
+        if [ ! -d "$current_link" ] || [ ! -f "$runtime_fleet" ]; then
+            echo "__ERR__:runtime_missing"
+            exit 1
+        fi
+        if [ ! -d "$release_dir/install" ]; then
+            echo "__ERR__:install_missing"
+            exit 1
+        fi
+        sudo -n systemctl restart {target_ctx.target.service_unit}
+        state="$(sudo -n systemctl is-active {target_ctx.target.service_unit} 2>/dev/null || true)"
+        if [ "$state" != "active" ]; then
+            echo "__ERR__:inactive:$state"
+            exit 1
+        fi
+        echo "ACTIVE"
+    """
+    result = await target_ctx.ssh.run(
+        f"bash -lc {target_ctx.ssh.q(restart_cmd)}", timeout=40
+    )
+    if result.returncode == 0 and "ACTIVE" in (result.stdout or ""):
+        return
+
+    error = target_ctx.ssh.format_remote_error(
+        result.stderr or result.stdout,
+        "Restart runtime service failed",
+    )
+    if previous_target:
+        rollback_cmd = f"""
+            set -e
+            current_link={target_ctx.ssh.q(paths["current_link"])}
+            previous_link={target_ctx.ssh.q(paths["previous_link"])}
+            previous_target={target_ctx.ssh.q(previous_target)}
+            failed_release={target_ctx.ssh.q(release_dir)}
+            if [ -d "$previous_target" ]; then
+                ln -sfn "$previous_target" "$current_link"
+                ln -sfn "$failed_release" "$previous_link"
+                sudo -n systemctl restart {target_ctx.target.service_unit} >/dev/null 2>&1 || true
+            fi
+        """
+        await target_ctx.ssh.run(
+            f"bash -lc {target_ctx.ssh.q(rollback_cmd)}", timeout=30
+        )
+        raise RuntimeError(f"{error} Reverted to the previous release.")
+
+    raise RuntimeError(error)
+
+
+async def _stage_source_build_on_pi(
+    target_ctx: TargetContext, *, bundle_name: str, package_names: list[str]
+) -> dict[str, str]:
+    paths = target_ctx.target.deploy_paths()
+    package_list = " ".join(target_ctx.ssh.q(name) for name in package_names)
+    cmd = f"""
+        set -e
+        incoming_dir={target_ctx.ssh.q(paths["incoming_dir"])}
+        releases_dir={target_ctx.ssh.q(paths["releases_dir"])}
+        current_link={target_ctx.ssh.q(paths["current_link"])}
+        previous_link={target_ctx.ssh.q(paths["previous_link"])}
+        bundle_name={target_ctx.ssh.q(bundle_name)}
+        bundle_path="$incoming_dir/$bundle_name"
+        if [ ! -f "$bundle_path" ]; then
+            echo "__ERR__:missing_bundle"
+            exit 1
+        fi
+
+        current_target=""
+        if [ -L "$current_link" ]; then
+            current_target="$(readlink -f "$current_link" || true)"
+        elif [ -d "$current_link" ]; then
+            current_target="$current_link"
+        fi
+        if [ -z "$current_target" ] || [ ! -d "$current_target/install" ]; then
+            echo "__ERR__:missing_current"
+            exit 1
+        fi
+
+        release_slug="${{bundle_name%.tar.gz}}"
+        release_slug="${{release_slug%.tgz}}"
+        release_slug="${{release_slug%.zip}}"
+        release_id="$(date -u +%Y%m%d-%H%M%S)-source-$release_slug"
+        release_dir="$releases_dir/$release_id"
+        workspace_dir="$release_dir/source_workspace"
+        build_dir="$release_dir/build"
+        mkdir -p "$release_dir/install" "$workspace_dir"
+        cp -a "$current_target/install/." "$release_dir/install/"
+
+        if [[ "$bundle_name" == *.zip ]]; then
+            python3 - "$bundle_path" "$workspace_dir" <<'PY'
+from pathlib import Path
+import sys, zipfile
+
+bundle = Path(sys.argv[1])
+dest = Path(sys.argv[2])
+with zipfile.ZipFile(bundle) as archive:
+    archive.extractall(dest)
+PY
+        else
+            tar -xzf "$bundle_path" -C "$workspace_dir"
+        fi
+        rm -f "$bundle_path"
+
+        if [ ! -d "$workspace_dir/src" ]; then
+            echo "__ERR__:missing_src"
+            exit 1
+        fi
+
+        packages=({package_list})
+        if [ "${{#packages[@]}}" -eq 0 ]; then
+            echo "__ERR__:missing_packages"
+            exit 1
+        fi
+
+        cd "$workspace_dir"
+        source /opt/ros/humble/setup.bash
+        source "$current_target/install/setup.bash"
+        colcon build \
+            --build-base "$build_dir" \
+            --install-base "$release_dir/install" \
+            --packages-select "${{packages[@]}}" \
+            --cmake-args -DBUILD_SIM=OFF
+        rm -rf "$workspace_dir" "$build_dir"
+
+        ln -sfn "$release_dir" "$current_link"
+        if [ -n "$current_target" ] && [ -d "$current_target" ]; then
+            ln -sfn "$current_target" "$previous_link"
+        else
+            rm -f "$previous_link"
+        fi
+
+        find "$releases_dir" -mindepth 1 -maxdepth 1 -type d | while read -r candidate; do
+            if [ "$candidate" != "$release_dir" ] && [ "$candidate" != "$current_target" ]; then
+                rm -rf "$candidate"
+            fi
+        done
+
+        echo "__RELEASE_ID__:$release_id"
+        echo "__RELEASE_DIR__:$release_dir"
+        echo "__PREVIOUS_TARGET__:$current_target"
+    """
+    result = await target_ctx.ssh.run(f"bash -lc {target_ctx.ssh.q(cmd)}", timeout=900)
+    if result.returncode != 0:
+        combined = result.stderr or result.stdout
+        if "__ERR__:missing_current" in combined:
+            raise RuntimeError(
+                "Source build requires an installed base release on the target Pi. "
+                "Deploy a build artifact first."
+            )
+        raise RuntimeError(
+            target_ctx.ssh.format_remote_error(
+                combined, "Build source bundle on target failed"
+            )
+        )
+    return _parse_stage_output(
+        result.stdout or "", error_prefix="Build source bundle on target failed"
+    )
+
+
+async def _deploy_artifact_path(
+    ctx: AppContext,
+    *,
+    target_id: str | None,
+    local_path: str,
+    artifact_name: str,
+    source_type: str,
+    source_label: str,
+) -> dict:
+    target_ctx = ctx.resolve_target(target_id)
+    await _ensure_remote_layout(target_ctx)
+    await _copy_artifact_to_pi(target_ctx, local_path, artifact_name)
+
+    runtime_fleet_yaml, shared_fleet_yaml, local_mission_path = _render_runtime_fleet(
+        ctx, target_ctx
+    )
+    paths = target_ctx.target.deploy_paths()
+    await _copy_text_to_pi(
+        target_ctx,
+        remote_path=paths["fleet_file"],
+        content=shared_fleet_yaml,
+    )
+    await _copy_text_to_pi(
+        target_ctx,
+        remote_path=paths["overlay_file"],
+        content=target_ctx.target.overlay_yaml or "{}\n",
+    )
+    await _copy_text_to_pi(
+        target_ctx,
+        remote_path=paths["runtime_fleet"],
+        content=runtime_fleet_yaml,
+    )
+    await _seed_repo_missions(ctx, target_ctx)
+
+    mission_name = Path(local_mission_path).name
+    mission_copy = await target_ctx.ssh.scp(
+        local_mission_path,
+        f"{paths['missions_dir']}/{mission_name}",
+        timeout=60,
+    )
+    if mission_copy.returncode != 0:
+        raise RuntimeError(
+            target_ctx.ssh.format_remote_error(
+                mission_copy.stderr, "Upload selected mission failed"
+            )
+        )
+
+    release = await _extract_release_on_pi(target_ctx, artifact_name)
+    await _write_release_metadata(
+        target_ctx,
+        release_dir=release["release_dir"],
+        metadata=_release_metadata_payload(
+            target_ctx,
+            release_id=release["release_id"],
+            source_type=source_type,
+            source_label=source_label,
+        ),
+    )
+    await _ensure_runtime_service(target_ctx)
+    await _ensure_runtime_prereqs(target_ctx)
+    await _activate_release(
+        target_ctx,
+        release_dir=release["release_dir"],
+        previous_target=release["previous_target"],
+    )
+
+    return {
+        "success": True,
+        "output": (
+            f"Deployed {artifact_name} to {target_ctx.target.target_id} "
+            f"({release['release_id']})"
+        ),
+    }
+
+
+async def upload_source_bundle(
+    ctx: AppContext,
+    *,
+    target_id: str | None,
+    filename: str,
+    file_bytes: bytes,
+) -> dict:
+    upload_path = ""
+    normalized_bundle = ""
+    try:
+        bundle_name = sanitize_source_bundle_name(filename)
+        bundle_suffix = (
+            ".zip"
+            if bundle_name.endswith(".zip")
+            else ".tgz"
+            if bundle_name.endswith(".tgz")
+            else ".tar.gz"
+        )
+        with tempfile.NamedTemporaryFile(
+            suffix=bundle_suffix, delete=False
+        ) as tmp:
+            tmp.write(file_bytes)
+            upload_path = tmp.name
+
+        normalized_bundle, package_names, sanitized_name = _normalize_source_bundle(
+            upload_path, bundle_name
+        )
+        target_ctx = ctx.resolve_target(target_id)
+        await _ensure_remote_layout(target_ctx)
+        await _ensure_source_build_prereqs(target_ctx)
+        await _copy_file_to_pi(
+            target_ctx, local_path=normalized_bundle, remote_name=sanitized_name
+        )
+
+        runtime_fleet_yaml, shared_fleet_yaml, local_mission_path = _render_runtime_fleet(
+            ctx, target_ctx
+        )
+        paths = target_ctx.target.deploy_paths()
+        await _copy_text_to_pi(
+            target_ctx,
+            remote_path=paths["fleet_file"],
+            content=shared_fleet_yaml,
+        )
+        await _copy_text_to_pi(
+            target_ctx,
+            remote_path=paths["overlay_file"],
+            content=target_ctx.target.overlay_yaml or "{}\n",
+        )
+        await _copy_text_to_pi(
+            target_ctx,
+            remote_path=paths["runtime_fleet"],
+            content=runtime_fleet_yaml,
+        )
+        await _seed_repo_missions(ctx, target_ctx)
+
+        mission_name = Path(local_mission_path).name
+        mission_copy = await target_ctx.ssh.scp(
+            local_mission_path,
+            f"{paths['missions_dir']}/{mission_name}",
+            timeout=60,
+        )
+        if mission_copy.returncode != 0:
+            raise RuntimeError(
+                target_ctx.ssh.format_remote_error(
+                    mission_copy.stderr, "Upload selected mission failed"
+                )
+            )
+
+        release = await _stage_source_build_on_pi(
+            target_ctx,
+            bundle_name=sanitized_name,
+            package_names=package_names,
+        )
+        await _write_release_metadata(
+            target_ctx,
+            release_dir=release["release_dir"],
+            metadata=_release_metadata_payload(
+                target_ctx,
+                release_id=release["release_id"],
+                source_type="source-build",
+                source_label=sanitized_name,
+                package_names=package_names,
+            ),
+        )
+        await _write_build_info(
+            target_ctx,
+            release_dir=release["release_dir"],
+            content=_source_build_info_text(
+                target_ctx=target_ctx,
+                source_label=sanitized_name,
+                package_names=package_names,
+            ),
+        )
+        await _ensure_runtime_service(target_ctx)
+        await _ensure_runtime_prereqs(target_ctx)
+        await _activate_release(
+            target_ctx,
+            release_dir=release["release_dir"],
+            previous_target=release["previous_target"],
+        )
+        return {
+            "success": True,
+            "output": (
+                f"Built and deployed source bundle {sanitized_name} to "
+                f"{target_ctx.target.target_id} ({release['release_id']})"
+            ),
+        }
+    except RuntimeError as exc:
+        return {"success": False, "error": str(exc)}
+    except Exception as exc:
+        return {"success": False, "error": str(exc)}
+    finally:
+        if upload_path and os.path.exists(upload_path):
+            os.unlink(upload_path)
+        if normalized_bundle:
+            normalized_root = Path(normalized_bundle).resolve().parent
+            shutil.rmtree(normalized_root, ignore_errors=True)
+
+
+async def current_build(ctx: AppContext, *, target_id: str | None = None) -> dict:
+    target_ctx = ctx.resolve_target(target_id)
+    try:
+        paths = target_ctx.target.deploy_paths()
+        cmd = f"""
+            current_link={target_ctx.ssh.q(paths["current_link"])}
+            if [ -L "$current_link" ] || [ -d "$current_link" ]; then
+                release_id="$(basename "$(readlink -f "$current_link" 2>/dev/null || echo "$current_link")")"
+                metadata="$current_link/{_RELEASE_METADATA_NAME}"
+                build_info="$current_link/install/BUILD_INFO.txt"
+                if [ -f "$metadata" ]; then
+                    echo "__META_BEGIN__"
+                    cat "$metadata"
+                    echo "__META_END__"
+                fi
+                if [ -f "$build_info" ]; then
+                    echo "__INFO_BEGIN__"
+                    cat "$build_info"
+                    echo "__INFO_END__"
+                    echo "__RELEASE__:$release_id"
+                    exit 0
+                fi
+                echo "__INSTALLED__:$release_id"
+                exit 0
+            fi
+            echo "__NONE__"
+        """
+        result = await target_ctx.ssh.run(
+            f"bash -lc {target_ctx.ssh.q(cmd)}", timeout=10
         )
         if result.returncode != 0:
             return {
                 "success": True,
                 "installed": False,
-                "info": ctx.ssh.friendly_error(result.stderr),
+                "info": target_ctx.ssh.friendly_error(result.stderr),
             }
 
-        if result.stdout.strip() == "yes":
+        lines = [line for line in (result.stdout or "").splitlines() if line.strip()]
+        if not lines or lines == ["__NONE__"]:
+            return {"success": True, "installed": False, "info": "No build deployed"}
+
+        metadata_lines: list[str] = []
+        build_info_lines: list[str] = []
+        section = None
+        trailing_markers: list[str] = []
+        for line in lines:
+            if line == "__META_BEGIN__":
+                section = "meta"
+                continue
+            if line == "__META_END__":
+                section = None
+                continue
+            if line == "__INFO_BEGIN__":
+                section = "info"
+                continue
+            if line == "__INFO_END__":
+                section = None
+                continue
+            if line.startswith("__RELEASE__:") or line.startswith("__INSTALLED__:"):
+                trailing_markers.append(line)
+                continue
+            if section == "meta":
+                metadata_lines.append(line)
+            elif section == "info":
+                build_info_lines.append(line)
+
+        info_parts: list[str] = []
+        if metadata_lines:
+            metadata = yaml.safe_load("\n".join(metadata_lines)) or {}
+            if isinstance(metadata, dict):
+                summary = _release_metadata_summary(metadata)
+                if summary:
+                    info_parts.append(summary)
+        if build_info_lines:
+            info_parts.append("\n".join(build_info_lines).strip())
+
+        release_id = None
+        marker = trailing_markers[-1] if trailing_markers else ""
+        if marker.startswith("__RELEASE__:"):
+            release_id = marker.split(":", 1)[1]
+            info = "\n\n".join(part for part in info_parts if part).strip()
             return {
                 "success": True,
                 "installed": True,
-                "info": "Build installed (no BUILD_INFO.txt)",
+                "info": info or "Build installed",
+                "release_id": release_id,
             }
-
-        return {"success": True, "installed": False, "info": "No build deployed"}
+        if marker.startswith("__INSTALLED__:"):
+            release_id = marker.split(":", 1)[1]
+            info = "\n\n".join(part for part in info_parts if part).strip()
+            return {
+                "success": True,
+                "installed": True,
+                "info": info or "Build installed (no BUILD_INFO.txt)",
+                "release_id": release_id,
+            }
+        return {
+            "success": True,
+            "installed": True,
+            "info": "\n".join(lines).strip(),
+            "release_id": release_id,
+        }
     except Exception as exc:
         return {
             "success": True,
             "installed": False,
-            "info": ctx.ssh.friendly_error(str(exc)),
+            "info": target_ctx.ssh.friendly_error(str(exc)),
         }
 
 
-async def upload_build(ctx: AppContext, filename: str, file_bytes: bytes) -> dict:
+async def upload_build(
+    ctx: AppContext,
+    *,
+    target_id: str | None,
+    filename: str,
+    file_bytes: bytes,
+) -> dict:
     tmp_path = ""
     try:
         artifact_name = sanitize_artifact_name(filename)
         with tempfile.NamedTemporaryFile(suffix=".tar.gz", delete=False) as tmp:
             tmp.write(file_bytes)
             tmp_path = tmp.name
-
-        await _copy_artifact_to_pi(ctx, tmp_path, artifact_name)
-        await _extract_artifact_on_pi(ctx, artifact_name)
-
-        return {"success": True, "output": f"Deployed {artifact_name} to Pi"}
+        return await _deploy_artifact_path(
+            ctx,
+            target_id=target_id,
+            local_path=tmp_path,
+            artifact_name=artifact_name,
+            source_type="upload",
+            source_label=artifact_name,
+        )
     except RuntimeError as exc:
         return {"success": False, "error": str(exc)}
     except Exception as exc:
-        return {"success": False, "error": ctx.ssh.friendly_error(str(exc))}
+        return {"success": False, "error": str(exc)}
     finally:
         if tmp_path and os.path.exists(tmp_path):
             os.unlink(tmp_path)
 
 
 async def list_builds(ctx: AppContext) -> dict:
-    if not ctx.config.github_repo:
+    if not ctx.operator_config.github_repo:
         return {"success": False, "error": "GITHUB_REPO not configured", "builds": []}
     try:
         httpx = _require_httpx()
-        async with httpx.AsyncClient(timeout=15) as client:
-            resp = await client.get(
-                f"https://api.github.com/repos/{ctx.config.github_repo}/releases",
+        builds: list[dict[str, object]] = []
+        async with httpx.AsyncClient(timeout=20) as client:
+            releases_resp = await client.get(
+                f"https://api.github.com/repos/{ctx.operator_config.github_repo}/releases",
                 headers=_github_headers(ctx),
             )
-            resp.raise_for_status()
-            releases = resp.json()
+            releases_resp.raise_for_status()
+            releases = releases_resp.json()
 
-        if isinstance(releases, dict) and "message" in releases:
-            return {"success": False, "error": releases["message"], "builds": []}
+            artifacts_resp = await client.get(
+                f"https://api.github.com/repos/{ctx.operator_config.github_repo}/actions/artifacts?per_page=30",
+                headers=_github_headers(ctx),
+            )
+            artifacts_resp.raise_for_status()
+            artifacts_payload = artifacts_resp.json()
 
-        builds = []
         for rel in releases:
-            if rel.get("tag_name", "").startswith("build-"):
-                assets = rel.get("assets", [])
-                builds.append(
-                    {
-                        "tag": rel["tag_name"],
-                        "sha": rel["tag_name"].replace("build-", ""),
-                        "name": rel.get("name", rel["tag_name"]),
-                        "date": rel.get("published_at", "")[:10],
-                        "download_url": assets[0]["browser_download_url"]
-                        if assets
-                        else None,
-                        "size_mb": round(assets[0]["size"] / 1_000_000, 1)
-                        if assets
-                        else None,
-                    }
-                )
-        return {"success": True, "builds": builds[:20]}
+            tag_name = rel.get("tag_name", "")
+            if not str(tag_name).startswith("build-"):
+                continue
+            assets = rel.get("assets", [])
+            builds.append(
+                {
+                    "source": "release",
+                    "tag": rel["tag_name"],
+                    "sha": rel["tag_name"].replace("build-", ""),
+                    "name": rel.get("name", rel["tag_name"]),
+                    "date": rel.get("published_at", "")[:10],
+                    "download_url": assets[0]["browser_download_url"]
+                    if assets
+                    else None,
+                    "size_mb": round(assets[0]["size"] / 1_000_000, 1)
+                    if assets
+                    else None,
+                }
+            )
+
+        for artifact in artifacts_payload.get("artifacts", []):
+            workflow_run = artifact.get("workflow_run") or {}
+            builds.append(
+                {
+                    "source": "actions",
+                    "tag": f"run-{workflow_run.get('id', artifact.get('id'))}",
+                    "sha": str(workflow_run.get("head_sha", ""))[:7],
+                    "name": artifact.get("name", f"artifact-{artifact.get('id')}"),
+                    "date": str(artifact.get("updated_at", ""))[:10],
+                    "size_mb": round(
+                        (artifact.get("size_in_bytes", 0) or 0) / 1_000_000, 1
+                    ),
+                    "run_id": str(workflow_run.get("id", "")) or None,
+                    "artifact_id": str(artifact.get("id", "")) or None,
+                    "artifact_name": artifact.get("name"),
+                    "branch": workflow_run.get("head_branch"),
+                }
+            )
+        return {"success": True, "builds": builds[:40]}
     except Exception as exc:
         return {"success": False, "error": str(exc), "builds": []}
 
 
-async def download_build(ctx: AppContext, tag: str) -> dict:
-    if not ctx.config.github_repo:
+async def download_build(
+    ctx: AppContext,
+    *,
+    target_id: str | None,
+    tag: str = "",
+    source: str = "release",
+    artifact_id: str = "",
+) -> dict:
+    if not ctx.operator_config.github_repo:
         return {"success": False, "error": "GITHUB_REPO not configured"}
 
     tmp_path = ""
     try:
         httpx = _require_httpx()
-        async with httpx.AsyncClient(timeout=15) as client:
+        headers = _github_headers(ctx)
+        artifact_name = ""
+        extract_dir: Path | None = None
+        async with httpx.AsyncClient(timeout=300, follow_redirects=True) as client:
+            if source == "actions":
+                if not artifact_id:
+                    return {
+                        "success": False,
+                        "error": "Downloading a GitHub Actions artifact requires artifact_id.",
+                    }
+                download_url = f"https://api.github.com/repos/{ctx.operator_config.github_repo}/actions/artifacts/{artifact_id}/zip"
+                with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as tmp:
+                    tmp_path = tmp.name
+                async with client.stream("GET", download_url, headers=headers) as resp:
+                    resp.raise_for_status()
+                    with open(tmp_path, "wb") as out:
+                        async for chunk in resp.aiter_bytes():
+                            out.write(chunk)
+
+                extract_dir = Path(tempfile.mkdtemp(prefix="integration-actions-artifact-"))
+                with zipfile.ZipFile(tmp_path) as bundle:
+                    bundle.extractall(extract_dir)
+                tarballs = sorted(extract_dir.rglob("*.tar.gz"))
+                if not tarballs:
+                    return {
+                        "success": False,
+                        "error": "GitHub Actions artifact did not contain a .tar.gz deploy bundle.",
+                    }
+                local_tarball = tarballs[0]
+                artifact_name = sanitize_artifact_name(local_tarball.name)
+                result = await _deploy_artifact_path(
+                    ctx,
+                    target_id=target_id,
+                    local_path=str(local_tarball),
+                    artifact_name=artifact_name,
+                    source_type="actions",
+                    source_label=f"actions-artifact-{artifact_id}",
+                )
+                return result
+
             resp = await client.get(
-                f"https://api.github.com/repos/{ctx.config.github_repo}/releases/tags/{tag}",
-                headers=_github_headers(ctx),
+                f"https://api.github.com/repos/{ctx.operator_config.github_repo}/releases/tags/{tag}",
+                headers=headers,
             )
             resp.raise_for_status()
             release = resp.json()
+            assets = release.get("assets", [])
+            if not assets:
+                return {"success": False, "error": f"No assets found for {tag}"}
+            download_url = assets[0]["browser_download_url"]
+            artifact_name = sanitize_artifact_name(assets[0]["name"])
 
-        assets = release.get("assets", [])
-        if not assets:
-            return {"success": False, "error": f"No assets found for {tag}"}
-
-        download_url = assets[0]["browser_download_url"]
-        artifact_name = sanitize_artifact_name(assets[0]["name"])
-
-        with tempfile.NamedTemporaryFile(suffix=".tar.gz", delete=False) as tmp:
-            tmp_path = tmp.name
-
-        async with httpx.AsyncClient(timeout=300, follow_redirects=True) as client:
-            async with client.stream(
-                "GET", download_url, headers=_github_headers(ctx)
-            ) as resp:
+            with tempfile.NamedTemporaryFile(suffix=".tar.gz", delete=False) as tmp:
+                tmp_path = tmp.name
+            async with client.stream("GET", download_url, headers=headers) as resp:
                 resp.raise_for_status()
                 with open(tmp_path, "wb") as out:
                     async for chunk in resp.aiter_bytes():
                         out.write(chunk)
 
-        await _copy_artifact_to_pi(ctx, tmp_path, artifact_name)
-        await _extract_artifact_on_pi(ctx, artifact_name)
-        return {"success": True, "output": f"Downloaded {tag} and deployed to Pi"}
+        return await _deploy_artifact_path(
+            ctx,
+            target_id=target_id,
+            local_path=tmp_path,
+            artifact_name=artifact_name,
+            source_type="release",
+            source_label=tag or artifact_name,
+        )
     except RuntimeError as exc:
         return {"success": False, "error": str(exc)}
     except Exception as exc:
-        return {"success": False, "error": ctx.ssh.friendly_error(str(exc))}
+        return {"success": False, "error": str(exc)}
     finally:
         if tmp_path and os.path.exists(tmp_path):
             os.unlink(tmp_path)
+        if "extract_dir" in locals() and extract_dir is not None:
+            shutil.rmtree(extract_dir, ignore_errors=True)
 
 
-async def rollback_build(ctx: AppContext) -> dict:
+async def rollback_build(ctx: AppContext, *, target_id: str | None = None) -> dict:
+    target_ctx = ctx.resolve_target(target_id)
     try:
+        paths = target_ctx.target.deploy_paths()
         rollback_cmd = f"""
-            cd {ctx.ssh.q(ctx.config.remote_dir)}
-            if [ ! -d install.bak ]; then
-                echo "NO_BACKUP"
+            set -e
+            current_link={target_ctx.ssh.q(paths["current_link"])}
+            previous_link={target_ctx.ssh.q(paths["previous_link"])}
+            if [ ! -L "$previous_link" ] && [ ! -d "$previous_link" ]; then
+                echo "NO_PREVIOUS"
                 exit 1
             fi
-            if [ -d install ]; then
-                mv install install.tmp
-                mv install.bak install
-                mv install.tmp install.bak
-            else
-                mv install.bak install
+            current_target=""
+            if [ -L "$current_link" ] || [ -d "$current_link" ]; then
+                current_target="$(readlink -f "$current_link" 2>/dev/null || echo "$current_link")"
             fi
+            previous_target="$(readlink -f "$previous_link" 2>/dev/null || echo "$previous_link")"
+            ln -sfn "$previous_target" "$current_link"
+            if [ -n "$current_target" ] && [ -d "$current_target" ]; then
+                ln -sfn "$current_target" "$previous_link"
+            fi
+            echo "__RELEASE_DIR__:$previous_target"
+            echo "__PREVIOUS_TARGET__:$current_target"
         """
-        result = await ctx.ssh.run(rollback_cmd, timeout=30)
+        result = await target_ctx.ssh.run(
+            f"bash -lc {target_ctx.ssh.q(rollback_cmd)}", timeout=20
+        )
         if result.returncode != 0:
-            if "NO_BACKUP" in result.stdout:
-                return {"success": False, "error": "No backup build to rollback to"}
-            return {"success": False, "error": ctx.ssh.friendly_error(result.stderr)}
+            if "NO_PREVIOUS" in (result.stdout or ""):
+                return {
+                    "success": False,
+                    "error": "No previous release to roll back to",
+                }
+            return {
+                "success": False,
+                "error": target_ctx.ssh.friendly_error(result.stderr or result.stdout),
+            }
 
-        return {"success": True, "output": "Rolled back to previous build"}
+        release_dir = ""
+        previous_target = ""
+        for line in (result.stdout or "").splitlines():
+            if line.startswith("__RELEASE_DIR__:"):
+                release_dir = line.split(":", 1)[1].strip()
+            elif line.startswith("__PREVIOUS_TARGET__:"):
+                previous_target = line.split(":", 1)[1].strip()
+        await _activate_release(
+            target_ctx, release_dir=release_dir, previous_target=previous_target
+        )
+        return {"success": True, "output": "Rolled back to previous release"}
     except Exception as exc:
-        return {"success": False, "error": ctx.ssh.friendly_error(str(exc))}
+        return {"success": False, "error": target_ctx.ssh.friendly_error(str(exc))}

@@ -29,3 +29,9 @@ rosdep update --rosdistro "$ROS_DISTRO"
 
 ci_install_apriltag
 ci_install_pigpio
+
+python3 -m pip install --no-cache-dir \
+    "fastapi[standard]" \
+    httpx \
+    pydantic \
+    python-multipart

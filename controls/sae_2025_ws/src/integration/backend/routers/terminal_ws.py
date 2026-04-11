@@ -14,10 +14,12 @@ def build_router(ctx: AppContext) -> APIRouter:
         websocket: WebSocket,
         offset: int = Query(default=0),
         inode: int = Query(default=0),
+        target_id: str | None = Query(default=None),
     ):
         await mission_service.stream_terminal(
             ctx,
             websocket,
+            target_id=target_id,
             offset=offset,
             inode=inode,
         )

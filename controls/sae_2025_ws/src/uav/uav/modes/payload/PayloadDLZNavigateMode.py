@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import math
-from typing import Optional
+from typing import Literal, Optional
+from typing_extensions import TypedDict
 
 import numpy as np
 from rclpy.node import Node
@@ -19,6 +20,11 @@ _EIGHTH_TURN = math.pi / 4.0  # 45 degrees
 _ANGLE_TOL = 0.05  # radians, stop slightly early to avoid overshoot
 
 _VALID_START_PHASES = ("wait_for_plane", "scan_tags", "line_follow")
+
+
+class TagTransitionRule(TypedDict):
+    transitions: int
+    direction: Literal["cw", "ccw"]
 
 
 class PayloadDLZNavigateMode(Mode):
@@ -58,12 +64,13 @@ class PayloadDLZNavigateMode(Mode):
 
     mission_target = "payload"
     required_vision_nodes = (PayloadColorSquareNode, PayloadAprilTagNode)
+    transition_labels = ("done",)
 
     def __init__(
         self,
         node: Node,
         vehicle: Payload,
-        direction: str = "ccw",
+        direction: Literal["cw", "ccw"] = "ccw",
         target_transitions: int = 1,
         turn_angular_speed: float = 0.5,
         line_follow_speed_mps: float = 0.10,
@@ -71,10 +78,10 @@ class PayloadDLZNavigateMode(Mode):
         k_ang: float = 0.4,
         max_angular: float = 0.5,
         # Scan / lookup params
-        tag_transition_table: dict = {},
+        tag_transition_table: dict[str, TagTransitionRule] | None = None,
         detect_frames: int = 5,
         scan_duration_s: float = 1.0,
-        start_phase: str = "wait_for_plane",
+        start_phase: Literal["wait_for_plane", "scan_tags", "line_follow"] = "wait_for_plane",
         tag_size_m: float = 0.0508,
         tag_family: str = DEFAULT_TAG_FAMILY,
     ):
@@ -98,7 +105,7 @@ class PayloadDLZNavigateMode(Mode):
         self.k_ang = float(k_ang)
         self.max_angular = float(max_angular)
 
-        self.tag_transition_table = dict(tag_transition_table)
+        self.tag_transition_table = dict(tag_transition_table or {})
         self.detect_frames = int(detect_frames)
         self.scan_duration_s = float(scan_duration_s)
         self.start_phase = start_phase
