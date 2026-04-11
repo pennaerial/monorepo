@@ -1,5 +1,5 @@
 # launch_params.yaml
-mission_name: payload_retreat
+mission_name: payload_wait_drive_out
 # Vehicle namespace for mission-facing topics/services.
 # Leave blank to use the mission-target default (`uav` for UAV missions, `payload_0` for payload missions).
 vehicle_name: ""
@@ -7,7 +7,7 @@ debug: false
 vision_debug: true
 # Automatically start the mission manager once its runtime is ready.
 # Set false to leave the mission idle until /<vehicle>/mode_manager/start_mission is called.
-auto_launch: true
+auto_launch: false
 
 # PX4 / airframe settings for UAV missions and sim-backed payload missions.
 airframe: standard_vtol # Enter a preset below or a valid airframe ID (integer), either custom or from PX4
@@ -33,4 +33,4 @@ camera_preprocess_hook: ""
 servo_only: false
 payload_controller: ""
 
-sim: true
+sim: false

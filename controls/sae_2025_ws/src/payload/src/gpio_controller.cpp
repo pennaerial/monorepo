@@ -266,6 +266,9 @@ void GPIOController::dead_reckon_callback(
     dr_right_start_.store(right_now);
     dr_left_goal_.store(left_goal);
     dr_right_goal_.store(right_goal);
+    dr_left_done_.store(false);
+    dr_right_done_.store(false);
+
     cmd_linear_.store(linear_cmd);
     cmd_angular_.store(angular_cmd);
     control_mode_.store(ControlMode::DEAD_RECKONING);
@@ -311,6 +314,12 @@ void GPIOController::control_loop()
         prev_left_count_ = left_count;
         prev_right_count_ = right_count;
 
+        // Declare pub fields with defaults so they're valid in all modes
+        payload::control_math::PidTerms left_terms{};
+        payload::control_math::PidTerms right_terms{};
+        float left_duty  = 0.0f;
+        float right_duty = 0.0f;
+
         if (control_mode_.load() == ControlMode::DEAD_RECKONING) {
             const int64_t left_goal   = dr_left_goal_.load();
             const int64_t right_goal  = dr_right_goal_.load();
@@ -334,76 +343,92 @@ void GPIOController::control_loop()
                 left_count, left_goal, left_rem, left_done,
                 right_count, right_goal, right_rem, right_done);
 
-            if (left_done && right_done) {
+            if (left_done && !dr_left_done_.load()) {
+                dr_left_done_.store(true);
+                RCLCPP_INFO(node_->get_logger(), "DR | Left wheel done (rem=%ld)", left_rem);
+            }
+            if (right_done && !dr_right_done_.load()) {
+                dr_right_done_.store(true);
+                RCLCPP_INFO(node_->get_logger(), "DR | Right wheel done (rem=%ld)", right_rem);
+            }
+
+            if (dr_left_done_.load() && dr_right_done_.load()) {
                 cmd_linear_.store(0.0);
                 cmd_angular_.store(0.0);
-                if (left_motor_)  left_motor_->hard_brake();                                                                                                                                     
+                if (left_motor_)  left_motor_->hard_brake();
                 if (right_motor_) right_motor_->hard_brake();
                 control_mode_.store(ControlMode::NORMAL);
-                RCLCPP_INFO(node_->get_logger(), "DR | Complete —  braking motors");
+                RCLCPP_INFO(node_->get_logger(), "DR | Complete — braking motors");
             }
+
         }
 
-        const double left_raw_rpm = payload::control_math::rpm_from_count_delta(
-            left_delta, p.encoder.output_cpr, dt_s);
-        const double right_raw_rpm = payload::control_math::rpm_from_count_delta(
-            right_delta, p.encoder.output_cpr, dt_s);
+        {
+            const double left_raw_rpm = payload::control_math::rpm_from_count_delta(
+                left_delta, p.encoder.output_cpr, dt_s);
+            const double right_raw_rpm = payload::control_math::rpm_from_count_delta(
+                right_delta, p.encoder.output_cpr, dt_s);
 
-        left_filtered_rpm_ = payload::control_math::low_pass_filter(
-            left_raw_rpm, left_filtered_rpm_, p.pid.velocity_alpha);
-        right_filtered_rpm_ = payload::control_math::low_pass_filter(
-            right_raw_rpm, right_filtered_rpm_, p.pid.velocity_alpha);
+            left_filtered_rpm_ = payload::control_math::low_pass_filter(
+                left_raw_rpm, left_filtered_rpm_, p.pid.velocity_alpha);
+            right_filtered_rpm_ = payload::control_math::low_pass_filter(
+                right_raw_rpm, right_filtered_rpm_, p.pid.velocity_alpha);
 
-        const payload::control_math::PidConfig left_pid_cfg {
-            p.pid.left_kp,
-            p.pid.left_ki,
-            p.pid.left_kd,
-            p.pid.i_clamp,
-            p.pid.output_limit_norm,
-            p.pid.stop_deadband_rpm,
-        };
-        const payload::control_math::PidConfig right_pid_cfg {
-            p.pid.right_kp,
-            p.pid.right_ki,
-            p.pid.right_kd,
-            p.pid.i_clamp,
-            p.pid.output_limit_norm,
-            p.pid.stop_deadband_rpm,
-        };
+            const payload::control_math::PidConfig left_pid_cfg {
+                p.pid.left_kp,
+                p.pid.left_ki,
+                p.pid.left_kd,
+                p.pid.i_clamp,
+                p.pid.output_limit_norm,
+                p.pid.stop_deadband_rpm,
+            };
+            const payload::control_math::PidConfig right_pid_cfg {
+                p.pid.right_kp,
+                p.pid.right_ki,
+                p.pid.right_kd,
+                p.pid.i_clamp,
+                p.pid.output_limit_norm,
+                p.pid.stop_deadband_rpm,
+            };
 
-        const auto left_terms = payload::control_math::pid_step(
-            setpoints.left_rpm,
-            left_filtered_rpm_,
-            dt_s,
-            left_pid_cfg,
-            left_pid_state_);
-        const auto right_terms = payload::control_math::pid_step(
-            setpoints.right_rpm,
-            right_filtered_rpm_,
-            dt_s,
-            right_pid_cfg,
-            right_pid_state_);
+            const bool in_dr = (control_mode_.load() == ControlMode::DEAD_RECKONING);
+            const double left_sp  = (in_dr && dr_left_done_.load())  ? 0.0 : setpoints.left_rpm;
+            const double right_sp = (in_dr && dr_right_done_.load()) ? 0.0 : setpoints.right_rpm;
 
-        const float left_duty =
-            static_cast<float>(std::abs(left_terms.output) * 100.0);
-        const float right_duty =
-            static_cast<float>(std::abs(right_terms.output) * 100.0);
+            left_terms = payload::control_math::pid_step(
+                left_sp,
+                left_filtered_rpm_,
+                dt_s,
+                left_pid_cfg,
+                left_pid_state_);
+            right_terms = payload::control_math::pid_step(
+                right_sp,
+                right_filtered_rpm_,
+                dt_s,
+                right_pid_cfg,
+                right_pid_state_);
 
-        if (left_terms.output > 0.0) {
-            left_motor_->forward(left_duty);
-        } else if (left_terms.output < 0.0) {
-            left_motor_->reverse(left_duty);
-        } else {
-            left_motor_->coast();
+            left_duty  = static_cast<float>(std::abs(left_terms.output)  * 100.0);
+            right_duty = static_cast<float>(std::abs(right_terms.output) * 100.0);
+
+            if (left_terms.output > 0.0) {
+                left_motor_->forward(left_duty);
+            } else if (left_terms.output < 0.0) {
+                left_motor_->reverse(left_duty);
+            } else {
+                left_motor_->coast();
+            }
+
+            if (right_terms.output > 0.0) {
+                right_motor_->forward(right_duty);
+            } else if (right_terms.output < 0.0) {
+                right_motor_->reverse(right_duty);
+            } else {
+                right_motor_->coast();
+            }
+
         }
 
-        if (right_terms.output > 0.0) {
-            right_motor_->forward(right_duty);
-        } else if (right_terms.output < 0.0) {
-            right_motor_->reverse(right_duty);
-        } else {
-            right_motor_->coast();
-        }
 
         if (motor_state_pub_) {
             payload_interfaces::msg::MotorState msg;

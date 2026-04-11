@@ -16,9 +16,6 @@ from launch.actions import (
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 
-from sim.orchestration import resolve_stage_world
-from sim.constants import COMPETITION_NAMES, DEFAULT_COMPETITION, Competition
-from sim.utils import load_sim_launch_parameters
 from uav.runtime.mission_spec import MissionSpec, mission_path_for_name
 from uav.utils import find_folder_with_heuristic, get_airframe_details, vehicle_id_dict
 
@@ -60,7 +57,7 @@ def _resolve_airframe_id(airframe_value) -> int:
             raise ValueError(f"Unknown airframe name: {airframe_value}") from exc
 
 
-def _resolved_sim_world_name(sim_params: dict) -> str:
+def _resolved_sim_world_name(sim_params: dict, COMPETITION_NAMES, DEFAULT_COMPETITION, Competition) -> str:
     competition_num = sim_params.get("competition", DEFAULT_COMPETITION.value)
     try:
         competition_type = Competition(competition_num)
@@ -104,7 +101,9 @@ def _legacy_backend_override(
     model: str,
     px4_airframe_id: int | None = None,
 ) -> tuple[dict, str]:
-    world_name = _resolved_sim_world_name(sim_params)
+    from sim.orchestration import resolve_stage_world
+    from sim.constants import COMPETITION_NAMES, DEFAULT_COMPETITION, Competition
+    world_name = _resolved_sim_world_name(sim_params, COMPETITION_NAMES, DEFAULT_COMPETITION, Competition)
     resolved_world = resolve_stage_world(
         world_name=world_name,
         mission_stage=sim_params.get("mission_stage", ""),
@@ -230,6 +229,7 @@ def _single_vehicle_config(context, params: dict) -> tuple[dict, dict | None]:
     if not sim:
         return vehicle_config, None
 
+    from sim.utils import load_sim_launch_parameters
     sim_params = load_sim_launch_parameters()
     backend, world_name = _legacy_backend_override(
         mission_spec=mission_spec,

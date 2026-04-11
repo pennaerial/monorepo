@@ -58,6 +58,8 @@ class PayloadRetreatMode(Mode):
         edge_invalid_max_frames: int = 30,
         turn_angular_speed: float = 0.5,
         turn_direction: int = 1,
+        turn_angular: float = math.pi,
+        turn_speed: float = 1.85,
         compressed_image: bool = False,
         camera_debug: bool = False,
     ):
@@ -69,6 +71,8 @@ class PayloadRetreatMode(Mode):
         self.edge_invalid_max_frames = int(edge_invalid_max_frames)
         self.turn_angular_speed = float(turn_angular_speed)
         self.turn_direction = 1 if int(turn_direction) >= 0 else -1
+        self.turn_angular = float(turn_angular)
+        self.turn_speed = float(turn_speed)
         self.compressed_image = bool(compressed_image)
         self.camera_debug = bool(camera_debug)
 
@@ -181,9 +185,9 @@ class PayloadRetreatMode(Mode):
         # ---- Phase 2: turn 180° in place, dead reckoning ----
         if self._phase == "turn_180":
             if self._turn_future is None:
-                angular = math.pi * self.turn_direction
-                self._turn_future = self.vehicle.dead_reckon(0.0, angular, 1.85)
-                self.log("PayloadRetreatMode: sent dead_reckon for 180° turn at 1.85 rad/s")
+                angular = self.turn_angular * self.turn_direction
+                self._turn_future = self.vehicle.dead_reckon(0.0, angular, self.turn_speed)
+                self.log(f"PayloadRetreatMode: sent dead_reckon for {math.degrees(self.turn_angular):.0f}° turn at {self.turn_speed} rad/s")
                 return
             if self._turn_future.done():
                 self._done = True

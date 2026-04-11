@@ -44,10 +44,10 @@
       i_clamp: 1.0
       output_limit_norm: 1.0
       stop_deadband_rpm: 1.0
-      velocity_alpha: 1.0
+      velocity_alpha: 0.8
 
     control:
-      loop_ms: 50
+      loop_ms: 20
 
     servo:
       pulse_min_us: 700.0

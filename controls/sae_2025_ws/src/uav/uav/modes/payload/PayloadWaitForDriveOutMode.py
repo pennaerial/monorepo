@@ -25,9 +25,8 @@ from ..Mode import Mode
 class DriveOutState(Enum):
     WAIT_UNREEL = 0
     REVERSING = 1
-    SETTLING = 2  # brief pause after reverse before turning
-    TURNING = 3
-    DONE = 4
+    TURNING = 2
+    DONE = 3
 
 
 class PayloadWaitForDriveOutMode(Mode):
@@ -46,12 +45,16 @@ class PayloadWaitForDriveOutMode(Mode):
         confirm_frames: int = 5,
         lower_hsv: list = (0, 0, 180),
         upper_hsv: list = (180, 20, 255),
+        turn_angular: float = math.pi,
+        turn_speed: float = 1.85,
     ):
         super().__init__(node, vehicle)
         self.vehicle: Payload = vehicle
         self.confirm_frames = int(confirm_frames)
         self._lower_hsv = [int(v) for v in lower_hsv]
         self._upper_hsv = [int(v) for v in upper_hsv]
+        self.turn_angular = float(turn_angular)
+        self.turn_speed = float(turn_speed)
 
         self._done = False
         self._clear_count = 0
@@ -66,7 +69,6 @@ class PayloadWaitForDriveOutMode(Mode):
         self._first_response_logged = False
         self._last_wait_log_time = 0.0
         self._dr_future = None
-        self._reverse_done_time = None
         self.state = DriveOutState.WAIT_UNREEL
         self.log("PayloadWaitForDriveOutMode: waiting for clear path")
 
@@ -81,7 +83,6 @@ class PayloadWaitForDriveOutMode(Mode):
 
     def on_update(self, time_delta: float) -> None:
         if self._done:
-            self.log("done")
             return
 
         if self.state == DriveOutState.WAIT_UNREEL:
@@ -112,9 +113,6 @@ class PayloadWaitForDriveOutMode(Mode):
                 )
                 if self._clear_count >= self.confirm_frames:
                     self.state = DriveOutState.REVERSING
-                    self._dr_future = self.vehicle.dead_reckon(
-                        linear=-0.1, angular=0.0, speed=0.3
-                    )
                     self.log("PayloadWaitForDriveOutMode: path clear — reversing 0.1 m")
             else:
                 if self._clear_count > 0:
@@ -124,25 +122,24 @@ class PayloadWaitForDriveOutMode(Mode):
                 self._clear_count = 0
         elif self.state == DriveOutState.REVERSING:
             self.vehicle.set_servo(180.0)
-            if self._dr_future is not None and self._dr_future.done():
+            if self._dr_future is None:
+                self._dr_future = self.vehicle.dead_reckon(
+                    linear=-0.05, angular=0.0, speed=self.turn_speed
+                )
+            elif self._dr_future.done():
                 result = self._dr_future.result()
                 self.log(
                     f"PayloadWaitForDriveOutMode: reverse done success={result.success} — settling"
                 )
                 self._dr_future = None
                 self._reverse_done_time = self._now()
-                self.state = DriveOutState.SETTLING
-        elif self.state == DriveOutState.SETTLING:
-            if self._now() - self._reverse_done_time >= 0.2:
-                self.log(
-                    "PayloadWaitForDriveOutMode: settle complete — starting 180 turn"
-                )
-                self._dr_future = self.vehicle.dead_reckon(
-                    linear=0.0, angular=math.pi, speed=1.85
-                )
                 self.state = DriveOutState.TURNING
         elif self.state == DriveOutState.TURNING:
-            if self._dr_future is not None and self._dr_future.done():
+            if self._dr_future is None:
+                self._dr_future = self.vehicle.dead_reckon(
+                    linear=0.0, angular=self.turn_angular, speed=self.turn_speed
+                )
+            elif self._dr_future.done():
                 result = self._dr_future.result()
                 self.log(
                     f"PayloadWaitForDriveOutMode: turn done success={result.success} — terminating"

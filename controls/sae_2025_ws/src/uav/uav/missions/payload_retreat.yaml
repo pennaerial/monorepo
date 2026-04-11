@@ -11,5 +11,7 @@ modes:
       edge_min_pixels: 500
       edge_invalid_max_frames: 30
       turn_direction: 1
+      turn_angular: 3.14159
+      turn_speed: 1.85
       camera_debug: false
       compressed_image: false

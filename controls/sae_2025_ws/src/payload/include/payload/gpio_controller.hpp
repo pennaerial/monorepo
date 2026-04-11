@@ -76,6 +76,8 @@ private:
     std::atomic<int64_t>     dr_right_goal_  {0};
     std::atomic<int64_t>     dr_left_start_  {0};  // snapshot at service call time
     std::atomic<int64_t>     dr_right_start_ {0};
+    std::atomic<bool>        dr_left_done_   {false};
+    std::atomic<bool>        dr_right_done_  {false};
 
     rclcpp::Publisher<payload_interfaces::msg::MotorState>::SharedPtr motor_state_pub_;
     rclcpp::Service<payload_interfaces::srv::ComputePidZieglerNichols>::SharedPtr zn_service_;
