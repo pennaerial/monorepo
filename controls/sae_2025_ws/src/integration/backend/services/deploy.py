@@ -15,6 +15,7 @@ from pathlib import Path
 import yaml
 
 from ..context import AppContext, TargetContext
+from ..config import default_fleet_file
 from uav.runtime.mission_spec import MissionSpec
 
 _ARTIFACT_NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
@@ -43,6 +44,16 @@ _SHARED_OVERLAY_KEYS = {
 }
 _UAV_OVERLAY_KEYS = _SHARED_OVERLAY_KEYS | {"px4_airframe_id", "px4_namespace"}
 _PAYLOAD_OVERLAY_KEYS = _SHARED_OVERLAY_KEYS | {"payload_controller"}
+
+
+def _selected_fleet_file(
+    ctx: AppContext, target_ctx: TargetContext | None = None
+) -> str:
+    del target_ctx
+    current = ctx.build_source_store.current()
+    if current.fleet_file:
+        return current.fleet_file
+    return default_fleet_file(ctx.base_dir)
 
 
 def _require_httpx():
@@ -84,7 +95,11 @@ def sanitize_source_bundle_name(filename: str) -> str:
 
 
 def _build_source_payload(ctx: AppContext) -> dict[str, object]:
-    return ctx.build_source_store.current().to_payload_dict()
+    payload = ctx.build_source_store.current().to_payload_dict()
+    fleet_file = _selected_fleet_file(ctx)
+    payload["fleet_file"] = fleet_file
+    payload.update(_fleet_preview(ctx, fleet_file))
+    return payload
 
 
 def _build_source_response(
@@ -126,6 +141,63 @@ def _load_local_yaml(path: Path) -> dict:
     if not isinstance(payload, dict):
         raise ValueError(f"YAML file '{path}' must define a mapping.")
     return payload
+
+
+def _fleet_preview(ctx: AppContext, fleet_file: str) -> dict[str, object]:
+    preview = {
+        "fleet_exists": False,
+        "fleet_error": None,
+        "fleet_vehicles": [],
+    }
+    raw = str(fleet_file or "").strip()
+    if not raw:
+        preview["fleet_error"] = "No fleet file selected."
+        return preview
+
+    try:
+        fleet_path = _resolve_local_path(ctx, raw)
+        if not fleet_path.exists():
+            preview["fleet_error"] = f"Fleet file not found: {raw}"
+            return preview
+        shared_fleet = _load_local_yaml(fleet_path)
+        defaults = deepcopy(shared_fleet.get("defaults", {})) or {}
+        if not isinstance(defaults, dict):
+            raise ValueError("Fleet defaults must be a mapping.")
+        vehicles = shared_fleet.get("vehicles", [])
+        if not isinstance(vehicles, list):
+            raise ValueError("Fleet vehicles must be a list.")
+        preview["fleet_exists"] = True
+        fleet_vehicles: list[dict[str, object]] = []
+        for vehicle in vehicles:
+            if not isinstance(vehicle, dict):
+                continue
+            merged = deepcopy(defaults)
+            merged.update(vehicle)
+            mission_name = str(merged.get("mission", "")).strip() or None
+            mission_path = str(merged.get("mission_path", "")).strip() or None
+            mission_target = None
+            try:
+                resolved_name, resolved_path, mission_spec = _mission_source_for(
+                    ctx, merged
+                )
+                mission_name = resolved_name
+                mission_path = str(resolved_path)
+                mission_target = mission_spec.target
+            except Exception:
+                mission_target = str(merged.get("kind", "")).strip() or None
+            fleet_vehicles.append(
+                {
+                    "name": str(vehicle.get("name", "")).strip(),
+                    "kind": mission_target,
+                    "mission": mission_name,
+                    "mission_path": mission_path,
+                }
+            )
+        preview["fleet_vehicles"] = fleet_vehicles
+        return preview
+    except Exception as exc:
+        preview["fleet_error"] = str(exc)
+        return preview
 
 
 def _vehicle_from_fleet(fleet: dict, vehicle_name: str) -> dict:
@@ -231,6 +303,7 @@ def _release_metadata_payload(
     release_id: str,
     source_type: str,
     source_label: str,
+    fleet_file: str,
     package_names: list[str] | None = None,
 ) -> dict[str, object]:
     payload: dict[str, object] = {
@@ -239,7 +312,7 @@ def _release_metadata_payload(
         "source_label": source_label,
         "target_id": target_ctx.target.target_id,
         "vehicle_name": target_ctx.target.vehicle_name,
-        "fleet_file": target_ctx.target.fleet_file,
+        "fleet_file": fleet_file,
         "deployed_at_utc": datetime.now(timezone.utc)
         .replace(microsecond=0)
         .isoformat()
@@ -353,7 +426,9 @@ def _local_source_package_names(
     ctx: AppContext, target_ctx: TargetContext
 ) -> list[str]:
     selected_vehicle = _vehicle_from_fleet(
-        _load_local_yaml(_resolve_local_path(ctx, target_ctx.target.fleet_file)),
+        _load_local_yaml(
+            _resolve_local_path(ctx, _selected_fleet_file(ctx, target_ctx))
+        ),
         target_ctx.target.vehicle_name,
     )
     overlay = target_ctx.target.overlay_data()
@@ -411,7 +486,7 @@ def _render_runtime_fleet(
     ctx: AppContext, target_ctx: TargetContext
 ) -> tuple[str, str, str]:
     target = target_ctx.target
-    fleet_path = _resolve_local_path(ctx, target.fleet_file)
+    fleet_path = _resolve_local_path(ctx, _selected_fleet_file(ctx, target_ctx))
     shared_fleet = _load_local_yaml(fleet_path)
     fleet_defaults = deepcopy(shared_fleet.get("defaults", {}))
     if fleet_defaults is None:
@@ -1134,6 +1209,7 @@ async def _deploy_artifact_path(
             release_id=release["release_id"],
             source_type=source_type,
             source_label=source_label,
+            fleet_file=_selected_fleet_file(ctx, target_ctx),
         ),
     )
     await _ensure_runtime_service(target_ctx)
@@ -1217,6 +1293,7 @@ async def _deploy_source_bundle_path(
             release_id=release["release_id"],
             source_type=source_type,
             source_label=source_label,
+            fleet_file=_selected_fleet_file(ctx, target_ctx),
             package_names=package_names,
         ),
     )
@@ -1333,6 +1410,7 @@ async def set_github_build_source(
     artifact_id: str = "",
     run_id: str = "",
     sha: str = "",
+    commit_subject: str = "",
     name: str = "",
     date: str = "",
     download_url: str = "",
@@ -1347,6 +1425,7 @@ async def set_github_build_source(
             artifact_id=artifact_id,
             run_id=run_id,
             sha=sha,
+            commit_subject=commit_subject,
             name=name,
             date=date,
             download_url=download_url,
@@ -1401,6 +1480,35 @@ async def set_local_codebase_build_source(ctx: AppContext) -> dict[str, object]:
             ctx,
             success=True,
             output="Local codebase selected",
+        )
+    except Exception as exc:
+        return _build_source_response(
+            ctx,
+            success=False,
+            error=str(exc),
+        )
+
+
+async def set_global_fleet_file(
+    ctx: AppContext,
+    *,
+    fleet_file: str,
+) -> dict[str, object]:
+    try:
+        selected = str(fleet_file or "").strip()
+        if not selected:
+            raise ValueError("fleet_file is required.")
+        fleet_path = _resolve_local_path(ctx, selected)
+        if not fleet_path.exists():
+            raise ValueError(f"Fleet file not found: {selected}")
+        fleet_payload = _load_local_yaml(fleet_path)
+        if not isinstance(fleet_payload.get("vehicles", []), list):
+            raise ValueError("Fleet file must define vehicles as a list.")
+        ctx.build_source_store.set_fleet_file(fleet_file=selected)
+        return _build_source_response(
+            ctx,
+            success=True,
+            output=f"Fleet selected: {selected}",
         )
     except Exception as exc:
         return _build_source_response(
@@ -1614,18 +1722,57 @@ async def upload_build(
 
 async def list_builds(ctx: AppContext) -> dict:
     if not ctx.operator_config.github_repo:
-        return {"success": False, "error": "GITHUB_REPO not configured", "builds": []}
+        return {
+            "success": False,
+            "error": "GITHUB_REPO not configured",
+            "builds": [],
+            "releases": [],
+            "artifacts": [],
+        }
     try:
         httpx = _require_httpx()
-        builds: list[dict[str, object]] = []
-        async with httpx.AsyncClient(timeout=20) as client:
-            releases_resp = await client.get(
-                f"https://api.github.com/repos/{ctx.operator_config.github_repo}/releases",
-                headers=_github_headers(ctx),
-            )
-            releases_resp.raise_for_status()
-            releases = releases_resp.json()
+        releases_builds: list[dict[str, object]] = []
+        artifact_builds: list[dict[str, object]] = []
 
+        async def _collect_releases(client) -> list[dict[str, object]]:
+            collected: list[dict[str, object]] = []
+            page = 1
+            while True:
+                response = await client.get(
+                    f"https://api.github.com/repos/{ctx.operator_config.github_repo}/releases?per_page=100&page={page}",
+                    headers=_github_headers(ctx),
+                )
+                response.raise_for_status()
+                page_payload = response.json()
+                if not page_payload:
+                    break
+                if not isinstance(page_payload, list):
+                    raise ValueError("Unexpected releases payload from GitHub.")
+                collected.extend(page_payload)
+                if len(page_payload) < 100:
+                    break
+                page += 1
+            return collected
+
+        async def _commit_subject_for(client, commit_sha: str) -> str | None:
+            if not commit_sha:
+                return None
+            try:
+                response = await client.get(
+                    f"https://api.github.com/repos/{ctx.operator_config.github_repo}/commits/{commit_sha}",
+                    headers=_github_headers(ctx),
+                )
+                response.raise_for_status()
+                payload = response.json() or {}
+                message = (
+                    payload.get("commit", {}).get("message", "").splitlines()[0].strip()
+                )
+                return message or None
+            except Exception:
+                return None
+
+        async with httpx.AsyncClient(timeout=20) as client:
+            releases = await _collect_releases(client)
             artifacts_resp = await client.get(
                 f"https://api.github.com/repos/{ctx.operator_config.github_repo}/actions/artifacts?per_page=30",
                 headers=_github_headers(ctx),
@@ -1633,16 +1780,46 @@ async def list_builds(ctx: AppContext) -> dict:
             artifacts_resp.raise_for_status()
             artifacts_payload = artifacts_resp.json()
 
-        for rel in releases:
-            tag_name = rel.get("tag_name", "")
-            if not str(tag_name).startswith("build-"):
-                continue
+            release_commit_shas: list[str] = []
+            artifact_commit_shas: list[str] = []
+            release_rows: list[tuple[dict, str]] = []
+            artifact_rows: list[tuple[dict, str]] = []
+
+            for rel in releases:
+                tag_name = rel.get("tag_name", "")
+                if not str(tag_name).startswith("build-"):
+                    continue
+                assets = rel.get("assets", [])
+                commit_sha = str(rel.get("tag_name", "")).replace("build-", "").strip()
+                release_rows.append((rel, commit_sha))
+                if commit_sha:
+                    release_commit_shas.append(commit_sha)
+
+            for artifact in artifacts_payload.get("artifacts", []):
+                workflow_run = artifact.get("workflow_run") or {}
+                commit_sha = str(workflow_run.get("head_sha", "")).strip()
+                artifact_rows.append((artifact, commit_sha))
+                if commit_sha:
+                    artifact_commit_shas.append(commit_sha)
+
+            unique_commit_shas = {
+                sha: None for sha in (release_commit_shas + artifact_commit_shas) if sha
+            }
+            for commit_sha in unique_commit_shas:
+                unique_commit_shas[commit_sha] = await _commit_subject_for(
+                    client, commit_sha
+                )
+
+        for rel, commit_sha in release_rows:
             assets = rel.get("assets", [])
-            builds.append(
+            display_sha = commit_sha[:7] if len(commit_sha) > 7 else commit_sha
+            releases_builds.append(
                 {
                     "source": "release",
                     "tag": rel["tag_name"],
-                    "sha": rel["tag_name"].replace("build-", ""),
+                    "sha": display_sha,
+                    "commit_sha": commit_sha or None,
+                    "commit_subject": unique_commit_shas.get(commit_sha),
                     "name": rel.get("name", rel["tag_name"]),
                     "date": rel.get("published_at", "")[:10],
                     "download_url": assets[0]["browser_download_url"]
@@ -1654,13 +1831,15 @@ async def list_builds(ctx: AppContext) -> dict:
                 }
             )
 
-        for artifact in artifacts_payload.get("artifacts", []):
+        for artifact, commit_sha in artifact_rows:
             workflow_run = artifact.get("workflow_run") or {}
-            builds.append(
+            artifact_builds.append(
                 {
                     "source": "actions",
                     "tag": f"run-{workflow_run.get('id', artifact.get('id'))}",
-                    "sha": str(workflow_run.get("head_sha", ""))[:7],
+                    "sha": commit_sha[:7] if len(commit_sha) > 7 else commit_sha,
+                    "commit_sha": commit_sha or None,
+                    "commit_subject": unique_commit_shas.get(commit_sha),
                     "name": artifact.get("name", f"artifact-{artifact.get('id')}"),
                     "date": str(artifact.get("updated_at", ""))[:10],
                     "size_mb": round(
@@ -1672,9 +1851,20 @@ async def list_builds(ctx: AppContext) -> dict:
                     "branch": workflow_run.get("head_branch"),
                 }
             )
-        return {"success": True, "builds": builds[:40]}
+        return {
+            "success": True,
+            "builds": releases_builds + artifact_builds,
+            "releases": releases_builds,
+            "artifacts": artifact_builds,
+        }
     except Exception as exc:
-        return {"success": False, "error": str(exc), "builds": []}
+        return {
+            "success": False,
+            "error": str(exc),
+            "builds": [],
+            "releases": [],
+            "artifacts": [],
+        }
 
 
 async def download_build(

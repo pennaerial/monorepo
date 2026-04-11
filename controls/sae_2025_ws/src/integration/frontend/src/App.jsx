@@ -770,7 +770,7 @@ function WifiCard({ connected, wifiStatus, onRefresh, targetId }) {
   )
 }
 
-function MissionControl({ connected, buildInfo, onRefresh, workspacePaths, targetId, selectedTarget }) {
+function MissionControl({ connected, buildInfo, onRefresh, workspacePaths, fleetFile, targetId, selectedTarget }) {
   const [paramsMode, setParamsMode] = useState('form')
   const [missionViewMode, setMissionViewMode] = useState('graph')
   const [integerDrafts, setIntegerDrafts] = useState({})
@@ -834,7 +834,7 @@ function MissionControl({ connected, buildInfo, onRefresh, workspacePaths, targe
     displayWorkspacePath(workspacePaths?.missions_dir, workspaceRoot) ||
     'config/missions'
   const fleetDisplayPath =
-    displayWorkspacePath(selectedTarget?.fleet_file || workspacePaths?.fleet_file, workspaceRoot) ||
+    displayWorkspacePath(fleetFile || workspacePaths?.fleet_file, workspaceRoot) ||
     'config/fleet.yaml'
 
   useEffect(() => {
@@ -1110,15 +1110,16 @@ function MissionControl({ connected, buildInfo, onRefresh, workspacePaths, targe
               </div>
 
               {missionViewMode === 'graph' ? (
-              <MissionGraphEditor
-                connected={connected}
-                setMissionFileText={setMissionFileText}
-                parsedMission={parsedMission}
-                selectedTarget={selectedTarget}
-                missionsDirDisplayPath={missionsDirDisplayPath}
-                selectedMissionName={selectedMissionName}
-                busy={missionFileLoading || missionFileSaving}
-                modeRegistry={modeRegistry}
+                <MissionGraphEditor
+                  connected={connected}
+                  setMissionFileText={setMissionFileText}
+                  parsedMission={parsedMission}
+                  selectedTarget={selectedTarget}
+                  fleetFile={fleetFile}
+                  missionsDirDisplayPath={missionsDirDisplayPath}
+                  selectedMissionName={selectedMissionName}
+                  busy={missionFileLoading || missionFileSaving}
+                  modeRegistry={modeRegistry}
                 schemaLoading={schemaLoading}
                 schemaError={schemaError}
                 missionDocumentSchema={missionDocumentSchema}
@@ -1174,6 +1175,7 @@ function MissionGraphEditor({
   setMissionFileText,
   parsedMission,
   selectedTarget,
+  fleetFile,
   missionsDirDisplayPath,
   selectedMissionName,
   busy,
@@ -1204,7 +1206,7 @@ function MissionGraphEditor({
     }
     return Object.values(modeRegistry || {}).flat()
   }, [modeRegistry, parsedMission.selectedTarget, selectedMode?.target])
-  const fleetDisplayPath = selectedTarget?.fleet_file || ''
+  const fleetDisplayPath = fleetFile || selectedTarget?.fleet_file || ''
 
   const applyMissionUpdate = useCallback((updater) => {
     setMissionFileText(prev => {
@@ -1640,6 +1642,8 @@ function normalizeBuildRecord(build) {
     source: build.source || build.source_type || 'release',
     tag: build.tag || build.ref || '',
     sha: build.sha || build.commit || '',
+    commitSha: build.commit_sha || build.commitSha || build.head_sha || '',
+    commitSubject: build.commit_subject || build.commitSubject || '',
     name: build.name || build.artifact_name || build.bundle_name || build.tag || 'Build',
     date: build.date || build.published_at?.slice(0, 10) || build.updated_at?.slice(0, 10) || '',
     download_url: build.download_url || '',
@@ -1667,48 +1671,65 @@ function normalizeBackendBuildSource(raw) {
   }
 
   const kindHint = `${payload.kind || payload.source_kind || payload.source_type || payload.type || sourceString || ''}`.trim().toLowerCase()
+  const normalizedKind = kindHint.replace(/_/g, '-')
+  const fleetVehicles = Array.isArray(payload.fleet_vehicles)
+    ? payload.fleet_vehicles.map(vehicle => ({
+      name: `${vehicle?.name || ''}`.trim(),
+      kind: vehicle?.kind ? `${vehicle.kind}`.trim() : '',
+      mission: vehicle?.mission ? `${vehicle.mission}`.trim() : '',
+      missionPath: vehicle?.mission_path ? `${vehicle.mission_path}`.trim() : '',
+    })).filter(vehicle => vehicle.name)
+    : []
+  const contextFields = {
+    fleetFile: `${payload.fleet_file || ''}`.trim(),
+    fleetExists: payload.fleet_exists !== false,
+    fleetError: payload.fleet_error || '',
+    fleetVehicles,
+  }
   if (!kindHint || kindHint === 'none' || kindHint === 'null' || kindHint === 'empty') {
-    return { kind: 'none' }
+    return { kind: 'none', ...contextFields }
   }
 
-  if (kindHint === 'github' || kindHint === 'release' || kindHint === 'actions') {
+  if (normalizedKind === 'github' || normalizedKind === 'release' || normalizedKind === 'actions') {
     const build = normalizeBuildRecord(payload.build || payload.selected_build || payload.build_info || payload)
     return {
       kind: 'github',
       build,
+      ...contextFields,
     }
   }
 
   if (
-    kindHint === 'local-artifact'
-    || kindHint === 'artifact'
-    || kindHint === 'upload'
-    || kindHint === 'artifact-file'
-    || kindHint === 'artifact_file'
-    || kindHint.startsWith('artifact')
+    normalizedKind === 'local-artifact'
+    || normalizedKind === 'artifact'
+    || normalizedKind === 'upload'
+    || normalizedKind === 'artifact-file'
+    || normalizedKind.startsWith('artifact')
   ) {
     return {
       kind: 'local-artifact',
       fileName: payload.file_name || payload.filename || payload.artifact_name || payload.source_label || payload.name || '',
       sourceLabel: payload.source_label || payload.artifact_name || payload.file_name || payload.filename || 'Local artifact bundle',
       cached: payload.cached !== false,
+      ...contextFields,
     }
   }
 
   if (
-    kindHint === 'local-codebase'
-    || kindHint === 'codebase'
-    || kindHint === 'source-build'
-    || kindHint === 'source'
+    normalizedKind === 'local-codebase'
+    || normalizedKind === 'codebase'
+    || normalizedKind === 'source-build'
+    || normalizedKind === 'source'
   ) {
     return {
       kind: 'local-codebase',
       sourceLabel: payload.source_label || payload.name || 'Current local codebase',
       packages: Array.isArray(payload.packages) ? payload.packages : [],
+      ...contextFields,
     }
   }
 
-  return { kind: 'none' }
+  return { kind: 'none', ...contextFields }
 }
 
 function describeBuildSource(buildSource, loaded = true) {
@@ -1724,6 +1745,17 @@ function describeBuildSource(buildSource, loaded = true) {
     return {
       title: 'No build source selected',
       detail: 'Choose a deploy source before opening a hardware detail page.',
+      fleetDetail: buildSource?.fleetFile
+        ? `Fleet: ${buildSource.fleetFile}`
+        : 'Fleet file not selected.',
+      ready: false,
+    }
+  }
+  if (!buildSource.fleetFile || buildSource.fleetExists === false) {
+    return {
+      title: buildSource.fleetFile ? 'Fleet selection needs attention' : 'Fleet file not selected',
+      detail: buildSource.fleetError || 'Choose a valid fleet file before assigning and deploying hardware.',
+      fleetDetail: buildSource.fleetFile || 'No fleet file selected.',
       ready: false,
     }
   }
@@ -1731,7 +1763,8 @@ function describeBuildSource(buildSource, loaded = true) {
     const build = buildSource.build
     return {
       title: build?.name || build?.tag || 'GitHub build',
-      detail: `${build?.source === 'actions' ? 'GitHub Actions artifact' : 'GitHub release'}${build?.sha ? ` · ${build.sha}` : ''}${build?.date ? ` · ${build.date}` : ''}`,
+      detail: `${build?.source === 'actions' ? 'GitHub Actions artifact' : 'GitHub release'}${build?.sha ? ` · ${build.sha}` : ''}${build?.commit_subject ? ` · ${build.commit_subject}` : ''}${build?.date ? ` · ${build.date}` : ''}`,
+      fleetDetail: buildSource.fleetFile,
       ready: true,
     }
   }
@@ -1741,6 +1774,7 @@ function describeBuildSource(buildSource, loaded = true) {
       detail: buildSource.cached
         ? 'Cached by the backend and ready for deployment.'
         : 'Uploaded from this laptop and cached by the backend.',
+      fleetDetail: buildSource.fleetFile,
       ready: true,
     }
   }
@@ -1750,12 +1784,14 @@ function describeBuildSource(buildSource, loaded = true) {
       detail: buildSource.packages?.length
         ? `Packages the local workspace into a source bundle (${buildSource.packages.length} package(s)).`
         : 'Packages the local workspace into a source bundle and builds it on the selected Pi.',
+      fleetDetail: buildSource.fleetFile,
       ready: true,
     }
   }
   return {
     title: 'Unknown build source',
     detail: 'Select a supported build source.',
+    fleetDetail: buildSource?.fleetFile || 'No fleet file selected.',
     ready: false,
   }
 }
@@ -1780,24 +1816,30 @@ function buildSelectionKey(build) {
   ].join('::')
 }
 
-function hardwareDraftFromSelection(target, liveDevice, operatorConfig) {
+function inventoryDraftFromSelection(target, liveDevice, operatorConfig) {
   const hostname = target?.pi_host || liveDevice?.hostname || ''
-  const defaultSshPass = operatorConfig?.default_ssh_pass === '••••'
-    ? ''
-    : operatorConfig?.default_ssh_pass || ''
   return {
     target_id: target?.target_id || suggestedTargetId(hostname),
     label: target?.label || hostname || 'Unnamed device',
     pi_host: target?.pi_host || hostname,
     pi_user: target?.pi_user || operatorConfig?.default_pi_user || 'penn',
     ssh_key: target?.ssh_key || operatorConfig?.default_ssh_key || '',
-    ssh_pass: target?.ssh_pass || defaultSshPass,
+    ssh_pass: target?.ssh_pass || '',
     deploy_root: target?.deploy_root || operatorConfig?.default_deploy_root || '/home/penn/pennair-deploy',
-    fleet_file: target?.fleet_file || '',
-    vehicle_name: target?.vehicle_name || '',
     service_unit: target?.service_unit || 'pennair-autonomy.service',
-    overlay_yaml: target?.overlay_yaml || defaultOverlayYaml(),
   }
+}
+
+function assignmentDraftFromTarget(target) {
+  return {
+    target_id: target?.target_id || '',
+    vehicle_name: target?.vehicle_name || '',
+    overlay_yaml: target?.overlay_yaml || '',
+  }
+}
+
+function fleetVehicleByName(buildSource, vehicleName) {
+  return (buildSource?.fleetVehicles || []).find(vehicle => vehicle.name === vehicleName) || null
 }
 
 function EmptyState({ title, message, actionLabel, onAction }) {
@@ -1864,11 +1906,11 @@ function AppHeader({ page, onPageChange, theme, onToggleTheme, liveCount, buildS
 
 function LiveHardwareCard({ device, buildSource, buildSourceLoaded = true, onOpen }) {
   const sourceSummary = describeBuildSource(buildSource, buildSourceLoaded)
-  let footerText = buildSourceLoaded ? 'Select build source' : 'Loading build source'
-  if (!device.saved) {
-    footerText = 'Save device setup before deploy'
+  let footerText = buildSourceLoaded ? 'Select build source and fleet' : 'Loading deploy context'
+  if (sourceSummary.ready && !device.saved) {
+    footerText = 'Save device in Inventory to continue'
   } else if (sourceSummary.ready) {
-    footerText = 'Ready to deploy'
+    footerText = 'Open assignment and deploy controls'
   }
   return (
     <button type="button" className="hardware-card" onClick={() => onOpen(device.hardware_id)}>
@@ -1939,34 +1981,62 @@ function SetupField({ label, value, onChange, placeholder, type = 'text' }) {
   )
 }
 
-function HardwareSetupCard({ draft, liveDevice, onChange, onSave, saving, saveResult }) {
+function AssignmentCard({ draft, buildSource, onChange, onSave, saving, saveResult }) {
+  const fleetVehicles = Array.isArray(buildSource?.fleetVehicles) ? buildSource.fleetVehicles : []
+  const selectedVehicle = fleetVehicleByName(buildSource, draft?.vehicle_name || '')
+  const canSave = Boolean(draft?.target_id && draft?.vehicle_name && buildSource?.fleetExists)
+
   return (
     <div className="card">
-      <h2 className="card-title">Hardware Setup</h2>
+      <h2 className="card-title">Assignment</h2>
       <div className="card-content settings-grid">
-        <SetupField label="Target ID" value={draft.target_id} onChange={value => onChange('target_id', value)} placeholder="payload-pi" />
-        <SetupField label="Label" value={draft.label} onChange={value => onChange('label', value)} placeholder="Payload Pi" />
-        <SetupField label="Pi host" value={draft.pi_host} onChange={value => onChange('pi_host', value)} placeholder={liveDevice?.hostname || 'payload-pi.local'} />
-        <SetupField label="Pi user" value={draft.pi_user} onChange={value => onChange('pi_user', value)} placeholder="penn" />
-        <SetupField label="SSH key path" value={draft.ssh_key} onChange={value => onChange('ssh_key', value)} placeholder="~/.ssh/pennair_pi_ed25519" />
-        <SetupField label="SSH password" value={draft.ssh_pass} onChange={value => onChange('ssh_pass', value)} placeholder="Optional password" type="password" />
-        <SetupField label="Deploy root" value={draft.deploy_root} onChange={value => onChange('deploy_root', value)} placeholder="/home/penn/pennair-deploy" />
-        <SetupField label="Fleet file" value={draft.fleet_file} onChange={value => onChange('fleet_file', value)} placeholder="src/uav/uav/fleets/example_fleet.yaml" />
-        <SetupField label="Desired controllable" value={draft.vehicle_name} onChange={value => onChange('vehicle_name', value)} placeholder="uav_0" />
-        <SetupField label="Systemd unit" value={draft.service_unit} onChange={value => onChange('service_unit', value)} placeholder="pennair-autonomy.service" />
+        <div className="info-box compact-info settings-field settings-field-full">
+          <strong>Global fleet</strong>
+          <p>{buildSource?.fleetFile || 'No fleet file selected.'}</p>
+        </div>
+        <div className="settings-field">
+          <label>Assigned controllable</label>
+          <select value={draft?.vehicle_name || ''} onChange={e => onChange('vehicle_name', e.target.value)}>
+            <option value="">Select controllable</option>
+            {fleetVehicles.map(vehicle => (
+              <option key={vehicle.name} value={vehicle.name}>
+                {vehicle.name}
+                {vehicle.kind ? ` · ${vehicle.kind}` : ''}
+                {vehicle.mission ? ` · ${vehicle.mission}` : ''}
+              </option>
+            ))}
+          </select>
+        </div>
         <div className="settings-field settings-field-full">
-          <label>Overlay YAML</label>
+          <label>Selected fleet entry</label>
+          <div className="info-box compact-info">
+            {selectedVehicle ? (
+              <>
+                <strong>{selectedVehicle.name}</strong>
+                <p>
+                  {selectedVehicle.kind || 'unknown kind'}
+                  {selectedVehicle.mission ? ` · mission ${selectedVehicle.mission}` : ''}
+                  {selectedVehicle.missionPath ? ` · ${selectedVehicle.missionPath}` : ''}
+                </p>
+              </>
+            ) : (
+              <p>Select a controllable from the current fleet before deploying this Pi.</p>
+            )}
+          </div>
+        </div>
+        <div className="settings-field settings-field-full">
+          <label>Override YAML</label>
           <textarea
             className="yaml-editor compact-yaml"
-            value={draft.overlay_yaml}
+            value={draft?.overlay_yaml || ''}
             onChange={e => onChange('overlay_yaml', e.target.value)}
             spellCheck={false}
           />
-          <p className="subtext left-note">This controls mission selection and target-specific launch parameters used during deploy.</p>
+          <p className="subtext left-note">The fleet entry supplies the base mission and launch config. This YAML is merged on top as Pi-specific overrides only.</p>
         </div>
         <div className="settings-field settings-save">
-          <button className="btn btn-primary" type="button" onClick={onSave} disabled={saving}>
-            {saving ? 'Saving...' : 'Save Device Setup'}
+          <button className="btn btn-primary" type="button" onClick={onSave} disabled={saving || !canSave}>
+            {saving ? 'Saving...' : 'Save Assignment'}
           </button>
         </div>
         <Result data={saveResult} />
@@ -1980,6 +2050,7 @@ function DeployActionCard({
   buildSourceLoaded = true,
   connected,
   targetId,
+  assignedVehicleName,
   buildInfo,
   deploying,
   deployResult,
@@ -1987,7 +2058,7 @@ function DeployActionCard({
   onRollback,
 }) {
   const sourceSummary = describeBuildSource(buildSource, buildSourceLoaded)
-  const canDeploy = Boolean(targetId) && buildSourceLoaded && sourceSummary.ready
+  const canDeploy = Boolean(targetId) && Boolean(assignedVehicleName) && buildSourceLoaded && sourceSummary.ready
 
   return (
     <div className="card">
@@ -2010,6 +2081,11 @@ function DeployActionCard({
         {targetId && !sourceSummary.ready && buildSourceLoaded && (
           <p className="subtext left-note">
             Choose a build source on the Build Source page before deploying to this Pi.
+          </p>
+        )}
+        {targetId && sourceSummary.ready && !assignedVehicleName && (
+          <p className="subtext left-note">
+            Choose and save a controllable assignment before deploying to this Pi.
           </p>
         )}
         <button className="btn btn-primary" type="button" onClick={onDeploy} disabled={!canDeploy || deploying}>
@@ -2068,6 +2144,10 @@ function RuntimeOverviewCard({ liveDevice, selectedTarget, connected, buildInfo,
             <strong>{selectedTarget ? selectedTarget.target_id : 'Not saved'}</strong>
           </div>
           <div className="overview-row">
+            <span>Assigned controllable</span>
+            <strong>{selectedTarget?.vehicle_name || 'Not assigned'}</strong>
+          </div>
+          <div className="overview-row">
             <span>Reachability</span>
             <strong>{reachabilityText}</strong>
           </div>
@@ -2103,11 +2183,11 @@ function HardwareDetailPage({
   pollError,
   buildSource,
   buildSourceLoaded = true,
-  setupDraft,
-  onSetupChange,
-  onSaveSetup,
-  savingSetup,
-  saveResult,
+  assignmentDraft,
+  onAssignmentChange,
+  onSaveAssignment,
+  savingAssignment,
+  assignmentResult,
   onRefresh,
   onBack,
   detailTab,
@@ -2139,7 +2219,7 @@ function HardwareDetailPage({
 
       <div className="mini-tabs detail-tabs">
         <button className={`mini-tab ${detailTab === 'setup' ? 'mini-tab-active' : ''}`} type="button" onClick={() => onDetailTabChange('setup')}>
-          Setup & Deploy
+          Assignment & Deploy
         </button>
         <button
           className={`mini-tab ${detailTab === 'mission' ? 'mini-tab-active' : ''}`}
@@ -2154,13 +2234,13 @@ function HardwareDetailPage({
       {detailTab === 'setup' ? (
         <>
           <div className="grid">
-            <HardwareSetupCard
-              draft={setupDraft}
-              liveDevice={liveDevice}
-              onChange={onSetupChange}
-              onSave={onSaveSetup}
-              saving={savingSetup}
-              saveResult={saveResult}
+            <AssignmentCard
+              draft={assignmentDraft}
+              buildSource={buildSource}
+              onChange={onAssignmentChange}
+              onSave={onSaveAssignment}
+              saving={savingAssignment}
+              saveResult={assignmentResult}
             />
             <RuntimeOverviewCard
               liveDevice={liveDevice}
@@ -2178,6 +2258,7 @@ function HardwareDetailPage({
               buildSourceLoaded={buildSourceLoaded}
               connected={connected}
               targetId={selectedTargetId}
+              assignedVehicleName={assignmentDraft?.vehicle_name || selectedTarget?.vehicle_name || ''}
               buildInfo={buildInfo}
               deploying={deploying}
               deployResult={deployResult}
@@ -2200,6 +2281,7 @@ function HardwareDetailPage({
           buildInfo={buildInfo}
           onRefresh={onRefresh}
           workspacePaths={workspacePaths}
+          fleetFile={buildSource?.fleetFile || ''}
           targetId={selectedTargetId}
           selectedTarget={selectedTarget}
         />
@@ -2213,55 +2295,79 @@ function BuildSourcePage({
   buildSourceLoaded = true,
   buildSourceResult,
   buildSourceWorking,
-  builds,
+  releases,
+  artifacts,
   loadingBuilds,
   buildListResult,
   onLoadBuilds,
   onSelectGitHubBuild,
   onSelectLocalArtifact,
   onSelectLocalCodebase,
+  onSelectFleetFile,
   onClearBuildSource,
 }) {
-  const [selectedBuildKey, setSelectedBuildKey] = useState('')
+  const [selectedReleaseKey, setSelectedReleaseKey] = useState('')
+  const [selectedArtifactKey, setSelectedArtifactKey] = useState('')
+  const [fleetDraft, setFleetDraft] = useState(buildSource?.fleetFile || '')
 
   useEffect(() => {
-    if (!selectedBuildKey && builds.length > 0) {
-      setSelectedBuildKey(buildSelectionKey(builds[0]))
+    if (!selectedReleaseKey && releases.length > 0) {
+      setSelectedReleaseKey(buildSelectionKey(releases[0]))
     }
-  }, [builds, selectedBuildKey])
+  }, [releases, selectedReleaseKey])
 
   useEffect(() => {
-    if (!selectedBuildKey) return
-    if (builds.some(build => buildSelectionKey(build) === selectedBuildKey)) return
-    setSelectedBuildKey(builds[0] ? buildSelectionKey(builds[0]) : '')
-  }, [builds, selectedBuildKey])
+    if (!selectedArtifactKey && artifacts.length > 0) {
+      setSelectedArtifactKey(buildSelectionKey(artifacts[0]))
+    }
+  }, [artifacts, selectedArtifactKey])
 
   useEffect(() => {
     if (buildSource?.kind === 'github' && buildSource.build) {
-      setSelectedBuildKey(buildSelectionKey(buildSource.build))
-      return
+      const key = buildSelectionKey(buildSource.build)
+      if (buildSource.build.source === 'actions') {
+        setSelectedArtifactKey(key)
+      } else {
+        setSelectedReleaseKey(key)
+      }
     }
-    if (!selectedBuildKey || builds.some(build => buildSelectionKey(build) === selectedBuildKey)) return
-    setSelectedBuildKey(builds[0] ? buildSelectionKey(builds[0]) : '')
-  }, [buildSource, builds, selectedBuildKey])
+  }, [buildSource])
 
-  const selectedBuild = builds.find(build => buildSelectionKey(build) === selectedBuildKey) || null
+  useEffect(() => {
+    if (selectedReleaseKey && !releases.some(build => buildSelectionKey(build) === selectedReleaseKey)) {
+      setSelectedReleaseKey(releases[0] ? buildSelectionKey(releases[0]) : '')
+    }
+  }, [releases, selectedReleaseKey])
+
+  useEffect(() => {
+    if (selectedArtifactKey && !artifacts.some(build => buildSelectionKey(build) === selectedArtifactKey)) {
+      setSelectedArtifactKey(artifacts[0] ? buildSelectionKey(artifacts[0]) : '')
+    }
+  }, [artifacts, selectedArtifactKey])
+
+  useEffect(() => {
+    setFleetDraft(buildSource?.fleetFile || '')
+  }, [buildSource?.fleetFile])
+
+  const selectedRelease = releases.find(build => buildSelectionKey(build) === selectedReleaseKey) || null
+  const selectedArtifact = artifacts.find(build => buildSelectionKey(build) === selectedArtifactKey) || null
   const sourceSummary = describeBuildSource(buildSource, buildSourceLoaded)
 
   return (
     <>
       <div className="section-head">
         <div>
-          <div className="section-kicker">Global Build Source</div>
-          <h2>Choose what the next deploy uses</h2>
+          <div className="section-kicker">Global Deploy Context</div>
+          <h2>Choose the build source and fleet for the next hardware deploy</h2>
         </div>
       </div>
 
       <div className="card card-full">
-        <h2 className="card-title">Active Selection</h2>
+        <h2 className="card-title">Active Deploy Context</h2>
         <div className="info-box compact-info">
           <strong>{sourceSummary.title}</strong>
           <p>{sourceSummary.detail}</p>
+          <p>{sourceSummary.fleetDetail || 'No fleet file selected.'}</p>
         </div>
         <div className="settings-actions">
           <button className="btn btn-secondary" type="button" onClick={onClearBuildSource} disabled={buildSourceWorking || !buildSourceLoaded || buildSource?.kind === 'none'}>
@@ -2273,32 +2379,98 @@ function BuildSourcePage({
 
       <div className="grid">
         <div className="card">
-          <h2 className="card-title">Remote Artifact</h2>
+          <h2 className="card-title">Fleet Selection</h2>
           <div className="card-content">
-            <p className="subtext left-note">Use a GitHub Release or GitHub Actions artifact as the active deploy source.</p>
+            <p className="subtext left-note">This fleet applies globally. Hardware detail pages only choose which controllable from this fleet each Pi should run.</p>
+            <SetupField
+              label="Fleet file"
+              value={fleetDraft}
+              onChange={setFleetDraft}
+              placeholder="src/uav/uav/fleets/example_fleet.yaml"
+            />
+            <button className="btn btn-primary" type="button" onClick={() => onSelectFleetFile(fleetDraft)} disabled={buildSourceWorking || !fleetDraft.trim()}>
+              {buildSourceWorking ? 'Saving...' : 'Save Fleet Selection'}
+            </button>
+          </div>
+        </div>
+
+        <div className="card">
+          <h2 className="card-title">GitHub Releases</h2>
+          <div className="card-content">
+            <p className="subtext left-note">Use a published `build-*` GitHub release as the active deploy source.</p>
             <button className="btn btn-secondary" type="button" onClick={onLoadBuilds} disabled={loadingBuilds}>
               {loadingBuilds ? 'Loading...' : 'Fetch GitHub Builds'}
             </button>
-            {builds.length > 0 && (
+            {releases.length > 0 && (
               <>
-                <select value={selectedBuildKey} onChange={e => setSelectedBuildKey(e.target.value)}>
-                  {builds.map(build => (
+                <select value={selectedReleaseKey} onChange={e => setSelectedReleaseKey(e.target.value)}>
+                  {releases.map(build => (
                     <option key={buildSelectionKey(build)} value={buildSelectionKey(build)}>
-                      {build.source === 'actions' ? '[Actions]' : '[Release]'} {build.name || build.tag} {build.date ? `· ${build.date}` : ''}
+                      {build.name || build.tag}
+                      {build.sha ? ` · ${build.sha}` : ''}
+                      {build.date ? ` · ${build.date}` : ''}
                     </option>
                   ))}
                 </select>
+                {selectedRelease && (
+                  <div className="info-box compact-info">
+                    <strong>{selectedRelease.name || selectedRelease.tag}</strong>
+                    <p>
+                      {selectedRelease.commitSubject || 'No commit subject available.'}
+                      {selectedRelease.commitSha ? ` · ${selectedRelease.commitSha}` : ''}
+                    </p>
+                  </div>
+                )}
                 <button
                   className="btn btn-primary"
                   type="button"
-                  onClick={() => onSelectGitHubBuild(selectedBuild)}
-                  disabled={!selectedBuild || buildSourceWorking}
+                  onClick={() => onSelectGitHubBuild(selectedRelease)}
+                  disabled={!selectedRelease || buildSourceWorking}
                 >
-                  Use Selected Remote Build
+                  Use Selected Release
                 </button>
               </>
             )}
             <Result data={buildListResult} />
+          </div>
+        </div>
+
+        <div className="card">
+          <h2 className="card-title">Recent Actions Artifacts</h2>
+          <div className="card-content">
+            <p className="subtext left-note">Use a recent GitHub Actions artifact as the active deploy source.</p>
+            {artifacts.length > 0 ? (
+              <>
+                <select value={selectedArtifactKey} onChange={e => setSelectedArtifactKey(e.target.value)}>
+                  {artifacts.map(build => (
+                    <option key={buildSelectionKey(build)} value={buildSelectionKey(build)}>
+                      {build.name || build.tag}
+                      {build.sha ? ` · ${build.sha}` : ''}
+                      {build.date ? ` · ${build.date}` : ''}
+                    </option>
+                  ))}
+                </select>
+                {selectedArtifact && (
+                  <div className="info-box compact-info">
+                    <strong>{selectedArtifact.name || selectedArtifact.tag}</strong>
+                    <p>
+                      {selectedArtifact.commitSubject || 'No commit subject available.'}
+                      {selectedArtifact.commitSha ? ` · ${selectedArtifact.commitSha}` : ''}
+                    </p>
+                  </div>
+                )}
+                <button
+                  className="btn btn-primary"
+                  type="button"
+                  onClick={() => onSelectGitHubBuild(selectedArtifact)}
+                  disabled={!selectedArtifact || buildSourceWorking}
+                >
+                  Use Selected Actions Artifact
+                </button>
+              </>
+            ) : (
+              <p className="subtext left-note">Fetch GitHub builds to load recent workflow artifacts.</p>
+            )}
           </div>
         </div>
 
@@ -2362,7 +2534,12 @@ function InventoryPage({
   onImportInventory,
   inventoryIoLoading,
   liveLookup,
+  inventoryMode,
+  onCreateInventoryTarget,
 }) {
+  const [showOperatorAdvanced, setShowOperatorAdvanced] = useState(false)
+  const [showDeviceAdvanced, setShowDeviceAdvanced] = useState(false)
+
   return (
     <>
       <div className="section-head">
@@ -2382,7 +2559,14 @@ function InventoryPage({
             <SetupField label="Default deploy root" value={operatorDraft.default_deploy_root} onChange={value => onOperatorChange('default_deploy_root', value)} placeholder="/home/penn/pennair-deploy" />
             <SetupField label="Default Pi user" value={operatorDraft.default_pi_user} onChange={value => onOperatorChange('default_pi_user', value)} placeholder="penn" />
             <SetupField label="Default SSH key" value={operatorDraft.default_ssh_key} onChange={value => onOperatorChange('default_ssh_key', value)} placeholder="~/.ssh/pennair_pi_ed25519" />
-            <SetupField label="Default SSH password" value={operatorDraft.default_ssh_pass} onChange={value => onOperatorChange('default_ssh_pass', value)} placeholder="Optional password" type="password" />
+            <div className="settings-field settings-field-full">
+              <button className="btn btn-secondary btn-inline" type="button" onClick={() => setShowOperatorAdvanced(value => !value)}>
+                {showOperatorAdvanced ? 'Hide Advanced Recovery Auth' : 'Show Advanced Recovery Auth'}
+              </button>
+            </div>
+            {showOperatorAdvanced && (
+              <SetupField label="Default SSH password" value={operatorDraft.default_ssh_pass} onChange={value => onOperatorChange('default_ssh_pass', value)} placeholder="Optional password" type="password" />
+            )}
             <div className="settings-field settings-save">
               <button className="btn btn-primary" type="button" onClick={onSaveOperator} disabled={operatorSaving}>
                 {operatorSaving ? 'Saving...' : 'Save Defaults'}
@@ -2417,6 +2601,9 @@ function InventoryPage({
           </div>
           <div className="divider" />
           <div className="card-content">
+            <button className="btn btn-secondary" type="button" onClick={onCreateInventoryTarget}>
+              New Device
+            </button>
             <button className="btn btn-secondary" type="button" onClick={onExportInventory} disabled={inventoryIoLoading}>
               {inventoryIoLoading ? 'Working...' : 'Export Inventory'}
             </button>
@@ -2440,34 +2627,40 @@ function InventoryPage({
 
       {inventoryDraft && (
         <div className="card card-full">
-          <h2 className="card-title">Edit Saved Device</h2>
+          <h2 className="card-title">{inventoryMode === 'new' ? 'Add Device' : 'Edit Saved Device'}</h2>
           <div className="card-content settings-grid">
-            <SetupField label="Target ID" value={inventoryDraft.target_id} onChange={value => onInventoryDraftChange('target_id', value)} placeholder="payload-pi" />
             <SetupField label="Label" value={inventoryDraft.label} onChange={value => onInventoryDraftChange('label', value)} placeholder="Payload Pi" />
             <SetupField label="Pi host" value={inventoryDraft.pi_host} onChange={value => onInventoryDraftChange('pi_host', value)} placeholder="payload-pi.local" />
-            <SetupField label="Pi user" value={inventoryDraft.pi_user} onChange={value => onInventoryDraftChange('pi_user', value)} placeholder="penn" />
-            <SetupField label="SSH key path" value={inventoryDraft.ssh_key} onChange={value => onInventoryDraftChange('ssh_key', value)} placeholder="~/.ssh/pennair_pi_ed25519" />
-            <SetupField label="SSH password" value={inventoryDraft.ssh_pass} onChange={value => onInventoryDraftChange('ssh_pass', value)} placeholder="Optional password" type="password" />
-            <SetupField label="Deploy root" value={inventoryDraft.deploy_root} onChange={value => onInventoryDraftChange('deploy_root', value)} placeholder="/home/penn/pennair-deploy" />
-            <SetupField label="Fleet file" value={inventoryDraft.fleet_file} onChange={value => onInventoryDraftChange('fleet_file', value)} placeholder="src/uav/uav/fleets/example_fleet.yaml" />
-            <SetupField label="Desired controllable" value={inventoryDraft.vehicle_name} onChange={value => onInventoryDraftChange('vehicle_name', value)} placeholder="uav_0" />
-            <SetupField label="Systemd unit" value={inventoryDraft.service_unit} onChange={value => onInventoryDraftChange('service_unit', value)} placeholder="pennair-autonomy.service" />
             <div className="settings-field settings-field-full">
-              <label>Overlay YAML</label>
-              <textarea
-                className="yaml-editor compact-yaml"
-                value={inventoryDraft.overlay_yaml}
-                onChange={e => onInventoryDraftChange('overlay_yaml', e.target.value)}
-                spellCheck={false}
-              />
+              <div className="info-box compact-info">
+                <strong>Internal target ID</strong>
+                <p>{inventoryDraft.target_id}</p>
+                <p>Assignments and target-specific launch overrides are configured from Hardware after a global build source and fleet file are selected.</p>
+              </div>
             </div>
+            <div className="settings-field settings-field-full">
+              <button className="btn btn-secondary btn-inline" type="button" onClick={() => setShowDeviceAdvanced(value => !value)}>
+                {showDeviceAdvanced ? 'Hide Advanced Overrides' : 'Show Advanced Overrides'}
+              </button>
+            </div>
+            {showDeviceAdvanced && (
+              <>
+                <SetupField label="Pi user" value={inventoryDraft.pi_user} onChange={value => onInventoryDraftChange('pi_user', value)} placeholder="penn" />
+                <SetupField label="SSH key path" value={inventoryDraft.ssh_key} onChange={value => onInventoryDraftChange('ssh_key', value)} placeholder="~/.ssh/pennair_pi_ed25519" />
+                <SetupField label="Deploy root" value={inventoryDraft.deploy_root} onChange={value => onInventoryDraftChange('deploy_root', value)} placeholder="/home/penn/pennair-deploy" />
+                <SetupField label="Systemd unit" value={inventoryDraft.service_unit} onChange={value => onInventoryDraftChange('service_unit', value)} placeholder="pennair-autonomy.service" />
+                <SetupField label="SSH password" value={inventoryDraft.ssh_pass} onChange={value => onInventoryDraftChange('ssh_pass', value)} placeholder="Optional recovery password" type="password" />
+              </>
+            )}
             <div className="settings-actions">
               <button className="btn btn-primary" type="button" onClick={onSaveInventoryTarget} disabled={inventorySaving}>
                 {inventorySaving ? 'Saving...' : 'Save Device'}
               </button>
-              <button className="btn btn-secondary" type="button" onClick={onDeleteInventoryTarget} disabled={inventorySaving}>
-                Delete Device
-              </button>
+              {inventoryMode !== 'new' && (
+                <button className="btn btn-secondary" type="button" onClick={onDeleteInventoryTarget} disabled={inventorySaving}>
+                  Delete Device
+                </button>
+              )}
             </div>
             <Result data={inventoryResult} />
           </div>
@@ -2504,12 +2697,14 @@ function App() {
   const [liveDevices, setLiveDevices] = useState([])
   const [selectedHardwareId, setSelectedHardwareId] = useState('')
   const [selectedInventoryTargetId, setSelectedInventoryTargetId] = useState('')
+  const [inventoryMode, setInventoryMode] = useState('existing')
   const [detailTab, setDetailTab] = useState('setup')
   const [buildSource, setBuildSource] = useState({ kind: 'none' })
   const [buildSourceLoaded, setBuildSourceLoaded] = useState(false)
   const [buildSourceResult, setBuildSourceResult] = useState(null)
   const [buildSourceWorking, setBuildSourceWorking] = useState(false)
-  const [builds, setBuilds] = useState([])
+  const [releaseBuilds, setReleaseBuilds] = useState([])
+  const [artifactBuilds, setArtifactBuilds] = useState([])
   const [loadingBuilds, setLoadingBuilds] = useState(false)
   const [buildListResult, setBuildListResult] = useState(null)
 
@@ -2520,10 +2715,10 @@ function App() {
   const [inventoryResult, setInventoryResult] = useState(null)
   const [discoveryResult, setDiscoveryResult] = useState(null)
   const [pollError, setPollError] = useState(null)
-  const [setupDraft, setSetupDraft] = useState(null)
-  const [setupDirty, setSetupDirty] = useState(false)
-  const [setupSaving, setSetupSaving] = useState(false)
-  const [setupResult, setSetupResult] = useState(null)
+  const [assignmentDraft, setAssignmentDraft] = useState(null)
+  const [assignmentDirty, setAssignmentDirty] = useState(false)
+  const [assignmentSaving, setAssignmentSaving] = useState(false)
+  const [assignmentResult, setAssignmentResult] = useState(null)
   const [inventoryDraft, setInventoryDraft] = useState(null)
   const [inventoryDirty, setInventoryDirty] = useState(false)
   const [operatorDraft, setOperatorDraft] = useState(null)
@@ -2597,6 +2792,9 @@ function App() {
       setTargets(nextTargets)
       setInventoryResult(null)
       setSelectedInventoryTargetId(prev => {
+        if (inventoryMode === 'new') {
+          return prev
+        }
         if (!nextTargets.length) return ''
         if (activeTargetId && nextTargets.some(target => target.target_id === activeTargetId)) {
           return activeTargetId
@@ -2628,7 +2826,7 @@ function App() {
       setBuildSourceResult(buildSourceData)
     }
     setBuildSourceLoaded(true)
-  }, [buildSourceLoaded])
+  }, [buildSourceLoaded, inventoryMode])
 
   const refreshDetail = useCallback(async (targetId) => {
     if (!targetId) {
@@ -2688,22 +2886,30 @@ function App() {
   }, [operatorConfig, operatorDirty])
 
   useEffect(() => {
-    if (setupDirty) return
-    setSetupDraft(hardwareDraftFromSelection(selectedTarget, selectedLiveDevice, operatorConfig))
-    setSetupResult(null)
+    if (assignmentDirty) return
+    setAssignmentDraft(assignmentDraftFromTarget(selectedTarget))
+    setAssignmentResult(null)
     setDeployResult(null)
     setDetailTab('setup')
-  }, [operatorConfig, selectedLiveDevice?.hardware_id, selectedTarget?.target_id, setupDirty])
+  }, [
+    selectedTarget?.overlay_yaml,
+    selectedTarget?.target_id,
+    selectedTarget?.vehicle_name,
+    assignmentDirty,
+  ])
 
   useEffect(() => {
+    if (inventoryMode === 'new') {
+      return
+    }
     if (!selectedInventoryTargetId) {
       setInventoryDraft(null)
       return
     }
     const target = targetMap[selectedInventoryTargetId] || null
     if (inventoryDirty) return
-    setInventoryDraft(target ? hardwareDraftFromSelection(target, null, operatorConfig) : null)
-  }, [operatorConfig, selectedInventoryTargetId, targetMap, inventoryDirty])
+    setInventoryDraft(target ? inventoryDraftFromSelection(target, null, operatorConfig) : null)
+  }, [inventoryMode, operatorConfig, selectedInventoryTargetId, targetMap, inventoryDirty])
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
@@ -2744,16 +2950,14 @@ function App() {
     setResult(data)
     setSaving(false)
     if (data.success) {
-      if (scope === 'setup') {
-        setSetupDirty(false)
+      if (scope === 'assignment') {
+        setAssignmentDirty(false)
       }
       if (scope === 'inventory') {
         setInventoryDirty(false)
+        setInventoryMode('existing')
       }
       await refreshGlobal()
-      if (draft.pi_host) {
-        setSelectedHardwareId(normalizeHostname(draft.pi_host))
-      }
       if (draft.target_id) {
         setSelectedInventoryTargetId(draft.target_id)
       }
@@ -2816,9 +3020,17 @@ function App() {
     setBuildListResult(null)
     const data = await api('/api/builds/list')
     if (data.success) {
-      setBuilds(data.builds || [])
+      setReleaseBuilds(data.releases || [])
+      setArtifactBuilds(data.artifacts || [])
     }
-    setBuildListResult(data.success ? { success: true, output: `Loaded ${data.builds?.length || 0} build(s)` } : data)
+    setBuildListResult(
+      data.success
+        ? {
+          success: true,
+          output: `Loaded ${data.releases?.length || 0} release(s) and ${data.artifacts?.length || 0} recent artifact(s)`,
+        }
+        : data
+    )
     setLoadingBuilds(false)
   }
 
@@ -2830,6 +3042,7 @@ function App() {
       fd.append('tag', build.tag || '')
       fd.append('source', build.source || 'release')
       fd.append('sha', build.sha || '')
+      fd.append('commit_subject', build.commitSubject || '')
       fd.append('name', build.name || '')
       fd.append('date', build.date || '')
       if (build.artifact_id) {
@@ -2842,6 +3055,21 @@ function App() {
         fd.append('run_id', build.run_id)
       }
       const data = await api('/api/build-source/github', { method: 'POST', body: fd })
+      setBuildSourceResult(data)
+      if (data.success) {
+        await refreshBuildSource({ preserveResult: true })
+      }
+    } finally {
+      setBuildSourceWorking(false)
+    }
+  }
+
+  const saveGlobalFleetFile = async fleetFile => {
+    setBuildSourceWorking(true)
+    try {
+      const fd = new FormData()
+      fd.append('fleet_file', fleetFile || '')
+      const data = await api('/api/build-source/fleet', { method: 'POST', body: fd })
       setBuildSourceResult(data)
       if (data.success) {
         await refreshBuildSource({ preserveResult: true })
@@ -2923,6 +3151,40 @@ function App() {
     }
   }
 
+  const openHardware = hardwareId => {
+    const sourceSummary = describeBuildSource(buildSource, buildSourceLoaded)
+    const liveDevice = liveDevices.find(device => device.hardware_id === hardwareId) || null
+    if (!sourceSummary.ready) {
+      setBuildSourceResult({
+        success: false,
+        error: 'Select a build source and a valid fleet file before opening per-device controls.',
+      })
+      setPage('build-source')
+      return
+    }
+    if (!liveDevice?.saved) {
+      setInventoryMode('new')
+      setInventoryDirty(false)
+      setSelectedInventoryTargetId('')
+      setInventoryDraft(inventoryDraftFromSelection(null, liveDevice, operatorConfig))
+      setInventoryResult(null)
+      setPage('inventory')
+      return
+    }
+    setAssignmentDirty(false)
+    setSelectedHardwareId(hardwareId)
+    setPage('hardware')
+  }
+
+  const createInventoryTarget = () => {
+    setInventoryMode('new')
+    setInventoryDirty(false)
+    setSelectedInventoryTargetId('')
+    setInventoryDraft(inventoryDraftFromSelection(null, null, operatorConfig))
+    setInventoryResult(null)
+    setPage('inventory')
+  }
+
   return (
     <div className="app">
       <AppHeader
@@ -2942,10 +3204,7 @@ function App() {
           buildSourceLoaded={buildSourceLoaded}
           discoveryResult={discoveryResult}
           onRefresh={refreshGlobal}
-          onOpenHardware={hardwareId => {
-            setSetupDirty(false)
-            setSelectedHardwareId(hardwareId)
-          }}
+          onOpenHardware={openHardware}
         />
       )}
 
@@ -2961,20 +3220,20 @@ function App() {
           pollError={pollError}
           buildSource={buildSource}
           buildSourceLoaded={buildSourceLoaded}
-          setupDraft={setupDraft || hardwareDraftFromSelection(selectedTarget, selectedLiveDevice, operatorConfig)}
-          onSetupChange={(field, value) => {
-            setSetupDirty(true)
-            setSetupDraft(prev => ({ ...(prev || {}), [field]: value }))
+          assignmentDraft={assignmentDraft || assignmentDraftFromTarget(selectedTarget)}
+          onAssignmentChange={(field, value) => {
+            setAssignmentDirty(true)
+            setAssignmentDraft(prev => ({ ...(prev || {}), [field]: value }))
           }}
-          onSaveSetup={() => handleSaveTargetDraft(setupDraft, setSetupSaving, setSetupResult, 'setup')}
-          savingSetup={setupSaving}
-          saveResult={setupResult}
+          onSaveAssignment={() => handleSaveTargetDraft(assignmentDraft, setAssignmentSaving, setAssignmentResult, 'assignment')}
+          savingAssignment={assignmentSaving}
+          assignmentResult={assignmentResult}
           onRefresh={() => {
             refreshGlobal()
             refreshDetail(selectedTargetId)
           }}
           onBack={() => {
-            setSetupDirty(false)
+            setAssignmentDirty(false)
             setSelectedHardwareId('')
           }}
           detailTab={detailTab}
@@ -2992,13 +3251,15 @@ function App() {
           buildSourceLoaded={buildSourceLoaded}
           buildSourceResult={buildSourceResult}
           buildSourceWorking={buildSourceWorking}
-          builds={builds}
+          releases={releaseBuilds}
+          artifacts={artifactBuilds}
           loadingBuilds={loadingBuilds}
           buildListResult={buildListResult}
           onLoadBuilds={loadBuilds}
           onSelectGitHubBuild={selectGithubBuildSource}
           onSelectLocalArtifact={selectLocalArtifactSource}
           onSelectLocalCodebase={selectLocalCodebaseSource}
+          onSelectFleetFile={saveGlobalFleetFile}
           onClearBuildSource={clearBuildSource}
         />
       )}
@@ -3025,13 +3286,23 @@ function App() {
           targets={targets}
           selectedInventoryTargetId={selectedInventoryTargetId}
           onSelectInventoryTarget={targetId => {
+            setInventoryMode('existing')
             setInventoryDirty(false)
             setSelectedInventoryTargetId(targetId)
           }}
           inventoryDraft={inventoryDraft}
           onInventoryDraftChange={(field, value) => {
             setInventoryDirty(true)
-            setInventoryDraft(prev => ({ ...(prev || {}), [field]: value }))
+            setInventoryDraft(prev => {
+              const next = { ...(prev || {}), [field]: value }
+              if (inventoryMode === 'new' && field === 'pi_host') {
+                next.target_id = suggestedTargetId(value)
+                if (!prev?.label || prev.label === '' || prev.label === prev.pi_host) {
+                  next.label = value || 'Unnamed device'
+                }
+              }
+              return next
+            })
           }}
           onSaveInventoryTarget={() => handleSaveTargetDraft(inventoryDraft, setInventorySaving, setInventoryResult, 'inventory')}
           onDeleteInventoryTarget={handleDeleteInventoryTarget}
@@ -3043,6 +3314,8 @@ function App() {
           onImportInventory={handleImportInventory}
           inventoryIoLoading={inventoryIoLoading}
           liveLookup={liveLookup}
+          inventoryMode={inventoryMode}
+          onCreateInventoryTarget={createInventoryTarget}
         />
       )}
     </div>

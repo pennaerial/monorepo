@@ -131,15 +131,15 @@ def test_target_record_validates_identity_and_overlay():
             default_fleet_file="/tmp/fleet.yaml",
         )
 
-    with pytest.raises(ValueError, match="requires a non-empty vehicle_name"):
-        TargetRecord.from_dict(
-            {
-                **_make_target(),
-                "vehicle_name": "",
-            },
-            default_deploy_root="/home/penn/pennair-deploy",
-            default_fleet_file="/tmp/fleet.yaml",
-        )
+    unassigned = TargetRecord.from_dict(
+        {
+            **_make_target(),
+            "vehicle_name": "",
+        },
+        default_deploy_root="/home/penn/pennair-deploy",
+        default_fleet_file="/tmp/fleet.yaml",
+    )
+    assert unassigned.vehicle_name == ""
 
     bad_overlay = TargetRecord.from_dict(
         {

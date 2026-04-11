@@ -26,6 +26,7 @@ def build_router(ctx: AppContext) -> APIRouter:
         artifact_id: Annotated[str, Form()] = "",
         run_id: Annotated[str, Form()] = "",
         sha: Annotated[str, Form()] = "",
+        commit_subject: Annotated[str, Form()] = "",
         name: Annotated[str, Form()] = "",
         date: Annotated[str, Form()] = "",
         download_url: Annotated[str, Form()] = "",
@@ -43,6 +44,7 @@ def build_router(ctx: AppContext) -> APIRouter:
                 artifact_id=artifact_id,
                 run_id=run_id,
                 sha=sha,
+                commit_subject=commit_subject,
                 name=name,
                 date=date,
                 download_url=download_url,
@@ -72,6 +74,19 @@ def build_router(ctx: AppContext) -> APIRouter:
 
         return BuildSourceResponse.model_validate(
             await deploy_service.set_local_codebase_build_source(ctx)
+        )
+
+    @router.post("/fleet", response_model=BuildSourceResponse)
+    async def set_global_fleet_file(
+        fleet_file: Annotated[str, Form(...)],
+    ) -> BuildSourceResponse:
+        from ..services import deploy as deploy_service
+
+        return BuildSourceResponse.model_validate(
+            await deploy_service.set_global_fleet_file(
+                ctx,
+                fleet_file=fleet_file,
+            )
         )
 
     @router.post("/clear", response_model=BuildSourceResponse)

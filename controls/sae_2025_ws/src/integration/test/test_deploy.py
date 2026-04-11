@@ -84,9 +84,16 @@ class _FakeResponse:
 
 
 class _FakeAsyncClient:
-    def __init__(self, *, releases_payload: dict, artifacts_payload: dict):
+    def __init__(
+        self,
+        *,
+        releases_payload: dict,
+        artifacts_payload: dict,
+        commit_payloads: dict[str, dict] | None = None,
+    ):
         self.releases_payload = releases_payload
         self.artifacts_payload = artifacts_payload
+        self.commit_payloads = commit_payloads or {}
         self.requests: list[str] = []
 
     async def __aenter__(self):
@@ -97,6 +104,19 @@ class _FakeAsyncClient:
 
     async def get(self, url: str, headers=None):
         self.requests.append(url)
+        if "/releases?per_page=100&page=" in url:
+            page = url.rsplit("=", 1)[-1]
+            if page == "1":
+                return _FakeResponse(self.releases_payload)
+            return _FakeResponse([])
+        if "/commits/" in url:
+            commit_sha = url.rsplit("/", 1)[-1]
+            return _FakeResponse(
+                self.commit_payloads.get(
+                    commit_sha,
+                    {"commit": {"message": ""}},
+                )
+            )
         if url.endswith("/releases"):
             return _FakeResponse(self.releases_payload)
         if url.endswith("/actions/artifacts?per_page=30"):
@@ -161,7 +181,11 @@ def _make_context(tmp_path: Path, target: TargetRecord) -> SimpleNamespace:
         base_dir=base_dir,
         operator_config=operator,
         inventory=inventory,
-        build_source_store=BuildSourceStore(build_source_path, cache_dir=cache_dir),
+        build_source_store=BuildSourceStore(
+            build_source_path,
+            cache_dir=cache_dir,
+            default_fleet_file=target.fleet_file,
+        ),
         resolve_target=lambda target_id=None: SimpleNamespace(
             target=inventory.get_target(target_id),
             ssh=_FakeSSH(result=_FakeSSHResult()),
@@ -418,11 +442,13 @@ def test_release_metadata_payload_and_summary(tmp_path):
         release_id="20260411-build-hover",
         source_type="source-build",
         source_label="local-uav.tar.gz",
+        fleet_file=str(target.fleet_file),
         package_names=["uav", "uav_interfaces"],
     )
 
     assert metadata["release_id"] == "20260411-build-hover"
     assert metadata["source_type"] == "source-build"
+    assert metadata["fleet_file"] == str(target.fleet_file)
     assert metadata["vehicle_name"] == "uav_0"
     assert metadata["packages"] == ["uav", "uav_interfaces"]
 
@@ -588,6 +614,12 @@ def test_list_builds_combines_releases_and_artifacts(tmp_path, monkeypatch):
                     }
                 ]
             },
+            commit_payloads={
+                "deadbeef": {"commit": {"message": "Release commit subject\n\nbody"}},
+                "cafebabedeadbeef": {
+                    "commit": {"message": "Artifact commit subject\n\nbody"}
+                },
+            },
         )
     )
     monkeypatch.setattr(deploy_service, "_require_httpx", lambda: fake_httpx)
@@ -599,16 +631,22 @@ def test_list_builds_combines_releases_and_artifacts(tmp_path, monkeypatch):
     assert result["builds"][0] == {
         "source": "release",
         "tag": "build-deadbeef",
-        "sha": "deadbeef",
+        "sha": "deadbee",
+        "commit_sha": "deadbeef",
+        "commit_subject": "Release commit subject",
         "name": "build-deadbeef",
         "date": "2026-04-11",
         "download_url": "https://example.com/build.tar.gz",
         "size_mb": 1.2,
     }
     assert result["builds"][1]["source"] == "actions"
+    assert result["builds"][1]["commit_sha"] == "cafebabedeadbeef"
+    assert result["builds"][1]["commit_subject"] == "Artifact commit subject"
     assert result["builds"][1]["artifact_id"] == "99"
     assert result["builds"][1]["run_id"] == "42"
     assert result["builds"][1]["branch"] == "feature/release-metadata"
+    assert len(result["releases"]) == 1
+    assert len(result["artifacts"]) == 1
 
 
 def test_current_build_parses_release_marker(tmp_path):

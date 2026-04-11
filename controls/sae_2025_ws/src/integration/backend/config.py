@@ -157,8 +157,6 @@ class TargetRecord:
         if not fleet_file:
             raise ValueError(f"Target '{target_id}' requires a non-empty fleet_file.")
         vehicle_name = str(data.get("vehicle_name", "")).strip()
-        if not vehicle_name:
-            raise ValueError(f"Target '{target_id}' requires a non-empty vehicle_name.")
         service_unit = (
             str(data.get("service_unit", "pennair-autonomy.service")).strip()
             or "pennair-autonomy.service"
@@ -538,6 +536,7 @@ class BuildSourceRecord:
     artifact_id: str = ""
     run_id: str = ""
     sha: str = ""
+    commit_subject: str = ""
     name: str = ""
     date: str = ""
     download_url: str = ""
@@ -547,6 +546,7 @@ class BuildSourceRecord:
     local_artifact_path: str = ""
     local_artifact_size_bytes: int | None = None
     codebase_root: str = ""
+    fleet_file: str = ""
     updated_at: str = ""
 
     @classmethod
@@ -563,6 +563,7 @@ class BuildSourceRecord:
             artifact_id=str(payload.get("artifact_id", "")).strip(),
             run_id=str(payload.get("run_id", "")).strip(),
             sha=str(payload.get("sha", "")).strip(),
+            commit_subject=str(payload.get("commit_subject", "")).strip(),
             name=str(payload.get("name", "")).strip(),
             date=str(payload.get("date", "")).strip(),
             download_url=str(payload.get("download_url", "")).strip(),
@@ -580,6 +581,7 @@ class BuildSourceRecord:
                 else None
             ),
             codebase_root=str(payload.get("codebase_root", "")).strip(),
+            fleet_file=str(payload.get("fleet_file", "")).strip(),
             updated_at=str(payload.get("updated_at", "")).strip(),
         )
         record.validate()
@@ -611,6 +613,7 @@ class BuildSourceRecord:
             "artifact_id": self.artifact_id,
             "run_id": self.run_id,
             "sha": self.sha,
+            "commit_subject": self.commit_subject,
             "name": self.name,
             "date": self.date,
             "download_url": self.download_url,
@@ -620,6 +623,7 @@ class BuildSourceRecord:
             "local_artifact_path": self.local_artifact_path,
             "local_artifact_size_bytes": self.local_artifact_size_bytes,
             "codebase_root": self.codebase_root,
+            "fleet_file": self.fleet_file,
             "updated_at": self.updated_at,
         }
 
@@ -647,6 +651,7 @@ class BuildSourceRecord:
             "artifact_id": self.artifact_id or None,
             "run_id": self.run_id or None,
             "sha": self.sha or None,
+            "commit_subject": self.commit_subject or None,
             "name": self.name or None,
             "date": self.date or None,
             "download_url": self.download_url or None,
@@ -657,15 +662,17 @@ class BuildSourceRecord:
             "local_artifact_exists": local_exists,
             "local_artifact_size_bytes": self.local_artifact_size_bytes,
             "codebase_root": self.codebase_root or None,
+            "fleet_file": self.fleet_file or None,
             "updated_at": self.updated_at or None,
         }
 
 
 class BuildSourceStore:
-    def __init__(self, path: Path, *, cache_dir: Path):
+    def __init__(self, path: Path, *, cache_dir: Path, default_fleet_file: str = ""):
         self.path = path
         self.cache_dir = cache_dir
-        self._current = BuildSourceRecord()
+        self.default_fleet_file = default_fleet_file.strip()
+        self._current = BuildSourceRecord(fleet_file=self.default_fleet_file)
         self._load()
 
     def _load(self) -> None:
@@ -681,7 +688,12 @@ class BuildSourceStore:
         try:
             self._current = BuildSourceRecord.from_dict(payload)
         except ValueError:
-            self._current = BuildSourceRecord()
+            self._current = BuildSourceRecord(fleet_file=self.default_fleet_file)
+            self.save()
+            return
+
+        if not self._current.fleet_file and self.default_fleet_file:
+            self._current.fleet_file = self.default_fleet_file
             self.save()
 
     def save(self) -> None:
@@ -719,6 +731,7 @@ class BuildSourceStore:
         artifact_id: str = "",
         run_id: str = "",
         sha: str = "",
+        commit_subject: str = "",
         name: str = "",
         date: str = "",
         download_url: str = "",
@@ -733,12 +746,14 @@ class BuildSourceStore:
             artifact_id=artifact_id.strip(),
             run_id=run_id.strip(),
             sha=sha.strip(),
+            commit_subject=commit_subject.strip(),
             name=name.strip(),
             date=date.strip(),
             download_url=download_url.strip(),
             size_mb=size_mb,
             branch=branch.strip(),
             artifact_name=artifact_name.strip(),
+            fleet_file=self._current.fleet_file or self.default_fleet_file,
             updated_at=_utc_now(),
         )
         record.validate()
@@ -755,6 +770,7 @@ class BuildSourceStore:
             artifact_name=artifact_name,
             local_artifact_path=str(cached_path),
             local_artifact_size_bytes=len(file_bytes),
+            fleet_file=self._current.fleet_file or self.default_fleet_file,
             updated_at=_utc_now(),
         )
         record.validate()
@@ -764,14 +780,30 @@ class BuildSourceStore:
         record = BuildSourceRecord(
             kind="local_codebase",
             codebase_root=codebase_root.strip(),
+            fleet_file=self._current.fleet_file or self.default_fleet_file,
             updated_at=_utc_now(),
         )
         record.validate()
         return self._replace(record)
 
+    def set_fleet_file(self, *, fleet_file: str) -> BuildSourceRecord:
+        next_record = BuildSourceRecord.from_dict(
+            {
+                **self._current.to_store_dict(),
+                "fleet_file": fleet_file.strip(),
+                "updated_at": _utc_now(),
+            }
+        )
+        self._current = next_record
+        self.save()
+        return self._current
+
     def clear(self) -> BuildSourceRecord:
         previous = self._current
-        self._current = BuildSourceRecord(updated_at=_utc_now())
+        self._current = BuildSourceRecord(
+            fleet_file=previous.fleet_file or self.default_fleet_file,
+            updated_at=_utc_now(),
+        )
         self.save()
         if previous.kind == "local_artifact":
             self._remove_cached_artifact(previous)

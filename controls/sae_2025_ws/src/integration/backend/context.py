@@ -66,6 +66,7 @@ def create_context(base_dir: Path) -> AppContext:
     build_source_store = BuildSourceStore(
         build_source_path,
         cache_dir=build_source_cache_dir,
+        default_fleet_file=default_fleet_file(base_dir),
     )
     return AppContext(
         base_dir=base_dir,

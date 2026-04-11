@@ -96,7 +96,11 @@ def _make_context(tmp_path: Path) -> SimpleNamespace:
         seed_target=target,
     )
     build_source_path, cache_dir = build_source_store_paths(operator.inventory_path)
-    build_source_store = BuildSourceStore(build_source_path, cache_dir=cache_dir)
+    build_source_store = BuildSourceStore(
+        build_source_path,
+        cache_dir=cache_dir,
+        default_fleet_file=target.fleet_file,
+    )
 
     def resolve_target(target_id: str | None = None):
         resolved = inventory.get_target(target_id)
@@ -207,10 +211,17 @@ def test_terminal_websocket_requires_target_id(client):
             pass
 
 
-def test_build_source_routes_round_trip(client):
+def test_build_source_routes_round_trip(client, tmp_path):
+    fleet_path = tmp_path / "fleet.yaml"
+    fleet_path.write_text(
+        "vehicles:\n  - name: uav_0\n    mission: hover\n",
+        encoding="utf-8",
+    )
+
     response = client.get("/api/build-source")
     assert response.status_code == 200
     assert response.json()["source"]["kind"] == "none"
+    assert response.json()["source"]["fleet_file"]
 
     response = client.post(
         "/api/build-source/github",
@@ -218,6 +229,7 @@ def test_build_source_routes_round_trip(client):
             "source": "release",
             "tag": "build-deadbeef",
             "sha": "deadbee",
+            "commit_subject": "Test release subject",
             "name": "build-deadbeef",
         },
     )
@@ -226,6 +238,16 @@ def test_build_source_routes_round_trip(client):
     assert payload["success"] is True
     assert payload["source"]["kind"] == "github"
     assert payload["source"]["tag"] == "build-deadbeef"
+    assert payload["source"]["commit_subject"] == "Test release subject"
+
+    response = client.post(
+        "/api/build-source/fleet",
+        data={"fleet_file": str(fleet_path)},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["success"] is True
+    assert payload["source"]["fleet_file"] == str(fleet_path)
 
     response = client.post(
         "/api/build-source/local-artifact",

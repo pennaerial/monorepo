@@ -138,6 +138,8 @@ class BuildListItem(BaseModel):
     source: Literal["release", "actions"]
     tag: str
     sha: str
+    commit_sha: str | None = None
+    commit_subject: str | None = None
     name: str
     date: str
     download_url: str | None = None
@@ -151,7 +153,16 @@ class BuildListItem(BaseModel):
 class BuildListResponse(BaseModel):
     success: bool
     builds: list[BuildListItem] = Field(default_factory=list)
+    releases: list[BuildListItem] = Field(default_factory=list)
+    artifacts: list[BuildListItem] = Field(default_factory=list)
     error: str | None = None
+
+
+class FleetVehiclePreview(BaseModel):
+    name: str
+    kind: str | None = None
+    mission: str | None = None
+    mission_path: str | None = None
 
 
 class BuildSourcePayload(BaseModel):
@@ -162,6 +173,7 @@ class BuildSourcePayload(BaseModel):
     artifact_id: str | None = None
     run_id: str | None = None
     sha: str | None = None
+    commit_subject: str | None = None
     name: str | None = None
     date: str | None = None
     download_url: str | None = None
@@ -172,6 +184,10 @@ class BuildSourcePayload(BaseModel):
     local_artifact_exists: bool | None = None
     local_artifact_size_bytes: int | None = None
     codebase_root: str | None = None
+    fleet_file: str | None = None
+    fleet_exists: bool | None = None
+    fleet_error: str | None = None
+    fleet_vehicles: list[FleetVehiclePreview] = Field(default_factory=list)
     updated_at: str | None = None
 
 
