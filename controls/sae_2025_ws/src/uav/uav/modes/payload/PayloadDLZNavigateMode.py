@@ -81,7 +81,9 @@ class PayloadDLZNavigateMode(Mode):
         tag_transition_table: dict[str, TagTransitionRule] | None = None,
         detect_frames: int = 5,
         scan_duration_s: float = 1.0,
-        start_phase: Literal["wait_for_plane", "scan_tags", "line_follow"] = "wait_for_plane",
+        start_phase: Literal[
+            "wait_for_plane", "scan_tags", "line_follow"
+        ] = "wait_for_plane",
         tag_size_m: float = 0.0508,
         tag_family: str = DEFAULT_TAG_FAMILY,
     ):

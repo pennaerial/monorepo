@@ -114,14 +114,10 @@ class TargetRecord:
             )
         pi_user = str(data.get("pi_user", "penn")).strip() or "penn"
         if not _PI_USER_RE.fullmatch(pi_user):
-            raise ValueError(
-                f"Target '{target_id}' has invalid pi_user '{pi_user}'."
-            )
+            raise ValueError(f"Target '{target_id}' has invalid pi_user '{pi_user}'.")
         pi_host = str(data.get("pi_host", "")).strip() or "penn-desktop.local"
         if not _HOST_RE.fullmatch(pi_host):
-            raise ValueError(
-                f"Target '{target_id}' has invalid pi_host '{pi_host}'."
-            )
+            raise ValueError(f"Target '{target_id}' has invalid pi_host '{pi_host}'.")
         deploy_root = str(data.get("deploy_root", default_deploy_root)).strip()
         if not deploy_root:
             raise ValueError(f"Target '{target_id}' requires a non-empty deploy_root.")

@@ -71,9 +71,7 @@ def sanitize_artifact_name(filename: str) -> str:
 def sanitize_source_bundle_name(filename: str) -> str:
     name = sanitize_artifact_name(filename)
     if not name.endswith(_SOURCE_BUNDLE_EXTENSIONS):
-        raise ValueError(
-            "Source bundle must be one of: .tar.gz, .tgz, or .zip."
-        )
+        raise ValueError("Source bundle must be one of: .tar.gz, .tgz, or .zip.")
     return name
 
 
@@ -116,7 +114,9 @@ def _vehicle_from_fleet(fleet: dict, vehicle_name: str) -> dict:
     raise ValueError(f"Fleet file does not define a vehicle named '{vehicle_name}'.")
 
 
-def _mission_source_for(ctx: AppContext, vehicle: dict) -> tuple[str, Path, MissionSpec]:
+def _mission_source_for(
+    ctx: AppContext, vehicle: dict
+) -> tuple[str, Path, MissionSpec]:
     mission_path = str(vehicle.get("mission_path", "")).strip()
     if mission_path:
         local_path = _resolve_local_path(ctx, mission_path)
@@ -176,7 +176,9 @@ def _validate_runtime_vehicle(runtime_vehicle: dict[str, object]) -> None:
     name = str(runtime_vehicle.get("name", "")).strip() or "<unnamed>"
     mission_target = str(runtime_vehicle.get("kind", "")).strip()
     if mission_target not in {"uav", "payload"}:
-        raise ValueError(f"Runtime vehicle '{name}' has unsupported kind '{mission_target}'.")
+        raise ValueError(
+            f"Runtime vehicle '{name}' has unsupported kind '{mission_target}'."
+        )
     if not str(runtime_vehicle.get("mission_path", "")).strip():
         raise ValueError(f"Runtime vehicle '{name}' requires a mission_path.")
     if not isinstance(runtime_vehicle.get("camera_mount_offsets"), list):
@@ -187,9 +189,10 @@ def _validate_runtime_vehicle(runtime_vehicle: dict[str, object]) -> None:
         raise ValueError(
             f"Runtime vehicle '{name}' requires px4_airframe_id for UAV hardware launch."
         )
-    if mission_target == "payload" and not str(
-        runtime_vehicle.get("payload_controller", "")
-    ).strip():
+    if (
+        mission_target == "payload"
+        and not str(runtime_vehicle.get("payload_controller", "")).strip()
+    ):
         raise ValueError(
             f"Runtime vehicle '{name}' requires payload_controller for payload hardware launch."
         )
@@ -434,9 +437,7 @@ async def _copy_file_to_pi(
 async def _copy_artifact_to_pi(
     target_ctx: TargetContext, local_path: str, artifact_name: str
 ) -> None:
-    await _copy_file_to_pi(
-        target_ctx, local_path=local_path, remote_name=artifact_name
-    )
+    await _copy_file_to_pi(target_ctx, local_path=local_path, remote_name=artifact_name)
 
 
 async def _copy_text_to_pi(
@@ -1085,9 +1086,7 @@ async def upload_source_bundle(
             if bundle_name.endswith(".tgz")
             else ".tar.gz"
         )
-        with tempfile.NamedTemporaryFile(
-            suffix=bundle_suffix, delete=False
-        ) as tmp:
+        with tempfile.NamedTemporaryFile(suffix=bundle_suffix, delete=False) as tmp:
             tmp.write(file_bytes)
             upload_path = tmp.name
 
@@ -1101,8 +1100,8 @@ async def upload_source_bundle(
             target_ctx, local_path=normalized_bundle, remote_name=sanitized_name
         )
 
-        runtime_fleet_yaml, shared_fleet_yaml, local_mission_path = _render_runtime_fleet(
-            ctx, target_ctx
+        runtime_fleet_yaml, shared_fleet_yaml, local_mission_path = (
+            _render_runtime_fleet(ctx, target_ctx)
         )
         paths = target_ctx.target.deploy_paths()
         await _copy_text_to_pi(
@@ -1424,7 +1423,9 @@ async def download_build(
                         async for chunk in resp.aiter_bytes():
                             out.write(chunk)
 
-                extract_dir = Path(tempfile.mkdtemp(prefix="integration-actions-artifact-"))
+                extract_dir = Path(
+                    tempfile.mkdtemp(prefix="integration-actions-artifact-")
+                )
                 with zipfile.ZipFile(tmp_path) as bundle:
                     bundle.extractall(extract_dir)
                 tarballs = sorted(extract_dir.rglob("*.tar.gz"))

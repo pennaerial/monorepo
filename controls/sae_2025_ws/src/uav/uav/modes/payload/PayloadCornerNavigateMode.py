@@ -468,10 +468,7 @@ class PayloadCornerNavigateMode(Mode):
                 if self._center_stable >= self.center_stable_frames:
                     self.vehicle.stop()
                     self._prev_color = (
-                        self._latest_dominant
-                        or dominant
-                        or self._first_color
-                        or "A"
+                        self._latest_dominant or dominant or self._first_color or "A"
                     )
                     self._phase = "line_follow"
                     self.log(

@@ -179,11 +179,11 @@ def _write_source_bundle(tmp_path: Path, *, package_dir_name: str = "uav") -> Pa
     package_dir.mkdir(parents=True, exist_ok=True)
     (package_dir / "package.xml").write_text(
         (
-            "<package format=\"3\">\n"
+            '<package format="3">\n'
             f"  <name>{package_dir_name}</name>\n"
             "  <version>0.0.0</version>\n"
             "  <description>test</description>\n"
-            "  <maintainer email=\"test@example.com\">Test</maintainer>\n"
+            '  <maintainer email="test@example.com">Test</maintainer>\n'
             "  <license>MIT</license>\n"
             "</package>\n"
         ),
@@ -424,8 +424,8 @@ def test_release_metadata_payload_and_summary(tmp_path):
 def test_normalize_source_bundle_extracts_package_names(tmp_path):
     bundle_path = _write_source_bundle(tmp_path, package_dir_name="uav")
 
-    normalized_path, package_names, sanitized_name = deploy_service._normalize_source_bundle(
-        str(bundle_path), "uav-bundle.tar.gz"
+    normalized_path, package_names, sanitized_name = (
+        deploy_service._normalize_source_bundle(str(bundle_path), "uav-bundle.tar.gz")
     )
 
     assert package_names == ["uav"]
