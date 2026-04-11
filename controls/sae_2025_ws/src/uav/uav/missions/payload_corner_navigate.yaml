@@ -21,6 +21,8 @@ modes:
       align_lat_tol_px: 25.0
       align_stable_frames: 3
       line_follow_speed_mps: 0.10
+      line_follow_strip_frac: 0.55
+      line_follow_min_pixels: 50
       k_lat: 0.003
-      k_ang: 0.4
+      k_ang: 0.4   # currently unused — kept for future re-enable
       max_angular: 0.5
