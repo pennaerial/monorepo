@@ -33,7 +33,7 @@ def _make_operator(tmp_path: Path) -> OperatorConfig:
         inventory_path=tmp_path / ".integration_inventory.json",
         default_deploy_root="/home/penn/pennair-deploy",
         default_pi_user="penn",
-        default_ssh_key="~/.ssh/id_ed25519",
+        default_ssh_key="~/.ssh/pennair_pi_ed25519",
         default_ssh_pass="default-secret",
     )
 
@@ -233,7 +233,7 @@ def test_inventory_store_round_trips_through_disk(tmp_path):
     assert restored_operator.hotspot_name == "pennair-hotspot"
     assert restored_operator.default_deploy_root == "/home/penn/pennair-deploy"
     assert restored_operator.default_pi_user == "penn"
-    assert restored_operator.default_ssh_key == "~/.ssh/id_ed25519"
+    assert restored_operator.default_ssh_key == "~/.ssh/pennair_pi_ed25519"
     assert restored_operator.default_ssh_pass == "default-secret"
     assert [target.target_id for target in restored.list_targets()] == [
         "backup",
@@ -301,7 +301,7 @@ def test_inventory_store_exports_and_imports(tmp_path):
     )
     assert was_created is True
     assert created.pi_user == "penn"
-    assert created.ssh_key == "~/.ssh/id_ed25519"
+    assert created.ssh_key == "~/.ssh/pennair_pi_ed25519"
     assert created.ssh_pass == "default-secret"
 
     payload = store.export_payload()

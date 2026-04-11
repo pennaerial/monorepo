@@ -1948,7 +1948,7 @@ function HardwareSetupCard({ draft, liveDevice, onChange, onSave, saving, saveRe
         <SetupField label="Label" value={draft.label} onChange={value => onChange('label', value)} placeholder="Payload Pi" />
         <SetupField label="Pi host" value={draft.pi_host} onChange={value => onChange('pi_host', value)} placeholder={liveDevice?.hostname || 'payload-pi.local'} />
         <SetupField label="Pi user" value={draft.pi_user} onChange={value => onChange('pi_user', value)} placeholder="penn" />
-        <SetupField label="SSH key path" value={draft.ssh_key} onChange={value => onChange('ssh_key', value)} placeholder="~/.ssh/id_ed25519" />
+        <SetupField label="SSH key path" value={draft.ssh_key} onChange={value => onChange('ssh_key', value)} placeholder="~/.ssh/pennair_pi_ed25519" />
         <SetupField label="SSH password" value={draft.ssh_pass} onChange={value => onChange('ssh_pass', value)} placeholder="Optional password" type="password" />
         <SetupField label="Deploy root" value={draft.deploy_root} onChange={value => onChange('deploy_root', value)} placeholder="/home/penn/pennair-deploy" />
         <SetupField label="Fleet file" value={draft.fleet_file} onChange={value => onChange('fleet_file', value)} placeholder="src/uav/uav/fleets/example_fleet.yaml" />
@@ -2381,7 +2381,7 @@ function InventoryPage({
             <SetupField label="Hotspot name" value={operatorDraft.hotspot_name} onChange={value => onOperatorChange('hotspot_name', value)} placeholder="penn-desktop" />
             <SetupField label="Default deploy root" value={operatorDraft.default_deploy_root} onChange={value => onOperatorChange('default_deploy_root', value)} placeholder="/home/penn/pennair-deploy" />
             <SetupField label="Default Pi user" value={operatorDraft.default_pi_user} onChange={value => onOperatorChange('default_pi_user', value)} placeholder="penn" />
-            <SetupField label="Default SSH key" value={operatorDraft.default_ssh_key} onChange={value => onOperatorChange('default_ssh_key', value)} placeholder="~/.ssh/id_ed25519" />
+            <SetupField label="Default SSH key" value={operatorDraft.default_ssh_key} onChange={value => onOperatorChange('default_ssh_key', value)} placeholder="~/.ssh/pennair_pi_ed25519" />
             <SetupField label="Default SSH password" value={operatorDraft.default_ssh_pass} onChange={value => onOperatorChange('default_ssh_pass', value)} placeholder="Optional password" type="password" />
             <div className="settings-field settings-save">
               <button className="btn btn-primary" type="button" onClick={onSaveOperator} disabled={operatorSaving}>
@@ -2446,7 +2446,7 @@ function InventoryPage({
             <SetupField label="Label" value={inventoryDraft.label} onChange={value => onInventoryDraftChange('label', value)} placeholder="Payload Pi" />
             <SetupField label="Pi host" value={inventoryDraft.pi_host} onChange={value => onInventoryDraftChange('pi_host', value)} placeholder="payload-pi.local" />
             <SetupField label="Pi user" value={inventoryDraft.pi_user} onChange={value => onInventoryDraftChange('pi_user', value)} placeholder="penn" />
-            <SetupField label="SSH key path" value={inventoryDraft.ssh_key} onChange={value => onInventoryDraftChange('ssh_key', value)} placeholder="~/.ssh/id_ed25519" />
+            <SetupField label="SSH key path" value={inventoryDraft.ssh_key} onChange={value => onInventoryDraftChange('ssh_key', value)} placeholder="~/.ssh/pennair_pi_ed25519" />
             <SetupField label="SSH password" value={inventoryDraft.ssh_pass} onChange={value => onInventoryDraftChange('ssh_pass', value)} placeholder="Optional password" type="password" />
             <SetupField label="Deploy root" value={inventoryDraft.deploy_root} onChange={value => onInventoryDraftChange('deploy_root', value)} placeholder="/home/penn/pennair-deploy" />
             <SetupField label="Fleet file" value={inventoryDraft.fleet_file} onChange={value => onInventoryDraftChange('fleet_file', value)} placeholder="src/uav/uav/fleets/example_fleet.yaml" />
@@ -3012,7 +3012,7 @@ function App() {
             inventory_path: '',
             default_deploy_root: '/home/penn/pennair-deploy',
             default_pi_user: 'penn',
-            default_ssh_key: '',
+            default_ssh_key: '~/.ssh/pennair_pi_ed25519',
             default_ssh_pass: '',
           }}
           onOperatorChange={(field, value) => {

@@ -51,7 +51,9 @@ class OperatorConfig:
                 "DEPLOY_ROOT", "/home/penn/pennair-deploy"
             ),
             default_pi_user=os.environ.get("DEFAULT_PI_USER", "penn"),
-            default_ssh_key=os.environ.get("DEFAULT_SSH_KEY", ""),
+            default_ssh_key=os.environ.get(
+                "DEFAULT_SSH_KEY", "~/.ssh/pennair_pi_ed25519"
+            ),
             default_ssh_pass=os.environ.get("DEFAULT_SSH_PASS", ""),
         )
 
