@@ -4,7 +4,6 @@ from time import time
 from uav.vehicles.Payload import Payload
 from .ModeManager import ModeManager
 from .mission_spec import MissionSpec
-from std_srvs.srv import Trigger
 
 
 class PayloadModeManager(ModeManager):

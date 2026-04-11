@@ -415,7 +415,7 @@ def detect_payload_unreeled(
 ):
     hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
     h = image.shape[0]
-    floor_strip = hsv[int(h * 0.75):h, :]  # bottom 25%
+    floor_strip = hsv[int(h * 0.75) : h, :]  # bottom 25%
 
     white_mask = cv2.inRange(floor_strip, np.array(lower_hsv), np.array(upper_hsv))
 
@@ -431,10 +431,19 @@ def detect_payload_unreeled(
     if debug:
         vis = image.copy()
         h_full = vis.shape[0]
-        cv2.rectangle(vis, (0, int(h_full * 0.75)), (vis.shape[1], h_full), (0, 255, 255), 2)
-        vis[int(h_full * 0.75):h_full, :][white_mask > 0] = (255, 100, 0)
-        cv2.putText(vis, f"white_ratio={white_ratio:.3f}  count={white_count}",
-                    (8, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+        cv2.rectangle(
+            vis, (0, int(h_full * 0.75)), (vis.shape[1], h_full), (0, 255, 255), 2
+        )
+        vis[int(h_full * 0.75) : h_full, :][white_mask > 0] = (255, 100, 0)
+        cv2.putText(
+            vis,
+            f"white_ratio={white_ratio:.3f}  count={white_count}",
+            (8, 30),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.7,
+            (0, 255, 0),
+            2,
+        )
         debug_frame = vis
 
     return white_mask, white_ratio, white_count, debug_frame
@@ -500,15 +509,24 @@ Examples:
         camera_info = _make_camera_info(bgr)
         gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
 
-        all_obs = detect_payload_apriltags(gray, camera_info, detector, cache.backend, tag_size_m)
-        solved_obs = solve_payload_apriltags(gray, camera_info, detector, cache.backend, tag_size_m)
+        all_obs = detect_payload_apriltags(
+            gray, camera_info, detector, cache.backend, tag_size_m
+        )
+        solved_obs = solve_payload_apriltags(
+            gray, camera_info, detector, cache.backend, tag_size_m
+        )
 
         print(f"detected={len(all_obs)}  solved={len(solved_obs)}")
         for o in all_obs:
-            pose_str = (f"  pose=({o.pose_x:.3f}, {o.pose_y:.3f}, yaw={o.pose_yaw:.3f})"
-                        if o.pose_x is not None else "")
-            print(f"  id={o.tag_id}  tvec=({o.tvec_x:.3f}, {o.tvec_y:.3f}, {o.tvec_z:.3f})"
-                  f"  yaw_err={o.yaw_error:.3f}  area={o.area:.0f}{pose_str}")
+            pose_str = (
+                f"  pose=({o.pose_x:.3f}, {o.pose_y:.3f}, yaw={o.pose_yaw:.3f})"
+                if o.pose_x is not None
+                else ""
+            )
+            print(
+                f"  id={o.tag_id}  tvec=({o.tvec_x:.3f}, {o.tvec_y:.3f}, {o.tvec_z:.3f})"
+                f"  yaw_err={o.yaw_error:.3f}  area={o.area:.0f}{pose_str}"
+            )
 
     else:
         print(f"ERROR: unknown command '{command}'")

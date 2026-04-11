@@ -43,6 +43,7 @@ class PayloadNavigateAroundPlaneMode(Mode):
 
     mission_target = "payload"
     required_vision_nodes = (PayloadAprilTagNode,)
+    transition_labels = ("approach",)
 
     def __init__(
         self,

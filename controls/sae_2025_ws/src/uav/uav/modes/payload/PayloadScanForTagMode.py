@@ -27,6 +27,7 @@ class PayloadScanForTagMode(Mode):
 
     mission_target = "payload"
     required_vision_nodes = (PayloadAprilTagNode,)
+    transition_labels = ("found", "not_found")
 
     def __init__(
         self,
@@ -46,9 +47,17 @@ class PayloadScanForTagMode(Mode):
     def on_enter(self) -> None:
         self._angle_swept = 0.0
         self._status = "continue"
+        # Match spin direction to however PayloadDLZNavigateMode was travelling.
+        # CCW travel → positive angular (spin left/CCW).
+        # CW  travel → negative angular (spin right/CW).
+        nav_direction = getattr(self.node, "dlz_navigate_direction", None)
+        if nav_direction == "cw":
+            self._signed_spin_speed = -self.spin_angular_speed
+        else:
+            self._signed_spin_speed = self.spin_angular_speed
         self.log(
             f"PayloadScanForTagMode: scanning for tag {self.tag_id} "
-            f"(spin={self.spin_angular_speed:.2f} rad/s)"
+            f"(spin={self._signed_spin_speed:.2f} rad/s, nav_direction={nav_direction or 'unset→ccw'})"
         )
 
     def _request_state(self) -> Optional[PayloadAprilTagState.Response]:
@@ -80,8 +89,8 @@ class PayloadScanForTagMode(Mode):
             )
             return
 
-        self._angle_swept += self.spin_angular_speed * time_delta
-        self.vehicle.drive(0.0, self.spin_angular_speed)
+        self._angle_swept += abs(self._signed_spin_speed) * time_delta
+        self.vehicle.drive(0.0, self._signed_spin_speed)
 
     def check_status(self) -> str:
         return self._status

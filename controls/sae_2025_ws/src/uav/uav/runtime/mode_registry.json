@@ -1,0 +1,2857 @@
+{
+  "modes": {
+    "uav.modes.payload.AprilTagApproachMode": {
+      "class_name": "AprilTagApproachMode",
+      "class_path": "uav.modes.payload.AprilTagApproachMode",
+      "description": "Drives the payload straight toward a visible AprilTag.",
+      "display_name": "AprilTagApproachMode",
+      "mission_target": "payload",
+      "module_path": "uav.modes.payload.AprilTagApproachMode",
+      "param_fields": [
+        {
+          "annotation": {
+            "kind": "union",
+            "options": [
+              {
+                "kind": "int"
+              },
+              {
+                "kind": "none"
+              }
+            ]
+          },
+          "default": null,
+          "default_kind": "none",
+          "name": "tag_id",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.0508,
+          "default_kind": "value",
+          "name": "tag_size_m",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "str"
+          },
+          "default": "tag36h11",
+          "default_kind": "value",
+          "name": "tag_family",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.2,
+          "default_kind": "value",
+          "name": "max_forward_speed",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.5,
+          "default_kind": "value",
+          "name": "forward_gain",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.003,
+          "default_kind": "value",
+          "name": "angular_gain",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.0,
+          "default_kind": "value",
+          "name": "yaw_gain",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.2,
+          "default_kind": "value",
+          "name": "stop_distance_m",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.5,
+          "default_kind": "value",
+          "name": "tag_lost_coast_s",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "bool"
+          },
+          "default": false,
+          "default_kind": "value",
+          "name": "camera_debug",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "bool"
+          },
+          "default": true,
+          "default_kind": "value",
+          "name": "sim",
+          "required": false
+        }
+      ],
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "angular_gain": {
+            "default": 0.003,
+            "title": "Angular Gain",
+            "type": "number"
+          },
+          "camera_debug": {
+            "default": false,
+            "title": "Camera Debug",
+            "type": "boolean"
+          },
+          "forward_gain": {
+            "default": 0.5,
+            "title": "Forward Gain",
+            "type": "number"
+          },
+          "max_forward_speed": {
+            "default": 0.2,
+            "title": "Max Forward Speed",
+            "type": "number"
+          },
+          "sim": {
+            "default": true,
+            "title": "Sim",
+            "type": "boolean"
+          },
+          "stop_distance_m": {
+            "default": 0.2,
+            "title": "Stop Distance M",
+            "type": "number"
+          },
+          "tag_family": {
+            "default": "tag36h11",
+            "title": "Tag Family",
+            "type": "string"
+          },
+          "tag_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Tag Id"
+          },
+          "tag_lost_coast_s": {
+            "default": 0.5,
+            "title": "Tag Lost Coast S",
+            "type": "number"
+          },
+          "tag_size_m": {
+            "default": 0.0508,
+            "title": "Tag Size M",
+            "type": "number"
+          },
+          "yaw_gain": {
+            "default": 0.0,
+            "title": "Yaw Gain",
+            "type": "number"
+          }
+        },
+        "title": "AprilTagApproachModeParams",
+        "type": "object"
+      },
+      "required_vision_nodes": [],
+      "transition_labels": []
+    },
+    "uav.modes.payload.PayloadAprilTagApproachMode": {
+      "class_name": "PayloadAprilTagApproachMode",
+      "class_path": "uav.modes.payload.PayloadAprilTagApproachMode",
+      "description": "Drive the payload toward one AprilTag and terminate once close enough.",
+      "display_name": "PayloadAprilTagApproachMode",
+      "mission_target": "payload",
+      "module_path": "uav.modes.payload.PayloadAprilTagApproachMode",
+      "param_fields": [
+        {
+          "annotation": {
+            "kind": "union",
+            "options": [
+              {
+                "kind": "int"
+              },
+              {
+                "kind": "none"
+              }
+            ]
+          },
+          "default": null,
+          "default_kind": "none",
+          "name": "tag_id",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.0508,
+          "default_kind": "value",
+          "name": "tag_size_m",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "str"
+          },
+          "default": "tag36h11",
+          "default_kind": "value",
+          "name": "tag_family",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.2,
+          "default_kind": "value",
+          "name": "max_forward_speed",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.5,
+          "default_kind": "value",
+          "name": "forward_gain",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.003,
+          "default_kind": "value",
+          "name": "angular_gain",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.0,
+          "default_kind": "value",
+          "name": "yaw_gain",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.2,
+          "default_kind": "value",
+          "name": "stop_distance_m",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.5,
+          "default_kind": "value",
+          "name": "tag_lost_coast_s",
+          "required": false
+        }
+      ],
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "angular_gain": {
+            "default": 0.003,
+            "title": "Angular Gain",
+            "type": "number"
+          },
+          "forward_gain": {
+            "default": 0.5,
+            "title": "Forward Gain",
+            "type": "number"
+          },
+          "max_forward_speed": {
+            "default": 0.2,
+            "title": "Max Forward Speed",
+            "type": "number"
+          },
+          "stop_distance_m": {
+            "default": 0.2,
+            "title": "Stop Distance M",
+            "type": "number"
+          },
+          "tag_family": {
+            "default": "tag36h11",
+            "title": "Tag Family",
+            "type": "string"
+          },
+          "tag_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Tag Id"
+          },
+          "tag_lost_coast_s": {
+            "default": 0.5,
+            "title": "Tag Lost Coast S",
+            "type": "number"
+          },
+          "tag_size_m": {
+            "default": 0.0508,
+            "title": "Tag Size M",
+            "type": "number"
+          },
+          "yaw_gain": {
+            "default": 0.0,
+            "title": "Yaw Gain",
+            "type": "number"
+          }
+        },
+        "title": "PayloadAprilTagApproachModeParams",
+        "type": "object"
+      },
+      "required_vision_nodes": [
+        "PayloadAprilTagNode"
+      ],
+      "transition_labels": []
+    },
+    "uav.modes.payload.PayloadColorOrbitToRearMode": {
+      "class_name": "PayloadColorOrbitToRearMode",
+      "class_path": "uav.modes.payload.PayloadColorOrbitToRearMode",
+      "description": "Navigate payload to rear of VTOL when starting on opposite side.",
+      "display_name": "PayloadColorOrbitToRearMode",
+      "mission_target": "payload",
+      "module_path": "uav.modes.payload.PayloadColorOrbitToRearMode",
+      "param_fields": [
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.1,
+          "default_kind": "value",
+          "name": "tag_size_m",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "str"
+          },
+          "default": "tag36h11",
+          "default_kind": "value",
+          "name": "tag_family",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "int"
+          },
+          "default": 1,
+          "default_kind": "value",
+          "name": "dock_target_tag_id",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 30.0,
+          "default_kind": "value",
+          "name": "dock_align_angle_deg",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.4,
+          "default_kind": "value",
+          "name": "dock_align_hold_s",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.3,
+          "default_kind": "value",
+          "name": "search_spin_rps",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.12,
+          "default_kind": "value",
+          "name": "go_to_edge_speed_mps",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.35,
+          "default_kind": "value",
+          "name": "edge_threshold",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "int"
+          },
+          "default": 5,
+          "default_kind": "value",
+          "name": "edge_stable_frames",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "int"
+          },
+          "default": 500,
+          "default_kind": "value",
+          "name": "edge_min_pixels",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "int"
+          },
+          "default": 30,
+          "default_kind": "value",
+          "name": "edge_invalid_max_frames",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.12,
+          "default_kind": "value",
+          "name": "edge_orbit_speed_mps",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.008,
+          "default_kind": "value",
+          "name": "edge_k_lat",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.6,
+          "default_kind": "value",
+          "name": "edge_k_ang",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "str"
+          },
+          "default": "dock",
+          "default_kind": "value",
+          "name": "handoff_dock_mode_name",
+          "required": false
+        }
+      ],
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "dock_align_angle_deg": {
+            "default": 30.0,
+            "title": "Dock Align Angle Deg",
+            "type": "number"
+          },
+          "dock_align_hold_s": {
+            "default": 0.4,
+            "title": "Dock Align Hold S",
+            "type": "number"
+          },
+          "dock_target_tag_id": {
+            "default": 1,
+            "title": "Dock Target Tag Id",
+            "type": "integer"
+          },
+          "edge_invalid_max_frames": {
+            "default": 30,
+            "title": "Edge Invalid Max Frames",
+            "type": "integer"
+          },
+          "edge_k_ang": {
+            "default": 0.6,
+            "title": "Edge K Ang",
+            "type": "number"
+          },
+          "edge_k_lat": {
+            "default": 0.008,
+            "title": "Edge K Lat",
+            "type": "number"
+          },
+          "edge_min_pixels": {
+            "default": 500,
+            "title": "Edge Min Pixels",
+            "type": "integer"
+          },
+          "edge_orbit_speed_mps": {
+            "default": 0.12,
+            "title": "Edge Orbit Speed Mps",
+            "type": "number"
+          },
+          "edge_stable_frames": {
+            "default": 5,
+            "title": "Edge Stable Frames",
+            "type": "integer"
+          },
+          "edge_threshold": {
+            "default": 0.35,
+            "title": "Edge Threshold",
+            "type": "number"
+          },
+          "go_to_edge_speed_mps": {
+            "default": 0.12,
+            "title": "Go To Edge Speed Mps",
+            "type": "number"
+          },
+          "handoff_dock_mode_name": {
+            "default": "dock",
+            "title": "Handoff Dock Mode Name",
+            "type": "string"
+          },
+          "search_spin_rps": {
+            "default": 0.3,
+            "title": "Search Spin Rps",
+            "type": "number"
+          },
+          "tag_family": {
+            "default": "tag36h11",
+            "title": "Tag Family",
+            "type": "string"
+          },
+          "tag_size_m": {
+            "default": 0.1,
+            "title": "Tag Size M",
+            "type": "number"
+          }
+        },
+        "title": "PayloadColorOrbitToRearModeParams",
+        "type": "object"
+      },
+      "required_vision_nodes": [
+        "PayloadColorOrbitNode"
+      ],
+      "transition_labels": [
+        "handoff_dock"
+      ]
+    },
+    "uav.modes.payload.PayloadCornerNavigateMode": {
+      "class_name": "PayloadCornerNavigateMode",
+      "class_path": "uav.modes.payload.PayloadCornerNavigateMode",
+      "description": "Base class for UAV operational modes within a ROS 2 node.",
+      "display_name": "PayloadCornerNavigateMode",
+      "mission_target": "payload",
+      "module_path": "uav.modes.payload.PayloadCornerNavigateMode",
+      "param_fields": [
+        {
+          "annotation": {
+            "kind": "str"
+          },
+          "default": "ccw",
+          "default_kind": "value",
+          "name": "direction",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.12,
+          "default_kind": "value",
+          "name": "drive_out_speed_mps",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "int"
+          },
+          "default": 3,
+          "default_kind": "value",
+          "name": "detect_frames",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 20.0,
+          "default_kind": "value",
+          "name": "max_drive_out_s",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.2,
+          "default_kind": "value",
+          "name": "drive_out_strip_frac",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "int"
+          },
+          "default": 150,
+          "default_kind": "value",
+          "name": "drive_out_min_pixels",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "bool"
+          },
+          "default": false,
+          "default_kind": "value",
+          "name": "compressed_image",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.4,
+          "default_kind": "value",
+          "name": "align_angular_speed",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 30.0,
+          "default_kind": "value",
+          "name": "center_tol_px",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "int"
+          },
+          "default": 150,
+          "default_kind": "value",
+          "name": "center_min_pixels",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "int"
+          },
+          "default": 3,
+          "default_kind": "value",
+          "name": "center_stable_frames",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 6.283185307179586,
+          "default_kind": "value",
+          "name": "max_turn_to_center_rad",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 25.0,
+          "default_kind": "value",
+          "name": "align_lat_tol_px",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "int"
+          },
+          "default": 3,
+          "default_kind": "value",
+          "name": "align_stable_frames",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 3.9269908169872414,
+          "default_kind": "value",
+          "name": "max_align_rad",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.1,
+          "default_kind": "value",
+          "name": "line_follow_speed_mps",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.55,
+          "default_kind": "value",
+          "name": "line_follow_strip_frac",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "int"
+          },
+          "default": 50,
+          "default_kind": "value",
+          "name": "line_follow_min_pixels",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.003,
+          "default_kind": "value",
+          "name": "k_lat",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.4,
+          "default_kind": "value",
+          "name": "k_ang",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.5,
+          "default_kind": "value",
+          "name": "max_angular",
+          "required": false
+        }
+      ],
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "align_angular_speed": {
+            "default": 0.4,
+            "title": "Align Angular Speed",
+            "type": "number"
+          },
+          "align_lat_tol_px": {
+            "default": 25.0,
+            "title": "Align Lat Tol Px",
+            "type": "number"
+          },
+          "align_stable_frames": {
+            "default": 3,
+            "title": "Align Stable Frames",
+            "type": "integer"
+          },
+          "center_min_pixels": {
+            "default": 150,
+            "title": "Center Min Pixels",
+            "type": "integer"
+          },
+          "center_stable_frames": {
+            "default": 3,
+            "title": "Center Stable Frames",
+            "type": "integer"
+          },
+          "center_tol_px": {
+            "default": 30.0,
+            "title": "Center Tol Px",
+            "type": "number"
+          },
+          "compressed_image": {
+            "default": false,
+            "title": "Compressed Image",
+            "type": "boolean"
+          },
+          "detect_frames": {
+            "default": 3,
+            "title": "Detect Frames",
+            "type": "integer"
+          },
+          "direction": {
+            "default": "ccw",
+            "title": "Direction",
+            "type": "string"
+          },
+          "drive_out_min_pixels": {
+            "default": 150,
+            "title": "Drive Out Min Pixels",
+            "type": "integer"
+          },
+          "drive_out_speed_mps": {
+            "default": 0.12,
+            "title": "Drive Out Speed Mps",
+            "type": "number"
+          },
+          "drive_out_strip_frac": {
+            "default": 0.2,
+            "title": "Drive Out Strip Frac",
+            "type": "number"
+          },
+          "k_ang": {
+            "default": 0.4,
+            "title": "K Ang",
+            "type": "number"
+          },
+          "k_lat": {
+            "default": 0.003,
+            "title": "K Lat",
+            "type": "number"
+          },
+          "line_follow_min_pixels": {
+            "default": 50,
+            "title": "Line Follow Min Pixels",
+            "type": "integer"
+          },
+          "line_follow_speed_mps": {
+            "default": 0.1,
+            "title": "Line Follow Speed Mps",
+            "type": "number"
+          },
+          "line_follow_strip_frac": {
+            "default": 0.55,
+            "title": "Line Follow Strip Frac",
+            "type": "number"
+          },
+          "max_align_rad": {
+            "default": 3.9269908169872414,
+            "title": "Max Align Rad",
+            "type": "number"
+          },
+          "max_angular": {
+            "default": 0.5,
+            "title": "Max Angular",
+            "type": "number"
+          },
+          "max_drive_out_s": {
+            "default": 20.0,
+            "title": "Max Drive Out S",
+            "type": "number"
+          },
+          "max_turn_to_center_rad": {
+            "default": 6.283185307179586,
+            "title": "Max Turn To Center Rad",
+            "type": "number"
+          }
+        },
+        "title": "PayloadCornerNavigateModeParams",
+        "type": "object"
+      },
+      "required_vision_nodes": [
+        "PayloadColorSquareNode"
+      ],
+      "transition_labels": []
+    },
+    "uav.modes.payload.PayloadDLZNavigateMode": {
+      "class_name": "PayloadDLZNavigateMode",
+      "class_path": "uav.modes.payload.PayloadDLZNavigateMode",
+      "description": "Navigate the payload along the alternating-colour square border of the DLZ.",
+      "display_name": "PayloadDLZNavigateMode",
+      "mission_target": "payload",
+      "module_path": "uav.modes.payload.PayloadDLZNavigateMode",
+      "param_fields": [
+        {
+          "annotation": {
+            "choices": [
+              "cw",
+              "ccw"
+            ],
+            "kind": "literal"
+          },
+          "default": "ccw",
+          "default_kind": "value",
+          "name": "direction",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "int"
+          },
+          "default": 1,
+          "default_kind": "value",
+          "name": "target_transitions",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.5,
+          "default_kind": "value",
+          "name": "turn_angular_speed",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.1,
+          "default_kind": "value",
+          "name": "line_follow_speed_mps",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.003,
+          "default_kind": "value",
+          "name": "k_lat",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.4,
+          "default_kind": "value",
+          "name": "k_ang",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.5,
+          "default_kind": "value",
+          "name": "max_angular",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "union",
+            "options": [
+              {
+                "key": {
+                  "kind": "str"
+                },
+                "kind": "dict",
+                "value": {
+                  "fields": [
+                    {
+                      "annotation": {
+                        "choices": [
+                          "cw",
+                          "ccw"
+                        ],
+                        "kind": "literal"
+                      },
+                      "name": "direction",
+                      "required": true
+                    },
+                    {
+                      "annotation": {
+                        "kind": "int"
+                      },
+                      "name": "transitions",
+                      "required": true
+                    }
+                  ],
+                  "kind": "typed_dict",
+                  "name": "TagTransitionRule"
+                }
+              },
+              {
+                "kind": "none"
+              }
+            ]
+          },
+          "default": null,
+          "default_kind": "none",
+          "name": "tag_transition_table",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "int"
+          },
+          "default": 5,
+          "default_kind": "value",
+          "name": "detect_frames",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 1.0,
+          "default_kind": "value",
+          "name": "scan_duration_s",
+          "required": false
+        },
+        {
+          "annotation": {
+            "choices": [
+              "wait_for_plane",
+              "scan_tags",
+              "line_follow"
+            ],
+            "kind": "literal"
+          },
+          "default": "wait_for_plane",
+          "default_kind": "value",
+          "name": "start_phase",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.0508,
+          "default_kind": "value",
+          "name": "tag_size_m",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "str"
+          },
+          "default": "tag36h11",
+          "default_kind": "value",
+          "name": "tag_family",
+          "required": false
+        }
+      ],
+      "params_schema": {
+        "$defs": {
+          "TagTransitionRule": {
+            "additionalProperties": false,
+            "properties": {
+              "direction": {
+                "enum": [
+                  "cw",
+                  "ccw"
+                ],
+                "title": "Direction",
+                "type": "string"
+              },
+              "transitions": {
+                "title": "Transitions",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "transitions",
+              "direction"
+            ],
+            "title": "TagTransitionRule",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "detect_frames": {
+            "default": 5,
+            "title": "Detect Frames",
+            "type": "integer"
+          },
+          "direction": {
+            "default": "ccw",
+            "enum": [
+              "cw",
+              "ccw"
+            ],
+            "title": "Direction",
+            "type": "string"
+          },
+          "k_ang": {
+            "default": 0.4,
+            "title": "K Ang",
+            "type": "number"
+          },
+          "k_lat": {
+            "default": 0.003,
+            "title": "K Lat",
+            "type": "number"
+          },
+          "line_follow_speed_mps": {
+            "default": 0.1,
+            "title": "Line Follow Speed Mps",
+            "type": "number"
+          },
+          "max_angular": {
+            "default": 0.5,
+            "title": "Max Angular",
+            "type": "number"
+          },
+          "scan_duration_s": {
+            "default": 1.0,
+            "title": "Scan Duration S",
+            "type": "number"
+          },
+          "start_phase": {
+            "default": "wait_for_plane",
+            "enum": [
+              "wait_for_plane",
+              "scan_tags",
+              "line_follow"
+            ],
+            "title": "Start Phase",
+            "type": "string"
+          },
+          "tag_family": {
+            "default": "tag36h11",
+            "title": "Tag Family",
+            "type": "string"
+          },
+          "tag_size_m": {
+            "default": 0.0508,
+            "title": "Tag Size M",
+            "type": "number"
+          },
+          "tag_transition_table": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/$defs/TagTransitionRule"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Tag Transition Table"
+          },
+          "target_transitions": {
+            "default": 1,
+            "title": "Target Transitions",
+            "type": "integer"
+          },
+          "turn_angular_speed": {
+            "default": 0.5,
+            "title": "Turn Angular Speed",
+            "type": "number"
+          }
+        },
+        "title": "PayloadDLZNavigateModeParams",
+        "type": "object"
+      },
+      "required_vision_nodes": [
+        "PayloadColorSquareNode",
+        "PayloadAprilTagNode"
+      ],
+      "transition_labels": [
+        "done"
+      ]
+    },
+    "uav.modes.payload.PayloadDriveToAprilTagMode": {
+      "class_name": "PayloadDriveToAprilTagMode",
+      "class_path": "uav.modes.payload.PayloadDriveToAprilTagMode",
+      "description": "Drives the payload toward a VTOL using processed AprilTag observations.",
+      "display_name": "PayloadDriveToAprilTagMode",
+      "mission_target": "payload",
+      "module_path": "uav.modes.payload.PayloadDriveToAprilTagMode",
+      "param_fields": [
+        {
+          "annotation": {
+            "kind": "union",
+            "options": [
+              {
+                "kind": "int"
+              },
+              {
+                "kind": "none"
+              }
+            ]
+          },
+          "default": null,
+          "default_kind": "none",
+          "name": "tag_id",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.2,
+          "default_kind": "value",
+          "name": "stop_distance_m",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.1,
+          "default_kind": "value",
+          "name": "tag_size_m",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "str"
+          },
+          "default": "tag36h11",
+          "default_kind": "value",
+          "name": "tag_family",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.3,
+          "default_kind": "value",
+          "name": "linear_gain",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.002,
+          "default_kind": "value",
+          "name": "angular_gain",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "bool"
+          },
+          "default": false,
+          "default_kind": "value",
+          "name": "dock_rear_orthogonal",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "int"
+          },
+          "default": 1,
+          "default_kind": "value",
+          "name": "dock_target_tag_id",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 2.0,
+          "default_kind": "value",
+          "name": "dock_orbit_radius_m",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.15,
+          "default_kind": "value",
+          "name": "dock_orbit_speed_mps",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.103,
+          "default_kind": "value",
+          "name": "dock_cam_to_rear_m",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.15,
+          "default_kind": "value",
+          "name": "dock_heading_rate_limit",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.4,
+          "default_kind": "value",
+          "name": "dock_search_spin_rps",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 30.0,
+          "default_kind": "value",
+          "name": "dock_align_angle_deg",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.4,
+          "default_kind": "value",
+          "name": "dock_align_hold_s",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 2.0,
+          "default_kind": "value",
+          "name": "dock_approach_front_dist_m",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 1.8,
+          "default_kind": "value",
+          "name": "dock_approach_front_min_m",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 2.2,
+          "default_kind": "value",
+          "name": "dock_approach_front_max_m",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 1.0,
+          "default_kind": "value",
+          "name": "dock_front_safe_standoff_m",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.2,
+          "default_kind": "value",
+          "name": "dock_approach_backup_margin_m",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.3,
+          "default_kind": "value",
+          "name": "dock_approach_bearing_gain",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.5,
+          "default_kind": "value",
+          "name": "dock_approach_pixel_scale",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 7.0,
+          "default_kind": "value",
+          "name": "dock_orbit_straight_duration_s",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 1.5,
+          "default_kind": "value",
+          "name": "dock_orbit_peek_duration_s",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 15.0,
+          "default_kind": "value",
+          "name": "dock_orbit_peek_max_when_lost_s",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.8,
+          "default_kind": "value",
+          "name": "dock_orbit_radial_k",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 2.0,
+          "default_kind": "value",
+          "name": "dock_orbit_yaw_k",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.4,
+          "default_kind": "value",
+          "name": "dock_orbit_peek_blend",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "union",
+            "options": [
+              {
+                "kind": "str"
+              },
+              {
+                "kind": "none"
+              }
+            ]
+          },
+          "default": null,
+          "default_kind": "none",
+          "name": "start_phase",
+          "required": false
+        }
+      ],
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "angular_gain": {
+            "default": 0.002,
+            "title": "Angular Gain",
+            "type": "number"
+          },
+          "dock_align_angle_deg": {
+            "default": 30.0,
+            "title": "Dock Align Angle Deg",
+            "type": "number"
+          },
+          "dock_align_hold_s": {
+            "default": 0.4,
+            "title": "Dock Align Hold S",
+            "type": "number"
+          },
+          "dock_approach_backup_margin_m": {
+            "default": 0.2,
+            "title": "Dock Approach Backup Margin M",
+            "type": "number"
+          },
+          "dock_approach_bearing_gain": {
+            "default": 0.3,
+            "title": "Dock Approach Bearing Gain",
+            "type": "number"
+          },
+          "dock_approach_front_dist_m": {
+            "default": 2.0,
+            "title": "Dock Approach Front Dist M",
+            "type": "number"
+          },
+          "dock_approach_front_max_m": {
+            "default": 2.2,
+            "title": "Dock Approach Front Max M",
+            "type": "number"
+          },
+          "dock_approach_front_min_m": {
+            "default": 1.8,
+            "title": "Dock Approach Front Min M",
+            "type": "number"
+          },
+          "dock_approach_pixel_scale": {
+            "default": 0.5,
+            "title": "Dock Approach Pixel Scale",
+            "type": "number"
+          },
+          "dock_cam_to_rear_m": {
+            "default": 0.103,
+            "title": "Dock Cam To Rear M",
+            "type": "number"
+          },
+          "dock_front_safe_standoff_m": {
+            "default": 1.0,
+            "title": "Dock Front Safe Standoff M",
+            "type": "number"
+          },
+          "dock_heading_rate_limit": {
+            "default": 0.15,
+            "title": "Dock Heading Rate Limit",
+            "type": "number"
+          },
+          "dock_orbit_peek_blend": {
+            "default": 0.4,
+            "title": "Dock Orbit Peek Blend",
+            "type": "number"
+          },
+          "dock_orbit_peek_duration_s": {
+            "default": 1.5,
+            "title": "Dock Orbit Peek Duration S",
+            "type": "number"
+          },
+          "dock_orbit_peek_max_when_lost_s": {
+            "default": 15.0,
+            "title": "Dock Orbit Peek Max When Lost S",
+            "type": "number"
+          },
+          "dock_orbit_radial_k": {
+            "default": 0.8,
+            "title": "Dock Orbit Radial K",
+            "type": "number"
+          },
+          "dock_orbit_radius_m": {
+            "default": 2.0,
+            "title": "Dock Orbit Radius M",
+            "type": "number"
+          },
+          "dock_orbit_speed_mps": {
+            "default": 0.15,
+            "title": "Dock Orbit Speed Mps",
+            "type": "number"
+          },
+          "dock_orbit_straight_duration_s": {
+            "default": 7.0,
+            "title": "Dock Orbit Straight Duration S",
+            "type": "number"
+          },
+          "dock_orbit_yaw_k": {
+            "default": 2.0,
+            "title": "Dock Orbit Yaw K",
+            "type": "number"
+          },
+          "dock_rear_orthogonal": {
+            "default": false,
+            "title": "Dock Rear Orthogonal",
+            "type": "boolean"
+          },
+          "dock_search_spin_rps": {
+            "default": 0.4,
+            "title": "Dock Search Spin Rps",
+            "type": "number"
+          },
+          "dock_target_tag_id": {
+            "default": 1,
+            "title": "Dock Target Tag Id",
+            "type": "integer"
+          },
+          "linear_gain": {
+            "default": 0.3,
+            "title": "Linear Gain",
+            "type": "number"
+          },
+          "start_phase": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Start Phase"
+          },
+          "stop_distance_m": {
+            "default": 0.2,
+            "title": "Stop Distance M",
+            "type": "number"
+          },
+          "tag_family": {
+            "default": "tag36h11",
+            "title": "Tag Family",
+            "type": "string"
+          },
+          "tag_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Tag Id"
+          },
+          "tag_size_m": {
+            "default": 0.1,
+            "title": "Tag Size M",
+            "type": "number"
+          }
+        },
+        "title": "PayloadDriveToAprilTagModeParams",
+        "type": "object"
+      },
+      "required_vision_nodes": [
+        "PayloadAprilTagNode"
+      ],
+      "transition_labels": []
+    },
+    "uav.modes.payload.PayloadNavigateAroundPlaneMode": {
+      "class_name": "PayloadNavigateAroundPlaneMode",
+      "class_path": "uav.modes.payload.PayloadNavigateAroundPlaneMode",
+      "description": "Navigate payload from the wrong side of the VTOL to the approach side.",
+      "display_name": "PayloadNavigateAroundPlaneMode",
+      "mission_target": "payload",
+      "module_path": "uav.modes.payload.PayloadNavigateAroundPlaneMode",
+      "param_fields": [
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 1.5,
+          "default_kind": "value",
+          "name": "orbit_radius_m",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "int"
+          },
+          "default": 0,
+          "default_kind": "value",
+          "name": "approach_tag_id",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.15,
+          "default_kind": "value",
+          "name": "nav_speed_mps",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 2.0,
+          "default_kind": "value",
+          "name": "nav_angular_gain",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.6,
+          "default_kind": "value",
+          "name": "max_angular_rps",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.4,
+          "default_kind": "value",
+          "name": "waypoint_reach_dist_m",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.3,
+          "default_kind": "value",
+          "name": "scan_spin_rps",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 8.0,
+          "default_kind": "value",
+          "name": "scan_timeout_s",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 1.0,
+          "default_kind": "value",
+          "name": "tag_lost_coast_s",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.1,
+          "default_kind": "value",
+          "name": "tag_size_m",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "str"
+          },
+          "default": "tag36h11",
+          "default_kind": "value",
+          "name": "tag_family",
+          "required": false
+        }
+      ],
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "approach_tag_id": {
+            "default": 0,
+            "title": "Approach Tag Id",
+            "type": "integer"
+          },
+          "max_angular_rps": {
+            "default": 0.6,
+            "title": "Max Angular Rps",
+            "type": "number"
+          },
+          "nav_angular_gain": {
+            "default": 2.0,
+            "title": "Nav Angular Gain",
+            "type": "number"
+          },
+          "nav_speed_mps": {
+            "default": 0.15,
+            "title": "Nav Speed Mps",
+            "type": "number"
+          },
+          "orbit_radius_m": {
+            "default": 1.5,
+            "title": "Orbit Radius M",
+            "type": "number"
+          },
+          "scan_spin_rps": {
+            "default": 0.3,
+            "title": "Scan Spin Rps",
+            "type": "number"
+          },
+          "scan_timeout_s": {
+            "default": 8.0,
+            "title": "Scan Timeout S",
+            "type": "number"
+          },
+          "tag_family": {
+            "default": "tag36h11",
+            "title": "Tag Family",
+            "type": "string"
+          },
+          "tag_lost_coast_s": {
+            "default": 1.0,
+            "title": "Tag Lost Coast S",
+            "type": "number"
+          },
+          "tag_size_m": {
+            "default": 0.1,
+            "title": "Tag Size M",
+            "type": "number"
+          },
+          "waypoint_reach_dist_m": {
+            "default": 0.4,
+            "title": "Waypoint Reach Dist M",
+            "type": "number"
+          }
+        },
+        "title": "PayloadNavigateAroundPlaneModeParams",
+        "type": "object"
+      },
+      "required_vision_nodes": [
+        "PayloadAprilTagNode"
+      ],
+      "transition_labels": [
+        "approach"
+      ]
+    },
+    "uav.modes.payload.PayloadRetreatMode": {
+      "class_name": "PayloadRetreatMode",
+      "class_path": "uav.modes.payload.PayloadRetreatMode",
+      "description": "Drive the payload to the edge of the DLZ, then turn 180\u00b0 to face the center.",
+      "display_name": "PayloadRetreatMode",
+      "mission_target": "payload",
+      "module_path": "uav.modes.payload.PayloadRetreatMode",
+      "param_fields": [
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.12,
+          "default_kind": "value",
+          "name": "forward_speed_mps",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.3,
+          "default_kind": "value",
+          "name": "edge_threshold",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "int"
+          },
+          "default": 5,
+          "default_kind": "value",
+          "name": "edge_stable_frames",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "int"
+          },
+          "default": 10,
+          "default_kind": "value",
+          "name": "edge_min_pixels",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "int"
+          },
+          "default": 30,
+          "default_kind": "value",
+          "name": "edge_invalid_max_frames",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.5,
+          "default_kind": "value",
+          "name": "turn_angular_speed",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "int"
+          },
+          "default": 1,
+          "default_kind": "value",
+          "name": "turn_direction",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "bool"
+          },
+          "default": false,
+          "default_kind": "value",
+          "name": "compressed_image",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "bool"
+          },
+          "default": false,
+          "default_kind": "value",
+          "name": "camera_debug",
+          "required": false
+        }
+      ],
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "camera_debug": {
+            "default": false,
+            "title": "Camera Debug",
+            "type": "boolean"
+          },
+          "compressed_image": {
+            "default": false,
+            "title": "Compressed Image",
+            "type": "boolean"
+          },
+          "edge_invalid_max_frames": {
+            "default": 30,
+            "title": "Edge Invalid Max Frames",
+            "type": "integer"
+          },
+          "edge_min_pixels": {
+            "default": 10,
+            "title": "Edge Min Pixels",
+            "type": "integer"
+          },
+          "edge_stable_frames": {
+            "default": 5,
+            "title": "Edge Stable Frames",
+            "type": "integer"
+          },
+          "edge_threshold": {
+            "default": 0.3,
+            "title": "Edge Threshold",
+            "type": "number"
+          },
+          "forward_speed_mps": {
+            "default": 0.12,
+            "title": "Forward Speed Mps",
+            "type": "number"
+          },
+          "turn_angular_speed": {
+            "default": 0.5,
+            "title": "Turn Angular Speed",
+            "type": "number"
+          },
+          "turn_direction": {
+            "default": 1,
+            "title": "Turn Direction",
+            "type": "integer"
+          }
+        },
+        "title": "PayloadRetreatModeParams",
+        "type": "object"
+      },
+      "required_vision_nodes": [
+        "PayloadAprilTagNode"
+      ],
+      "transition_labels": []
+    },
+    "uav.modes.payload.PayloadScanForTagMode": {
+      "class_name": "PayloadScanForTagMode",
+      "class_path": "uav.modes.payload.PayloadScanForTagMode",
+      "description": "Spin in place looking for a specific AprilTag.",
+      "display_name": "PayloadScanForTagMode",
+      "mission_target": "payload",
+      "module_path": "uav.modes.payload.PayloadScanForTagMode",
+      "param_fields": [
+        {
+          "annotation": {
+            "kind": "int"
+          },
+          "default": 0,
+          "default_kind": "value",
+          "name": "tag_id",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.0508,
+          "default_kind": "value",
+          "name": "tag_size_m",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "str"
+          },
+          "default": "tag36h11",
+          "default_kind": "value",
+          "name": "tag_family",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.4,
+          "default_kind": "value",
+          "name": "spin_angular_speed",
+          "required": false
+        }
+      ],
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "spin_angular_speed": {
+            "default": 0.4,
+            "title": "Spin Angular Speed",
+            "type": "number"
+          },
+          "tag_family": {
+            "default": "tag36h11",
+            "title": "Tag Family",
+            "type": "string"
+          },
+          "tag_id": {
+            "default": 0,
+            "title": "Tag Id",
+            "type": "integer"
+          },
+          "tag_size_m": {
+            "default": 0.0508,
+            "title": "Tag Size M",
+            "type": "number"
+          }
+        },
+        "title": "PayloadScanForTagModeParams",
+        "type": "object"
+      },
+      "required_vision_nodes": [
+        "PayloadAprilTagNode"
+      ],
+      "transition_labels": [
+        "found",
+        "not_found"
+      ]
+    },
+    "uav.modes.payload.PayloadWaitForDriveOutMode": {
+      "class_name": "PayloadWaitForDriveOutMode",
+      "class_path": "uav.modes.payload.PayloadWaitForDriveOutMode",
+      "description": "Poll PayloadDriveOutNode each update tick. Once the path ahead registers as",
+      "display_name": "PayloadWaitForDriveOutMode",
+      "mission_target": "payload",
+      "module_path": "uav.modes.payload.PayloadWaitForDriveOutMode",
+      "param_fields": [
+        {
+          "annotation": {
+            "kind": "int"
+          },
+          "default": 5,
+          "default_kind": "value",
+          "name": "confirm_frames",
+          "required": false
+        },
+        {
+          "annotation": {
+            "items": [
+              {
+                "kind": "int"
+              },
+              {
+                "kind": "int"
+              },
+              {
+                "kind": "int"
+              }
+            ],
+            "kind": "tuple",
+            "variadic": false
+          },
+          "default": [
+            0,
+            0,
+            180
+          ],
+          "default_kind": "value",
+          "name": "lower_hsv",
+          "required": false
+        },
+        {
+          "annotation": {
+            "items": [
+              {
+                "kind": "int"
+              },
+              {
+                "kind": "int"
+              },
+              {
+                "kind": "int"
+              }
+            ],
+            "kind": "tuple",
+            "variadic": false
+          },
+          "default": [
+            180,
+            20,
+            255
+          ],
+          "default_kind": "value",
+          "name": "upper_hsv",
+          "required": false
+        }
+      ],
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "confirm_frames": {
+            "default": 5,
+            "title": "Confirm Frames",
+            "type": "integer"
+          },
+          "lower_hsv": {
+            "default": [
+              0,
+              0,
+              180
+            ],
+            "maxItems": 3,
+            "minItems": 3,
+            "prefixItems": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Lower Hsv",
+            "type": "array"
+          },
+          "upper_hsv": {
+            "default": [
+              180,
+              20,
+              255
+            ],
+            "maxItems": 3,
+            "minItems": 3,
+            "prefixItems": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Upper Hsv",
+            "type": "array"
+          }
+        },
+        "title": "PayloadWaitForDriveOutModeParams",
+        "type": "object"
+      },
+      "required_vision_nodes": [
+        "PayloadDriveOutNode"
+      ],
+      "transition_labels": [
+        "complete"
+      ]
+    },
+    "uav.modes.uav.LandingMode": {
+      "class_name": "LandingMode",
+      "class_path": "uav.modes.uav.LandingMode",
+      "description": "A mode for taking off vertically.",
+      "display_name": "LandingMode",
+      "mission_target": "uav",
+      "module_path": "uav.modes.uav.LandingMode",
+      "param_fields": [],
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "title": "LandingModeParams",
+        "type": "object"
+      },
+      "required_vision_nodes": [],
+      "transition_labels": []
+    },
+    "uav.modes.uav.NavGPSMode": {
+      "class_name": "NavGPSMode",
+      "class_path": "uav.modes.uav.NavGPSMode",
+      "description": "A mode for navigating to a GPS coordinate",
+      "display_name": "NavGPSMode",
+      "mission_target": "uav",
+      "module_path": "uav.modes.uav.NavGPSMode",
+      "param_fields": [
+        {
+          "annotation": {
+            "item": {
+              "items": [
+                {
+                  "items": [
+                    {
+                      "kind": "float"
+                    },
+                    {
+                      "kind": "float"
+                    },
+                    {
+                      "kind": "float"
+                    }
+                  ],
+                  "kind": "tuple",
+                  "variadic": false
+                },
+                {
+                  "kind": "float"
+                },
+                {
+                  "choices": [
+                    "GPS",
+                    "LOCAL"
+                  ],
+                  "kind": "literal"
+                }
+              ],
+              "kind": "tuple",
+              "variadic": false
+            },
+            "kind": "list"
+          },
+          "default": null,
+          "default_kind": "missing",
+          "name": "coordinates",
+          "required": true
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 1,
+          "default_kind": "value",
+          "name": "margin",
+          "required": false
+        }
+      ],
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "coordinates": {
+            "items": {
+              "maxItems": 3,
+              "minItems": 3,
+              "prefixItems": [
+                {
+                  "maxItems": 3,
+                  "minItems": 3,
+                  "prefixItems": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "number"
+                    }
+                  ],
+                  "type": "array"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "enum": [
+                    "GPS",
+                    "LOCAL"
+                  ],
+                  "type": "string"
+                }
+              ],
+              "type": "array"
+            },
+            "title": "Coordinates",
+            "type": "array"
+          },
+          "margin": {
+            "default": 1,
+            "title": "Margin",
+            "type": "number"
+          }
+        },
+        "required": [
+          "coordinates"
+        ],
+        "title": "NavGPSModeParams",
+        "type": "object"
+      },
+      "required_vision_nodes": [],
+      "transition_labels": [
+        "complete"
+      ]
+    },
+    "uav.modes.uav.PayloadDropoffMode": {
+      "class_name": "PayloadDropoffMode",
+      "class_path": "uav.modes.uav.PayloadDropoffMode",
+      "description": "A mode for dropping off the payload.",
+      "display_name": "PayloadDropoffMode",
+      "mission_target": "uav",
+      "module_path": "uav.modes.uav.PayloadDropoffMode",
+      "param_fields": [
+        {
+          "annotation": {
+            "kind": "union",
+            "options": [
+              {
+                "items": [
+                  {
+                    "kind": "float"
+                  },
+                  {
+                    "kind": "float"
+                  },
+                  {
+                    "kind": "float"
+                  }
+                ],
+                "kind": "tuple",
+                "variadic": false
+              },
+              {
+                "kind": "none"
+              }
+            ]
+          },
+          "default": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "default_kind": "value",
+          "name": "offsets",
+          "required": false
+        }
+      ],
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "offsets": {
+            "anyOf": [
+              {
+                "maxItems": 3,
+                "minItems": 3,
+                "prefixItems": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "title": "Offsets"
+          }
+        },
+        "title": "PayloadDropoffModeParams",
+        "type": "object"
+      },
+      "required_vision_nodes": [
+        "PayloadTrackingNode"
+      ],
+      "transition_labels": [
+        "complete"
+      ]
+    },
+    "uav.modes.uav.PayloadPickupMode": {
+      "class_name": "PayloadPickupMode",
+      "class_path": "uav.modes.uav.PayloadPickupMode",
+      "description": "A mode for picking up a payload.",
+      "display_name": "PayloadPickupMode",
+      "mission_target": "uav",
+      "module_path": "uav.modes.uav.PayloadPickupMode",
+      "param_fields": [
+        {
+          "annotation": {
+            "kind": "str"
+          },
+          "default": "green",
+          "default_kind": "value",
+          "name": "color",
+          "required": false
+        }
+      ],
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "color": {
+            "default": "green",
+            "title": "Color",
+            "type": "string"
+          }
+        },
+        "title": "PayloadPickupModeParams",
+        "type": "object"
+      },
+      "required_vision_nodes": [
+        "PayloadTrackingNode"
+      ],
+      "transition_labels": [
+        "complete"
+      ]
+    },
+    "uav.modes.uav.ServoDropoffMode": {
+      "class_name": "ServoDropoffMode",
+      "class_path": "uav.modes.uav.ServoDropoffMode",
+      "description": "A mode for dropping off the payload.",
+      "display_name": "ServoDropoffMode",
+      "mission_target": "uav",
+      "module_path": "uav.modes.uav.ServoDropoffMode",
+      "param_fields": [
+        {
+          "annotation": {
+            "kind": "union",
+            "options": [
+              {
+                "items": [
+                  {
+                    "kind": "float"
+                  },
+                  {
+                    "kind": "float"
+                  },
+                  {
+                    "kind": "float"
+                  }
+                ],
+                "kind": "tuple",
+                "variadic": false
+              },
+              {
+                "kind": "none"
+              }
+            ]
+          },
+          "default": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "default_kind": "value",
+          "name": "offsets",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "union",
+            "options": [
+              {
+                "items": [
+                  {
+                    "kind": "float"
+                  },
+                  {
+                    "kind": "float"
+                  },
+                  {
+                    "kind": "float"
+                  }
+                ],
+                "kind": "tuple",
+                "variadic": false
+              },
+              {
+                "kind": "none"
+              }
+            ]
+          },
+          "default": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "default_kind": "value",
+          "name": "camera_offsets",
+          "required": false
+        }
+      ],
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "camera_offsets": {
+            "anyOf": [
+              {
+                "maxItems": 3,
+                "minItems": 3,
+                "prefixItems": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "title": "Camera Offsets"
+          },
+          "offsets": {
+            "anyOf": [
+              {
+                "maxItems": 3,
+                "minItems": 3,
+                "prefixItems": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "title": "Offsets"
+          }
+        },
+        "title": "ServoDropoffModeParams",
+        "type": "object"
+      },
+      "required_vision_nodes": [],
+      "transition_labels": [
+        "complete"
+      ]
+    },
+    "uav.modes.uav.TakeoffMode": {
+      "class_name": "TakeoffMode",
+      "class_path": "uav.modes.uav.TakeoffMode",
+      "description": "A mode for takeoff (vertical or horizontal).",
+      "display_name": "TakeoffMode",
+      "mission_target": "uav",
+      "module_path": "uav.modes.uav.TakeoffMode",
+      "param_fields": [
+        {
+          "annotation": {
+            "choices": [
+              "vertical",
+              "horizontal"
+            ],
+            "kind": "literal"
+          },
+          "default": "vertical",
+          "default_kind": "value",
+          "name": "takeoff_type",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": null,
+          "default_kind": "nan",
+          "name": "fw_tko_pitch",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": null,
+          "default_kind": "nan",
+          "name": "yaw",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": null,
+          "default_kind": "nan",
+          "name": "latitude",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": null,
+          "default_kind": "nan",
+          "name": "longitude",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": null,
+          "default_kind": "nan",
+          "name": "altitude",
+          "required": false
+        }
+      ],
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "altitude": {
+            "title": "Altitude",
+            "type": "number"
+          },
+          "fw_tko_pitch": {
+            "title": "Fw Tko Pitch",
+            "type": "number"
+          },
+          "latitude": {
+            "title": "Latitude",
+            "type": "number"
+          },
+          "longitude": {
+            "title": "Longitude",
+            "type": "number"
+          },
+          "takeoff_type": {
+            "default": "vertical",
+            "enum": [
+              "vertical",
+              "horizontal"
+            ],
+            "title": "Takeoff Type",
+            "type": "string"
+          },
+          "yaw": {
+            "title": "Yaw",
+            "type": "number"
+          }
+        },
+        "title": "TakeoffModeParams",
+        "type": "object"
+      },
+      "required_vision_nodes": [],
+      "transition_labels": [
+        "complete"
+      ]
+    },
+    "uav.modes.uav.TransitionMode": {
+      "class_name": "TransitionMode",
+      "class_path": "uav.modes.uav.TransitionMode",
+      "description": "A mode for transitioning between VTOL types",
+      "display_name": "TransitionMode",
+      "mission_target": "uav",
+      "module_path": "uav.modes.uav.TransitionMode",
+      "param_fields": [
+        {
+          "annotation": {
+            "choices": [
+              "MC",
+              "FW"
+            ],
+            "kind": "literal"
+          },
+          "default": null,
+          "default_kind": "missing",
+          "name": "to_mode",
+          "required": true
+        }
+      ],
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "to_mode": {
+            "enum": [
+              "MC",
+              "FW"
+            ],
+            "title": "To Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "to_mode"
+        ],
+        "title": "TransitionModeParams",
+        "type": "object"
+      },
+      "required_vision_nodes": [],
+      "transition_labels": [
+        "complete"
+      ]
+    },
+    "uav.modes.uav.WaypointMission": {
+      "class_name": "WaypointMission",
+      "class_path": "uav.modes.uav.WaypointMission",
+      "description": "Simple waypoint mission for testing scoring node.",
+      "display_name": "WaypointMission",
+      "mission_target": "uav",
+      "module_path": "uav.modes.uav.WaypointMission",
+      "param_fields": [
+        {
+          "annotation": {
+            "kind": "union",
+            "options": [
+              {
+                "item": {
+                  "item": {
+                    "kind": "float"
+                  },
+                  "kind": "list"
+                },
+                "kind": "list"
+              },
+              {
+                "kind": "none"
+              }
+            ]
+          },
+          "default": null,
+          "default_kind": "none",
+          "name": "waypoints",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.5,
+          "default_kind": "value",
+          "name": "waypoint_tolerance",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 1.0,
+          "default_kind": "value",
+          "name": "speed",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 1.0,
+          "default_kind": "value",
+          "name": "loiter_time",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 2.0,
+          "default_kind": "value",
+          "name": "altitude",
+          "required": false
+        }
+      ],
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "altitude": {
+            "default": 2.0,
+            "title": "Altitude",
+            "type": "number"
+          },
+          "loiter_time": {
+            "default": 1.0,
+            "title": "Loiter Time",
+            "type": "number"
+          },
+          "speed": {
+            "default": 1.0,
+            "title": "Speed",
+            "type": "number"
+          },
+          "waypoint_tolerance": {
+            "default": 0.5,
+            "title": "Waypoint Tolerance",
+            "type": "number"
+          },
+          "waypoints": {
+            "anyOf": [
+              {
+                "items": {
+                  "items": {
+                    "type": "number"
+                  },
+                  "type": "array"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Waypoints"
+          }
+        },
+        "title": "WaypointMissionParams",
+        "type": "object"
+      },
+      "required_vision_nodes": [],
+      "transition_labels": []
+    }
+  },
+  "schema_version": 1
+}

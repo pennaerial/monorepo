@@ -7,6 +7,7 @@ import pytest
 
 from uav.modes.Mode import Mode
 import uav.runtime.mission_spec as mission_spec_module
+import uav.runtime.schema as schema_module
 from uav.runtime.mission_spec import (
     MissionSpec,
     load_mode_class,
@@ -52,8 +53,9 @@ def test_load_uav_mission_spec(tmp_path):
           cruise:
             class: uav.modes.uav.NavGPSMode
             params:
-              target_waypoint: [1.0, 2.0, 3.0]
-              acceptance_radius: 0.2
+              coordinates:
+                - [[1.0, 2.0, 3.0], 0.0, LOCAL]
+              margin: 0.2
             transitions:
               complete: land
           land:
@@ -71,6 +73,10 @@ def test_load_uav_mission_spec(tmp_path):
     assert mission_spec.modes["start"].class_path == "uav.modes.uav.TakeoffMode"
     assert mission_spec.modes["start"].params == {"altitude": 3.0}
     assert mission_spec.modes["start"].transitions == {"complete": "cruise"}
+    assert mission_spec.modes["cruise"].params == {
+        "coordinates": [((1.0, 2.0, 3.0), 0.0, "LOCAL")],
+        "margin": 0.2,
+    }
 
 
 def test_load_payload_mission_spec(tmp_path):
@@ -79,12 +85,12 @@ def test_load_payload_mission_spec(tmp_path):
         """
         modes:
           start:
-            class: uav.modes.payload.PayloadDriveToAprilTagMode
+            class: uav.modes.payload.PayloadScanForTagMode
             params:
               tag_id: 1
-              stop_distance_m: 0.2
             transitions:
-              complete: approach
+              found: approach
+              not_found: approach
           approach:
             class: uav.modes.payload.PayloadAprilTagApproachMode
             params:
@@ -100,7 +106,7 @@ def test_load_payload_mission_spec(tmp_path):
     assert mission_spec.is_uav is False
     assert mission_spec.vision_nodes == ("PayloadAprilTagNode",)
     assert mission_spec.modes["start"].class_path == (
-        "uav.modes.payload.PayloadDriveToAprilTagMode"
+        "uav.modes.payload.PayloadScanForTagMode"
     )
     assert mission_spec.modes["start"].params["tag_id"] == 1
     assert mission_spec.modes["approach"].class_path == (
@@ -256,23 +262,24 @@ def test_undefined_transition_target_is_rejected(tmp_path):
 
 @pytest.mark.parametrize("mission_target", [None, "boat"])
 def test_invalid_mode_target_is_rejected(monkeypatch, mission_target):
-    def _on_update(self, time_delta: float) -> None:
-        pass
-
-    def _check_status(self) -> str:
-        return "continue"
-
-    FakeMode = type(
-        "FakeMode",
-        (Mode,),
-        {
-            "mission_target": mission_target,
-            "on_update": _on_update,
-            "check_status": _check_status,
-        },
+    monkeypatch.setattr(
+        schema_module,
+        "mode_entry_for_class_path",
+        lambda _path: type(
+            "FakeEntry",
+            (),
+            {
+                "mission_target": mission_target,
+                "required_vision_nodes": (),
+                "transition_labels": (),
+            },
+        )(),
     )
-
-    monkeypatch.setattr(mission_spec_module, "load_mode_class", lambda _path: FakeMode)
+    monkeypatch.setattr(
+        schema_module,
+        "validate_mode_params",
+        lambda _path, params: params,
+    )
 
     with pytest.raises(ValueError, match="must declare mission_target"):
         load_mission_spec({"modes": {"start": {"class": "fake.module.FakeMode"}}})

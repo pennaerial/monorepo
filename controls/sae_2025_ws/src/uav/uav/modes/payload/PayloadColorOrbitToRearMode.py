@@ -43,6 +43,7 @@ class PayloadColorOrbitToRearMode(Mode):
 
     mission_target = "payload"
     required_vision_nodes = (PayloadColorOrbitNode,)
+    transition_labels = ("handoff_dock",)
 
     def __init__(
         self,

@@ -1,5 +1,5 @@
 # launch_params.yaml
-mission_name: payload_wait_drive_out
+mission_name: payload_corner_navigate
 # Vehicle namespace for mission-facing topics/services.
 # Leave blank to use the mission-target default (`uav` for UAV missions, `payload_0` for payload missions).
 vehicle_name: ""

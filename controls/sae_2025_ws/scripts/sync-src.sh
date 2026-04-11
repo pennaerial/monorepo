@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Syncs ROS2 source packages to the Pi over rsync.
+# Dev-only helper that syncs ROS2 source packages to a Pi over rsync.
+# This does not create a release-managed deployment under ~/pennair-deploy and is
+# not the supported production deploy path.
 #
 # Usage:
 #   ./sync-src.sh <user@host>                                  # Deploy default packages
@@ -21,6 +23,7 @@ DEPLOY_PACKAGES=(
 # --- Argument parsing ---
 if [[ $# -eq 0 || "$1" == --* ]]; then
 	echo "Usage: $0 <user@host> [--packages-select pkg...] [--password]" >&2
+	echo "Note: dev-only fast path; production deploys should use the release-based dashboard or deploy scripts." >&2
 	exit 1
 fi
 REMOTE="$1"

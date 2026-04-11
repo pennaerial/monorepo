@@ -18,6 +18,7 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.logging import get_logger
 from launch.substitutions import LaunchConfiguration
 
+from uav.runtime.fleet_spec import load_fleet_document
 from sim.orchestration import resolve_stage_world
 from uav.runtime.mission_spec import MissionSpec, mission_path_for_name
 
@@ -44,16 +45,37 @@ _EXCLUDED_FLEET_KEYS = {
 }
 
 
+def _prevalidate_raw_fleet_keys(fleet: dict) -> None:
+    if not isinstance(fleet, dict):
+        return
+
+    backend = fleet.get("backend", {})
+    backend_kind = ""
+    if isinstance(backend, dict):
+        backend_kind = str(backend.get("kind", "")).strip()
+
+    _defaults_config(fleet)
+    for raw_vehicle in _vehicles_config(fleet):
+        name = str(raw_vehicle.get("name", "")).strip() or "<unnamed>"
+        _validate_vehicle_keys(
+            raw_vehicle,
+            name_hint=name,
+            backend_kind=backend_kind,
+        )
+
+
 def _load_fleet_file(context) -> dict:
     fleet_path = LaunchConfiguration("fleet_file").perform(context).strip()
     if not fleet_path:
         raise ValueError("fleet.launch.py requires fleet_file:=...")
     resolved_path = Path(os.path.expanduser(fleet_path)).resolve()
-    with resolved_path.open("r", encoding="utf-8") as fleet_stream:
-        fleet = yaml.safe_load(fleet_stream) or {}
-    if not isinstance(fleet, dict):
-        raise ValueError(f"Fleet file '{resolved_path}' must define a mapping.")
-    return fleet
+    with resolved_path.open("r", encoding="utf-8") as fleet_file:
+        raw_fleet = yaml.safe_load(fleet_file) or {}
+    _prevalidate_raw_fleet_keys(raw_fleet)
+    return load_fleet_document(resolved_path).model_dump(
+        mode="python",
+        exclude_none=True,
+    )
 
 
 def _backend_config(fleet: dict) -> dict:
@@ -61,11 +83,13 @@ def _backend_config(fleet: dict) -> dict:
     if not isinstance(backend, dict):
         raise ValueError("Fleet file backend section must be a mapping.")
     kind = str(backend.get("kind", "")).strip()
+    if kind == "hardware":
+        return {
+            "kind": "hardware",
+            "px4_path": backend.get("px4_path", "~/PX4-Autopilot"),
+        }
     if kind != "sim":
-        raise ValueError(
-            f"Unsupported backend kind '{kind}'. "
-            "This first orchestration pass implements sim only."
-        )
+        raise ValueError(f"Unsupported backend kind '{kind}'.")
     world_name = str(backend.get("world_name", "")).strip()
     if not world_name:
         raise ValueError("Sim backend requires a non-empty backend.world_name.")
@@ -125,7 +149,9 @@ def _defaults_config(fleet: dict) -> dict:
     return defaults
 
 
-def _validate_vehicle_keys(vehicle: dict, *, name_hint: str) -> None:
+def _validate_vehicle_keys(vehicle: dict, *, name_hint: str, backend_kind: str) -> None:
+    if backend_kind == "hardware":
+        return
     for key in _EXCLUDED_FLEET_KEYS:
         if key in vehicle:
             raise ValueError(
@@ -163,17 +189,24 @@ def _resolve_bool(value, *, key: str, default: bool) -> bool:
 
 
 def _vehicle_stack_configs(fleet: dict) -> tuple[dict, list[dict]]:
+    _prevalidate_raw_fleet_keys(fleet)
+    fleet = load_fleet_document(fleet).model_dump(mode="python", exclude_none=True)
     backend = _backend_config(fleet)
     defaults = _defaults_config(fleet)
     vehicles = _vehicles_config(fleet)
-    controllables = backend["_resolved_world"]["params"]["controllables"]
+    backend_kind = backend["kind"]
+    controllables = (
+        backend["_resolved_world"]["params"]["controllables"]
+        if backend_kind == "sim"
+        else {}
+    )
 
     resolved = []
     next_px4_instance = 0
 
     for raw_vehicle in vehicles:
         name = str(raw_vehicle.get("name", "")).strip() or "<unnamed>"
-        _validate_vehicle_keys(raw_vehicle, name_hint=name)
+        _validate_vehicle_keys(raw_vehicle, name_hint=name, backend_kind=backend_kind)
         vehicle = deepcopy(defaults)
         vehicle.update(raw_vehicle)
 
@@ -182,11 +215,11 @@ def _vehicle_stack_configs(fleet: dict) -> tuple[dict, list[dict]]:
 
         if not name:
             raise ValueError("Fleet vehicles require a non-empty name.")
-        if not controllable_name:
+        if backend_kind == "sim" and not controllable_name:
             raise ValueError(
                 f"Fleet vehicle '{name}' requires a controllable reference."
             )
-        if controllable_name not in controllables:
+        if backend_kind == "sim" and controllable_name not in controllables:
             raise ValueError(
                 f"Fleet vehicle '{name}' references unknown controllable '{controllable_name}'."
             )
@@ -201,20 +234,23 @@ def _vehicle_stack_configs(fleet: dict) -> tuple[dict, list[dict]]:
                 f"but mission target is '{kind}'."
             )
 
-        controllable = deepcopy(controllables[controllable_name])
-        controllable_kind = str(controllable.get("kind", "")).strip()
-        if controllable_kind and controllable_kind != kind:
-            raise ValueError(
-                f"Fleet vehicle '{name}' kind '{kind}' does not match "
-                f"controllable '{controllable_name}' kind '{controllable_kind}'."
-            )
+        if backend_kind == "sim":
+            controllable = deepcopy(controllables[controllable_name])
+            controllable_kind = str(controllable.get("kind", "")).strip()
+            if controllable_kind and controllable_kind != kind:
+                raise ValueError(
+                    f"Fleet vehicle '{name}' kind '{kind}' does not match "
+                    f"controllable '{controllable_name}' kind '{controllable_kind}'."
+                )
+        else:
+            controllable = {}
 
         stack_config = {
             "kind": kind,
             "vehicle_name": name,
             "mission_name": mission_name,
             "mission_path": mission_path,
-            "sim": True,
+            "sim": backend_kind == "sim",
             "auto_launch": _resolve_bool(
                 vehicle.get("auto_launch", True), key="auto_launch", default=True
             ),
@@ -242,26 +278,37 @@ def _vehicle_stack_configs(fleet: dict) -> tuple[dict, list[dict]]:
             "px4_path": os.path.expanduser(
                 str(backend.get("px4_path", "~/PX4-Autopilot"))
             ),
-            "sim_world_name": backend["world_name"],
-            "sim_entity_name": controllable_name,
-            "launch_middleware": False if kind == "uav" else False,
-            "launch_px4_sitl": kind == "uav",
+            "sim_world_name": backend.get("world_name", ""),
+            "sim_entity_name": controllable_name or name,
+            "launch_middleware": backend_kind != "sim" and kind == "uav",
+            "launch_px4_sitl": backend_kind == "sim" and kind == "uav",
             "launch_payload_backend": kind == "payload",
-            "px4_namespace": name,
+            "px4_namespace": str(vehicle.get("px4_namespace", name)).strip() or name,
             "model": str(controllable.get("model", "")).strip(),
         }
 
         if kind == "uav":
-            px4_airframe_id = controllable.get("px4_airframe_id")
+            px4_airframe_id = (
+                controllable.get("px4_airframe_id")
+                if backend_kind == "sim"
+                else vehicle.get("px4_airframe_id")
+            )
             if px4_airframe_id is None:
                 raise ValueError(
                     f"Fleet vehicle '{name}' requires controllable "
-                    f"'{controllable_name}' to define px4_airframe_id."
+                    f"'{controllable_name or name}' to define px4_airframe_id."
                 )
             px4_instance = next_px4_instance
             stack_config["px4_instance"] = int(px4_instance)
             stack_config["px4_airframe_id"] = int(px4_airframe_id)
             next_px4_instance = max(next_px4_instance, int(px4_instance) + 1)
+        else:
+            stack_config["payload_controller"] = str(
+                vehicle.get(
+                    "payload_controller",
+                    "SimController" if backend_kind == "sim" else "GPIOController",
+                )
+            ).strip()
 
         resolved.append(stack_config)
 
@@ -273,27 +320,32 @@ def launch_setup(context, *args, **kwargs):
     fleet = _load_fleet_file(context)
     backend, vehicles = _vehicle_stack_configs(fleet)
 
-    actions = [
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
-                os.path.join(
-                    get_package_share_directory("sim"), "launch", "sim.launch.py"
-                )
-            ),
-            launch_arguments={
-                "px4_path": str(backend.get("px4_path", "~/PX4-Autopilot")),
-                "backend_json": json.dumps(
-                    {
-                        key: value
-                        for key, value in backend.items()
-                        if not key.startswith("_")
-                    }
-                ),
-            }.items(),
-        )
-    ]
+    actions = []
 
-    if any(vehicle["kind"] == "uav" for vehicle in vehicles):
+    if backend["kind"] == "sim":
+        actions.append(
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    os.path.join(
+                        get_package_share_directory("sim"), "launch", "sim.launch.py"
+                    )
+                ),
+                launch_arguments={
+                    "px4_path": str(backend.get("px4_path", "~/PX4-Autopilot")),
+                    "backend_json": json.dumps(
+                        {
+                            key: value
+                            for key, value in backend.items()
+                            if not key.startswith("_")
+                        }
+                    ),
+                }.items(),
+            )
+        )
+
+    if backend["kind"] == "sim" and any(
+        vehicle["kind"] == "uav" for vehicle in vehicles
+    ):
         middleware_port = int(backend.get("middleware_port", 8888))
         logger.info(
             f"Launching shared MicroXRCEAgent for fleet on UDP port {middleware_port}."

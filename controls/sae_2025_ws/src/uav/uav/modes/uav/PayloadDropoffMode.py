@@ -18,6 +18,7 @@ class PayloadDropoffMode(Mode):
 
     mission_target = "uav"
     required_vision_nodes = (PayloadTrackingNode,)
+    transition_labels = ("complete",)
 
     def __init__(
         self,

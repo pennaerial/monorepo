@@ -37,6 +37,7 @@ class PayloadWaitForDriveOutMode(Mode):
 
     mission_target = "payload"
     required_vision_nodes = (PayloadDriveOutNode,)
+    transition_labels = ("complete",)
 
     def __init__(
         self,

@@ -6,7 +6,7 @@ import shutil
 import subprocess
 from dataclasses import dataclass
 
-from .config import RuntimeConfig
+from .config import TargetRecord
 
 
 @dataclass(slots=True)
@@ -17,7 +17,7 @@ class SSHResult:
 
 
 class SSHExecutor:
-    def __init__(self, config: RuntimeConfig):
+    def __init__(self, config: TargetRecord):
         self.config = config
 
     @staticmethod
