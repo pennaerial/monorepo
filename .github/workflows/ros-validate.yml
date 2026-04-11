@@ -28,30 +28,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  validate_ros2_workspace:
-    if: vars.ROS_CI_IMAGE_AMD64 == ''
-    name: Validate ROS 2 Workspace (fallback container)
-    runs-on: ubuntu-22.04
-    container:
-      image: ros:humble-ros-base
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Install stable CI dependencies
-        run: bash controls/sae_2025_ws/scripts/ci/install_ros_ci_deps.sh
-
-      - name: Build and validate ROS workspace
-        env:
-          INSTALL_DEPS: "0"
-        run: bash controls/sae_2025_ws/scripts/ci/validate_ros_workspace.sh
-
   validate_ros2_workspace_ci_image:
-    if: vars.ROS_CI_IMAGE_AMD64 != ''
-    name: Validate ROS 2 Workspace (GHCR CI image)
+    name: Validate ROS 2 Workspace
     runs-on: ubuntu-22.04
     container:
       image: ${{ vars.ROS_CI_IMAGE_AMD64 }}
