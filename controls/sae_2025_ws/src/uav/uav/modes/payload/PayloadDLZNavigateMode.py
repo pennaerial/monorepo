@@ -204,6 +204,9 @@ class PayloadDLZNavigateMode(Mode):
 
     def on_exit(self) -> None:
         self.vehicle.stop()
+        # Expose the resolved travel direction so PayloadScanForTagMode can
+        # spin in the same direction as the DLZ navigation just travelled.
+        self.node.dlz_navigate_direction = self.direction
 
     # ------------------------------------------------------------------
     # Phase: WAIT_FOR_PLANE
