@@ -141,7 +141,8 @@ read_authorized_key() {
 
 install_base_services() {
     deploy_info "Installing SSH and mDNS services"
-    run_root apt-get update
+    deploy_preflight_time_sync run_root
+    deploy_apt_update run_root
     run_root apt-get install -y sudo curl openssh-server avahi-daemon
     run_root systemctl enable --now ssh
     run_root systemctl enable --now avahi-daemon

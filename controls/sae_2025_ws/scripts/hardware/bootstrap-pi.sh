@@ -38,10 +38,19 @@ Options:
 EOF
 }
 
+run_root() {
+    if [[ "$(id -u)" -eq 0 ]]; then
+        "$@"
+    else
+        sudo "$@"
+    fi
+}
+
 install_prereqs() {
     deploy_info "Installing system prerequisites"
-    sudo apt-get update
-    sudo apt-get install -y curl jq tar rsync git python3-pip build-essential cmake
+    deploy_preflight_time_sync run_root
+    deploy_apt_update run_root
+    run_root apt-get install -y curl jq tar rsync git python3-pip build-essential cmake
 
     if ! python3 -c "import apriltag" >/dev/null 2>&1; then
         deploy_info "Installing apriltag into the user site"
@@ -64,13 +73,13 @@ install_pigpio() {
     pushd "$tmpdir/pigpio" >/dev/null
     cmake . -DBUILD_SHARED_LIBS=ON
     make -j"$(nproc)"
-    sudo make install
-    sudo ldconfig
+    run_root make install
+    run_root ldconfig
     popd >/dev/null
 
     if ! systemctl list-unit-files pigpiod.service >/dev/null 2>&1; then
         deploy_info "Installing pigpiod systemd unit"
-        sudo tee /etc/systemd/system/pigpiod.service >/dev/null <<'EOF_UNIT'
+        run_root tee /etc/systemd/system/pigpiod.service >/dev/null <<'EOF_UNIT'
 [Unit]
 Description=Daemon required to control GPIO pins via pigpio
 
@@ -84,8 +93,8 @@ WantedBy=multi-user.target
 EOF_UNIT
     fi
 
-    sudo systemctl daemon-reload
-    sudo systemctl enable --now pigpiod
+    run_root systemctl daemon-reload
+    run_root systemctl enable --now pigpiod
 }
 
 install_runtime_helper() {
@@ -113,7 +122,7 @@ install_systemd_unit() {
     deploy_prepare_root
     local unit_path="/etc/systemd/system/${SERVICE_NAME}.service"
     deploy_info "Installing systemd unit ${unit_path}"
-    sudo tee "$unit_path" >/dev/null <<EOF_UNIT
+    run_root tee "$unit_path" >/dev/null <<EOF_UNIT
 [Unit]
 Description=SAE hardware runtime fleet
 Wants=network-online.target pigpiod.service
@@ -134,12 +143,12 @@ RestartSec=3
 WantedBy=multi-user.target
 EOF_UNIT
 
-    sudo systemctl daemon-reload
+    run_root systemctl daemon-reload
     if [[ "$ENABLE_SERVICE" == "1" ]]; then
-        sudo systemctl enable "${SERVICE_NAME}.service"
+        run_root systemctl enable "${SERVICE_NAME}.service"
     fi
     if [[ "$START_SERVICE" == "1" ]]; then
-        sudo systemctl restart "${SERVICE_NAME}.service"
+        run_root systemctl restart "${SERVICE_NAME}.service"
     fi
 }
 

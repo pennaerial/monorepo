@@ -41,6 +41,98 @@ deploy_require_cmds() {
     fi
 }
 
+deploy_clock_is_synchronized() {
+    if ! command -v timedatectl >/dev/null 2>&1; then
+        return 1
+    fi
+
+    local key value
+    for key in NTPSynchronized SystemClockSynchronized; do
+        value="$(timedatectl show -p "$key" --value 2>/dev/null || true)"
+        if [[ "$value" == "yes" ]]; then
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+deploy_preflight_time_sync() {
+    local runner="${1:-}"
+    if ! command -v timedatectl >/dev/null 2>&1; then
+        return 0
+    fi
+
+    deploy_info "Ensuring system clock is synchronized before apt operations"
+    if [[ -n "$runner" ]]; then
+        "$runner" timedatectl set-ntp true >/dev/null 2>&1 || true
+        "$runner" systemctl restart systemd-timesyncd >/dev/null 2>&1 || true
+    else
+        timedatectl set-ntp true >/dev/null 2>&1 || true
+        systemctl restart systemd-timesyncd >/dev/null 2>&1 || true
+    fi
+
+    local _attempt
+    for _attempt in {1..10}; do
+        if deploy_clock_is_synchronized; then
+            deploy_info "System clock synchronized"
+            return 0
+        fi
+        sleep 2
+    done
+
+    deploy_warn "System clock is not yet reported as synchronized; apt may still fail until time is corrected."
+    return 0
+}
+
+deploy_report_apt_failure() {
+    local log_file="$1"
+    local hints=()
+
+    if grep -q "not valid yet" "$log_file"; then
+        hints+=("Clock skew detected. On the Pi, run 'sudo timedatectl set-ntp true' and wait for time sync, or set the clock manually if the Pi has no NTP access.")
+    fi
+
+    if grep -q "NO_PUBKEY" "$log_file"; then
+        hints+=("A third-party apt repository has a missing or stale signing key. On hardware Pis, sim-only repos such as Gazebo can usually be disabled if they are not needed.")
+    fi
+
+    if grep -q "packages.osrfoundation.org/gazebo" "$log_file"; then
+        hints+=("Detected the Gazebo apt repository. If this Pi does not run local simulation, disable '/etc/apt/sources.list.d/gazebo-stable.list' and rerun provisioning.")
+    fi
+
+    if ((${#hints[@]} == 0)); then
+        deploy_error "apt-get update failed. Review the apt output above and repair the Pi's package sources before rerunning this script."
+    fi
+
+    printf '[ERROR] apt-get update failed.\n' >&2
+    local hint
+    for hint in "${hints[@]}"; do
+        printf '[ERROR] %s\n' "$hint" >&2
+    done
+    exit 1
+}
+
+deploy_apt_update() {
+    local runner="${1:-}"
+    local log_file
+    log_file="$(mktemp)"
+
+    if [[ -n "$runner" ]]; then
+        if "$runner" apt-get update 2>&1 | tee "$log_file"; then
+            rm -f "$log_file"
+            return 0
+        fi
+    else
+        if apt-get update 2>&1 | tee "$log_file"; then
+            rm -f "$log_file"
+            return 0
+        fi
+    fi
+
+    deploy_report_apt_failure "$log_file"
+}
+
 deploy_detect_repo() {
     if [[ -n "${GITHUB_REPO:-}" ]]; then
         printf '%s\n' "$GITHUB_REPO"

@@ -106,5 +106,6 @@ Keep physical Pi identity in the hostname. Use inventory `vehicle_name` for the 
 Notes:
 - run the provisioning script on the Pi itself
 - ROS 2 Humble still needs to exist on the Pi at `/opt/ros/humble`
+- the script now attempts NTP time sync before any `apt` work, but broken third-party apt repos on the Pi can still block provisioning
 - `--no-bootstrap` skips the deploy-root/systemd install if you only want hostname/user/SSH setup
 - if you do not want a hosted public key, use `--authorized-key-file` or `--authorized-key` instead
