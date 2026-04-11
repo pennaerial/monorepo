@@ -119,7 +119,7 @@ class _FakeAsyncClient:
             )
         if url.endswith("/releases"):
             return _FakeResponse(self.releases_payload)
-        if url.endswith("/actions/artifacts?per_page=30"):
+        if "/actions/artifacts?per_page=" in url:
             return _FakeResponse(self.artifacts_payload)
         raise AssertionError(f"Unexpected GET URL in test: {url}")
 
@@ -140,7 +140,6 @@ def _make_operator(tmp_path: Path) -> OperatorConfig:
 def _make_target(
     *,
     target_id: str,
-    fleet_file: Path,
     vehicle_name: str,
     overlay_yaml: str,
     pi_host: str = "pi.local",
@@ -154,18 +153,21 @@ def _make_target(
             "deploy_root": "/home/penn/pennair-deploy",
             "ssh_key": "",
             "ssh_pass": "",
-            "fleet_file": str(fleet_file),
             "vehicle_name": vehicle_name,
             "overlay_yaml": overlay_yaml,
             "service_unit": "pennair-autonomy.service",
             "enabled": True,
         },
         default_deploy_root="/home/penn/pennair-deploy",
-        default_fleet_file=str(fleet_file),
     )
 
 
-def _make_context(tmp_path: Path, target: TargetRecord) -> SimpleNamespace:
+def _make_context(
+    tmp_path: Path,
+    target: TargetRecord,
+    *,
+    fleet_file: Path | None = None,
+) -> SimpleNamespace:
     base_dir = tmp_path / "src" / "integration"
     base_dir.mkdir(parents=True, exist_ok=True)
     operator = _make_operator(tmp_path)
@@ -173,19 +175,34 @@ def _make_context(tmp_path: Path, target: TargetRecord) -> SimpleNamespace:
         operator.inventory_path,
         operator_config=operator,
         default_deploy_root=operator.default_deploy_root,
-        default_fleet_file=target.fleet_file,
         seed_target=target,
     )
     build_source_path, cache_dir = build_source_store_paths(operator.inventory_path)
+    build_source_store = BuildSourceStore(
+        build_source_path,
+        cache_dir=cache_dir,
+    )
+    if fleet_file is not None:
+        build_source_store.set_fleet_file(fleet_file=str(fleet_file))
+        build_source_store.set_local_codebase(codebase_root=str(tmp_path))
+
+    def require_deploy_context(require_build_source: bool = True) -> None:
+        current = build_source_store.current()
+        if require_build_source and current.kind == "none":
+            raise ValueError(
+                "Select a build source before opening per-device deploy controls."
+            )
+        if not current.fleet_file:
+            raise ValueError(
+                "Select a fleet file before opening per-device deploy controls."
+            )
+
     return SimpleNamespace(
         base_dir=base_dir,
         operator_config=operator,
         inventory=inventory,
-        build_source_store=BuildSourceStore(
-            build_source_path,
-            cache_dir=cache_dir,
-            default_fleet_file=target.fleet_file,
-        ),
+        build_source_store=build_source_store,
+        require_deploy_context=require_deploy_context,
         resolve_target=lambda target_id=None: SimpleNamespace(
             target=inventory.get_target(target_id),
             ssh=_FakeSSH(result=_FakeSSHResult()),
@@ -263,7 +280,6 @@ def test_render_runtime_fleet_for_uav(tmp_path, monkeypatch):
 
     target = _make_target(
         target_id="pi-1",
-        fleet_file=fleet_file,
         vehicle_name="uav_0",
         overlay_yaml=(
             "auto_launch: true\n"
@@ -278,7 +294,7 @@ def test_render_runtime_fleet_for_uav(tmp_path, monkeypatch):
             "px4_airframe_id: 4004\n"
         ),
     )
-    ctx = _make_context(tmp_path, target)
+    ctx = _make_context(tmp_path, target, fleet_file=fleet_file)
 
     monkeypatch.setattr(
         deploy_service,
@@ -353,12 +369,11 @@ def test_render_runtime_fleet_for_payload_defaults(tmp_path, monkeypatch):
     )
     target = _make_target(
         target_id="pi-2",
-        fleet_file=fleet_file,
         vehicle_name="payload_0",
         overlay_yaml="auto_launch: false\npayload_controller: SimController\n",
         pi_host="pi-2.local",
     )
-    ctx = _make_context(tmp_path, target)
+    ctx = _make_context(tmp_path, target, fleet_file=fleet_file)
 
     monkeypatch.setattr(
         deploy_service,
@@ -407,11 +422,10 @@ def test_validate_overlay_preview_rejects_unsupported_fields(tmp_path, monkeypat
     )
     target = _make_target(
         target_id="pi-validate",
-        fleet_file=fleet_file,
         vehicle_name="uav_0",
         overlay_yaml="mission: hover\npx4_airframe_id: 4004\n",
     )
-    ctx = _make_context(tmp_path, target)
+    ctx = _make_context(tmp_path, target, fleet_file=fleet_file)
 
     monkeypatch.setattr(deploy_service, "_missions_root", lambda _ctx: missions_root)
     monkeypatch.setattr(
@@ -429,9 +443,9 @@ def test_validate_overlay_preview_rejects_unsupported_fields(tmp_path, monkeypat
 
 
 def test_release_metadata_payload_and_summary(tmp_path):
+    fleet_file = tmp_path / "fleet.yaml"
     target = _make_target(
         target_id="pi-meta",
-        fleet_file=tmp_path / "fleet.yaml",
         vehicle_name="uav_0",
         overlay_yaml="mission: hover\npx4_airframe_id: 4004\n",
     )
@@ -442,13 +456,13 @@ def test_release_metadata_payload_and_summary(tmp_path):
         release_id="20260411-build-hover",
         source_type="source-build",
         source_label="local-uav.tar.gz",
-        fleet_file=str(target.fleet_file),
+        fleet_file=str(fleet_file),
         package_names=["uav", "uav_interfaces"],
     )
 
     assert metadata["release_id"] == "20260411-build-hover"
     assert metadata["source_type"] == "source-build"
-    assert metadata["fleet_file"] == str(target.fleet_file)
+    assert metadata["fleet_file"] == str(fleet_file)
     assert metadata["vehicle_name"] == "uav_0"
     assert metadata["packages"] == ["uav", "uav_interfaces"]
 
@@ -524,11 +538,10 @@ def test_build_local_source_bundle_scopes_packages_for_target(tmp_path, monkeypa
     )
     target = _make_target(
         target_id="pi-payload",
-        fleet_file=fleet_file,
         vehicle_name="payload_0",
         overlay_yaml="mission: payload_retreat\npayload_controller: GPIOController\n",
     )
-    ctx = _make_context(tmp_path, target)
+    ctx = _make_context(tmp_path, target, fleet_file=fleet_file)
 
     monkeypatch.setattr(deploy_service, "_missions_root", lambda _ctx: missions_root)
     monkeypatch.setattr(
@@ -564,18 +577,6 @@ def test_list_builds_combines_releases_and_artifacts(tmp_path, monkeypatch):
     ctx = SimpleNamespace(
         base_dir=tmp_path / "src" / "integration",
         operator_config=_make_operator(tmp_path),
-        inventory=InventoryStore(
-            tmp_path / ".integration_inventory.json",
-            operator_config=_make_operator(tmp_path),
-            default_deploy_root="/home/penn/pennair-deploy",
-            default_fleet_file="/tmp/fleet.yaml",
-            seed_target=_make_target(
-                target_id="pi-1",
-                fleet_file=tmp_path / "fleet.yaml",
-                vehicle_name="uav_0",
-                overlay_yaml="mission: hover\npx4_airframe_id: 4004\n",
-            ),
-        ),
     )
 
     fake_httpx = SimpleNamespace(
@@ -600,6 +601,7 @@ def test_list_builds_combines_releases_and_artifacts(tmp_path, monkeypatch):
                 },
             ],
             artifacts_payload={
+                "total_count": 1,
                 "artifacts": [
                     {
                         "id": 99,
@@ -647,12 +649,14 @@ def test_list_builds_combines_releases_and_artifacts(tmp_path, monkeypatch):
     assert result["builds"][1]["branch"] == "feature/release-metadata"
     assert len(result["releases"]) == 1
     assert len(result["artifacts"]) == 1
+    assert result["artifact_page"] == 1
+    assert result["artifact_page_size"] == 20
+    assert result["artifact_has_more"] is False
 
 
 def test_current_build_parses_release_marker(tmp_path):
     target = _make_target(
         target_id="pi-3",
-        fleet_file=tmp_path / "fleet.yaml",
         vehicle_name="uav_0",
         overlay_yaml="mission: hover\npx4_airframe_id: 4004\n",
     )
@@ -665,7 +669,7 @@ def test_current_build_parses_release_marker(tmp_path):
             )
         ),
     )
-    ctx = _make_context(tmp_path, target)
+    ctx = _make_context(tmp_path, target, fleet_file=tmp_path / "fleet.yaml")
     ctx.resolve_target = lambda target_id=None: fake_target_ctx  # type: ignore[method-assign]
 
     result = asyncio.run(deploy_service.current_build(ctx))
@@ -681,7 +685,6 @@ def test_current_build_parses_release_marker(tmp_path):
 def test_current_build_includes_release_metadata(tmp_path):
     target = _make_target(
         target_id="pi-meta-build",
-        fleet_file=tmp_path / "fleet.yaml",
         vehicle_name="uav_0",
         overlay_yaml="mission: hover\npx4_airframe_id: 4004\n",
     )
@@ -713,7 +716,7 @@ def test_current_build_includes_release_metadata(tmp_path):
             )
         ),
     )
-    ctx = _make_context(tmp_path, target)
+    ctx = _make_context(tmp_path, target, fleet_file=tmp_path / "fleet.yaml")
     ctx.resolve_target = lambda target_id=None: fake_target_ctx  # type: ignore[method-assign]
 
     result = asyncio.run(deploy_service.current_build(ctx))
@@ -736,11 +739,10 @@ def test_sanitize_artifact_name_rejects_invalid_names():
 def test_build_source_round_trip_and_local_artifact_cache(tmp_path):
     target = _make_target(
         target_id="pi-source",
-        fleet_file=tmp_path / "fleet.yaml",
         vehicle_name="uav_0",
         overlay_yaml="mission: hover\npx4_airframe_id: 4004\n",
     )
-    ctx = _make_context(tmp_path, target)
+    ctx = _make_context(tmp_path, target, fleet_file=tmp_path / "fleet.yaml")
 
     result = asyncio.run(
         deploy_service.set_github_build_source(
@@ -774,11 +776,10 @@ def test_deploy_selected_source_dispatches_to_persisted_selection(
 ):
     target = _make_target(
         target_id="pi-dispatch",
-        fleet_file=tmp_path / "fleet.yaml",
         vehicle_name="uav_0",
         overlay_yaml="mission: hover\npx4_airframe_id: 4004\n",
     )
-    ctx = _make_context(tmp_path, target)
+    ctx = _make_context(tmp_path, target, fleet_file=tmp_path / "fleet.yaml")
 
     calls: list[tuple[str, dict[str, object]]] = []
 
@@ -846,3 +847,20 @@ def test_deploy_selected_source_dispatches_to_persisted_selection(
     )
     assert result["success"] is True
     assert calls[-1] == ("local_codebase", {"target_id": "pi-dispatch"})
+
+
+def test_deploy_selected_source_requires_global_fleet_selection(tmp_path):
+    target = _make_target(
+        target_id="pi-no-fleet",
+        vehicle_name="uav_0",
+        overlay_yaml="mission: hover\npx4_airframe_id: 4004\n",
+    )
+    ctx = _make_context(tmp_path, target)
+
+    asyncio.run(deploy_service.set_local_codebase_build_source(ctx))
+    result = asyncio.run(
+        deploy_service.deploy_selected_source(ctx, target_id="pi-no-fleet")
+    )
+
+    assert result["success"] is False
+    assert "fleet file" in result["error"].lower()

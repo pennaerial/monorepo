@@ -436,7 +436,7 @@ export function useMissionControl({ connected, onRefresh, targetId }) {
 
     const name = `${missionName || ''}`.trim()
     if (!name) {
-      setMissionFileResult({ success: false, error: 'Set the overlay name in the config before saving mission YAML.' })
+      setMissionFileResult({ success: false, error: 'Select a mission from the fleet context before saving mission YAML.' })
       return false
     }
 
@@ -456,7 +456,7 @@ export function useMissionControl({ connected, onRefresh, targetId }) {
 
   const saveParams = useCallback(async () => {
     if (!connected) {
-      setParamsResult({ success: false, error: 'Connect to the target WiFi before editing the overlay config.' })
+      setParamsResult({ success: false, error: 'Connect to the target WiFi before editing deploy overrides.' })
       return
     }
 

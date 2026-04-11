@@ -43,7 +43,6 @@ class TargetPayload(BaseModel):
     deploy_root: str
     ssh_key: str
     ssh_pass: str
-    fleet_file: str
     vehicle_name: str
     overlay_yaml: str
     service_unit: str
@@ -155,6 +154,9 @@ class BuildListResponse(BaseModel):
     builds: list[BuildListItem] = Field(default_factory=list)
     releases: list[BuildListItem] = Field(default_factory=list)
     artifacts: list[BuildListItem] = Field(default_factory=list)
+    artifact_page: int = 1
+    artifact_page_size: int = 20
+    artifact_has_more: bool = False
     error: str | None = None
 
 
@@ -163,6 +165,18 @@ class FleetVehiclePreview(BaseModel):
     kind: str | None = None
     mission: str | None = None
     mission_path: str | None = None
+    auto_launch: bool | None = None
+    debug: bool | None = None
+    vision_debug: bool | None = None
+    save_vision_milliseconds: int | None = None
+    servo_only: bool | None = None
+    camera_mount_offsets: list[float] = Field(default_factory=list)
+    camera_input_transport: str | None = None
+    camera_rotate_degrees: float | None = None
+    camera_preprocess_hook: str | None = None
+    px4_airframe_id: int | None = None
+    px4_namespace: str | None = None
+    payload_controller: str | None = None
 
 
 class BuildSourcePayload(BaseModel):

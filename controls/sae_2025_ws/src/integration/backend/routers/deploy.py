@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, File, Form, UploadFile
+from fastapi import APIRouter, File, Form, Query, UploadFile
 
 from ..context import AppContext
 from ..models import BuildCurrentResponse, BuildListResponse, MessageResponse
@@ -65,10 +65,19 @@ def build_router(ctx: AppContext) -> APIRouter:
         return BuildListResponse.model_validate({**result, "builds": []})
 
     @router.get("/list", response_model=BuildListResponse)
-    async def list_builds() -> BuildListResponse:
+    async def list_builds(
+        artifact_page: Annotated[int, Query()] = 1,
+        artifact_page_size: Annotated[int, Query()] = 20,
+    ) -> BuildListResponse:
         from ..services import deploy as deploy_service
 
-        return BuildListResponse.model_validate(await deploy_service.list_builds(ctx))
+        return BuildListResponse.model_validate(
+            await deploy_service.list_builds(
+                ctx,
+                artifact_page=artifact_page,
+                artifact_page_size=artifact_page_size,
+            )
+        )
 
     @router.post("/download", response_model=MessageResponse | BuildListResponse)
     async def download_build(

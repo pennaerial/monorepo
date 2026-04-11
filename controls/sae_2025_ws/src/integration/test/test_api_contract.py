@@ -72,14 +72,12 @@ def _make_target() -> TargetRecord:
             "deploy_root": "/home/penn/pennair-deploy",
             "ssh_key": "",
             "ssh_pass": "",
-            "fleet_file": "/tmp/fleet.yaml",
             "vehicle_name": "uav_0",
             "overlay_yaml": "mission: hover\npx4_airframe_id: 4004\n",
             "service_unit": "pennair-autonomy.service",
             "enabled": True,
         },
         default_deploy_root="/home/penn/pennair-deploy",
-        default_fleet_file="/tmp/fleet.yaml",
     )
 
 
@@ -92,14 +90,12 @@ def _make_context(tmp_path: Path) -> SimpleNamespace:
         operator.inventory_path,
         operator_config=operator,
         default_deploy_root=operator.default_deploy_root,
-        default_fleet_file=target.fleet_file,
         seed_target=target,
     )
     build_source_path, cache_dir = build_source_store_paths(operator.inventory_path)
     build_source_store = BuildSourceStore(
         build_source_path,
         cache_dir=cache_dir,
-        default_fleet_file=target.fleet_file,
     )
 
     def resolve_target(target_id: str | None = None):
@@ -119,6 +115,7 @@ def _make_context(tmp_path: Path) -> SimpleNamespace:
         operator_config=operator,
         inventory=inventory,
         build_source_store=build_source_store,
+        require_deploy_context=lambda require_build_source=True: None,
         resolve_target=resolve_target,
         list_targets=inventory.list_targets,
     )
@@ -221,7 +218,7 @@ def test_build_source_routes_round_trip(client, tmp_path):
     response = client.get("/api/build-source")
     assert response.status_code == 200
     assert response.json()["source"]["kind"] == "none"
-    assert response.json()["source"]["fleet_file"]
+    assert response.json()["source"]["fleet_file"] is None
 
     response = client.post(
         "/api/build-source/github",

@@ -57,12 +57,29 @@ def _systemd_access_error(target_ctx: TargetContext, raw: str) -> str:
         return (
             f"Systemd control on {target_ctx.target.ssh_target()} requires sudo. "
             "Bootstrap the Pi or grant passwordless sudo for install/systemctl."
-        )
+    )
     return target_ctx.ssh.friendly_error(raw)
+
+
+def _require_runtime_target(ctx: AppContext, target_ctx: TargetContext) -> None:
+    ctx.require_deploy_context()
+    if not target_ctx.target.vehicle_name:
+        raise ValueError(
+            f"Target '{target_ctx.target.target_id}' must be assigned to a controllable before using runtime controls."
+        )
 
 
 async def probe_launch_status(ctx: AppContext, *, target_id: str | None = None) -> dict:
     target_ctx = ctx.resolve_target(target_id)
+    try:
+        _require_runtime_target(ctx, target_ctx)
+    except ValueError as exc:
+        return {
+            "success": False,
+            "running": False,
+            "state": "error",
+            "error": str(exc),
+        }
     paths = _runtime_paths(target_ctx)
     cmd = f"""
         current_link={target_ctx.ssh.q(paths["current_link"])}
@@ -241,6 +258,10 @@ async def stream_terminal(
 
 async def prepare_mission(ctx: AppContext, *, target_id: str | None = None) -> dict:
     target_ctx = ctx.resolve_target(target_id)
+    try:
+        _require_runtime_target(ctx, target_ctx)
+    except ValueError as exc:
+        return {"success": False, "error": str(exc)}
     await target_ctx.mission_state.set(
         phase="preparing",
         launch_state="running",
@@ -357,6 +378,7 @@ async def _call_vehicle_service(
 ) -> dict:
     target_ctx = ctx.resolve_target(target_id)
     try:
+        _require_runtime_target(ctx, target_ctx)
         cmd = _runtime_shell(
             target_ctx,
             (
@@ -419,6 +441,7 @@ async def trigger_failsafe(ctx: AppContext, *, target_id: str | None = None) -> 
 async def get_launch_params(ctx: AppContext, *, target_id: str | None = None) -> dict:
     target_ctx = ctx.resolve_target(target_id)
     try:
+        _require_runtime_target(ctx, target_ctx)
         overlay_path = target_ctx.target.mission_paths()["overlay_file"]
         result = await target_ctx.ssh.run(
             f"cat {target_ctx.ssh.q(overlay_path)}", timeout=10
@@ -440,6 +463,7 @@ async def get_launch_params(ctx: AppContext, *, target_id: str | None = None) ->
 async def list_mission_names(ctx: AppContext, *, target_id: str | None = None) -> dict:
     target_ctx = ctx.resolve_target(target_id)
     try:
+        _require_runtime_target(ctx, target_ctx)
         missions_dir = target_ctx.target.mission_paths()["missions_dir"]
         cmd = f"""
             missions_dir={target_ctx.ssh.q(missions_dir)}
@@ -489,6 +513,10 @@ async def _resolve_mission_file_path(
     ctx: AppContext, mission_name: str, *, target_id: str | None, allow_create: bool
 ) -> dict:
     target_ctx = ctx.resolve_target(target_id)
+    try:
+        _require_runtime_target(ctx, target_ctx)
+    except ValueError as exc:
+        return {"success": False, "error": str(exc)}
     missions_dir = target_ctx.target.mission_paths()["missions_dir"]
     cmd = f"""
         missions_dir={target_ctx.ssh.q(missions_dir)}
@@ -660,6 +688,7 @@ async def set_launch_params(
     tmp_path = ""
     target_ctx = ctx.resolve_target(target_id)
     try:
+        _require_runtime_target(ctx, target_ctx)
         deploy_service.validate_overlay_preview(ctx, target_ctx, content)
         overlay_path = target_ctx.target.mission_paths()["overlay_file"]
         mkdir_result = await target_ctx.ssh.run(

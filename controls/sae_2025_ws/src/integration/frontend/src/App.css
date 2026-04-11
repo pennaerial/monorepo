@@ -313,6 +313,79 @@
   font-size: 0.78rem;
 }
 
+.mission-context-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-bottom: 0.5rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--params-bg);
+}
+
+.build-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.build-row {
+  display: flex;
+  align-items: stretch;
+  gap: 0.55rem;
+}
+
+.build-row-active .build-row-select {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.build-row-select {
+  flex: 1;
+  text-align: left;
+  padding: 0.72rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.build-row-select:hover {
+  border-color: var(--accent);
+}
+
+.build-row-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.build-row-top strong {
+  font-size: 0.85rem;
+}
+
+.build-row-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.18rem;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  word-break: break-word;
+}
+
+.build-row-use {
+  width: auto;
+  align-self: stretch;
+  min-width: 76px;
+}
+
 /* ── Form Elements ──────────────────────────────────────── */
 
 label {
@@ -726,6 +799,29 @@ select {
   white-space: pre;
 }
 
+.advanced-raw-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-top: 0.25rem;
+  padding: 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--params-bg);
+}
+
+.advanced-raw-editor > summary {
+  cursor: pointer;
+  list-style: none;
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.advanced-raw-editor > summary::-webkit-details-marker {
+  display: none;
+}
+
 .mission-editor {
   min-height: 360px;
 }
@@ -1025,6 +1121,7 @@ select {
 
   .placeholder-grid,
   .row-actions,
+  .build-row,
   .params-layout,
   .settings-grid,
   .mission-graph-grid,
@@ -1032,6 +1129,10 @@ select {
   .mission-schema-summary {
     grid-template-columns: 1fr;
     flex-direction: column;
+  }
+
+  .build-row-use {
+    width: 100%;
   }
 
   .mission-schema-badges {

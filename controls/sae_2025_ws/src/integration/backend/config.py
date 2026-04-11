@@ -117,7 +117,6 @@ class TargetRecord:
     deploy_root: str
     ssh_key: str
     ssh_pass: str
-    fleet_file: str
     vehicle_name: str
     overlay_yaml: str
     service_unit: str
@@ -129,7 +128,6 @@ class TargetRecord:
         data: dict[str, object],
         *,
         default_deploy_root: str,
-        default_fleet_file: str,
     ) -> "TargetRecord":
         target_id = str(data.get("target_id", "")).strip()
         if not _TARGET_ID_RE.fullmatch(target_id):
@@ -153,9 +151,6 @@ class TargetRecord:
             raise ValueError(
                 f"Target '{target_id}' deploy_root '{deploy_root}' must be absolute or home-relative."
             )
-        fleet_file = str(data.get("fleet_file", default_fleet_file)).strip()
-        if not fleet_file:
-            raise ValueError(f"Target '{target_id}' requires a non-empty fleet_file.")
         vehicle_name = str(data.get("vehicle_name", "")).strip()
         service_unit = (
             str(data.get("service_unit", "pennair-autonomy.service")).strip()
@@ -173,7 +168,6 @@ class TargetRecord:
             deploy_root=deploy_root or default_deploy_root,
             ssh_key=str(data.get("ssh_key", "")).strip(),
             ssh_pass=str(data.get("ssh_pass", "")),
-            fleet_file=fleet_file or default_fleet_file,
             vehicle_name=vehicle_name,
             overlay_yaml=str(data.get("overlay_yaml", "") or ""),
             service_unit=service_unit,
@@ -243,7 +237,6 @@ class TargetRecord:
             "deploy_root": self.deploy_root,
             "ssh_key": self.ssh_key,
             "ssh_pass": self.ssh_pass,
-            "fleet_file": self.fleet_file,
             "vehicle_name": self.vehicle_name,
             "overlay_yaml": self.overlay_yaml,
             "service_unit": self.service_unit,
@@ -273,7 +266,6 @@ class TargetRecord:
         _set("pi_host", updates.get("pi_host"))
         _set("deploy_root", updates.get("deploy_root"))
         _set("ssh_key", updates.get("ssh_key"))
-        _set("fleet_file", updates.get("fleet_file"))
         _set("vehicle_name", updates.get("vehicle_name"))
         _set("overlay_yaml", updates.get("overlay_yaml"))
         _set("service_unit", updates.get("service_unit"))
@@ -303,13 +295,11 @@ class InventoryStore:
         *,
         operator_config: OperatorConfig,
         default_deploy_root: str,
-        default_fleet_file: str,
         seed_target: TargetRecord,
     ):
         self.path = path
         self.operator_config = operator_config
         self.default_deploy_root = default_deploy_root
-        self.default_fleet_file = default_fleet_file
         self._targets: dict[str, TargetRecord] = {}
         self._active_target_id: str = seed_target.target_id
         self._load(seed_target)
@@ -437,7 +427,6 @@ class InventoryStore:
             target = TargetRecord.from_dict(
                 candidate,
                 default_deploy_root=self.default_deploy_root,
-                default_fleet_file=self.default_fleet_file,
             )
             self._targets[target_id] = target
         else:
@@ -456,7 +445,6 @@ class InventoryStore:
                     "ssh_pass": data.get(
                         "ssh_pass", self.operator_config.default_ssh_pass
                     ),
-                    "fleet_file": data.get("fleet_file", self.default_fleet_file),
                     "vehicle_name": data.get("vehicle_name", ""),
                     "overlay_yaml": data.get("overlay_yaml", ""),
                     "service_unit": data.get(
@@ -465,7 +453,6 @@ class InventoryStore:
                     "enabled": data.get("enabled", True),
                 },
                 default_deploy_root=self.default_deploy_root,
-                default_fleet_file=self.default_fleet_file,
             )
             self._targets[target_id] = target
             created = True
@@ -522,7 +509,6 @@ class InventoryStore:
             record = TargetRecord.from_dict(
                 item,
                 default_deploy_root=self.default_deploy_root,
-                default_fleet_file=self.default_fleet_file,
             )
             loaded[record.target_id] = record
         return loaded
@@ -668,11 +654,10 @@ class BuildSourceRecord:
 
 
 class BuildSourceStore:
-    def __init__(self, path: Path, *, cache_dir: Path, default_fleet_file: str = ""):
+    def __init__(self, path: Path, *, cache_dir: Path):
         self.path = path
         self.cache_dir = cache_dir
-        self.default_fleet_file = default_fleet_file.strip()
-        self._current = BuildSourceRecord(fleet_file=self.default_fleet_file)
+        self._current = BuildSourceRecord()
         self._load()
 
     def _load(self) -> None:
@@ -688,12 +673,7 @@ class BuildSourceStore:
         try:
             self._current = BuildSourceRecord.from_dict(payload)
         except ValueError:
-            self._current = BuildSourceRecord(fleet_file=self.default_fleet_file)
-            self.save()
-            return
-
-        if not self._current.fleet_file and self.default_fleet_file:
-            self._current.fleet_file = self.default_fleet_file
+            self._current = BuildSourceRecord()
             self.save()
 
     def save(self) -> None:
@@ -753,7 +733,7 @@ class BuildSourceStore:
             size_mb=size_mb,
             branch=branch.strip(),
             artifact_name=artifact_name.strip(),
-            fleet_file=self._current.fleet_file or self.default_fleet_file,
+            fleet_file=self._current.fleet_file,
             updated_at=_utc_now(),
         )
         record.validate()
@@ -770,7 +750,7 @@ class BuildSourceStore:
             artifact_name=artifact_name,
             local_artifact_path=str(cached_path),
             local_artifact_size_bytes=len(file_bytes),
-            fleet_file=self._current.fleet_file or self.default_fleet_file,
+            fleet_file=self._current.fleet_file,
             updated_at=_utc_now(),
         )
         record.validate()
@@ -780,7 +760,7 @@ class BuildSourceStore:
         record = BuildSourceRecord(
             kind="local_codebase",
             codebase_root=codebase_root.strip(),
-            fleet_file=self._current.fleet_file or self.default_fleet_file,
+            fleet_file=self._current.fleet_file,
             updated_at=_utc_now(),
         )
         record.validate()
@@ -801,7 +781,7 @@ class BuildSourceStore:
     def clear(self) -> BuildSourceRecord:
         previous = self._current
         self._current = BuildSourceRecord(
-            fleet_file=previous.fleet_file or self.default_fleet_file,
+            fleet_file=previous.fleet_file,
             updated_at=_utc_now(),
         )
         self.save()
@@ -852,6 +832,7 @@ def default_fleet_file(base_dir: Path) -> str:
 
 
 def seed_target_from_env(base_dir: Path, operator: OperatorConfig) -> TargetRecord:
+    del base_dir
     return TargetRecord.from_dict(
         {
             "target_id": os.environ.get("TARGET_ID", "default"),
@@ -861,17 +842,12 @@ def seed_target_from_env(base_dir: Path, operator: OperatorConfig) -> TargetReco
             "deploy_root": os.environ.get("DEPLOY_ROOT", operator.default_deploy_root),
             "ssh_key": os.environ.get("SSH_KEY", operator.default_ssh_key),
             "ssh_pass": os.environ.get("SSH_PASS", operator.default_ssh_pass),
-            "fleet_file": os.environ.get("FLEET_FILE", default_fleet_file(base_dir)),
-            "vehicle_name": os.environ.get("VEHICLE_NAME", "uav"),
-            "overlay_yaml": os.environ.get(
-                "TARGET_OVERLAY_YAML",
-                "mission: basic\nauto_launch: false\npx4_airframe_id: 4004\npayload_controller: GPIOController\n",
-            ),
+            "vehicle_name": os.environ.get("VEHICLE_NAME", ""),
+            "overlay_yaml": os.environ.get("TARGET_OVERLAY_YAML", ""),
             "service_unit": os.environ.get(
                 "TARGET_SYSTEMD_UNIT", "pennair-autonomy.service"
             ),
             "enabled": True,
         },
         default_deploy_root=operator.default_deploy_root,
-        default_fleet_file=default_fleet_file(base_dir),
     )

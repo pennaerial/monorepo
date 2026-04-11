@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import '@xterm/xterm/css/xterm.css'
 import './App.css'
 import { useMissionControl } from './hooks/useMissionControl'
-import { api, withTargetFormData, withTargetId } from './services/api'
+import { api, withQueryParams, withTargetFormData, withTargetId } from './services/api'
 
 const LAUNCH_PARAM_FIELDS = [
   {
@@ -107,6 +107,10 @@ const LAUNCH_PARAM_TOGGLE_FIELDS = [
   'auto_launch',
   'servo_only',
 ].map(key => LAUNCH_PARAM_FIELD_MAP[key]).filter(Boolean)
+
+const LAUNCH_PARAM_STRUCTURE_FIELDS = LAUNCH_PARAM_CORE_FIELDS.filter(
+  field => field.key !== 'mission' && field.key !== 'mission_path'
+)
 
 const MISSION_ACTIONS = [
   {
@@ -770,10 +774,18 @@ function WifiCard({ connected, wifiStatus, onRefresh, targetId }) {
   )
 }
 
-function MissionControl({ connected, buildInfo, onRefresh, workspacePaths, fleetFile, targetId, selectedTarget }) {
-  const [paramsMode, setParamsMode] = useState('form')
+function MissionControl({ connected, buildInfo, onRefresh, workspacePaths, buildSource, targetId, selectedTarget }) {
   const [missionViewMode, setMissionViewMode] = useState('graph')
+  const [showAdvancedRaw, setShowAdvancedRaw] = useState(false)
   const [integerDrafts, setIntegerDrafts] = useState({})
+  const selectedVehicle = useMemo(
+    () => selectedFleetVehicle(buildSource, selectedTarget),
+    [buildSource, selectedTarget]
+  )
+  const selectedMissionName = useMemo(
+    () => missionNameFromVehicle(selectedVehicle),
+    [selectedVehicle]
+  )
   const {
     terminalHostRef,
     missionState,
@@ -785,9 +797,6 @@ function MissionControl({ connected, buildInfo, onRefresh, workspacePaths, fleet
     setParamsText,
     paramsLoading,
     paramsResult,
-    missionNames,
-    missionNamesLoading,
-    missionNamesError,
     modeRegistry,
     schemaLoading,
     schemaError,
@@ -811,6 +820,14 @@ function MissionControl({ connected, buildInfo, onRefresh, workspacePaths, fleet
     setIntegerDrafts({})
   }, [paramsText])
 
+  useEffect(() => {
+    if (!connected || !selectedMissionName) return
+    setParamsText(prev => {
+      const withMission = setYamlFieldValue(prev, 'mission', 'string', selectedMissionName)
+      return setYamlFieldValue(withMission, 'mission_path', 'string', selectedVehicle?.missionPath || '')
+    })
+  }, [connected, selectedMissionName, selectedVehicle?.missionPath, setParamsText])
+
   const updateField = (field, value) => {
     setParamsText(prev => setYamlFieldValue(prev, field.key, field.type, value))
   }
@@ -825,16 +842,13 @@ function MissionControl({ connected, buildInfo, onRefresh, workspacePaths, fleet
     })
   }
 
-  const selectedMissionName = `${getYamlFieldValue(paramsText, 'mission', 'string') || ''}`.trim()
   const workspaceRoot = workspacePaths?.deploy_root || ''
-  const launchParamsDisplayPath =
-    displayWorkspacePath(workspacePaths?.overlay_file, workspaceRoot) ||
-    'config/overlay.yaml'
+  const launchParamsDisplayPath = displayWorkspacePath(workspacePaths?.overlay_file, workspaceRoot) || 'config/overlay.yaml'
   const missionsDirDisplayPath =
     displayWorkspacePath(workspacePaths?.missions_dir, workspaceRoot) ||
     'config/missions'
   const fleetDisplayPath =
-    displayWorkspacePath(fleetFile || workspacePaths?.fleet_file, workspaceRoot) ||
+    displayWorkspacePath(buildSource?.fleetFile, workspaceRoot) ||
     'config/fleet.yaml'
 
   useEffect(() => {
@@ -852,49 +866,8 @@ function MissionControl({ connected, buildInfo, onRefresh, workspacePaths, fleet
     setMissionFileText,
   ])
 
-  const renderCoreField = (field) => {
+  const renderCommonOverrideField = (field) => {
     const value = getYamlFieldValue(paramsText, field.key, field.type)
-
-    if (field.key === 'mission') {
-      const currentValue = `${value ?? ''}`
-      const options = Array.isArray(missionNames) ? [...missionNames] : []
-      if (currentValue && !options.includes(currentValue)) {
-        options.unshift(currentValue)
-      }
-
-      return (
-        <div key={field.key} className="param-field">
-          <label>{field.label}</label>
-          <select
-            value={currentValue}
-            onChange={e => updateField(field, e.target.value)}
-            disabled={!connected || missionNamesLoading}
-          >
-            {!currentValue && (
-              <option value="" disabled>
-                {missionNamesLoading ? 'Loading overlay files...' : 'Select overlay file'}
-              </option>
-            )}
-            {options.length === 0 && (
-              <option value="" disabled>
-                No overlay YAML files found
-              </option>
-            )}
-            {options.map(name => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
-          <p className="param-help">{field.help}</p>
-          {connected && missionNamesError && (
-            <p className="param-help param-help-warn">
-              Overlay file list unavailable from `{missionsDirDisplayPath}`: {missionNamesError}
-            </p>
-          )}
-        </div>
-      )
-    }
 
     if (field.type === 'array3') {
       const textValue = Array.isArray(value) ? value.join(', ') : '0, 0, 0'
@@ -1020,33 +993,61 @@ function MissionControl({ connected, buildInfo, onRefresh, workspacePaths, fleet
       </div>
 
       <div className="card card-full">
-        <h2 className="card-title">Mission Overlay Config ({launchParamsDisplayPath})</h2>
+        <h2 className="card-title">Runtime Overrides ({launchParamsDisplayPath})</h2>
         <div className="card-content">
-          <div className="mini-tabs">
-            <button className={`mini-tab ${paramsMode === 'form' ? 'mini-tab-active' : ''}`} onClick={() => setParamsMode('form')}>Form View</button>
-            <button className={`mini-tab ${paramsMode === 'raw' ? 'mini-tab-active' : ''}`} onClick={() => setParamsMode('raw')}>Raw YAML</button>
-          </div>
-
           {!connected && (
-            <p className="subtext left-note">Connect to the target WiFi to load and edit the overlay config.</p>
+            <p className="subtext left-note">Connect to the target WiFi to load and edit runtime overrides.</p>
+          )}
+          {connected && (!selectedVehicle || !selectedMissionName) && (
+            <p className="subtext left-note">Assign a controllable in Inventory before editing deploy overrides.</p>
           )}
 
-          {paramsMode === 'form' ? (
-            <div className="params-layout">
-              <div className="params-section">
-                <h3 className="params-section-title">Core Configuration</h3>
-                <div className="params-stack">
-                  {LAUNCH_PARAM_CORE_FIELDS.map(renderCoreField)}
-                </div>
+          <div className="mission-context-summary">
+            <div className="overview-stack">
+              <div className="overview-row">
+                <span>Fleet file</span>
+                <strong>{fleetDisplayPath || 'No fleet file selected'}</strong>
               </div>
-              <div className="params-section">
-                <h3 className="params-section-title">Mission Toggles</h3>
-                <div className="toggle-grid">
-                  {LAUNCH_PARAM_TOGGLE_FIELDS.map(renderToggleField)}
-                </div>
+              <div className="overview-row">
+                <span>Controllable</span>
+                <strong>{selectedVehicle?.name || selectedTarget?.vehicle_name || 'Not assigned'}</strong>
+              </div>
+              <div className="overview-row">
+                <span>Derived mission</span>
+                <strong>{selectedMissionName || 'Not available'}</strong>
+              </div>
+              <div className="overview-row">
+                <span>Kind</span>
+                <strong>{selectedVehicle?.kind || parsedMission.selectedTarget || 'unknown'}</strong>
               </div>
             </div>
-          ) : (
+            <p className="subtext left-note">
+              The fleet entry defines the base mission. These fields only edit Pi-specific runtime overrides on top of that derived context.
+            </p>
+          </div>
+
+          <div className="params-layout">
+            <div className="params-section">
+              <h3 className="params-section-title">Common Overrides</h3>
+              <div className="params-stack">
+                {LAUNCH_PARAM_STRUCTURE_FIELDS.map(renderCommonOverrideField)}
+              </div>
+            </div>
+            <div className="params-section">
+              <h3 className="params-section-title">Mission Toggles</h3>
+              <div className="toggle-grid">
+                {LAUNCH_PARAM_TOGGLE_FIELDS.map(renderToggleField)}
+              </div>
+            </div>
+          </div>
+
+          <details className="advanced-raw-editor" open={showAdvancedRaw}>
+            <summary onClick={e => {
+              e.preventDefault()
+              setShowAdvancedRaw(value => !value)
+            }}>
+              {showAdvancedRaw ? 'Hide raw YAML overrides' : 'Show raw YAML overrides'}
+            </summary>
             <textarea
               className="yaml-editor"
               value={paramsText}
@@ -1054,17 +1055,20 @@ function MissionControl({ connected, buildInfo, onRefresh, workspacePaths, fleet
               spellCheck={false}
               disabled={!connected}
             />
-          )}
+            <p className="subtext left-note">
+              Use raw YAML only for extra overrides that are not exposed in the structured fields above.
+            </p>
+          </details>
 
           <div className="row-actions">
             <button className="btn btn-secondary" onClick={loadParams} disabled={paramsLoading || !connected}>
               {paramsLoading ? 'Loading...' : 'Reload From Target'}
             </button>
             <button className="btn btn-primary" onClick={saveParams} disabled={paramsLoading || !connected}>
-              {paramsLoading ? 'Saving...' : 'Save Overlay'}
+              {paramsLoading ? 'Saving...' : 'Save Overrides'}
             </button>
           </div>
-          <p className="subtext left-note">Reload discards unsaved local edits and re-reads the file from the target.</p>
+          <p className="subtext left-note">Reload discards unsaved local edits and re-reads the selected target file from the Pi.</p>
           {connected && <Result data={paramsResult} />}
         </div>
       </div>
@@ -1085,7 +1089,7 @@ function MissionControl({ connected, buildInfo, onRefresh, workspacePaths, fleet
 
       <div className="card card-full">
         <h2 className="card-title">
-          Mission Editor (
+          Mission YAML (
           {selectedMissionName
             ? `${missionsDirDisplayPath}/${selectedMissionName}.yaml`
             : `${missionsDirDisplayPath}/<mission>.yaml`}
@@ -1096,7 +1100,7 @@ function MissionControl({ connected, buildInfo, onRefresh, workspacePaths, fleet
             <p className="subtext left-note">Connect to the target WiFi to view and edit mission YAML.</p>
           )}
           {connected && !selectedMissionName && (
-            <p className="subtext left-note">Set the mission name in the overlay to load a mission YAML file.</p>
+            <p className="subtext left-note">Assign a controllable with a mission to load its mission YAML file.</p>
           )}
           {connected && selectedMissionName && (
             <>
@@ -1115,7 +1119,7 @@ function MissionControl({ connected, buildInfo, onRefresh, workspacePaths, fleet
                   setMissionFileText={setMissionFileText}
                   parsedMission={parsedMission}
                   selectedTarget={selectedTarget}
-                  fleetFile={fleetFile}
+                  buildSource={buildSource}
                   missionsDirDisplayPath={missionsDirDisplayPath}
                   selectedMissionName={selectedMissionName}
                   busy={missionFileLoading || missionFileSaving}
@@ -1175,7 +1179,7 @@ function MissionGraphEditor({
   setMissionFileText,
   parsedMission,
   selectedTarget,
-  fleetFile,
+  buildSource,
   missionsDirDisplayPath,
   selectedMissionName,
   busy,
@@ -1186,6 +1190,10 @@ function MissionGraphEditor({
 }) {
   const [selectedModeName, setSelectedModeName] = useState('')
   const registryByClass = useMemo(() => normalizeModeRegistry(modeRegistry), [modeRegistry])
+  const selectedVehicle = useMemo(
+    () => fleetVehicleByName(buildSource, selectedTarget?.vehicle_name || ''),
+    [buildSource, selectedTarget?.vehicle_name]
+  )
 
   useEffect(() => {
     if (!parsedMission.modes.length) {
@@ -1206,7 +1214,7 @@ function MissionGraphEditor({
     }
     return Object.values(modeRegistry || {}).flat()
   }, [modeRegistry, parsedMission.selectedTarget, selectedMode?.target])
-  const fleetDisplayPath = fleetFile || selectedTarget?.fleet_file || ''
+  const fleetDisplayPath = buildSource?.fleetFile || ''
 
   const applyMissionUpdate = useCallback((updater) => {
     setMissionFileText(prev => {
@@ -1400,7 +1408,10 @@ function MissionGraphEditor({
             Mission source: `{selectedMissionName ? `${missionsDirDisplayPath}/${selectedMissionName}.yaml` : `${missionsDirDisplayPath}/<mission>.yaml`}`
           </div>
           <div className="mission-schema-line">
-            Fleet source: `{fleetDisplayPath || 'No fleet file on selected target'}`
+            Fleet source: `{fleetDisplayPath || 'No fleet file selected'}`
+          </div>
+          <div className="mission-schema-line">
+            Controllable: `{selectedVehicle?.name || selectedTarget?.vehicle_name || 'Not assigned'}`
           </div>
         </div>
         <div className="mission-schema-badges">
@@ -1655,6 +1666,117 @@ function normalizeBuildRecord(build) {
   }
 }
 
+function buildSelectionKey(build) {
+  if (!build) return ''
+  return [
+    build.source || 'release',
+    build.tag || '',
+    build.artifact_id || '',
+    build.run_id || '',
+  ].join('::')
+}
+
+function mergeBuildLists(previous, incoming) {
+  const seen = new Set()
+  const next = []
+  ;[...(previous || []), ...(incoming || [])].forEach(build => {
+    const key = buildSelectionKey(build)
+    if (!key || seen.has(key)) return
+    seen.add(key)
+    next.push(build)
+  })
+  return next
+}
+
+function formatBuildType(build) {
+  if (!build) return 'Build'
+  return build.source === 'actions' ? 'Artifact' : 'Release'
+}
+
+function formatBuildDate(build) {
+  return build?.date || build?.published_at?.slice(0, 10) || build?.updated_at?.slice(0, 10) || ''
+}
+
+function buildListPaginationFromResponse(data, current = {}) {
+  const pageInfo = data?.artifacts_page_info || data?.artifact_page_info || data?.artifacts_pagination || data?.artifact_pagination || data?.pagination?.artifacts || data?.pagination || null
+  const currentPage = Number.isFinite(Number(pageInfo?.page ?? data?.artifact_page ?? data?.artifacts_page ?? current.page))
+    ? Number(pageInfo?.page ?? data?.artifact_page ?? data?.artifacts_page ?? current.page)
+    : current.page || 0
+  const currentLimit = Number.isFinite(Number(pageInfo?.limit ?? pageInfo?.page_size ?? data?.artifact_page_size ?? data?.artifacts_page_size ?? data?.page_size ?? current.limit))
+    ? Number(pageInfo?.limit ?? pageInfo?.page_size ?? data?.artifact_page_size ?? data?.artifacts_page_size ?? data?.page_size ?? current.limit)
+    : current.limit || 0
+  const hasMore = Boolean(
+    pageInfo?.has_more ??
+    pageInfo?.hasMore ??
+    data?.artifacts_has_more ??
+    data?.artifact_has_more ??
+    data?.artifacts_more ??
+    data?.artifact_more ??
+    data?.next_artifact_cursor ??
+    data?.artifact_next_cursor ??
+    data?.artifacts_next_cursor ??
+    data?.next_cursor ??
+    data?.next_offset ??
+    data?.next_page
+  )
+  const normalized = {
+    hasMore,
+    cursor: `${pageInfo?.next_cursor ?? data?.artifact_next_cursor ?? data?.artifacts_next_cursor ?? data?.next_cursor ?? current.cursor ?? ''}`.trim(),
+    offset: Number.isFinite(Number(pageInfo?.offset ?? pageInfo?.next_offset ?? data?.artifact_next_offset ?? data?.artifacts_next_offset ?? data?.next_offset ?? current.offset))
+      ? Number(pageInfo?.offset ?? pageInfo?.next_offset ?? data?.artifact_next_offset ?? data?.artifacts_next_offset ?? data?.next_offset ?? current.offset)
+      : current.offset || 0,
+    page: Number.isFinite(Number(pageInfo?.next_page ?? data?.artifact_next_page ?? data?.artifacts_next_page ?? data?.next_page))
+      ? Number(pageInfo?.next_page ?? data?.artifact_next_page ?? data?.artifacts_next_page ?? data?.next_page)
+      : (hasMore ? currentPage + 1 : currentPage),
+    limit: currentLimit,
+  }
+
+  if (!normalized.hasMore) {
+    normalized.hasMore = Boolean(normalized.cursor || normalized.offset)
+  }
+  return normalized
+}
+
+function buildListQueryParams(pagination = {}) {
+  const params = {}
+  if (pagination.cursor) {
+    params.cursor = pagination.cursor
+    params.artifact_cursor = pagination.cursor
+    params.artifacts_cursor = pagination.cursor
+  }
+  if (Number.isFinite(pagination.offset)) {
+    params.offset = pagination.offset
+    params.artifact_offset = pagination.offset
+    params.artifacts_offset = pagination.offset
+  }
+  if (Number.isFinite(pagination.page)) {
+    params.page = pagination.page
+    params.artifact_page = pagination.page
+    params.artifacts_page = pagination.page
+  }
+  if (Number.isFinite(pagination.limit) && pagination.limit > 0) {
+    params.limit = pagination.limit
+    params.artifact_page_size = pagination.limit
+    params.artifacts_page_size = pagination.limit
+  }
+  return params
+}
+
+function selectedFleetVehicle(buildSource, selectedTarget) {
+  return fleetVehicleByName(buildSource, selectedTarget?.vehicle_name || '')
+}
+
+function missionNameFromVehicle(vehicle) {
+  if (!vehicle) return ''
+  const missionPath = `${vehicle.missionPath || ''}`.trim()
+  if (missionPath) {
+    const normalized = missionPath.replace(/\\/g, '/')
+    const basename = normalized.split('/').pop() || ''
+    return basename.replace(/\.ya?ml$/i, '')
+  }
+  return `${vehicle.mission || ''}`.trim()
+}
+
 function normalizeBackendBuildSource(raw) {
   const sourceString = typeof raw?.source === 'string' ? raw.source.trim().toLowerCase() : ''
   const payload =
@@ -1807,15 +1929,6 @@ function buildSourceBadge(buildSource, loaded = true) {
   return 'Custom Source'
 }
 
-function buildSelectionKey(build) {
-  if (!build) return ''
-  return [
-    build.source || 'release',
-    build.tag || '',
-    build.artifact_id || '',
-  ].join('::')
-}
-
 function inventoryDraftFromSelection(target, liveDevice, operatorConfig) {
   const hostname = target?.pi_host || liveDevice?.hostname || ''
   return {
@@ -1865,7 +1978,7 @@ function AppHeader({ page, onPageChange, theme, onToggleTheme, liveCount, buildS
       <div className="app-brand">
         <div className="app-brand-kicker">PennAiR</div>
         <h1 className="title">Autonomy Operations</h1>
-        <p className="app-subtitle">Live hardware, one backend-owned build source, and target-scoped runtime control.</p>
+        <p className="app-subtitle">Live hardware, one global deploy context, and target-scoped runtime control.</p>
       </div>
       <div className="app-header-meta">
         <div className="header-stat">
@@ -2025,14 +2138,10 @@ function AssignmentCard({ draft, buildSource, onChange, onSave, saving, saveResu
           </div>
         </div>
         <div className="settings-field settings-field-full">
-          <label>Override YAML</label>
-          <textarea
-            className="yaml-editor compact-yaml"
-            value={draft?.overlay_yaml || ''}
-            onChange={e => onChange('overlay_yaml', e.target.value)}
-            spellCheck={false}
-          />
-          <p className="subtext left-note">The fleet entry supplies the base mission and launch config. This YAML is merged on top as Pi-specific overrides only.</p>
+          <div className="info-box compact-info">
+            <strong>Derived runtime context</strong>
+            <p>The selected fleet entry supplies the base mission and launch config. Common runtime overrides are edited in Mission Control, not here.</p>
+          </div>
         </div>
         <div className="settings-field settings-save">
           <button className="btn btn-primary" type="button" onClick={onSave} disabled={saving || !canSave}>
@@ -2281,7 +2390,7 @@ function HardwareDetailPage({
           buildInfo={buildInfo}
           onRefresh={onRefresh}
           workspacePaths={workspacePaths}
-          fleetFile={buildSource?.fleetFile || ''}
+          buildSource={buildSource}
           targetId={selectedTargetId}
           selectedTarget={selectedTarget}
         />
@@ -2297,6 +2406,7 @@ function BuildSourcePage({
   buildSourceWorking,
   releases,
   artifacts,
+  artifactPagination,
   loadingBuilds,
   buildListResult,
   onLoadBuilds,
@@ -2349,9 +2459,31 @@ function BuildSourcePage({
     setFleetDraft(buildSource?.fleetFile || '')
   }, [buildSource?.fleetFile])
 
-  const selectedRelease = releases.find(build => buildSelectionKey(build) === selectedReleaseKey) || null
-  const selectedArtifact = artifacts.find(build => buildSelectionKey(build) === selectedArtifactKey) || null
   const sourceSummary = describeBuildSource(buildSource, buildSourceLoaded)
+  const canLoadMoreArtifacts = Boolean(artifactPagination?.hasMore)
+
+  const buildRow = (build, selectedKey, onSelect, onUse) => {
+    const key = buildSelectionKey(build)
+    const active = key === selectedKey
+    return (
+      <div key={key} className={`build-row ${active ? 'build-row-active' : ''}`}>
+        <button className="build-row-select" type="button" onClick={onSelect}>
+          <div className="build-row-top">
+            <span className="launch-pill">{formatBuildType(build)}</span>
+            <strong>{build.name || build.tag || build.artifact_name || 'Build'}</strong>
+          </div>
+          <div className="build-row-meta">
+            <span>{build.sha || 'No SHA'}</span>
+            <span>{build.commitSubject || 'No commit subject available.'}</span>
+            <span>{formatBuildDate(build) || 'No date available'}</span>
+          </div>
+        </button>
+        <button className="btn btn-primary btn-inline build-row-use" type="button" onClick={onUse} disabled={buildSourceWorking}>
+          Use
+        </button>
+      </div>
+    )
+  }
 
   return (
     <>
@@ -2401,36 +2533,16 @@ function BuildSourcePage({
             <button className="btn btn-secondary" type="button" onClick={onLoadBuilds} disabled={loadingBuilds}>
               {loadingBuilds ? 'Loading...' : 'Fetch GitHub Builds'}
             </button>
-            {releases.length > 0 && (
-              <>
-                <select value={selectedReleaseKey} onChange={e => setSelectedReleaseKey(e.target.value)}>
-                  {releases.map(build => (
-                    <option key={buildSelectionKey(build)} value={buildSelectionKey(build)}>
-                      {build.name || build.tag}
-                      {build.sha ? ` · ${build.sha}` : ''}
-                      {build.date ? ` · ${build.date}` : ''}
-                    </option>
-                  ))}
-                </select>
-                {selectedRelease && (
-                  <div className="info-box compact-info">
-                    <strong>{selectedRelease.name || selectedRelease.tag}</strong>
-                    <p>
-                      {selectedRelease.commitSubject || 'No commit subject available.'}
-                      {selectedRelease.commitSha ? ` · ${selectedRelease.commitSha}` : ''}
-                    </p>
-                  </div>
-                )}
-                <button
-                  className="btn btn-primary"
-                  type="button"
-                  onClick={() => onSelectGitHubBuild(selectedRelease)}
-                  disabled={!selectedRelease || buildSourceWorking}
-                >
-                  Use Selected Release
-                </button>
-              </>
-            )}
+            <div className="build-list">
+              {releases.length > 0 ? releases.map(build => buildRow(
+                build,
+                selectedReleaseKey,
+                () => setSelectedReleaseKey(buildSelectionKey(build)),
+                () => onSelectGitHubBuild(build)
+              )) : (
+                <p className="subtext left-note">No releases loaded yet. Fetch GitHub builds to browse tagged releases.</p>
+              )}
+            </div>
             <Result data={buildListResult} />
           </div>
         </div>
@@ -2439,37 +2551,20 @@ function BuildSourcePage({
           <h2 className="card-title">Recent Actions Artifacts</h2>
           <div className="card-content">
             <p className="subtext left-note">Use a recent GitHub Actions artifact as the active deploy source.</p>
-            {artifacts.length > 0 ? (
-              <>
-                <select value={selectedArtifactKey} onChange={e => setSelectedArtifactKey(e.target.value)}>
-                  {artifacts.map(build => (
-                    <option key={buildSelectionKey(build)} value={buildSelectionKey(build)}>
-                      {build.name || build.tag}
-                      {build.sha ? ` · ${build.sha}` : ''}
-                      {build.date ? ` · ${build.date}` : ''}
-                    </option>
-                  ))}
-                </select>
-                {selectedArtifact && (
-                  <div className="info-box compact-info">
-                    <strong>{selectedArtifact.name || selectedArtifact.tag}</strong>
-                    <p>
-                      {selectedArtifact.commitSubject || 'No commit subject available.'}
-                      {selectedArtifact.commitSha ? ` · ${selectedArtifact.commitSha}` : ''}
-                    </p>
-                  </div>
-                )}
-                <button
-                  className="btn btn-primary"
-                  type="button"
-                  onClick={() => onSelectGitHubBuild(selectedArtifact)}
-                  disabled={!selectedArtifact || buildSourceWorking}
-                >
-                  Use Selected Actions Artifact
-                </button>
-              </>
-            ) : (
-              <p className="subtext left-note">Fetch GitHub builds to load recent workflow artifacts.</p>
+            <div className="build-list">
+              {artifacts.length > 0 ? artifacts.map(build => buildRow(
+                build,
+                selectedArtifactKey,
+                () => setSelectedArtifactKey(buildSelectionKey(build)),
+                () => onSelectGitHubBuild(build)
+              )) : (
+                <p className="subtext left-note">Fetch GitHub builds to load recent workflow artifacts.</p>
+              )}
+            </div>
+            {canLoadMoreArtifacts && (
+              <button className="btn btn-secondary" type="button" onClick={() => onLoadBuilds({ appendArtifacts: true })} disabled={loadingBuilds}>
+                {loadingBuilds ? 'Loading...' : 'Load more artifacts'}
+              </button>
             )}
           </div>
         </div>
@@ -2635,7 +2730,7 @@ function InventoryPage({
               <div className="info-box compact-info">
                 <strong>Internal target ID</strong>
                 <p>{inventoryDraft.target_id}</p>
-                <p>Assignments and target-specific launch overrides are configured from Hardware after a global build source and fleet file are selected.</p>
+                <p>Assignments and target-specific launch overrides are configured from Hardware after the global deploy context is selected.</p>
               </div>
             </div>
             <div className="settings-field settings-field-full">
@@ -2705,6 +2800,7 @@ function App() {
   const [buildSourceWorking, setBuildSourceWorking] = useState(false)
   const [releaseBuilds, setReleaseBuilds] = useState([])
   const [artifactBuilds, setArtifactBuilds] = useState([])
+  const [artifactPagination, setArtifactPagination] = useState({ hasMore: false, cursor: '', offset: 0, page: 0, limit: 0 })
   const [loadingBuilds, setLoadingBuilds] = useState(false)
   const [buildListResult, setBuildListResult] = useState(null)
 
@@ -2754,6 +2850,10 @@ function App() {
     : selectedSavedTarget
   const selectedTargetId = selectedTarget?.target_id || ''
   const workspacePaths = selectedTarget?.workspace_paths || null
+  const buildSourceSummary = useMemo(
+    () => describeBuildSource(buildSource, buildSourceLoaded),
+    [buildSource, buildSourceLoaded]
+  )
 
   const refreshBuildSource = useCallback(async ({ preserveResult = false } = {}) => {
     const data = await api('/api/build-source')
@@ -2899,6 +2999,15 @@ function App() {
   ])
 
   useEffect(() => {
+    if (page !== 'hardware' || !selectedHardwareId) return
+    if (buildSourceSummary.ready) return
+    setSelectedHardwareId('')
+    setDetailTab('setup')
+    setDeployResult(null)
+    setPage('build-source')
+  }, [buildSourceSummary.ready, page, selectedHardwareId])
+
+  useEffect(() => {
     if (inventoryMode === 'new') {
       return
     }
@@ -3015,19 +3124,26 @@ function App() {
     }
   }
 
-  const loadBuilds = async () => {
+  const loadBuilds = async ({ appendArtifacts = false } = {}) => {
     setLoadingBuilds(true)
     setBuildListResult(null)
-    const data = await api('/api/builds/list')
+    const query = appendArtifacts ? buildListQueryParams(artifactPagination) : {}
+    const url = withQueryParams('/api/builds/list', query)
+    const data = await api(url)
     if (data.success) {
       setReleaseBuilds(data.releases || [])
-      setArtifactBuilds(data.artifacts || [])
+      setArtifactBuilds(prev => (
+        appendArtifacts ? mergeBuildLists(prev, data.artifacts || []) : (data.artifacts || [])
+      ))
+      setArtifactPagination(prev => buildListPaginationFromResponse(data, appendArtifacts ? prev : {}))
     }
     setBuildListResult(
       data.success
         ? {
           success: true,
-          output: `Loaded ${data.releases?.length || 0} release(s) and ${data.artifacts?.length || 0} recent artifact(s)`,
+          output: appendArtifacts
+            ? `Loaded ${data.artifacts?.length || 0} more artifact(s)`
+            : `Loaded ${data.releases?.length || 0} release(s) and ${data.artifacts?.length || 0} recent artifact(s)`,
         }
         : data
     )
@@ -3152,12 +3268,11 @@ function App() {
   }
 
   const openHardware = hardwareId => {
-    const sourceSummary = describeBuildSource(buildSource, buildSourceLoaded)
     const liveDevice = liveDevices.find(device => device.hardware_id === hardwareId) || null
-    if (!sourceSummary.ready) {
+    if (!buildSourceSummary.ready) {
       setBuildSourceResult({
         success: false,
-        error: 'Select a build source and a valid fleet file before opening per-device controls.',
+        error: 'Select a build source and fleet selection before opening per-device controls.',
       })
       setPage('build-source')
       return
@@ -3253,6 +3368,7 @@ function App() {
           buildSourceWorking={buildSourceWorking}
           releases={releaseBuilds}
           artifacts={artifactBuilds}
+          artifactPagination={artifactPagination}
           loadingBuilds={loadingBuilds}
           buildListResult={buildListResult}
           onLoadBuilds={loadBuilds}

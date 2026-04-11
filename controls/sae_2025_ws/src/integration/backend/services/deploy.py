@@ -15,7 +15,6 @@ from pathlib import Path
 import yaml
 
 from ..context import AppContext, TargetContext
-from ..config import default_fleet_file
 from uav.runtime.mission_spec import MissionSpec
 
 _ARTIFACT_NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
@@ -46,14 +45,8 @@ _UAV_OVERLAY_KEYS = _SHARED_OVERLAY_KEYS | {"px4_airframe_id", "px4_namespace"}
 _PAYLOAD_OVERLAY_KEYS = _SHARED_OVERLAY_KEYS | {"payload_controller"}
 
 
-def _selected_fleet_file(
-    ctx: AppContext, target_ctx: TargetContext | None = None
-) -> str:
-    del target_ctx
-    current = ctx.build_source_store.current()
-    if current.fleet_file:
-        return current.fleet_file
-    return default_fleet_file(ctx.base_dir)
+def _selected_fleet_file(ctx: AppContext) -> str:
+    return str(ctx.build_source_store.current().fleet_file or "").strip()
 
 
 def _require_httpx():
@@ -97,7 +90,7 @@ def sanitize_source_bundle_name(filename: str) -> str:
 def _build_source_payload(ctx: AppContext) -> dict[str, object]:
     payload = ctx.build_source_store.current().to_payload_dict()
     fleet_file = _selected_fleet_file(ctx)
-    payload["fleet_file"] = fleet_file
+    payload["fleet_file"] = fleet_file or None
     payload.update(_fleet_preview(ctx, fleet_file))
     return payload
 
@@ -143,6 +136,88 @@ def _load_local_yaml(path: Path) -> dict:
     return payload
 
 
+def _load_selected_fleet(ctx: AppContext) -> tuple[str, Path, dict, dict[str, object]]:
+    fleet_file = _selected_fleet_file(ctx)
+    if not fleet_file:
+        raise ValueError("No fleet file selected.")
+
+    fleet_path = _resolve_local_path(ctx, fleet_file)
+    if not fleet_path.exists():
+        raise ValueError(f"Fleet file not found: {fleet_file}")
+
+    shared_fleet = _load_local_yaml(fleet_path)
+    defaults = deepcopy(shared_fleet.get("defaults", {})) or {}
+    if not isinstance(defaults, dict):
+        raise ValueError("Fleet defaults must be a mapping.")
+
+    vehicles = shared_fleet.get("vehicles", [])
+    if not isinstance(vehicles, list):
+        raise ValueError("Fleet vehicles must be a list.")
+
+    return fleet_file, fleet_path, shared_fleet, defaults
+
+
+def _runtime_vehicle_from_config(
+    ctx: AppContext,
+    *,
+    merged_vehicle: dict[str, object],
+    vehicle_name: str,
+    mission_path_override: str | None = None,
+) -> tuple[dict[str, object], Path, str]:
+    mission_name, local_mission_path, mission_spec = _mission_source_for(
+        ctx, merged_vehicle
+    )
+    mission_target = mission_spec.target
+    runtime_vehicle = {
+        "name": vehicle_name,
+        "kind": mission_target,
+        "mission": mission_name,
+        "mission_path": mission_path_override or str(local_mission_path),
+        "auto_launch": _bool_value(merged_vehicle.get("auto_launch"), default=False),
+        "debug": _bool_value(merged_vehicle.get("debug"), default=False),
+        "vision_debug": _bool_value(
+            merged_vehicle.get("vision_debug"), default=False
+        ),
+        "save_vision_milliseconds": int(
+            merged_vehicle.get("save_vision_milliseconds", 0) or 0
+        ),
+        "servo_only": _bool_value(merged_vehicle.get("servo_only"), default=False),
+        "camera_mount_offsets": _normalized_camera_offsets(
+            merged_vehicle.get("camera_mount_offsets")
+        ),
+        "camera_input_transport": str(
+            merged_vehicle.get("camera_input_transport", "compressed")
+        ).strip(),
+        "camera_rotate_degrees": float(
+            merged_vehicle.get(
+                "camera_rotate_degrees", 180.0 if mission_target == "payload" else 0.0
+            )
+            or 0.0
+        ),
+        "camera_preprocess_hook": str(
+            merged_vehicle.get("camera_preprocess_hook", "")
+        ).strip(),
+    }
+
+    if mission_target == "uav":
+        px4_airframe_id = merged_vehicle.get("px4_airframe_id")
+        runtime_vehicle["px4_airframe_id"] = (
+            int(px4_airframe_id) if px4_airframe_id is not None else None
+        )
+        runtime_vehicle["px4_namespace"] = (
+            str(merged_vehicle.get("px4_namespace", vehicle_name)).strip()
+            or vehicle_name
+        )
+    else:
+        runtime_vehicle["payload_controller"] = (
+            str(merged_vehicle.get("payload_controller", "GPIOController")).strip()
+            or "GPIOController"
+        )
+
+    _validate_runtime_vehicle(runtime_vehicle)
+    return runtime_vehicle, local_mission_path, mission_target
+
+
 def _fleet_preview(ctx: AppContext, fleet_file: str) -> dict[str, object]:
     preview = {
         "fleet_exists": False,
@@ -155,17 +230,8 @@ def _fleet_preview(ctx: AppContext, fleet_file: str) -> dict[str, object]:
         return preview
 
     try:
-        fleet_path = _resolve_local_path(ctx, raw)
-        if not fleet_path.exists():
-            preview["fleet_error"] = f"Fleet file not found: {raw}"
-            return preview
-        shared_fleet = _load_local_yaml(fleet_path)
-        defaults = deepcopy(shared_fleet.get("defaults", {})) or {}
-        if not isinstance(defaults, dict):
-            raise ValueError("Fleet defaults must be a mapping.")
+        _, _, shared_fleet, defaults = _load_selected_fleet(ctx)
         vehicles = shared_fleet.get("vehicles", [])
-        if not isinstance(vehicles, list):
-            raise ValueError("Fleet vehicles must be a list.")
         preview["fleet_exists"] = True
         fleet_vehicles: list[dict[str, object]] = []
         for vehicle in vehicles:
@@ -173,24 +239,51 @@ def _fleet_preview(ctx: AppContext, fleet_file: str) -> dict[str, object]:
                 continue
             merged = deepcopy(defaults)
             merged.update(vehicle)
-            mission_name = str(merged.get("mission", "")).strip() or None
-            mission_path = str(merged.get("mission_path", "")).strip() or None
-            mission_target = None
             try:
-                resolved_name, resolved_path, mission_spec = _mission_source_for(
-                    ctx, merged
+                runtime_vehicle, local_mission_path, _ = _runtime_vehicle_from_config(
+                    ctx,
+                    merged_vehicle=merged,
+                    vehicle_name=str(vehicle.get("name", "")).strip(),
                 )
-                mission_name = resolved_name
-                mission_path = str(resolved_path)
-                mission_target = mission_spec.target
             except Exception:
-                mission_target = str(merged.get("kind", "")).strip() or None
+                runtime_vehicle = {
+                    "name": str(vehicle.get("name", "")).strip(),
+                    "kind": str(merged.get("kind", "")).strip() or None,
+                    "mission": str(merged.get("mission", "")).strip() or None,
+                    "mission_path": str(merged.get("mission_path", "")).strip()
+                    or None,
+                }
+                local_mission_path = None
             fleet_vehicles.append(
                 {
-                    "name": str(vehicle.get("name", "")).strip(),
-                    "kind": mission_target,
-                    "mission": mission_name,
-                    "mission_path": mission_path,
+                    "name": runtime_vehicle["name"],
+                    "kind": runtime_vehicle.get("kind"),
+                    "mission": runtime_vehicle.get("mission"),
+                    "mission_path": str(local_mission_path)
+                    if local_mission_path is not None
+                    else runtime_vehicle.get("mission_path"),
+                    "auto_launch": runtime_vehicle.get("auto_launch"),
+                    "debug": runtime_vehicle.get("debug"),
+                    "vision_debug": runtime_vehicle.get("vision_debug"),
+                    "save_vision_milliseconds": runtime_vehicle.get(
+                        "save_vision_milliseconds"
+                    ),
+                    "servo_only": runtime_vehicle.get("servo_only"),
+                    "camera_mount_offsets": runtime_vehicle.get(
+                        "camera_mount_offsets", []
+                    ),
+                    "camera_input_transport": runtime_vehicle.get(
+                        "camera_input_transport"
+                    ),
+                    "camera_rotate_degrees": runtime_vehicle.get(
+                        "camera_rotate_degrees"
+                    ),
+                    "camera_preprocess_hook": runtime_vehicle.get(
+                        "camera_preprocess_hook"
+                    ),
+                    "px4_airframe_id": runtime_vehicle.get("px4_airframe_id"),
+                    "px4_namespace": runtime_vehicle.get("px4_namespace"),
+                    "payload_controller": runtime_vehicle.get("payload_controller"),
                 }
             )
         preview["fleet_vehicles"] = fleet_vehicles
@@ -425,12 +518,8 @@ def _normalize_source_bundle(
 def _local_source_package_names(
     ctx: AppContext, target_ctx: TargetContext
 ) -> list[str]:
-    selected_vehicle = _vehicle_from_fleet(
-        _load_local_yaml(
-            _resolve_local_path(ctx, _selected_fleet_file(ctx, target_ctx))
-        ),
-        target_ctx.target.vehicle_name,
-    )
+    _, _, shared_fleet, _ = _load_selected_fleet(ctx)
+    selected_vehicle = _vehicle_from_fleet(shared_fleet, target_ctx.target.vehicle_name)
     overlay = target_ctx.target.overlay_data()
     merged = deepcopy(selected_vehicle)
     merged.update(overlay)
@@ -485,14 +574,13 @@ def _build_local_source_bundle(
 def _render_runtime_fleet(
     ctx: AppContext, target_ctx: TargetContext
 ) -> tuple[str, str, str]:
+    ctx.require_deploy_context()
     target = target_ctx.target
-    fleet_path = _resolve_local_path(ctx, _selected_fleet_file(ctx, target_ctx))
-    shared_fleet = _load_local_yaml(fleet_path)
-    fleet_defaults = deepcopy(shared_fleet.get("defaults", {}))
-    if fleet_defaults is None:
-        fleet_defaults = {}
-    if not isinstance(fleet_defaults, dict):
-        raise ValueError("Shared fleet defaults must be a mapping.")
+    if not target.vehicle_name:
+        raise ValueError(
+            f"Target '{target.target_id}' must be assigned to a controllable before deploy."
+        )
+    _, _, shared_fleet, fleet_defaults = _load_selected_fleet(ctx)
 
     selected_vehicle = _vehicle_from_fleet(shared_fleet, target.vehicle_name)
     overlay = target.overlay_data()
@@ -501,52 +589,21 @@ def _render_runtime_fleet(
     merged.update(selected_vehicle)
     merged.update(overlay)
 
-    mission_name, local_mission_path, mission_spec = _mission_source_for(ctx, merged)
-    mission_target = mission_spec.target
+    _, local_mission_path, mission_target = _runtime_vehicle_from_config(
+        ctx,
+        merged_vehicle=merged,
+        vehicle_name=target.vehicle_name,
+    )
     _validate_overlay_data(target_ctx, overlay, mission_target=mission_target)
     remote_mission_path = (
         f"{target.deploy_paths()['missions_dir']}/{Path(local_mission_path).name}"
     )
-
-    runtime_vehicle = {
-        "name": target.vehicle_name,
-        "kind": mission_target,
-        "mission": mission_name,
-        "mission_path": remote_mission_path,
-        "auto_launch": _bool_value(merged.get("auto_launch"), default=False),
-        "debug": _bool_value(merged.get("debug"), default=False),
-        "vision_debug": _bool_value(merged.get("vision_debug"), default=False),
-        "save_vision_milliseconds": int(merged.get("save_vision_milliseconds", 0) or 0),
-        "servo_only": _bool_value(merged.get("servo_only"), default=False),
-        "camera_mount_offsets": _normalized_camera_offsets(
-            merged.get("camera_mount_offsets")
-        ),
-        "camera_input_transport": str(
-            merged.get("camera_input_transport", "compressed")
-        ).strip(),
-        "camera_rotate_degrees": float(
-            merged.get(
-                "camera_rotate_degrees", 180.0 if mission_target == "payload" else 0.0
-            )
-            or 0.0
-        ),
-        "camera_preprocess_hook": str(merged.get("camera_preprocess_hook", "")).strip(),
-    }
-
-    if mission_target == "uav":
-        px4_airframe_id = merged.get("px4_airframe_id")
-        runtime_vehicle["px4_airframe_id"] = int(px4_airframe_id)
-        runtime_vehicle["px4_namespace"] = (
-            str(merged.get("px4_namespace", target.vehicle_name)).strip()
-            or target.vehicle_name
-        )
-    else:
-        runtime_vehicle["payload_controller"] = (
-            str(merged.get("payload_controller", "GPIOController")).strip()
-            or "GPIOController"
-        )
-
-    _validate_runtime_vehicle(runtime_vehicle)
+    runtime_vehicle, _, _ = _runtime_vehicle_from_config(
+        ctx,
+        merged_vehicle=merged,
+        vehicle_name=target.vehicle_name,
+        mission_path_override=remote_mission_path,
+    )
 
     runtime_fleet = {
         "backend": {"kind": "hardware"},
@@ -1209,7 +1266,7 @@ async def _deploy_artifact_path(
             release_id=release["release_id"],
             source_type=source_type,
             source_label=source_label,
-            fleet_file=_selected_fleet_file(ctx, target_ctx),
+            fleet_file=_selected_fleet_file(ctx),
         ),
     )
     await _ensure_runtime_service(target_ctx)
@@ -1293,7 +1350,7 @@ async def _deploy_source_bundle_path(
             release_id=release["release_id"],
             source_type=source_type,
             source_label=source_label,
-            fleet_file=_selected_fleet_file(ctx, target_ctx),
+            fleet_file=_selected_fleet_file(ctx),
             package_names=package_names,
         ),
     )
@@ -1583,6 +1640,7 @@ async def deploy_selected_source(
 async def current_build(ctx: AppContext, *, target_id: str | None = None) -> dict:
     target_ctx = ctx.resolve_target(target_id)
     try:
+        ctx.require_deploy_context()
         paths = target_ctx.target.deploy_paths()
         cmd = f"""
             current_link={target_ctx.ssh.q(paths["current_link"])}
@@ -1720,7 +1778,14 @@ async def upload_build(
             os.unlink(tmp_path)
 
 
-async def list_builds(ctx: AppContext) -> dict:
+async def list_builds(
+    ctx: AppContext,
+    *,
+    artifact_page: int = 1,
+    artifact_page_size: int = 20,
+) -> dict:
+    artifact_page = max(int(artifact_page or 1), 1)
+    artifact_page_size = max(1, min(int(artifact_page_size or 20), 50))
     if not ctx.operator_config.github_repo:
         return {
             "success": False,
@@ -1728,11 +1793,15 @@ async def list_builds(ctx: AppContext) -> dict:
             "builds": [],
             "releases": [],
             "artifacts": [],
+            "artifact_page": artifact_page,
+            "artifact_page_size": artifact_page_size,
+            "artifact_has_more": False,
         }
     try:
         httpx = _require_httpx()
         releases_builds: list[dict[str, object]] = []
         artifact_builds: list[dict[str, object]] = []
+        artifact_has_more = False
 
         async def _collect_releases(client) -> list[dict[str, object]]:
             collected: list[dict[str, object]] = []
@@ -1774,11 +1843,21 @@ async def list_builds(ctx: AppContext) -> dict:
         async with httpx.AsyncClient(timeout=20) as client:
             releases = await _collect_releases(client)
             artifacts_resp = await client.get(
-                f"https://api.github.com/repos/{ctx.operator_config.github_repo}/actions/artifacts?per_page=30",
+                "https://api.github.com/repos/"
+                f"{ctx.operator_config.github_repo}/actions/artifacts"
+                f"?per_page={artifact_page_size}&page={artifact_page}",
                 headers=_github_headers(ctx),
             )
             artifacts_resp.raise_for_status()
             artifacts_payload = artifacts_resp.json()
+            artifact_payload_rows = artifacts_payload.get("artifacts", [])
+            total_count = artifacts_payload.get("total_count")
+            if isinstance(total_count, int):
+                artifact_has_more = (
+                    artifact_page * artifact_page_size < total_count
+                )
+            else:
+                artifact_has_more = len(artifact_payload_rows) >= artifact_page_size
 
             release_commit_shas: list[str] = []
             artifact_commit_shas: list[str] = []
@@ -1795,7 +1874,7 @@ async def list_builds(ctx: AppContext) -> dict:
                 if commit_sha:
                     release_commit_shas.append(commit_sha)
 
-            for artifact in artifacts_payload.get("artifacts", []):
+            for artifact in artifact_payload_rows:
                 workflow_run = artifact.get("workflow_run") or {}
                 commit_sha = str(workflow_run.get("head_sha", "")).strip()
                 artifact_rows.append((artifact, commit_sha))
@@ -1856,6 +1935,9 @@ async def list_builds(ctx: AppContext) -> dict:
             "builds": releases_builds + artifact_builds,
             "releases": releases_builds,
             "artifacts": artifact_builds,
+            "artifact_page": artifact_page,
+            "artifact_page_size": artifact_page_size,
+            "artifact_has_more": artifact_has_more,
         }
     except Exception as exc:
         return {
@@ -1864,6 +1946,9 @@ async def list_builds(ctx: AppContext) -> dict:
             "builds": [],
             "releases": [],
             "artifacts": [],
+            "artifact_page": artifact_page,
+            "artifact_page_size": artifact_page_size,
+            "artifact_has_more": False,
         }
 
 

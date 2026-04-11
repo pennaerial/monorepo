@@ -1,15 +1,8 @@
 const SSH_AUTH_ERROR_RE = /(permission denied|authentication failed|auth fail|incorrect password|access denied|password was rejected|password authentication is required|no ssh password is set)/i
 const SSH_PASSWORD_HINT = 'If this target requires password auth, open Settings and enter the SSH password.'
 
-let passwordPromptInFlight = null
-
 function isSshAuthError(error) {
   return typeof error === 'string' && SSH_AUTH_ERROR_RE.test(error)
-}
-
-function shouldPromptForAuth(opts) {
-  const method = (opts?.method || 'GET').toUpperCase()
-  return method !== 'GET'
 }
 
 function withSshPasswordHint(error) {
@@ -79,75 +72,8 @@ export async function requestJson(url, opts) {
   }
 }
 
-async function promptSshPassword() {
-  if (!passwordPromptInFlight) {
-    passwordPromptInFlight = Promise.resolve(
-      window.prompt('SSH authentication failed. Enter the target SSH password to retry:', '')
-    ).finally(() => {
-      passwordPromptInFlight = null
-    })
-  }
-  return passwordPromptInFlight
-}
-
-function targetIdFromRequest(url, opts) {
-  try {
-    const parsed = new URL(url, window.location.origin)
-    const fromQuery = parsed.searchParams.get('target_id')
-    if (fromQuery) return fromQuery
-  } catch {
-    // Ignore URL parsing failure and fall back to FormData.
-  }
-
-  if (opts?.body instanceof FormData) {
-    const fromBody = opts.body.get('target_id')
-    if (typeof fromBody === 'string' && fromBody.trim()) return fromBody.trim()
-  }
-  return ''
-}
-
-async function updateSshPassword(targetId, password) {
-  if (!targetId) {
-    return {
-      success: false,
-      error: 'No target is selected for SSH password update.',
-    }
-  }
-  const fd = new FormData()
-  fd.append('target_id', targetId)
-  fd.append('ssh_pass', password)
-  return requestJson('/api/inventory', { method: 'POST', body: fd })
-}
-
-export async function api(url, opts, hasRetriedAuth = false) {
+export async function api(url, opts) {
   const data = await requestJson(url, opts)
-  const targetId = targetIdFromRequest(url, opts)
-
-  if (
-    !hasRetriedAuth &&
-    shouldPromptForAuth(opts) &&
-    !url.startsWith('/api/inventory') &&
-    !data.success &&
-    isSshAuthError(data.error)
-  ) {
-    const password = await promptSshPassword()
-    if (password === null) {
-      return {
-        success: false,
-        error: withSshPasswordHint('SSH authentication failed. Password update cancelled.'),
-      }
-    }
-
-    const updateRes = await updateSshPassword(targetId, password)
-    if (!updateRes.success) {
-      return {
-        success: false,
-        error: updateRes.error || 'Failed to update SSH password.',
-      }
-    }
-
-    return api(url, opts, true)
-  }
 
   if (!data.success && isSshAuthError(data.error)) {
     return {

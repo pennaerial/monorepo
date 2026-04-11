@@ -42,7 +42,6 @@ def _make_target(
     *,
     target_id: str = "pi-1",
     vehicle_name: str = "uav_0",
-    fleet_file: str = "/tmp/fleet.yaml",
     overlay_yaml: str = "mission: hover\npx4_airframe_id: 4004\n",
 ) -> dict[str, object]:
     return {
@@ -53,7 +52,6 @@ def _make_target(
         "deploy_root": "/home/penn/pennair-deploy",
         "ssh_key": "",
         "ssh_pass": "",
-        "fleet_file": fleet_file,
         "vehicle_name": vehicle_name,
         "overlay_yaml": overlay_yaml,
         "service_unit": "pennair-autonomy.service",
@@ -103,7 +101,6 @@ def test_target_record_validates_identity_and_overlay():
     record = TargetRecord.from_dict(
         _make_target(),
         default_deploy_root="/home/penn/pennair-deploy",
-        default_fleet_file="/tmp/fleet.yaml",
     )
 
     assert record.ssh_target() == "penn@pi-1.local"
@@ -128,7 +125,6 @@ def test_target_record_validates_identity_and_overlay():
                 "vehicle_name": "uav_0",
             },
             default_deploy_root="/home/penn/pennair-deploy",
-            default_fleet_file="/tmp/fleet.yaml",
         )
 
     unassigned = TargetRecord.from_dict(
@@ -137,7 +133,6 @@ def test_target_record_validates_identity_and_overlay():
             "vehicle_name": "",
         },
         default_deploy_root="/home/penn/pennair-deploy",
-        default_fleet_file="/tmp/fleet.yaml",
     )
     assert unassigned.vehicle_name == ""
 
@@ -147,7 +142,6 @@ def test_target_record_validates_identity_and_overlay():
             "overlay_yaml": "- not-a-mapping",
         },
         default_deploy_root="/home/penn/pennair-deploy",
-        default_fleet_file="/tmp/fleet.yaml",
     )
     with pytest.raises(ValueError, match="overlay must be a YAML mapping"):
         bad_overlay.overlay_data()
@@ -156,14 +150,12 @@ def test_target_record_validates_identity_and_overlay():
         TargetRecord.from_dict(
             {**_make_target(), "pi_host": "bad host"},
             default_deploy_root="/home/penn/pennair-deploy",
-            default_fleet_file="/tmp/fleet.yaml",
         )
 
     with pytest.raises(ValueError, match="invalid service_unit"):
         TargetRecord.from_dict(
             {**_make_target(), "service_unit": "bad service"},
             default_deploy_root="/home/penn/pennair-deploy",
-            default_fleet_file="/tmp/fleet.yaml",
         )
 
 
@@ -172,14 +164,12 @@ def test_inventory_store_round_trips_through_disk(tmp_path):
     seed_target = TargetRecord.from_dict(
         _make_target(),
         default_deploy_root=operator.default_deploy_root,
-        default_fleet_file="/tmp/fleet.yaml",
     )
 
     store = InventoryStore(
         operator.inventory_path,
         operator_config=operator,
         default_deploy_root=operator.default_deploy_root,
-        default_fleet_file="/tmp/fleet.yaml",
         seed_target=seed_target,
     )
 
@@ -192,7 +182,6 @@ def test_inventory_store_round_trips_through_disk(tmp_path):
             "deploy_root": "/opt/pennair",
             "ssh_key": "/tmp/id_ed25519",
             "ssh_pass": "secret",
-            "fleet_file": "/tmp/backup_fleet.yaml",
             "vehicle_name": "payload_0",
             "overlay_yaml": "mission: payload_retreat\npayload_controller: SimController\n",
             "service_unit": "backup.service",
@@ -223,7 +212,6 @@ def test_inventory_store_round_trips_through_disk(tmp_path):
         operator.inventory_path,
         operator_config=restored_operator,
         default_deploy_root="/tmp/unused",
-        default_fleet_file="/tmp/fleet.yaml",
         seed_target=seed_target,
     )
 
@@ -245,7 +233,6 @@ def test_inventory_store_round_trips_through_disk(tmp_path):
             tmp_path / "single.json",
             operator_config=_make_operator(tmp_path),
             default_deploy_root="/home/penn/pennair-deploy",
-            default_fleet_file="/tmp/fleet.yaml",
             seed_target=seed_target,
         )
         lone_store.delete_target("pi-1")
@@ -256,13 +243,11 @@ def test_inventory_store_revalidates_existing_target_updates(tmp_path):
     seed_target = TargetRecord.from_dict(
         _make_target(),
         default_deploy_root=operator.default_deploy_root,
-        default_fleet_file="/tmp/fleet.yaml",
     )
     store = InventoryStore(
         operator.inventory_path,
         operator_config=operator,
         default_deploy_root=operator.default_deploy_root,
-        default_fleet_file="/tmp/fleet.yaml",
         seed_target=seed_target,
     )
 
@@ -280,14 +265,12 @@ def test_inventory_store_exports_and_imports(tmp_path):
     seed_target = TargetRecord.from_dict(
         _make_target(),
         default_deploy_root=operator.default_deploy_root,
-        default_fleet_file="/tmp/fleet.yaml",
     )
 
     store = InventoryStore(
         operator.inventory_path,
         operator_config=operator,
         default_deploy_root=operator.default_deploy_root,
-        default_fleet_file="/tmp/fleet.yaml",
         seed_target=seed_target,
     )
 
@@ -362,13 +345,11 @@ def test_build_source_store_persists_separately_from_inventory(tmp_path):
     seed_target = TargetRecord.from_dict(
         _make_target(),
         default_deploy_root=operator.default_deploy_root,
-        default_fleet_file="/tmp/fleet.yaml",
     )
     inventory = InventoryStore(
         operator.inventory_path,
         operator_config=operator,
         default_deploy_root=operator.default_deploy_root,
-        default_fleet_file="/tmp/fleet.yaml",
         seed_target=seed_target,
     )
     source_path, cache_dir = build_source_store_paths(operator.inventory_path)
@@ -411,3 +392,28 @@ def test_build_source_store_local_artifact_clears_cached_file(tmp_path):
 
     assert store.current().kind == "none"
     assert not artifact_path.exists()
+
+
+def test_build_source_store_persists_fleet_selection_and_local_sources(tmp_path):
+    operator = _make_operator(tmp_path)
+    source_path, cache_dir = build_source_store_paths(operator.inventory_path)
+    store = BuildSourceStore(source_path, cache_dir=cache_dir)
+
+    store.set_fleet_file(fleet_file="/tmp/runtime-fleet.yaml")
+    artifact_record = store.set_local_artifact(
+        artifact_name="bundle.tar.gz",
+        file_bytes=b"artifact-bytes",
+    )
+    artifact_path = Path(artifact_record.local_artifact_path)
+
+    restored = BuildSourceStore(source_path, cache_dir=cache_dir)
+    assert restored.current().kind == "local_artifact"
+    assert restored.current().fleet_file == "/tmp/runtime-fleet.yaml"
+    assert restored.current().artifact_name == "bundle.tar.gz"
+    assert artifact_path.exists()
+
+    restored.set_local_codebase(codebase_root="/workspace/monorepo")
+    reloaded = BuildSourceStore(source_path, cache_dir=cache_dir)
+    assert reloaded.current().kind == "local_codebase"
+    assert reloaded.current().fleet_file == "/tmp/runtime-fleet.yaml"
+    assert reloaded.current().codebase_root == "/workspace/monorepo"

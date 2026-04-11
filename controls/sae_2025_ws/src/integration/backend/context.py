@@ -9,7 +9,6 @@ from .config import (
     OperatorConfig,
     TargetRecord,
     build_source_store_paths,
-    default_fleet_file,
     seed_target_from_env,
 )
 from .ssh import SSHExecutor
@@ -30,6 +29,17 @@ class AppContext:
     inventory: InventoryStore
     build_source_store: BuildSourceStore
     _target_cache: dict[str, TargetContext] = field(default_factory=dict)
+
+    def require_deploy_context(self, *, require_build_source: bool = True) -> None:
+        current = self.build_source_store.current()
+        if require_build_source and current.kind == "none":
+            raise ValueError(
+                "Select a build source before opening per-device deploy controls."
+            )
+        if not current.fleet_file.strip():
+            raise ValueError(
+                "Select a fleet file before opening per-device deploy controls."
+            )
 
     def resolve_target(self, target_id: str | None = None) -> TargetContext:
         target = self.inventory.get_target(target_id)
@@ -57,7 +67,6 @@ def create_context(base_dir: Path) -> AppContext:
         operator.inventory_path,
         operator_config=operator,
         default_deploy_root=operator.default_deploy_root,
-        default_fleet_file=default_fleet_file(base_dir),
         seed_target=seed_target,
     )
     build_source_path, build_source_cache_dir = build_source_store_paths(
@@ -66,7 +75,6 @@ def create_context(base_dir: Path) -> AppContext:
     build_source_store = BuildSourceStore(
         build_source_path,
         cache_dir=build_source_cache_dir,
-        default_fleet_file=default_fleet_file(base_dir),
     )
     return AppContext(
         base_dir=base_dir,

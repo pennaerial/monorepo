@@ -43,19 +43,16 @@ def _make_context(tmp_path: Path) -> SimpleNamespace:
             "deploy_root": "/home/penn/pennair-deploy",
             "ssh_key": "",
             "ssh_pass": "",
-            "fleet_file": "/tmp/fleet.yaml",
             "vehicle_name": "uav_0",
             "overlay_yaml": "mission: hover\npx4_airframe_id: 4004\n",
             "service_unit": "pennair-autonomy.service",
         },
         default_deploy_root=operator.default_deploy_root,
-        default_fleet_file="/tmp/fleet.yaml",
     )
     inventory = InventoryStore(
         operator.inventory_path,
         operator_config=operator,
         default_deploy_root=operator.default_deploy_root,
-        default_fleet_file="/tmp/fleet.yaml",
         seed_target=seed_target,
     )
     return SimpleNamespace(list_targets=inventory.list_targets)
