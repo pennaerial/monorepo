@@ -241,6 +241,8 @@ def _build_camera_actions(
             "--ros-args",
             "-p",
             "image_size:=[640,480]",
+            "-p",
+            "output_encoding:=bgr8",
         ]
         if mission_spec.is_payload and str(camera_contract["camera_info_url"]).strip():
             v4l2_cmd.extend(
