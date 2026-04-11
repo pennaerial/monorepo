@@ -39,7 +39,8 @@ jobs:
       - name: Compile integration backend
         working-directory: controls/sae_2025_ws/src/integration
         run: |
-          python3 -m py_compile $(find backend -name '*.py' | sort) app.py
+          mapfile -t py_files < <(find backend -name '*.py' | sort)
+          python3 -m py_compile "${py_files[@]}" app.py
 
       - name: Build integration frontend
         working-directory: controls/sae_2025_ws/src/integration/frontend

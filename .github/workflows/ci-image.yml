@@ -27,22 +27,21 @@ env:
 jobs:
   build_image:
     name: Build ${{ matrix.arch }} CI image
-    runs-on: ubuntu-22.04
+    runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - arch: amd64
             platform: linux/amd64
+            runner: ubuntu-22.04
           - arch: arm64
             platform: linux/arm64
+            runner: ubuntu-22.04-arm
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3

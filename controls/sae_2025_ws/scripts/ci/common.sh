@@ -26,9 +26,32 @@ ci_root_or_sudo() {
     fi
 }
 
-ci_source_ros() {
+ci_source_setup() {
+    local setup_path="$1"
+    local had_nounset=0
+
+    case $- in
+        *u*)
+            had_nounset=1
+            set +u
+            ;;
+    esac
+
     # shellcheck disable=SC1090
-    . "/opt/ros/$(ci_ros_distro)/setup.sh"
+    . "$setup_path"
+
+    if [[ "$had_nounset" == "1" ]]; then
+        set -u
+    fi
+}
+
+ci_source_ros() {
+    ci_source_setup "/opt/ros/$(ci_ros_distro)/setup.sh"
+}
+
+ci_source_workspace() {
+    local workspace_root="${1:-$(ci_workspace_root)}"
+    ci_source_setup "$workspace_root/install/setup.sh"
 }
 
 ci_install_system_packages() {
