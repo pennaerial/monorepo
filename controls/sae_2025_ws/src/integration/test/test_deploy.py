@@ -28,7 +28,13 @@ services_pkg = types.ModuleType("backend.services")
 services_pkg.__path__ = [str(PACKAGE_ROOT / "backend" / "services")]
 sys.modules.setdefault("backend.services", services_pkg)
 
-from backend.config import InventoryStore, OperatorConfig, TargetRecord  # noqa: E402
+from backend.config import (  # noqa: E402
+    BuildSourceStore,
+    InventoryStore,
+    OperatorConfig,
+    TargetRecord,
+    build_source_store_paths,
+)
 from backend.services import deploy as deploy_service  # noqa: E402
 
 
@@ -105,6 +111,9 @@ def _make_operator(tmp_path: Path) -> OperatorConfig:
         hotspot_name="pennair-hotspot",
         inventory_path=tmp_path / ".integration_inventory.json",
         default_deploy_root="/home/penn/pennair-deploy",
+        default_pi_user="penn",
+        default_ssh_key="",
+        default_ssh_pass="",
     )
 
 
@@ -147,10 +156,12 @@ def _make_context(tmp_path: Path, target: TargetRecord) -> SimpleNamespace:
         default_fleet_file=target.fleet_file,
         seed_target=target,
     )
+    build_source_path, cache_dir = build_source_store_paths(operator.inventory_path)
     return SimpleNamespace(
         base_dir=base_dir,
         operator_config=operator,
         inventory=inventory,
+        build_source_store=BuildSourceStore(build_source_path, cache_dir=cache_dir),
         resolve_target=lambda target_id=None: SimpleNamespace(
             target=inventory.get_target(target_id),
             ssh=_FakeSSH(result=_FakeSSHResult()),
@@ -440,6 +451,89 @@ def test_normalize_source_bundle_extracts_package_names(tmp_path):
     assert (extract_dir / "src" / "uav" / "marker.txt").exists()
 
 
+def test_build_local_source_bundle_scopes_packages_for_target(tmp_path, monkeypatch):
+    repo_src = tmp_path / "src"
+    repo_src.mkdir(parents=True, exist_ok=True)
+    for package_name in (
+        "actuator_msgs",
+        "payload_interfaces",
+        "px4_msgs",
+        "uav_interfaces",
+        "uav",
+        "payload",
+    ):
+        package_dir = repo_src / package_name
+        package_dir.mkdir(parents=True, exist_ok=True)
+        (package_dir / "package.xml").write_text(
+            (
+                '<package format="3">\n'
+                f"  <name>{package_name}</name>\n"
+                "  <version>0.0.0</version>\n"
+                "  <description>test</description>\n"
+                '  <maintainer email="test@example.com">Test</maintainer>\n'
+                "  <license>MIT</license>\n"
+                "</package>\n"
+            ),
+            encoding="utf-8",
+        )
+
+    missions_root = tmp_path / "src" / "uav" / "uav" / "missions"
+    missions_root.mkdir(parents=True, exist_ok=True)
+    _write_mission(
+        missions_root,
+        "payload_retreat",
+        "uav.modes.payload.PayloadRetreatMode",
+    )
+
+    fleet_file = _write_fleet(
+        tmp_path,
+        {
+            "vehicles": [
+                {
+                    "name": "payload_0",
+                    "mission": "payload_retreat",
+                }
+            ],
+        },
+    )
+    target = _make_target(
+        target_id="pi-payload",
+        fleet_file=fleet_file,
+        vehicle_name="payload_0",
+        overlay_yaml="mission: payload_retreat\npayload_controller: GPIOController\n",
+    )
+    ctx = _make_context(tmp_path, target)
+
+    monkeypatch.setattr(deploy_service, "_missions_root", lambda _ctx: missions_root)
+    monkeypatch.setattr(
+        deploy_service.MissionSpec,
+        "load",
+        staticmethod(lambda _path: SimpleNamespace(target="payload")),
+    )
+
+    bundle_path, package_names, bundle_name = deploy_service._build_local_source_bundle(
+        ctx, ctx.resolve_target()
+    )
+
+    assert package_names == [
+        "actuator_msgs",
+        "payload_interfaces",
+        "px4_msgs",
+        "uav_interfaces",
+        "uav",
+        "payload",
+    ]
+    assert bundle_name.startswith("local-codebase-")
+
+    extract_dir = tmp_path / "local-source"
+    extract_dir.mkdir()
+    with tarfile.open(bundle_path, "r:gz") as archive:
+        archive.extractall(extract_dir)
+
+    for package_name in package_names:
+        assert (extract_dir / "src" / package_name / "package.xml").exists()
+
+
 def test_list_builds_combines_releases_and_artifacts(tmp_path, monkeypatch):
     ctx = SimpleNamespace(
         base_dir=tmp_path / "src" / "integration",
@@ -599,3 +693,118 @@ def test_sanitize_artifact_name_rejects_invalid_names():
     )
     with pytest.raises(ValueError, match="unsupported characters"):
         deploy_service.sanitize_artifact_name("bad name.tar.gz")
+
+
+def test_build_source_round_trip_and_local_artifact_cache(tmp_path):
+    target = _make_target(
+        target_id="pi-source",
+        fleet_file=tmp_path / "fleet.yaml",
+        vehicle_name="uav_0",
+        overlay_yaml="mission: hover\npx4_airframe_id: 4004\n",
+    )
+    ctx = _make_context(tmp_path, target)
+
+    result = asyncio.run(
+        deploy_service.set_github_build_source(
+            ctx,
+            source="release",
+            tag="build-deadbeef",
+            sha="deadbee",
+            name="build-deadbeef",
+        )
+    )
+    assert result["success"] is True
+    assert result["source"]["kind"] == "github"
+    assert result["source"]["tag"] == "build-deadbeef"
+
+    result = asyncio.run(
+        deploy_service.set_local_artifact_build_source(
+            ctx,
+            filename="hardware-build.tar.gz",
+            file_bytes=b"deploy-bundle",
+        )
+    )
+    assert result["success"] is True
+    assert result["source"]["kind"] == "local_artifact"
+    assert result["source"]["artifact_name"] == "hardware-build.tar.gz"
+    assert result["source"]["local_artifact_exists"] is True
+    assert Path(result["source"]["local_artifact_path"]).exists()
+
+
+def test_deploy_selected_source_dispatches_to_persisted_selection(
+    tmp_path, monkeypatch
+):
+    target = _make_target(
+        target_id="pi-dispatch",
+        fleet_file=tmp_path / "fleet.yaml",
+        vehicle_name="uav_0",
+        overlay_yaml="mission: hover\npx4_airframe_id: 4004\n",
+    )
+    ctx = _make_context(tmp_path, target)
+
+    calls: list[tuple[str, dict[str, object]]] = []
+
+    async def fake_download_build(inner_ctx, **kwargs):
+        calls.append(("github", kwargs))
+        return {"success": True, "output": "github deploy"}
+
+    async def fake_deploy_artifact_path(inner_ctx, **kwargs):
+        calls.append(("local_artifact", kwargs))
+        return {"success": True, "output": "artifact deploy"}
+
+    async def fake_deploy_local_codebase(inner_ctx, **kwargs):
+        calls.append(("local_codebase", kwargs))
+        return {"success": True, "output": "codebase deploy"}
+
+    monkeypatch.setattr(deploy_service, "download_build", fake_download_build)
+    monkeypatch.setattr(
+        deploy_service, "_deploy_artifact_path", fake_deploy_artifact_path
+    )
+    monkeypatch.setattr(
+        deploy_service, "deploy_local_codebase", fake_deploy_local_codebase
+    )
+
+    asyncio.run(
+        deploy_service.set_github_build_source(
+            ctx,
+            source="actions",
+            artifact_id="42",
+            run_id="99",
+            name="arm-artifact",
+        )
+    )
+    result = asyncio.run(
+        deploy_service.deploy_selected_source(ctx, target_id="pi-dispatch")
+    )
+    assert result["success"] is True
+    assert calls[-1] == (
+        "github",
+        {
+            "target_id": "pi-dispatch",
+            "tag": "",
+            "source": "actions",
+            "artifact_id": "42",
+        },
+    )
+
+    asyncio.run(
+        deploy_service.set_local_artifact_build_source(
+            ctx,
+            filename="artifact.tar.gz",
+            file_bytes=b"artifact",
+        )
+    )
+    result = asyncio.run(
+        deploy_service.deploy_selected_source(ctx, target_id="pi-dispatch")
+    )
+    assert result["success"] is True
+    assert calls[-1][0] == "local_artifact"
+    assert calls[-1][1]["target_id"] == "pi-dispatch"
+    assert calls[-1][1]["artifact_name"] == "artifact.tar.gz"
+
+    asyncio.run(deploy_service.set_local_codebase_build_source(ctx))
+    result = asyncio.run(
+        deploy_service.deploy_selected_source(ctx, target_id="pi-dispatch")
+    )
+    assert result["success"] is True
+    assert calls[-1] == ("local_codebase", {"target_id": "pi-dispatch"})

@@ -21,6 +21,9 @@ class OperatorConfigPayload(BaseModel):
     hotspot_name: str
     inventory_path: str
     default_deploy_root: str
+    default_pi_user: str
+    default_ssh_key: str
+    default_ssh_pass: str
 
 
 class WorkspacePathsPayload(BaseModel):
@@ -52,8 +55,23 @@ class TargetPayload(BaseModel):
 class ConfigResponse(BaseModel):
     success: Literal[True] = True
     config: OperatorConfigPayload
-    active_target_id: str
-    workspace_paths: WorkspacePathsPayload
+
+
+class LiveHardwareDeviceResponse(BaseModel):
+    hardware_id: str
+    hostname: str
+    addresses: list[str] = Field(default_factory=list)
+    service_name: str | None = None
+    service_type: str | None = None
+    matched_target_id: str | None = None
+    matched_label: str | None = None
+    saved: bool = False
+
+
+class HardwareDiscoveryResponse(BaseModel):
+    success: bool
+    devices: list[LiveHardwareDeviceResponse] = Field(default_factory=list)
+    error: str | None = None
 
 
 class InventoryResponse(BaseModel):
@@ -133,6 +151,34 @@ class BuildListItem(BaseModel):
 class BuildListResponse(BaseModel):
     success: bool
     builds: list[BuildListItem] = Field(default_factory=list)
+    error: str | None = None
+
+
+class BuildSourcePayload(BaseModel):
+    kind: Literal["none", "github", "local_artifact", "local_codebase"]
+    summary: str
+    github_source: Literal["release", "actions"] | None = None
+    tag: str | None = None
+    artifact_id: str | None = None
+    run_id: str | None = None
+    sha: str | None = None
+    name: str | None = None
+    date: str | None = None
+    download_url: str | None = None
+    size_mb: float | None = None
+    branch: str | None = None
+    artifact_name: str | None = None
+    local_artifact_path: str | None = None
+    local_artifact_exists: bool | None = None
+    local_artifact_size_bytes: int | None = None
+    codebase_root: str | None = None
+    updated_at: str | None = None
+
+
+class BuildSourceResponse(BaseModel):
+    success: bool
+    source: BuildSourcePayload | None = None
+    output: str | None = None
     error: str | None = None
 
 

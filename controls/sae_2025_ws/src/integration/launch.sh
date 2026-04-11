@@ -32,7 +32,7 @@ ensure_python_backend_deps() {
     "$python_bin" - <<'PY'
 import importlib.util
 
-required = ["fastapi", "httpx", "multipart", "uvicorn"]
+required = ["fastapi", "httpx", "multipart", "uvicorn", "zeroconf"]
 missing = [name for name in required if importlib.util.find_spec(name) is None]
 if missing:
     print(" ".join(missing))
@@ -40,10 +40,10 @@ if missing:
 PY
   )"; then
     echo "Backend Python dependencies missing (${missing_modules:-unknown}). Installing..."
-    if ! "$python_bin" -m pip install "fastapi[standard]" python-multipart httpx; then
+    if ! "$python_bin" -m pip install "fastapi[standard]" python-multipart httpx zeroconf; then
       echo "Error: failed to install backend Python dependencies."
       echo "Try manually:"
-      echo "  $python_bin -m pip install \"fastapi[standard]\" python-multipart httpx"
+      echo "  $python_bin -m pip install \"fastapi[standard]\" python-multipart httpx zeroconf"
       exit 1
     fi
   fi

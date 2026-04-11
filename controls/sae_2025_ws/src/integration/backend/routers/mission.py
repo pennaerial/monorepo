@@ -21,7 +21,7 @@ def build_router(ctx: AppContext) -> APIRouter:
 
     @router.get("/api/mission/state", response_model=MissionStateResponse)
     async def mission_state(
-        target_id: Annotated[str | None, Query()] = None,
+        target_id: Annotated[str, Query(...)],
     ) -> MissionStateResponse:
         from ..services import mission as mission_service
 
@@ -33,7 +33,7 @@ def build_router(ctx: AppContext) -> APIRouter:
         "/api/mission/launch/status", response_model=MissionLaunchStatusResponse
     )
     async def mission_launch_status(
-        target_id: Annotated[str | None, Query()] = None,
+        target_id: Annotated[str, Query(...)],
     ) -> MissionLaunchStatusResponse:
         from ..services import mission as mission_service
 
@@ -43,10 +43,10 @@ def build_router(ctx: AppContext) -> APIRouter:
 
     @router.get("/api/mission/launch/logs", response_model=MissionLogsResponse)
     async def mission_launch_logs(
+        target_id: Annotated[str, Query(...)],
         lines: Annotated[int, Query()] = 200,
         offset: Annotated[int | None, Query()] = None,
         inode: Annotated[int | None, Query()] = None,
-        target_id: Annotated[str | None, Query()] = None,
     ) -> MissionLogsResponse:
         from ..services import mission as mission_service
 
@@ -63,7 +63,7 @@ def build_router(ctx: AppContext) -> APIRouter:
     @router.post(
         "/api/mission/prepare", response_model=MessageResponse | MissionLogsResponse
     )
-    async def prepare_mission(target_id: Annotated[str | None, Form()] = None):
+    async def prepare_mission(target_id: Annotated[str, Form(...)]):
         from ..services import mission as mission_service
 
         result = await mission_service.prepare_mission(ctx, target_id=target_id)
@@ -76,7 +76,7 @@ def build_router(ctx: AppContext) -> APIRouter:
     @router.post(
         "/api/mission/stop", response_model=MessageResponse | MissionLogsResponse
     )
-    async def stop_mission(target_id: Annotated[str | None, Form()] = None):
+    async def stop_mission(target_id: Annotated[str, Form(...)]):
         from ..services import mission as mission_service
 
         result = await mission_service.stop_mission(ctx, target_id=target_id)
@@ -89,7 +89,7 @@ def build_router(ctx: AppContext) -> APIRouter:
     @router.post(
         "/api/mission/start", response_model=MessageResponse | MissionLogsResponse
     )
-    async def start_mission(target_id: Annotated[str | None, Form()] = None):
+    async def start_mission(target_id: Annotated[str, Form(...)]):
         from ..services import mission as mission_service
 
         result = await mission_service.start_mission(ctx, target_id=target_id)
@@ -100,7 +100,7 @@ def build_router(ctx: AppContext) -> APIRouter:
         )
 
     @router.post("/api/failsafe", response_model=MessageResponse | MissionLogsResponse)
-    async def trigger_failsafe(target_id: Annotated[str | None, Form()] = None):
+    async def trigger_failsafe(target_id: Annotated[str, Form(...)]):
         from ..services import mission as mission_service
 
         result = await mission_service.trigger_failsafe(ctx, target_id=target_id)
@@ -112,7 +112,7 @@ def build_router(ctx: AppContext) -> APIRouter:
 
     @router.get("/api/mission/launch-params", response_model=LaunchParamsResponse)
     async def get_launch_params(
-        target_id: Annotated[str | None, Query()] = None,
+        target_id: Annotated[str, Query(...)],
     ) -> LaunchParamsResponse:
         from ..services import mission as mission_service
 
@@ -122,7 +122,7 @@ def build_router(ctx: AppContext) -> APIRouter:
 
     @router.get("/api/mission/mission-names", response_model=MissionNameOptionsResponse)
     async def get_mission_names(
-        target_id: Annotated[str | None, Query()] = None,
+        target_id: Annotated[str, Query(...)],
     ) -> MissionNameOptionsResponse:
         from ..services import mission as mission_service
 
@@ -133,7 +133,7 @@ def build_router(ctx: AppContext) -> APIRouter:
     @router.post("/api/mission/launch-params", response_model=LaunchParamsResponse)
     async def set_launch_params(
         content: Annotated[str, Form(...)],
-        target_id: Annotated[str | None, Form()] = None,
+        target_id: Annotated[str, Form(...)],
     ):
         from ..services import mission as mission_service
 
@@ -146,7 +146,7 @@ def build_router(ctx: AppContext) -> APIRouter:
     @router.get("/api/mission/mission-file", response_model=MissionFileResponse)
     async def get_mission_file(
         name: Annotated[str, Query(...)],
-        target_id: Annotated[str | None, Query()] = None,
+        target_id: Annotated[str, Query(...)],
     ) -> MissionFileResponse:
         from ..services import mission as mission_service
 
@@ -158,7 +158,7 @@ def build_router(ctx: AppContext) -> APIRouter:
     async def set_mission_file(
         name: Annotated[str, Form(...)],
         content: Annotated[str, Form(...)],
-        target_id: Annotated[str | None, Form()] = None,
+        target_id: Annotated[str, Form(...)],
     ) -> MissionFileResponse:
         from ..services import mission as mission_service
 

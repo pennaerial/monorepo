@@ -5,6 +5,7 @@ import os
 import re
 import subprocess
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 
 import yaml
@@ -14,6 +15,8 @@ _TARGET_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 _PI_USER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*$")
 _HOST_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]*$")
 _SERVICE_UNIT_RE = re.compile(r"^[A-Za-z0-9@_.-]+\.service$")
+_BUILD_SOURCE_KINDS = {"none", "github", "local_artifact", "local_codebase"}
+_GITHUB_BUILD_SOURCES = {"release", "actions"}
 
 
 @dataclass(slots=True)
@@ -23,6 +26,9 @@ class OperatorConfig:
     hotspot_name: str
     inventory_path: Path
     default_deploy_root: str
+    default_pi_user: str
+    default_ssh_key: str
+    default_ssh_pass: str
 
     @classmethod
     def from_env(cls, base_dir: Path) -> "OperatorConfig":
@@ -44,6 +50,9 @@ class OperatorConfig:
             default_deploy_root=os.environ.get(
                 "DEPLOY_ROOT", "/home/penn/pennair-deploy"
             ),
+            default_pi_user=os.environ.get("DEFAULT_PI_USER", "penn"),
+            default_ssh_key=os.environ.get("DEFAULT_SSH_KEY", ""),
+            default_ssh_pass=os.environ.get("DEFAULT_SSH_PASS", ""),
         )
 
     def to_safe_dict(self) -> dict[str, str]:
@@ -53,6 +62,9 @@ class OperatorConfig:
             "hotspot_name": self.hotspot_name,
             "inventory_path": str(self.inventory_path),
             "default_deploy_root": self.default_deploy_root,
+            "default_pi_user": self.default_pi_user,
+            "default_ssh_key": self.default_ssh_key,
+            "default_ssh_pass": "••••" if self.default_ssh_pass else "",
         }
 
     def to_store_dict(self) -> dict[str, str]:
@@ -61,6 +73,9 @@ class OperatorConfig:
             "github_token": self.github_token,
             "hotspot_name": self.hotspot_name,
             "default_deploy_root": self.default_deploy_root,
+            "default_pi_user": self.default_pi_user,
+            "default_ssh_key": self.default_ssh_key,
+            "default_ssh_pass": self.default_ssh_pass,
         }
 
     def update_from_form(self, updates: dict[str, str | None]) -> dict[str, str]:
@@ -75,11 +90,18 @@ class OperatorConfig:
         _set("github_repo", updates.get("github_repo"))
         _set("hotspot_name", updates.get("hotspot_name"))
         _set("default_deploy_root", updates.get("default_deploy_root"))
+        _set("default_pi_user", updates.get("default_pi_user"))
+        _set("default_ssh_key", updates.get("default_ssh_key"))
 
         github_token = updates.get("github_token")
         if github_token is not None and github_token != "••••":
             self.github_token = github_token
             changed["github_token"] = "(set)"
+
+        default_ssh_pass = updates.get("default_ssh_pass")
+        if default_ssh_pass is not None and default_ssh_pass != "••••":
+            self.default_ssh_pass = default_ssh_pass
+            changed["default_ssh_pass"] = "(set)"
 
         return changed
 
@@ -404,18 +426,36 @@ class InventoryStore:
             raise ValueError("target_id is required.")
 
         if target_id in self._targets:
-            target = self._targets[target_id]
-            target.update_from_form(data)
+            current = self._targets[target_id]
+            candidate = current.to_store_dict()
+            for key, value in data.items():
+                if value is None:
+                    continue
+                if key == "ssh_pass" and value == "••••":
+                    continue
+                candidate[key] = value
+            target = TargetRecord.from_dict(
+                candidate,
+                default_deploy_root=self.default_deploy_root,
+                default_fleet_file=self.default_fleet_file,
+            )
+            self._targets[target_id] = target
         else:
             target = TargetRecord.from_dict(
                 {
                     "target_id": target_id,
                     "label": data.get("label", target_id),
-                    "pi_user": data.get("pi_user", "penn"),
+                    "pi_user": data.get(
+                        "pi_user", self.operator_config.default_pi_user
+                    ),
                     "pi_host": data.get("pi_host", ""),
                     "deploy_root": data.get("deploy_root", self.default_deploy_root),
-                    "ssh_key": data.get("ssh_key", ""),
-                    "ssh_pass": data.get("ssh_pass", ""),
+                    "ssh_key": data.get(
+                        "ssh_key", self.operator_config.default_ssh_key
+                    ),
+                    "ssh_pass": data.get(
+                        "ssh_pass", self.operator_config.default_ssh_pass
+                    ),
                     "fleet_file": data.get("fleet_file", self.default_fleet_file),
                     "vehicle_name": data.get("vehicle_name", ""),
                     "overlay_yaml": data.get("overlay_yaml", ""),
@@ -458,6 +498,16 @@ class InventoryStore:
             self.operator_config.default_deploy_root = str(
                 operator["default_deploy_root"]
             )
+        if operator.get("default_pi_user"):
+            self.operator_config.default_pi_user = str(operator["default_pi_user"])
+        if "default_ssh_key" in operator:
+            self.operator_config.default_ssh_key = str(
+                operator.get("default_ssh_key", "")
+            )
+        if "default_ssh_pass" in operator:
+            self.operator_config.default_ssh_pass = str(
+                operator.get("default_ssh_pass", "")
+            )
 
     def _parse_targets(self, targets: object) -> dict[str, TargetRecord]:
         if not isinstance(targets, list):
@@ -476,6 +526,271 @@ class InventoryStore:
             )
             loaded[record.target_id] = record
         return loaded
+
+
+@dataclass(slots=True)
+class BuildSourceRecord:
+    kind: str = "none"
+    github_source: str = ""
+    tag: str = ""
+    artifact_id: str = ""
+    run_id: str = ""
+    sha: str = ""
+    name: str = ""
+    date: str = ""
+    download_url: str = ""
+    size_mb: float | None = None
+    branch: str = ""
+    artifact_name: str = ""
+    local_artifact_path: str = ""
+    local_artifact_size_bytes: int | None = None
+    codebase_root: str = ""
+    updated_at: str = ""
+
+    @classmethod
+    def from_dict(cls, data: dict[str, object] | None) -> "BuildSourceRecord":
+        payload = data or {}
+        kind = str(payload.get("kind", "none")).strip() or "none"
+        if kind not in _BUILD_SOURCE_KINDS:
+            raise ValueError(f"Unsupported build source kind '{kind}'.")
+
+        record = cls(
+            kind=kind,
+            github_source=str(payload.get("github_source", "")).strip(),
+            tag=str(payload.get("tag", "")).strip(),
+            artifact_id=str(payload.get("artifact_id", "")).strip(),
+            run_id=str(payload.get("run_id", "")).strip(),
+            sha=str(payload.get("sha", "")).strip(),
+            name=str(payload.get("name", "")).strip(),
+            date=str(payload.get("date", "")).strip(),
+            download_url=str(payload.get("download_url", "")).strip(),
+            size_mb=(
+                float(payload["size_mb"])
+                if payload.get("size_mb") not in (None, "")
+                else None
+            ),
+            branch=str(payload.get("branch", "")).strip(),
+            artifact_name=str(payload.get("artifact_name", "")).strip(),
+            local_artifact_path=str(payload.get("local_artifact_path", "")).strip(),
+            local_artifact_size_bytes=(
+                int(payload["local_artifact_size_bytes"])
+                if payload.get("local_artifact_size_bytes") not in (None, "")
+                else None
+            ),
+            codebase_root=str(payload.get("codebase_root", "")).strip(),
+            updated_at=str(payload.get("updated_at", "")).strip(),
+        )
+        record.validate()
+        return record
+
+    def validate(self) -> None:
+        if self.kind == "github":
+            if self.github_source not in _GITHUB_BUILD_SOURCES:
+                raise ValueError(
+                    "GitHub build source requires github_source to be 'release' or 'actions'."
+                )
+            if self.github_source == "release" and not self.tag:
+                raise ValueError("GitHub release source requires tag.")
+            if self.github_source == "actions" and not self.artifact_id:
+                raise ValueError("GitHub Actions source requires artifact_id.")
+        elif self.kind == "local_artifact":
+            if not self.artifact_name:
+                raise ValueError("Local artifact source requires artifact_name.")
+            if not self.local_artifact_path:
+                raise ValueError("Local artifact source requires local_artifact_path.")
+        elif self.kind == "local_codebase" and not self.codebase_root:
+            raise ValueError("Local codebase source requires codebase_root.")
+
+    def to_store_dict(self) -> dict[str, object]:
+        return {
+            "kind": self.kind,
+            "github_source": self.github_source,
+            "tag": self.tag,
+            "artifact_id": self.artifact_id,
+            "run_id": self.run_id,
+            "sha": self.sha,
+            "name": self.name,
+            "date": self.date,
+            "download_url": self.download_url,
+            "size_mb": self.size_mb,
+            "branch": self.branch,
+            "artifact_name": self.artifact_name,
+            "local_artifact_path": self.local_artifact_path,
+            "local_artifact_size_bytes": self.local_artifact_size_bytes,
+            "codebase_root": self.codebase_root,
+            "updated_at": self.updated_at,
+        }
+
+    def summary(self) -> str:
+        if self.kind == "github":
+            if self.github_source == "release":
+                return self.name or self.tag or "GitHub release"
+            label = self.name or self.artifact_name or self.artifact_id or "artifact"
+            return f"GitHub Actions {label}"
+        if self.kind == "local_artifact":
+            return self.artifact_name or "Local artifact"
+        if self.kind == "local_codebase":
+            return self.codebase_root or "Local codebase"
+        return "No build source selected"
+
+    def to_payload_dict(self) -> dict[str, object]:
+        local_exists = None
+        if self.kind == "local_artifact":
+            local_exists = Path(self.local_artifact_path).exists()
+        return {
+            "kind": self.kind,
+            "summary": self.summary(),
+            "github_source": self.github_source or None,
+            "tag": self.tag or None,
+            "artifact_id": self.artifact_id or None,
+            "run_id": self.run_id or None,
+            "sha": self.sha or None,
+            "name": self.name or None,
+            "date": self.date or None,
+            "download_url": self.download_url or None,
+            "size_mb": self.size_mb,
+            "branch": self.branch or None,
+            "artifact_name": self.artifact_name or None,
+            "local_artifact_path": self.local_artifact_path or None,
+            "local_artifact_exists": local_exists,
+            "local_artifact_size_bytes": self.local_artifact_size_bytes,
+            "codebase_root": self.codebase_root or None,
+            "updated_at": self.updated_at or None,
+        }
+
+
+class BuildSourceStore:
+    def __init__(self, path: Path, *, cache_dir: Path):
+        self.path = path
+        self.cache_dir = cache_dir
+        self._current = BuildSourceRecord()
+        self._load()
+
+    def _load(self) -> None:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+        if not self.path.exists():
+            self.save()
+            return
+
+        with self.path.open("r", encoding="utf-8") as handle:
+            payload = json.load(handle) or {}
+
+        try:
+            self._current = BuildSourceRecord.from_dict(payload)
+        except ValueError:
+            self._current = BuildSourceRecord()
+            self.save()
+
+    def save(self) -> None:
+        with self.path.open("w", encoding="utf-8") as handle:
+            json.dump(self._current.to_store_dict(), handle, indent=2)
+            handle.write("\n")
+
+    def current(self) -> BuildSourceRecord:
+        return self._current
+
+    def _replace(self, record: BuildSourceRecord) -> BuildSourceRecord:
+        previous = self._current
+        self._current = record
+        self.save()
+        if previous.kind == "local_artifact":
+            self._remove_cached_artifact(previous)
+        return self._current
+
+    def _remove_cached_artifact(self, record: BuildSourceRecord | None = None) -> None:
+        source = record or self._current
+        if source.kind != "local_artifact" or not source.local_artifact_path:
+            return
+        try:
+            artifact_path = Path(source.local_artifact_path)
+            if artifact_path.exists():
+                artifact_path.unlink()
+        except Exception:
+            pass
+
+    def set_github(
+        self,
+        *,
+        github_source: str,
+        tag: str = "",
+        artifact_id: str = "",
+        run_id: str = "",
+        sha: str = "",
+        name: str = "",
+        date: str = "",
+        download_url: str = "",
+        size_mb: float | None = None,
+        branch: str = "",
+        artifact_name: str = "",
+    ) -> BuildSourceRecord:
+        record = BuildSourceRecord(
+            kind="github",
+            github_source=github_source.strip(),
+            tag=tag.strip(),
+            artifact_id=artifact_id.strip(),
+            run_id=run_id.strip(),
+            sha=sha.strip(),
+            name=name.strip(),
+            date=date.strip(),
+            download_url=download_url.strip(),
+            size_mb=size_mb,
+            branch=branch.strip(),
+            artifact_name=artifact_name.strip(),
+            updated_at=_utc_now(),
+        )
+        record.validate()
+        return self._replace(record)
+
+    def set_local_artifact(
+        self, *, artifact_name: str, file_bytes: bytes
+    ) -> BuildSourceRecord:
+        cached_name = f"{datetime.now(timezone.utc):%Y%m%d-%H%M%S}-{artifact_name}"
+        cached_path = self.cache_dir / cached_name
+        cached_path.write_bytes(file_bytes)
+        record = BuildSourceRecord(
+            kind="local_artifact",
+            artifact_name=artifact_name,
+            local_artifact_path=str(cached_path),
+            local_artifact_size_bytes=len(file_bytes),
+            updated_at=_utc_now(),
+        )
+        record.validate()
+        return self._replace(record)
+
+    def set_local_codebase(self, *, codebase_root: str) -> BuildSourceRecord:
+        record = BuildSourceRecord(
+            kind="local_codebase",
+            codebase_root=codebase_root.strip(),
+            updated_at=_utc_now(),
+        )
+        record.validate()
+        return self._replace(record)
+
+    def clear(self) -> BuildSourceRecord:
+        previous = self._current
+        self._current = BuildSourceRecord(updated_at=_utc_now())
+        self.save()
+        if previous.kind == "local_artifact":
+            self._remove_cached_artifact(previous)
+        return self._current
+
+
+def build_source_store_paths(inventory_path: Path) -> tuple[Path, Path]:
+    parent = inventory_path.parent
+    return (
+        parent / ".integration_build_source.json",
+        parent / ".integration_build_source_cache",
+    )
+
+
+def _utc_now() -> str:
+    return (
+        datetime.now(timezone.utc)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
 
 
 def _detect_github_repo(base_dir: Path) -> str:
@@ -510,8 +825,8 @@ def seed_target_from_env(base_dir: Path, operator: OperatorConfig) -> TargetReco
             "pi_user": os.environ.get("PI_USER", "penn"),
             "pi_host": os.environ.get("PI_HOST", "penn-desktop.local"),
             "deploy_root": os.environ.get("DEPLOY_ROOT", operator.default_deploy_root),
-            "ssh_key": os.environ.get("SSH_KEY", ""),
-            "ssh_pass": os.environ.get("SSH_PASS", ""),
+            "ssh_key": os.environ.get("SSH_KEY", operator.default_ssh_key),
+            "ssh_pass": os.environ.get("SSH_PASS", operator.default_ssh_pass),
             "fleet_file": os.environ.get("FLEET_FILE", default_fleet_file(base_dir)),
             "vehicle_name": os.environ.get("VEHICLE_NAME", "uav"),
             "overlay_yaml": os.environ.get(
