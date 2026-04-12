@@ -7,7 +7,7 @@ debug: true
 vision_debug: true
 # Automatically start the mission manager once its runtime is ready.
 # Set false to leave the mission idle until /<vehicle>/mode_manager/start_mission is called.
-auto_launch: false
+auto_launch: true
 
 # PX4 / airframe settings for UAV missions and sim-backed payload missions.
 airframe: standard_vtol # Enter a preset below or a valid airframe ID (integer), either custom or from PX4

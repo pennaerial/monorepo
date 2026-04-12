@@ -4,11 +4,16 @@ from dataclasses import dataclass
 from typing import Optional
 
 from rclpy.node import Node
+from sensor_msgs.msg import CameraInfo, CompressedImage, Image
+from cv_bridge import CvBridge
+import cv2
 
 from uav.vehicles.Payload import Payload
-from uav.vision_nodes import PayloadAprilTagNode
-from uav.vision_nodes.payload_perception_common import DEFAULT_TAG_FAMILY
-from uav_interfaces.srv import PayloadAprilTagState
+from uav.vision_nodes.payload_perception_common import (
+    DEFAULT_TAG_FAMILY,
+    AprilTagDetectorCache,
+    detect_payload_apriltags,
+)
 
 from ..Mode import Mode
 
@@ -29,7 +34,8 @@ class PayloadAprilTagApproachMode(Mode):
     """Drive the payload toward one AprilTag and terminate once close enough."""
 
     mission_target = "payload"
-    required_vision_nodes = (PayloadAprilTagNode,)
+    required_vision_nodes = ()
+    requires_camera = True
     transition_labels = ()
 
     def __init__(
@@ -45,6 +51,7 @@ class PayloadAprilTagApproachMode(Mode):
         yaw_gain: float = 0.0,
         stop_distance_m: float = 0.2,
         tag_lost_coast_s: float = 0.5,
+        compressed: bool = False,
     ):
         super().__init__(node, vehicle)
         self.vehicle: Payload = vehicle
@@ -58,6 +65,28 @@ class PayloadAprilTagApproachMode(Mode):
         self.stop_distance_m = float(stop_distance_m)
         self.tag_lost_coast_s = float(tag_lost_coast_s)
 
+        self._bridge = CvBridge()
+        self._latest_image: Optional[Image | CompressedImage] = None
+        self._latest_camera_info: Optional[CameraInfo] = None
+        self._detector_cache = AprilTagDetectorCache()
+        self._detector = self._detector_cache.get(self.tag_family)
+
+        if bool(compressed):
+            self.node.create_subscription(
+                CompressedImage,
+                f"{vehicle.image_topic}/compressed",
+                self._on_compressed_image,
+                1,
+            )
+        else:
+            self.node.create_subscription(
+                Image, vehicle.image_topic, self._on_image, 1
+            )
+
+        self.node.create_subscription(
+            CameraInfo, vehicle.camera_info_topic, self._on_camera_info, 1
+        )
+
         self._done = False
         self._image_width = 0.0
         self._last_tag_time: Optional[float] = None
@@ -65,6 +94,24 @@ class PayloadAprilTagApproachMode(Mode):
         self._last_wait_log_time = 0.0
         self._last_no_tag_log_time = 0.0
         self._last_drive_log_time = 0.0
+
+    def _on_image(self, msg: Image) -> None:
+        self._latest_image = msg
+
+    def _on_compressed_image(self, msg: CompressedImage) -> None:
+        self._latest_image = msg
+
+    def _on_camera_info(self, msg: CameraInfo) -> None:
+        if self._latest_camera_info is None:
+            self._latest_camera_info = msg
+
+    def _get_bgr_frame(self) -> Optional[object]:
+        msg = self._latest_image
+        if msg is None:
+            return None
+        if isinstance(msg, CompressedImage):
+            return self._bridge.compressed_imgmsg_to_cv2(msg, desired_encoding="bgr8")
+        return self._bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
 
     def on_enter(self) -> None:
         self._done = False
@@ -75,46 +122,36 @@ class PayloadAprilTagApproachMode(Mode):
         self._last_no_tag_log_time = 0.0
         self._last_drive_log_time = 0.0
         self.vehicle.set_servo(180.0)
-        self.log(
-            "PayloadAprilTagApproachMode: servo set to 180, using PayloadAprilTagNode service"
+        self.log("PayloadAprilTagApproachMode: servo set to 180, detecting apriltags inline")
+
+    def _detect_observations(self) -> Optional[dict[int, TagObservation]]:
+        bgr = self._get_bgr_frame()
+        if bgr is None:
+            return None
+        if self._latest_camera_info is None:
+            return None
+        gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
+        self._image_width = float(bgr.shape[1])
+        raw_obs = detect_payload_apriltags(
+            gray,
+            self._latest_camera_info,
+            self._detector,
+            self._detector_cache.backend,
+            self.tag_size_m,
         )
-
-    def _request_state(self) -> Optional[PayloadAprilTagState.Response]:
-        request = PayloadAprilTagState.Request()
-        request.tag_size_m = float(self.tag_size_m)
-        request.tag_family = self.tag_family
-        return self.send_request(PayloadAprilTagNode, request)
-
-    def _decode_observations(
-        self, response: PayloadAprilTagState.Response
-    ) -> dict[int, TagObservation]:
-        self._image_width = float(response.image_width)
-        counts = [
-            len(response.all_tag_ids),
-            len(response.all_tvec_x),
-            len(response.all_tvec_y),
-            len(response.all_tvec_z),
-            len(response.all_center_x),
-            len(response.all_center_y),
-            len(response.all_yaw_error),
-            len(response.all_tag_area),
-        ]
-        observation_count = min(counts) if counts else 0
-
-        observations: dict[int, TagObservation] = {}
-        for index in range(observation_count):
-            tag_id = int(response.all_tag_ids[index])
-            observations[tag_id] = TagObservation(
-                tag_id=tag_id,
-                tvec_x=float(response.all_tvec_x[index]),
-                tvec_y=float(response.all_tvec_y[index]),
-                tvec_z=float(response.all_tvec_z[index]),
-                center_x=float(response.all_center_x[index]),
-                center_y=float(response.all_center_y[index]),
-                yaw_error=float(response.all_yaw_error[index]),
-                area=float(response.all_tag_area[index]),
+        return {
+            obs.tag_id: TagObservation(
+                tag_id=obs.tag_id,
+                tvec_x=obs.tvec_x,
+                tvec_y=obs.tvec_y,
+                tvec_z=obs.tvec_z,
+                center_x=obs.center_x,
+                center_y=obs.center_y,
+                yaw_error=obs.yaw_error,
+                area=obs.area,
             )
-        return observations
+            for obs in raw_obs
+        }
 
     def _publish_drive(self, linear: float, angular: float) -> None:
         self.vehicle.drive(float(linear), float(angular))
@@ -146,32 +183,33 @@ class PayloadAprilTagApproachMode(Mode):
             return
 
         now = self._now()
-        response = self._request_state()
-        if response is None:
-            self._handle_tag_timeout(now)
-            return
 
-        if not response.detector_available:
+        if self._detector is None:
             self.log(
                 "PayloadAprilTagApproachMode: apriltag not installed; cannot detect tags."
             )
             return
 
-        if not response.has_image or not response.has_camera_info:
+        if self._latest_image is None or self._latest_camera_info is None:
             if now - self._last_wait_log_time >= 2.0:
                 self._last_wait_log_time = now
                 self.log(
                     "PayloadAprilTagApproachMode: waiting for payload camera "
-                    f"(image={response.has_image}, camera_info={response.has_camera_info})"
+                    f"(image={self._latest_image is not None}, "
+                    f"camera_info={self._latest_camera_info is not None})"
                 )
             self._handle_tag_timeout(now)
             return
 
         if not self._first_response_logged:
             self._first_response_logged = True
-            self.log("PayloadAprilTagApproachMode: first perception response received")
+            self.log("PayloadAprilTagApproachMode: first camera frame received")
 
-        observations = self._decode_observations(response)
+        observations = self._detect_observations()
+        if observations is None:
+            self._handle_tag_timeout(now)
+            return
+
         target = self._select_target(observations)
 
         if target is None:

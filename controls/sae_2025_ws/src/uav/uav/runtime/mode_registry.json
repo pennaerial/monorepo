@@ -96,6 +96,15 @@
           "default_kind": "value",
           "name": "tag_lost_coast_s",
           "required": false
+        },
+        {
+          "annotation": {
+            "kind": "bool"
+          },
+          "default": false,
+          "default_kind": "value",
+          "name": "compressed",
+          "required": false
         }
       ],
       "params_schema": {
@@ -105,6 +114,11 @@
             "default": 0.003,
             "title": "Angular Gain",
             "type": "number"
+          },
+          "compressed": {
+            "default": false,
+            "title": "Compressed",
+            "type": "boolean"
           },
           "forward_gain": {
             "default": 0.5,
@@ -157,9 +171,8 @@
         "title": "PayloadAprilTagApproachModeParams",
         "type": "object"
       },
-      "required_vision_nodes": [
-        "PayloadAprilTagNode"
-      ],
+      "required_vision_nodes": [],
+      "requires_camera": true,
       "transition_labels": []
     },
     "uav.modes.payload.PayloadColorOrbitToRearMode": {
@@ -391,6 +404,7 @@
       "required_vision_nodes": [
         "PayloadColorOrbitNode"
       ],
+      "requires_camera": false,
       "transition_labels": [
         "handoff_dock"
       ]
@@ -498,7 +512,7 @@
           "annotation": {
             "kind": "float"
           },
-          "default": 20.0,
+          "default": 30.0,
           "default_kind": "value",
           "name": "max_drive_out_s",
           "required": false
@@ -619,6 +633,24 @@
           "default_kind": "value",
           "name": "max_angular",
           "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 2.354,
+          "default_kind": "value",
+          "name": "dr_angular_turn",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 1.5,
+          "default_kind": "value",
+          "name": "dr_speed",
+          "required": false
         }
       ],
       "params_schema": {
@@ -707,6 +739,16 @@
             "title": "Direction",
             "type": "string"
           },
+          "dr_angular_turn": {
+            "default": 2.354,
+            "title": "Dr Angular Turn",
+            "type": "number"
+          },
+          "dr_speed": {
+            "default": 1.5,
+            "title": "Dr Speed",
+            "type": "number"
+          },
           "drive_out_min_pixels": {
             "default": 150,
             "title": "Drive Out Min Pixels",
@@ -748,7 +790,7 @@
             "type": "number"
           },
           "max_drive_out_s": {
-            "default": 20.0,
+            "default": 30.0,
             "title": "Max Drive Out S",
             "type": "number"
           },
@@ -762,6 +804,7 @@
         "type": "object"
       },
       "required_vision_nodes": [],
+      "requires_camera": false,
       "transition_labels": []
     },
     "uav.modes.payload.PayloadDLZNavigateMode": {
@@ -1054,6 +1097,7 @@
         "PayloadColorSquareNode",
         "PayloadAprilTagNode"
       ],
+      "requires_camera": false,
       "transition_labels": [
         "done"
       ]
@@ -1513,6 +1557,7 @@
       "required_vision_nodes": [
         "PayloadAprilTagNode"
       ],
+      "requires_camera": false,
       "transition_labels": []
     },
     "uav.modes.payload.PayloadNavigateAroundPlaneMode": {
@@ -1688,6 +1733,7 @@
       "required_vision_nodes": [
         "PayloadAprilTagNode"
       ],
+      "requires_camera": false,
       "transition_labels": [
         "approach"
       ]
@@ -1865,6 +1911,7 @@
       "required_vision_nodes": [
         "PayloadAprilTagNode"
       ],
+      "requires_camera": false,
       "transition_labels": []
     },
     "uav.modes.payload.PayloadScanForTagMode": {
@@ -1942,6 +1989,7 @@
       "required_vision_nodes": [
         "PayloadAprilTagNode"
       ],
+      "requires_camera": false,
       "transition_labels": [
         "found",
         "not_found"
@@ -2062,677 +2110,10 @@
         "type": "object"
       },
       "required_vision_nodes": [],
+      "requires_camera": true,
       "transition_labels": [
         "complete"
       ]
-    },
-    "uav.modes.uav.LandingMode": {
-      "class_name": "LandingMode",
-      "class_path": "uav.modes.uav.LandingMode",
-      "description": "A mode for taking off vertically.",
-      "display_name": "LandingMode",
-      "mission_target": "uav",
-      "module_path": "uav.modes.uav.LandingMode",
-      "param_fields": [],
-      "params_schema": {
-        "additionalProperties": false,
-        "properties": {},
-        "title": "LandingModeParams",
-        "type": "object"
-      },
-      "required_vision_nodes": [],
-      "transition_labels": []
-    },
-    "uav.modes.uav.NavGPSMode": {
-      "class_name": "NavGPSMode",
-      "class_path": "uav.modes.uav.NavGPSMode",
-      "description": "A mode for navigating to a GPS coordinate",
-      "display_name": "NavGPSMode",
-      "mission_target": "uav",
-      "module_path": "uav.modes.uav.NavGPSMode",
-      "param_fields": [
-        {
-          "annotation": {
-            "item": {
-              "items": [
-                {
-                  "items": [
-                    {
-                      "kind": "float"
-                    },
-                    {
-                      "kind": "float"
-                    },
-                    {
-                      "kind": "float"
-                    }
-                  ],
-                  "kind": "tuple",
-                  "variadic": false
-                },
-                {
-                  "kind": "float"
-                },
-                {
-                  "choices": [
-                    "GPS",
-                    "LOCAL"
-                  ],
-                  "kind": "literal"
-                }
-              ],
-              "kind": "tuple",
-              "variadic": false
-            },
-            "kind": "list"
-          },
-          "default": null,
-          "default_kind": "missing",
-          "name": "coordinates",
-          "required": true
-        },
-        {
-          "annotation": {
-            "kind": "float"
-          },
-          "default": 1,
-          "default_kind": "value",
-          "name": "margin",
-          "required": false
-        }
-      ],
-      "params_schema": {
-        "additionalProperties": false,
-        "properties": {
-          "coordinates": {
-            "items": {
-              "maxItems": 3,
-              "minItems": 3,
-              "prefixItems": [
-                {
-                  "maxItems": 3,
-                  "minItems": 3,
-                  "prefixItems": [
-                    {
-                      "type": "number"
-                    },
-                    {
-                      "type": "number"
-                    },
-                    {
-                      "type": "number"
-                    }
-                  ],
-                  "type": "array"
-                },
-                {
-                  "type": "number"
-                },
-                {
-                  "enum": [
-                    "GPS",
-                    "LOCAL"
-                  ],
-                  "type": "string"
-                }
-              ],
-              "type": "array"
-            },
-            "title": "Coordinates",
-            "type": "array"
-          },
-          "margin": {
-            "default": 1,
-            "title": "Margin",
-            "type": "number"
-          }
-        },
-        "required": [
-          "coordinates"
-        ],
-        "title": "NavGPSModeParams",
-        "type": "object"
-      },
-      "required_vision_nodes": [],
-      "transition_labels": [
-        "complete"
-      ]
-    },
-    "uav.modes.uav.PayloadDropoffMode": {
-      "class_name": "PayloadDropoffMode",
-      "class_path": "uav.modes.uav.PayloadDropoffMode",
-      "description": "A mode for dropping off the payload.",
-      "display_name": "PayloadDropoffMode",
-      "mission_target": "uav",
-      "module_path": "uav.modes.uav.PayloadDropoffMode",
-      "param_fields": [
-        {
-          "annotation": {
-            "kind": "union",
-            "options": [
-              {
-                "items": [
-                  {
-                    "kind": "float"
-                  },
-                  {
-                    "kind": "float"
-                  },
-                  {
-                    "kind": "float"
-                  }
-                ],
-                "kind": "tuple",
-                "variadic": false
-              },
-              {
-                "kind": "none"
-              }
-            ]
-          },
-          "default": [
-            0.0,
-            0.0,
-            0.0
-          ],
-          "default_kind": "value",
-          "name": "offsets",
-          "required": false
-        }
-      ],
-      "params_schema": {
-        "additionalProperties": false,
-        "properties": {
-          "offsets": {
-            "anyOf": [
-              {
-                "maxItems": 3,
-                "minItems": 3,
-                "prefixItems": [
-                  {
-                    "type": "number"
-                  },
-                  {
-                    "type": "number"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ],
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": [
-              0.0,
-              0.0,
-              0.0
-            ],
-            "title": "Offsets"
-          }
-        },
-        "title": "PayloadDropoffModeParams",
-        "type": "object"
-      },
-      "required_vision_nodes": [
-        "PayloadTrackingNode"
-      ],
-      "transition_labels": [
-        "complete"
-      ]
-    },
-    "uav.modes.uav.PayloadPickupMode": {
-      "class_name": "PayloadPickupMode",
-      "class_path": "uav.modes.uav.PayloadPickupMode",
-      "description": "A mode for picking up a payload.",
-      "display_name": "PayloadPickupMode",
-      "mission_target": "uav",
-      "module_path": "uav.modes.uav.PayloadPickupMode",
-      "param_fields": [
-        {
-          "annotation": {
-            "kind": "str"
-          },
-          "default": "green",
-          "default_kind": "value",
-          "name": "color",
-          "required": false
-        }
-      ],
-      "params_schema": {
-        "additionalProperties": false,
-        "properties": {
-          "color": {
-            "default": "green",
-            "title": "Color",
-            "type": "string"
-          }
-        },
-        "title": "PayloadPickupModeParams",
-        "type": "object"
-      },
-      "required_vision_nodes": [
-        "PayloadTrackingNode"
-      ],
-      "transition_labels": [
-        "complete"
-      ]
-    },
-    "uav.modes.uav.ServoDropoffMode": {
-      "class_name": "ServoDropoffMode",
-      "class_path": "uav.modes.uav.ServoDropoffMode",
-      "description": "A mode for dropping off the payload.",
-      "display_name": "ServoDropoffMode",
-      "mission_target": "uav",
-      "module_path": "uav.modes.uav.ServoDropoffMode",
-      "param_fields": [
-        {
-          "annotation": {
-            "kind": "union",
-            "options": [
-              {
-                "items": [
-                  {
-                    "kind": "float"
-                  },
-                  {
-                    "kind": "float"
-                  },
-                  {
-                    "kind": "float"
-                  }
-                ],
-                "kind": "tuple",
-                "variadic": false
-              },
-              {
-                "kind": "none"
-              }
-            ]
-          },
-          "default": [
-            0.0,
-            0.0,
-            0.0
-          ],
-          "default_kind": "value",
-          "name": "offsets",
-          "required": false
-        },
-        {
-          "annotation": {
-            "kind": "union",
-            "options": [
-              {
-                "items": [
-                  {
-                    "kind": "float"
-                  },
-                  {
-                    "kind": "float"
-                  },
-                  {
-                    "kind": "float"
-                  }
-                ],
-                "kind": "tuple",
-                "variadic": false
-              },
-              {
-                "kind": "none"
-              }
-            ]
-          },
-          "default": [
-            0.0,
-            0.0,
-            0.0
-          ],
-          "default_kind": "value",
-          "name": "camera_offsets",
-          "required": false
-        }
-      ],
-      "params_schema": {
-        "additionalProperties": false,
-        "properties": {
-          "camera_offsets": {
-            "anyOf": [
-              {
-                "maxItems": 3,
-                "minItems": 3,
-                "prefixItems": [
-                  {
-                    "type": "number"
-                  },
-                  {
-                    "type": "number"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ],
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": [
-              0.0,
-              0.0,
-              0.0
-            ],
-            "title": "Camera Offsets"
-          },
-          "offsets": {
-            "anyOf": [
-              {
-                "maxItems": 3,
-                "minItems": 3,
-                "prefixItems": [
-                  {
-                    "type": "number"
-                  },
-                  {
-                    "type": "number"
-                  },
-                  {
-                    "type": "number"
-                  }
-                ],
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": [
-              0.0,
-              0.0,
-              0.0
-            ],
-            "title": "Offsets"
-          }
-        },
-        "title": "ServoDropoffModeParams",
-        "type": "object"
-      },
-      "required_vision_nodes": [],
-      "transition_labels": [
-        "complete"
-      ]
-    },
-    "uav.modes.uav.TakeoffMode": {
-      "class_name": "TakeoffMode",
-      "class_path": "uav.modes.uav.TakeoffMode",
-      "description": "A mode for takeoff (vertical or horizontal).",
-      "display_name": "TakeoffMode",
-      "mission_target": "uav",
-      "module_path": "uav.modes.uav.TakeoffMode",
-      "param_fields": [
-        {
-          "annotation": {
-            "choices": [
-              "vertical",
-              "horizontal"
-            ],
-            "kind": "literal"
-          },
-          "default": "vertical",
-          "default_kind": "value",
-          "name": "takeoff_type",
-          "required": false
-        },
-        {
-          "annotation": {
-            "kind": "float"
-          },
-          "default": null,
-          "default_kind": "nan",
-          "name": "fw_tko_pitch",
-          "required": false
-        },
-        {
-          "annotation": {
-            "kind": "float"
-          },
-          "default": null,
-          "default_kind": "nan",
-          "name": "yaw",
-          "required": false
-        },
-        {
-          "annotation": {
-            "kind": "float"
-          },
-          "default": null,
-          "default_kind": "nan",
-          "name": "latitude",
-          "required": false
-        },
-        {
-          "annotation": {
-            "kind": "float"
-          },
-          "default": null,
-          "default_kind": "nan",
-          "name": "longitude",
-          "required": false
-        },
-        {
-          "annotation": {
-            "kind": "float"
-          },
-          "default": null,
-          "default_kind": "nan",
-          "name": "altitude",
-          "required": false
-        }
-      ],
-      "params_schema": {
-        "additionalProperties": false,
-        "properties": {
-          "altitude": {
-            "title": "Altitude",
-            "type": "number"
-          },
-          "fw_tko_pitch": {
-            "title": "Fw Tko Pitch",
-            "type": "number"
-          },
-          "latitude": {
-            "title": "Latitude",
-            "type": "number"
-          },
-          "longitude": {
-            "title": "Longitude",
-            "type": "number"
-          },
-          "takeoff_type": {
-            "default": "vertical",
-            "enum": [
-              "vertical",
-              "horizontal"
-            ],
-            "title": "Takeoff Type",
-            "type": "string"
-          },
-          "yaw": {
-            "title": "Yaw",
-            "type": "number"
-          }
-        },
-        "title": "TakeoffModeParams",
-        "type": "object"
-      },
-      "required_vision_nodes": [],
-      "transition_labels": [
-        "complete"
-      ]
-    },
-    "uav.modes.uav.TransitionMode": {
-      "class_name": "TransitionMode",
-      "class_path": "uav.modes.uav.TransitionMode",
-      "description": "A mode for transitioning between VTOL types",
-      "display_name": "TransitionMode",
-      "mission_target": "uav",
-      "module_path": "uav.modes.uav.TransitionMode",
-      "param_fields": [
-        {
-          "annotation": {
-            "choices": [
-              "MC",
-              "FW"
-            ],
-            "kind": "literal"
-          },
-          "default": null,
-          "default_kind": "missing",
-          "name": "to_mode",
-          "required": true
-        }
-      ],
-      "params_schema": {
-        "additionalProperties": false,
-        "properties": {
-          "to_mode": {
-            "enum": [
-              "MC",
-              "FW"
-            ],
-            "title": "To Mode",
-            "type": "string"
-          }
-        },
-        "required": [
-          "to_mode"
-        ],
-        "title": "TransitionModeParams",
-        "type": "object"
-      },
-      "required_vision_nodes": [],
-      "transition_labels": [
-        "complete"
-      ]
-    },
-    "uav.modes.uav.WaypointMission": {
-      "class_name": "WaypointMission",
-      "class_path": "uav.modes.uav.WaypointMission",
-      "description": "Simple waypoint mission for testing scoring node.",
-      "display_name": "WaypointMission",
-      "mission_target": "uav",
-      "module_path": "uav.modes.uav.WaypointMission",
-      "param_fields": [
-        {
-          "annotation": {
-            "kind": "union",
-            "options": [
-              {
-                "item": {
-                  "item": {
-                    "kind": "float"
-                  },
-                  "kind": "list"
-                },
-                "kind": "list"
-              },
-              {
-                "kind": "none"
-              }
-            ]
-          },
-          "default": null,
-          "default_kind": "none",
-          "name": "waypoints",
-          "required": false
-        },
-        {
-          "annotation": {
-            "kind": "float"
-          },
-          "default": 0.5,
-          "default_kind": "value",
-          "name": "waypoint_tolerance",
-          "required": false
-        },
-        {
-          "annotation": {
-            "kind": "float"
-          },
-          "default": 1.0,
-          "default_kind": "value",
-          "name": "speed",
-          "required": false
-        },
-        {
-          "annotation": {
-            "kind": "float"
-          },
-          "default": 1.0,
-          "default_kind": "value",
-          "name": "loiter_time",
-          "required": false
-        },
-        {
-          "annotation": {
-            "kind": "float"
-          },
-          "default": 2.0,
-          "default_kind": "value",
-          "name": "altitude",
-          "required": false
-        }
-      ],
-      "params_schema": {
-        "additionalProperties": false,
-        "properties": {
-          "altitude": {
-            "default": 2.0,
-            "title": "Altitude",
-            "type": "number"
-          },
-          "loiter_time": {
-            "default": 1.0,
-            "title": "Loiter Time",
-            "type": "number"
-          },
-          "speed": {
-            "default": 1.0,
-            "title": "Speed",
-            "type": "number"
-          },
-          "waypoint_tolerance": {
-            "default": 0.5,
-            "title": "Waypoint Tolerance",
-            "type": "number"
-          },
-          "waypoints": {
-            "anyOf": [
-              {
-                "items": {
-                  "items": {
-                    "type": "number"
-                  },
-                  "type": "array"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Waypoints"
-          }
-        },
-        "title": "WaypointMissionParams",
-        "type": "object"
-      },
-      "required_vision_nodes": [],
-      "transition_labels": []
     }
   },
   "schema_version": 1

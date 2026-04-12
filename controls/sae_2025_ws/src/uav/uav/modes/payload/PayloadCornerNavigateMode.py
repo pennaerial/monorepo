@@ -4,7 +4,7 @@ out to a tape edge, align with it, then follow the border in the configured
 travel direction (cw / ccw) until reaching the first corner.
 
 Phase sequence:
-    DRIVE_OUT → TURN_TO_CENTER → LINE_FOLLOW → CORNER_TURN → DONE
+    DRIVE_OUT → TURN_TO_CENTER → LINE_FOLLOW → DONE
 
 DRIVE_OUT
     Drive forward at drive_out_speed_mps. Subscribes to the payload camera
@@ -95,6 +95,8 @@ class PayloadCornerNavigateMode(Mode):
         line_follow_min_pixels: int = 50,
         k_lat: float = 0.003,
         max_angular: float = 0.5,
+        dr_angular_turn: float = 2.354,
+        dr_speed: float = 1.5
     ):
         super().__init__(node, vehicle)
         direction = str(direction).lower().strip()
@@ -138,6 +140,10 @@ class PayloadCornerNavigateMode(Mode):
         self._image_sub = None
         self._image: Optional[object] = None
         self._annotated_pub = None
+
+        self._dr_angular = float(dr_angular_turn)
+        self._dr_speed = float(dr_speed)
+        self._dr_future = None
 
     # ------------------------------------------------------------------
     # helpers
@@ -215,8 +221,8 @@ class PayloadCornerNavigateMode(Mode):
             self._update_turn_to_center(time_delta)
         elif self._phase == "line_follow":
             self._update_line_follow(time_delta)
-        elif self._phase == "corner_turn":
-            self._update_corner_turn(time_delta)
+        elif self._phase == "dead_reckon":
+            self._update_dead_reckon()
 
     def check_status(self) -> str:
         # Both the success path (_done) and the safety bail-outs (_terminate)
@@ -478,58 +484,6 @@ class PayloadCornerNavigateMode(Mode):
         self.vehicle.drive(0.0, angular)
 
     # ------------------------------------------------------------------
-    # Phase: CORNER_TURN
-    # ------------------------------------------------------------------
-
-    def _update_corner_turn(self, time_delta: float) -> None:
-        angular = self.align_angular_speed
-        self._turn_to_center_rad += abs(angular) * time_delta
-
-        bgr = self._decode_image()
-        total = 0
-        lateral_error_px = 0.0
-        dominant: Optional[str] = None
-        if bgr is not None:
-            total, lateral_error_px, dominant = self._middle_third_color_metrics(bgr)
-            if (
-                total >= self.center_min_pixels
-                and abs(lateral_error_px) < self.center_tol_px
-            ):
-                if dominant is not None:
-                    self._latest_dominant = dominant
-                self._center_stable += 1
-                if self._center_stable >= self.center_stable_frames:
-                    self.vehicle.stop()
-                    self._annotate_turn_to_center(
-                        bgr, total, lateral_error_px, dominant
-                    )
-                    self._done = True
-                    self.log(
-                        f"PayloadCornerNavigateMode: CORNER_TURN centered "
-                        f"(lat={lateral_error_px:.1f}px, total={total}px, "
-                        f"turned={math.degrees(self._turn_to_center_rad):.1f}°) → done"
-                    )
-                    return
-            else:
-                self._center_stable = 0
-                if dominant is not None:
-                    self._latest_dominant = dominant
-
-        if self._turn_to_center_rad >= self.max_turn_to_center_rad:
-            self.vehicle.stop()
-            self._terminate = True
-            self.log(
-                f"PayloadCornerNavigateMode: CORNER_TURN spun "
-                f"{math.degrees(self._turn_to_center_rad):.1f}° without centering — "
-                f"terminating"
-            )
-            return
-
-        if bgr is not None:
-            self._annotate_turn_to_center(bgr, total, lateral_error_px, dominant)
-        self.vehicle.drive(0.0, angular)
-
-    # ------------------------------------------------------------------
     # Phase: LINE_FOLLOW
     # ------------------------------------------------------------------
 
@@ -606,13 +560,12 @@ class PayloadCornerNavigateMode(Mode):
                 transitioned_this_tick,
                 0.0,
             )
-            self._turn_to_center_rad = 0.0
-            self._center_stable = 0
-            self._latest_dominant = None
-            self._phase = "corner_turn"
+            self._phase = "dead_reckon"
+            self._dr_future = None
             self.log(
                 f"PayloadCornerNavigateMode: current colour {current} lost "
-                f"after corner detected → CORNER_TURN"
+                f"after corner detected → DEAD_RECKON "
+                f"(angular={self._dr_angular:.3f} speed={self._dr_speed:.2f})"
             )
             return
 
@@ -641,6 +594,23 @@ class PayloadCornerNavigateMode(Mode):
             angular,
         )
         self.vehicle.drive(self.line_follow_speed_mps, angular)
+
+    # ------------------------------------------------------------------
+    # Phase: DEAD_RECKON
+    # ------------------------------------------------------------------
+
+    def _update_dead_reckon(self) -> None:
+        if self._dr_future is None:
+            self._dr_future = self.vehicle.dead_reckon(
+                linear=0.0, angular=self._dr_angular, speed=self._dr_speed
+            )
+        elif self._dr_future.done():
+            result = self._dr_future.result()
+            self.log(
+                f"PayloadCornerNavigateMode: DEAD_RECKON done "
+                f"success={result.success} → done"
+            )
+            self._done = True
 
     # ------------------------------------------------------------------
     # Annotated debug image
