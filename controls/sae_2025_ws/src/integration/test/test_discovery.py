@@ -5,6 +5,7 @@ import sys
 import types
 from pathlib import Path
 from types import SimpleNamespace
+import subprocess
 
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
@@ -169,3 +170,20 @@ def test_browse_services_falls_back_to_dns_sd_on_darwin(monkeypatch):
             addresses={"192.168.1.22"},
         )
     ]
+
+
+def test_run_bounded_command_merges_stderr_without_capture_output_conflict(monkeypatch):
+    calls = []
+
+    def fake_run(*args, **kwargs):
+        calls.append(kwargs)
+        return SimpleNamespace(stdout="ok\n")
+
+    monkeypatch.setattr(discovery.subprocess, "run", fake_run)
+
+    output = discovery._run_bounded_command(["dns-sd", "-B", "_ssh._tcp", "local"], 1.0)
+
+    assert output == "ok\n"
+    assert calls[0]["stdout"] is subprocess.PIPE
+    assert calls[0]["stderr"] is subprocess.STDOUT
+    assert "capture_output" not in calls[0]

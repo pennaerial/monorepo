@@ -75,7 +75,7 @@ def _run_bounded_command(args: list[str], timeout_s: float) -> str:
     try:
         result = subprocess.run(
             args,
-            capture_output=True,
+            stdout=subprocess.PIPE,
             text=True,
             stderr=subprocess.STDOUT,
             timeout=timeout_s,
