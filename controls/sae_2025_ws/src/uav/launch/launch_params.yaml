@@ -1,5 +1,5 @@
 # launch_params.yaml
-mission_name: payload_corner_navigate
+mission_name: payload_wait_drive_out
 # Vehicle namespace for mission-facing topics/services.
 # Leave blank to use the mission-target default (`uav` for UAV missions, `payload_0` for payload missions).
 vehicle_name: ""
@@ -21,6 +21,10 @@ custom_airframe_model: "" # Leave blank if using default PX4 model or enter file
 px4_namespace: ""
 # Optional explicit PX4 multi-instance index for sim. Fleet orchestration assigns this automatically.
 px4_instance: 0
+
+# Force the camera stack (v4l2 + camera node) to launch even when no external
+# vision service nodes are required (e.g. when CV runs inline inside a mode).
+use_camera: true
 
 # Vehicle camera settings. Only used when the mission modes require vision nodes.
 save_vision_milliseconds: 0 # Interval between saving vision images in milliseconds, set to 0 to disable saving.

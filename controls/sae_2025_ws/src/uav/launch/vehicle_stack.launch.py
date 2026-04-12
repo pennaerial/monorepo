@@ -519,6 +519,7 @@ def launch_setup(context, *args, **kwargs):
     )
 
     requires_vision = bool(mission_spec.vision_nodes)
+    requires_camera = requires_vision or _resolve_bool(config, "use_camera", False)
 
     px4_path = ""
     vehicle_class = None
@@ -555,7 +556,7 @@ def launch_setup(context, *args, **kwargs):
                 else ""
             ),
         )
-        if requires_vision
+        if requires_camera
         else None
     )
     if (
@@ -581,7 +582,7 @@ def launch_setup(context, *args, **kwargs):
             vision_debug=vision_debug,
             save_vision_milliseconds=save_vision_milliseconds,
         )
-        if requires_vision
+        if requires_camera
         else []
     )
 
