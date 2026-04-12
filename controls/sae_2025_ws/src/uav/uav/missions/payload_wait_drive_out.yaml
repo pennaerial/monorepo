@@ -2,13 +2,12 @@ modes:
   start:
     class: uav.modes.payload.PayloadWaitForDriveOutMode.PayloadWaitForDriveOutMode
     params:
-      confirm_frames: 50
-      clear_threshold: 0.5
-      lower_hsv: [0, 0, 180]
-      upper_hsv: [165, 46, 255]
+      dark_threshold: 100
+      clear_ratio: 0.3
+      wait_seconds: 30.0
       turn_angular: 3.14
       turn_speed: 1.5
-      compressed_image: true
+      compressed_image: false
       debug: true
     #transitions:
     #  complete: retreat
