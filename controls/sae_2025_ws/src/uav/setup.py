@@ -1,8 +1,50 @@
-from setuptools import find_packages, setup
-import os
 from glob import glob
+import os
+from pathlib import Path
+import sys
+
+from setuptools import find_packages, setup
+from setuptools.command.build_py import build_py as _build_py
+from setuptools.command.develop import develop as _develop
+from setuptools.command.install import install as _install
 
 package_name = "uav"
+_SCHEMA_REGISTRY_REFRESHED = False
+
+
+def _refresh_mode_schema_registry() -> None:
+    global _SCHEMA_REGISTRY_REFRESHED
+    if _SCHEMA_REGISTRY_REFRESHED:
+        return
+
+    package_root = Path(__file__).resolve().parent
+    if str(package_root) not in sys.path:
+        sys.path.insert(0, str(package_root))
+
+    from uav.runtime.schema_generator import refresh_schema_registry
+
+    output = refresh_schema_registry()
+    print(f"Wrote mode schema registry to '{output}'.")
+    _SCHEMA_REGISTRY_REFRESHED = True
+
+
+class _RefreshSchemaRegistryMixin:
+    def run(self):
+        _refresh_mode_schema_registry()
+        super().run()
+
+
+class build_py(_RefreshSchemaRegistryMixin, _build_py):
+    pass
+
+
+class develop(_RefreshSchemaRegistryMixin, _develop):
+    pass
+
+
+class install(_RefreshSchemaRegistryMixin, _install):
+    pass
+
 
 setup(
     name=package_name,
@@ -39,6 +81,11 @@ setup(
         "test": [
             "pytest",
         ],
+    },
+    cmdclass={
+        "build_py": build_py,
+        "develop": develop,
+        "install": install,
     },
     entry_points={
         "console_scripts": [
