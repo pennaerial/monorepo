@@ -38,11 +38,18 @@ def _normalize_host(hostname: str) -> str:
     return value
 
 
-def _target_match(ctx: AppContext, hostname: str) -> tuple[str | None, str | None]:
+def _normalized_addresses(addresses: set[str] | list[str] | tuple[str, ...]) -> set[str]:
+    return {str(address).strip().lower() for address in addresses if str(address).strip()}
+
+
+def _target_match(
+    ctx: AppContext, hostname: str, addresses: set[str] | list[str] | tuple[str, ...]
+) -> tuple[str | None, str | None]:
     normalized = _normalize_host(hostname)
+    known_addresses = _normalized_addresses(addresses)
     for target in ctx.list_targets():
         target_host = _normalize_host(target.pi_host)
-        if normalized == target_host:
+        if normalized == target_host or target.pi_host.strip().lower() in known_addresses:
             return target.target_id, target.label
     return None, None
 
@@ -260,7 +267,9 @@ async def live_hardware_cards(
     discovered = await asyncio.to_thread(_browse_services, timeout_s)
     cards: list[dict[str, object]] = []
     for device in discovered:
-        matched_target_id, matched_label = _target_match(ctx, device.hostname)
+        matched_target_id, matched_label = _target_match(
+            ctx, device.hostname, device.addresses
+        )
         cards.append(
             {
                 "hardware_id": _normalize_host(device.hostname) or device.hostname,

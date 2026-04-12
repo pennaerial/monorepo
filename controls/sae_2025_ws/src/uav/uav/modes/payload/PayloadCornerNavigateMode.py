@@ -185,8 +185,12 @@ class PayloadCornerNavigateMode(Mode):
                 Image, cam_topic, self._image_cb, 1
             )
 
-        annotated_topic = self.vehicle.namespaced_path("annotated_image")
-        self._annotated_pub = self.node.create_publisher(Image, annotated_topic, 1)
+        annotated_topic = self.vehicle.namespaced_path(
+            "annotated_image/compressed"
+        )
+        self._annotated_pub = self.node.create_publisher(
+            CompressedImage, annotated_topic, 1
+        )
 
         self.log(
             f"PayloadCornerNavigateMode: enter direction={self.direction} "
@@ -626,7 +630,7 @@ class PayloadCornerNavigateMode(Mode):
         if self._annotated_pub is None:
             return
         try:
-            msg = self._bridge.cv2_to_imgmsg(debug, encoding="bgr8")
+            msg = self._bridge.cv2_to_compressed_imgmsg(debug, dst_format="jpeg")
             msg.header.stamp = self.node.get_clock().now().to_msg()
             self._annotated_pub.publish(msg)
         except Exception as exc:

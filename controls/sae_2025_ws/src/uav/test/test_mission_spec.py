@@ -69,6 +69,7 @@ def test_load_uav_mission_spec(tmp_path):
     assert mission_spec.is_uav is True
     assert mission_spec.is_payload is False
     assert mission_spec.vision_nodes == ()
+    assert mission_spec.requires_camera is False
     assert mission_spec.path == mission_path
     assert mission_spec.modes["start"].class_path == "uav.modes.uav.TakeoffMode"
     assert mission_spec.modes["start"].params == {"altitude": 3.0}
@@ -105,6 +106,7 @@ def test_load_payload_mission_spec(tmp_path):
     assert mission_spec.is_payload is True
     assert mission_spec.is_uav is False
     assert mission_spec.vision_nodes == ("PayloadAprilTagNode",)
+    assert mission_spec.requires_camera is True
     assert mission_spec.modes["start"].class_path == (
         "uav.modes.payload.PayloadScanForTagMode"
     )
@@ -129,7 +131,24 @@ def test_mission_spec_from_dict():
     assert mission_spec.target == "payload"
     assert mission_spec.path is None
     assert mission_spec.vision_nodes == ("PayloadAprilTagNode",)
+    assert mission_spec.requires_camera is True
     assert mission_spec.modes["start"].params["tag_id"] == 0
+
+
+def test_mission_spec_marks_camera_only_mode_as_camera_required():
+    mission_spec = MissionSpec.from_dict(
+        {
+            "modes": {
+                "start": {
+                    "class": "uav.modes.payload.PayloadWaitForDriveOutMode.PayloadWaitForDriveOutMode",
+                }
+            }
+        }
+    )
+
+    assert mission_spec.target == "payload"
+    assert mission_spec.vision_nodes == ()
+    assert mission_spec.requires_camera is True
 
 
 @pytest.mark.parametrize(

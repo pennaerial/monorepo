@@ -69,6 +69,10 @@ sudo apt-get upgrade
    # From the workspace (this) directory
    rosdep install -r --from-paths src -i -y --rosdistro humble
    ```
+   `rosdep` on Ubuntu 22.04/Jammy does not provide a Pydantic v2 package, so install that separately in the Python environment you use for `uav`:
+   ```bash
+   python3 -m pip install "pydantic>=2,<3"
+   ```
 
 ---
 
@@ -82,14 +86,14 @@ sudo apt-get upgrade
     colcon build
     ```
 
-2. Install camera and AprilTag dependencies used by the vision stack:
+2. Install the runtime Python dependencies used by the UAV / vision stack:
 
     ```bash
     sudo apt-get update
     sudo apt install ros-humble-cv-bridge python3-opencv python3-pip build-essential cmake
-    python3 -m pip install apriltag
+    python3 -m pip install "pydantic>=2,<3" apriltag
     ```
-    AprilTag missions now always use the Python `apriltag` package for detection. Use the distro `python3-opencv` package for `cv2`; do not install `opencv-python` just to get AprilTag support.
+    `uav` mission and fleet loading now require `pydantic>=2,<3`, and AprilTag missions still require the Python `apriltag` package. Use the distro `python3-opencv` package for `cv2`; do not install `opencv-python` just to get AprilTag support.
 
 3. If you are running payload hardware on a Raspberry Pi, also complete the one-time `pigpio` / `pigpiod` setup in [src/payload/README.md](src/payload/README.md). The payload GPIO controller will not start unless `pigpiod` is running.
 ---

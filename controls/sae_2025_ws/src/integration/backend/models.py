@@ -147,6 +147,11 @@ class BuildListItem(BaseModel):
     artifact_id: str | None = None
     artifact_name: str | None = None
     branch: str | None = None
+    workflow_name: str | None = None
+    workflow_event: str | None = None
+    workflow_conclusion: str | None = None
+    deployable: bool = True
+    fallback: bool = False
 
 
 class BuildListResponse(BaseModel):
@@ -199,6 +204,9 @@ class BuildSourcePayload(BaseModel):
     local_artifact_size_bytes: int | None = None
     codebase_root: str | None = None
     fleet_file: str | None = None
+    available_fleets: list[str] = Field(default_factory=list)
+    fleet_catalog_source: str | None = None
+    fleet_catalog_error: str | None = None
     fleet_exists: bool | None = None
     fleet_error: str | None = None
     fleet_vehicles: list[FleetVehiclePreview] = Field(default_factory=list)
@@ -209,6 +217,20 @@ class BuildSourceResponse(BaseModel):
     success: bool
     source: BuildSourcePayload | None = None
     output: str | None = None
+    error: str | None = None
+
+
+class FleetCatalogResponse(BaseModel):
+    success: bool
+    source_kind: str
+    source_label: str | None = None
+    selected_fleet_file: str | None = None
+    available_fleets: list[str] = Field(default_factory=list)
+    fleet_catalog_source: str | None = None
+    fleet_catalog_error: str | None = None
+    fleet_exists: bool | None = None
+    fleet_error: str | None = None
+    fleet_vehicles: list[FleetVehiclePreview] = Field(default_factory=list)
     error: str | None = None
 
 

@@ -71,6 +71,45 @@ ci_install_apriltag() {
     python3 -c "import apriltag; print(apriltag.__file__)"
 }
 
+ci_ensure_pip() {
+    if python3 -m pip --version >/dev/null 2>&1; then
+        return
+    fi
+
+    ci_log "Installing python3-pip"
+    ci_install_system_packages python3-pip
+}
+
+ci_has_pydantic_v2() {
+    python3 - <<'PY' >/dev/null 2>&1
+try:
+    import pydantic
+
+    version = getattr(pydantic, "__version__", "0")
+    major = int(version.split(".", 1)[0])
+except Exception:
+    raise SystemExit(1)
+
+raise SystemExit(0 if major >= 2 else 1)
+PY
+}
+
+ci_ensure_pydantic_v2() {
+    if ci_has_pydantic_v2; then
+        ci_log "pydantic>=2 already available"
+        return
+    fi
+
+    ci_ensure_pip
+    ci_log "Installing pydantic>=2 Python package"
+    python3 -m pip install --no-cache-dir --upgrade "pydantic>=2,<3"
+    python3 - <<'PY'
+import pydantic
+
+print(pydantic.__version__)
+PY
+}
+
 ci_install_pigpio() {
     local pigpio_dir="/tmp/pigpio"
 

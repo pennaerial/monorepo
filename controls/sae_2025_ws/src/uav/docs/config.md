@@ -17,6 +17,7 @@ Key fields:
 - `custom_airframe_model`
 - `px4_namespace`
 - `px4_instance`
+- `force_camera`
 - `save_vision_milliseconds`
 - `camera_mount_offsets`
 - `camera_input_transport`
@@ -32,9 +33,12 @@ Hardware defaults for `main.launch.py`.
 Same shape as the sim file, but with hardware-oriented defaults such as:
 - `sim: false`
 - `mission_name: basic`
+- `force_camera: false`
 - `camera_input_transport: compressed`
 - `camera_rotate_degrees: 180.0`
 - `payload_controller: GPIOController`
+
+`use_camera` is still accepted on the legacy single-vehicle path as a deprecated alias for `force_camera`.
 
 ## Fleet YAML Shape
 
@@ -63,6 +67,7 @@ defaults:
   auto_launch: true
   debug: false
   vision_debug: false
+  force_camera: false
   save_vision_milliseconds: 0
   servo_only: false
   camera_mount_offsets: [0.0, 0.0, 0.0]
@@ -88,6 +93,7 @@ Runtime-owned:
 - which mission runs on which controllable
 - auto-start behavior
 - debug and vision flags
+- manual camera override
 - camera transport/rotation/preprocess settings
 - namespace and PX4 instance in the single-vehicle compatibility path
 

@@ -158,20 +158,24 @@ def test_target_record_validates_identity_and_overlay():
             default_deploy_root="/home/penn/pennair-deploy",
         )
 
+    with pytest.raises(ValueError, match="requires a non-empty pi_host"):
+        TargetRecord.from_dict(
+            {**_make_target(), "pi_host": ""},
+            default_deploy_root="/home/penn/pennair-deploy",
+        )
+
 
 def test_inventory_store_round_trips_through_disk(tmp_path):
     operator = _make_operator(tmp_path)
-    seed_target = TargetRecord.from_dict(
-        _make_target(),
-        default_deploy_root=operator.default_deploy_root,
-    )
 
     store = InventoryStore(
         operator.inventory_path,
         operator_config=operator,
         default_deploy_root=operator.default_deploy_root,
-        seed_target=seed_target,
     )
+    created, was_created = store.upsert_target(_make_target())
+    assert was_created is True
+    assert created.target_id == "pi-1"
 
     created, was_created = store.upsert_target(
         {
@@ -212,7 +216,6 @@ def test_inventory_store_round_trips_through_disk(tmp_path):
         operator.inventory_path,
         operator_config=restored_operator,
         default_deploy_root="/tmp/unused",
-        seed_target=seed_target,
     )
 
     assert restored.active_target_id() == "backup"
@@ -228,28 +231,27 @@ def test_inventory_store_round_trips_through_disk(tmp_path):
         "pi-1",
     ]
 
-    with pytest.raises(ValueError, match="Cannot delete the last target"):
-        lone_store = InventoryStore(
-            tmp_path / "single.json",
-            operator_config=_make_operator(tmp_path),
-            default_deploy_root="/home/penn/pennair-deploy",
-            seed_target=seed_target,
-        )
-        lone_store.delete_target("pi-1")
+    lone_store = InventoryStore(
+        tmp_path / "single.json",
+        operator_config=_make_operator(tmp_path),
+        default_deploy_root="/home/penn/pennair-deploy",
+    )
+    created, _ = lone_store.upsert_target(_make_target())
+    lone_store.delete_target(created.target_id)
+    assert lone_store.list_targets() == []
+    assert lone_store.active_target_id() == ""
+    with pytest.raises(KeyError, match="No saved targets in inventory"):
+        lone_store.get_target(None)
 
 
 def test_inventory_store_revalidates_existing_target_updates(tmp_path):
     operator = _make_operator(tmp_path)
-    seed_target = TargetRecord.from_dict(
-        _make_target(),
-        default_deploy_root=operator.default_deploy_root,
-    )
     store = InventoryStore(
         operator.inventory_path,
         operator_config=operator,
         default_deploy_root=operator.default_deploy_root,
-        seed_target=seed_target,
     )
+    store.upsert_target(_make_target())
 
     with pytest.raises(ValueError, match="invalid pi_host"):
         store.upsert_target(
@@ -262,17 +264,12 @@ def test_inventory_store_revalidates_existing_target_updates(tmp_path):
 
 def test_inventory_store_exports_and_imports(tmp_path):
     operator = _make_operator(tmp_path)
-    seed_target = TargetRecord.from_dict(
-        _make_target(),
-        default_deploy_root=operator.default_deploy_root,
-    )
-
     store = InventoryStore(
         operator.inventory_path,
         operator_config=operator,
         default_deploy_root=operator.default_deploy_root,
-        seed_target=seed_target,
     )
+    store.upsert_target(_make_target())
 
     created, was_created = store.upsert_target(
         {
@@ -342,16 +339,12 @@ def test_inventory_store_exports_and_imports(tmp_path):
 
 def test_build_source_store_persists_separately_from_inventory(tmp_path):
     operator = _make_operator(tmp_path)
-    seed_target = TargetRecord.from_dict(
-        _make_target(),
-        default_deploy_root=operator.default_deploy_root,
-    )
     inventory = InventoryStore(
         operator.inventory_path,
         operator_config=operator,
         default_deploy_root=operator.default_deploy_root,
-        seed_target=seed_target,
     )
+    inventory.upsert_target(_make_target())
     source_path, cache_dir = build_source_store_paths(operator.inventory_path)
     store = BuildSourceStore(source_path, cache_dir=cache_dir)
 
@@ -391,6 +384,7 @@ def test_build_source_store_local_artifact_clears_cached_file(tmp_path):
     store.clear()
 
     assert store.current().kind == "none"
+    assert store.current().fleet_file == ""
     assert not artifact_path.exists()
 
 
@@ -408,12 +402,52 @@ def test_build_source_store_persists_fleet_selection_and_local_sources(tmp_path)
 
     restored = BuildSourceStore(source_path, cache_dir=cache_dir)
     assert restored.current().kind == "local_artifact"
-    assert restored.current().fleet_file == "/tmp/runtime-fleet.yaml"
+    assert restored.current().fleet_file == "runtime-fleet.yaml"
     assert restored.current().artifact_name == "bundle.tar.gz"
     assert artifact_path.exists()
 
     restored.set_local_codebase(codebase_root="/workspace/monorepo")
     reloaded = BuildSourceStore(source_path, cache_dir=cache_dir)
     assert reloaded.current().kind == "local_codebase"
-    assert reloaded.current().fleet_file == "/tmp/runtime-fleet.yaml"
+    assert reloaded.current().fleet_file == "runtime-fleet.yaml"
     assert reloaded.current().codebase_root == "/workspace/monorepo"
+
+
+def test_inventory_store_starts_empty_and_persists_blank_state(tmp_path):
+    operator = _make_operator(tmp_path)
+    store = InventoryStore(
+        operator.inventory_path,
+        operator_config=operator,
+        default_deploy_root=operator.default_deploy_root,
+    )
+
+    assert store.list_targets() == []
+    assert store.active_target_id() == ""
+
+    payload = json.loads(operator.inventory_path.read_text(encoding="utf-8"))
+    assert payload["targets"] == []
+    assert payload["active_target_id"] == ""
+
+
+def test_inventory_import_populates_active_target_when_store_was_empty(tmp_path):
+    operator = _make_operator(tmp_path)
+    store = InventoryStore(
+        operator.inventory_path,
+        operator_config=operator,
+        default_deploy_root=operator.default_deploy_root,
+    )
+
+    summary = store.import_payload(
+        {
+            "targets": [
+                _make_target(
+                    target_id="pi-2",
+                    vehicle_name="payload_0",
+                    overlay_yaml="mission: payload_retreat\npayload_controller: GPIOController\n",
+                )
+            ]
+        }
+    )
+
+    assert summary["active_target_id"] == "pi-2"
+    assert store.active_target_id() == "pi-2"
