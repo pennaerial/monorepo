@@ -11,3 +11,27 @@ modes:
       debug: true
     transitions:
       complete: corner
+
+  corner:
+    class: uav.modes.payload.PayloadCornerNavigateMode
+    params:
+      direction: ccw
+      ccw_lower_hsv: [100, 100, 100]
+      ccw_upper_hsv: [130, 255, 255]
+      cw_lower_hsv: [170, 140, 120]
+      cw_upper_hsv: [180, 255, 255]
+      drive_out_speed_mps: 0.1
+      detect_frames: 3
+      max_drive_out_s: 30.0
+      drive_out_strip_frac: 0.30
+      drive_out_min_pixels: 150
+      compressed_image: false
+      align_angular_speed: 0.7
+      center_tol_px: 30.0
+      center_min_pixels: 150
+      center_stable_frames: 1
+      line_follow_speed_mps: 0.10
+      line_follow_strip_frac: 0.40
+      line_follow_min_pixels: 50
+      k_lat: 0.003
+      max_angular: 1.3
