@@ -2008,7 +2008,7 @@
     "uav.modes.payload.PayloadWaitForDriveOutMode": {
       "class_name": "PayloadWaitForDriveOutMode",
       "class_path": "uav.modes.payload.PayloadWaitForDriveOutMode",
-      "description": "Poll PayloadDriveOutNode each update tick. Once the path ahead registers as",
+      "description": "Subscribe to the payload camera topic and run detect_payload_unreeled each",
       "display_name": "PayloadWaitForDriveOutMode",
       "mission_target": "payload",
       "module_path": "uav.modes.payload.PayloadWaitForDriveOutMode",
@@ -2017,9 +2017,18 @@
           "annotation": {
             "kind": "int"
           },
-          "default": 5,
+          "default": 70,
           "default_kind": "value",
           "name": "confirm_frames",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.3,
+          "default_kind": "value",
+          "name": "clear_threshold",
           "required": false
         },
         {
@@ -2071,15 +2080,48 @@
           "default_kind": "value",
           "name": "turn_speed",
           "required": false
+        },
+        {
+          "annotation": {
+            "kind": "bool"
+          },
+          "default": false,
+          "default_kind": "value",
+          "name": "compressed_image",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "bool"
+          },
+          "default": false,
+          "default_kind": "value",
+          "name": "debug",
+          "required": false
         }
       ],
       "params_schema": {
         "additionalProperties": false,
         "properties": {
+          "clear_threshold": {
+            "default": 0.3,
+            "title": "Clear Threshold",
+            "type": "number"
+          },
+          "compressed_image": {
+            "default": false,
+            "title": "Compressed Image",
+            "type": "boolean"
+          },
           "confirm_frames": {
-            "default": 5,
+            "default": 70,
             "title": "Confirm Frames",
             "type": "integer"
+          },
+          "debug": {
+            "default": false,
+            "title": "Debug",
+            "type": "boolean"
           },
           "lower_hsv": {
             "default": [
@@ -2119,9 +2161,7 @@
         "title": "PayloadWaitForDriveOutModeParams",
         "type": "object"
       },
-      "required_vision_nodes": [
-        "PayloadDriveOutNode"
-      ],
+      "required_vision_nodes": [],
       "transition_labels": [
         "complete"
       ]

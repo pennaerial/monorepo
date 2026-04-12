@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from collections.abc import Sequence
 from enum import Enum
 import importlib
@@ -53,7 +54,15 @@ def _iter_mode_classes() -> list[type[Mode]]:
     for module_info in pkgutil.walk_packages(
         mode_package.__path__, prefix=f"{mode_package.__name__}."
     ):
-        module = importlib.import_module(module_info.name)
+        try:
+            module = importlib.import_module(module_info.name)
+        except ImportError as exc:
+            print(
+                f"WARNING: skipping mode module '{module_info.name}' "
+                f"(missing dependency: {exc})",
+                file=sys.stderr,
+            )
+            continue
         for value in vars(module).values():
             if (
                 isinstance(value, type)
