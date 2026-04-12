@@ -95,8 +95,13 @@ class PayloadCornerNavigateMode(Mode):
         line_follow_min_pixels: int = 50,
         k_lat: float = 0.003,
         max_angular: float = 0.5,
-        dr_angular_turn: float = 2.354,
-        dr_speed: float = 1.5
+        # TAPE_ALIGN — rotate until diagonal black-tape centroid is centered
+        tape_align_lower_hsv: list[int] = (0, 0, 0),
+        tape_align_upper_hsv: list[int] = (180, 255, 60),
+        tape_align_angular_speed: float = 0.6,
+        tape_align_center_tol_px: float = 20.0,
+        tape_align_min_pixels: int = 100,
+        tape_align_stable_frames: int = 3,
     ):
         super().__init__(node, vehicle)
         direction = str(direction).lower().strip()
@@ -136,14 +141,17 @@ class PayloadCornerNavigateMode(Mode):
         self.k_lat = float(k_lat)
         self.max_angular = float(max_angular)
 
+        self._lower_black = np.array(tape_align_lower_hsv, dtype=np.uint8)
+        self._upper_black = np.array(tape_align_upper_hsv, dtype=np.uint8)
+        self.tape_align_angular_speed = float(tape_align_angular_speed)
+        self.tape_align_center_tol_px = float(tape_align_center_tol_px)
+        self.tape_align_min_pixels = int(tape_align_min_pixels)
+        self.tape_align_stable_frames = int(tape_align_stable_frames)
+
         self._bridge = CvBridge()
         self._image_sub = None
         self._image: Optional[object] = None
         self._annotated_pub = None
-
-        self._dr_angular = float(dr_angular_turn)
-        self._dr_speed = float(dr_speed)
-        self._dr_future = None
 
     # ------------------------------------------------------------------
     # helpers
@@ -180,6 +188,9 @@ class PayloadCornerNavigateMode(Mode):
         # LINE_FOLLOW state
         self._prev_color: Optional[str] = None
         self._corner_color_seen: bool = False
+
+        # TAPE_ALIGN state
+        self._tape_align_stable: int = 0
         # Starts True — transitions are armed immediately on entry. Set to
         # False after each mid-side swap to suppress false corners from
         # residual pixels at the boundary we just crossed; re-arms once the
@@ -221,8 +232,8 @@ class PayloadCornerNavigateMode(Mode):
             self._update_turn_to_center(time_delta)
         elif self._phase == "line_follow":
             self._update_line_follow(time_delta)
-        elif self._phase == "dead_reckon":
-            self._update_dead_reckon()
+        elif self._phase == "tape_align":
+            self._update_tape_align()
 
     def check_status(self) -> str:
         # Both the success path (_done) and the safety bail-outs (_terminate)
@@ -560,12 +571,11 @@ class PayloadCornerNavigateMode(Mode):
                 transitioned_this_tick,
                 0.0,
             )
-            self._phase = "dead_reckon"
-            self._dr_future = None
+            self._phase = "tape_align"
+            self._tape_align_stable = 0
             self.log(
                 f"PayloadCornerNavigateMode: current colour {current} lost "
-                f"after corner detected → DEAD_RECKON "
-                f"(angular={self._dr_angular:.3f} speed={self._dr_speed:.2f})"
+                f"after corner detected → TAPE_ALIGN"
             )
             return
 
@@ -596,21 +606,63 @@ class PayloadCornerNavigateMode(Mode):
         self.vehicle.drive(self.line_follow_speed_mps, angular)
 
     # ------------------------------------------------------------------
-    # Phase: DEAD_RECKON
+    # Phase: TAPE_ALIGN
     # ------------------------------------------------------------------
 
-    def _update_dead_reckon(self) -> None:
-        if self._dr_future is None:
-            self._dr_future = self.vehicle.dead_reckon(
-                linear=0.0, angular=self._dr_angular, speed=self._dr_speed
-            )
-        elif self._dr_future.done():
-            result = self._dr_future.result()
+    def _black_centroid_metrics(self, bgr: np.ndarray) -> Tuple[int, float]:
+        """Return ``(pixel_count, lateral_error_px)`` for black tape in the
+        bottom ``line_follow_strip_frac`` of the frame, full width.
+        ``lateral_error_px`` = centroid x minus strip center x; positive means
+        tape is right of center."""
+        h, w = bgr.shape[:2]
+        strip_start = int(h * (1.0 - self.line_follow_strip_frac))
+        strip = bgr[strip_start:, :]
+        hsv = cv2.cvtColor(strip, cv2.COLOR_BGR2HSV)
+        mask = cv2.inRange(hsv, self._lower_black, self._upper_black)
+        count = int(np.count_nonzero(mask))
+        if count == 0:
+            return 0, 0.0
+        ys, xs = np.nonzero(mask)
+        centroid_x = float(xs.mean())
+        strip_center_x = strip.shape[1] / 2.0
+        return count, centroid_x - strip_center_x
+
+    def _update_tape_align(self) -> None:
+        bgr = self._decode_image()
+        if bgr is None:
+            self.vehicle.stop()
+            return
+
+        count, lateral_px = self._black_centroid_metrics(bgr)
+
+        if count < self.tape_align_min_pixels:
+            # Tape not visible yet — rotate slowly to search
+            self.vehicle.drive(0.0, self.tape_align_angular_speed)
+            self._tape_align_stable = 0
             self.log(
-                f"PayloadCornerNavigateMode: DEAD_RECKON done "
-                f"success={result.success} → done"
+                f"PayloadCornerNavigateMode: TAPE_ALIGN searching "
+                f"(black_px={count})"
             )
-            self._done = True
+            return
+
+        # Proportional correction toward center
+        if abs(lateral_px) <= self.tape_align_center_tol_px:
+            self._tape_align_stable += 1
+            self.vehicle.stop()
+            if self._tape_align_stable >= self.tape_align_stable_frames:
+                self.log(
+                    f"PayloadCornerNavigateMode: TAPE_ALIGN centered "
+                    f"(lat={lateral_px:.1f}px, px={count}) → done"
+                )
+                self._done = True
+        else:
+            self._tape_align_stable = 0
+            direction = -1.0 if lateral_px > 0 else 1.0
+            self.vehicle.drive(0.0, direction * self.tape_align_angular_speed)
+            self.log(
+                f"PayloadCornerNavigateMode: TAPE_ALIGN turning "
+                f"lat={lateral_px:.1f}px black_px={count}"
+            )
 
     # ------------------------------------------------------------------
     # Annotated debug image
