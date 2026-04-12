@@ -160,7 +160,6 @@
       "required_vision_nodes": [
         "PayloadAprilTagNode"
       ],
-      "requires_camera": false,
       "transition_labels": []
     },
     "uav.modes.payload.PayloadColorOrbitToRearMode": {
@@ -392,7 +391,6 @@
       "required_vision_nodes": [
         "PayloadColorOrbitNode"
       ],
-      "requires_camera": false,
       "transition_labels": [
         "handoff_dock"
       ]
@@ -764,7 +762,6 @@
         "type": "object"
       },
       "required_vision_nodes": [],
-      "requires_camera": false,
       "transition_labels": []
     },
     "uav.modes.payload.PayloadDLZNavigateMode": {
@@ -1057,7 +1054,6 @@
         "PayloadColorSquareNode",
         "PayloadAprilTagNode"
       ],
-      "requires_camera": false,
       "transition_labels": [
         "done"
       ]
@@ -1517,7 +1513,6 @@
       "required_vision_nodes": [
         "PayloadAprilTagNode"
       ],
-      "requires_camera": false,
       "transition_labels": []
     },
     "uav.modes.payload.PayloadNavigateAroundPlaneMode": {
@@ -1693,7 +1688,6 @@
       "required_vision_nodes": [
         "PayloadAprilTagNode"
       ],
-      "requires_camera": false,
       "transition_labels": [
         "approach"
       ]
@@ -1871,7 +1865,6 @@
       "required_vision_nodes": [
         "PayloadAprilTagNode"
       ],
-      "requires_camera": false,
       "transition_labels": []
     },
     "uav.modes.payload.PayloadScanForTagMode": {
@@ -1949,7 +1942,6 @@
       "required_vision_nodes": [
         "PayloadAprilTagNode"
       ],
-      "requires_camera": false,
       "transition_labels": [
         "found",
         "not_found"
@@ -2070,7 +2062,6 @@
         "type": "object"
       },
       "required_vision_nodes": [],
-      "requires_camera": true,
       "transition_labels": [
         "complete"
       ]
@@ -2090,7 +2081,6 @@
         "type": "object"
       },
       "required_vision_nodes": [],
-      "requires_camera": false,
       "transition_labels": []
     },
     "uav.modes.uav.NavGPSMode": {
@@ -2204,7 +2194,6 @@
         "type": "object"
       },
       "required_vision_nodes": [],
-      "requires_camera": false,
       "transition_labels": [
         "complete"
       ]
@@ -2290,7 +2279,6 @@
       "required_vision_nodes": [
         "PayloadTrackingNode"
       ],
-      "requires_camera": false,
       "transition_labels": [
         "complete"
       ]
@@ -2328,7 +2316,6 @@
       "required_vision_nodes": [
         "PayloadTrackingNode"
       ],
-      "requires_camera": false,
       "transition_labels": [
         "complete"
       ]
@@ -2474,7 +2461,6 @@
         "type": "object"
       },
       "required_vision_nodes": [],
-      "requires_camera": false,
       "transition_labels": [
         "complete"
       ]
@@ -2583,7 +2569,6 @@
         "type": "object"
       },
       "required_vision_nodes": [],
-      "requires_camera": false,
       "transition_labels": [
         "complete"
       ]
@@ -2629,7 +2614,6 @@
         "type": "object"
       },
       "required_vision_nodes": [],
-      "requires_camera": false,
       "transition_labels": [
         "complete"
       ]
@@ -2748,7 +2732,6 @@
         "type": "object"
       },
       "required_vision_nodes": [],
-      "requires_camera": false,
       "transition_labels": []
     }
   },

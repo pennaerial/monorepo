@@ -1,0 +1,18 @@
+{
+  "kind": "github",
+  "github_source": "release",
+  "tag": "build-19aac36",
+  "artifact_id": "",
+  "run_id": "",
+  "sha": "19aac36",
+  "name": "ROS 2 Build 19aac36",
+  "date": "2026-04-11",
+  "download_url": "",
+  "size_mb": null,
+  "branch": "",
+  "artifact_name": "",
+  "local_artifact_path": "",
+  "local_artifact_size_bytes": null,
+  "codebase_root": "",
+  "updated_at": "2026-04-11T22:22:40Z"
+}
