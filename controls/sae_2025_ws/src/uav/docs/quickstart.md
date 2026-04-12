@@ -7,6 +7,7 @@ Sim-first onboarding for the UAV framework.
 - A built workspace
 - A PX4-Autopilot checkout, usually at `~/PX4-Autopilot`
 - For sim, Gazebo and `MicroXRCEAgent` available on `PATH`
+- `pydantic>=2,<3` installed in the Python environment that will run `uav`
 
 ## Build And Source
 ```bash
@@ -14,6 +15,12 @@ source /opt/ros/humble/setup.bash
 cd /home/ubuntu/monorepo/controls/sae_2025_ws
 colcon build --packages-select sim uav payload
 source install/setup.bash
+```
+
+If your environment is missing the UAV runtime dependency, install it before launch:
+
+```bash
+python3 -m pip install "pydantic>=2,<3"
 ```
 
 ## Single Vehicle
@@ -49,7 +56,8 @@ What success looks like:
 - each managed vehicle starts in its own namespace
 - UAV entries attach to backend controllables and start PX4 SITL
 - payload entries start payload runtime only
-- missions that need vision also bring up camera and vision nodes
+- missions that need camera or vision bring up the required camera pipeline
+- missions with service-based CV also launch the relevant vision nodes
 
 ## Where Things Live
 - Missions: `src/uav/uav/missions/*.yaml`

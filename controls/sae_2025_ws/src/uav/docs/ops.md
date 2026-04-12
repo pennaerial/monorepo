@@ -24,10 +24,10 @@ param set-default NAV_FORCE_VT 0
 
 ### AprilTag missions fail immediately or no detector is available
 
-Install `apriltag` on the machine running the vision nodes:
+Install the runtime Python dependencies on the machine running the vision nodes:
 
 ```bash
-python3 -m pip install apriltag
+python3 -m pip install "pydantic>=2,<3" apriltag
 ```
 
 ### `auto_launch: false` and the mission never starts

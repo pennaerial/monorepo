@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from collections.abc import Sequence
 from enum import Enum
 import importlib
@@ -53,7 +54,15 @@ def _iter_mode_classes() -> list[type[Mode]]:
     for module_info in pkgutil.walk_packages(
         mode_package.__path__, prefix=f"{mode_package.__name__}."
     ):
-        module = importlib.import_module(module_info.name)
+        try:
+            module = importlib.import_module(module_info.name)
+        except ImportError as exc:
+            print(
+                f"WARNING: skipping mode module '{module_info.name}' "
+                f"(missing dependency: {exc})",
+                file=sys.stderr,
+            )
+            continue
         for value in vars(module).values():
             if (
                 isinstance(value, type)
@@ -284,6 +293,7 @@ def build_mode_registry_entry(mode_class: type[Mode]) -> ModeRegistryEntry:
         description=_doc_summary(mode_class),
         mission_target=mission_target,
         required_vision_nodes=mode_class.required_vision_node_names(),
+        requires_camera=bool(getattr(mode_class, "requires_camera", False)),
         transition_labels=mode_class.declared_transition_labels(),
         params_schema=_sanitize_json_schema(
             mode_params_model(mode_class).model_json_schema()

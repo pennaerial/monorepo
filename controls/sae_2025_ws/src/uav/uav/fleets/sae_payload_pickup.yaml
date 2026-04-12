@@ -1,8 +1,8 @@
 backend:
-  kind: sim
+  kind: real
   px4_path: ~/PX4-Autopilot
-  world_name: sae
-  mission_stage: payload_docking
+  # world_name: sae
+  # jmission_stage: payload_docking
 
 defaults:
   auto_launch: true
@@ -18,5 +18,5 @@ defaults:
 vehicles:
   - name: payload
     controllable: payload_0
-    mission: payload_apriltag_approach
+    mission: payload_wait_drive_out
     camera_mount_offsets: [0.2, 0.0, 0.0]

@@ -43,9 +43,9 @@ ros2 launch uav fleet.launch.py \
 
 ## High-Signal Gotchas
 
-- AprilTag-based payload missions need `apriltag` installed:
+- Mission and fleet loading need `pydantic>=2,<3`, and AprilTag-based payload missions also need `apriltag`:
   ```bash
-  python3 -m pip install apriltag
+  python3 -m pip install "pydantic>=2,<3" apriltag
   ```
 - `auto_launch: false` does not block startup. It leaves the mission idle until `/<vehicle>/mode_manager/start_mission` is called.
 - Sim launches default to GUI. Use `SAE_SIM_GUI=0` or `SAE_SIM_HEADLESS=1` for headless runs.

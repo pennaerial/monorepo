@@ -50,8 +50,8 @@
       loop_ms: 50
 
     servo:
-      pulse_min_us: 700.0
-      pulse_max_us: 2300.0
+      pulse_min_us: 600.0
+      pulse_max_us: 2200.0
       frequency: 50
 
     sim:

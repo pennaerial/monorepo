@@ -7,6 +7,7 @@ modes:
       tag_size_m: 0.0508
       max_forward_speed: 0.2
       forward_gain: 0.5
-      angular_gain: 0.005
+      angular_gain: 0.006
       yaw_gain: 0.6
       stop_distance_m: 0.2
+      compressed: false

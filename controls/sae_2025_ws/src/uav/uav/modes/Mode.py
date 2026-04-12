@@ -17,6 +17,7 @@ class Mode(ABC):
 
     mission_target: ClassVar[str | None] = None
     required_vision_nodes: ClassVar[tuple[object, ...]] = ()
+    requires_camera: ClassVar[bool] = False
     transition_labels: ClassVar[tuple[str, ...]] = ()
 
     def __init__(self, node: Node, vehicle: Vehicle):
