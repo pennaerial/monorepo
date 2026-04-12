@@ -30,8 +30,17 @@ def test_mode_registry_entry_exposes_transition_labels_and_schema():
 
     assert entry.class_path == "uav.modes.uav.TakeoffMode"
     assert entry.mission_target == "uav"
+    assert entry.requires_camera is False
     assert entry.transition_labels == ("complete",)
     assert "takeoff_type" in entry.params_schema["properties"]
+
+
+def test_mode_registry_entry_marks_camera_only_modes():
+    entry = mode_entry_for_class_path("uav.modes.payload.PayloadWaitForDriveOutMode")
+
+    assert entry.mission_target == "payload"
+    assert entry.required_vision_nodes == ()
+    assert entry.requires_camera is True
 
 
 def test_mode_registry_entries_include_payload_modes():

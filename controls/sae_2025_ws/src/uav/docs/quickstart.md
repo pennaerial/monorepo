@@ -49,7 +49,8 @@ What success looks like:
 - each managed vehicle starts in its own namespace
 - UAV entries attach to backend controllables and start PX4 SITL
 - payload entries start payload runtime only
-- missions that need vision also bring up camera and vision nodes
+- missions that need camera or vision bring up the required camera pipeline
+- missions with service-based CV also launch the relevant vision nodes
 
 ## Where Things Live
 - Missions: `src/uav/uav/missions/*.yaml`

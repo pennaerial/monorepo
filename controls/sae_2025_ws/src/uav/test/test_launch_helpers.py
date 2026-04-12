@@ -100,6 +100,17 @@ def test_yaml_bool_value_rejects_non_boolean(main_launch_module):
         main_launch_module._yaml_bool_value("false", name="auto_launch", default=True)
 
 
+def test_main_launch_force_camera_prefers_new_key(main_launch_module):
+    assert (
+        main_launch_module._resolve_force_camera({"force_camera": True, "use_camera": False})
+        is True
+    )
+
+
+def test_main_launch_force_camera_accepts_legacy_alias(main_launch_module):
+    assert main_launch_module._resolve_force_camera({"use_camera": True}) is True
+
+
 @pytest.mark.parametrize(
     ("mission_spec", "expected"),
     [
@@ -143,6 +154,149 @@ def test_resolve_bool(stack_launch_module, value, default, expected):
 def test_resolve_bool_rejects_invalid_value(stack_launch_module):
     with pytest.raises(ValueError, match="expected boolean 'flag'"):
         stack_launch_module._resolve_bool({"flag": "maybe"}, "flag", True)
+
+
+def test_vehicle_stack_force_camera_prefers_new_key(stack_launch_module):
+    assert (
+        stack_launch_module._resolve_force_camera(
+            {"force_camera": True, "use_camera": False}
+        )
+        is True
+    )
+
+
+def test_vehicle_stack_force_camera_accepts_legacy_alias(stack_launch_module):
+    assert stack_launch_module._resolve_force_camera({"use_camera": "yes"}) is True
+
+
+def test_launch_setup_starts_camera_actions_for_camera_only_mission(
+    monkeypatch, stack_launch_module
+):
+    mission_spec = SimpleNamespace(
+        is_uav=False,
+        is_payload=True,
+        target="payload",
+        vision_nodes=(),
+        requires_camera=True,
+    )
+    recorded = {}
+
+    monkeypatch.setattr(
+        stack_launch_module,
+        "_load_vehicle_config",
+        lambda _context: {
+            "vehicle_name": "payload_0",
+            "sim": False,
+            "auto_launch": True,
+            "debug": False,
+            "vision_debug": False,
+            "launch_payload_backend": False,
+        },
+    )
+    monkeypatch.setattr(
+        stack_launch_module, "_resolve_mission_path", lambda _config: "/tmp/mission.yaml"
+    )
+    monkeypatch.setattr(
+        stack_launch_module.MissionSpec, "load", staticmethod(lambda _path: mission_spec)
+    )
+    monkeypatch.setattr(
+        stack_launch_module, "_runtime_executable_for", lambda _mission_spec: "payload_mission"
+    )
+    monkeypatch.setattr(
+        stack_launch_module,
+        "_resolve_camera_input_transport",
+        lambda **_kwargs: "compressed",
+    )
+    monkeypatch.setattr(
+        stack_launch_module,
+        "_camera_contract_for",
+        lambda *args, **kwargs: {
+            "vehicle_name": "payload_0",
+            "camera_info_url": "",
+            "mission_target": "payload",
+        },
+    )
+
+    def _record_camera_actions(**kwargs):
+        recorded["camera_actions"] = kwargs
+        return ["camera"]
+
+    monkeypatch.setattr(
+        stack_launch_module,
+        "_build_camera_actions",
+        _record_camera_actions,
+    )
+    monkeypatch.setattr(
+        stack_launch_module,
+        "_build_runtime_parameters",
+        lambda **_kwargs: {},
+    )
+    monkeypatch.setattr(
+        stack_launch_module,
+        "_payload_launch_action",
+        lambda **_kwargs: "payload",
+    )
+    monkeypatch.setattr(
+        stack_launch_module,
+        "Node",
+        lambda **kwargs: ("node", kwargs),
+    )
+
+    actions = stack_launch_module.launch_setup(SimpleNamespace())
+
+    assert "camera_actions" in recorded
+    assert recorded["camera_actions"]["vision_nodes"] == []
+    assert "camera" in actions
+
+
+def test_launch_setup_validates_uav_camera_sensor_for_camera_only_mission(
+    monkeypatch, stack_launch_module
+):
+    mission_spec = SimpleNamespace(
+        is_uav=True,
+        is_payload=False,
+        target="uav",
+        vision_nodes=(),
+        requires_camera=True,
+    )
+
+    monkeypatch.setattr(
+        stack_launch_module,
+        "_load_vehicle_config",
+        lambda _context: {
+            "vehicle_name": "uav_0",
+            "sim": False,
+            "auto_launch": True,
+            "debug": False,
+            "vision_debug": False,
+            "launch_middleware": False,
+            "launch_px4_sitl": False,
+            "px4_path": "/tmp/PX4-Autopilot",
+        },
+    )
+    monkeypatch.setattr(
+        stack_launch_module, "_resolve_mission_path", lambda _config: "/tmp/mission.yaml"
+    )
+    monkeypatch.setattr(
+        stack_launch_module.MissionSpec, "load", staticmethod(lambda _path: mission_spec)
+    )
+    monkeypatch.setattr(
+        stack_launch_module, "_runtime_executable_for", lambda _mission_spec: "uav_mission"
+    )
+    monkeypatch.setattr(
+        stack_launch_module,
+        "find_folder_with_heuristic",
+        lambda *_args, **_kwargs: "/tmp/PX4-Autopilot",
+    )
+    monkeypatch.setattr(
+        stack_launch_module,
+        "_resolve_uav_airframe",
+        lambda _config, _px4_path: (SimpleNamespace(name="MULTICOPTER"), 4004, "no_camera"),
+    )
+    monkeypatch.setattr(stack_launch_module, "vehicle_camera_map", {})
+
+    with pytest.raises(ValueError, match="does not have a camera sensor configured"):
+        stack_launch_module.launch_setup(SimpleNamespace())
 
 
 def test_vehicle_namespace_for_rejects_empty(stack_launch_module):

@@ -47,6 +47,9 @@ defaults:
   # Extra logging/visualization from the vision stack.
   vision_debug: false
 
+  # Force the camera stack on even when the mission does not declare it.
+  force_camera: false
+
   # Persist vision frames for this many milliseconds. `0` disables capture.
   save_vision_milliseconds: 0
 
