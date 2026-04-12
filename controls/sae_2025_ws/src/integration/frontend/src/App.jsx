@@ -1803,7 +1803,7 @@ function normalizeBackendBuildSource(raw) {
     payload.fleet_options || payload.fleetOptions || payload.fleet_files || payload.fleetFiles || payload.fleet_catalog || payload.fleetCatalog
   )
   const contextFields = {
-    fleetFile: `${payload.fleet_file || ''}`.trim(),
+    fleetFile: fleetSelectionId(payload.fleet_file || ''),
     fleetExists: payload.fleet_exists !== false,
     fleetError: payload.fleet_error || '',
     fleetVehicles,
@@ -1936,26 +1936,36 @@ function normalizeFleetOptions(rawOptions) {
     .map(option => {
       if (!option) return null
       if (typeof option === 'string') {
-        const value = option.trim()
+        const rawValue = option.trim()
+        const value = fleetSelectionId(rawValue)
         if (!value) return null
         return {
           value,
-          label: displayWorkspacePath(value, '') || value,
+          path: rawValue,
+          label: value,
           description: '',
           disabled: false,
         }
       }
       if (typeof option !== 'object') return null
-      const value = `${option.fleet_file || option.path || option.value || option.file || option.name || ''}`.trim()
+      const rawValue = `${option.fleet_file || option.path || option.value || option.file || option.name || ''}`.trim()
+      const value = fleetSelectionId(rawValue)
       if (!value) return null
       return {
         value,
-        label: `${option.label || option.name || displayWorkspacePath(value, '') || value}`.trim(),
+        path: rawValue,
+        label: `${option.label || option.name || value}`.trim(),
         description: `${option.description || option.detail || ''}`.trim(),
         disabled: option.available === false,
       }
     })
     .filter(Boolean)
+}
+
+function fleetSelectionId(rawValue) {
+  const value = `${rawValue || ''}`.trim().replace(/\\/g, '/')
+  if (!value) return ''
+  return value.split('/').filter(Boolean).pop() || value
 }
 
 function shortBuildSha(build) {
@@ -2526,7 +2536,9 @@ function BuildSourcePage({
 }) {
   const [selectedBuildKey, setSelectedBuildKey] = useState('')
   const [buildSearch, setBuildSearch] = useState('')
-  const [fleetDraft, setFleetDraft] = useState(buildSource?.fleetFile || '')
+  const [fleetDraft, setFleetDraft] = useState(fleetSelectionId(buildSource?.fleetFile || ''))
+  const sourceSummary = describeBuildSource(buildSource, buildSourceLoaded)
+  const fleetOptions = Array.isArray(buildSource?.fleetOptions) ? buildSource.fleetOptions : []
 
   useEffect(() => {
     if (buildSource?.kind === 'github' && buildSource.build) {
@@ -2535,13 +2547,18 @@ function BuildSourcePage({
   }, [buildSource])
 
   useEffect(() => {
-    setFleetDraft(buildSource?.fleetFile || '')
-  }, [buildSource?.fleetFile])
-
-  const sourceSummary = describeBuildSource(buildSource, buildSourceLoaded)
-  const fleetOptions = Array.isArray(buildSource?.fleetOptions) ? buildSource.fleetOptions : []
+    const nextDraft = fleetSelectionId(buildSource?.fleetFile || '')
+    if (!nextDraft) {
+      setFleetDraft('')
+      return
+    }
+    setFleetDraft(fleetOptions.some(option => option.value === nextDraft) ? nextDraft : '')
+  }, [buildSource?.fleetFile, fleetOptions])
   const allBuilds = useMemo(() => mergeBuildLists(releases, artifacts), [releases, artifacts])
   const deferredSearch = useDeferredValue(buildSearch.trim().toLowerCase())
+  const fleetHelpText = buildSource?.kind === 'none'
+    ? 'Select a build to load fleet choices.'
+    : 'Fleet choices come from the selected build source and are keyed by filename.'
   const filteredBuilds = useMemo(() => {
     if (!deferredSearch) return allBuilds
     return allBuilds.filter(build => buildSearchText(build).includes(deferredSearch))
@@ -2622,38 +2639,23 @@ function BuildSourcePage({
           <h2 className="card-title">Fleet</h2>
           <div className="card-content">
             <p className="subtext left-note">One fleet is active at a time. Hardware pages only choose the controllable inside this fleet.</p>
-            <label>Fleet file</label>
+            <label>Fleet</label>
             <select
               value={fleetDraft}
               onChange={e => setFleetDraft(e.target.value)}
               disabled={buildSourceWorking || loadingBuilds || fleetOptions.length === 0}
             >
-              {fleetOptions.length > 0 ? (
-                <>
-                  <option value="">Select fleet</option>
-                  {fleetOptions.map(option => (
-                    <option key={option.value} value={option.value} disabled={option.disabled}>
-                      {option.label}
-                    </option>
-                  ))}
-                </>
-              ) : (
-                <option value={fleetDraft || ''}>{fleetDraft || 'Backend has not exposed a fleet list'}</option>
-              )}
+              <option value="">{fleetOptions.length > 0 ? 'Select fleet' : 'No fleet choices available'}</option>
+              {fleetOptions.map(option => (
+                <option key={option.value} value={option.value} disabled={option.disabled}>
+                  {option.label}
+                </option>
+              ))}
             </select>
             {!fleetOptions.length && (
-              <>
-                <p className="param-help">The backend does not expose fleet choices yet. Edit the path manually below and save it as the active context.</p>
-                <input
-                  type="text"
-                  value={fleetDraft}
-                  onChange={e => setFleetDraft(e.target.value)}
-                  placeholder="src/uav/uav/fleets/example_fleet.yaml"
-                  disabled={buildSourceWorking || loadingBuilds}
-                />
-              </>
+              <p className="param-help">{fleetHelpText}</p>
             )}
-            <button className="btn btn-primary" type="button" onClick={() => onSelectFleetFile(fleetDraft.trim())} disabled={buildSourceWorking || !fleetDraft.trim()}>
+            <button className="btn btn-primary" type="button" onClick={() => onSelectFleetFile(fleetDraft.trim())} disabled={buildSourceWorking || !fleetDraft.trim() || fleetOptions.length === 0}>
               {buildSourceWorking ? 'Saving...' : 'Save Fleet'}
             </button>
           </div>
@@ -3336,8 +3338,9 @@ function App() {
   const saveGlobalFleetFile = async fleetFile => {
     setBuildSourceWorking(true)
     try {
+      const selectedFleetId = fleetSelectionId(fleetFile)
       const fd = new FormData()
-      fd.append('fleet_file', fleetFile || '')
+      fd.append('fleet_file', selectedFleetId || '')
       const data = await api('/api/build-source/fleet', { method: 'POST', body: fd })
       setBuildSourceResult(data)
       if (data.success) {

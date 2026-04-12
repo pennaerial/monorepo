@@ -113,6 +113,27 @@ def _catalog_yaml_paths(root: Path) -> list[Path]:
     return sorted(paths)
 
 
+def _fleet_catalog_lookup_from_paths(paths: list[Path]) -> dict[str, Path]:
+    catalog: dict[str, Path] = {}
+    duplicate_names: set[str] = set()
+    for path in paths:
+        fleet_file = path.name.strip()
+        if not fleet_file:
+            continue
+        resolved = path.resolve()
+        existing = catalog.get(fleet_file)
+        if existing is not None and existing != resolved:
+            duplicate_names.add(fleet_file)
+            continue
+        catalog[fleet_file] = resolved
+    if duplicate_names:
+        joined = ", ".join(sorted(duplicate_names))
+        raise ValueError(
+            f"Duplicate fleet file names in selected build source: {joined}"
+        )
+    return {fleet_file: catalog[fleet_file] for fleet_file in sorted(catalog)}
+
+
 def _safe_extract_path(base_dir: Path, member_name: str) -> Path | None:
     candidate = (base_dir / member_name).resolve()
     base_resolved = base_dir.resolve()
@@ -135,21 +156,35 @@ def _archive_member_names(archive_path: Path) -> list[str]:
     )
 
 
+def _is_fleet_yaml_member(member_name: str) -> bool:
+    normalized = member_name.replace("\\", "/").lower()
+    return "/fleets/" in normalized and normalized.endswith((".yaml", ".yml"))
+
+
+def _is_supported_archive_member(member_name: str) -> bool:
+    normalized = member_name.replace("\\", "/").lower()
+    return normalized.endswith(_SOURCE_BUNDLE_EXTENSIONS)
+
+
+def _nested_archive_destination(extract_dir: Path, member_name: str) -> Path:
+    base_name = Path(member_name.replace("\\", "/")).name or "nested-archive"
+    digest = hashlib.sha1(member_name.encode("utf-8")).hexdigest()[:8]
+    nested_dir = extract_dir / "__nested__"
+    nested_dir.mkdir(parents=True, exist_ok=True)
+    return nested_dir / f"{digest}-{base_name}"
+
+
 def _extract_catalog_from_archive(
-    archive_path: Path, extract_dir: Path
+    archive_path: Path, extract_dir: Path, *, _depth: int = 0
 ) -> list[Path]:
     extract_dir.mkdir(parents=True, exist_ok=True)
     member_names = _archive_member_names(archive_path)
     catalog_paths: list[Path] = []
 
-    def _is_fleet_yaml(member_name: str) -> bool:
-        normalized = member_name.replace("\\", "/").lower()
-        return "/fleets/" in normalized and normalized.endswith((".yaml", ".yml"))
-
     if archive_path.name.endswith(".zip"):
         with zipfile.ZipFile(archive_path) as archive:
             for member_name in member_names:
-                if not _is_fleet_yaml(member_name):
+                if not _is_fleet_yaml_member(member_name):
                     continue
                 destination = _safe_extract_path(extract_dir, member_name)
                 if destination is None:
@@ -157,10 +192,32 @@ def _extract_catalog_from_archive(
                 destination.parent.mkdir(parents=True, exist_ok=True)
                 archive.extract(member_name, extract_dir)
                 catalog_paths.append(destination)
+            if not catalog_paths and _depth == 0:
+                for member_name in member_names:
+                    if not _is_supported_archive_member(member_name):
+                        continue
+                    nested_archive_path = _nested_archive_destination(
+                        extract_dir, member_name
+                    )
+                    with archive.open(member_name) as nested_archive_stream:
+                        with nested_archive_path.open("wb") as nested_archive_file:
+                            shutil.copyfileobj(
+                                nested_archive_stream, nested_archive_file
+                            )
+                    nested_extract_dir = nested_archive_path.parent / (
+                        f"{nested_archive_path.name}.extract"
+                    )
+                    catalog_paths.extend(
+                        _extract_catalog_from_archive(
+                            nested_archive_path,
+                            nested_extract_dir,
+                            _depth=_depth + 1,
+                        )
+                    )
     else:
         with tarfile.open(archive_path, "r:gz") as archive:
             for member in archive.getmembers():
-                if not member.isfile() or not _is_fleet_yaml(member.name):
+                if not member.isfile() or not _is_fleet_yaml_member(member.name):
                     continue
                 destination = _safe_extract_path(extract_dir, member.name)
                 if destination is None:
@@ -172,47 +229,53 @@ def _extract_catalog_from_archive(
     return sorted({path.resolve() for path in catalog_paths})
 
 
-def _fleet_catalog_from_local_codebase(ctx: AppContext) -> tuple[list[str], str | None]:
+def _fleet_catalog_lookup_from_local_codebase(
+    ctx: AppContext,
+) -> tuple[dict[str, Path], str | None]:
     root = _repo_root(ctx) / "src" / "uav" / "uav" / "fleets"
     if not root.exists():
-        return [], str(root)
+        return {}, str(root)
     paths = _catalog_yaml_paths(root)
-    return [str(path.resolve()) for path in paths], str(root)
+    return _fleet_catalog_lookup_from_paths(paths), str(root)
 
 
-def _fleet_catalog_from_current_source(
+def _fleet_catalog_lookup_from_current_source(
     ctx: AppContext,
-) -> tuple[list[str], str | None, str | None]:
+) -> tuple[dict[str, Path], str | None, str | None]:
     current = ctx.build_source_store.current()
     if current.kind == "none":
-        return [], None, None
+        return {}, None, None
 
     if current.kind == "local_codebase":
-        catalog, catalog_source = _fleet_catalog_from_local_codebase(ctx)
+        catalog, catalog_source = _fleet_catalog_lookup_from_local_codebase(ctx)
         return catalog, catalog_source, None
 
     if current.kind == "local_artifact":
         artifact_path = Path(current.local_artifact_path)
         if not artifact_path.exists():
-            return [], str(artifact_path), "Selected local artifact no longer exists."
+            return {}, str(artifact_path), "Selected local artifact no longer exists."
         catalog_dir = _fleet_catalog_dir(ctx)
         extract_dir = catalog_dir / "extract"
         if not extract_dir.exists():
             try:
                 _extract_catalog_from_archive(artifact_path, extract_dir)
             except Exception as exc:
-                return [], str(artifact_path), str(exc)
-        catalog = [str(path.resolve()) for path in _catalog_yaml_paths(extract_dir)]
+                return {}, str(artifact_path), str(exc)
+        catalog = _fleet_catalog_lookup_from_paths(_catalog_yaml_paths(extract_dir))
         return catalog, str(artifact_path), None
 
     archive_url = _build_archive_url(ctx)
     if not archive_url:
-        return [], "github", "Selected GitHub build source does not expose a download URL."
+        return (
+            {},
+            "github",
+            "Selected GitHub build source does not expose a download URL.",
+        )
 
     catalog_dir = _fleet_catalog_dir(ctx)
     extract_dir = catalog_dir / "extract"
     if extract_dir.exists():
-        catalog = [str(path.resolve()) for path in _catalog_yaml_paths(extract_dir)]
+        catalog = _fleet_catalog_lookup_from_paths(_catalog_yaml_paths(extract_dir))
         if catalog:
             return catalog, archive_url, None
 
@@ -228,10 +291,59 @@ def _fleet_catalog_from_current_source(
                     for chunk in resp.iter_bytes():
                         out.write(chunk)
         _extract_catalog_from_archive(archive_path, extract_dir)
-        catalog = [str(path.resolve()) for path in _catalog_yaml_paths(extract_dir)]
+        catalog = _fleet_catalog_lookup_from_paths(_catalog_yaml_paths(extract_dir))
         return catalog, archive_url, None
     except Exception as exc:
-        return [], archive_url, str(exc)
+        return {}, archive_url, str(exc)
+
+
+def _fleet_catalog_from_current_source(
+    ctx: AppContext,
+) -> tuple[list[str], str | None, str | None]:
+    catalog, catalog_source, catalog_error = _fleet_catalog_lookup_from_current_source(
+        ctx
+    )
+    return sorted(catalog), catalog_source, catalog_error
+
+
+def _resolve_catalog_fleet_path(ctx: AppContext, fleet_file: str) -> tuple[str, Path]:
+    selected = Path(str(fleet_file or "").strip().replace("\\", "/")).name.strip()
+    if not selected:
+        raise ValueError("No fleet file selected.")
+
+    current_kind = ctx.build_source_store.current().kind
+    if current_kind == "none":
+        raise ValueError("Select a build source before selecting a fleet.")
+
+    catalog, _, catalog_error = _fleet_catalog_lookup_from_current_source(ctx)
+    if catalog_error:
+        raise ValueError(catalog_error)
+    if not catalog:
+        raise ValueError("The selected build source does not expose any fleet YAML files.")
+
+    fleet_path = catalog.get(selected)
+    if fleet_path is None:
+        raise ValueError(f"Fleet file not found: {selected}")
+
+    return selected, fleet_path
+
+
+def _reconcile_selected_fleet_with_current_source(
+    ctx: AppContext, previous_fleet_file: str
+) -> None:
+    selected = Path(str(previous_fleet_file or "").strip().replace("\\", "/")).name.strip()
+    if not selected:
+        if _selected_fleet_file(ctx):
+            ctx.build_source_store.set_fleet_file(fleet_file="")
+        return
+
+    catalog, _, catalog_error = _fleet_catalog_from_current_source(ctx)
+    if catalog_error or selected not in set(catalog):
+        ctx.build_source_store.set_fleet_file(fleet_file="")
+        return
+
+    if _selected_fleet_file(ctx) != selected:
+        ctx.build_source_store.set_fleet_file(fleet_file=selected)
 
 
 def _require_httpx():
@@ -273,8 +385,9 @@ def sanitize_source_bundle_name(filename: str) -> str:
 
 
 def _build_source_payload(ctx: AppContext) -> dict[str, object]:
-    payload = ctx.build_source_store.current().to_payload_dict()
-    fleet_file = _selected_fleet_file(ctx)
+    current = ctx.build_source_store.current()
+    payload = current.to_payload_dict()
+    fleet_file = _selected_fleet_file(ctx) if current.kind != "none" else ""
     payload["fleet_file"] = fleet_file or None
     payload.update(_fleet_preview(ctx, fleet_file))
     available_fleets, fleet_catalog_source, fleet_catalog_error = (
@@ -332,9 +445,7 @@ def _load_selected_fleet(ctx: AppContext) -> tuple[str, Path, dict, dict[str, ob
     if not fleet_file:
         raise ValueError("No fleet file selected.")
 
-    fleet_path = _resolve_local_path(ctx, fleet_file)
-    if not fleet_path.exists():
-        raise ValueError(f"Fleet file not found: {fleet_file}")
+    fleet_file, fleet_path = _resolve_catalog_fleet_path(ctx, fleet_file)
 
     shared_fleet = _load_local_yaml(fleet_path)
     defaults = deepcopy(shared_fleet.get("defaults", {})) or {}
@@ -1655,7 +1766,9 @@ async def get_fleet_catalog(ctx: AppContext) -> dict[str, object]:
     available_fleets, catalog_source, catalog_error = _fleet_catalog_from_current_source(
         ctx
     )
-    selected_fleet_file = _selected_fleet_file(ctx) or None
+    selected_fleet_file = (
+        _selected_fleet_file(ctx) if current.kind != "none" else ""
+    ) or None
     fleet_preview = _fleet_preview(ctx, selected_fleet_file or "")
     return {
         "success": True,
@@ -1689,6 +1802,11 @@ async def set_github_build_source(
     artifact_name: str = "",
 ) -> dict[str, object]:
     try:
+        previous_fleet_file = (
+            _selected_fleet_file(ctx)
+            if ctx.build_source_store.current().kind != "none"
+            else ""
+        )
         ctx.build_source_store.set_github(
             github_source=source,
             tag=tag,
@@ -1703,6 +1821,7 @@ async def set_github_build_source(
             branch=branch,
             artifact_name=artifact_name,
         )
+        _reconcile_selected_fleet_with_current_source(ctx, previous_fleet_file)
         return _build_source_response(
             ctx,
             success=True,
@@ -1724,10 +1843,16 @@ async def set_local_artifact_build_source(
 ) -> dict[str, object]:
     try:
         artifact_name = sanitize_artifact_name(filename)
+        previous_fleet_file = (
+            _selected_fleet_file(ctx)
+            if ctx.build_source_store.current().kind != "none"
+            else ""
+        )
         ctx.build_source_store.set_local_artifact(
             artifact_name=artifact_name,
             file_bytes=file_bytes,
         )
+        _reconcile_selected_fleet_with_current_source(ctx, previous_fleet_file)
         return _build_source_response(
             ctx,
             success=True,
@@ -1743,9 +1868,15 @@ async def set_local_artifact_build_source(
 
 async def set_local_codebase_build_source(ctx: AppContext) -> dict[str, object]:
     try:
+        previous_fleet_file = (
+            _selected_fleet_file(ctx)
+            if ctx.build_source_store.current().kind != "none"
+            else ""
+        )
         ctx.build_source_store.set_local_codebase(
             codebase_root=str(_repo_root(ctx)),
         )
+        _reconcile_selected_fleet_with_current_source(ctx, previous_fleet_file)
         return _build_source_response(
             ctx,
             success=True,
@@ -1765,29 +1896,29 @@ async def set_global_fleet_file(
     fleet_file: str,
 ) -> dict[str, object]:
     try:
-        selected = str(fleet_file or "").strip()
+        selected = Path(str(fleet_file or "").strip().replace("\\", "/")).name.strip()
         if not selected:
             raise ValueError("fleet_file is required.")
-        fleet_path = _resolve_local_path(ctx, selected)
-        if not fleet_path.exists():
-            raise ValueError(f"Fleet file not found: {selected}")
-        fleet_payload = _load_local_yaml(fleet_path)
-        if not isinstance(fleet_payload.get("vehicles", []), list):
-            raise ValueError("Fleet file must define vehicles as a list.")
-        catalog, catalog_source, catalog_error = _fleet_catalog_from_current_source(ctx)
+        current_kind = ctx.build_source_store.current().kind
+        if current_kind == "none":
+            raise ValueError("Select a build source before selecting a fleet.")
+        catalog_lookup, catalog_source, catalog_error = (
+            _fleet_catalog_lookup_from_current_source(ctx)
+        )
         if catalog_error:
             raise ValueError(catalog_error)
-        current_kind = ctx.build_source_store.current().kind
-        if catalog:
-            resolved = str(fleet_path.resolve())
-            if resolved not in set(catalog):
-                raise ValueError(
-                    "fleet_file must be one of the fleet YAML files from the selected build source."
-                )
-        elif current_kind in {"github", "local_artifact"}:
+        if not catalog_lookup:
             raise ValueError(
                 "The selected build source does not expose any fleet YAML files."
             )
+        fleet_path = catalog_lookup.get(selected)
+        if fleet_path is None:
+            raise ValueError(
+                "fleet_file must be one of the fleet YAML files from the selected build source."
+            )
+        fleet_payload = _load_local_yaml(fleet_path)
+        if not isinstance(fleet_payload.get("vehicles", []), list):
+            raise ValueError("Fleet file must define vehicles as a list.")
         ctx.build_source_store.set_fleet_file(fleet_file=selected)
         response = _build_source_response(
             ctx,
@@ -1796,7 +1927,7 @@ async def set_global_fleet_file(
         )
         if response.get("source"):
             response["source"]["fleet_catalog_source"] = catalog_source
-            response["source"]["available_fleets"] = catalog
+            response["source"]["available_fleets"] = sorted(catalog_lookup)
         return response
     except Exception as exc:
         return _build_source_response(

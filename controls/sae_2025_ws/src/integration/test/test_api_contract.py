@@ -247,7 +247,9 @@ def test_terminal_websocket_requires_target_id(client):
 
 
 def test_build_source_routes_round_trip(client, tmp_path):
-    fleet_path = tmp_path / "fleet.yaml"
+    fleets_dir = tmp_path / "src" / "uav" / "uav" / "fleets"
+    fleets_dir.mkdir(parents=True, exist_ok=True)
+    fleet_path = fleets_dir / "fleet.yaml"
     fleet_path.write_text(
         "vehicles:\n  - name: uav_0\n    mission: hover\n",
         encoding="utf-8",
@@ -284,12 +286,12 @@ def test_build_source_routes_round_trip(client, tmp_path):
 
     response = client.post(
         "/api/build-source/fleet",
-        data={"fleet_file": str(fleet_path)},
+        data={"fleet_file": fleet_path.name},
     )
     assert response.status_code == 200
     payload = response.json()
     assert payload["success"] is True
-    assert payload["source"]["fleet_file"] == str(fleet_path)
+    assert payload["source"]["fleet_file"] == fleet_path.name
 
     response = client.post(
         "/api/build-source/local-artifact",
@@ -333,18 +335,20 @@ def test_build_source_catalog_endpoint_exposes_available_fleets(client, tmp_path
     payload = response.json()
     assert payload["success"] is True
     assert payload["source_kind"] == "local_codebase"
-    assert payload["available_fleets"] == sorted(
-        [str(primary_fleet), str(backup_fleet)]
-    )
+    assert sorted(payload["available_fleets"]) == [
+        "backup.yaml",
+        "primary.yaml",
+    ]
 
     response = client.post(
         "/api/build-source/fleet",
-        data={"fleet_file": str(primary_fleet)},
+        data={"fleet_file": primary_fleet.name},
     )
     assert response.status_code == 200
     payload = response.json()
     assert payload["success"] is True
-    assert payload["source"]["fleet_file"] == str(primary_fleet)
-    assert sorted(payload["source"]["available_fleets"]) == sorted(
-        [str(primary_fleet), str(backup_fleet)]
-    )
+    assert payload["source"]["fleet_file"] == primary_fleet.name
+    assert sorted(payload["source"]["available_fleets"]) == [
+        "backup.yaml",
+        "primary.yaml",
+    ]

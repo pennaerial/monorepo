@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+import io
 import inspect
 import sys
 import tarfile
 import types
 from pathlib import Path
 from types import SimpleNamespace
+import zipfile
 
 import pytest
 import yaml
@@ -125,6 +127,40 @@ class _FakeAsyncClient:
         raise AssertionError(f"Unexpected GET URL in test: {url}")
 
 
+class _FakeStreamResponse:
+    def __init__(self, body: bytes):
+        self.body = body
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+    def raise_for_status(self) -> None:
+        return None
+
+    def iter_bytes(self, chunk_size: int = 65536):
+        for start in range(0, len(self.body), chunk_size):
+            yield self.body[start : start + chunk_size]
+
+
+class _FakeHTTPXClient:
+    def __init__(self, *, body: bytes):
+        self.body = body
+        self.requests: list[tuple[str, str]] = []
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+    def stream(self, method: str, url: str, headers=None):
+        self.requests.append((method, url))
+        return _FakeStreamResponse(self.body)
+
+
 def _make_operator(tmp_path: Path) -> OperatorConfig:
     return OperatorConfig(
         github_repo="pennaerial/monorepo",
@@ -194,7 +230,7 @@ def _make_context(
         cache_dir=cache_dir,
     )
     if fleet_file is not None:
-        build_source_store.set_fleet_file(fleet_file=str(fleet_file))
+        build_source_store.set_fleet_file(fleet_file=fleet_file.name)
         build_source_store.set_local_codebase(codebase_root=str(tmp_path))
 
     def require_deploy_context(require_build_source: bool = True) -> None:
@@ -230,8 +266,9 @@ def _write_mission(root: Path, name: str, mission_class: str) -> Path:
     return path
 
 
-def _write_fleet(tmp_path: Path, content: dict) -> Path:
-    path = tmp_path / "fleet.yaml"
+def _write_fleet(tmp_path: Path, content: dict, *, name: str = "fleet.yaml") -> Path:
+    path = tmp_path / "src" / "uav" / "uav" / "fleets" / name
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(yaml.safe_dump(content, sort_keys=False), encoding="utf-8")
     return path
 
@@ -283,6 +320,42 @@ def _write_fleet_bundle(tmp_path: Path, *, fleet_names: tuple[str, ...]) -> Path
     with tarfile.open(bundle_path, "w:gz") as archive:
         archive.add(bundle_root / "install", arcname="install")
     return bundle_path
+
+
+def _write_actions_artifact_zip(
+    tmp_path: Path,
+    *,
+    fleet_names: tuple[str, ...],
+    tarball_name: str = "ros2-build-cafebabe.tar.gz",
+) -> Path:
+    bundle_root = tmp_path / "actions-artifact"
+    fleets_root = bundle_root / "install" / "uav" / "share" / "uav" / "fleets"
+    fleets_root.mkdir(parents=True, exist_ok=True)
+    for fleet_name in fleet_names:
+        (fleets_root / fleet_name).write_text(
+            yaml.safe_dump(
+                {
+                    "vehicles": [
+                        {
+                            "name": "uav_0",
+                            "mission": "hover",
+                        }
+                    ]
+                },
+                sort_keys=False,
+            ),
+            encoding="utf-8",
+        )
+
+    inner_tarball = io.BytesIO()
+    with tarfile.open(fileobj=inner_tarball, mode="w:gz") as archive:
+        archive.add(bundle_root / "install", arcname="install")
+    inner_tarball.seek(0)
+
+    zip_path = tmp_path / "actions-artifact.zip"
+    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr(tarball_name, inner_tarball.getvalue())
+    return zip_path
 
 
 def test_render_runtime_fleet_for_uav(tmp_path, monkeypatch):
@@ -480,7 +553,7 @@ def test_validate_overlay_preview_rejects_unsupported_fields(tmp_path, monkeypat
 
 
 def test_release_metadata_payload_and_summary(tmp_path):
-    fleet_file = tmp_path / "fleet.yaml"
+    fleet_file = "fleet.yaml"
     target = _make_target(
         target_id="pi-meta",
         vehicle_name="uav_0",
@@ -493,13 +566,13 @@ def test_release_metadata_payload_and_summary(tmp_path):
         release_id="20260411-build-hover",
         source_type="source-build",
         source_label="local-uav.tar.gz",
-        fleet_file=str(fleet_file),
+        fleet_file=fleet_file,
         package_names=["uav", "uav_interfaces"],
     )
 
     assert metadata["release_id"] == "20260411-build-hover"
     assert metadata["source_type"] == "source-build"
-    assert metadata["fleet_file"] == str(fleet_file)
+    assert metadata["fleet_file"] == fleet_file
     assert metadata["vehicle_name"] == "uav_0"
     assert metadata["packages"] == ["uav", "uav_interfaces"]
 
@@ -1007,3 +1080,129 @@ def test_fleet_catalog_exposes_local_artifact_fleets_and_validates_selection(
     )
     assert result["success"] is False
     assert "selected build source" in result["error"].lower()
+
+
+def test_build_source_change_preserves_matching_fleet_filename(tmp_path):
+    target = _make_target(
+        target_id="pi-preserve-fleet",
+        vehicle_name="uav_0",
+        overlay_yaml="mission: hover\npx4_airframe_id: 4004\n",
+    )
+    ctx = _make_context(tmp_path, target)
+    shared_fleet = _write_fleet(
+        tmp_path,
+        {"vehicles": [{"name": "uav_0", "mission": "hover"}]},
+        name="shared.yaml",
+    )
+
+    result = asyncio.run(deploy_service.set_local_codebase_build_source(ctx))
+    assert result["success"] is True
+
+    result = asyncio.run(
+        deploy_service.set_global_fleet_file(ctx, fleet_file=str(shared_fleet))
+    )
+    assert result["success"] is True
+    assert result["source"]["fleet_file"] == "shared.yaml"
+
+    bundle_path = _write_fleet_bundle(
+        tmp_path,
+        fleet_names=("shared.yaml", "backup.yaml"),
+    )
+    result = asyncio.run(
+        deploy_service.set_local_artifact_build_source(
+            ctx,
+            filename="fleet-bundle.tar.gz",
+            file_bytes=bundle_path.read_bytes(),
+        )
+    )
+
+    assert result["success"] is True
+    assert result["source"]["kind"] == "local_artifact"
+    assert result["source"]["fleet_file"] == "shared.yaml"
+    assert result["source"]["available_fleets"] == ["backup.yaml", "shared.yaml"]
+
+
+def test_build_source_change_clears_missing_fleet_filename(tmp_path):
+    target = _make_target(
+        target_id="pi-clear-fleet",
+        vehicle_name="uav_0",
+        overlay_yaml="mission: hover\npx4_airframe_id: 4004\n",
+    )
+    ctx = _make_context(tmp_path, target)
+    primary_fleet = _write_fleet(
+        tmp_path,
+        {"vehicles": [{"name": "uav_0", "mission": "hover"}]},
+        name="primary.yaml",
+    )
+
+    result = asyncio.run(deploy_service.set_local_codebase_build_source(ctx))
+    assert result["success"] is True
+
+    result = asyncio.run(
+        deploy_service.set_global_fleet_file(ctx, fleet_file=str(primary_fleet))
+    )
+    assert result["success"] is True
+    assert result["source"]["fleet_file"] == "primary.yaml"
+
+    bundle_path = _write_fleet_bundle(
+        tmp_path,
+        fleet_names=("backup.yaml",),
+    )
+    result = asyncio.run(
+        deploy_service.set_local_artifact_build_source(
+            ctx,
+            filename="fleet-bundle.tar.gz",
+            file_bytes=bundle_path.read_bytes(),
+        )
+    )
+
+    assert result["success"] is True
+    assert result["source"]["kind"] == "local_artifact"
+    assert result["source"]["fleet_file"] is None
+    assert result["source"]["available_fleets"] == ["backup.yaml"]
+
+
+def test_fleet_catalog_discovers_nested_actions_artifact_tarball(
+    tmp_path, monkeypatch
+):
+    target = _make_target(
+        target_id="pi-actions-catalog",
+        vehicle_name="uav_0",
+        overlay_yaml="mission: hover\npx4_airframe_id: 4004\n",
+    )
+    ctx = _make_context(tmp_path, target)
+
+    zip_path = _write_actions_artifact_zip(
+        tmp_path,
+        fleet_names=("alpha.yaml", "beta.yaml"),
+        tarball_name="ros2-build-cafebabe.tar.gz",
+    )
+    archive_bytes = zip_path.read_bytes()
+    fake_httpx = SimpleNamespace(
+        Client=lambda timeout=300, follow_redirects=True: _FakeHTTPXClient(
+            body=archive_bytes
+        )
+    )
+    monkeypatch.setattr(deploy_service, "_require_httpx", lambda: fake_httpx)
+
+    asyncio.run(
+        deploy_service.set_github_build_source(
+            ctx,
+            source="actions",
+            artifact_id="6389816289",
+            run_id="24297396361",
+            sha="591aeed",
+            branch="user/ethayu/manual-merge",
+            name="ros2-build-2657150",
+        )
+    )
+
+    catalog = asyncio.run(deploy_service.get_fleet_catalog(ctx))
+
+    assert catalog["success"] is True
+    assert catalog["fleet_catalog_error"] is None
+    assert catalog["fleet_catalog_source"].endswith("/actions/artifacts/6389816289/zip")
+    assert sorted(catalog["available_fleets"]) == [
+        "alpha.yaml",
+        "beta.yaml",
+    ]

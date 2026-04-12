@@ -384,6 +384,7 @@ def test_build_source_store_local_artifact_clears_cached_file(tmp_path):
     store.clear()
 
     assert store.current().kind == "none"
+    assert store.current().fleet_file == ""
     assert not artifact_path.exists()
 
 
@@ -401,14 +402,14 @@ def test_build_source_store_persists_fleet_selection_and_local_sources(tmp_path)
 
     restored = BuildSourceStore(source_path, cache_dir=cache_dir)
     assert restored.current().kind == "local_artifact"
-    assert restored.current().fleet_file == "/tmp/runtime-fleet.yaml"
+    assert restored.current().fleet_file == "runtime-fleet.yaml"
     assert restored.current().artifact_name == "bundle.tar.gz"
     assert artifact_path.exists()
 
     restored.set_local_codebase(codebase_root="/workspace/monorepo")
     reloaded = BuildSourceStore(source_path, cache_dir=cache_dir)
     assert reloaded.current().kind == "local_codebase"
-    assert reloaded.current().fleet_file == "/tmp/runtime-fleet.yaml"
+    assert reloaded.current().fleet_file == "runtime-fleet.yaml"
     assert reloaded.current().codebase_root == "/workspace/monorepo"
 
 
