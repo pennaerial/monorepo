@@ -217,9 +217,6 @@ def _build_camera_actions(
     vision_debug: bool,
     save_vision_milliseconds: int,
 ) -> list:
-    if not vision_nodes:
-        return []
-
     save_vision = save_vision_milliseconds > 0
     actions = []
 
