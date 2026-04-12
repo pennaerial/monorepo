@@ -104,3 +104,68 @@ def test_live_hardware_cards_match_inventory_hosts(tmp_path, monkeypatch):
             "saved": False,
         },
     ]
+
+
+def test_parse_dns_sd_browse_output_extracts_instances():
+    output = """Browsing for _ssh._tcp.local
+DATE: ---Sat 11 Apr 2026---
+22:32:47.611  ...STARTING...
+Timestamp     A/R    Flags  if Domain               Service Type         Instance Name
+22:32:47.869  Add        2  14 local.               _ssh._tcp.           air-02
+22:32:48.100  Add        2  14 local.               _ssh._tcp.           air-03
+"""
+
+    assert discovery._parse_dns_sd_browse_output(output, "_ssh._tcp.local.") == [
+        "air-02",
+        "air-03",
+    ]
+
+
+def test_parse_dns_sd_resolve_output_extracts_hostname():
+    output = """Lookup air-02._ssh._tcp.local
+DATE: ---Sat 11 Apr 2026---
+22:32:49.000  air-02._ssh._tcp.local. can be reached at air-02.local.:22 (interface 14)
+"""
+
+    assert discovery._parse_dns_sd_resolve_output(output) == "air-02.local"
+
+
+def test_parse_dns_sd_addrinfo_output_extracts_addresses():
+    output = """DATE: ---Sat 11 Apr 2026---
+Timestamp     A/R    Flags  if Hostname                               Address                                      TTL
+22:32:50.000  Add        2  14 air-02.local.                         192.168.1.22                                 120
+22:32:50.000  Add        2  14 air-02.local.                         fe80::1234%en0                               120
+"""
+
+    assert discovery._parse_dns_sd_addrinfo_output(output, "air-02.local") == {
+        "192.168.1.22",
+        "fe80::1234%en0",
+    }
+
+
+def test_browse_services_falls_back_to_dns_sd_on_darwin(monkeypatch):
+    monkeypatch.setattr(discovery.sys, "platform", "darwin")
+    monkeypatch.setattr(discovery, "_browse_services_zeroconf", lambda _timeout: [])
+    monkeypatch.setattr(
+        discovery,
+        "_browse_services_dns_sd",
+        lambda _timeout: [
+            discovery._DiscoveredService(
+                hostname="air-02.local",
+                service_name="air-02._ssh._tcp.local.",
+                service_type="_ssh._tcp.local.",
+                addresses={"192.168.1.22"},
+            )
+        ],
+    )
+
+    discovered = discovery._browse_services(1.25)
+
+    assert discovered == [
+        discovery._DiscoveredService(
+            hostname="air-02.local",
+            service_name="air-02._ssh._tcp.local.",
+            service_type="_ssh._tcp.local.",
+            addresses={"192.168.1.22"},
+        )
+    ]
