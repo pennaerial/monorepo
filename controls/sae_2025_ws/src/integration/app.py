@@ -4,6 +4,7 @@
 #     "fastapi[standard]",
 #     "python-multipart",
 #     "httpx",
+#     "pydantic>=2,<3",
 #     "zeroconf",
 # ]
 # ///

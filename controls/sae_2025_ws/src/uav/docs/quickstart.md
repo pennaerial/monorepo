@@ -7,6 +7,7 @@ Sim-first onboarding for the UAV framework.
 - A built workspace
 - A PX4-Autopilot checkout, usually at `~/PX4-Autopilot`
 - For sim, Gazebo and `MicroXRCEAgent` available on `PATH`
+- `pydantic>=2,<3` installed in the Python environment that will run `uav`
 
 ## Build And Source
 ```bash
@@ -14,6 +15,12 @@ source /opt/ros/humble/setup.bash
 cd /home/ubuntu/monorepo/controls/sae_2025_ws
 colcon build --packages-select sim uav payload
 source install/setup.bash
+```
+
+If your environment is missing the UAV runtime dependency, install it before launch:
+
+```bash
+python3 -m pip install "pydantic>=2,<3"
 ```
 
 ## Single Vehicle

@@ -12,6 +12,12 @@ package_name = "uav"
 _SCHEMA_REGISTRY_REFRESHED = False
 
 
+def _missing_pydantic_v2(exc: ImportError) -> bool:
+    if isinstance(exc, ModuleNotFoundError):
+        return exc.name == "pydantic"
+    return "pydantic" in str(exc) and "ConfigDict" in str(exc)
+
+
 def _refresh_mode_schema_registry() -> None:
     global _SCHEMA_REGISTRY_REFRESHED
     if _SCHEMA_REGISTRY_REFRESHED:
@@ -21,7 +27,16 @@ def _refresh_mode_schema_registry() -> None:
     if str(package_root) not in sys.path:
         sys.path.insert(0, str(package_root))
 
-    from uav.runtime.schema_generator import refresh_schema_registry
+    try:
+        from uav.runtime.schema_generator import refresh_schema_registry
+    except ImportError as exc:
+        if not _missing_pydantic_v2(exc):
+            raise
+        print(
+            "WARNING: skipping mode schema registry refresh because pydantic>=2 is not available during setup.",
+            file=sys.stderr,
+        )
+        return
 
     output = refresh_schema_registry()
     print(f"Wrote mode schema registry to '{output}'.")
@@ -71,7 +86,7 @@ setup(
             glob(os.path.join(package_name, "fleets", "*.yaml")),
         ),
     ],
-    install_requires=["setuptools", "apriltag"],
+    install_requires=["setuptools", "apriltag", "pydantic>=2,<3"],
     zip_safe=True,
     maintainer="ubuntu",
     maintainer_email="ubuntu@todo.todo",

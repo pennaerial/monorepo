@@ -41,6 +41,24 @@ deploy_require_cmds() {
     fi
 }
 
+deploy_python_has_apriltag() {
+    python3 -c "import apriltag" >/dev/null 2>&1
+}
+
+deploy_python_has_pydantic_v2() {
+    python3 - <<'PY' >/dev/null 2>&1
+try:
+    import pydantic
+
+    version = getattr(pydantic, "__version__", "0")
+    major = int(version.split(".", 1)[0])
+except Exception:
+    raise SystemExit(1)
+
+raise SystemExit(0 if major >= 2 else 1)
+PY
+}
+
 deploy_clock_is_synchronized() {
     if ! command -v timedatectl >/dev/null 2>&1; then
         return 1

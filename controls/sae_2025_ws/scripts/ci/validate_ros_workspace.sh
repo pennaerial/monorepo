@@ -17,6 +17,8 @@ if [[ "$INSTALL_DEPS" != "0" ]]; then
     "$SCRIPT_DIR/install_ros_ci_deps.sh"
 fi
 
+ci_ensure_pydantic_v2
+
 ci_source_ros
 
 ci_log "Installing workspace dependencies via rosdep"

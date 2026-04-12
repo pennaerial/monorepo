@@ -3,6 +3,7 @@
 ## Extra Dependency
 ```bash
 sudo apt install ros-humble-tf-transformations
+python3 -m pip install "pydantic>=2,<3"
 ```
 
 ## Current SAE Sim Launch Behavior

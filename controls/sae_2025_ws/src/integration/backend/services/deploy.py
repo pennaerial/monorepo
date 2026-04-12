@@ -118,24 +118,39 @@ def _catalog_yaml_paths(root: Path) -> list[Path]:
     return sorted(paths)
 
 
+def _path_endswith_parts(path: Path, suffix_parts: tuple[str, ...]) -> bool:
+    parts = tuple(part.lower() for part in path.parts)
+    return len(parts) >= len(suffix_parts) and parts[-len(suffix_parts) :] == suffix_parts
+
+
+def _fleet_catalog_candidate_key(path: Path) -> tuple[int, int, int, str]:
+    fleet_file = path.name.lower()
+    if _path_endswith_parts(
+        path, ("install", "uav", "share", "uav", "fleets", fleet_file)
+    ):
+        rank = 0
+    elif _path_endswith_parts(path, ("src", "uav", "uav", "fleets", fleet_file)):
+        rank = 1
+    elif _path_endswith_parts(path, ("uav", "fleets", fleet_file)):
+        rank = 2
+    else:
+        rank = 3
+    nested_penalty = sum(1 for part in path.parts if part.lower() == "__nested__")
+    return (rank, nested_penalty, len(path.parts), str(path))
+
+
 def _fleet_catalog_lookup_from_paths(paths: list[Path]) -> dict[str, Path]:
-    catalog: dict[str, Path] = {}
-    duplicate_names: set[str] = set()
+    candidates: dict[str, set[Path]] = {}
     for path in paths:
         fleet_file = path.name.strip()
         if not fleet_file:
             continue
-        resolved = path.resolve()
-        existing = catalog.get(fleet_file)
-        if existing is not None and existing != resolved:
-            duplicate_names.add(fleet_file)
-            continue
-        catalog[fleet_file] = resolved
-    if duplicate_names:
-        joined = ", ".join(sorted(duplicate_names))
-        raise ValueError(
-            f"Duplicate fleet file names in selected build source: {joined}"
-        )
+        # Real bundles can mirror the same fleet into both install/ and src/
+        # trees. Collapse those copies to one operator-facing filename.
+        candidates.setdefault(fleet_file, set()).add(path.resolve())
+    catalog: dict[str, Path] = {}
+    for fleet_file, fleet_paths in candidates.items():
+        catalog[fleet_file] = sorted(fleet_paths, key=_fleet_catalog_candidate_key)[0]
     return {fleet_file: catalog[fleet_file] for fleet_file in sorted(catalog)}
 
 
@@ -252,8 +267,11 @@ def _fleet_catalog_lookup_from_current_source(
         return {}, None, None
 
     if current.kind == "local_codebase":
-        catalog, catalog_source = _fleet_catalog_lookup_from_local_codebase(ctx)
-        return catalog, catalog_source, None
+        try:
+            catalog, catalog_source = _fleet_catalog_lookup_from_local_codebase(ctx)
+            return catalog, catalog_source, None
+        except Exception as exc:
+            return {}, "local_codebase", str(exc)
 
     if current.kind == "local_artifact":
         artifact_path = Path(current.local_artifact_path)
@@ -261,13 +279,13 @@ def _fleet_catalog_lookup_from_current_source(
             return {}, str(artifact_path), "Selected local artifact no longer exists."
         catalog_dir = _fleet_catalog_dir(ctx)
         extract_dir = catalog_dir / "extract"
-        if not extract_dir.exists():
-            try:
+        try:
+            if not extract_dir.exists():
                 _extract_catalog_from_archive(artifact_path, extract_dir)
-            except Exception as exc:
-                return {}, str(artifact_path), str(exc)
-        catalog = _fleet_catalog_lookup_from_paths(_catalog_yaml_paths(extract_dir))
-        return catalog, str(artifact_path), None
+            catalog = _fleet_catalog_lookup_from_paths(_catalog_yaml_paths(extract_dir))
+            return catalog, str(artifact_path), None
+        except Exception as exc:
+            return {}, str(artifact_path), str(exc)
 
     archive_url = _build_archive_url(ctx)
     if not archive_url:
@@ -280,9 +298,12 @@ def _fleet_catalog_lookup_from_current_source(
     catalog_dir = _fleet_catalog_dir(ctx)
     extract_dir = catalog_dir / "extract"
     if extract_dir.exists():
-        catalog = _fleet_catalog_lookup_from_paths(_catalog_yaml_paths(extract_dir))
-        if catalog:
-            return catalog, archive_url, None
+        try:
+            catalog = _fleet_catalog_lookup_from_paths(_catalog_yaml_paths(extract_dir))
+            if catalog:
+                return catalog, archive_url, None
+        except Exception as exc:
+            return {}, archive_url, str(exc)
 
     httpx = _require_httpx()
     archive_ext = _catalog_archive_extension(current)
@@ -465,7 +486,7 @@ def _github_error_message(
             retry_hint = f" GitHub resets at {reset_time:%Y-%m-%d %H:%M:%S UTC}."
 
     auth_hint = (
-        " Configure `GITHUB_TOKEN` in Integration settings or the backend environment for higher limits."
+        " Configure `GITHUB_TOKEN` in Operator Defaults under the Inventory tab or the backend environment for higher limits."
         if not token_configured
         else ""
     )
@@ -514,9 +535,16 @@ def _build_source_payload(ctx: AppContext) -> dict[str, object]:
     fleet_file = _selected_fleet_file(ctx) if current.kind != "none" else ""
     payload["fleet_file"] = fleet_file or None
     payload.update(_fleet_preview(ctx, fleet_file))
-    available_fleets, fleet_catalog_source, fleet_catalog_error = (
-        _fleet_catalog_from_current_source(ctx)
-    )
+    try:
+        available_fleets, fleet_catalog_source, fleet_catalog_error = (
+            _fleet_catalog_from_current_source(ctx)
+        )
+    except Exception as exc:
+        available_fleets, fleet_catalog_source, fleet_catalog_error = (
+            [],
+            None,
+            str(exc),
+        )
     payload["available_fleets"] = available_fleets
     payload["fleet_catalog_source"] = fleet_catalog_source
     payload["fleet_catalog_error"] = fleet_catalog_error
@@ -1366,6 +1394,16 @@ async def _ensure_runtime_prereqs(target_ctx: TargetContext) -> None:
         python3 - <<'PY'
 import importlib.util
 missing = [name for name in ('apriltag',) if importlib.util.find_spec(name) is None]
+try:
+    import pydantic
+
+    version = getattr(pydantic, "__version__", "0")
+    major = int(version.split(".", 1)[0])
+except Exception:
+    missing.append('pydantic>=2')
+else:
+    if major < 2:
+        missing.append('pydantic>=2')
 print(' '.join(missing))
 PY
     """
@@ -1379,14 +1417,18 @@ PY
             )
         )
     missing = (result.stdout or "").strip().split()
-    if "apriltag" in missing:
+    if missing:
         install_cmd = """
             set -e
             if ! python3 -m pip --version >/dev/null 2>&1; then
                 sudo -n apt-get update
                 sudo -n apt-get install -y python3-pip build-essential cmake
             fi
-            python3 -m pip install --user apriltag
+            if ! python3 -m pip install --user --upgrade apriltag "pydantic>=2,<3"; then
+                sudo -n apt-get update
+                sudo -n apt-get install -y build-essential cmake
+                python3 -m pip install --user --upgrade apriltag "pydantic>=2,<3"
+            fi
         """
         install = await target_ctx.ssh.run(
             f"bash -lc {target_ctx.ssh.q(install_cmd)}", timeout=300
@@ -1395,7 +1437,7 @@ PY
             raise RuntimeError(
                 target_ctx.ssh.format_remote_error(
                     install.stderr or install.stdout,
-                    "Install apriltag runtime failed",
+                    "Install UAV runtime Python dependencies failed",
                 )
             )
 
@@ -1410,16 +1452,33 @@ async def _ensure_source_build_prereqs(target_ctx: TargetContext) -> None:
                 break
             fi
         done
-        if [ -z "$missing" ]; then
-            exit 0
+        if [ -n "$missing" ]; then
+            sudo -n apt-get update
+            sudo -n apt-get install -y \
+                python3-colcon-common-extensions \
+                build-essential \
+                cmake \
+                python3-pip
         fi
 
-        sudo -n apt-get update
-        sudo -n apt-get install -y \
-            python3-colcon-common-extensions \
-            build-essential \
-            cmake \
-            python3-pip
+        if ! python3 - <<'PY' >/dev/null 2>&1
+try:
+    import pydantic
+
+    version = getattr(pydantic, "__version__", "0")
+    major = int(version.split(".", 1)[0])
+except Exception:
+    raise SystemExit(1)
+
+raise SystemExit(0 if major >= 2 else 1)
+PY
+        then
+            if ! python3 -m pip --version >/dev/null 2>&1; then
+                sudo -n apt-get update
+                sudo -n apt-get install -y python3-pip
+            fi
+            python3 -m pip install --user --upgrade "pydantic>=2,<3"
+        fi
     """
     result = await target_ctx.ssh.run(f"bash -lc {target_ctx.ssh.q(cmd)}", timeout=300)
     if result.returncode != 0:

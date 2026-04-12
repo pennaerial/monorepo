@@ -56,9 +56,9 @@ install_prereqs() {
     deploy_apt_update run_root
     run_root apt-get install -y curl jq tar rsync git python3-pip build-essential cmake
 
-    if ! python3 -c "import apriltag" >/dev/null 2>&1; then
-        deploy_info "Installing apriltag into the user site"
-        python3 -m pip install --user apriltag
+    if ! deploy_python_has_apriltag || ! deploy_python_has_pydantic_v2; then
+        deploy_info "Installing UAV Python runtime packages into the user site"
+        python3 -m pip install --user --upgrade apriltag "pydantic>=2,<3"
     fi
 }
 

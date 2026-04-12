@@ -203,6 +203,20 @@ current_link="${deploy_root}/current"
 previous_link="${deploy_root}/previous"
 stage_dir="$(mktemp -d "${releases_dir}/.staging.${release_name}.XXXXXX")"
 
+python_has_pydantic_v2() {
+    python3 - <<'PY' >/dev/null 2>&1
+try:
+    import pydantic
+
+    version = getattr(pydantic, "__version__", "0")
+    major = int(version.split(".", 1)[0])
+except Exception:
+    raise SystemExit(1)
+
+raise SystemExit(0 if major >= 2 else 1)
+PY
+}
+
 mkdir -p "$releases_dir" "${deploy_root}/config" "${deploy_root}/bin" "${deploy_root}/systemd"
 tar -xzf "$archive" -C "$stage_dir"
 rm -f "$archive"
@@ -224,6 +238,22 @@ fi
 
 ln -sfn "$release_dir" "$current_link"
 chmod +x "${deploy_root}/bin/runtime_fleet" 2>/dev/null || true
+
+if ! python3 -c "import apriltag" >/dev/null 2>&1 || ! python_has_pydantic_v2; then
+    if ! python3 -m pip --version >/dev/null 2>&1; then
+        if ! command -v sudo >/dev/null 2>&1; then
+            printf 'python3-pip is missing and sudo is unavailable for installation\n' >&2
+            exit 1
+        fi
+        sudo -n apt-get update
+        sudo -n apt-get install -y python3-pip build-essential cmake
+    fi
+    if ! python3 -m pip install --user --upgrade apriltag "pydantic>=2,<3"; then
+        sudo -n apt-get update
+        sudo -n apt-get install -y build-essential cmake
+        python3 -m pip install --user --upgrade apriltag "pydantic>=2,<3"
+    fi
+fi
 
 if command -v sudo >/dev/null 2>&1 && sudo -n systemctl list-unit-files pennair-autonomy.service >/dev/null 2>&1; then
     if sudo -n systemctl restart pennair-autonomy.service >/dev/null 2>&1; then
