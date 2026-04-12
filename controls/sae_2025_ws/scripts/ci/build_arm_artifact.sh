@@ -11,6 +11,7 @@ ROS_DISTRO="${ROS_DISTRO:-humble}"
 
 cd "$WORKSPACE_ROOT"
 
+ci_ensure_pydantic_v2
 ci_source_ros
 
 ci_log "Installing workspace dependencies via rosdep"

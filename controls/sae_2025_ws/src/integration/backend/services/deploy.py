@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import tarfile
 import tempfile
+from time import monotonic
 import xml.etree.ElementTree as ET
 import zipfile
 from copy import deepcopy
@@ -44,6 +45,10 @@ _SHARED_OVERLAY_KEYS = {
 }
 _UAV_OVERLAY_KEYS = _SHARED_OVERLAY_KEYS | {"px4_airframe_id", "px4_namespace"}
 _PAYLOAD_OVERLAY_KEYS = _SHARED_OVERLAY_KEYS | {"payload_controller"}
+_BUILD_LIST_CACHE_TTL_SECONDS = 60.0
+_COMMIT_SUBJECT_CACHE_TTL_SECONDS = 1800.0
+_BUILD_LIST_CACHE: dict[tuple[object, ...], tuple[float, dict[str, object]]] = {}
+_COMMIT_SUBJECT_CACHE: dict[str, tuple[float, str | None]] = {}
 
 
 def _selected_fleet_file(ctx: AppContext) -> str:
@@ -113,6 +118,42 @@ def _catalog_yaml_paths(root: Path) -> list[Path]:
     return sorted(paths)
 
 
+def _path_endswith_parts(path: Path, suffix_parts: tuple[str, ...]) -> bool:
+    parts = tuple(part.lower() for part in path.parts)
+    return len(parts) >= len(suffix_parts) and parts[-len(suffix_parts) :] == suffix_parts
+
+
+def _fleet_catalog_candidate_key(path: Path) -> tuple[int, int, int, str]:
+    fleet_file = path.name.lower()
+    if _path_endswith_parts(
+        path, ("install", "uav", "share", "uav", "fleets", fleet_file)
+    ):
+        rank = 0
+    elif _path_endswith_parts(path, ("src", "uav", "uav", "fleets", fleet_file)):
+        rank = 1
+    elif _path_endswith_parts(path, ("uav", "fleets", fleet_file)):
+        rank = 2
+    else:
+        rank = 3
+    nested_penalty = sum(1 for part in path.parts if part.lower() == "__nested__")
+    return (rank, nested_penalty, len(path.parts), str(path))
+
+
+def _fleet_catalog_lookup_from_paths(paths: list[Path]) -> dict[str, Path]:
+    candidates: dict[str, set[Path]] = {}
+    for path in paths:
+        fleet_file = path.name.strip()
+        if not fleet_file:
+            continue
+        # Real bundles can mirror the same fleet into both install/ and src/
+        # trees. Collapse those copies to one operator-facing filename.
+        candidates.setdefault(fleet_file, set()).add(path.resolve())
+    catalog: dict[str, Path] = {}
+    for fleet_file, fleet_paths in candidates.items():
+        catalog[fleet_file] = sorted(fleet_paths, key=_fleet_catalog_candidate_key)[0]
+    return {fleet_file: catalog[fleet_file] for fleet_file in sorted(catalog)}
+
+
 def _safe_extract_path(base_dir: Path, member_name: str) -> Path | None:
     candidate = (base_dir / member_name).resolve()
     base_resolved = base_dir.resolve()
@@ -135,21 +176,35 @@ def _archive_member_names(archive_path: Path) -> list[str]:
     )
 
 
+def _is_fleet_yaml_member(member_name: str) -> bool:
+    normalized = member_name.replace("\\", "/").lower()
+    return "/fleets/" in normalized and normalized.endswith((".yaml", ".yml"))
+
+
+def _is_supported_archive_member(member_name: str) -> bool:
+    normalized = member_name.replace("\\", "/").lower()
+    return normalized.endswith(_SOURCE_BUNDLE_EXTENSIONS)
+
+
+def _nested_archive_destination(extract_dir: Path, member_name: str) -> Path:
+    base_name = Path(member_name.replace("\\", "/")).name or "nested-archive"
+    digest = hashlib.sha1(member_name.encode("utf-8")).hexdigest()[:8]
+    nested_dir = extract_dir / "__nested__"
+    nested_dir.mkdir(parents=True, exist_ok=True)
+    return nested_dir / f"{digest}-{base_name}"
+
+
 def _extract_catalog_from_archive(
-    archive_path: Path, extract_dir: Path
+    archive_path: Path, extract_dir: Path, *, _depth: int = 0
 ) -> list[Path]:
     extract_dir.mkdir(parents=True, exist_ok=True)
     member_names = _archive_member_names(archive_path)
     catalog_paths: list[Path] = []
 
-    def _is_fleet_yaml(member_name: str) -> bool:
-        normalized = member_name.replace("\\", "/").lower()
-        return "/fleets/" in normalized and normalized.endswith((".yaml", ".yml"))
-
     if archive_path.name.endswith(".zip"):
         with zipfile.ZipFile(archive_path) as archive:
             for member_name in member_names:
-                if not _is_fleet_yaml(member_name):
+                if not _is_fleet_yaml_member(member_name):
                     continue
                 destination = _safe_extract_path(extract_dir, member_name)
                 if destination is None:
@@ -157,10 +212,32 @@ def _extract_catalog_from_archive(
                 destination.parent.mkdir(parents=True, exist_ok=True)
                 archive.extract(member_name, extract_dir)
                 catalog_paths.append(destination)
+            if not catalog_paths and _depth == 0:
+                for member_name in member_names:
+                    if not _is_supported_archive_member(member_name):
+                        continue
+                    nested_archive_path = _nested_archive_destination(
+                        extract_dir, member_name
+                    )
+                    with archive.open(member_name) as nested_archive_stream:
+                        with nested_archive_path.open("wb") as nested_archive_file:
+                            shutil.copyfileobj(
+                                nested_archive_stream, nested_archive_file
+                            )
+                    nested_extract_dir = nested_archive_path.parent / (
+                        f"{nested_archive_path.name}.extract"
+                    )
+                    catalog_paths.extend(
+                        _extract_catalog_from_archive(
+                            nested_archive_path,
+                            nested_extract_dir,
+                            _depth=_depth + 1,
+                        )
+                    )
     else:
         with tarfile.open(archive_path, "r:gz") as archive:
             for member in archive.getmembers():
-                if not member.isfile() or not _is_fleet_yaml(member.name):
+                if not member.isfile() or not _is_fleet_yaml_member(member.name):
                     continue
                 destination = _safe_extract_path(extract_dir, member.name)
                 if destination is None:
@@ -172,49 +249,61 @@ def _extract_catalog_from_archive(
     return sorted({path.resolve() for path in catalog_paths})
 
 
-def _fleet_catalog_from_local_codebase(ctx: AppContext) -> tuple[list[str], str | None]:
+def _fleet_catalog_lookup_from_local_codebase(
+    ctx: AppContext,
+) -> tuple[dict[str, Path], str | None]:
     root = _repo_root(ctx) / "src" / "uav" / "uav" / "fleets"
     if not root.exists():
-        return [], str(root)
+        return {}, str(root)
     paths = _catalog_yaml_paths(root)
-    return [str(path.resolve()) for path in paths], str(root)
+    return _fleet_catalog_lookup_from_paths(paths), str(root)
 
 
-def _fleet_catalog_from_current_source(
+def _fleet_catalog_lookup_from_current_source(
     ctx: AppContext,
-) -> tuple[list[str], str | None, str | None]:
+) -> tuple[dict[str, Path], str | None, str | None]:
     current = ctx.build_source_store.current()
     if current.kind == "none":
-        return [], None, None
+        return {}, None, None
 
     if current.kind == "local_codebase":
-        catalog, catalog_source = _fleet_catalog_from_local_codebase(ctx)
-        return catalog, catalog_source, None
+        try:
+            catalog, catalog_source = _fleet_catalog_lookup_from_local_codebase(ctx)
+            return catalog, catalog_source, None
+        except Exception as exc:
+            return {}, "local_codebase", str(exc)
 
     if current.kind == "local_artifact":
         artifact_path = Path(current.local_artifact_path)
         if not artifact_path.exists():
-            return [], str(artifact_path), "Selected local artifact no longer exists."
+            return {}, str(artifact_path), "Selected local artifact no longer exists."
         catalog_dir = _fleet_catalog_dir(ctx)
         extract_dir = catalog_dir / "extract"
-        if not extract_dir.exists():
-            try:
+        try:
+            if not extract_dir.exists():
                 _extract_catalog_from_archive(artifact_path, extract_dir)
-            except Exception as exc:
-                return [], str(artifact_path), str(exc)
-        catalog = [str(path.resolve()) for path in _catalog_yaml_paths(extract_dir)]
-        return catalog, str(artifact_path), None
+            catalog = _fleet_catalog_lookup_from_paths(_catalog_yaml_paths(extract_dir))
+            return catalog, str(artifact_path), None
+        except Exception as exc:
+            return {}, str(artifact_path), str(exc)
 
     archive_url = _build_archive_url(ctx)
     if not archive_url:
-        return [], "github", "Selected GitHub build source does not expose a download URL."
+        return (
+            {},
+            "github",
+            "Selected GitHub build source does not expose a download URL.",
+        )
 
     catalog_dir = _fleet_catalog_dir(ctx)
     extract_dir = catalog_dir / "extract"
     if extract_dir.exists():
-        catalog = [str(path.resolve()) for path in _catalog_yaml_paths(extract_dir)]
-        if catalog:
-            return catalog, archive_url, None
+        try:
+            catalog = _fleet_catalog_lookup_from_paths(_catalog_yaml_paths(extract_dir))
+            if catalog:
+                return catalog, archive_url, None
+        except Exception as exc:
+            return {}, archive_url, str(exc)
 
     httpx = _require_httpx()
     archive_ext = _catalog_archive_extension(current)
@@ -228,10 +317,59 @@ def _fleet_catalog_from_current_source(
                     for chunk in resp.iter_bytes():
                         out.write(chunk)
         _extract_catalog_from_archive(archive_path, extract_dir)
-        catalog = [str(path.resolve()) for path in _catalog_yaml_paths(extract_dir)]
+        catalog = _fleet_catalog_lookup_from_paths(_catalog_yaml_paths(extract_dir))
         return catalog, archive_url, None
     except Exception as exc:
-        return [], archive_url, str(exc)
+        return {}, archive_url, str(exc)
+
+
+def _fleet_catalog_from_current_source(
+    ctx: AppContext,
+) -> tuple[list[str], str | None, str | None]:
+    catalog, catalog_source, catalog_error = _fleet_catalog_lookup_from_current_source(
+        ctx
+    )
+    return sorted(catalog), catalog_source, catalog_error
+
+
+def _resolve_catalog_fleet_path(ctx: AppContext, fleet_file: str) -> tuple[str, Path]:
+    selected = Path(str(fleet_file or "").strip().replace("\\", "/")).name.strip()
+    if not selected:
+        raise ValueError("No fleet file selected.")
+
+    current_kind = ctx.build_source_store.current().kind
+    if current_kind == "none":
+        raise ValueError("Select a build source before selecting a fleet.")
+
+    catalog, _, catalog_error = _fleet_catalog_lookup_from_current_source(ctx)
+    if catalog_error:
+        raise ValueError(catalog_error)
+    if not catalog:
+        raise ValueError("The selected build source does not expose any fleet YAML files.")
+
+    fleet_path = catalog.get(selected)
+    if fleet_path is None:
+        raise ValueError(f"Fleet file not found: {selected}")
+
+    return selected, fleet_path
+
+
+def _reconcile_selected_fleet_with_current_source(
+    ctx: AppContext, previous_fleet_file: str
+) -> None:
+    selected = Path(str(previous_fleet_file or "").strip().replace("\\", "/")).name.strip()
+    if not selected:
+        if _selected_fleet_file(ctx):
+            ctx.build_source_store.set_fleet_file(fleet_file="")
+        return
+
+    catalog, _, catalog_error = _fleet_catalog_from_current_source(ctx)
+    if catalog_error or selected not in set(catalog):
+        ctx.build_source_store.set_fleet_file(fleet_file="")
+        return
+
+    if _selected_fleet_file(ctx) != selected:
+        ctx.build_source_store.set_fleet_file(fleet_file=selected)
 
 
 def _require_httpx():
@@ -251,6 +389,125 @@ def _github_headers(ctx: AppContext) -> dict:
     if ctx.operator_config.github_token:
         headers["Authorization"] = f"Bearer {ctx.operator_config.github_token}"
     return headers
+
+
+def _build_list_cache_key(
+    ctx: AppContext,
+    *,
+    artifact_page: int,
+    artifact_page_size: int,
+    q: str,
+    sha: str,
+    commit_subject: str,
+    branch: str,
+    include_fallback: bool,
+) -> tuple[object, ...]:
+    return (
+        ctx.operator_config.github_repo,
+        artifact_page,
+        artifact_page_size,
+        q.strip(),
+        sha.strip(),
+        commit_subject.strip(),
+        branch.strip(),
+        include_fallback,
+    )
+
+
+def _build_list_cache_get(
+    cache_key: tuple[object, ...], *, allow_stale: bool = False
+) -> dict[str, object] | None:
+    cached = _BUILD_LIST_CACHE.get(cache_key)
+    if cached is None:
+        return None
+    cached_at, payload = cached
+    age = monotonic() - cached_at
+    if not allow_stale and age > _BUILD_LIST_CACHE_TTL_SECONDS:
+        return None
+    return deepcopy(payload)
+
+
+def _build_list_cache_set(
+    cache_key: tuple[object, ...], payload: dict[str, object]
+) -> dict[str, object]:
+    cached_payload = deepcopy(payload)
+    _BUILD_LIST_CACHE[cache_key] = (monotonic(), cached_payload)
+    return deepcopy(cached_payload)
+
+
+def _commit_subject_cache_get(commit_sha: str) -> str | None | object:
+    cached = _COMMIT_SUBJECT_CACHE.get(commit_sha)
+    if cached is None:
+        return ...
+    cached_at, subject = cached
+    if monotonic() - cached_at > _COMMIT_SUBJECT_CACHE_TTL_SECONDS:
+        _COMMIT_SUBJECT_CACHE.pop(commit_sha, None)
+        return ...
+    return subject
+
+
+def _commit_subject_cache_set(commit_sha: str, subject: str | None) -> None:
+    _COMMIT_SUBJECT_CACHE[commit_sha] = (monotonic(), subject)
+
+
+def _github_error_message(
+    exc: Exception,
+    *,
+    token_configured: bool,
+    using_cached_response: bool = False,
+    during_commit_lookup: bool = False,
+) -> str | None:
+    response = getattr(exc, "response", None)
+    status_code = getattr(response, "status_code", None)
+    if status_code != 403:
+        return None
+
+    message = ""
+    headers = getattr(response, "headers", {}) or {}
+    try:
+        payload = response.json() or {}
+        if isinstance(payload, dict):
+            message = str(payload.get("message", "")).strip()
+    except Exception:
+        message = str(getattr(response, "text", "") or "").strip()
+
+    lowered = message.lower()
+    if "rate limit" not in lowered:
+        return None
+
+    retry_hint = ""
+    retry_after = str(headers.get("retry-after", "")).strip()
+    if retry_after.isdigit():
+        retry_hint = f" Retry after about {retry_after} seconds."
+    else:
+        reset_at = str(headers.get("x-ratelimit-reset", "")).strip()
+        if reset_at.isdigit():
+            reset_time = datetime.fromtimestamp(int(reset_at), tz=timezone.utc)
+            retry_hint = f" GitHub resets at {reset_time:%Y-%m-%d %H:%M:%S UTC}."
+
+    auth_hint = (
+        " Configure `GITHUB_TOKEN` in Operator Defaults under the Inventory tab or the backend environment for higher limits."
+        if not token_configured
+        else ""
+    )
+
+    if during_commit_lookup:
+        return (
+            "GitHub commit-title lookups were rate-limited. "
+            "Showing available builds with fallback titles."
+            f"{retry_hint}{auth_hint}"
+        ).strip()
+
+    if using_cached_response:
+        return (
+            "GitHub API rate limit exceeded. Showing a cached build list."
+            f"{retry_hint}{auth_hint}"
+        ).strip()
+
+    return (
+        "GitHub API rate limit exceeded while loading deployable builds."
+        f"{retry_hint}{auth_hint}"
+    ).strip()
 
 
 def sanitize_artifact_name(filename: str) -> str:
@@ -273,13 +530,21 @@ def sanitize_source_bundle_name(filename: str) -> str:
 
 
 def _build_source_payload(ctx: AppContext) -> dict[str, object]:
-    payload = ctx.build_source_store.current().to_payload_dict()
-    fleet_file = _selected_fleet_file(ctx)
+    current = ctx.build_source_store.current()
+    payload = current.to_payload_dict()
+    fleet_file = _selected_fleet_file(ctx) if current.kind != "none" else ""
     payload["fleet_file"] = fleet_file or None
     payload.update(_fleet_preview(ctx, fleet_file))
-    available_fleets, fleet_catalog_source, fleet_catalog_error = (
-        _fleet_catalog_from_current_source(ctx)
-    )
+    try:
+        available_fleets, fleet_catalog_source, fleet_catalog_error = (
+            _fleet_catalog_from_current_source(ctx)
+        )
+    except Exception as exc:
+        available_fleets, fleet_catalog_source, fleet_catalog_error = (
+            [],
+            None,
+            str(exc),
+        )
     payload["available_fleets"] = available_fleets
     payload["fleet_catalog_source"] = fleet_catalog_source
     payload["fleet_catalog_error"] = fleet_catalog_error
@@ -332,9 +597,7 @@ def _load_selected_fleet(ctx: AppContext) -> tuple[str, Path, dict, dict[str, ob
     if not fleet_file:
         raise ValueError("No fleet file selected.")
 
-    fleet_path = _resolve_local_path(ctx, fleet_file)
-    if not fleet_path.exists():
-        raise ValueError(f"Fleet file not found: {fleet_file}")
+    fleet_file, fleet_path = _resolve_catalog_fleet_path(ctx, fleet_file)
 
     shared_fleet = _load_local_yaml(fleet_path)
     defaults = deepcopy(shared_fleet.get("defaults", {})) or {}
@@ -1126,74 +1389,76 @@ async def _ensure_runtime_service(target_ctx: TargetContext) -> None:
             os.unlink(unit_tmp)
 
 
-async def _ensure_runtime_prereqs(target_ctx: TargetContext) -> None:
-    checks = """
-        python3 - <<'PY'
-import importlib.util
-missing = [name for name in ('apriltag',) if importlib.util.find_spec(name) is None]
-print(' '.join(missing))
-PY
-    """
-    result = await target_ctx.ssh.run(
-        f"bash -lc {target_ctx.ssh.q(checks)}", timeout=20
+def _deploy_lib_local_path(ctx: AppContext) -> Path:
+    return _repo_root(ctx) / "scripts" / "hardware" / "deploy-lib.sh"
+
+
+async def _run_remote_deploy_lib(
+    ctx: AppContext,
+    target_ctx: TargetContext,
+    *,
+    helper_invocation: str,
+    timeout: int,
+    error_prefix: str,
+) -> None:
+    helper_path = _deploy_lib_local_path(ctx)
+    if not helper_path.exists():
+        raise RuntimeError(f"Missing deploy helper library: {helper_path}")
+
+    await _copy_file_to_pi(
+        target_ctx, local_path=str(helper_path), remote_name="deploy-lib.sh"
     )
-    if result.returncode != 0:
-        raise RuntimeError(
-            target_ctx.ssh.format_remote_error(
-                result.stderr or result.stdout, "Runtime prerequisite check failed"
-            )
-        )
-    missing = (result.stdout or "").strip().split()
-    if "apriltag" in missing:
-        install_cmd = """
-            set -e
-            if ! python3 -m pip --version >/dev/null 2>&1; then
-                sudo -n apt-get update
-                sudo -n apt-get install -y python3-pip build-essential cmake
+
+    remote_helper = f"{target_ctx.target.deploy_paths()['incoming_dir']}/deploy-lib.sh"
+    cmd = f"""
+        set -euo pipefail
+        remote_helper={target_ctx.ssh.q(remote_helper)}
+        run_root() {{
+            if [ "$(id -u)" -eq 0 ]; then
+                "$@"
+            else
+                sudo -n "$@"
             fi
-            python3 -m pip install --user apriltag
-        """
-        install = await target_ctx.ssh.run(
-            f"bash -lc {target_ctx.ssh.q(install_cmd)}", timeout=300
-        )
-        if install.returncode != 0:
-            raise RuntimeError(
-                target_ctx.ssh.format_remote_error(
-                    install.stderr or install.stdout,
-                    "Install apriltag runtime failed",
-                )
-            )
-
-
-async def _ensure_source_build_prereqs(target_ctx: TargetContext) -> None:
-    cmd = """
-        set -e
-        missing=""
-        for tool in colcon cmake make gcc g++; do
-            if ! command -v "$tool" >/dev/null 2>&1; then
-                missing=1
-                break
-            fi
-        done
-        if [ -z "$missing" ]; then
-            exit 0
-        fi
-
-        sudo -n apt-get update
-        sudo -n apt-get install -y \
-            python3-colcon-common-extensions \
-            build-essential \
-            cmake \
-            python3-pip
+        }}
+        source "$remote_helper"
+        {helper_invocation}
     """
-    result = await target_ctx.ssh.run(f"bash -lc {target_ctx.ssh.q(cmd)}", timeout=300)
+    result = await target_ctx.ssh.run(f"bash -lc {target_ctx.ssh.q(cmd)}", timeout=timeout)
     if result.returncode != 0:
         raise RuntimeError(
             target_ctx.ssh.format_remote_error(
                 result.stderr or result.stdout,
-                "Install source-build prerequisites failed",
+                error_prefix,
             )
         )
+
+
+async def _ensure_runtime_prereqs(ctx: AppContext, target_ctx: TargetContext) -> None:
+    await _run_remote_deploy_lib(
+        ctx,
+        target_ctx,
+        helper_invocation=(
+            "deploy_ensure_uav_python_runtime run_root "
+            + target_ctx.ssh.q(target_ctx.target.pi_user)
+        ),
+        timeout=300,
+        error_prefix="Install UAV runtime Python dependencies failed",
+    )
+
+
+async def _ensure_source_build_prereqs(
+    ctx: AppContext, target_ctx: TargetContext
+) -> None:
+    await _run_remote_deploy_lib(
+        ctx,
+        target_ctx,
+        helper_invocation=(
+            "deploy_ensure_source_build_prereqs run_root "
+            + target_ctx.ssh.q(target_ctx.target.pi_user)
+        ),
+        timeout=300,
+        error_prefix="Install source-build prerequisites failed",
+    )
 
 
 async def _write_release_metadata(
@@ -1461,7 +1726,7 @@ async def _deploy_artifact_path(
         ),
     )
     await _ensure_runtime_service(target_ctx)
-    await _ensure_runtime_prereqs(target_ctx)
+    await _ensure_runtime_prereqs(ctx, target_ctx)
     await _activate_release(
         target_ctx,
         release_dir=release["release_dir"],
@@ -1489,7 +1754,7 @@ async def _deploy_source_bundle_path(
 ) -> dict:
     target_ctx = ctx.resolve_target(target_id)
     await _ensure_remote_layout(target_ctx)
-    await _ensure_source_build_prereqs(target_ctx)
+    await _ensure_source_build_prereqs(ctx, target_ctx)
     await _copy_file_to_pi(
         target_ctx, local_path=local_bundle_path, remote_name=bundle_name
     )
@@ -1555,7 +1820,7 @@ async def _deploy_source_bundle_path(
         ),
     )
     await _ensure_runtime_service(target_ctx)
-    await _ensure_runtime_prereqs(target_ctx)
+    await _ensure_runtime_prereqs(ctx, target_ctx)
     await _activate_release(
         target_ctx,
         release_dir=release["release_dir"],
@@ -1655,7 +1920,9 @@ async def get_fleet_catalog(ctx: AppContext) -> dict[str, object]:
     available_fleets, catalog_source, catalog_error = _fleet_catalog_from_current_source(
         ctx
     )
-    selected_fleet_file = _selected_fleet_file(ctx) or None
+    selected_fleet_file = (
+        _selected_fleet_file(ctx) if current.kind != "none" else ""
+    ) or None
     fleet_preview = _fleet_preview(ctx, selected_fleet_file or "")
     return {
         "success": True,
@@ -1689,6 +1956,11 @@ async def set_github_build_source(
     artifact_name: str = "",
 ) -> dict[str, object]:
     try:
+        previous_fleet_file = (
+            _selected_fleet_file(ctx)
+            if ctx.build_source_store.current().kind != "none"
+            else ""
+        )
         ctx.build_source_store.set_github(
             github_source=source,
             tag=tag,
@@ -1703,6 +1975,7 @@ async def set_github_build_source(
             branch=branch,
             artifact_name=artifact_name,
         )
+        _reconcile_selected_fleet_with_current_source(ctx, previous_fleet_file)
         return _build_source_response(
             ctx,
             success=True,
@@ -1724,10 +1997,16 @@ async def set_local_artifact_build_source(
 ) -> dict[str, object]:
     try:
         artifact_name = sanitize_artifact_name(filename)
+        previous_fleet_file = (
+            _selected_fleet_file(ctx)
+            if ctx.build_source_store.current().kind != "none"
+            else ""
+        )
         ctx.build_source_store.set_local_artifact(
             artifact_name=artifact_name,
             file_bytes=file_bytes,
         )
+        _reconcile_selected_fleet_with_current_source(ctx, previous_fleet_file)
         return _build_source_response(
             ctx,
             success=True,
@@ -1743,9 +2022,15 @@ async def set_local_artifact_build_source(
 
 async def set_local_codebase_build_source(ctx: AppContext) -> dict[str, object]:
     try:
+        previous_fleet_file = (
+            _selected_fleet_file(ctx)
+            if ctx.build_source_store.current().kind != "none"
+            else ""
+        )
         ctx.build_source_store.set_local_codebase(
             codebase_root=str(_repo_root(ctx)),
         )
+        _reconcile_selected_fleet_with_current_source(ctx, previous_fleet_file)
         return _build_source_response(
             ctx,
             success=True,
@@ -1765,29 +2050,29 @@ async def set_global_fleet_file(
     fleet_file: str,
 ) -> dict[str, object]:
     try:
-        selected = str(fleet_file or "").strip()
+        selected = Path(str(fleet_file or "").strip().replace("\\", "/")).name.strip()
         if not selected:
             raise ValueError("fleet_file is required.")
-        fleet_path = _resolve_local_path(ctx, selected)
-        if not fleet_path.exists():
-            raise ValueError(f"Fleet file not found: {selected}")
-        fleet_payload = _load_local_yaml(fleet_path)
-        if not isinstance(fleet_payload.get("vehicles", []), list):
-            raise ValueError("Fleet file must define vehicles as a list.")
-        catalog, catalog_source, catalog_error = _fleet_catalog_from_current_source(ctx)
+        current_kind = ctx.build_source_store.current().kind
+        if current_kind == "none":
+            raise ValueError("Select a build source before selecting a fleet.")
+        catalog_lookup, catalog_source, catalog_error = (
+            _fleet_catalog_lookup_from_current_source(ctx)
+        )
         if catalog_error:
             raise ValueError(catalog_error)
-        current_kind = ctx.build_source_store.current().kind
-        if catalog:
-            resolved = str(fleet_path.resolve())
-            if resolved not in set(catalog):
-                raise ValueError(
-                    "fleet_file must be one of the fleet YAML files from the selected build source."
-                )
-        elif current_kind in {"github", "local_artifact"}:
+        if not catalog_lookup:
             raise ValueError(
                 "The selected build source does not expose any fleet YAML files."
             )
+        fleet_path = catalog_lookup.get(selected)
+        if fleet_path is None:
+            raise ValueError(
+                "fleet_file must be one of the fleet YAML files from the selected build source."
+            )
+        fleet_payload = _load_local_yaml(fleet_path)
+        if not isinstance(fleet_payload.get("vehicles", []), list):
+            raise ValueError("Fleet file must define vehicles as a list.")
         ctx.build_source_store.set_fleet_file(fleet_file=selected)
         response = _build_source_response(
             ctx,
@@ -1796,7 +2081,7 @@ async def set_global_fleet_file(
         )
         if response.get("source"):
             response["source"]["fleet_catalog_source"] = catalog_source
-            response["source"]["available_fleets"] = catalog
+            response["source"]["available_fleets"] = sorted(catalog_lookup)
         return response
     except Exception as exc:
         return _build_source_response(
@@ -2133,6 +2418,16 @@ async def list_builds(
 ) -> dict:
     artifact_page = max(int(artifact_page or 1), 1)
     artifact_page_size = max(1, min(int(artifact_page_size or 20), 50))
+    cache_key = _build_list_cache_key(
+        ctx,
+        artifact_page=artifact_page,
+        artifact_page_size=artifact_page_size,
+        q=q,
+        sha=sha,
+        commit_subject=commit_subject,
+        branch=branch,
+        include_fallback=include_fallback,
+    )
     if not ctx.operator_config.github_repo:
         return {
             "success": False,
@@ -2144,10 +2439,16 @@ async def list_builds(
             "artifact_page_size": artifact_page_size,
             "artifact_has_more": False,
         }
+    cached_response = _build_list_cache_get(cache_key)
+    if cached_response is not None:
+        return cached_response
     try:
         httpx = _require_httpx()
+        token_configured = bool(ctx.operator_config.github_token)
         releases_builds: list[dict[str, object]] = []
         artifact_builds: list[dict[str, object]] = []
+        commit_lookup_warning: str | None = None
+        commit_lookup_rate_limited = False
 
         async def _collect_releases(client) -> list[dict[str, object]]:
             collected: list[dict[str, object]] = []
@@ -2195,7 +2496,13 @@ async def list_builds(
             return collected
 
         async def _commit_subject_for(client, commit_sha: str) -> str | None:
+            nonlocal commit_lookup_warning, commit_lookup_rate_limited
             if not commit_sha:
+                return None
+            cached_subject = _commit_subject_cache_get(commit_sha)
+            if cached_subject is not ...:
+                return cached_subject
+            if commit_lookup_rate_limited:
                 return None
             try:
                 response = await client.get(
@@ -2207,8 +2514,19 @@ async def list_builds(
                 message = (
                     payload.get("commit", {}).get("message", "").splitlines()[0].strip()
                 )
-                return message or None
-            except Exception:
+                subject = message or None
+                _commit_subject_cache_set(commit_sha, subject)
+                return subject
+            except Exception as exc:
+                warning = _github_error_message(
+                    exc,
+                    token_configured=token_configured,
+                    during_commit_lookup=True,
+                )
+                if warning:
+                    commit_lookup_rate_limited = True
+                    commit_lookup_warning = warning
+                    return None
                 return None
 
         async with httpx.AsyncClient(timeout=20) as client:
@@ -2325,7 +2643,7 @@ async def list_builds(
         combined = releases_builds + artifact_builds
         combined.sort(key=lambda item: str(item.get("date", "")), reverse=True)
         artifact_has_more = False if (q or sha or commit_subject or branch or include_fallback) else len(artifact_rows) >= artifact_page_size
-        return {
+        response_payload = {
             "success": True,
             "builds": combined,
             "releases": releases_builds,
@@ -2333,11 +2651,22 @@ async def list_builds(
             "artifact_page": 1 if (q or sha or commit_subject or branch or include_fallback) else artifact_page,
             "artifact_page_size": artifact_page_size,
             "artifact_has_more": artifact_has_more,
+            "error": commit_lookup_warning,
         }
+        return _build_list_cache_set(cache_key, response_payload)
     except Exception as exc:
+        cached_stale = _build_list_cache_get(cache_key, allow_stale=True)
+        fallback_error = _github_error_message(
+            exc,
+            token_configured=bool(ctx.operator_config.github_token),
+            using_cached_response=bool(cached_stale),
+        )
+        if cached_stale is not None and fallback_error:
+            cached_stale["error"] = fallback_error
+            return cached_stale
         return {
             "success": False,
-            "error": str(exc),
+            "error": fallback_error or str(exc),
             "builds": [],
             "releases": [],
             "artifacts": [],

@@ -25,6 +25,7 @@ _SHARED_DEFAULT_KEYS = {
     "auto_launch",
     "debug",
     "vision_debug",
+    "force_camera",
     "save_vision_milliseconds",
     "servo_only",
     "camera_mount_offsets",
@@ -267,6 +268,9 @@ def _vehicle_stack_configs(fleet: dict) -> tuple[dict, list[dict]]:
             ),
             "vision_debug": _resolve_bool(
                 vehicle.get("vision_debug", False), key="vision_debug", default=False
+            ),
+            "force_camera": _resolve_bool(
+                vehicle.get("force_camera", False), key="force_camera", default=False
             ),
             "save_vision_milliseconds": int(vehicle.get("save_vision_milliseconds", 0)),
             "servo_only": _resolve_bool(

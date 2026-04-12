@@ -68,6 +68,7 @@ def _example_fleet():
             "auto_launch": True,
             "debug": False,
             "vision_debug": False,
+            "force_camera": False,
             "save_vision_milliseconds": 0,
             "servo_only": False,
             "camera_mount_offsets": [0.0, 0.0, 0.0],
@@ -87,6 +88,7 @@ def _example_fleet():
                 "controllable": "payload_0",
                 "mission": "payload_retreat",
                 "vision_debug": True,
+                "force_camera": True,
             },
         ],
     }
@@ -237,6 +239,7 @@ def test_vehicle_stack_configs_defaults_namespaces_and_instances(
     assert vehicles[0]["auto_launch"] is True
     assert vehicles[0]["debug"] is False
     assert vehicles[0]["vision_debug"] is False
+    assert vehicles[0]["force_camera"] is False
     assert vehicles[0]["save_vision_milliseconds"] == 0
     assert vehicles[0]["servo_only"] is False
     assert vehicles[0]["camera_mount_offsets"] == [0.2, 0.0, 0.0]
@@ -246,6 +249,7 @@ def test_vehicle_stack_configs_defaults_namespaces_and_instances(
     assert vehicles[1]["auto_launch"] is True
     assert vehicles[1]["debug"] is False
     assert vehicles[1]["vision_debug"] is True
+    assert vehicles[1]["force_camera"] is True
     assert vehicles[1]["save_vision_milliseconds"] == 0
     assert vehicles[1]["servo_only"] is False
     assert vehicles[1]["camera_mount_offsets"] == [0.0, 0.0, 0.0]

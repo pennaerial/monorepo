@@ -167,6 +167,15 @@ copy_runtime_helper() {
     run_scp "$helper" "$target:$REMOTE_DEPLOY_ROOT/bin/runtime_fleet"
 }
 
+copy_deploy_lib() {
+    local target="$1"
+    local helper="$SCRIPT_DIR/hardware/deploy-lib.sh"
+    [[ -f "$helper" ]] || error "Missing deploy helper library: $helper"
+
+    prepare_remote_root "$target"
+    run_scp "$helper" "$target:$REMOTE_DEPLOY_ROOT/systemd/deploy-lib.sh"
+}
+
 deploy_to_target() {
     local target="$1"
     local tarball="$2"
@@ -183,6 +192,7 @@ deploy_to_target() {
 
     prepare_remote_root "$target"
     copy_runtime_helper "$target"
+    copy_deploy_lib "$target"
 
     info "Copying build artifact"
     run_scp "$tarball" "$target:$archive_remote"
@@ -201,7 +211,18 @@ releases_dir="${deploy_root}/releases"
 release_dir="${releases_dir}/${release_name}"
 current_link="${deploy_root}/current"
 previous_link="${deploy_root}/previous"
+deploy_lib="${deploy_root}/systemd/deploy-lib.sh"
 stage_dir="$(mktemp -d "${releases_dir}/.staging.${release_name}.XXXXXX")"
+
+run_root() {
+    if [[ "$(id -u)" -eq 0 ]]; then
+        "$@"
+    else
+        sudo -n "$@"
+    fi
+}
+
+source "$deploy_lib"
 
 mkdir -p "$releases_dir" "${deploy_root}/config" "${deploy_root}/bin" "${deploy_root}/systemd"
 tar -xzf "$archive" -C "$stage_dir"
@@ -224,6 +245,8 @@ fi
 
 ln -sfn "$release_dir" "$current_link"
 chmod +x "${deploy_root}/bin/runtime_fleet" 2>/dev/null || true
+
+deploy_ensure_uav_python_runtime run_root "$(id -un)"
 
 if command -v sudo >/dev/null 2>&1 && sudo -n systemctl list-unit-files pennair-autonomy.service >/dev/null 2>&1; then
     if sudo -n systemctl restart pennair-autonomy.service >/dev/null 2>&1; then

@@ -41,6 +41,24 @@ deploy_require_cmds() {
     fi
 }
 
+deploy_python_has_apriltag() {
+    python3 -c "import apriltag" >/dev/null 2>&1
+}
+
+deploy_python_has_pydantic_v2() {
+    python3 - <<'PY' >/dev/null 2>&1
+try:
+    import pydantic
+
+    version = getattr(pydantic, "__version__", "0")
+    major = int(version.split(".", 1)[0])
+except Exception:
+    raise SystemExit(1)
+
+raise SystemExit(0 if major >= 2 else 1)
+PY
+}
+
 deploy_clock_is_synchronized() {
     if ! command -v timedatectl >/dev/null 2>&1; then
         return 1
@@ -191,6 +209,147 @@ deploy_apt_update() {
     fi
 
     deploy_report_apt_failure "$log_file"
+}
+
+deploy_run_with_runner() {
+    local runner="${1:-}"
+    shift
+    if [[ -n "$runner" ]]; then
+        "$runner" "$@"
+    else
+        "$@"
+    fi
+}
+
+deploy_current_user() {
+    id -un 2>/dev/null || printf '%s\n' "${USER:-}"
+}
+
+deploy_run_as_user() {
+    local target_user="${1:-}"
+    shift
+    local current_user
+    current_user="$(deploy_current_user)"
+
+    if [[ -z "$target_user" || "$target_user" == "$current_user" ]]; then
+        "$@"
+        return $?
+    fi
+
+    if ! command -v sudo >/dev/null 2>&1; then
+        return 1
+    fi
+
+    sudo -H -u "$target_user" "$@"
+}
+
+deploy_python_has_apriltag_for_user() {
+    local target_user="${1:-}"
+    if [[ -n "$target_user" ]]; then
+        deploy_run_as_user "$target_user" python3 -c "import apriltag" >/dev/null 2>&1
+    else
+        deploy_python_has_apriltag
+    fi
+}
+
+deploy_python_has_pydantic_v2_for_user() {
+    local target_user="${1:-}"
+    if [[ -n "$target_user" ]]; then
+        deploy_run_as_user "$target_user" python3 - <<'PY' >/dev/null 2>&1
+try:
+    import pydantic
+
+    version = getattr(pydantic, "__version__", "0")
+    major = int(version.split(".", 1)[0])
+except Exception:
+    raise SystemExit(1)
+
+raise SystemExit(0 if major >= 2 else 1)
+PY
+    else
+        deploy_python_has_pydantic_v2
+    fi
+}
+
+deploy_ensure_uav_python_runtime() {
+    local apt_runner="${1:-}"
+    local python_user="${2:-$(deploy_current_user)}"
+    local needs_runtime=0
+
+    if deploy_python_has_apriltag_for_user "$python_user"; then
+        deploy_info "apriltag Python package already installed for ${python_user}"
+    else
+        deploy_warn "apriltag Python package not found for ${python_user}; installing it into the user site"
+        needs_runtime=1
+    fi
+
+    if deploy_python_has_pydantic_v2_for_user "$python_user"; then
+        deploy_info "pydantic>=2 Python package already installed for ${python_user}"
+    else
+        deploy_warn "pydantic>=2 Python package not found for ${python_user}; installing it into the user site"
+        needs_runtime=1
+    fi
+
+    if [[ "$needs_runtime" == "0" ]]; then
+        return 0
+    fi
+
+    if ! deploy_run_as_user "$python_user" python3 -m pip --version >/dev/null 2>&1; then
+        deploy_info "Installing python3-pip and build prerequisites"
+        deploy_preflight_time_sync "$apt_runner"
+        deploy_apt_update "$apt_runner"
+        deploy_run_with_runner "$apt_runner" apt-get install -y python3-pip build-essential cmake
+    fi
+
+    if ! deploy_run_as_user "$python_user" python3 -m pip install --user --upgrade apriltag "pydantic>=2,<3"; then
+        deploy_info "Retrying Python runtime package install after ensuring build prerequisites"
+        deploy_preflight_time_sync "$apt_runner"
+        deploy_apt_update "$apt_runner"
+        deploy_run_with_runner "$apt_runner" apt-get install -y build-essential cmake
+        deploy_run_as_user "$python_user" python3 -m pip install --user --upgrade apriltag "pydantic>=2,<3"
+    fi
+
+    deploy_python_has_apriltag_for_user "$python_user" || deploy_error "apriltag install failed for ${python_user}"
+    deploy_python_has_pydantic_v2_for_user "$python_user" || deploy_error "pydantic>=2 install failed for ${python_user}"
+    deploy_info "UAV Python runtime packages are ready for ${python_user}"
+}
+
+deploy_ensure_source_build_prereqs() {
+    local apt_runner="${1:-}"
+    local python_user="${2:-$(deploy_current_user)}"
+    local missing_tools=()
+    local tool
+
+    for tool in colcon cmake make gcc g++; do
+        if ! command -v "$tool" >/dev/null 2>&1; then
+            missing_tools+=("$tool")
+        fi
+    done
+
+    if ((${#missing_tools[@]} > 0)); then
+        deploy_info "Installing source-build prerequisites: ${missing_tools[*]}"
+        deploy_preflight_time_sync "$apt_runner"
+        deploy_apt_update "$apt_runner"
+        deploy_run_with_runner "$apt_runner" apt-get install -y \
+            python3-colcon-common-extensions \
+            build-essential \
+            cmake \
+            python3-pip
+    fi
+
+    if ! deploy_python_has_pydantic_v2_for_user "$python_user"; then
+        if ! deploy_run_as_user "$python_user" python3 -m pip --version >/dev/null 2>&1; then
+            deploy_info "Installing python3-pip for ${python_user}"
+            deploy_preflight_time_sync "$apt_runner"
+            deploy_apt_update "$apt_runner"
+            deploy_run_with_runner "$apt_runner" apt-get install -y python3-pip
+        fi
+        deploy_run_as_user "$python_user" python3 -m pip install --user --upgrade "pydantic>=2,<3"
+    fi
+
+    deploy_require_cmds colcon cmake make gcc g++
+    deploy_python_has_pydantic_v2_for_user "$python_user" || deploy_error "pydantic>=2 install failed for ${python_user}"
+    deploy_info "Source-build prerequisites are ready for ${python_user}"
 }
 
 deploy_detect_repo() {

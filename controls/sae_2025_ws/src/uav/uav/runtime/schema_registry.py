@@ -34,6 +34,7 @@ class ModeRegistryEntry(BaseModel):
     description: str
     mission_target: str
     required_vision_nodes: tuple[str, ...]
+    requires_camera: bool = False
     transition_labels: tuple[str, ...]
     params_schema: dict[str, Any]
     param_fields: tuple[ModeParamFieldSpec, ...] = ()

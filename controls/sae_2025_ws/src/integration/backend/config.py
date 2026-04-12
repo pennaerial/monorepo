@@ -19,6 +19,13 @@ _BUILD_SOURCE_KINDS = {"none", "github", "local_artifact", "local_codebase"}
 _GITHUB_BUILD_SOURCES = {"release", "actions"}
 
 
+def _normalize_fleet_file(value: object) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    return Path(raw.replace("\\", "/")).name.strip()
+
+
 @dataclass(slots=True)
 class OperatorConfig:
     github_repo: str
@@ -545,6 +552,7 @@ class BuildSourceRecord:
         kind = str(payload.get("kind", "none")).strip() or "none"
         if kind not in _BUILD_SOURCE_KINDS:
             raise ValueError(f"Unsupported build source kind '{kind}'.")
+        fleet_file = _normalize_fleet_file(payload.get("fleet_file", ""))
 
         record = cls(
             kind=kind,
@@ -571,7 +579,7 @@ class BuildSourceRecord:
                 else None
             ),
             codebase_root=str(payload.get("codebase_root", "")).strip(),
-            fleet_file=str(payload.get("fleet_file", "")).strip(),
+            fleet_file=fleet_file,
             updated_at=str(payload.get("updated_at", "")).strip(),
         )
         record.validate()
@@ -774,7 +782,7 @@ class BuildSourceStore:
         next_record = BuildSourceRecord.from_dict(
             {
                 **self._current.to_store_dict(),
-                "fleet_file": fleet_file.strip(),
+                "fleet_file": _normalize_fleet_file(fleet_file),
                 "updated_at": _utc_now(),
             }
         )
@@ -785,7 +793,6 @@ class BuildSourceStore:
     def clear(self) -> BuildSourceRecord:
         previous = self._current
         self._current = BuildSourceRecord(
-            fleet_file=previous.fleet_file,
             updated_at=_utc_now(),
         )
         self.save()
