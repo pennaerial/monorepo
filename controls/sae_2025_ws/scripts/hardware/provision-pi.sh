@@ -11,6 +11,7 @@ DEPLOY_USER="${DEPLOY_USER:-penn}"
 AUTHORIZED_KEY_FILE=""
 AUTHORIZED_KEY_TEXT=""
 AUTHORIZED_KEY_URL="${AUTHORIZED_KEY_URL:-}"
+ALLOW_PLACEHOLDER_HOSTNAME=0
 ENABLE_NOPASSWD_SUDO="${ENABLE_NOPASSWD_SUDO:-1}"
 RUN_BOOTSTRAP="${RUN_BOOTSTRAP:-1}"
 START_SERVICE="${START_SERVICE:-0}"
@@ -38,6 +39,8 @@ Options:
   --authorized-key-file PATH Read one SSH public key from PATH
   --authorized-key TEXT      Install one SSH public key from literal text
   --authorized-key-url URL   Download one SSH public key from URL
+  --allow-placeholder-hostname
+                             Allow placeholder-style hostnames such as air-0x
   --deploy-root PATH         Deploy root for bootstrap (default: /home/<user>/pennair-deploy)
   --service NAME             Systemd service name for bootstrap (default: $SERVICE_NAME)
   --no-nopasswd-sudo         Do not install a passwordless sudoers drop-in
@@ -50,6 +53,7 @@ Examples:
   $0 --hostname air-01 --authorized-key-file ~/.ssh/pennair_pi_ed25519.pub
   $0 --hostname air-02 --authorized-key-url https://raw.githubusercontent.com/pennaerial/monorepo/main/controls/sae_2025_ws/ops/keys/pennair_pi_ed25519.pub
   $0 --hostname payload-01 --user penn --no-bootstrap
+  $0 --hostname air-0x --allow-placeholder-hostname --no-bootstrap
 EOF
 }
 
@@ -88,6 +92,23 @@ validate_hostname() {
         deploy_error "Invalid hostname '$1'. Use lowercase letters, numbers, and dashes only."
     fi
     printf '%s\n' "$value"
+}
+
+warn_placeholder_hostname() {
+    local hostname="$1"
+
+    if [[ ! "$hostname" =~ (^|-)0x($|-) ]]; then
+        return 0
+    fi
+
+    if [[ "$ALLOW_PLACEHOLDER_HOSTNAME" == "1" ]]; then
+        deploy_warn "Continuing with placeholder-style hostname '$hostname' because --allow-placeholder-hostname was provided."
+        return 0
+    fi
+
+    deploy_warn "Hostname '$hostname' looks like an example placeholder from the README."
+    deploy_warn "Use a real hostname such as 'air-01' or rerun with --allow-placeholder-hostname to bypass this check."
+    deploy_error "Refusing to provision with placeholder-style hostname '$hostname'."
 }
 
 resolve_user_home() {
@@ -295,6 +316,10 @@ while [[ $# -gt 0 ]]; do
             AUTHORIZED_KEY_URL="$2"
             shift 2
             ;;
+        --allow-placeholder-hostname)
+            ALLOW_PLACEHOLDER_HOSTNAME=1
+            shift
+            ;;
         --deploy-root)
             DEPLOY_ROOT="$2"
             shift 2
@@ -329,8 +354,9 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-ensure_root_access
 HOSTNAME_VALUE="$(validate_hostname "$HOSTNAME_VALUE")"
+warn_placeholder_hostname "$HOSTNAME_VALUE"
+ensure_root_access
 ensure_deploy_user "$DEPLOY_USER"
 
 if [[ -z "$DEPLOY_ROOT" ]]; then
