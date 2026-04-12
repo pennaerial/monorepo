@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import sys
 import tarfile
 import types
@@ -171,12 +172,22 @@ def _make_context(
     base_dir = tmp_path / "src" / "integration"
     base_dir.mkdir(parents=True, exist_ok=True)
     operator = _make_operator(tmp_path)
-    inventory = InventoryStore(
-        operator.inventory_path,
-        operator_config=operator,
-        default_deploy_root=operator.default_deploy_root,
-        seed_target=target,
-    )
+    inventory_kwargs = {
+        "operator_config": operator,
+        "default_deploy_root": operator.default_deploy_root,
+    }
+    if "seed_target" in inspect.signature(InventoryStore).parameters:
+        inventory = InventoryStore(
+            operator.inventory_path,
+            seed_target=target,
+            **inventory_kwargs,
+        )
+    else:
+        inventory = InventoryStore(
+            operator.inventory_path,
+            **inventory_kwargs,
+        )
+        inventory.upsert_target(target.to_store_dict())
     build_source_path, cache_dir = build_source_store_paths(operator.inventory_path)
     build_source_store = BuildSourceStore(
         build_source_path,
@@ -245,6 +256,32 @@ def _write_source_bundle(tmp_path: Path, *, package_dir_name: str = "uav") -> Pa
     bundle_path = tmp_path / "source-bundle.tar.gz"
     with tarfile.open(bundle_path, "w:gz") as archive:
         archive.add(bundle_root / "src", arcname="src")
+    return bundle_path
+
+
+def _write_fleet_bundle(tmp_path: Path, *, fleet_names: tuple[str, ...]) -> Path:
+    bundle_root = tmp_path / "fleet-bundle"
+    fleets_root = bundle_root / "install" / "uav" / "share" / "uav" / "fleets"
+    fleets_root.mkdir(parents=True, exist_ok=True)
+    for fleet_name in fleet_names:
+        (fleets_root / fleet_name).write_text(
+            yaml.safe_dump(
+                {
+                    "vehicles": [
+                        {
+                            "name": "uav_0",
+                            "mission": "hover",
+                        }
+                    ]
+                },
+                sort_keys=False,
+            ),
+            encoding="utf-8",
+        )
+
+    bundle_path = tmp_path / "fleet-bundle.tar.gz"
+    with tarfile.open(bundle_path, "w:gz") as archive:
+        archive.add(bundle_root / "install", arcname="install")
     return bundle_path
 
 
@@ -584,8 +621,13 @@ def test_list_builds_combines_releases_and_artifacts(tmp_path, monkeypatch):
             releases_payload=[
                 {
                     "tag_name": "build-deadbeef",
-                    "name": "build-deadbeef",
-                    "published_at": "2026-04-11T00:00:00Z",
+                    "name": "ROS 2 Build deadbeef",
+                    "published_at": "2026-04-11T00:05:00Z",
+                    "body": (
+                        "Commit: deadbeef\n"
+                        "Built: 2026-04-11T00:00:00Z\n"
+                        "Branch: main\n"
+                    ),
                     "assets": [
                         {
                             "browser_download_url": "https://example.com/build.tar.gz",
@@ -605,13 +647,44 @@ def test_list_builds_combines_releases_and_artifacts(tmp_path, monkeypatch):
                 "artifacts": [
                     {
                         "id": 99,
-                        "name": "arm-artifact",
+                        "name": "ros2-build-cafebabe.tar.gz",
                         "updated_at": "2026-04-11T01:00:00Z",
                         "size_in_bytes": 8_000_000,
                         "workflow_run": {
                             "id": 42,
                             "head_sha": "cafebabedeadbeef",
                             "head_branch": "feature/release-metadata",
+                            "event": "push",
+                            "name": "ARM Artifact",
+                            "conclusion": "success",
+                        },
+                    },
+                    {
+                        "id": 100,
+                        "name": "ros2-build-fallback.tar.gz",
+                        "updated_at": "2026-04-11T02:00:00Z",
+                        "size_in_bytes": 8_000_000,
+                        "workflow_run": {
+                            "id": 43,
+                            "head_sha": "feedfacefeedface",
+                            "head_branch": "feature/fallback",
+                            "event": "workflow_dispatch",
+                            "name": "ARM Fallback",
+                            "conclusion": "success",
+                        },
+                    },
+                    {
+                        "id": 101,
+                        "name": "dockerbuild-123.zip",
+                        "updated_at": "2026-04-11T03:00:00Z",
+                        "size_in_bytes": 1_000_000,
+                        "workflow_run": {
+                            "id": 44,
+                            "head_sha": "badc0debadc0de",
+                            "head_branch": "feature/ignored",
+                            "event": "push",
+                            "name": "Docker Build",
+                            "conclusion": "success",
                         },
                     }
                 ]
@@ -620,6 +693,9 @@ def test_list_builds_combines_releases_and_artifacts(tmp_path, monkeypatch):
                 "deadbeef": {"commit": {"message": "Release commit subject\n\nbody"}},
                 "cafebabedeadbeef": {
                     "commit": {"message": "Artifact commit subject\n\nbody"}
+                },
+                "feedfacefeedface": {
+                    "commit": {"message": "Fallback artifact subject\n\nbody"}
                 },
             },
         )
@@ -630,28 +706,48 @@ def test_list_builds_combines_releases_and_artifacts(tmp_path, monkeypatch):
 
     assert result["success"] is True
     assert len(result["builds"]) == 2
-    assert result["builds"][0] == {
+    assert result["builds"][0]["source"] == "actions"
+    assert result["builds"][0]["commit_sha"] == "cafebabedeadbeef"
+    assert result["builds"][0]["commit_subject"] == "Artifact commit subject"
+    assert result["builds"][0]["artifact_id"] == "99"
+    assert result["builds"][0]["run_id"] == "42"
+    assert result["builds"][0]["branch"] == "feature/release-metadata"
+    assert result["builds"][0]["date"] == "2026-04-11T01:00:00Z"
+    assert result["builds"][0]["workflow_event"] == "push"
+    assert result["builds"][0]["fallback"] is False
+    assert result["builds"][1] == {
         "source": "release",
         "tag": "build-deadbeef",
         "sha": "deadbee",
         "commit_sha": "deadbeef",
         "commit_subject": "Release commit subject",
-        "name": "build-deadbeef",
-        "date": "2026-04-11",
+        "name": "Release commit subject",
+        "date": "2026-04-11T00:00:00Z",
         "download_url": "https://example.com/build.tar.gz",
         "size_mb": 1.2,
+        "branch": "main",
+        "workflow_name": "ARM Artifact Release",
+        "workflow_event": "release",
+        "workflow_conclusion": None,
+        "deployable": True,
+        "fallback": False,
     }
-    assert result["builds"][1]["source"] == "actions"
-    assert result["builds"][1]["commit_sha"] == "cafebabedeadbeef"
-    assert result["builds"][1]["commit_subject"] == "Artifact commit subject"
-    assert result["builds"][1]["artifact_id"] == "99"
-    assert result["builds"][1]["run_id"] == "42"
-    assert result["builds"][1]["branch"] == "feature/release-metadata"
     assert len(result["releases"]) == 1
     assert len(result["artifacts"]) == 1
     assert result["artifact_page"] == 1
     assert result["artifact_page_size"] == 20
     assert result["artifact_has_more"] is False
+
+    filtered = asyncio.run(
+        deploy_service.list_builds(
+            ctx,
+            include_fallback=True,
+            q="fallback",
+        )
+    )
+    assert len(filtered["builds"]) == 1
+    assert filtered["builds"][0]["fallback"] is True
+    assert filtered["builds"][0]["workflow_event"] == "workflow_dispatch"
 
 
 def test_current_build_parses_release_marker(tmp_path):
@@ -864,3 +960,50 @@ def test_deploy_selected_source_requires_global_fleet_selection(tmp_path):
 
     assert result["success"] is False
     assert "fleet file" in result["error"].lower()
+
+
+def test_fleet_catalog_exposes_local_artifact_fleets_and_validates_selection(
+    tmp_path,
+):
+    target = _make_target(
+        target_id="pi-catalog",
+        vehicle_name="uav_0",
+        overlay_yaml="mission: hover\npx4_airframe_id: 4004\n",
+    )
+    ctx = _make_context(tmp_path, target)
+
+    bundle_path = _write_fleet_bundle(
+        tmp_path,
+        fleet_names=("primary.yaml", "backup.yaml"),
+    )
+
+    result = asyncio.run(
+        deploy_service.set_local_artifact_build_source(
+            ctx,
+            filename="fleet-bundle.tar.gz",
+            file_bytes=bundle_path.read_bytes(),
+        )
+    )
+    assert result["success"] is True
+
+    catalog = asyncio.run(deploy_service.get_fleet_catalog(ctx))
+    assert catalog["success"] is True
+    assert len(catalog["available_fleets"]) == 2
+
+    selected_fleet = catalog["available_fleets"][0]
+    result = asyncio.run(
+        deploy_service.set_global_fleet_file(ctx, fleet_file=selected_fleet)
+    )
+    assert result["success"] is True
+    assert selected_fleet in result["source"]["available_fleets"]
+
+    rogue_fleet = tmp_path / "rogue.yaml"
+    rogue_fleet.write_text(
+        "vehicles:\n  - name: uav_9\n    mission: hover\n",
+        encoding="utf-8",
+    )
+    result = asyncio.run(
+        deploy_service.set_global_fleet_file(ctx, fleet_file=str(rogue_fleet))
+    )
+    assert result["success"] is False
+    assert "selected build source" in result["error"].lower()

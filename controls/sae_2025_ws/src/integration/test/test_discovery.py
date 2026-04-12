@@ -17,7 +17,7 @@ backend_pkg.__path__ = [str(PACKAGE_ROOT / "backend")]
 sys.modules.setdefault("backend", backend_pkg)
 
 from backend import discovery  # noqa: E402
-from backend.config import InventoryStore, OperatorConfig, TargetRecord  # noqa: E402
+from backend.config import InventoryStore, OperatorConfig  # noqa: E402
 
 
 def _make_operator(tmp_path: Path) -> OperatorConfig:
@@ -35,7 +35,12 @@ def _make_operator(tmp_path: Path) -> OperatorConfig:
 
 def _make_context(tmp_path: Path) -> SimpleNamespace:
     operator = _make_operator(tmp_path)
-    seed_target = TargetRecord.from_dict(
+    inventory = InventoryStore(
+        operator.inventory_path,
+        operator_config=operator,
+        default_deploy_root=operator.default_deploy_root,
+    )
+    inventory.upsert_target(
         {
             "target_id": "pi-1",
             "label": "Primary Pi",
@@ -47,14 +52,7 @@ def _make_context(tmp_path: Path) -> SimpleNamespace:
             "vehicle_name": "uav_0",
             "overlay_yaml": "mission: hover\npx4_airframe_id: 4004\n",
             "service_unit": "pennair-autonomy.service",
-        },
-        default_deploy_root=operator.default_deploy_root,
-    )
-    inventory = InventoryStore(
-        operator.inventory_path,
-        operator_config=operator,
-        default_deploy_root=operator.default_deploy_root,
-        seed_target=seed_target,
+        }
     )
     return SimpleNamespace(list_targets=inventory.list_targets)
 
@@ -105,6 +103,49 @@ def test_live_hardware_cards_match_inventory_hosts(tmp_path, monkeypatch):
             "saved": False,
         },
     ]
+
+
+def test_live_hardware_cards_match_saved_ip_hosts(tmp_path, monkeypatch):
+    operator = _make_operator(tmp_path)
+    inventory = InventoryStore(
+        operator.inventory_path,
+        operator_config=operator,
+        default_deploy_root=operator.default_deploy_root,
+    )
+    inventory.upsert_target(
+        {
+            "target_id": "payload",
+            "label": "Payload Pi",
+            "pi_user": "penn",
+            "pi_host": "10.0.0.44",
+            "deploy_root": "/home/penn/pennair-deploy",
+            "ssh_key": "",
+            "ssh_pass": "",
+            "vehicle_name": "payload_0",
+            "overlay_yaml": "mission: payload_retreat\npayload_controller: GPIOController\n",
+            "service_unit": "pennair-autonomy.service",
+        }
+    )
+    ctx = SimpleNamespace(list_targets=inventory.list_targets)
+
+    monkeypatch.setattr(
+        discovery,
+        "_browse_services",
+        lambda _timeout: [
+            discovery._DiscoveredService(
+                hostname="payload.local",
+                service_name="Payload._ssh._tcp.local.",
+                service_type="_ssh._tcp.local.",
+                addresses={"10.0.0.44"},
+            )
+        ],
+    )
+
+    devices = asyncio.run(discovery.live_hardware_cards(ctx, timeout_s=0))
+
+    assert devices[0]["matched_target_id"] == "payload"
+    assert devices[0]["matched_label"] == "Payload Pi"
+    assert devices[0]["saved"] is True
 
 
 def test_parse_dns_sd_browse_output_extracts_instances():

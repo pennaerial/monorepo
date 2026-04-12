@@ -9,7 +9,6 @@ from .config import (
     OperatorConfig,
     TargetRecord,
     build_source_store_paths,
-    seed_target_from_env,
 )
 from .ssh import SSHExecutor
 from .state import MissionStateMachine
@@ -62,12 +61,10 @@ class AppContext:
 
 def create_context(base_dir: Path) -> AppContext:
     operator = OperatorConfig.from_env(base_dir)
-    seed_target = seed_target_from_env(base_dir, operator)
     inventory = InventoryStore(
         operator.inventory_path,
         operator_config=operator,
         default_deploy_root=operator.default_deploy_root,
-        seed_target=seed_target,
     )
     build_source_path, build_source_cache_dir = build_source_store_paths(
         operator.inventory_path

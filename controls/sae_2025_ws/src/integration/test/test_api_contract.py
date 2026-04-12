@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import asyncio
+import inspect
 import sys
 import types
 from pathlib import Path
 from types import SimpleNamespace
 
+import httpx
 import pytest
-from fastapi.testclient import TestClient
 
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
@@ -86,12 +88,22 @@ def _make_context(tmp_path: Path) -> SimpleNamespace:
     base_dir.mkdir(parents=True, exist_ok=True)
     operator = _make_operator(tmp_path)
     target = _make_target()
-    inventory = InventoryStore(
-        operator.inventory_path,
-        operator_config=operator,
-        default_deploy_root=operator.default_deploy_root,
-        seed_target=target,
-    )
+    inventory_kwargs = {
+        "operator_config": operator,
+        "default_deploy_root": operator.default_deploy_root,
+    }
+    if "seed_target" in inspect.signature(InventoryStore).parameters:
+        inventory = InventoryStore(
+            operator.inventory_path,
+            seed_target=target,
+            **inventory_kwargs,
+        )
+    else:
+        inventory = InventoryStore(
+            operator.inventory_path,
+            **inventory_kwargs,
+        )
+        inventory.upsert_target(target.to_store_dict())
     build_source_path, cache_dir = build_source_store_paths(operator.inventory_path)
     build_source_store = BuildSourceStore(
         build_source_path,
@@ -126,7 +138,29 @@ def client(tmp_path, monkeypatch):
     ctx = _make_context(tmp_path)
     monkeypatch.setattr("backend.app_factory.create_context", lambda base_dir: ctx)
     app = create_app(tmp_path / "src" / "integration")
-    return TestClient(app)
+
+    class ApiClient:
+        def __init__(self, app):
+            self.app = app
+
+        def request(self, method: str, url: str, **kwargs):
+            async def _send():
+                transport = httpx.ASGITransport(app=self.app)
+                async with httpx.AsyncClient(
+                    transport=transport,
+                    base_url="http://testserver",
+                ) as async_client:
+                    return await async_client.request(method, url, **kwargs)
+
+            return asyncio.run(_send())
+
+        def get(self, url: str, **kwargs):
+            return self.request("GET", url, **kwargs)
+
+        def post(self, url: str, **kwargs):
+            return self.request("POST", url, **kwargs)
+
+    return ApiClient(app)
 
 
 def test_config_is_operator_global_only(client):
@@ -203,9 +237,13 @@ def test_target_scoped_upload_routes_require_target_id(client):
 
 
 def test_terminal_websocket_requires_target_id(client):
-    with pytest.raises(Exception):
-        with client.websocket_connect("/ws/mission/terminal"):
-            pass
+    route = next(
+        route
+        for route in client.app.routes
+        if getattr(route, "path", "") == "/ws/mission/terminal"
+    )
+    target_param = inspect.signature(route.endpoint).parameters["target_id"]
+    assert target_param.default.is_required()
 
 
 def test_build_source_routes_round_trip(client, tmp_path):
@@ -237,6 +275,13 @@ def test_build_source_routes_round_trip(client, tmp_path):
     assert payload["source"]["tag"] == "build-deadbeef"
     assert payload["source"]["commit_subject"] == "Test release subject"
 
+    response = client.post("/api/build-source/local-codebase")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["success"] is True
+    assert payload["source"]["kind"] == "local_codebase"
+    assert payload["source"]["codebase_root"]
+
     response = client.post(
         "/api/build-source/fleet",
         data={"fleet_file": str(fleet_path)},
@@ -259,15 +304,47 @@ def test_build_source_routes_round_trip(client, tmp_path):
     assert payload["source"]["artifact_name"] == "hardware-build.tar.gz"
     assert payload["source"]["local_artifact_exists"] is True
 
-    response = client.post("/api/build-source/local-codebase")
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["success"] is True
-    assert payload["source"]["kind"] == "local_codebase"
-    assert payload["source"]["codebase_root"]
-
     response = client.post("/api/build-source/clear")
     assert response.status_code == 200
     payload = response.json()
     assert payload["success"] is True
     assert payload["source"]["kind"] == "none"
+
+
+def test_build_source_catalog_endpoint_exposes_available_fleets(client, tmp_path):
+    fleets_dir = tmp_path / "src" / "uav" / "uav" / "fleets"
+    fleets_dir.mkdir(parents=True, exist_ok=True)
+    primary_fleet = fleets_dir / "primary.yaml"
+    backup_fleet = fleets_dir / "backup.yaml"
+    primary_fleet.write_text(
+        "vehicles:\n  - name: uav_0\n    mission: hover\n",
+        encoding="utf-8",
+    )
+    backup_fleet.write_text(
+        "vehicles:\n  - name: uav_1\n    mission: hover\n",
+        encoding="utf-8",
+    )
+
+    response = client.post("/api/build-source/local-codebase")
+    assert response.status_code == 200
+
+    response = client.get("/api/build-source/fleet-catalog")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["success"] is True
+    assert payload["source_kind"] == "local_codebase"
+    assert payload["available_fleets"] == sorted(
+        [str(primary_fleet), str(backup_fleet)]
+    )
+
+    response = client.post(
+        "/api/build-source/fleet",
+        data={"fleet_file": str(primary_fleet)},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["success"] is True
+    assert payload["source"]["fleet_file"] == str(primary_fleet)
+    assert sorted(payload["source"]["available_fleets"]) == sorted(
+        [str(primary_fleet), str(backup_fleet)]
+    )

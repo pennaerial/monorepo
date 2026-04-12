@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, File, Form, UploadFile
 
 from ..context import AppContext
-from ..models import BuildSourceResponse
+from ..models import BuildSourceResponse, FleetCatalogResponse
 
 
 def build_router(ctx: AppContext) -> APIRouter:
@@ -17,6 +17,14 @@ def build_router(ctx: AppContext) -> APIRouter:
 
         return BuildSourceResponse.model_validate(
             await deploy_service.get_build_source(ctx)
+        )
+
+    @router.get("/fleet-catalog", response_model=FleetCatalogResponse)
+    async def get_fleet_catalog() -> FleetCatalogResponse:
+        from ..services import deploy as deploy_service
+
+        return FleetCatalogResponse.model_validate(
+            await deploy_service.get_fleet_catalog(ctx)
         )
 
     @router.post("/github", response_model=BuildSourceResponse)

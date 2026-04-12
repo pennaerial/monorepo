@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from datetime import datetime, timezone
 import os
 import re
@@ -49,6 +50,190 @@ def _selected_fleet_file(ctx: AppContext) -> str:
     return str(ctx.build_source_store.current().fleet_file or "").strip()
 
 
+def _source_catalog_key(current) -> str:
+    payload = "|".join(
+        str(value)
+        for value in (
+            current.kind,
+            current.github_source,
+            current.tag,
+            current.artifact_id,
+            current.run_id,
+            current.sha,
+            current.download_url,
+            current.name,
+            current.artifact_name,
+            current.local_artifact_path,
+            current.codebase_root,
+            current.updated_at,
+        )
+    )
+    return hashlib.sha1(payload.encode("utf-8")).hexdigest()[:12]
+
+
+def _catalog_archive_extension(current) -> str:
+    if current.kind == "github" and current.github_source == "actions":
+        return ".zip"
+    return ".tar.gz"
+
+
+def _build_archive_url(ctx: AppContext) -> str | None:
+    current = ctx.build_source_store.current()
+    if current.kind != "github":
+        return None
+    if current.download_url:
+        return current.download_url
+    repo = ctx.operator_config.github_repo
+    if not repo:
+        return None
+    if current.github_source == "actions" and current.artifact_id:
+        return (
+            f"https://api.github.com/repos/{repo}/actions/artifacts/"
+            f"{current.artifact_id}/zip"
+        )
+    if current.github_source == "release" and current.tag and current.artifact_name:
+        return f"https://github.com/{repo}/releases/download/{current.tag}/{current.artifact_name}"
+    return None
+
+
+def _fleet_catalog_dir(ctx: AppContext) -> Path:
+    current = ctx.build_source_store.current()
+    return ctx.build_source_store.cache_dir / f"fleet-catalog-{_source_catalog_key(current)}"
+
+
+def _catalog_yaml_paths(root: Path) -> list[Path]:
+    if not root.exists():
+        return []
+    paths = {
+        path.resolve()
+        for pattern in ("*.yaml", "*.yml")
+        for path in root.rglob(pattern)
+        if "fleets" in {part.lower() for part in path.parts}
+    }
+    return sorted(paths)
+
+
+def _safe_extract_path(base_dir: Path, member_name: str) -> Path | None:
+    candidate = (base_dir / member_name).resolve()
+    base_resolved = base_dir.resolve()
+    try:
+        candidate.relative_to(base_resolved)
+    except ValueError:
+        return None
+    return candidate
+
+
+def _archive_member_names(archive_path: Path) -> list[str]:
+    if archive_path.name.endswith(".zip"):
+        with zipfile.ZipFile(archive_path) as archive:
+            return archive.namelist()
+    if archive_path.name.endswith(".tar.gz") or archive_path.name.endswith(".tgz"):
+        with tarfile.open(archive_path, "r:gz") as archive:
+            return [member.name for member in archive.getmembers() if member.isfile()]
+    raise ValueError(
+        f"Unsupported source bundle '{archive_path.name}'. Use .tar.gz, .tgz, or .zip."
+    )
+
+
+def _extract_catalog_from_archive(
+    archive_path: Path, extract_dir: Path
+) -> list[Path]:
+    extract_dir.mkdir(parents=True, exist_ok=True)
+    member_names = _archive_member_names(archive_path)
+    catalog_paths: list[Path] = []
+
+    def _is_fleet_yaml(member_name: str) -> bool:
+        normalized = member_name.replace("\\", "/").lower()
+        return "/fleets/" in normalized and normalized.endswith((".yaml", ".yml"))
+
+    if archive_path.name.endswith(".zip"):
+        with zipfile.ZipFile(archive_path) as archive:
+            for member_name in member_names:
+                if not _is_fleet_yaml(member_name):
+                    continue
+                destination = _safe_extract_path(extract_dir, member_name)
+                if destination is None:
+                    continue
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                archive.extract(member_name, extract_dir)
+                catalog_paths.append(destination)
+    else:
+        with tarfile.open(archive_path, "r:gz") as archive:
+            for member in archive.getmembers():
+                if not member.isfile() or not _is_fleet_yaml(member.name):
+                    continue
+                destination = _safe_extract_path(extract_dir, member.name)
+                if destination is None:
+                    continue
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                archive.extract(member, extract_dir)
+                catalog_paths.append(destination)
+
+    return sorted({path.resolve() for path in catalog_paths})
+
+
+def _fleet_catalog_from_local_codebase(ctx: AppContext) -> tuple[list[str], str | None]:
+    root = _repo_root(ctx) / "src" / "uav" / "uav" / "fleets"
+    if not root.exists():
+        return [], str(root)
+    paths = _catalog_yaml_paths(root)
+    return [str(path.resolve()) for path in paths], str(root)
+
+
+def _fleet_catalog_from_current_source(
+    ctx: AppContext,
+) -> tuple[list[str], str | None, str | None]:
+    current = ctx.build_source_store.current()
+    if current.kind == "none":
+        return [], None, None
+
+    if current.kind == "local_codebase":
+        catalog, catalog_source = _fleet_catalog_from_local_codebase(ctx)
+        return catalog, catalog_source, None
+
+    if current.kind == "local_artifact":
+        artifact_path = Path(current.local_artifact_path)
+        if not artifact_path.exists():
+            return [], str(artifact_path), "Selected local artifact no longer exists."
+        catalog_dir = _fleet_catalog_dir(ctx)
+        extract_dir = catalog_dir / "extract"
+        if not extract_dir.exists():
+            try:
+                _extract_catalog_from_archive(artifact_path, extract_dir)
+            except Exception as exc:
+                return [], str(artifact_path), str(exc)
+        catalog = [str(path.resolve()) for path in _catalog_yaml_paths(extract_dir)]
+        return catalog, str(artifact_path), None
+
+    archive_url = _build_archive_url(ctx)
+    if not archive_url:
+        return [], "github", "Selected GitHub build source does not expose a download URL."
+
+    catalog_dir = _fleet_catalog_dir(ctx)
+    extract_dir = catalog_dir / "extract"
+    if extract_dir.exists():
+        catalog = [str(path.resolve()) for path in _catalog_yaml_paths(extract_dir)]
+        if catalog:
+            return catalog, archive_url, None
+
+    httpx = _require_httpx()
+    archive_ext = _catalog_archive_extension(current)
+    archive_path = catalog_dir / f"archive{archive_ext}"
+    catalog_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        with httpx.Client(timeout=300, follow_redirects=True) as client:
+            with client.stream("GET", archive_url, headers=_github_headers(ctx)) as resp:
+                resp.raise_for_status()
+                with archive_path.open("wb") as out:
+                    for chunk in resp.iter_bytes():
+                        out.write(chunk)
+        _extract_catalog_from_archive(archive_path, extract_dir)
+        catalog = [str(path.resolve()) for path in _catalog_yaml_paths(extract_dir)]
+        return catalog, archive_url, None
+    except Exception as exc:
+        return [], archive_url, str(exc)
+
+
 def _require_httpx():
     try:
         import httpx
@@ -92,6 +277,12 @@ def _build_source_payload(ctx: AppContext) -> dict[str, object]:
     fleet_file = _selected_fleet_file(ctx)
     payload["fleet_file"] = fleet_file or None
     payload.update(_fleet_preview(ctx, fleet_file))
+    available_fleets, fleet_catalog_source, fleet_catalog_error = (
+        _fleet_catalog_from_current_source(ctx)
+    )
+    payload["available_fleets"] = available_fleets
+    payload["fleet_catalog_source"] = fleet_catalog_source
+    payload["fleet_catalog_error"] = fleet_catalog_error
     return payload
 
 
@@ -1459,6 +1650,28 @@ async def get_build_source(ctx: AppContext) -> dict[str, object]:
     return _build_source_response(ctx, success=True)
 
 
+async def get_fleet_catalog(ctx: AppContext) -> dict[str, object]:
+    current = ctx.build_source_store.current()
+    available_fleets, catalog_source, catalog_error = _fleet_catalog_from_current_source(
+        ctx
+    )
+    selected_fleet_file = _selected_fleet_file(ctx) or None
+    fleet_preview = _fleet_preview(ctx, selected_fleet_file or "")
+    return {
+        "success": True,
+        "source_kind": current.kind,
+        "source_label": current.summary(),
+        "selected_fleet_file": selected_fleet_file,
+        "available_fleets": available_fleets,
+        "fleet_catalog_source": catalog_source,
+        "fleet_catalog_error": catalog_error,
+        "fleet_exists": fleet_preview.get("fleet_exists"),
+        "fleet_error": fleet_preview.get("fleet_error"),
+        "fleet_vehicles": fleet_preview.get("fleet_vehicles", []),
+        "error": None,
+    }
+
+
 async def set_github_build_source(
     ctx: AppContext,
     *,
@@ -1561,12 +1774,30 @@ async def set_global_fleet_file(
         fleet_payload = _load_local_yaml(fleet_path)
         if not isinstance(fleet_payload.get("vehicles", []), list):
             raise ValueError("Fleet file must define vehicles as a list.")
+        catalog, catalog_source, catalog_error = _fleet_catalog_from_current_source(ctx)
+        if catalog_error:
+            raise ValueError(catalog_error)
+        current_kind = ctx.build_source_store.current().kind
+        if catalog:
+            resolved = str(fleet_path.resolve())
+            if resolved not in set(catalog):
+                raise ValueError(
+                    "fleet_file must be one of the fleet YAML files from the selected build source."
+                )
+        elif current_kind in {"github", "local_artifact"}:
+            raise ValueError(
+                "The selected build source does not expose any fleet YAML files."
+            )
         ctx.build_source_store.set_fleet_file(fleet_file=selected)
-        return _build_source_response(
+        response = _build_source_response(
             ctx,
             success=True,
             output=f"Fleet selected: {selected}",
         )
+        if response.get("source"):
+            response["source"]["fleet_catalog_source"] = catalog_source
+            response["source"]["available_fleets"] = catalog
+        return response
     except Exception as exc:
         return _build_source_response(
             ctx,
@@ -1778,11 +2009,127 @@ async def upload_build(
             os.unlink(tmp_path)
 
 
+def _release_body_value(release: dict, label: str) -> str:
+    body = str(release.get("body", "") or "")
+    prefix = f"{label}:"
+    for raw_line in body.splitlines():
+        line = raw_line.strip()
+        if line.startswith(prefix):
+            return line.split(":", 1)[1].strip()
+    return ""
+
+
+def _release_commit_sha(release: dict) -> str:
+    commit_sha = _release_body_value(release, "Commit")
+    if commit_sha:
+        return commit_sha
+    return str(release.get("tag_name", "")).replace("build-", "").strip()
+
+
+def _release_timestamp(release: dict) -> str:
+    built_at = _release_body_value(release, "Built")
+    if built_at:
+        return built_at
+    return str(release.get("published_at", "")).strip()
+
+
+def _release_branch(release: dict) -> str | None:
+    branch = _release_body_value(release, "Branch")
+    return branch or None
+
+
+def _artifact_name(artifact: dict) -> str:
+    return str(artifact.get("name", "")).strip()
+
+
+def _artifact_workflow_name(artifact: dict) -> str:
+    workflow_run = artifact.get("workflow_run") or {}
+    if not isinstance(workflow_run, dict):
+        return ""
+    return str(workflow_run.get("name", "")).strip()
+
+
+def _artifact_is_deployable(artifact: dict) -> bool:
+    artifact_name = _artifact_name(artifact).lower()
+    workflow_name = _artifact_workflow_name(artifact).lower()
+    return artifact_name.startswith("ros2-build-") or workflow_name in {
+        "arm artifact",
+        "arm fallback",
+    }
+
+
+def _artifact_is_fallback(artifact: dict) -> bool:
+    artifact_name = _artifact_name(artifact).lower()
+    workflow_name = _artifact_workflow_name(artifact).lower()
+    return "fallback" in artifact_name or "fallback" in workflow_name
+
+
+def _matches_build_filters(
+    item: dict[str, object],
+    *,
+    q: str = "",
+    sha: str = "",
+    commit_subject: str = "",
+    branch: str = "",
+    include_fallback: bool = False,
+) -> bool:
+    if not include_fallback and bool(item.get("fallback")):
+        return False
+
+    q_value = q.strip().lower()
+    sha_value = sha.strip().lower()
+    subject_value = commit_subject.strip().lower()
+    branch_value = branch.strip().lower()
+
+    if sha_value:
+        haystack = " ".join(
+            value
+            for value in (
+                str(item.get("sha", "") or "").lower(),
+                str(item.get("commit_sha", "") or "").lower(),
+            )
+            if value
+        )
+        if sha_value not in haystack:
+            return False
+
+    if subject_value:
+        if subject_value not in str(item.get("commit_subject", "") or "").lower():
+            return False
+
+    if branch_value:
+        if branch_value not in str(item.get("branch", "") or "").lower():
+            return False
+
+    if q_value:
+        searchable = " ".join(
+            str(value or "").lower()
+            for value in (
+                item.get("sha"),
+                item.get("commit_sha"),
+                item.get("commit_subject"),
+                item.get("name"),
+                item.get("tag"),
+                item.get("branch"),
+                item.get("workflow_name"),
+            )
+        )
+        if q_value not in searchable:
+            return False
+
+    return True
+
+
 async def list_builds(
     ctx: AppContext,
     *,
     artifact_page: int = 1,
     artifact_page_size: int = 20,
+    q: str = "",
+    sha: str = "",
+    commit_subject: str = "",
+    branch: str = "",
+    include_fallback: bool = False,
 ) -> dict:
     artifact_page = max(int(artifact_page or 1), 1)
     artifact_page_size = max(1, min(int(artifact_page_size or 20), 50))
@@ -1801,7 +2148,6 @@ async def list_builds(
         httpx = _require_httpx()
         releases_builds: list[dict[str, object]] = []
         artifact_builds: list[dict[str, object]] = []
-        artifact_has_more = False
 
         async def _collect_releases(client) -> list[dict[str, object]]:
             collected: list[dict[str, object]] = []
@@ -1819,6 +2165,31 @@ async def list_builds(
                     raise ValueError("Unexpected releases payload from GitHub.")
                 collected.extend(page_payload)
                 if len(page_payload) < 100:
+                    break
+                page += 1
+            return collected
+
+        async def _collect_artifacts(client) -> list[dict[str, object]]:
+            collected: list[dict[str, object]] = []
+            page = 1
+            while True:
+                response = await client.get(
+                    "https://api.github.com/repos/"
+                    f"{ctx.operator_config.github_repo}/actions/artifacts"
+                    f"?per_page={artifact_page_size}&page={page}",
+                    headers=_github_headers(ctx),
+                )
+                response.raise_for_status()
+                payload = response.json() or {}
+                rows = payload.get("artifacts", [])
+                if not isinstance(rows, list):
+                    raise ValueError("Unexpected artifacts payload from GitHub.")
+                collected.extend(rows)
+                if not rows:
+                    break
+                if len(rows) < artifact_page_size:
+                    break
+                if not include_fallback and page >= artifact_page and not q and not sha and not commit_subject and not branch:
                     break
                 page += 1
             return collected
@@ -1842,22 +2213,7 @@ async def list_builds(
 
         async with httpx.AsyncClient(timeout=20) as client:
             releases = await _collect_releases(client)
-            artifacts_resp = await client.get(
-                "https://api.github.com/repos/"
-                f"{ctx.operator_config.github_repo}/actions/artifacts"
-                f"?per_page={artifact_page_size}&page={artifact_page}",
-                headers=_github_headers(ctx),
-            )
-            artifacts_resp.raise_for_status()
-            artifacts_payload = artifacts_resp.json()
-            artifact_payload_rows = artifacts_payload.get("artifacts", [])
-            total_count = artifacts_payload.get("total_count")
-            if isinstance(total_count, int):
-                artifact_has_more = (
-                    artifact_page * artifact_page_size < total_count
-                )
-            else:
-                artifact_has_more = len(artifact_payload_rows) >= artifact_page_size
+            artifact_payload_rows = await _collect_artifacts(client)
 
             release_commit_shas: list[str] = []
             artifact_commit_shas: list[str] = []
@@ -1865,17 +2221,22 @@ async def list_builds(
             artifact_rows: list[tuple[dict, str]] = []
 
             for rel in releases:
-                tag_name = rel.get("tag_name", "")
-                if not str(tag_name).startswith("build-"):
+                tag_name = str(rel.get("tag_name", "")).strip()
+                if not tag_name.startswith("build-"):
                     continue
-                assets = rel.get("assets", [])
-                commit_sha = str(rel.get("tag_name", "")).replace("build-", "").strip()
+                commit_sha = _release_commit_sha(rel)
                 release_rows.append((rel, commit_sha))
                 if commit_sha:
                     release_commit_shas.append(commit_sha)
 
             for artifact in artifact_payload_rows:
+                if not _artifact_is_deployable(artifact):
+                    continue
+                if not include_fallback and _artifact_is_fallback(artifact):
+                    continue
                 workflow_run = artifact.get("workflow_run") or {}
+                if not isinstance(workflow_run, dict):
+                    workflow_run = {}
                 commit_sha = str(workflow_run.get("head_sha", "")).strip()
                 artifact_rows.append((artifact, commit_sha))
                 if commit_sha:
@@ -1890,52 +2251,86 @@ async def list_builds(
                 )
 
         for rel, commit_sha in release_rows:
-            assets = rel.get("assets", [])
-            display_sha = commit_sha[:7] if len(commit_sha) > 7 else commit_sha
-            releases_builds.append(
-                {
-                    "source": "release",
-                    "tag": rel["tag_name"],
-                    "sha": display_sha,
-                    "commit_sha": commit_sha or None,
-                    "commit_subject": unique_commit_shas.get(commit_sha),
-                    "name": rel.get("name", rel["tag_name"]),
-                    "date": rel.get("published_at", "")[:10],
-                    "download_url": assets[0]["browser_download_url"]
-                    if assets
-                    else None,
-                    "size_mb": round(assets[0]["size"] / 1_000_000, 1)
-                    if assets
-                    else None,
-                }
-            )
+            assets = rel.get("assets", []) or []
+            asset = assets[0] if assets else {}
+            item = {
+                "source": "release",
+                "tag": rel.get("tag_name", ""),
+                "sha": commit_sha[:7] if len(commit_sha) > 7 else commit_sha,
+                "commit_sha": commit_sha or None,
+                "commit_subject": unique_commit_shas.get(commit_sha),
+                "name": unique_commit_shas.get(commit_sha)
+                or rel.get("name", rel.get("tag_name", "")),
+                "date": _release_timestamp(rel),
+                "download_url": asset.get("browser_download_url"),
+                "size_mb": round((asset.get("size", 0) or 0) / 1_000_000, 1)
+                if assets
+                else None,
+                "branch": _release_branch(rel),
+                "workflow_name": "ARM Artifact Release",
+                "workflow_event": "release",
+                "workflow_conclusion": None,
+                "deployable": True,
+                "fallback": False,
+            }
+            if _matches_build_filters(
+                item,
+                q=q,
+                sha=sha,
+                commit_subject=commit_subject,
+                branch=branch,
+                include_fallback=include_fallback,
+            ):
+                releases_builds.append(item)
 
         for artifact, commit_sha in artifact_rows:
             workflow_run = artifact.get("workflow_run") or {}
-            artifact_builds.append(
-                {
-                    "source": "actions",
-                    "tag": f"run-{workflow_run.get('id', artifact.get('id'))}",
-                    "sha": commit_sha[:7] if len(commit_sha) > 7 else commit_sha,
-                    "commit_sha": commit_sha or None,
-                    "commit_subject": unique_commit_shas.get(commit_sha),
-                    "name": artifact.get("name", f"artifact-{artifact.get('id')}"),
-                    "date": str(artifact.get("updated_at", ""))[:10],
-                    "size_mb": round(
-                        (artifact.get("size_in_bytes", 0) or 0) / 1_000_000, 1
-                    ),
-                    "run_id": str(workflow_run.get("id", "")) or None,
-                    "artifact_id": str(artifact.get("id", "")) or None,
-                    "artifact_name": artifact.get("name"),
-                    "branch": workflow_run.get("head_branch"),
-                }
-            )
+            if not isinstance(workflow_run, dict):
+                workflow_run = {}
+            item = {
+                "source": "actions",
+                "tag": f"run-{workflow_run.get('id', artifact.get('id'))}",
+                "sha": commit_sha[:7] if len(commit_sha) > 7 else commit_sha,
+                "commit_sha": commit_sha or None,
+                "commit_subject": unique_commit_shas.get(commit_sha),
+                "name": unique_commit_shas.get(commit_sha)
+                or artifact.get("name", f"artifact-{artifact.get('id')}"),
+                "date": str(artifact.get("updated_at", "")).strip(),
+                "download_url": artifact.get("archive_download_url")
+                or (
+                    f"https://api.github.com/repos/{ctx.operator_config.github_repo}"
+                    f"/actions/artifacts/{artifact.get('id')}/zip"
+                ),
+                "size_mb": round((artifact.get("size_in_bytes", 0) or 0) / 1_000_000, 1),
+                "run_id": str(workflow_run.get("id", "")) or None,
+                "artifact_id": str(artifact.get("id", "")) or None,
+                "artifact_name": artifact.get("name"),
+                "branch": workflow_run.get("head_branch"),
+                "workflow_name": workflow_run.get("name"),
+                "workflow_event": workflow_run.get("event"),
+                "workflow_conclusion": workflow_run.get("conclusion"),
+                "deployable": _artifact_is_deployable(artifact),
+                "fallback": _artifact_is_fallback(artifact),
+            }
+            if _matches_build_filters(
+                item,
+                q=q,
+                sha=sha,
+                commit_subject=commit_subject,
+                branch=branch,
+                include_fallback=include_fallback,
+            ):
+                artifact_builds.append(item)
+
+        combined = releases_builds + artifact_builds
+        combined.sort(key=lambda item: str(item.get("date", "")), reverse=True)
+        artifact_has_more = False if (q or sha or commit_subject or branch or include_fallback) else len(artifact_rows) >= artifact_page_size
         return {
             "success": True,
-            "builds": releases_builds + artifact_builds,
+            "builds": combined,
             "releases": releases_builds,
             "artifacts": artifact_builds,
-            "artifact_page": artifact_page,
+            "artifact_page": 1 if (q or sha or commit_subject or branch or include_fallback) else artifact_page,
             "artifact_page_size": artifact_page_size,
             "artifact_has_more": artifact_has_more,
         }
