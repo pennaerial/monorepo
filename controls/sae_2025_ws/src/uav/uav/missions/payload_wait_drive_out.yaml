@@ -4,7 +4,7 @@ modes:
     params:
       dark_threshold: 100
       clear_ratio: 0.3
-      wait_seconds: 30.0
+      wait_seconds: 15.0
       turn_angular: 3.14
       turn_speed: 1.5
       compressed_image: false
