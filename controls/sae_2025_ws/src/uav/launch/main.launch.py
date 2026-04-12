@@ -216,6 +216,7 @@ def _single_vehicle_config(context, params: dict) -> tuple[dict, dict | None]:
         "px4_path": px4_path,
         "px4_namespace": str(params.get("px4_namespace", "")).strip(),
         "px4_instance": int(params.get("px4_instance", 0)),
+        "use_camera": bool(params.get("use_camera", mission_spec.is_payload)),
         "launch_middleware": mission_spec.is_uav,
         "launch_px4_sitl": bool(sim and mission_spec.is_uav),
         "launch_payload_backend": mission_spec.is_payload,
