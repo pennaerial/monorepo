@@ -353,6 +353,45 @@ def _write_fleet_bundle(tmp_path: Path, *, fleet_names: tuple[str, ...]) -> Path
     return bundle_path
 
 
+def _write_mirrored_fleet_bundle(
+    tmp_path: Path,
+    *,
+    fleet_name: str = "shared.yaml",
+) -> Path:
+    bundle_root = tmp_path / "mirrored-fleet-bundle"
+    install_fleets_root = (
+        bundle_root / "install" / "uav" / "share" / "uav" / "fleets"
+    )
+    source_fleets_root = bundle_root / "src" / "uav" / "uav" / "fleets"
+    install_fleets_root.mkdir(parents=True, exist_ok=True)
+    source_fleets_root.mkdir(parents=True, exist_ok=True)
+
+    (install_fleets_root / fleet_name).write_text(
+        yaml.safe_dump(
+            {
+                "vehicles": [
+                    {
+                        "name": "uav_0",
+                        "mission": "hover",
+                    }
+                ]
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    (source_fleets_root / fleet_name).write_text(
+        "vehicles: invalid\n",
+        encoding="utf-8",
+    )
+
+    bundle_path = tmp_path / "mirrored-fleet-bundle.tar.gz"
+    with tarfile.open(bundle_path, "w:gz") as archive:
+        archive.add(bundle_root / "install", arcname="install")
+        archive.add(bundle_root / "src", arcname="src")
+    return bundle_path
+
+
 def _write_actions_artifact_zip(
     tmp_path: Path,
     *,
@@ -387,6 +426,20 @@ def _write_actions_artifact_zip(
     with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         archive.writestr(tarball_name, inner_tarball.getvalue())
     return zip_path
+
+
+def _write_deploy_lib(tmp_path: Path) -> Path:
+    path = tmp_path / "scripts" / "hardware" / "deploy-lib.sh"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        (
+            "#!/usr/bin/env bash\n"
+            "deploy_ensure_uav_python_runtime() { :; }\n"
+            "deploy_ensure_source_build_prereqs() { :; }\n"
+        ),
+        encoding="utf-8",
+    )
+    return path
 
 
 def test_render_runtime_fleet_for_uav(tmp_path, monkeypatch):
@@ -1231,6 +1284,80 @@ def test_fleet_catalog_exposes_local_artifact_fleets_and_validates_selection(
     )
     assert result["success"] is False
     assert "selected build source" in result["error"].lower()
+
+
+def test_local_artifact_catalog_dedupes_mirrored_fleet_filenames(tmp_path):
+    target = _make_target(
+        target_id="pi-mirrored-fleet",
+        vehicle_name="uav_0",
+        overlay_yaml="mission: hover\npx4_airframe_id: 4004\n",
+    )
+    ctx = _make_context(tmp_path, target)
+
+    bundle_path = _write_mirrored_fleet_bundle(tmp_path, fleet_name="shared.yaml")
+
+    result = asyncio.run(
+        deploy_service.set_local_artifact_build_source(
+            ctx,
+            filename="mirrored-fleet-bundle.tar.gz",
+            file_bytes=bundle_path.read_bytes(),
+        )
+    )
+    assert result["success"] is True
+    assert result["source"]["fleet_catalog_error"] is None
+    assert result["source"]["available_fleets"] == ["shared.yaml"]
+
+    result = asyncio.run(
+        deploy_service.set_global_fleet_file(ctx, fleet_file="shared.yaml")
+    )
+    assert result["success"] is True
+    assert result["source"]["fleet_file"] == "shared.yaml"
+
+
+def test_ensure_runtime_prereqs_uses_shared_deploy_lib(tmp_path):
+    target = _make_target(
+        target_id="pi-runtime-prereqs",
+        vehicle_name="uav_0",
+        overlay_yaml="mission: hover\npx4_airframe_id: 4004\n",
+    )
+    ctx = _make_context(tmp_path, target)
+    helper_path = _write_deploy_lib(tmp_path)
+
+    target_ctx = ctx.resolve_target("pi-runtime-prereqs")
+    asyncio.run(deploy_service._ensure_runtime_prereqs(ctx, target_ctx))
+
+    paths = target_ctx.target.deploy_paths()
+    assert target_ctx.ssh.scp_calls == [
+        (str(helper_path), f"{paths['incoming_dir']}/deploy-lib.sh")
+    ]
+    assert any(
+        "deploy_ensure_uav_python_runtime run_root" in cmd
+        for cmd in target_ctx.ssh.run_calls
+    )
+    assert any(target_ctx.target.pi_user in cmd for cmd in target_ctx.ssh.run_calls)
+
+
+def test_ensure_source_build_prereqs_uses_shared_deploy_lib(tmp_path):
+    target = _make_target(
+        target_id="pi-source-prereqs",
+        vehicle_name="uav_0",
+        overlay_yaml="mission: hover\npx4_airframe_id: 4004\n",
+    )
+    ctx = _make_context(tmp_path, target)
+    helper_path = _write_deploy_lib(tmp_path)
+
+    target_ctx = ctx.resolve_target("pi-source-prereqs")
+    asyncio.run(deploy_service._ensure_source_build_prereqs(ctx, target_ctx))
+
+    paths = target_ctx.target.deploy_paths()
+    assert target_ctx.ssh.scp_calls == [
+        (str(helper_path), f"{paths['incoming_dir']}/deploy-lib.sh")
+    ]
+    assert any(
+        "deploy_ensure_source_build_prereqs run_root" in cmd
+        for cmd in target_ctx.ssh.run_calls
+    )
+    assert any(target_ctx.target.pi_user in cmd for cmd in target_ctx.ssh.run_calls)
 
 
 def test_build_source_change_preserves_matching_fleet_filename(tmp_path):

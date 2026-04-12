@@ -54,12 +54,8 @@ install_prereqs() {
     deploy_info "Installing system prerequisites"
     deploy_preflight_time_sync run_root
     deploy_apt_update run_root
-    run_root apt-get install -y curl jq tar rsync git python3-pip build-essential cmake
-
-    if ! deploy_python_has_apriltag || ! deploy_python_has_pydantic_v2; then
-        deploy_info "Installing UAV Python runtime packages into the user site"
-        python3 -m pip install --user --upgrade apriltag "pydantic>=2,<3"
-    fi
+    run_root apt-get install -y curl jq tar rsync git
+    deploy_ensure_uav_python_runtime run_root "$DEPLOY_USER"
 }
 
 install_pigpio() {

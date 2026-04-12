@@ -22,43 +22,12 @@ check_deps() {
     deploy_require_cmds curl jq tar python3
 }
 
-ensure_uav_python_runtime() {
-    local needs_runtime_deps=0
-
-    if deploy_python_has_apriltag; then
-        deploy_info "apriltag Python package already installed"
+run_root() {
+    if [[ "$(id -u)" -eq 0 ]]; then
+        "$@"
     else
-        deploy_warn "apriltag Python package not found; installing it into the user site"
-        needs_runtime_deps=1
+        sudo "$@"
     fi
-
-    if deploy_python_has_pydantic_v2; then
-        deploy_info "pydantic>=2 Python package already installed"
-    else
-        deploy_warn "pydantic>=2 Python package not found; installing it into the user site"
-        needs_runtime_deps=1
-    fi
-
-    if [[ "$needs_runtime_deps" == "0" ]]; then
-        return
-    fi
-
-    if ! python3 -m pip --version >/dev/null 2>&1; then
-        deploy_info "Installing python3-pip and build prerequisites"
-        sudo apt-get update
-        sudo apt-get install -y python3-pip build-essential cmake
-    fi
-
-    if ! python3 -m pip install --user --upgrade apriltag "pydantic>=2,<3"; then
-        deploy_info "Retrying Python runtime package install after ensuring build prerequisites"
-        sudo apt-get update
-        sudo apt-get install -y build-essential cmake
-        python3 -m pip install --user --upgrade apriltag "pydantic>=2,<3"
-    fi
-
-    deploy_python_has_apriltag || deploy_error "apriltag install failed"
-    deploy_python_has_pydantic_v2 || deploy_error "pydantic>=2 install failed"
-    deploy_info "UAV Python runtime packages are ready"
 }
 
 print_help() {
@@ -163,7 +132,7 @@ install_release_from_json() {
         deploy_install_runtime_helper "$SCRIPT_DIR/hardware/runtime_fleet.sh"
     fi
 
-    ensure_uav_python_runtime
+    deploy_ensure_uav_python_runtime run_root
 
     if command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files pennair-autonomy.service >/dev/null 2>&1; then
         if command -v sudo >/dev/null 2>&1; then

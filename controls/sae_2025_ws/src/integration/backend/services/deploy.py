@@ -1389,105 +1389,76 @@ async def _ensure_runtime_service(target_ctx: TargetContext) -> None:
             os.unlink(unit_tmp)
 
 
-async def _ensure_runtime_prereqs(target_ctx: TargetContext) -> None:
-    checks = """
-        python3 - <<'PY'
-import importlib.util
-missing = [name for name in ('apriltag',) if importlib.util.find_spec(name) is None]
-try:
-    import pydantic
+def _deploy_lib_local_path(ctx: AppContext) -> Path:
+    return _repo_root(ctx) / "scripts" / "hardware" / "deploy-lib.sh"
 
-    version = getattr(pydantic, "__version__", "0")
-    major = int(version.split(".", 1)[0])
-except Exception:
-    missing.append('pydantic>=2')
-else:
-    if major < 2:
-        missing.append('pydantic>=2')
-print(' '.join(missing))
-PY
-    """
-    result = await target_ctx.ssh.run(
-        f"bash -lc {target_ctx.ssh.q(checks)}", timeout=20
+
+async def _run_remote_deploy_lib(
+    ctx: AppContext,
+    target_ctx: TargetContext,
+    *,
+    helper_invocation: str,
+    timeout: int,
+    error_prefix: str,
+) -> None:
+    helper_path = _deploy_lib_local_path(ctx)
+    if not helper_path.exists():
+        raise RuntimeError(f"Missing deploy helper library: {helper_path}")
+
+    await _copy_file_to_pi(
+        target_ctx, local_path=str(helper_path), remote_name="deploy-lib.sh"
     )
-    if result.returncode != 0:
-        raise RuntimeError(
-            target_ctx.ssh.format_remote_error(
-                result.stderr or result.stdout, "Runtime prerequisite check failed"
-            )
-        )
-    missing = (result.stdout or "").strip().split()
-    if missing:
-        install_cmd = """
-            set -e
-            if ! python3 -m pip --version >/dev/null 2>&1; then
-                sudo -n apt-get update
-                sudo -n apt-get install -y python3-pip build-essential cmake
+
+    remote_helper = f"{target_ctx.target.deploy_paths()['incoming_dir']}/deploy-lib.sh"
+    cmd = f"""
+        set -euo pipefail
+        remote_helper={target_ctx.ssh.q(remote_helper)}
+        run_root() {{
+            if [ "$(id -u)" -eq 0 ]; then
+                "$@"
+            else
+                sudo -n "$@"
             fi
-            if ! python3 -m pip install --user --upgrade apriltag "pydantic>=2,<3"; then
-                sudo -n apt-get update
-                sudo -n apt-get install -y build-essential cmake
-                python3 -m pip install --user --upgrade apriltag "pydantic>=2,<3"
-            fi
-        """
-        install = await target_ctx.ssh.run(
-            f"bash -lc {target_ctx.ssh.q(install_cmd)}", timeout=300
-        )
-        if install.returncode != 0:
-            raise RuntimeError(
-                target_ctx.ssh.format_remote_error(
-                    install.stderr or install.stdout,
-                    "Install UAV runtime Python dependencies failed",
-                )
-            )
-
-
-async def _ensure_source_build_prereqs(target_ctx: TargetContext) -> None:
-    cmd = """
-        set -e
-        missing=""
-        for tool in colcon cmake make gcc g++; do
-            if ! command -v "$tool" >/dev/null 2>&1; then
-                missing=1
-                break
-            fi
-        done
-        if [ -n "$missing" ]; then
-            sudo -n apt-get update
-            sudo -n apt-get install -y \
-                python3-colcon-common-extensions \
-                build-essential \
-                cmake \
-                python3-pip
-        fi
-
-        if ! python3 - <<'PY' >/dev/null 2>&1
-try:
-    import pydantic
-
-    version = getattr(pydantic, "__version__", "0")
-    major = int(version.split(".", 1)[0])
-except Exception:
-    raise SystemExit(1)
-
-raise SystemExit(0 if major >= 2 else 1)
-PY
-        then
-            if ! python3 -m pip --version >/dev/null 2>&1; then
-                sudo -n apt-get update
-                sudo -n apt-get install -y python3-pip
-            fi
-            python3 -m pip install --user --upgrade "pydantic>=2,<3"
-        fi
+        }}
+        source "$remote_helper"
+        {helper_invocation}
     """
-    result = await target_ctx.ssh.run(f"bash -lc {target_ctx.ssh.q(cmd)}", timeout=300)
+    result = await target_ctx.ssh.run(f"bash -lc {target_ctx.ssh.q(cmd)}", timeout=timeout)
     if result.returncode != 0:
         raise RuntimeError(
             target_ctx.ssh.format_remote_error(
                 result.stderr or result.stdout,
-                "Install source-build prerequisites failed",
+                error_prefix,
             )
         )
+
+
+async def _ensure_runtime_prereqs(ctx: AppContext, target_ctx: TargetContext) -> None:
+    await _run_remote_deploy_lib(
+        ctx,
+        target_ctx,
+        helper_invocation=(
+            "deploy_ensure_uav_python_runtime run_root "
+            + target_ctx.ssh.q(target_ctx.target.pi_user)
+        ),
+        timeout=300,
+        error_prefix="Install UAV runtime Python dependencies failed",
+    )
+
+
+async def _ensure_source_build_prereqs(
+    ctx: AppContext, target_ctx: TargetContext
+) -> None:
+    await _run_remote_deploy_lib(
+        ctx,
+        target_ctx,
+        helper_invocation=(
+            "deploy_ensure_source_build_prereqs run_root "
+            + target_ctx.ssh.q(target_ctx.target.pi_user)
+        ),
+        timeout=300,
+        error_prefix="Install source-build prerequisites failed",
+    )
 
 
 async def _write_release_metadata(
@@ -1755,7 +1726,7 @@ async def _deploy_artifact_path(
         ),
     )
     await _ensure_runtime_service(target_ctx)
-    await _ensure_runtime_prereqs(target_ctx)
+    await _ensure_runtime_prereqs(ctx, target_ctx)
     await _activate_release(
         target_ctx,
         release_dir=release["release_dir"],
@@ -1783,7 +1754,7 @@ async def _deploy_source_bundle_path(
 ) -> dict:
     target_ctx = ctx.resolve_target(target_id)
     await _ensure_remote_layout(target_ctx)
-    await _ensure_source_build_prereqs(target_ctx)
+    await _ensure_source_build_prereqs(ctx, target_ctx)
     await _copy_file_to_pi(
         target_ctx, local_path=local_bundle_path, remote_name=bundle_name
     )
@@ -1849,7 +1820,7 @@ async def _deploy_source_bundle_path(
         ),
     )
     await _ensure_runtime_service(target_ctx)
-    await _ensure_runtime_prereqs(target_ctx)
+    await _ensure_runtime_prereqs(ctx, target_ctx)
     await _activate_release(
         target_ctx,
         release_dir=release["release_dir"],
