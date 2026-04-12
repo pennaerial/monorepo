@@ -2968,10 +2968,11 @@ function App() {
   }, [])
 
   useEffect(() => {
+    const refreshIntervalMs = page === 'hardware' ? 2000 : 5000
     refreshGlobal()
-    const interval = setInterval(refreshGlobal, 5000)
+    const interval = setInterval(refreshGlobal, refreshIntervalMs)
     return () => clearInterval(interval)
-  }, [refreshGlobal])
+  }, [page, refreshGlobal])
 
   useEffect(() => {
     refreshDetail(selectedTargetId)

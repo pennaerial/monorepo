@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from .context import AppContext
 
 LOG = logging.getLogger(__name__)
+_DARWIN_FORCE_DNS_SD = False
 
 _DISCOVERY_SERVICE_TYPES = (
     "_ssh._tcp.local.",
@@ -147,11 +148,6 @@ def _resolve_socket_addresses(hostname: str) -> set[str]:
 
 def _browse_services_zeroconf(timeout_s: float) -> list[_DiscoveredService]:
     IPVersion, ServiceBrowser, ServiceListener, Zeroconf = _require_zeroconf()
-    LOG.warning(
-        "Integration discovery: zeroconf browsing %s for %.2fs",
-        ", ".join(_DISCOVERY_SERVICE_TYPES),
-        timeout_s,
-    )
 
     class Listener(ServiceListener):
         def __init__(self, zeroconf) -> None:
@@ -165,25 +161,8 @@ def _browse_services_zeroconf(timeout_s: float) -> list[_DiscoveredService]:
             self.add_service(zeroconf, service_type, name)
 
         def add_service(self, zeroconf, service_type: str, name: str) -> None:
-            LOG.warning(
-                "Integration discovery: saw service announcement name=%s type=%s",
-                name,
-                service_type,
-            )
             info = zeroconf.get_service_info(service_type, name, timeout=500)
-            if info is None:
-                LOG.warning(
-                    "Integration discovery: service info lookup returned None name=%s type=%s timeout_ms=500",
-                    name,
-                    service_type,
-                )
-                return
-            if not info.server:
-                LOG.warning(
-                    "Integration discovery: service info missing server name=%s type=%s",
-                    name,
-                    service_type,
-                )
+            if info is None or not info.server:
                 return
             hostname = info.server.rstrip(".")
             key = _normalize_host(hostname)
@@ -196,22 +175,8 @@ def _browse_services_zeroconf(timeout_s: float) -> list[_DiscoveredService]:
                 )
                 self.found[key] = record
             addresses = info.parsed_addresses(IPVersion.All) or []
-            if not addresses:
-                LOG.warning(
-                    "Integration discovery: resolved service without addresses name=%s type=%s server=%s",
-                    name,
-                    service_type,
-                    hostname,
-                )
             for address in addresses:
                 record.addresses.add(address)
-            LOG.warning(
-                "Integration discovery: resolved name=%s type=%s server=%s addresses=%s",
-                name,
-                service_type,
-                hostname,
-                sorted(record.addresses),
-            )
 
     zeroconf = Zeroconf(ip_version=IPVersion.All)
     listener = Listener(zeroconf)
@@ -221,15 +186,9 @@ def _browse_services_zeroconf(timeout_s: float) -> list[_DiscoveredService]:
     ]
     try:
         time.sleep(timeout_s)
-        discovered = sorted(
+        return sorted(
             listener.found.values(), key=lambda item: _normalize_host(item.hostname)
         )
-        LOG.warning(
-            "Integration discovery: zeroconf browse finished discovered=%s hosts=%s",
-            len(discovered),
-            [item.hostname for item in discovered],
-        )
-        return discovered
     finally:
         for browser in browsers:
             browser.cancel()
@@ -237,11 +196,6 @@ def _browse_services_zeroconf(timeout_s: float) -> list[_DiscoveredService]:
 
 
 def _browse_services_dns_sd(timeout_s: float) -> list[_DiscoveredService]:
-    LOG.warning(
-        "Integration discovery: dns-sd browsing %s for %.2fs",
-        ", ".join(_DISCOVERY_SERVICE_TYPES),
-        timeout_s,
-    )
     discovered: dict[str, _DiscoveredService] = {}
     browse_timeout = max(timeout_s / max(len(_DISCOVERY_SERVICE_TYPES), 1), 0.75)
 
@@ -252,11 +206,6 @@ def _browse_services_dns_sd(timeout_s: float) -> list[_DiscoveredService]:
             browse_timeout,
         )
         instance_names = _parse_dns_sd_browse_output(browse_output, service_type)
-        LOG.warning(
-            "Integration discovery: dns-sd browse type=%s instances=%s",
-            service_type,
-            instance_names,
-        )
         for instance_name in instance_names:
             resolve_output = _run_bounded_command(
                 ["dns-sd", "-L", instance_name, browse_type, domain],
@@ -264,11 +213,6 @@ def _browse_services_dns_sd(timeout_s: float) -> list[_DiscoveredService]:
             )
             hostname = _parse_dns_sd_resolve_output(resolve_output)
             if not hostname:
-                LOG.warning(
-                    "Integration discovery: dns-sd resolve missing hostname name=%s type=%s",
-                    instance_name,
-                    service_type,
-                )
                 continue
             addresses = _parse_dns_sd_addrinfo_output(
                 _run_bounded_command(
@@ -289,25 +233,15 @@ def _browse_services_dns_sd(timeout_s: float) -> list[_DiscoveredService]:
                 )
                 discovered[key] = record
             record.addresses.update(addresses)
-            LOG.warning(
-                "Integration discovery: dns-sd resolved name=%s type=%s host=%s addresses=%s",
-                instance_name,
-                service_type,
-                hostname,
-                sorted(record.addresses),
-            )
 
-    resolved = sorted(discovered.values(), key=lambda item: _normalize_host(item.hostname))
-    LOG.warning(
-        "Integration discovery: dns-sd browse finished discovered=%s hosts=%s",
-        len(resolved),
-        [item.hostname for item in resolved],
-    )
-    return resolved
+    return sorted(discovered.values(), key=lambda item: _normalize_host(item.hostname))
 
 
 def _browse_services(timeout_s: float) -> list[_DiscoveredService]:
+    global _DARWIN_FORCE_DNS_SD
     if sys.platform == "darwin":
+        if _DARWIN_FORCE_DNS_SD:
+            return _browse_services_dns_sd(timeout_s)
         try:
             discovered = _browse_services_zeroconf(timeout_s)
         except Exception as exc:
@@ -315,7 +249,7 @@ def _browse_services(timeout_s: float) -> list[_DiscoveredService]:
             discovered = []
         if discovered:
             return discovered
-        LOG.warning("Integration discovery: zeroconf empty on macOS, falling back to dns-sd")
+        _DARWIN_FORCE_DNS_SD = True
         return _browse_services_dns_sd(timeout_s)
     return _browse_services_zeroconf(timeout_s)
 
@@ -323,7 +257,6 @@ def _browse_services(timeout_s: float) -> list[_DiscoveredService]:
 async def live_hardware_cards(
     ctx: AppContext, *, timeout_s: float = 1.25
 ) -> list[dict[str, object]]:
-    LOG.warning("Integration discovery: /api/hardware/live requested")
     discovered = await asyncio.to_thread(_browse_services, timeout_s)
     cards: list[dict[str, object]] = []
     for device in discovered:
@@ -340,9 +273,4 @@ async def live_hardware_cards(
                 "saved": matched_target_id is not None,
             }
         )
-    LOG.warning(
-        "Integration discovery: returning %s live hardware cards hostnames=%s",
-        len(cards),
-        [card["hostname"] for card in cards],
-    )
     return cards

@@ -146,6 +146,7 @@ Timestamp     A/R    Flags  if Hostname                               Address   
 
 def test_browse_services_falls_back_to_dns_sd_on_darwin(monkeypatch):
     monkeypatch.setattr(discovery.sys, "platform", "darwin")
+    monkeypatch.setattr(discovery, "_DARWIN_FORCE_DNS_SD", False)
     monkeypatch.setattr(discovery, "_browse_services_zeroconf", lambda _timeout: [])
     monkeypatch.setattr(
         discovery,
@@ -170,6 +171,33 @@ def test_browse_services_falls_back_to_dns_sd_on_darwin(monkeypatch):
             addresses={"192.168.1.22"},
         )
     ]
+    assert discovery._DARWIN_FORCE_DNS_SD is True
+
+
+def test_browse_services_uses_cached_dns_sd_on_darwin(monkeypatch):
+    monkeypatch.setattr(discovery.sys, "platform", "darwin")
+    monkeypatch.setattr(discovery, "_DARWIN_FORCE_DNS_SD", True)
+
+    def fail_zeroconf(_timeout):
+        raise AssertionError("zeroconf should be skipped when dns-sd is cached")
+
+    monkeypatch.setattr(discovery, "_browse_services_zeroconf", fail_zeroconf)
+    monkeypatch.setattr(
+        discovery,
+        "_browse_services_dns_sd",
+        lambda _timeout: [
+            discovery._DiscoveredService(
+                hostname="air-02.local",
+                service_name="air-02._ssh._tcp.local.",
+                service_type="_ssh._tcp.local.",
+                addresses={"192.168.1.22"},
+            )
+        ],
+    )
+
+    discovered = discovery._browse_services(1.25)
+
+    assert discovered[0].hostname == "air-02.local"
 
 
 def test_run_bounded_command_merges_stderr_without_capture_output_conflict(monkeypatch):
