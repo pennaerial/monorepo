@@ -76,14 +76,31 @@ class _FakeSSH:
 
 
 class _FakeResponse:
-    def __init__(self, payload: object):
+    def __init__(
+        self,
+        payload: object,
+        *,
+        status_code: int = 200,
+        headers: dict[str, str] | None = None,
+    ):
         self.payload = payload
+        self.status_code = status_code
+        self.headers = headers or {}
+        self.text = str(payload)
 
     def raise_for_status(self) -> None:
+        if self.status_code >= 400:
+            raise _FakeHTTPStatusError(self)
         return None
 
     def json(self) -> object:
         return self.payload
+
+
+class _FakeHTTPStatusError(Exception):
+    def __init__(self, response: _FakeResponse):
+        self.response = response
+        super().__init__(response.text)
 
 
 class _FakeAsyncClient:
@@ -93,10 +110,12 @@ class _FakeAsyncClient:
         releases_payload: dict,
         artifacts_payload: dict,
         commit_payloads: dict[str, dict] | None = None,
+        response_overrides: dict[str, _FakeResponse] | None = None,
     ):
         self.releases_payload = releases_payload
         self.artifacts_payload = artifacts_payload
         self.commit_payloads = commit_payloads or {}
+        self.response_overrides = response_overrides or {}
         self.requests: list[str] = []
 
     async def __aenter__(self):
@@ -107,6 +126,9 @@ class _FakeAsyncClient:
 
     async def get(self, url: str, headers=None):
         self.requests.append(url)
+        override = self.response_overrides.get(url)
+        if override is not None:
+            return override
         if "/releases?per_page=100&page=" in url:
             page = url.rsplit("=", 1)[-1]
             if page == "1":
@@ -159,6 +181,15 @@ class _FakeHTTPXClient:
     def stream(self, method: str, url: str, headers=None):
         self.requests.append((method, url))
         return _FakeStreamResponse(self.body)
+
+
+@pytest.fixture(autouse=True)
+def _clear_deploy_service_caches():
+    deploy_service._BUILD_LIST_CACHE.clear()
+    deploy_service._COMMIT_SUBJECT_CACHE.clear()
+    yield
+    deploy_service._BUILD_LIST_CACHE.clear()
+    deploy_service._COMMIT_SUBJECT_CACHE.clear()
 
 
 def _make_operator(tmp_path: Path) -> OperatorConfig:
@@ -821,6 +852,126 @@ def test_list_builds_combines_releases_and_artifacts(tmp_path, monkeypatch):
     assert len(filtered["builds"]) == 1
     assert filtered["builds"][0]["fallback"] is True
     assert filtered["builds"][0]["workflow_event"] == "workflow_dispatch"
+
+
+def test_list_builds_uses_cached_response_for_repeat_requests(tmp_path, monkeypatch):
+    ctx = SimpleNamespace(
+        base_dir=tmp_path / "src" / "integration",
+        operator_config=_make_operator(tmp_path),
+    )
+
+    client_creations = 0
+
+    def _client_factory(timeout=20):
+        nonlocal client_creations
+        client_creations += 1
+        return _FakeAsyncClient(
+            releases_payload=[
+                {
+                    "tag_name": "build-deadbeef",
+                    "name": "ROS 2 Build deadbeef",
+                    "published_at": "2026-04-11T00:05:00Z",
+                    "body": "Commit: deadbeef\nBuilt: 2026-04-11T00:00:00Z\nBranch: main\n",
+                    "assets": [
+                        {
+                            "browser_download_url": "https://example.com/build.tar.gz",
+                            "size": 1234567,
+                        }
+                    ],
+                }
+            ],
+            artifacts_payload={"total_count": 0, "artifacts": []},
+            commit_payloads={
+                "deadbeef": {"commit": {"message": "Release commit subject\n\nbody"}}
+            },
+        )
+
+    fake_httpx = SimpleNamespace(AsyncClient=_client_factory)
+    monkeypatch.setattr(deploy_service, "_require_httpx", lambda: fake_httpx)
+
+    first = asyncio.run(deploy_service.list_builds(ctx))
+    second = asyncio.run(deploy_service.list_builds(ctx))
+
+    assert first["success"] is True
+    assert second == first
+    assert client_creations == 1
+
+
+def test_list_builds_returns_stale_cache_when_github_rate_limited(tmp_path, monkeypatch):
+    ctx = SimpleNamespace(
+        base_dir=tmp_path / "src" / "integration",
+        operator_config=_make_operator(tmp_path),
+    )
+    ctx.operator_config.github_token = ""
+
+    base_httpx = SimpleNamespace(
+        AsyncClient=lambda timeout=20: _FakeAsyncClient(
+            releases_payload=[
+                {
+                    "tag_name": "build-deadbeef",
+                    "name": "ROS 2 Build deadbeef",
+                    "published_at": "2026-04-11T00:05:00Z",
+                    "body": "Commit: deadbeef\nBuilt: 2026-04-11T00:00:00Z\nBranch: main\n",
+                    "assets": [
+                        {
+                            "browser_download_url": "https://example.com/build.tar.gz",
+                            "size": 1234567,
+                        }
+                    ],
+                }
+            ],
+            artifacts_payload={"total_count": 0, "artifacts": []},
+            commit_payloads={
+                "deadbeef": {"commit": {"message": "Release commit subject\n\nbody"}}
+            },
+        )
+    )
+    monkeypatch.setattr(deploy_service, "_require_httpx", lambda: base_httpx)
+
+    first = asyncio.run(deploy_service.list_builds(ctx))
+    assert first["success"] is True
+
+    cache_key = deploy_service._build_list_cache_key(
+        ctx,
+        artifact_page=1,
+        artifact_page_size=20,
+        q="",
+        sha="",
+        commit_subject="",
+        branch="",
+        include_fallback=False,
+    )
+    cached_at, payload = deploy_service._BUILD_LIST_CACHE[cache_key]
+    deploy_service._BUILD_LIST_CACHE[cache_key] = (
+        cached_at - deploy_service._BUILD_LIST_CACHE_TTL_SECONDS - 1,
+        payload,
+    )
+
+    rate_limit_url = (
+        f"https://api.github.com/repos/{ctx.operator_config.github_repo}"
+        "/releases?per_page=100&page=1"
+    )
+    rate_limited_httpx = SimpleNamespace(
+        AsyncClient=lambda timeout=20: _FakeAsyncClient(
+            releases_payload=[],
+            artifacts_payload={"total_count": 0, "artifacts": []},
+            response_overrides={
+                rate_limit_url: _FakeResponse(
+                    {"message": "API rate limit exceeded"},
+                    status_code=403,
+                    headers={"x-ratelimit-reset": "1775976000"},
+                )
+            },
+        )
+    )
+    monkeypatch.setattr(deploy_service, "_require_httpx", lambda: rate_limited_httpx)
+
+    second = asyncio.run(deploy_service.list_builds(ctx))
+
+    assert second["success"] is True
+    assert second["builds"] == first["builds"]
+    assert "cached build list" in (second["error"] or "").lower()
+    assert "gITHUB_TOKEN".lower() in (second["error"] or "").lower()
 
 
 def test_current_build_parses_release_marker(tmp_path):

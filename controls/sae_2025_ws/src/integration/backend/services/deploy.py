@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import tarfile
 import tempfile
+from time import monotonic
 import xml.etree.ElementTree as ET
 import zipfile
 from copy import deepcopy
@@ -44,6 +45,10 @@ _SHARED_OVERLAY_KEYS = {
 }
 _UAV_OVERLAY_KEYS = _SHARED_OVERLAY_KEYS | {"px4_airframe_id", "px4_namespace"}
 _PAYLOAD_OVERLAY_KEYS = _SHARED_OVERLAY_KEYS | {"payload_controller"}
+_BUILD_LIST_CACHE_TTL_SECONDS = 60.0
+_COMMIT_SUBJECT_CACHE_TTL_SECONDS = 1800.0
+_BUILD_LIST_CACHE: dict[tuple[object, ...], tuple[float, dict[str, object]]] = {}
+_COMMIT_SUBJECT_CACHE: dict[str, tuple[float, str | None]] = {}
 
 
 def _selected_fleet_file(ctx: AppContext) -> str:
@@ -363,6 +368,125 @@ def _github_headers(ctx: AppContext) -> dict:
     if ctx.operator_config.github_token:
         headers["Authorization"] = f"Bearer {ctx.operator_config.github_token}"
     return headers
+
+
+def _build_list_cache_key(
+    ctx: AppContext,
+    *,
+    artifact_page: int,
+    artifact_page_size: int,
+    q: str,
+    sha: str,
+    commit_subject: str,
+    branch: str,
+    include_fallback: bool,
+) -> tuple[object, ...]:
+    return (
+        ctx.operator_config.github_repo,
+        artifact_page,
+        artifact_page_size,
+        q.strip(),
+        sha.strip(),
+        commit_subject.strip(),
+        branch.strip(),
+        include_fallback,
+    )
+
+
+def _build_list_cache_get(
+    cache_key: tuple[object, ...], *, allow_stale: bool = False
+) -> dict[str, object] | None:
+    cached = _BUILD_LIST_CACHE.get(cache_key)
+    if cached is None:
+        return None
+    cached_at, payload = cached
+    age = monotonic() - cached_at
+    if not allow_stale and age > _BUILD_LIST_CACHE_TTL_SECONDS:
+        return None
+    return deepcopy(payload)
+
+
+def _build_list_cache_set(
+    cache_key: tuple[object, ...], payload: dict[str, object]
+) -> dict[str, object]:
+    cached_payload = deepcopy(payload)
+    _BUILD_LIST_CACHE[cache_key] = (monotonic(), cached_payload)
+    return deepcopy(cached_payload)
+
+
+def _commit_subject_cache_get(commit_sha: str) -> str | None | object:
+    cached = _COMMIT_SUBJECT_CACHE.get(commit_sha)
+    if cached is None:
+        return ...
+    cached_at, subject = cached
+    if monotonic() - cached_at > _COMMIT_SUBJECT_CACHE_TTL_SECONDS:
+        _COMMIT_SUBJECT_CACHE.pop(commit_sha, None)
+        return ...
+    return subject
+
+
+def _commit_subject_cache_set(commit_sha: str, subject: str | None) -> None:
+    _COMMIT_SUBJECT_CACHE[commit_sha] = (monotonic(), subject)
+
+
+def _github_error_message(
+    exc: Exception,
+    *,
+    token_configured: bool,
+    using_cached_response: bool = False,
+    during_commit_lookup: bool = False,
+) -> str | None:
+    response = getattr(exc, "response", None)
+    status_code = getattr(response, "status_code", None)
+    if status_code != 403:
+        return None
+
+    message = ""
+    headers = getattr(response, "headers", {}) or {}
+    try:
+        payload = response.json() or {}
+        if isinstance(payload, dict):
+            message = str(payload.get("message", "")).strip()
+    except Exception:
+        message = str(getattr(response, "text", "") or "").strip()
+
+    lowered = message.lower()
+    if "rate limit" not in lowered:
+        return None
+
+    retry_hint = ""
+    retry_after = str(headers.get("retry-after", "")).strip()
+    if retry_after.isdigit():
+        retry_hint = f" Retry after about {retry_after} seconds."
+    else:
+        reset_at = str(headers.get("x-ratelimit-reset", "")).strip()
+        if reset_at.isdigit():
+            reset_time = datetime.fromtimestamp(int(reset_at), tz=timezone.utc)
+            retry_hint = f" GitHub resets at {reset_time:%Y-%m-%d %H:%M:%S UTC}."
+
+    auth_hint = (
+        " Configure `GITHUB_TOKEN` in Integration settings or the backend environment for higher limits."
+        if not token_configured
+        else ""
+    )
+
+    if during_commit_lookup:
+        return (
+            "GitHub commit-title lookups were rate-limited. "
+            "Showing available builds with fallback titles."
+            f"{retry_hint}{auth_hint}"
+        ).strip()
+
+    if using_cached_response:
+        return (
+            "GitHub API rate limit exceeded. Showing a cached build list."
+            f"{retry_hint}{auth_hint}"
+        ).strip()
+
+    return (
+        "GitHub API rate limit exceeded while loading deployable builds."
+        f"{retry_hint}{auth_hint}"
+    ).strip()
 
 
 def sanitize_artifact_name(filename: str) -> str:
@@ -2264,6 +2388,16 @@ async def list_builds(
 ) -> dict:
     artifact_page = max(int(artifact_page or 1), 1)
     artifact_page_size = max(1, min(int(artifact_page_size or 20), 50))
+    cache_key = _build_list_cache_key(
+        ctx,
+        artifact_page=artifact_page,
+        artifact_page_size=artifact_page_size,
+        q=q,
+        sha=sha,
+        commit_subject=commit_subject,
+        branch=branch,
+        include_fallback=include_fallback,
+    )
     if not ctx.operator_config.github_repo:
         return {
             "success": False,
@@ -2275,10 +2409,16 @@ async def list_builds(
             "artifact_page_size": artifact_page_size,
             "artifact_has_more": False,
         }
+    cached_response = _build_list_cache_get(cache_key)
+    if cached_response is not None:
+        return cached_response
     try:
         httpx = _require_httpx()
+        token_configured = bool(ctx.operator_config.github_token)
         releases_builds: list[dict[str, object]] = []
         artifact_builds: list[dict[str, object]] = []
+        commit_lookup_warning: str | None = None
+        commit_lookup_rate_limited = False
 
         async def _collect_releases(client) -> list[dict[str, object]]:
             collected: list[dict[str, object]] = []
@@ -2326,7 +2466,13 @@ async def list_builds(
             return collected
 
         async def _commit_subject_for(client, commit_sha: str) -> str | None:
+            nonlocal commit_lookup_warning, commit_lookup_rate_limited
             if not commit_sha:
+                return None
+            cached_subject = _commit_subject_cache_get(commit_sha)
+            if cached_subject is not ...:
+                return cached_subject
+            if commit_lookup_rate_limited:
                 return None
             try:
                 response = await client.get(
@@ -2338,8 +2484,19 @@ async def list_builds(
                 message = (
                     payload.get("commit", {}).get("message", "").splitlines()[0].strip()
                 )
-                return message or None
-            except Exception:
+                subject = message or None
+                _commit_subject_cache_set(commit_sha, subject)
+                return subject
+            except Exception as exc:
+                warning = _github_error_message(
+                    exc,
+                    token_configured=token_configured,
+                    during_commit_lookup=True,
+                )
+                if warning:
+                    commit_lookup_rate_limited = True
+                    commit_lookup_warning = warning
+                    return None
                 return None
 
         async with httpx.AsyncClient(timeout=20) as client:
@@ -2456,7 +2613,7 @@ async def list_builds(
         combined = releases_builds + artifact_builds
         combined.sort(key=lambda item: str(item.get("date", "")), reverse=True)
         artifact_has_more = False if (q or sha or commit_subject or branch or include_fallback) else len(artifact_rows) >= artifact_page_size
-        return {
+        response_payload = {
             "success": True,
             "builds": combined,
             "releases": releases_builds,
@@ -2464,11 +2621,22 @@ async def list_builds(
             "artifact_page": 1 if (q or sha or commit_subject or branch or include_fallback) else artifact_page,
             "artifact_page_size": artifact_page_size,
             "artifact_has_more": artifact_has_more,
+            "error": commit_lookup_warning,
         }
+        return _build_list_cache_set(cache_key, response_payload)
     except Exception as exc:
+        cached_stale = _build_list_cache_get(cache_key, allow_stale=True)
+        fallback_error = _github_error_message(
+            exc,
+            token_configured=bool(ctx.operator_config.github_token),
+            using_cached_response=bool(cached_stale),
+        )
+        if cached_stale is not None and fallback_error:
+            cached_stale["error"] = fallback_error
+            return cached_stale
         return {
             "success": False,
-            "error": str(exc),
+            "error": fallback_error or str(exc),
             "builds": [],
             "releases": [],
             "artifacts": [],

@@ -3289,9 +3289,11 @@ function App() {
       data.success
         ? {
           success: true,
-          output: appendArtifacts
-            ? `Loaded ${data.artifacts?.length || 0} more artifact(s)`
-            : `Loaded ${(data.releases || []).length + (data.artifacts || []).length || (data.builds || []).length || 0} deployable build(s)`,
+          output: data.error || (
+            appendArtifacts
+              ? `Loaded ${data.artifacts?.length || 0} more artifact(s)`
+              : `Loaded ${(data.releases || []).length + (data.artifacts || []).length || (data.builds || []).length || 0} deployable build(s)`
+          ),
         }
         : data
     )
