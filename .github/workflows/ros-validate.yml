@@ -40,6 +40,4 @@ jobs:
           submodules: recursive
 
       - name: Build and validate ROS workspace
-        env:
-          INSTALL_DEPS: "0"
         run: bash controls/sae_2025_ws/scripts/ci/validate_ros_workspace.sh

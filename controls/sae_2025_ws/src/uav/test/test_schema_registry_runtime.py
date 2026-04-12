@@ -69,6 +69,7 @@ def test_load_mission_spec_works_without_ros_setup(tmp_path):
         mission = load_mission_spec({str(mission_path)!r})
         print(json.dumps({{
             "target": mission.target,
+            "requires_camera": mission.requires_camera,
             "vision_nodes": mission.vision_nodes,
             "params": mission.modes["start"].params,
         }}, sort_keys=True))
@@ -84,6 +85,7 @@ def test_load_mission_spec_works_without_ros_setup(tmp_path):
     )
 
     assert '"target": "payload"' in result.stdout
+    assert '"requires_camera": true' in result.stdout
     assert '"PayloadAprilTagNode"' in result.stdout
 
 

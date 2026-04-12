@@ -1,22 +1,25 @@
 backend:
   kind: real
   px4_path: ~/PX4-Autopilot
-  # world_name: sae
-  # jmission_stage: payload_docking
 
 defaults:
   auto_launch: true
-  debug: false
-  vision_debug: false
+  debug: true
+  vision_debug: true
   save_vision_milliseconds: 0
   servo_only: false
   camera_mount_offsets: [0.0, 0.0, 0.0]
-  camera_input_transport: raw
+  camera_input_transport: compressed
   camera_rotate_degrees: 0.0
   camera_preprocess_hook: ""
 
 vehicles:
-  - name: payload
+  - name: payload_0
     controllable: payload_0
-    mission: payload_wait_drive_out
+    mission: payload_full_mission
+    camera_mount_offsets: [0.2, 0.0, 0.0]
+
+  - name: payload_1
+    controllable: payload_1
+    mission: payload_full_mission
     camera_mount_offsets: [0.2, 0.0, 0.0]

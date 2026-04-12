@@ -40,7 +40,7 @@ npm install
 
 `./launch.sh` also auto-checks dependencies at startup:
 - frontend deps (`npm install` when needed)
-- backend Python deps in conda mode (`fastapi[standard]`, `python-multipart`, `httpx`)
+- backend Python deps in conda mode (`fastapi[standard]`, `python-multipart`, `httpx`, `pydantic>=2,<3`)
 - `sshpass` via package manager when available (`brew`, `apt`, or `dnf`)
 
 ### 2. Launch Backend + Frontend Together

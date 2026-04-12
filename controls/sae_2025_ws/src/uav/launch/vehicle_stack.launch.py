@@ -76,6 +76,38 @@ def _resolve_bool(config: dict, key: str, default: bool) -> bool:
     raise ValueError(f"Vehicle stack expected boolean '{key}', received {value!r}.")
 
 
+def _warn_logger(logger, message: str) -> None:
+    if logger is None:
+        return
+    warn = getattr(logger, "warning", None) or getattr(logger, "warn", None)
+    if callable(warn):
+        warn(message)
+
+
+def _resolve_force_camera(config: dict, *, logger=None) -> bool:
+    has_force_camera = "force_camera" in config
+    has_use_camera = "use_camera" in config
+
+    if has_force_camera:
+        force_camera = _resolve_bool(config, "force_camera", False)
+        if has_use_camera:
+            _warn_logger(
+                logger,
+                "Vehicle stack field 'use_camera' is deprecated and ignored because "
+                "'force_camera' is also set.",
+            )
+        return force_camera
+
+    if has_use_camera:
+        _warn_logger(
+            logger,
+            "Vehicle stack field 'use_camera' is deprecated; use 'force_camera' instead.",
+        )
+        return _resolve_bool(config, "use_camera", False)
+
+    return False
+
+
 def _resolve_camera_input_transport(
     *,
     mission_spec: MissionSpec,
@@ -217,9 +249,6 @@ def _build_camera_actions(
     vision_debug: bool,
     save_vision_milliseconds: int,
 ) -> list:
-    if not vision_nodes:
-        return []
-
     save_vision = save_vision_milliseconds > 0
     actions = []
 
@@ -519,6 +548,9 @@ def launch_setup(context, *args, **kwargs):
     )
 
     requires_vision = bool(mission_spec.vision_nodes)
+    requires_camera = bool(getattr(mission_spec, "requires_camera", False)) or _resolve_force_camera(
+        config, logger=logger
+    )
 
     px4_path = ""
     vehicle_class = None
@@ -531,7 +563,7 @@ def launch_setup(context, *args, **kwargs):
         if not px4_path:
             raise ValueError("UAV vehicle stacks require a valid px4_path.")
         vehicle_class, autostart, model = _resolve_uav_airframe(config, px4_path)
-        if requires_vision and model and not vehicle_camera_map.get(model, False):
+        if requires_camera and model and not vehicle_camera_map.get(model, False):
             raise ValueError(
                 f"The selected airframe/model '{model}' does not have a camera sensor configured."
             )
@@ -555,7 +587,7 @@ def launch_setup(context, *args, **kwargs):
                 else ""
             ),
         )
-        if requires_vision
+        if requires_camera
         else None
     )
     if (
@@ -581,7 +613,7 @@ def launch_setup(context, *args, **kwargs):
             vision_debug=vision_debug,
             save_vision_milliseconds=save_vision_milliseconds,
         )
-        if requires_vision
+        if requires_camera
         else []
     )
 

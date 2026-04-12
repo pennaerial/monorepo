@@ -14,6 +14,7 @@ from launch.actions import (
     OpaqueFunction,
 )
 from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.logging import get_logger
 from launch.substitutions import LaunchConfiguration
 
 from uav.runtime.mission_spec import MissionSpec, mission_path_for_name
@@ -47,6 +48,40 @@ def _yaml_bool_value(config_value, *, name: str, default: bool) -> bool:
     )
 
 
+def _warn_logger(logger, message: str) -> None:
+    if logger is None:
+        return
+    warn = getattr(logger, "warning", None) or getattr(logger, "warn", None)
+    if callable(warn):
+        warn(message)
+
+
+def _resolve_force_camera(params: dict, *, logger=None) -> bool:
+    has_force_camera = "force_camera" in params
+    has_use_camera = "use_camera" in params
+
+    if has_force_camera:
+        force_camera = _yaml_bool_value(
+            params.get("force_camera"), name="force_camera", default=False
+        )
+        if has_use_camera:
+            _warn_logger(
+                logger,
+                "Launch parameter 'use_camera' is deprecated and ignored because "
+                "'force_camera' is also set.",
+            )
+        return force_camera
+
+    if has_use_camera:
+        _warn_logger(
+            logger,
+            "Launch parameter 'use_camera' is deprecated; use 'force_camera' instead.",
+        )
+        return _yaml_bool_value(params.get("use_camera"), name="use_camera", default=False)
+
+    return False
+
+
 def _resolve_airframe_id(airframe_value) -> int:
     try:
         return int(airframe_value)
@@ -57,7 +92,15 @@ def _resolve_airframe_id(airframe_value) -> int:
             raise ValueError(f"Unknown airframe name: {airframe_value}") from exc
 
 
-def _resolved_sim_world_name(sim_params: dict, COMPETITION_NAMES, DEFAULT_COMPETITION, Competition) -> str:
+def resolve_stage_world(**kwargs):
+    from sim.orchestration import resolve_stage_world as _resolve_stage_world
+
+    return _resolve_stage_world(**kwargs)
+
+
+def _resolved_sim_world_name(sim_params: dict) -> str:
+    from sim.constants import COMPETITION_NAMES, DEFAULT_COMPETITION, Competition
+
     competition_num = sim_params.get("competition", DEFAULT_COMPETITION.value)
     try:
         competition_type = Competition(competition_num)
@@ -101,9 +144,7 @@ def _legacy_backend_override(
     model: str,
     px4_airframe_id: int | None = None,
 ) -> tuple[dict, str]:
-    from sim.orchestration import resolve_stage_world
-    from sim.constants import COMPETITION_NAMES, DEFAULT_COMPETITION, Competition
-    world_name = _resolved_sim_world_name(sim_params, COMPETITION_NAMES, DEFAULT_COMPETITION, Competition)
+    world_name = _resolved_sim_world_name(sim_params)
     resolved_world = resolve_stage_world(
         world_name=world_name,
         mission_stage=sim_params.get("mission_stage", ""),
@@ -158,6 +199,7 @@ def _legacy_backend_override(
 
 
 def _single_vehicle_config(context, params: dict) -> tuple[dict, dict | None]:
+    logger = get_logger("main.launch")
     mission_name = _yaml_or_launch_string(
         context, "mission_name", params.get("mission_name", "basic")
     )
@@ -216,6 +258,7 @@ def _single_vehicle_config(context, params: dict) -> tuple[dict, dict | None]:
         "px4_path": px4_path,
         "px4_namespace": str(params.get("px4_namespace", "")).strip(),
         "px4_instance": int(params.get("px4_instance", 0)),
+        "force_camera": _resolve_force_camera(params, logger=logger),
         "launch_middleware": mission_spec.is_uav,
         "launch_px4_sitl": bool(sim and mission_spec.is_uav),
         "launch_payload_backend": mission_spec.is_payload,

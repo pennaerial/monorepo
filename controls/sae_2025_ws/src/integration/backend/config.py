@@ -19,6 +19,13 @@ _BUILD_SOURCE_KINDS = {"none", "github", "local_artifact", "local_codebase"}
 _GITHUB_BUILD_SOURCES = {"release", "actions"}
 
 
+def _normalize_fleet_file(value: object) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    return Path(raw.replace("\\", "/")).name.strip()
+
+
 @dataclass(slots=True)
 class OperatorConfig:
     github_repo: str
@@ -137,7 +144,9 @@ class TargetRecord:
         pi_user = str(data.get("pi_user", "penn")).strip() or "penn"
         if not _PI_USER_RE.fullmatch(pi_user):
             raise ValueError(f"Target '{target_id}' has invalid pi_user '{pi_user}'.")
-        pi_host = str(data.get("pi_host", "")).strip() or "penn-desktop.local"
+        pi_host = str(data.get("pi_host", "")).strip()
+        if not pi_host:
+            raise ValueError(f"Target '{target_id}' requires a non-empty pi_host.")
         if not _HOST_RE.fullmatch(pi_host):
             raise ValueError(f"Target '{target_id}' has invalid pi_host '{pi_host}'.")
         deploy_root = str(data.get("deploy_root", default_deploy_root)).strip()
@@ -295,20 +304,19 @@ class InventoryStore:
         *,
         operator_config: OperatorConfig,
         default_deploy_root: str,
-        seed_target: TargetRecord,
     ):
         self.path = path
         self.operator_config = operator_config
         self.default_deploy_root = default_deploy_root
         self._targets: dict[str, TargetRecord] = {}
-        self._active_target_id: str = seed_target.target_id
-        self._load(seed_target)
+        self._active_target_id: str = ""
+        self._load()
 
-    def _load(self, seed_target: TargetRecord) -> None:
+    def _load(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         if not self.path.exists():
-            self._targets = {seed_target.target_id: seed_target}
-            self._active_target_id = seed_target.target_id
+            self._targets = {}
+            self._active_target_id = ""
             self.save()
             return
 
@@ -317,17 +325,14 @@ class InventoryStore:
 
         self._apply_operator_store(payload.get("operator", {}))
         loaded = self._parse_targets(payload.get("targets", []))
-
-        if not loaded:
-            loaded[seed_target.target_id] = seed_target
-
         self._targets = loaded
         active_target_id = str(payload.get("active_target_id", "")).strip()
-        self._active_target_id = (
-            active_target_id
-            if active_target_id in self._targets
-            else next(iter(self._targets))
-        )
+        if active_target_id in self._targets:
+            self._active_target_id = active_target_id
+        elif self._targets:
+            self._active_target_id = next(iter(sorted(self._targets)))
+        else:
+            self._active_target_id = ""
 
     def save(self) -> None:
         payload = self.export_payload()
@@ -368,8 +373,10 @@ class InventoryStore:
         active_target_id = str(payload.get("active_target_id", "")).strip()
         if active_target_id in self._targets:
             self._active_target_id = active_target_id
-        elif replace_existing:
-            self._active_target_id = next(iter(sorted(self._targets)))
+        elif replace_existing or not self._active_target_id:
+            self._active_target_id = (
+                next(iter(sorted(self._targets))) if self._targets else ""
+            )
 
         self.save()
         return {
@@ -391,6 +398,8 @@ class InventoryStore:
             if target_id and target_id.strip()
             else self._active_target_id
         )
+        if not resolved:
+            raise KeyError("No saved targets in inventory.")
         try:
             return self._targets[resolved]
         except KeyError as exc:
@@ -459,17 +468,19 @@ class InventoryStore:
 
         if len(self._targets) == 1:
             self._active_target_id = target.target_id
+        elif not self._active_target_id:
+            self._active_target_id = target.target_id
         self.save()
         return target, created
 
     def delete_target(self, target_id: str) -> None:
         if target_id not in self._targets:
             raise KeyError(f"Unknown target '{target_id}'.")
-        if len(self._targets) == 1:
-            raise ValueError("Cannot delete the last target.")
         del self._targets[target_id]
         if self._active_target_id == target_id:
-            self._active_target_id = next(iter(sorted(self._targets)))
+            self._active_target_id = (
+                next(iter(sorted(self._targets))) if self._targets else ""
+            )
         self.save()
 
     def _apply_operator_store(self, operator: object) -> None:
@@ -541,6 +552,7 @@ class BuildSourceRecord:
         kind = str(payload.get("kind", "none")).strip() or "none"
         if kind not in _BUILD_SOURCE_KINDS:
             raise ValueError(f"Unsupported build source kind '{kind}'.")
+        fleet_file = _normalize_fleet_file(payload.get("fleet_file", ""))
 
         record = cls(
             kind=kind,
@@ -567,7 +579,7 @@ class BuildSourceRecord:
                 else None
             ),
             codebase_root=str(payload.get("codebase_root", "")).strip(),
-            fleet_file=str(payload.get("fleet_file", "")).strip(),
+            fleet_file=fleet_file,
             updated_at=str(payload.get("updated_at", "")).strip(),
         )
         record.validate()
@@ -770,7 +782,7 @@ class BuildSourceStore:
         next_record = BuildSourceRecord.from_dict(
             {
                 **self._current.to_store_dict(),
-                "fleet_file": fleet_file.strip(),
+                "fleet_file": _normalize_fleet_file(fleet_file),
                 "updated_at": _utc_now(),
             }
         )
@@ -781,7 +793,6 @@ class BuildSourceStore:
     def clear(self) -> BuildSourceRecord:
         previous = self._current
         self._current = BuildSourceRecord(
-            fleet_file=previous.fleet_file,
             updated_at=_utc_now(),
         )
         self.save()
@@ -829,25 +840,3 @@ def default_fleet_file(base_dir: Path) -> str:
         base_dir.parent / "uav" / "uav" / "fleets" / "example_fleet.yaml"
     ).resolve()
     return str(candidate)
-
-
-def seed_target_from_env(base_dir: Path, operator: OperatorConfig) -> TargetRecord:
-    del base_dir
-    return TargetRecord.from_dict(
-        {
-            "target_id": os.environ.get("TARGET_ID", "default"),
-            "label": os.environ.get("TARGET_LABEL", "Default Pi"),
-            "pi_user": os.environ.get("PI_USER", "penn"),
-            "pi_host": os.environ.get("PI_HOST", "penn-desktop.local"),
-            "deploy_root": os.environ.get("DEPLOY_ROOT", operator.default_deploy_root),
-            "ssh_key": os.environ.get("SSH_KEY", operator.default_ssh_key),
-            "ssh_pass": os.environ.get("SSH_PASS", operator.default_ssh_pass),
-            "vehicle_name": os.environ.get("VEHICLE_NAME", ""),
-            "overlay_yaml": os.environ.get("TARGET_OVERLAY_YAML", ""),
-            "service_unit": os.environ.get(
-                "TARGET_SYSTEMD_UNIT", "pennair-autonomy.service"
-            ),
-            "enabled": True,
-        },
-        default_deploy_root=operator.default_deploy_root,
-    )

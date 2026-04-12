@@ -54,12 +54,8 @@ install_prereqs() {
     deploy_info "Installing system prerequisites"
     deploy_preflight_time_sync run_root
     deploy_apt_update run_root
-    run_root apt-get install -y curl jq tar rsync git python3-pip build-essential cmake
-
-    if ! python3 -c "import apriltag" >/dev/null 2>&1; then
-        deploy_info "Installing apriltag into the user site"
-        python3 -m pip install --user apriltag
-    fi
+    run_root apt-get install -y curl jq tar rsync git
+    deploy_ensure_uav_python_runtime run_root "$DEPLOY_USER"
 }
 
 install_pigpio() {

@@ -68,6 +68,11 @@ def build_router(ctx: AppContext) -> APIRouter:
     async def list_builds(
         artifact_page: Annotated[int, Query()] = 1,
         artifact_page_size: Annotated[int, Query()] = 20,
+        q: Annotated[str, Query()] = "",
+        sha: Annotated[str, Query()] = "",
+        commit_subject: Annotated[str, Query()] = "",
+        branch: Annotated[str, Query()] = "",
+        include_fallback: Annotated[bool, Query()] = False,
     ) -> BuildListResponse:
         from ..services import deploy as deploy_service
 
@@ -76,6 +81,11 @@ def build_router(ctx: AppContext) -> APIRouter:
                 ctx,
                 artifact_page=artifact_page,
                 artifact_page_size=artifact_page_size,
+                q=q,
+                sha=sha,
+                commit_subject=commit_subject,
+                branch=branch,
+                include_fallback=include_fallback,
             )
         )
 
@@ -87,6 +97,7 @@ def build_router(ctx: AppContext) -> APIRouter:
         artifact_id: Annotated[str, Form()] = "",
         run_id: Annotated[str, Form()] = "",
         sha: Annotated[str, Form()] = "",
+        commit_subject: Annotated[str, Form()] = "",
         name: Annotated[str, Form()] = "",
         date: Annotated[str, Form()] = "",
         download_url: Annotated[str, Form()] = "",
@@ -103,6 +114,7 @@ def build_router(ctx: AppContext) -> APIRouter:
             artifact_id=artifact_id,
             run_id=run_id,
             sha=sha,
+            commit_subject=commit_subject,
             name=name,
             date=date,
             download_url=download_url,

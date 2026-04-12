@@ -85,6 +85,7 @@ After the one-time setup, `pigpiod` should start automatically on boot. A normal
 ```bash
 ssh penn@penn-desktop.local
 cd ~/monorepo/controls/sae_2025_ws
+python3 -m pip install --user "pydantic>=2,<3"
 source install/setup.bash
 ros2 launch uav main.launch.py params_file:=$(pwd)/src/uav/launch/launch_params_hardware.yaml
 ```

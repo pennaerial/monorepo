@@ -19,7 +19,11 @@ px4_namespace: ""
 # Optional explicit PX4 instance index. Multi-vehicle simulation assigns this automatically.
 px4_instance: 0
 
-# Vehicle camera settings. Only used when the mission modes require vision nodes.
+# Force the camera stack (v4l2 + camera node) to launch even when the selected
+# mission metadata does not require it.
+force_camera: false
+
+# Vehicle camera settings. Applied whenever the camera pipeline launches.
 save_vision_milliseconds: 0
 camera_mount_offsets: [0.0, 0.0, 0.0]
 camera_input_transport: compressed
