@@ -79,7 +79,7 @@ class PayloadCornerNavigateMode(Mode):
         # DRIVE_OUT
         drive_out_speed_mps: float = 0.12,
         detect_frames: int = 3,
-        max_drive_out_s: float = 20.0,
+        max_drive_out_s: float = 30.0,
         drive_out_strip_frac: float = 0.30,
         drive_out_min_pixels: int = 150,
         compressed_image: bool = False,
@@ -174,6 +174,11 @@ class PayloadCornerNavigateMode(Mode):
         # LINE_FOLLOW state
         self._prev_color: Optional[str] = None
         self._corner_color_seen: bool = False
+        # Starts True — transitions are armed immediately on entry. Set to
+        # False after each mid-side swap to suppress false corners from
+        # residual pixels at the boundary we just crossed; re-arms once the
+        # residual drops below line_follow_min_pixels.
+        self._boundary_cleared: bool = True
 
         cam_topic = self.vehicle.namespaced_path("camera")
         if self.compressed_image:
@@ -487,44 +492,49 @@ class PayloadCornerNavigateMode(Mode):
         other_count, other_lateral_px = self._single_color_strip_metrics(bgr, other)
         transitioned_this_tick = False
 
-        # A "transition" is observed when the OTHER colour dominates the strip
-        # over the current colour. We use the same dominance rule that
-        # PayloadColorSquareNode._detect_current_color uses: one colour must
-        # be at least 1.5× the other (and clear the visibility floor) to
-        # count as the new dominant. Waiting for the current colour to fully
-        # disappear is too strict — by the time both conditions hold, the
-        # payload has often already drifted off the line.
-        transitioned = (
-            other_count >= self.line_follow_min_pixels
-            and other_count > cur_count * _COLOR_DOMINANCE_RATIO
-        )
+        # After a mid-side swap, the "other" colour (residual from the
+        # boundary we just crossed) must drop below line_follow_min_pixels at
+        # least once before we check for new transitions. This proves the
+        # payload has physically moved away from the boundary, so the next
+        # time the other colour appears it's a real new boundary, not residual
+        # pixels from the old one.
+        if not self._boundary_cleared:
+            if other_count < self.line_follow_min_pixels:
+                self._boundary_cleared = True
+        elif not self._corner_color_seen:
+            transitioned = (
+                other_count >= self.line_follow_min_pixels
+                and other_count > cur_count * _COLOR_DOMINANCE_RATIO
+            )
 
-        if transitioned and not self._corner_color_seen:
-            transitioned_this_tick = True
-            if self._corner_transition(current, other):
-                # CORNER. Latch the flag but keep tracking the current colour
-                # (which is now disappearing) so we drive straight on through
-                # the end of our side's segment into the corner.
-                self._corner_color_seen = True
-                self.log(
-                    f"PayloadCornerNavigateMode: corner {current}→{other} "
-                    f"({other_count}px) — driving into corner until {current} disappears"
-                )
-            else:
-                # Mid-side transition. Switch the tracked colour to the new
-                # segment we are now physically over and continue line
-                # following along the same border. The next transition we
-                # see will be the corner.
-                self.log(
-                    f"PayloadCornerNavigateMode: mid-side {current}→{other} "
-                    f"({other_count}px) — switching tracked colour to {other}"
-                )
-                self._prev_color = other
-                current, other = other, current
-                cur_count, cur_lateral_px = other_count, other_lateral_px
-                other_count, other_lateral_px = (
-                    self._single_color_strip_metrics(bgr, other)
-                )
+            if transitioned:
+                transitioned_this_tick = True
+                if self._corner_transition(current, other):
+                    # CORNER. Latch the flag but keep tracking the current
+                    # colour (which is now disappearing) so we drive straight
+                    # on through the end of our side's segment into the corner.
+                    self._corner_color_seen = True
+                    self.log(
+                        f"PayloadCornerNavigateMode: corner {current}→{other} "
+                        f"({other_count}px) — driving into corner until "
+                        f"{current} disappears"
+                    )
+                else:
+                    # Mid-side transition. Switch the tracked colour and
+                    # require the old colour's residual pixels to clear
+                    # before checking for further transitions.
+                    self._boundary_cleared = False
+                    self.log(
+                        f"PayloadCornerNavigateMode: mid-side {current}→{other} "
+                        f"({other_count}px) — switching tracked colour to "
+                        f"{other}"
+                    )
+                    self._prev_color = other
+                    current, other = other, current
+                    cur_count, cur_lateral_px = other_count, other_lateral_px
+                    other_count, other_lateral_px = (
+                        self._single_color_strip_metrics(bgr, other)
+                    )
 
         # Stop condition: corner has been detected and the colour we are
         # following has dropped below the visibility threshold (we've driven
