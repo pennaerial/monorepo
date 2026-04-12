@@ -10,3 +10,4 @@ modes:
       angular_gain: 0.006
       yaw_gain: 0.6
       stop_distance_m: 0.2
+      compressed: false

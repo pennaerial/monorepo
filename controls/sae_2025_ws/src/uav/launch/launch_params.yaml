@@ -8,6 +8,7 @@ vision_debug: true
 # Automatically start the mission manager once its runtime is ready.
 # Set false to leave the mission idle until /<vehicle>/mode_manager/start_mission is called.
 auto_launch: false
+auto_launch: false
 
 # PX4 / airframe settings for UAV missions and sim-backed payload missions.
 airframe: standard_vtol # Enter a preset below or a valid airframe ID (integer), either custom or from PX4
@@ -22,6 +23,11 @@ px4_namespace: ""
 # Optional explicit PX4 multi-instance index for sim. Fleet orchestration assigns this automatically.
 px4_instance: 0
 
+# Force the camera stack (v4l2 + camera node) to launch even when the selected
+# mission metadata does not require it.
+force_camera: false
+
+# Vehicle camera settings. Applied whenever the camera pipeline launches.
 # Force the camera stack (v4l2 + camera node) to launch even when the selected
 # mission metadata does not require it.
 force_camera: false

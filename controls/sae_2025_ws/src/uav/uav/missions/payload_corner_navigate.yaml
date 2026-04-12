@@ -30,3 +30,6 @@ modes:
       line_follow_min_pixels: 50
       k_lat: 0.003
       max_angular: 1.3
+      dr_angular_turn: 2.354
+      dr_speed: 1.5
+
