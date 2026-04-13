@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Live plotter for payload motor state RPM traces.
+"""
+Live plotter for payload motor state RPM traces.
 
 Usage:
   python3 src/payload/test/plot_motor_state.py --topic /payload_0/motor_state
@@ -127,7 +128,7 @@ def main() -> None:
         return left_set_line, left_meas_line, right_set_line, right_meas_line
 
     interval_ms = max(1, int(1000.0 / args.refresh_hz))
-    _ani = FuncAnimation(fig, update, interval=interval_ms, blit=False)
+    fig._animation = FuncAnimation(fig, update, interval=interval_ms, blit=False)
 
     try:
         plt.show()

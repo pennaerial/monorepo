@@ -173,11 +173,11 @@ install(TARGETS payload
 install(DIRECTORY include/
   DESTINATION include
 )
-install(DIRECTORY 
-  launch 
+install(DIRECTORY
+  launch
   DESTINATION share/${PROJECT_NAME}
 )
-install(DIRECTORY 
+install(DIRECTORY
   config
   DESTINATION share/${PROJECT_NAME}
 )
@@ -204,6 +204,20 @@ if(BUILD_TESTING)
   )
   if(TARGET test_control_math)
     target_include_directories(test_control_math PRIVATE include)
+  endif()
+
+  ament_add_gtest(test_payload_shutdown
+    test/test_payload_shutdown.cpp
+    src/payload.cpp
+  )
+  if(TARGET test_payload_shutdown)
+    target_include_directories(test_payload_shutdown PRIVATE include)
+    ament_target_dependencies(test_payload_shutdown
+      rclcpp
+      payload_interfaces
+      pluginlib
+    )
+    target_link_libraries(test_payload_shutdown payload_parameters)
   endif()
 endif()
 
