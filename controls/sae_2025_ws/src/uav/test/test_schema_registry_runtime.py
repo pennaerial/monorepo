@@ -86,7 +86,7 @@ def test_load_mission_spec_works_without_ros_setup(tmp_path):
 
     assert '"target": "payload"' in result.stdout
     assert '"requires_camera": true' in result.stdout
-    assert '"PayloadAprilTagNode"' in result.stdout
+    assert '"vision_nodes": []' in result.stdout
 
 
 def test_load_fleet_document_works_without_ros_setup():
