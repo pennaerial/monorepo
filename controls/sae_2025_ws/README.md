@@ -171,7 +171,7 @@ Useful launch overrides:
 Example:
 
 ```bash
-ros2 launch uav main.launch.py mission_name:=payload_drive_to_apriltag payload_name:=payload_0
+ros2 launch uav main.launch.py mission_name:=payload_retreat payload_name:=payload_0
 ```
 
 For hardware payload missions, make sure `pigpiod` is already running or enabled as a service before launching.

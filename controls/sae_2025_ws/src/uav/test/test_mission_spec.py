@@ -255,7 +255,7 @@ def test_mode_derived_metadata_rejects_mixed_targets(tmp_path):
             transitions:
               complete: payload
           payload:
-            class: uav.modes.payload.PayloadDriveToAprilTagMode
+            class: uav.modes.payload.PayloadRetreatMode
         """,
     )
 
