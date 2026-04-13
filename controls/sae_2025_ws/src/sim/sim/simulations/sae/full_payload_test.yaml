@@ -10,7 +10,7 @@ world:
         position: [0.0, 0.0, -0.1]
         rpy: [0.0, 0.0, 0.0]
       string_obstacle:
-        path_to_sdf: "~/.simulation-gazebo/models/string_obstacle/model.sdf"
+        path_to_sdf: "package://sim/world_gen/models/string_obstacle/model.sdf"
         position: [-0.25, 0.0, 0.0]
         rpy: [0.0, 0.0, 0.0]
     controllables:

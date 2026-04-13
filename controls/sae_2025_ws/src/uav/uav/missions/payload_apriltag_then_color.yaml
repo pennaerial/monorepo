@@ -1,4 +1,4 @@
-# Approach an AprilTag, then continue toward a yellow colour target.
+# Approach an AprilTag, then continue toward a dark gray colour target.
 # PayloadAprilTagApproachMode returns "done" or "tag_lost" → transitions to color_approach
 # PayloadColorStringApproachMode returns "terminate" → mission ends
 modes:
@@ -20,8 +20,8 @@ modes:
   color_approach:
     class: uav.modes.payload.PayloadColorStringApproachMode
     params:
-      lower_hsv: [20, 100, 100]
-      upper_hsv: [35, 255, 255]
+      lower_hsv: [0, 0, 30]
+      upper_hsv: [179, 40, 120]
       forward_speed: 0.04
       angular_gain: 0.003
       centering_threshold_px: 15
