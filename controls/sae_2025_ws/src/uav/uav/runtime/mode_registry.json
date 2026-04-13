@@ -555,6 +555,15 @@
           "default_kind": "value",
           "name": "use_global_hsv_centroid",
           "required": false
+        },
+        {
+          "annotation": {
+            "kind": "bool"
+          },
+          "default": false,
+          "default_kind": "value",
+          "name": "debug",
+          "required": false
         }
       ],
       "params_schema": {
@@ -573,6 +582,11 @@
           "compressed": {
             "default": false,
             "title": "Compressed",
+            "type": "boolean"
+          },
+          "debug": {
+            "default": false,
+            "title": "Debug",
             "type": "boolean"
           },
           "drive_angular_scale": {

@@ -8,6 +8,11 @@ The largest qualifying contour supplies centroid and area; other HSV
 regions are ignored.  Set ``use_global_hsv_centroid`` to use the full mask
 as before.
 
+Set ``debug`` to true to publish a JPEG on
+``{camera_namespace}/vision/color_string_approach/debug/compressed`` with
+HSV mask contours drawn (green = tracked blob, orange = fails h/w, gray =
+too small, yellow = other qualified candidates).
+
 Phase 1 (ALIGN): rotate in place until the blob centroid is within
 ``centering_threshold_px`` of the image centre.
 
@@ -33,21 +38,15 @@ from uav.vehicles.Payload import Payload
 from ..Mode import Mode
 
 
-def _vertical_blob_centroid_area(
-    mask: np.ndarray,
+def _select_vertical_blob_from_contours(
+    contours: list,
     min_hw_ratio: float,
     min_area: float,
-) -> Optional[Tuple[float, int]]:
-    """Largest external contour with bbox height >= min_hw_ratio * width.
-
-    Returns ``(cx, area)`` in pixel units, or ``None`` if no contour qualifies.
-    """
-    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    best_area: float = -1.0
-    best_cx: float = 0.0
-    best_area_i: int = 0
-
-    for cnt in contours:
+) -> Optional[Tuple[float, int, int]]:
+    """Pick largest qualifying contour. Returns ``(cx, area, contour_index)``."""
+    best_idx = -1
+    best_area = -1.0
+    for i, cnt in enumerate(contours):
         a = cv2.contourArea(cnt)
         if a < min_area:
             continue
@@ -59,15 +58,16 @@ def _vertical_blob_centroid_area(
         M = cv2.moments(cnt)
         if M["m00"] <= 0:
             continue
-        cx = M["m10"] / M["m00"]
         if a > best_area:
             best_area = a
-            best_cx = cx
-            best_area_i = int(a)
+            best_idx = i
 
-    if best_area < 0:
+    if best_idx < 0:
         return None
-    return (best_cx, best_area_i)
+    cnt = contours[best_idx]
+    M = cv2.moments(cnt)
+    cx = M["m10"] / M["m00"]
+    return (cx, int(best_area), best_idx)
 
 
 class PayloadColorStringApproachMode(Mode):
@@ -94,6 +94,7 @@ class PayloadColorStringApproachMode(Mode):
         compressed: bool = False,
         vertical_blob_min_hw_ratio: float = 2.0,
         use_global_hsv_centroid: bool = False,
+        debug: bool = False,
     ):
         super().__init__(node, vehicle)
         self.vehicle: Payload = vehicle
@@ -109,9 +110,17 @@ class PayloadColorStringApproachMode(Mode):
         self.lost_timeout_s = float(lost_timeout_s)
         self.vertical_blob_min_hw_ratio = float(vertical_blob_min_hw_ratio)
         self.use_global_hsv_centroid = bool(use_global_hsv_centroid)
+        self.debug = bool(debug)
 
         self._bridge = CvBridge()
         self._latest_image: Optional[Image | CompressedImage] = None
+        self._debug_pub = None
+        if self.debug:
+            self._debug_pub = self.node.create_publisher(
+                CompressedImage,
+                f"{vehicle.camera_namespace}/vision/color_string_approach/debug/compressed",
+                1,
+            )
 
         if bool(compressed):
             self.node.create_subscription(
@@ -146,6 +155,97 @@ class PayloadColorStringApproachMode(Mode):
     def _now(self) -> float:
         return self.node.get_clock().now().nanoseconds * 1e-9
 
+    def _contour_class_vertical(
+        self, cnt: np.ndarray
+    ) -> Tuple[str, Tuple[int, int, int]]:
+        """Return (reason, bgr_color) for drawing: small | ratio | ok."""
+        a = cv2.contourArea(cnt)
+        if a < self.min_detect_pixels:
+            return "small", (80, 80, 80)
+        _x, _y, bw, bh = cv2.boundingRect(cnt)
+        if bw <= 0:
+            return "small", (80, 80, 80)
+        if float(bh) < self.vertical_blob_min_hw_ratio * float(bw):
+            return "ratio", (0, 140, 255)
+        M = cv2.moments(cnt)
+        if M["m00"] <= 0:
+            return "small", (80, 80, 80)
+        return "ok", (0, 220, 220)
+
+    def _publish_debug(
+        self,
+        bgr: np.ndarray,
+        mask: np.ndarray,
+        contours: list,
+        sel_idx: Optional[int],
+        cx: Optional[float],
+        area: int,
+        phase: str,
+        lateral_error: Optional[float],
+    ) -> None:
+        if self._debug_pub is None:
+            return
+        h, w = bgr.shape[:2]
+        icx = int(round(cx)) if cx is not None else None
+
+        overlay = np.zeros_like(bgr)
+        overlay[mask > 0] = (40, 180, 40)
+        vis = cv2.addWeighted(bgr, 0.72, overlay, 0.28, 0)
+
+        if self.use_global_hsv_centroid:
+            for cnt in contours:
+                cv2.drawContours(vis, [cnt], -1, (100, 100, 100), 1)
+            if icx is not None:
+                cv2.line(vis, (icx, 0), (icx, h - 1), (0, 255, 0), 2)
+        else:
+            for i, cnt in enumerate(contours):
+                reason, col = self._contour_class_vertical(cnt)
+                thick = 3 if i == sel_idx else 1
+                if reason == "ok" and i != sel_idx:
+                    col = (0, 255, 255)
+                    thick = 2
+                if i == sel_idx:
+                    col = (0, 255, 0)
+                    thick = 3
+                cv2.drawContours(vis, [cnt], -1, col, thick)
+                if i == sel_idx:
+                    x, y, bw, bh = cv2.boundingRect(cnt)
+                    cv2.rectangle(vis, (x, y), (x + bw, y + bh), (0, 255, 0), 1)
+            if icx is not None:
+                cv2.line(vis, (icx, 0), (icx, h - 1), (255, 255, 255), 1)
+
+        cx_frame = w // 2
+        cv2.line(vis, (cx_frame, 0), (cx_frame, h - 1), (180, 180, 255), 1)
+
+        err_s = f"err={lateral_error:+.0f}px" if lateral_error is not None else "err=—"
+        cv2.putText(
+            vis,
+            f"{phase}  area={area}  {err_s}",
+            (8, 24),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.55,
+            (0, 255, 255),
+            2,
+        )
+        cv2.putText(
+            vis,
+            "gray=small  orange=ratio  green=track  yellow=alt_ok",
+            (8, 48),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.45,
+            (200, 200, 200),
+            1,
+        )
+
+        try:
+            msg = self._bridge.cv2_to_compressed_imgmsg(vis, dst_format="jpeg")
+            msg.header.stamp = self.node.get_clock().now().to_msg()
+            self._debug_pub.publish(msg)
+        except Exception as exc:
+            self.node.get_logger().warning(
+                f"PayloadColorStringApproachMode: debug publish failed: {exc}"
+            )
+
     def on_enter(self) -> None:
         self._done = False
         self._stopping = False
@@ -159,6 +259,11 @@ class PayloadColorStringApproachMode(Mode):
             self.log(
                 "PayloadColorStringApproachMode: started — vertical blob "
                 f"(min h/w≥{self.vertical_blob_min_hw_ratio})"
+            )
+        if self.debug:
+            self.log(
+                "PayloadColorStringApproachMode: debug → "
+                f"{self.vehicle.camera_namespace}/vision/color_string_approach/debug/compressed"
             )
 
     def on_update(self, time_delta: float) -> None:
@@ -182,22 +287,42 @@ class PayloadColorStringApproachMode(Mode):
         self._image_width = float(bgr.shape[1])
         hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
         mask = cv2.inRange(hsv, self._lower_hsv, self._upper_hsv)
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
+        sel_idx: Optional[int] = None
         if self.use_global_hsv_centroid:
             M = cv2.moments(mask)
             area = int(M["m00"] / 255) if M["m00"] > 0 else 0
-            cx: Optional[float] = (M["m10"] / M["m00"]) if M["m00"] > 0 else None
+            cx = (M["m10"] / M["m00"]) if M["m00"] > 0 else None
         else:
-            blob = _vertical_blob_centroid_area(
-                mask,
+            picked = _select_vertical_blob_from_contours(
+                contours,
                 self.vertical_blob_min_hw_ratio,
                 float(self.min_detect_pixels),
             )
-            if blob is None:
+            if picked is None:
                 cx = None
                 area = 0
             else:
-                cx, area = blob
+                cx, area, sel_idx = picked[0], picked[1], picked[2]
+
+        phase = "LOST"
+        lateral_error: Optional[float] = None
+        if cx is not None and area >= self.min_detect_pixels:
+            lateral_error = cx - self._image_width / 2.0
+            phase = "ALIGN" if abs(lateral_error) > self.centering_threshold_px else "DRIVE"
+
+        if self.debug:
+            self._publish_debug(
+                bgr,
+                mask,
+                contours,
+                sel_idx,
+                cx,
+                area,
+                phase,
+                lateral_error,
+            )
 
         if cx is None or area < self.min_detect_pixels:
             if self._last_seen_time is not None and (now - self._last_seen_time) > self.lost_timeout_s:
