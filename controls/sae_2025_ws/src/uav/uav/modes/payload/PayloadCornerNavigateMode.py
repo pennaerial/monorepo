@@ -639,6 +639,7 @@ class PayloadCornerNavigateMode(Mode):
             # Tape not visible yet — rotate slowly to search
             self.vehicle.drive(0.0, self.tape_align_angular_speed)
             self._tape_align_stable = 0
+            self._annotate_tape_align(bgr, count, lateral_px, "searching")
             self.log(
                 f"PayloadCornerNavigateMode: TAPE_ALIGN searching "
                 f"(black_px={count})"
@@ -650,15 +651,19 @@ class PayloadCornerNavigateMode(Mode):
             self._tape_align_stable += 1
             self.vehicle.stop()
             if self._tape_align_stable >= self.tape_align_stable_frames:
+                self._annotate_tape_align(bgr, count, lateral_px, "LOCKED")
                 self.log(
                     f"PayloadCornerNavigateMode: TAPE_ALIGN centered "
                     f"(lat={lateral_px:.1f}px, px={count}) → done"
                 )
                 self._done = True
+            else:
+                self._annotate_tape_align(bgr, count, lateral_px, "centering")
         else:
             self._tape_align_stable = 0
             direction = -1.0 if lateral_px > 0 else 1.0
             self.vehicle.drive(0.0, direction * self.tape_align_angular_speed)
+            self._annotate_tape_align(bgr, count, lateral_px, "turning")
             self.log(
                 f"PayloadCornerNavigateMode: TAPE_ALIGN turning "
                 f"lat={lateral_px:.1f}px black_px={count}"
@@ -909,6 +914,71 @@ class PayloadCornerNavigateMode(Mode):
             debug,
             f"min={self.line_follow_min_pixels} "
             f"ang={angular:+.2f}rad/s v={self.line_follow_speed_mps:.2f}m/s",
+            62,
+        )
+        self._publish_annotated(debug)
+
+    def _annotate_tape_align(
+        self,
+        bgr: np.ndarray,
+        count: int,
+        lateral_px: float,
+        status: str,
+    ) -> None:
+        if self._annotated_pub is None or bgr is None:
+            return
+        debug = bgr.copy()
+        h, w = bgr.shape[:2]
+        # Exactly match _black_centroid_metrics: bottom line_follow_strip_frac,
+        # full width, same HSV thresholds, same center computation.
+        y0 = int(h * (1.0 - self.line_follow_strip_frac))
+        strip = bgr[y0:, :]
+        hsv = cv2.cvtColor(strip, cv2.COLOR_BGR2HSV)
+        mask = cv2.inRange(hsv, self._lower_black, self._upper_black)
+        cv2.rectangle(debug, (0, y0), (w - 1, h - 1), self._DBG_CROP, 1)
+        self._draw_shifted_contours(debug, mask, 0, y0, (180, 180, 180), 2)
+        # Use float / 2.0 to match _black_centroid_metrics exactly.
+        strip_center_x = strip.shape[1] / 2.0
+        # Tolerance band (green vertical lines).
+        tol_left = int(strip_center_x - self.tape_align_center_tol_px)
+        tol_right = int(strip_center_x + self.tape_align_center_tol_px)
+        cv2.line(debug, (tol_left, y0), (tol_left, h - 1), self._DBG_TOL, 1)
+        cv2.line(debug, (tol_right, y0), (tol_right, h - 1), self._DBG_TOL, 1)
+        # Strip-center reference (white).
+        cv2.line(
+            debug,
+            (int(strip_center_x), y0),
+            (int(strip_center_x), h - 1),
+            self._DBG_CENTER,
+            1,
+        )
+        # Black-tape centroid (green if in tolerance, orange otherwise).
+        # Reconstruct the centroid position the same way the algorithm does:
+        # centroid_x_in_strip = xs.mean(), lateral_px = centroid_x_in_strip - strip_center_x
+        # so centroid_x_in_strip = strip_center_x + lateral_px, drawn at x offset 0.
+        if count >= self.tape_align_min_pixels:
+            centroid_x = int(strip_center_x + lateral_px)
+            in_tol = abs(lateral_px) <= self.tape_align_center_tol_px
+            color = self._DBG_OK if in_tol else self._DBG_WARN
+            cv2.line(debug, (centroid_x, y0), (centroid_x, h - 1), color, 2)
+        self._put_label(
+            debug,
+            f"TAPE_ALIGN [{status}] dir={self.direction}",
+            22,
+            (0, 255, 255),
+            0.6,
+            2,
+        )
+        self._put_label(
+            debug,
+            f"black={count}px lat={lateral_px:+.1f}px "
+            f"tol=+/-{self.tape_align_center_tol_px:.0f} "
+            f"min={self.tape_align_min_pixels}",
+            44,
+        )
+        self._put_label(
+            debug,
+            f"stable={self._tape_align_stable}/{self.tape_align_stable_frames}",
             62,
         )
         self._publish_annotated(debug)

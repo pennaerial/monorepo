@@ -1,5 +1,5 @@
 # launch_params.yaml
-mission_name: payload_drive_corner
+mission_name: payload_corner_navigate_sim
 # Vehicle namespace for mission-facing topics/services.
 # Leave blank to use the mission-target default (`uav` for UAV missions, `payload_0` for payload missions).
 vehicle_name: ""
@@ -24,7 +24,7 @@ px4_instance: 0
 
 # Force the camera stack (v4l2 + camera node) to launch even when the selected
 # mission metadata does not require it.
-force_camera: false
+force_camera: true
 
 # Vehicle camera settings. Applied whenever the camera pipeline launches.
 save_vision_milliseconds: 0 # Interval between saving vision images in milliseconds, set to 0 to disable saving.
@@ -37,4 +37,4 @@ camera_preprocess_hook: ""
 servo_only: false
 payload_controller: ""
 
-sim: false
+sim: true
