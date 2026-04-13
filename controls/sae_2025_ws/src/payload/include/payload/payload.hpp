@@ -21,6 +21,7 @@ public:
   Payload(const std::string & vehicle_name, std::shared_ptr<Controller> controller);
   ~Payload() override;
   void init();
+  void prepare_for_shutdown() noexcept;
 
 private:
   rclcpp::Subscription<payload_interfaces::msg::DriveCommand>::SharedPtr ros_drive_subscriber_;
