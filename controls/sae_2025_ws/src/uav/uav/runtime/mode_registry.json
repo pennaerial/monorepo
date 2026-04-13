@@ -442,9 +442,9 @@
             "kind": "list"
           },
           "default": [
-            20,
-            100,
-            100
+            0,
+            0,
+            30
           ],
           "default_kind": "value",
           "name": "lower_hsv",
@@ -458,9 +458,9 @@
             "kind": "list"
           },
           "default": [
-            35,
-            255,
-            255
+            179,
+            40,
+            120
           ],
           "default_kind": "value",
           "name": "upper_hsv",
@@ -537,6 +537,24 @@
           "default_kind": "value",
           "name": "compressed",
           "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 2.0,
+          "default_kind": "value",
+          "name": "vertical_blob_min_hw_ratio",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "bool"
+          },
+          "default": false,
+          "default_kind": "value",
+          "name": "use_global_hsv_centroid",
+          "required": false
         }
       ],
       "params_schema": {
@@ -574,9 +592,9 @@
           },
           "lower_hsv": {
             "default": [
-              20,
-              100,
-              100
+              0,
+              0,
+              30
             ],
             "items": {
               "type": "integer"
@@ -596,15 +614,25 @@
           },
           "upper_hsv": {
             "default": [
-              35,
-              255,
-              255
+              179,
+              40,
+              120
             ],
             "items": {
               "type": "integer"
             },
             "title": "Upper Hsv",
             "type": "array"
+          },
+          "use_global_hsv_centroid": {
+            "default": false,
+            "title": "Use Global Hsv Centroid",
+            "type": "boolean"
+          },
+          "vertical_blob_min_hw_ratio": {
+            "default": 2.0,
+            "title": "Vertical Blob Min Hw Ratio",
+            "type": "number"
           }
         },
         "title": "PayloadColorStringApproachModeParams",

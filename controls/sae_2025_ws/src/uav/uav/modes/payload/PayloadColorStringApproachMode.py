@@ -2,6 +2,12 @@
 PayloadColorStringApproachMode: drive the payload toward a coloured target
 using HSV blob detection and a two-phase approach.
 
+By default only **vertically elongated** blobs are tracked: the axis-aligned
+bounding box must satisfy ``height >= vertical_blob_min_hw_ratio * width``.
+The largest qualifying contour supplies centroid and area; other HSV
+regions are ignored.  Set ``use_global_hsv_centroid`` to use the full mask
+as before.
+
 Phase 1 (ALIGN): rotate in place until the blob centroid is within
 ``centering_threshold_px`` of the image centre.
 
@@ -14,7 +20,7 @@ Terminates when the blob area exceeds ``stop_area`` pixels.
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Optional, Tuple
 
 import cv2
 import numpy as np
@@ -25,6 +31,43 @@ from sensor_msgs.msg import CompressedImage, Image
 from uav.vehicles.Payload import Payload
 
 from ..Mode import Mode
+
+
+def _vertical_blob_centroid_area(
+    mask: np.ndarray,
+    min_hw_ratio: float,
+    min_area: float,
+) -> Optional[Tuple[float, int]]:
+    """Largest external contour with bbox height >= min_hw_ratio * width.
+
+    Returns ``(cx, area)`` in pixel units, or ``None`` if no contour qualifies.
+    """
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    best_area: float = -1.0
+    best_cx: float = 0.0
+    best_area_i: int = 0
+
+    for cnt in contours:
+        a = cv2.contourArea(cnt)
+        if a < min_area:
+            continue
+        _x, _y, bw, bh = cv2.boundingRect(cnt)
+        if bw <= 0:
+            continue
+        if float(bh) < min_hw_ratio * float(bw):
+            continue
+        M = cv2.moments(cnt)
+        if M["m00"] <= 0:
+            continue
+        cx = M["m10"] / M["m00"]
+        if a > best_area:
+            best_area = a
+            best_cx = cx
+            best_area_i = int(a)
+
+    if best_area < 0:
+        return None
+    return (best_cx, best_area_i)
 
 
 class PayloadColorStringApproachMode(Mode):
@@ -39,8 +82,8 @@ class PayloadColorStringApproachMode(Mode):
         self,
         node: Node,
         vehicle: Payload,
-        lower_hsv: list[int] = (20, 100, 100),
-        upper_hsv: list[int] = (35, 255, 255),
+        lower_hsv: list[int] = (0, 0, 30),
+        upper_hsv: list[int] = (179, 40, 120),
         forward_speed: float = 0.08,
         angular_gain: float = 0.003,
         centering_threshold_px: int = 15,
@@ -49,6 +92,8 @@ class PayloadColorStringApproachMode(Mode):
         stop_area: int = 5000,
         lost_timeout_s: float = 3.0,
         compressed: bool = False,
+        vertical_blob_min_hw_ratio: float = 2.0,
+        use_global_hsv_centroid: bool = False,
     ):
         super().__init__(node, vehicle)
         self.vehicle: Payload = vehicle
@@ -62,6 +107,8 @@ class PayloadColorStringApproachMode(Mode):
         self.min_detect_pixels = int(min_detect_pixels)
         self.stop_area = int(stop_area)
         self.lost_timeout_s = float(lost_timeout_s)
+        self.vertical_blob_min_hw_ratio = float(vertical_blob_min_hw_ratio)
+        self.use_global_hsv_centroid = bool(use_global_hsv_centroid)
 
         self._bridge = CvBridge()
         self._latest_image: Optional[Image | CompressedImage] = None
@@ -106,7 +153,13 @@ class PayloadColorStringApproachMode(Mode):
         self._image_width = 0.0
         self._last_seen_time = None
         self._last_log_time = 0.0
-        self.log("PayloadColorStringApproachMode: started — looking for colour target")
+        if self.use_global_hsv_centroid:
+            self.log("PayloadColorStringApproachMode: started — global HSV centroid")
+        else:
+            self.log(
+                "PayloadColorStringApproachMode: started — vertical blob "
+                f"(min h/w≥{self.vertical_blob_min_hw_ratio})"
+            )
 
     def on_update(self, time_delta: float) -> None:
         if self._done:
@@ -129,10 +182,24 @@ class PayloadColorStringApproachMode(Mode):
         self._image_width = float(bgr.shape[1])
         hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
         mask = cv2.inRange(hsv, self._lower_hsv, self._upper_hsv)
-        M = cv2.moments(mask)
-        area = int(M["m00"] / 255) if M["m00"] > 0 else 0
 
-        if area < self.min_detect_pixels:
+        if self.use_global_hsv_centroid:
+            M = cv2.moments(mask)
+            area = int(M["m00"] / 255) if M["m00"] > 0 else 0
+            cx: Optional[float] = (M["m10"] / M["m00"]) if M["m00"] > 0 else None
+        else:
+            blob = _vertical_blob_centroid_area(
+                mask,
+                self.vertical_blob_min_hw_ratio,
+                float(self.min_detect_pixels),
+            )
+            if blob is None:
+                cx = None
+                area = 0
+            else:
+                cx, area = blob
+
+        if cx is None or area < self.min_detect_pixels:
             if self._last_seen_time is not None and (now - self._last_seen_time) > self.lost_timeout_s:
                 self.vehicle.stop()
                 self._last_seen_time = None
@@ -147,7 +214,6 @@ class PayloadColorStringApproachMode(Mode):
             self._stopping = True
             self.log(f"PayloadColorStringApproachMode: stop_area hit (area={area}), driving one more frame")
 
-        cx = M["m10"] / M["m00"]
         image_center = self._image_width / 2.0
         lateral_error = cx - image_center
         angular = -self.angular_gain * lateral_error
