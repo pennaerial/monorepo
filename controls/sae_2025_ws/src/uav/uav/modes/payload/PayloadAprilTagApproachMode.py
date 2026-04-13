@@ -81,9 +81,7 @@ class PayloadAprilTagApproachMode(Mode):
                 1,
             )
         else:
-            self.node.create_subscription(
-                Image, vehicle.image_topic, self._on_image, 1
-            )
+            self.node.create_subscription(Image, vehicle.image_topic, self._on_image, 1)
 
         self.node.create_subscription(
             CameraInfo, vehicle.camera_info_topic, self._on_camera_info, 1
@@ -126,7 +124,9 @@ class PayloadAprilTagApproachMode(Mode):
         self._last_no_tag_log_time = 0.0
         self._last_drive_log_time = 0.0
         self.vehicle.set_servo(180.0)
-        self.log("PayloadAprilTagApproachMode: servo set to 180, detecting apriltags inline")
+        self.log(
+            "PayloadAprilTagApproachMode: servo set to 180, detecting apriltags inline"
+        )
 
     def _detect_observations(self) -> Optional[dict[int, TagObservation]]:
         bgr = self._get_bgr_frame()

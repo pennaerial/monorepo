@@ -359,9 +359,7 @@ def _write_mirrored_fleet_bundle(
     fleet_name: str = "shared.yaml",
 ) -> Path:
     bundle_root = tmp_path / "mirrored-fleet-bundle"
-    install_fleets_root = (
-        bundle_root / "install" / "uav" / "share" / "uav" / "fleets"
-    )
+    install_fleets_root = bundle_root / "install" / "uav" / "share" / "uav" / "fleets"
     source_fleets_root = bundle_root / "src" / "uav" / "uav" / "fleets"
     install_fleets_root.mkdir(parents=True, exist_ok=True)
     source_fleets_root.mkdir(parents=True, exist_ok=True)
@@ -781,9 +779,7 @@ def test_list_builds_combines_releases_and_artifacts(tmp_path, monkeypatch):
                     "name": "ROS 2 Build deadbeef",
                     "published_at": "2026-04-11T00:05:00Z",
                     "body": (
-                        "Commit: deadbeef\n"
-                        "Built: 2026-04-11T00:00:00Z\n"
-                        "Branch: main\n"
+                        "Commit: deadbeef\nBuilt: 2026-04-11T00:00:00Z\nBranch: main\n"
                     ),
                     "assets": [
                         {
@@ -843,8 +839,8 @@ def test_list_builds_combines_releases_and_artifacts(tmp_path, monkeypatch):
                             "name": "Docker Build",
                             "conclusion": "success",
                         },
-                    }
-                ]
+                    },
+                ],
             },
             commit_payloads={
                 "deadbeef": {"commit": {"message": "Release commit subject\n\nbody"}},
@@ -950,7 +946,9 @@ def test_list_builds_uses_cached_response_for_repeat_requests(tmp_path, monkeypa
     assert client_creations == 1
 
 
-def test_list_builds_returns_stale_cache_when_github_rate_limited(tmp_path, monkeypatch):
+def test_list_builds_returns_stale_cache_when_github_rate_limited(
+    tmp_path, monkeypatch
+):
     ctx = SimpleNamespace(
         base_dir=tmp_path / "src" / "integration",
         operator_config=_make_operator(tmp_path),
@@ -1440,9 +1438,7 @@ def test_build_source_change_clears_missing_fleet_filename(tmp_path):
     assert result["source"]["available_fleets"] == ["backup.yaml"]
 
 
-def test_fleet_catalog_discovers_nested_actions_artifact_tarball(
-    tmp_path, monkeypatch
-):
+def test_fleet_catalog_discovers_nested_actions_artifact_tarball(tmp_path, monkeypatch):
     target = _make_target(
         target_id="pi-actions-catalog",
         vehicle_name="uav_0",

@@ -57,7 +57,7 @@ def _systemd_access_error(target_ctx: TargetContext, raw: str) -> str:
         return (
             f"Systemd control on {target_ctx.target.ssh_target()} requires sudo. "
             "Bootstrap the Pi or grant passwordless sudo for install/systemctl."
-    )
+        )
     return target_ctx.ssh.friendly_error(raw)
 
 
