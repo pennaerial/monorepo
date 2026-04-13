@@ -146,6 +146,7 @@ class PayloadColorStringApproachMode(Mode):
 
     def _get_bgr(self) -> Optional[np.ndarray]:
         msg = self._latest_image
+        self.log(f"msg: {msg}")
         if msg is None:
             return None
         if isinstance(msg, CompressedImage):
