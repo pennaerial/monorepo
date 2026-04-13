@@ -11,6 +11,10 @@ world:
         path_to_sdf: "~/.simulation-gazebo/models/dlz_alternating_border/model.sdf"
         position: [0.0, 0.0, -0.1]
         rpy: [0.0, 0.0, 0.0]
+      string_obstacle:
+        path_to_sdf: "~/.simulation-gazebo/models/string_obstacle/model.sdf"
+        position: [0.20, 0.0, 0.0]
+        rpy: [0.0, 0.0, 0.0]
     controllables:
       uav_0:
         kind: uav
