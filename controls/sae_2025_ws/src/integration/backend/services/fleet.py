@@ -9,10 +9,8 @@ from ..context import AppContext, TargetContext
 from ..models import (
     BuildSourceResponse,
     FleetActionDeviceResponse,
-    FleetActionResponse,
     FleetActionSummary,
     FleetBoardDeviceResponse,
-    FleetBoardResponse,
     FleetBoardSummary,
     FleetCatalogResponse,
     FleetConnectionSummary,

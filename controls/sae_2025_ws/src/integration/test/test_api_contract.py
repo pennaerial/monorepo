@@ -806,7 +806,7 @@ def test_build_source_routes_round_trip(client, tmp_path):
 
 def test_build_source_catalog_endpoint_exposes_available_fleets(client, tmp_path):
     primary_fleet = _write_fleet(tmp_path, name="primary.yaml")
-    backup_fleet = _write_fleet(tmp_path, name="backup.yaml")
+    _write_fleet(tmp_path, name="backup.yaml")
 
     response = client.post("/api/build-source/local-codebase")
     assert response.status_code == 200
