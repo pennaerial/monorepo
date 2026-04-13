@@ -11,5 +11,5 @@ modes:
       drive_angular_scale: 0.3
       min_detect_pixels: 50
       stop_area: 17000
-      lost_timeout_s: 3.0
+      lost_timeout_s: 10.0
       compressed: false
