@@ -4,7 +4,6 @@ import importlib
 from time import time
 from typing import Any, get_type_hints
 
-import rclpy
 from rclpy.node import Node
 from std_srvs.srv import Trigger
 
@@ -167,8 +166,25 @@ class ModeManager(Node):
         state = self.get_active_mode().check_status()
         self.handle_mode_state(state)
 
+    def _deactivate_active_mode(self) -> None:
+        if not self.active_mode:
+            return
+
+        mode_name = self.active_mode
+        mode = self.modes.get(mode_name)
+        self.active_mode = None
+        if mode is None or not getattr(mode, "active", False):
+            return
+
+        try:
+            mode.deactivate()
+        except Exception as exc:
+            self.get_logger().warn(
+                f"Failed to deactivate mode {mode_name} during shutdown: {exc}"
+            )
+
     def _stop_vehicle(self) -> None:
-        if self.vehicle is None or not rclpy.ok():
+        if self.vehicle is None:
             return
         stop_method = getattr(self.vehicle, "stop", None)
         if callable(stop_method):
@@ -219,10 +235,12 @@ class ModeManager(Node):
             self.get_logger().error(
                 f"Error in mode {self.active_mode}. Switching to safe stop behavior."
             )
+            self._deactivate_active_mode()
             self._stop_vehicle()
             self.destroy_node()
         elif state == "terminate":
             self.get_logger().info("Mission has completed.")
+            self._deactivate_active_mode()
             self._stop_vehicle()
             self.destroy_node()
         elif state != "continue":

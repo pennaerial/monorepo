@@ -46,6 +46,17 @@ class PayloadMissionBootstrap(Node):
         }
 
 
+def _shutdown_mission_node(mission_node) -> None:
+    if mission_node is None:
+        return
+    shutdown_mode = getattr(mission_node, "_deactivate_active_mode", None)
+    if callable(shutdown_mode):
+        shutdown_mode()
+    stop_vehicle = getattr(mission_node, "_stop_vehicle", None)
+    if callable(stop_vehicle):
+        stop_vehicle()
+
+
 def main(args=None) -> None:
     rclpy.init(args=args)
     bootstrap = PayloadMissionBootstrap()
@@ -63,8 +74,7 @@ def main(args=None) -> None:
         if bootstrap is not None:
             bootstrap.destroy_node()
         if mission_node is not None:
-            if rclpy.ok():
-                mission_node._stop_vehicle()
+            _shutdown_mission_node(mission_node)
             mission_node.destroy_node()
         if rclpy.ok():
             rclpy.shutdown()

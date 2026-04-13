@@ -648,3 +648,115 @@ def test_payload_bootstrap_bool_parameter_and_manager_validation(monkeypatch):
 
     with pytest.raises(ValueError, match="requires a payload mission spec"):
         payload_mission_module.PayloadMissionBootstrap.manager_kwargs(bootstrap)
+
+
+def test_mode_manager_stop_vehicle_without_rclpy_guard():
+    _require_runtime_support()
+
+    stop_calls: list[str] = []
+    manager = object.__new__(ModeManager)
+    manager.vehicle = SimpleNamespace(stop=lambda: stop_calls.append("stop"))
+    manager.get_logger = lambda: _FakeLogger()
+
+    ModeManager._stop_vehicle(manager)
+
+    assert stop_calls == ["stop"]
+
+
+def test_mode_manager_terminate_deactivates_mode_and_stops_vehicle():
+    _require_runtime_support()
+
+    events: list[str] = []
+    logger = _FakeLogger()
+
+    class _FakeMode:
+        def __init__(self) -> None:
+            self.active = True
+
+        def deactivate(self) -> None:
+            events.append("deactivate")
+            self.active = False
+
+    manager = object.__new__(ModeManager)
+    manager.vehicle = SimpleNamespace(stop=lambda: events.append("stop"))
+    manager.modes = {"start": _FakeMode()}
+    manager.transitions = {}
+    manager.active_mode = "start"
+    manager.get_logger = lambda: logger
+    manager.destroy_node = lambda: events.append("destroy")
+
+    ModeManager.handle_mode_state(manager, "terminate")
+
+    assert events == ["deactivate", "stop", "destroy"]
+    assert manager.active_mode is None
+
+
+def test_payload_mission_main_stops_vehicle_during_external_shutdown(monkeypatch):
+    _require_runtime_support()
+
+    if payload_mission_module is None:
+        pytest.skip(
+            "payload_interfaces Python module is not available in this test environment"
+        )
+
+    events: list[str] = []
+
+    class _Bootstrap:
+        def destroy_node(self) -> None:
+            events.append("bootstrap_destroy")
+
+        def manager_kwargs(self) -> dict:
+            events.append("manager_kwargs")
+            return {}
+
+    class _MissionNode:
+        def _deactivate_active_mode(self) -> None:
+            events.append("deactivate")
+
+        def _stop_vehicle(self) -> None:
+            events.append("stop")
+
+        def destroy_node(self) -> None:
+            events.append("destroy")
+
+    mission_node = _MissionNode()
+
+    monkeypatch.setattr(
+        payload_mission_module.rclpy,
+        "init",
+        lambda args=None: events.append("init"),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        payload_mission_module.rclpy,
+        "shutdown",
+        lambda: events.append("shutdown"),
+        raising=False,
+    )
+    monkeypatch.setattr(payload_mission_module.rclpy, "ok", lambda: False)
+    monkeypatch.setattr(payload_mission_module, "PayloadMissionBootstrap", _Bootstrap)
+    monkeypatch.setattr(
+        payload_mission_module,
+        "PayloadModeManager",
+        lambda **kwargs: events.append(f"manager:{kwargs}") or mission_node,
+    )
+    monkeypatch.setattr(
+        payload_mission_module.rclpy,
+        "spin",
+        lambda _node: (_ for _ in ()).throw(
+            payload_mission_module.ExternalShutdownException()
+        ),
+        raising=False,
+    )
+
+    payload_mission_module.main()
+
+    assert events == [
+        "init",
+        "manager_kwargs",
+        "bootstrap_destroy",
+        "manager:{}",
+        "deactivate",
+        "stop",
+        "destroy",
+    ]
