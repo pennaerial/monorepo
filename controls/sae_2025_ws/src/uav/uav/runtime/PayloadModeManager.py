@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import os
 from time import time
 
 from uav.vehicles.Payload import Payload
@@ -17,9 +16,6 @@ class PayloadModeManager(ModeManager):
         vehicle_name: str,
         auto_launch: bool = True,
         node_name: str = "mission",
-        emits_hotspot: bool = True,
-        target_ip: str = "192.168.4.1",
-        sync_domain_id: int = -1,
     ) -> None:
         super().__init__(node_name, auto_launch=auto_launch)
         if not mission_spec.is_payload:
@@ -27,23 +23,10 @@ class PayloadModeManager(ModeManager):
                 f"PayloadModeManager requires a payload mission spec, received target '{mission_spec.target}'."
             )
 
-        self.emits_hotspot: bool = emits_hotspot
-        self.target_ip: str = target_ip
-
-        main_domain = int(os.environ.get("ROS_DOMAIN_ID", "0"))
-        self.sync_domain_id: int = (
-            main_domain if sync_domain_id == -1 else sync_domain_id
-        )
-        self._main_domain_id: int = main_domain
-
         self.vehicle = Payload(self, str(vehicle_name))
         self.setup_vision(list(mission_spec.vision_nodes))
         self.setup_modes(mission_spec)
         self.timer = None
-
-    @property
-    def sync_is_local(self) -> bool:
-        return self.sync_domain_id == self._main_domain_id
 
     def spin_once(self) -> None:
         current_time = time()
