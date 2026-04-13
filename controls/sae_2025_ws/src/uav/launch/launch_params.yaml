@@ -1,5 +1,5 @@
 # launch_params.yaml
-mission_name: payload_apriltag_then_color
+mission_name: payload_color_string_approach
 # Vehicle namespace for mission-facing topics/services.
 # Leave blank to use the mission-target default (`uav` for UAV missions, `payload_0` for payload missions).
 vehicle_name: ""

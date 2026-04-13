@@ -1,0 +1,15 @@
+# Standalone test for PayloadColorStringApproachMode (yellow target).
+modes:
+  start:
+    class: uav.modes.payload.PayloadColorStringApproachMode
+    params:
+      lower_hsv: [20, 100, 100]
+      upper_hsv: [35, 255, 255]
+      forward_speed: 0.04
+      angular_gain: 0.003
+      centering_threshold_px: 15
+      drive_angular_scale: 0.3
+      min_detect_pixels: 50
+      stop_area: 17000
+      lost_timeout_s: 3.0
+      compressed: false
