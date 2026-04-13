@@ -85,6 +85,10 @@ setup(
             os.path.join("share", package_name, "fleets"),
             glob(os.path.join(package_name, "fleets", "*.yaml")),
         ),
+        (
+            os.path.join("share", package_name, "scripts"),
+            glob(os.path.join("scripts", "*.py")),
+        ),
     ],
     install_requires=["setuptools", "apriltag", "pydantic>=2,<3"],
     zip_safe=True,

@@ -14,6 +14,9 @@ class PayloadMissionBootstrap(Node):
         self.declare_parameter("mode_map", mission_path_for_name("basic"))
         self.declare_parameter("auto_launch", True)
         self.declare_parameter("vehicle_name", "")
+        self.declare_parameter("emits_hotspot", True)
+        self.declare_parameter("target_ip", "192.168.4.1")
+        self.declare_parameter("sync_domain_id", -1)
 
     def _bool_parameter(self, name: str) -> bool:
         value = self.get_parameter(name).value
@@ -43,6 +46,9 @@ class PayloadMissionBootstrap(Node):
             "auto_launch": self._bool_parameter("auto_launch"),
             "vehicle_name": vehicle_name,
             "node_name": "mission",
+            "emits_hotspot": self._bool_parameter("emits_hotspot"),
+            "target_ip": str(self.get_parameter("target_ip").value),
+            "sync_domain_id": int(self.get_parameter("sync_domain_id").value),
         }
 
 

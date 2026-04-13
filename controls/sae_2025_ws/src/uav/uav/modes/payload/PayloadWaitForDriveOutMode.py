@@ -27,6 +27,7 @@ from sensor_msgs.msg import CompressedImage, Image
 from uav.vehicles.Payload import Payload
 
 from ..Mode import Mode
+from .sync import PayloadSyncPublisherMixin
 
 
 class DriveOutState(Enum):
@@ -36,7 +37,7 @@ class DriveOutState(Enum):
     DONE = 3
 
 
-class PayloadWaitForDriveOutMode(Mode):
+class PayloadWaitForDriveOutMode(PayloadSyncPublisherMixin, Mode):
     """
     Subscribe to the payload camera and measure frame brightness. Once the
     non-dark pixel ratio exceeds `clear_ratio` continuously for `wait_seconds`,
@@ -161,11 +162,13 @@ class PayloadWaitForDriveOutMode(Mode):
         self._clear_since = None
         self._dr_future = None
         self.state = DriveOutState.WAIT_UNREEL
+        self._sync_pub_enter()
         self.log("waiting for unreel (watching for dark→bright transition)")
         self.vehicle.set_servo(0.0)
 
     def on_update(self, time_delta: float) -> None:
         if self._done:
+            self._sync_publish(DriveOutState.DONE.name)
             return
 
         if self.state == DriveOutState.WAIT_UNREEL:
@@ -218,8 +221,10 @@ class PayloadWaitForDriveOutMode(Mode):
                 self._dr_future = None
                 self._done = True
 
+        self._sync_publish(self.state.name)
+
     def check_status(self) -> str:
         return "complete" if self._done else "continue"
 
     def on_exit(self) -> None:
-        pass
+        self._sync_pub_exit()
