@@ -65,6 +65,7 @@ _COLOR_DOMINANCE_RATIO = 1.5
 
 class PayloadCornerNavigateMode(Mode):
     mission_target = "payload"
+    transition_labels = ("complete",)
 
     def __init__(
         self,
@@ -236,11 +237,9 @@ class PayloadCornerNavigateMode(Mode):
             self._update_tape_align()
 
     def check_status(self) -> str:
-        # Both the success path (_done) and the safety bail-outs (_terminate)
-        # end the mission. ModeManager.handle_mode_state treats "terminate" as
-        # the built-in mission-end state; any other value requires a YAML
-        # transition entry, so we report "terminate" for both.
-        if self._done or self._terminate:
+        if self._done:
+            return "complete"
+        if self._terminate:
             return "terminate"
         return "continue"
 
