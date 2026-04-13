@@ -367,8 +367,8 @@ def _fleet_catalog_lookup_from_current_source(
             False,
         )
 
-    catalog, catalog_source, catalog_error = _fleet_catalog_lookup_uncached_from_current_source(
-        ctx
+    catalog, catalog_source, catalog_error = (
+        _fleet_catalog_lookup_uncached_from_current_source(ctx)
     )
     if catalog and not catalog_error:
         _fleet_catalog_cache_set(
@@ -409,8 +409,8 @@ def _resolve_catalog_fleet_path(ctx: AppContext, fleet_file: str) -> tuple[str, 
     if current_kind == "none":
         raise ValueError("Select a build source before selecting a fleet.")
 
-    catalog, _, catalog_error, _catalog_stale = _fleet_catalog_lookup_from_current_source(
-        ctx
+    catalog, _, catalog_error, _catalog_stale = (
+        _fleet_catalog_lookup_from_current_source(ctx)
     )
     if catalog_error:
         raise ValueError(catalog_error)
@@ -664,11 +664,19 @@ def _build_source_payload(ctx: AppContext) -> dict[str, object]:
     payload["fleet_file"] = fleet_file or None
     payload.update(_fleet_preview(ctx, fleet_file))
     try:
-        available_fleets, fleet_catalog_source, fleet_catalog_error, fleet_catalog_stale = (
-            _fleet_catalog_from_current_source(ctx)
-        )
+        (
+            available_fleets,
+            fleet_catalog_source,
+            fleet_catalog_error,
+            fleet_catalog_stale,
+        ) = _fleet_catalog_from_current_source(ctx)
     except Exception as exc:
-        available_fleets, fleet_catalog_source, fleet_catalog_error, fleet_catalog_stale = (
+        (
+            available_fleets,
+            fleet_catalog_source,
+            fleet_catalog_error,
+            fleet_catalog_stale,
+        ) = (
             [],
             None,
             str(exc),
@@ -2769,10 +2777,9 @@ async def list_builds(
                 )
                 if warning:
                     workflow_lookup_rate_limited = True
-                    workflow_lookup_warning = (
-                        warning.replace("commit-title", "workflow metadata")
-                        .replace("fallback titles", "fallback workflow labels")
-                    )
+                    workflow_lookup_warning = warning.replace(
+                        "commit-title", "workflow metadata"
+                    ).replace("fallback titles", "fallback workflow labels")
                 _workflow_run_cache_set(run_id, None)
                 return None
 

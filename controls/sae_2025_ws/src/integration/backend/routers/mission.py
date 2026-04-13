@@ -110,9 +110,7 @@ def build_router(ctx: AppContext) -> APIRouter:
             hostname=hostname,
             vehicle_name=vehicle_name,
         )
-        result = await mission_service.prepare_mission(
-            ctx, target_ctx=target_ctx
-        )
+        result = await mission_service.prepare_mission(ctx, target_ctx=target_ctx)
         if result.get("success"):
             return MessageResponse.model_validate(result)
         return MissionLogsResponse.model_validate(
@@ -134,9 +132,7 @@ def build_router(ctx: AppContext) -> APIRouter:
             hostname=hostname,
             vehicle_name=vehicle_name,
         )
-        result = await mission_service.stop_mission(
-            ctx, target_ctx=target_ctx
-        )
+        result = await mission_service.stop_mission(ctx, target_ctx=target_ctx)
         if result.get("success"):
             return MessageResponse.model_validate(result)
         return MissionLogsResponse.model_validate(
@@ -158,9 +154,7 @@ def build_router(ctx: AppContext) -> APIRouter:
             hostname=hostname,
             vehicle_name=vehicle_name,
         )
-        result = await mission_service.start_mission(
-            ctx, target_ctx=target_ctx
-        )
+        result = await mission_service.start_mission(ctx, target_ctx=target_ctx)
         if result.get("success"):
             return MessageResponse.model_validate(result)
         return MissionLogsResponse.model_validate(
@@ -180,9 +174,7 @@ def build_router(ctx: AppContext) -> APIRouter:
             hostname=hostname,
             vehicle_name=vehicle_name,
         )
-        result = await mission_service.trigger_failsafe(
-            ctx, target_ctx=target_ctx
-        )
+        result = await mission_service.trigger_failsafe(ctx, target_ctx=target_ctx)
         if result.get("success"):
             return MessageResponse.model_validate(result)
         return MissionLogsResponse.model_validate(
@@ -203,9 +195,7 @@ def build_router(ctx: AppContext) -> APIRouter:
             vehicle_name=vehicle_name,
         )
         return LaunchParamsResponse.model_validate(
-            await mission_service.get_launch_params(
-                ctx, target_ctx=target_ctx
-            )
+            await mission_service.get_launch_params(ctx, target_ctx=target_ctx)
         )
 
     @router.get("/api/mission/mission-names", response_model=MissionNameOptionsResponse)
@@ -222,9 +212,7 @@ def build_router(ctx: AppContext) -> APIRouter:
             vehicle_name=vehicle_name,
         )
         return MissionNameOptionsResponse.model_validate(
-            await mission_service.list_mission_names(
-                ctx, target_ctx=target_ctx
-            )
+            await mission_service.list_mission_names(ctx, target_ctx=target_ctx)
         )
 
     @router.post("/api/mission/launch-params", response_model=LaunchParamsResponse)

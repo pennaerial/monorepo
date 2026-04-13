@@ -27,11 +27,7 @@ from . import mission as mission_service
 def _fleet_vehicle_lookup(
     fleet_vehicles: list[FleetVehiclePreview],
 ) -> dict[str, FleetVehiclePreview]:
-    return {
-        vehicle.name: vehicle
-        for vehicle in fleet_vehicles
-        if vehicle.name.strip()
-    }
+    return {vehicle.name: vehicle for vehicle in fleet_vehicles if vehicle.name.strip()}
 
 
 def _current_build_info(build: dict[str, Any]) -> FleetCurrentBuildSummary:
@@ -106,12 +102,15 @@ async def _resolve_device_context(
     ctx: AppContext,
     device: dict[str, Any],
 ) -> TargetContext:
-    hostname = str(
-        device.get("hostname")
-        or device.get("target_id")
-        or device.get("matched_target_id")
-        or ""
-    ).strip() or None
+    hostname = (
+        str(
+            device.get("hostname")
+            or device.get("target_id")
+            or device.get("matched_target_id")
+            or ""
+        ).strip()
+        or None
+    )
     vehicle_name = str(device.get("vehicle_name", "") or "").strip() or None
     label = str(device.get("label", "") or "").strip() or None
     return ctx.resolve_live_target(
@@ -128,9 +127,7 @@ async def _summarize_device(
 ) -> dict[str, Any]:
     target_ctx = await _resolve_device_context(ctx, device)
     vehicle_name = target_ctx.target.vehicle_name.strip() or None
-    selected_vehicle = (
-        fleet_vehicle_lookup.get(vehicle_name) if vehicle_name else None
-    )
+    selected_vehicle = fleet_vehicle_lookup.get(vehicle_name) if vehicle_name else None
 
     async def _connection() -> dict[str, Any]:
         try:
@@ -308,7 +305,9 @@ async def get_board(ctx: AppContext) -> dict[str, Any]:
                             "target_id": device.get("hostname")
                             or device.get("hardware_id"),
                             "last_seen_at": device.get("last_seen_at"),
-                            "discovery_stale": bool(device.get("discovery_stale", False)),
+                            "discovery_stale": bool(
+                                device.get("discovery_stale", False)
+                            ),
                             "vehicle_name": None,
                             "fleet_vehicle": None,
                             "connection": {
@@ -348,7 +347,9 @@ async def get_board(ctx: AppContext) -> dict[str, Any]:
             total_devices=len(board_devices),
             stale_devices=sum(1 for row in board_devices if row.discovery_stale),
             connected_devices=sum(
-                1 for row in board_devices if row.connection and row.connection.connected
+                1
+                for row in board_devices
+                if row.connection and row.connection.connected
             ),
             build_installed_devices=sum(
                 1
@@ -434,17 +435,11 @@ async def _perform_action(
                 ctx, target_ctx=target_ctx
             )
         elif action == "prepare":
-            result = await mission_service.prepare_mission(
-                ctx, target_ctx=target_ctx
-            )
+            result = await mission_service.prepare_mission(ctx, target_ctx=target_ctx)
         elif action == "start":
-            result = await mission_service.start_mission(
-                ctx, target_ctx=target_ctx
-            )
+            result = await mission_service.start_mission(ctx, target_ctx=target_ctx)
         elif action == "stop":
-            result = await mission_service.stop_mission(
-                ctx, target_ctx=target_ctx
-            )
+            result = await mission_service.stop_mission(ctx, target_ctx=target_ctx)
         else:
             raise ValueError(f"Unsupported fleet action '{action}'.")
     except Exception as exc:
@@ -474,9 +469,7 @@ async def _perform_action(
 
     current_build = refreshed.get("current_build") or {}
     active_release_id = (
-        result.get("active_release_id")
-        or current_build.get("release_id")
-        or None
+        result.get("active_release_id") or current_build.get("release_id") or None
     )
     attempted_release_id = result.get("attempted_release_id")
     rolled_back = bool(result.get("rolled_back", False))
@@ -495,9 +488,7 @@ async def _perform_action(
     refreshed["success"] = bool(result.get("success", False)) and not refresh_failed
     refreshed["output"] = result.get("output") if refreshed["success"] else None
     refreshed["error"] = (
-        result.get("error")
-        if result.get("error")
-        else refreshed.get("error")
+        result.get("error") if result.get("error") else refreshed.get("error")
     )
     if not refreshed["success"] and refresh_failed and not refreshed["error"]:
         refreshed["error"] = target_ctx.ssh.friendly_error("Device refresh failed")

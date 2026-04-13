@@ -25,7 +25,9 @@ def _reset_discovery_snapshot() -> None:
     discovery._DISCOVERY_LAST_REFRESH_MONOTONIC = 0.0
 
 
-def _assert_device_card(device: dict[str, object], *, discovery_stale: bool = False) -> None:
+def _assert_device_card(
+    device: dict[str, object], *, discovery_stale: bool = False
+) -> None:
     assert isinstance(device.get("last_seen_at"), str)
     assert device["discovery_stale"] is discovery_stale
 

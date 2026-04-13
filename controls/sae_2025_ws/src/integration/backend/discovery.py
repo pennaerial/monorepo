@@ -95,7 +95,9 @@ def _mark_snapshot_stale(now_monotonic: float | None = None) -> None:
     now_value = now_monotonic if now_monotonic is not None else time.monotonic()
     for key, entry in list(_DISCOVERY_SNAPSHOT.items()):
         last_seen = float(entry.get("last_seen_monotonic", 0.0) or 0.0)
-        age = now_value - last_seen if last_seen else _DISCOVERY_STALE_WINDOW_SECONDS + 1
+        age = (
+            now_value - last_seen if last_seen else _DISCOVERY_STALE_WINDOW_SECONDS + 1
+        )
         if age > _DISCOVERY_STALE_WINDOW_SECONDS:
             _DISCOVERY_SNAPSHOT.pop(key, None)
             continue
@@ -106,7 +108,9 @@ def _prune_snapshot(now_monotonic: float | None = None) -> None:
     now_value = now_monotonic if now_monotonic is not None else time.monotonic()
     for key, entry in list(_DISCOVERY_SNAPSHOT.items()):
         last_seen = float(entry.get("last_seen_monotonic", 0.0) or 0.0)
-        age = now_value - last_seen if last_seen else _DISCOVERY_STALE_WINDOW_SECONDS + 1
+        age = (
+            now_value - last_seen if last_seen else _DISCOVERY_STALE_WINDOW_SECONDS + 1
+        )
         if age > _DISCOVERY_STALE_WINDOW_SECONDS:
             _DISCOVERY_SNAPSHOT.pop(key, None)
 
@@ -139,7 +143,11 @@ def _update_snapshot(discovered: list[_DiscoveredService]) -> None:
             entry["discovery_stale"] = False
             continue
         last_seen = float(entry.get("last_seen_monotonic", 0.0) or 0.0)
-        age = now_monotonic - last_seen if last_seen else _DISCOVERY_STALE_WINDOW_SECONDS + 1
+        age = (
+            now_monotonic - last_seen
+            if last_seen
+            else _DISCOVERY_STALE_WINDOW_SECONDS + 1
+        )
         if age > _DISCOVERY_STALE_WINDOW_SECONDS:
             _DISCOVERY_SNAPSHOT.pop(key, None)
             continue
@@ -157,7 +165,9 @@ def _snapshot_cards(ctx: AppContext) -> list[dict[str, object]]:
         hostname = str(entry.get("hostname", "") or "")
         cards.append(
             {
-                "hardware_id": str(entry.get("hardware_id") or _snapshot_key(hostname) or hostname),
+                "hardware_id": str(
+                    entry.get("hardware_id") or _snapshot_key(hostname) or hostname
+                ),
                 "hostname": hostname,
                 "addresses": list(entry.get("addresses", []) or []),
                 "service_name": entry.get("service_name"),
@@ -375,9 +385,7 @@ async def live_hardware_cards(
     ctx: AppContext, *, timeout_s: float | None = None
 ) -> list[dict[str, object]]:
     refresh_timeout = (
-        _DISCOVERY_DEFAULT_TIMEOUT_SECONDS
-        if timeout_s is None
-        else float(timeout_s)
+        _DISCOVERY_DEFAULT_TIMEOUT_SECONDS if timeout_s is None else float(timeout_s)
     )
     now_monotonic = time.monotonic()
     with _DISCOVERY_SNAPSHOT_LOCK:

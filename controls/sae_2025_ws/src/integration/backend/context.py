@@ -97,8 +97,12 @@ class AppContext:
             label=label,
             pi_user=pi_user or self.operator_config.default_pi_user,
             deploy_root=deploy_root or self.operator_config.default_deploy_root,
-            ssh_key=ssh_key if ssh_key is not None else self.operator_config.default_ssh_key,
-            ssh_pass=ssh_pass if ssh_pass is not None else self.operator_config.default_ssh_pass,
+            ssh_key=ssh_key
+            if ssh_key is not None
+            else self.operator_config.default_ssh_key,
+            ssh_pass=ssh_pass
+            if ssh_pass is not None
+            else self.operator_config.default_ssh_pass,
             vehicle_name=vehicle_name or "",
             service_unit=service_unit or "pennair-autonomy.service",
             enabled=True if enabled is None else enabled,
@@ -150,7 +154,11 @@ class AppContext:
                     service_unit=service_unit,
                     enabled=enabled,
                 )
-        if vehicle_name and vehicle_name.strip() and target.vehicle_name != vehicle_name.strip():
+        if (
+            vehicle_name
+            and vehicle_name.strip()
+            and target.vehicle_name != vehicle_name.strip()
+        ):
             target = TargetRecord.from_dict(
                 {
                     **target.to_store_dict(),
@@ -203,7 +211,10 @@ class AppContext:
         )
 
         cached = self._target_cache.get(self._cache_key(target))
-        if cached is not None and cached.target.to_store_dict() == target.to_store_dict():
+        if (
+            cached is not None
+            and cached.target.to_store_dict() == target.to_store_dict()
+        ):
             return cached
 
         context = TargetContext(

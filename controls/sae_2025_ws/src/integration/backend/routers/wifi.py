@@ -90,9 +90,7 @@ def build_router(ctx: AppContext) -> APIRouter:
             hostname=hostname,
             vehicle_name=vehicle_name,
         )
-        result = await wifi_service.wifi_hotspot(
-            ctx, target_ctx=target_ctx
-        )
+        result = await wifi_service.wifi_hotspot(ctx, target_ctx=target_ctx)
         if result.get("success"):
             return MessageResponse.model_validate(result)
         return WifiScanResponse.model_validate({**result, "networks": []})

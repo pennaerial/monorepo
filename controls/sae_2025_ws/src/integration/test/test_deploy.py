@@ -1629,9 +1629,9 @@ def test_runner_script_disables_nounset_only_around_ros_setup(tmp_path):
     assert 'source "$DEPLOY_ROOT/current/install/setup.bash"' in script
     assert "set -u\nexec ros2 launch" in script
     assert script.index("set +u") < script.index("source /opt/ros/humble/setup.bash")
-    assert script.index('source "$DEPLOY_ROOT/current/install/setup.bash"') < script.index(
-        "set -u\nexec ros2 launch"
-    )
+    assert script.index(
+        'source "$DEPLOY_ROOT/current/install/setup.bash"'
+    ) < script.index("set -u\nexec ros2 launch")
 
 
 def test_activate_release_polls_stability_and_rolls_back_on_instability(tmp_path):
@@ -1691,7 +1691,9 @@ def test_activate_release_polls_stability_and_rolls_back_on_instability(tmp_path
     assert any("ln -sfn" in cmd for cmd in target_ctx.ssh.run_calls[1:])
 
 
-def test_perform_action_refreshes_failed_deploy_rows_with_rollback_metadata(tmp_path, monkeypatch):
+def test_perform_action_refreshes_failed_deploy_rows_with_rollback_metadata(
+    tmp_path, monkeypatch
+):
     from backend.models import FleetDeviceSelection
     from backend.services import fleet as fleet_service
 
@@ -1757,7 +1759,9 @@ def test_perform_action_refreshes_failed_deploy_rows_with_rollback_metadata(tmp_
         }
 
     monkeypatch.setattr(
-        fleet_service.deploy_service, "deploy_selected_source", fake_deploy_selected_source
+        fleet_service.deploy_service,
+        "deploy_selected_source",
+        fake_deploy_selected_source,
     )
     monkeypatch.setattr(fleet_service, "_summarize_device", fake_summarize_device)
 

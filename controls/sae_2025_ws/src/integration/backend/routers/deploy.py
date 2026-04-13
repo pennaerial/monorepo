@@ -55,9 +55,7 @@ def build_router(ctx: AppContext) -> APIRouter:
             hostname=hostname,
             vehicle_name=vehicle_name,
         )
-        result = await deploy_service.deploy_selected_source(
-            ctx, target_ctx=target_ctx
-        )
+        result = await deploy_service.deploy_selected_source(ctx, target_ctx=target_ctx)
         if result.get("success"):
             return MessageResponse.model_validate(result)
         return BuildListResponse.model_validate({**result, "builds": []})
@@ -83,9 +81,7 @@ def build_router(ctx: AppContext) -> APIRouter:
         )
         if not source_result.get("success"):
             return BuildListResponse.model_validate({**source_result, "builds": []})
-        result = await deploy_service.deploy_selected_source(
-            ctx, target_ctx=target_ctx
-        )
+        result = await deploy_service.deploy_selected_source(ctx, target_ctx=target_ctx)
         if result.get("success"):
             return MessageResponse.model_validate(result)
         return BuildListResponse.model_validate({**result, "builds": []})
@@ -181,9 +177,7 @@ def build_router(ctx: AppContext) -> APIRouter:
         )
         if not source_result.get("success"):
             return BuildListResponse.model_validate({**source_result, "builds": []})
-        result = await deploy_service.deploy_selected_source(
-            ctx, target_ctx=target_ctx
-        )
+        result = await deploy_service.deploy_selected_source(ctx, target_ctx=target_ctx)
         if result.get("success"):
             return MessageResponse.model_validate(result)
         return BuildListResponse.model_validate({**result, "builds": []})
@@ -201,9 +195,7 @@ def build_router(ctx: AppContext) -> APIRouter:
             hostname=hostname,
             vehicle_name=vehicle_name,
         )
-        result = await deploy_service.rollback_build(
-            ctx, target_ctx=target_ctx
-        )
+        result = await deploy_service.rollback_build(ctx, target_ctx=target_ctx)
         if result.get("success"):
             return MessageResponse.model_validate(result)
         return BuildListResponse.model_validate({**result, "builds": []})
@@ -224,9 +216,7 @@ def build_router(ctx: AppContext) -> APIRouter:
         source_result = await deploy_service.set_local_codebase_build_source(ctx)
         if not source_result.get("success"):
             return BuildListResponse.model_validate({**source_result, "builds": []})
-        result = await deploy_service.deploy_selected_source(
-            ctx, target_ctx=target_ctx
-        )
+        result = await deploy_service.deploy_selected_source(ctx, target_ctx=target_ctx)
         if result.get("success"):
             return MessageResponse.model_validate(result)
         return BuildListResponse.model_validate({**result, "builds": []})

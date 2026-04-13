@@ -40,9 +40,7 @@ def build_router(ctx: AppContext) -> APIRouter:
                 )
             ]
         return FleetActionResponse.model_validate(
-            await fleet_service.batch_action(
-                ctx, action="deploy", devices=devices
-            )
+            await fleet_service.batch_action(ctx, action="deploy", devices=devices)
         )
 
     @router.post("/prepare", response_model=FleetActionResponse)
@@ -63,9 +61,7 @@ def build_router(ctx: AppContext) -> APIRouter:
                 )
             ]
         return FleetActionResponse.model_validate(
-            await fleet_service.batch_action(
-                ctx, action="prepare", devices=devices
-            )
+            await fleet_service.batch_action(ctx, action="prepare", devices=devices)
         )
 
     @router.post("/start", response_model=FleetActionResponse)
@@ -86,9 +82,7 @@ def build_router(ctx: AppContext) -> APIRouter:
                 )
             ]
         return FleetActionResponse.model_validate(
-            await fleet_service.batch_action(
-                ctx, action="start", devices=devices
-            )
+            await fleet_service.batch_action(ctx, action="start", devices=devices)
         )
 
     @router.post("/stop", response_model=FleetActionResponse)
@@ -109,9 +103,7 @@ def build_router(ctx: AppContext) -> APIRouter:
                 )
             ]
         return FleetActionResponse.model_validate(
-            await fleet_service.batch_action(
-                ctx, action="stop", devices=devices
-            )
+            await fleet_service.batch_action(ctx, action="stop", devices=devices)
         )
 
     return router

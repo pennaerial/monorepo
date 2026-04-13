@@ -34,7 +34,9 @@ from backend.config import (  # noqa: E402
 )
 
 
-def _assert_api_device_card(device: dict[str, object], *, allow_null_last_seen: bool = False):
+def _assert_api_device_card(
+    device: dict[str, object], *, allow_null_last_seen: bool = False
+):
     if allow_null_last_seen:
         assert device["last_seen_at"] is None or isinstance(device["last_seen_at"], str)
     else:
@@ -161,8 +163,12 @@ def _make_context(tmp_path: Path) -> SimpleNamespace:
                     label=label,
                     pi_user=pi_user or operator.default_pi_user,
                     deploy_root=deploy_root or operator.default_deploy_root,
-                    ssh_key=ssh_key if ssh_key is not None else operator.default_ssh_key,
-                    ssh_pass=ssh_pass if ssh_pass is not None else operator.default_ssh_pass,
+                    ssh_key=ssh_key
+                    if ssh_key is not None
+                    else operator.default_ssh_key,
+                    ssh_pass=ssh_pass
+                    if ssh_pass is not None
+                    else operator.default_ssh_pass,
                     vehicle_name=vehicle_name or "",
                     service_unit=service_unit or "pennair-autonomy.service",
                     enabled=True if enabled is None else enabled,
@@ -387,7 +393,9 @@ def test_fleet_board_keeps_last_seen_device_when_discovery_returns_empty(
         return []
 
     monkeypatch.setattr(discovery, "_browse_services", fake_browse_services)
-    monkeypatch.setattr(fleet_service.deploy_service, "current_build", fake_current_build)
+    monkeypatch.setattr(
+        fleet_service.deploy_service, "current_build", fake_current_build
+    )
     monkeypatch.setattr(
         fleet_service.mission_service, "launch_status", fake_launch_status
     )
@@ -495,7 +503,9 @@ def test_wifi_status_accepts_hostname_scope(client, monkeypatch):
     from backend.services import wifi as wifi_service
 
     async def fake_wifi_status(ctx, *, target_ctx=None, target_id=None):
-        assert (target_ctx.target.target_id if target_ctx else target_id) == "pi-1.local"
+        assert (
+            target_ctx.target.target_id if target_ctx else target_id
+        ) == "pi-1.local"
         return {"success": True, "is_hotspot": False, "current_wifi": "ops"}
 
     monkeypatch.setattr(wifi_service, "wifi_status", fake_wifi_status)
@@ -514,7 +524,9 @@ def test_build_current_accepts_hostname_scope(client, monkeypatch):
     from backend.services import deploy as deploy_service
 
     async def fake_current_build(ctx, *, target_ctx=None, target_id=None):
-        assert (target_ctx.target.target_id if target_ctx else target_id) == "pi-1.local"
+        assert (
+            target_ctx.target.target_id if target_ctx else target_id
+        ) == "pi-1.local"
         return {"success": True, "installed": True, "info": "build ok"}
 
     monkeypatch.setattr(deploy_service, "current_build", fake_current_build)
@@ -533,7 +545,9 @@ def test_mission_state_accepts_hostname_scope(client, monkeypatch):
     from backend.services import mission as mission_service
 
     async def fake_mission_state(ctx, *, target_ctx=None, target_id=None):
-        assert (target_ctx.target.target_id if target_ctx else target_id) == "pi-1.local"
+        assert (
+            target_ctx.target.target_id if target_ctx else target_id
+        ) == "pi-1.local"
         return {
             "success": True,
             "state": {
@@ -748,9 +762,7 @@ def test_build_source_routes_round_trip(client, tmp_path):
     assert payload["source"]["kind"] == "local_codebase"
     assert payload["source"]["codebase_root"]
     assert payload["source"]["available_fleets"] == [fleet_path.name]
-    assert payload["source"]["fleet_catalog_source"].endswith(
-        "src/uav/uav/fleets"
-    )
+    assert payload["source"]["fleet_catalog_source"].endswith("src/uav/uav/fleets")
 
     response = client.post(
         "/api/build-source/fleet",
