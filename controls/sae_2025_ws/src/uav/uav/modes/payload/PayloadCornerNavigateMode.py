@@ -66,6 +66,7 @@ _COLOR_DOMINANCE_RATIO = 1.5
 class PayloadCornerNavigateMode(Mode):
     mission_target = "payload"
     transition_labels = ("complete",)
+    requires_camera = True
 
     def __init__(
         self,
