@@ -547,10 +547,9 @@ def launch_setup(context, *args, **kwargs):
         logger=logger,
     )
 
-    requires_vision = bool(mission_spec.vision_nodes)
-    requires_camera = bool(getattr(mission_spec, "requires_camera", False)) or _resolve_force_camera(
-        config, logger=logger
-    )
+    requires_camera = bool(
+        getattr(mission_spec, "requires_camera", False)
+    ) or _resolve_force_camera(config, logger=logger)
 
     px4_path = ""
     vehicle_class = None

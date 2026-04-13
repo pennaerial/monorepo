@@ -102,7 +102,9 @@ def test_yaml_bool_value_rejects_non_boolean(main_launch_module):
 
 def test_main_launch_force_camera_prefers_new_key(main_launch_module):
     assert (
-        main_launch_module._resolve_force_camera({"force_camera": True, "use_camera": False})
+        main_launch_module._resolve_force_camera(
+            {"force_camera": True, "use_camera": False}
+        )
         is True
     )
 
@@ -194,13 +196,19 @@ def test_launch_setup_starts_camera_actions_for_camera_only_mission(
         },
     )
     monkeypatch.setattr(
-        stack_launch_module, "_resolve_mission_path", lambda _config: "/tmp/mission.yaml"
+        stack_launch_module,
+        "_resolve_mission_path",
+        lambda _config: "/tmp/mission.yaml",
     )
     monkeypatch.setattr(
-        stack_launch_module.MissionSpec, "load", staticmethod(lambda _path: mission_spec)
+        stack_launch_module.MissionSpec,
+        "load",
+        staticmethod(lambda _path: mission_spec),
     )
     monkeypatch.setattr(
-        stack_launch_module, "_runtime_executable_for", lambda _mission_spec: "payload_mission"
+        stack_launch_module,
+        "_runtime_executable_for",
+        lambda _mission_spec: "payload_mission",
     )
     monkeypatch.setattr(
         stack_launch_module,
@@ -275,13 +283,19 @@ def test_launch_setup_validates_uav_camera_sensor_for_camera_only_mission(
         },
     )
     monkeypatch.setattr(
-        stack_launch_module, "_resolve_mission_path", lambda _config: "/tmp/mission.yaml"
+        stack_launch_module,
+        "_resolve_mission_path",
+        lambda _config: "/tmp/mission.yaml",
     )
     monkeypatch.setattr(
-        stack_launch_module.MissionSpec, "load", staticmethod(lambda _path: mission_spec)
+        stack_launch_module.MissionSpec,
+        "load",
+        staticmethod(lambda _path: mission_spec),
     )
     monkeypatch.setattr(
-        stack_launch_module, "_runtime_executable_for", lambda _mission_spec: "uav_mission"
+        stack_launch_module,
+        "_runtime_executable_for",
+        lambda _mission_spec: "uav_mission",
     )
     monkeypatch.setattr(
         stack_launch_module,
@@ -291,7 +305,11 @@ def test_launch_setup_validates_uav_camera_sensor_for_camera_only_mission(
     monkeypatch.setattr(
         stack_launch_module,
         "_resolve_uav_airframe",
-        lambda _config, _px4_path: (SimpleNamespace(name="MULTICOPTER"), 4004, "no_camera"),
+        lambda _config, _px4_path: (
+            SimpleNamespace(name="MULTICOPTER"),
+            4004,
+            "no_camera",
+        ),
     )
     monkeypatch.setattr(stack_launch_module, "vehicle_camera_map", {})
 

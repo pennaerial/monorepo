@@ -278,10 +278,15 @@ def _vehicle_stack_configs(fleet: dict) -> tuple[dict, list[dict]]:
             ),
             "payload_controller": str(vehicle.get("payload_controller", "")).strip(),
             "camera_input_transport": str(
-                vehicle.get("camera_input_transport", "raw" if backend_kind == "sim" else "compressed")
+                vehicle.get(
+                    "camera_input_transport",
+                    "raw" if backend_kind == "sim" else "compressed",
+                )
             ).strip(),
             "camera_rotate_degrees": float(
-                vehicle.get("camera_rotate_degrees", 0.0 if backend_kind == "sim" else 180.0)
+                vehicle.get(
+                    "camera_rotate_degrees", 0.0 if backend_kind == "sim" else 180.0
+                )
             ),
             "camera_preprocess_hook": str(
                 vehicle.get("camera_preprocess_hook", "")

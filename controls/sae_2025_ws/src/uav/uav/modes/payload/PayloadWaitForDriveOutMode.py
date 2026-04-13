@@ -27,6 +27,7 @@ from sensor_msgs.msg import CompressedImage, Image
 from uav.vehicles.Payload import Payload
 
 from ..Mode import Mode
+from .sync import PayloadSyncPublisherMixin
 
 
 class DriveOutState(Enum):
@@ -36,7 +37,7 @@ class DriveOutState(Enum):
     DONE = 3
 
 
-class PayloadWaitForDriveOutMode(Mode):
+class PayloadWaitForDriveOutMode(PayloadSyncPublisherMixin, Mode):
     """
     Subscribe to the payload camera and measure frame brightness. Once the
     non-dark pixel ratio exceeds `clear_ratio` continuously for `wait_seconds`,
@@ -123,11 +124,29 @@ class PayloadWaitForDriveOutMode(Mode):
         if self.debug_pub is not None:
             vis = bgr.copy()
             vis[non_dark_mask] = (0, 200, 0)
-            elapsed = (self._now() - self._clear_since) if self._clear_since is not None else 0.0
-            cv2.putText(vis, f"non-dark={ratio:.2f} thresh={self.dark_threshold}",
-                        (8, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
-            cv2.putText(vis, f"timer={elapsed:.1f}/{self.wait_seconds:.1f}s",
-                        (8, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+            elapsed = (
+                (self._now() - self._clear_since)
+                if self._clear_since is not None
+                else 0.0
+            )
+            cv2.putText(
+                vis,
+                f"non-dark={ratio:.2f} thresh={self.dark_threshold}",
+                (8, 30),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.7,
+                (0, 255, 255),
+                2,
+            )
+            cv2.putText(
+                vis,
+                f"timer={elapsed:.1f}/{self.wait_seconds:.1f}s",
+                (8, 60),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.7,
+                (0, 255, 255),
+                2,
+            )
             ok, buf = cv2.imencode(".jpg", vis, [cv2.IMWRITE_JPEG_QUALITY, 60])
             if ok:
                 msg = CompressedImage()
@@ -143,11 +162,13 @@ class PayloadWaitForDriveOutMode(Mode):
         self._clear_since = None
         self._dr_future = None
         self.state = DriveOutState.WAIT_UNREEL
+        self._sync_pub_enter()
         self.log("waiting for unreel (watching for dark→bright transition)")
         self.vehicle.set_servo(0.0)
 
     def on_update(self, time_delta: float) -> None:
         if self._done:
+            self._sync_publish(DriveOutState.DONE.name)
             return
 
         if self.state == DriveOutState.WAIT_UNREEL:
@@ -162,7 +183,9 @@ class PayloadWaitForDriveOutMode(Mode):
             if ratio >= self.clear_ratio:
                 if self._clear_since is None:
                     self._clear_since = now
-                    self.log(f"frame bright (ratio={ratio:.2f}) — starting {self.wait_seconds}s timer")
+                    self.log(
+                        f"frame bright (ratio={ratio:.2f}) — starting {self.wait_seconds}s timer"
+                    )
                 elapsed = now - self._clear_since
                 self.log(f"clear for {elapsed:.1f}/{self.wait_seconds:.1f}s")
                 if elapsed >= self.wait_seconds:
@@ -198,8 +221,10 @@ class PayloadWaitForDriveOutMode(Mode):
                 self._dr_future = None
                 self._done = True
 
+        self._sync_publish(self.state.name)
+
     def check_status(self) -> str:
         return "complete" if self._done else "continue"
 
     def on_exit(self) -> None:
-        pass
+        self._sync_pub_exit()

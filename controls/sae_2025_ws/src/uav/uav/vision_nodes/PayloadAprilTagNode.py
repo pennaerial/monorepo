@@ -337,7 +337,9 @@ class PayloadAprilTagNode(VisionNode):
 
         if self._debug_pub is not None:
             try:
-                msg = self._debug_bridge.cv2_to_compressed_imgmsg(vis, dst_format="jpeg")
+                msg = self._debug_bridge.cv2_to_compressed_imgmsg(
+                    vis, dst_format="jpeg"
+                )
                 msg.header.stamp = self.get_clock().now().to_msg()
                 self._debug_pub.publish(msg)
             except Exception as exc:

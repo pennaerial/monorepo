@@ -64,13 +64,18 @@ void Payload::load_controller_from_params()
 
 Payload::~Payload()
 {
-  shutdown_actuators();
+  prepare_for_shutdown();
   timed_drive_srv_.reset();
   ros_drive_subscriber_.reset();
   servo_subscriber_.reset();
   payload_params_listener_.reset();
   controller_name_.clear();
   controller_.reset();
+}
+
+void Payload::prepare_for_shutdown() noexcept
+{
+  shutdown_actuators();
 }
 
 void Payload::shutdown_actuators() noexcept

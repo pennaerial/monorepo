@@ -38,8 +38,12 @@ def _normalize_host(hostname: str) -> str:
     return value
 
 
-def _normalized_addresses(addresses: set[str] | list[str] | tuple[str, ...]) -> set[str]:
-    return {str(address).strip().lower() for address in addresses if str(address).strip()}
+def _normalized_addresses(
+    addresses: set[str] | list[str] | tuple[str, ...],
+) -> set[str]:
+    return {
+        str(address).strip().lower() for address in addresses if str(address).strip()
+    }
 
 
 def _target_match(
@@ -49,7 +53,10 @@ def _target_match(
     known_addresses = _normalized_addresses(addresses)
     for target in ctx.list_targets():
         target_host = _normalize_host(target.pi_host)
-        if normalized == target_host or target.pi_host.strip().lower() in known_addresses:
+        if (
+            normalized == target_host
+            or target.pi_host.strip().lower() in known_addresses
+        ):
             return target.target_id, target.label
     return None, None
 
@@ -252,7 +259,10 @@ def _browse_services(timeout_s: float) -> list[_DiscoveredService]:
         try:
             discovered = _browse_services_zeroconf(timeout_s)
         except Exception as exc:
-            LOG.warning("Integration discovery: zeroconf failed on macOS, falling back to dns-sd: %s", exc)
+            LOG.warning(
+                "Integration discovery: zeroconf failed on macOS, falling back to dns-sd: %s",
+                exc,
+            )
             discovered = []
         if discovered:
             return discovered

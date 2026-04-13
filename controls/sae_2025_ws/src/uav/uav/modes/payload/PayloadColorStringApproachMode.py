@@ -130,9 +130,7 @@ class PayloadColorStringApproachMode(Mode):
                 1,
             )
         else:
-            self.node.create_subscription(
-                Image, vehicle.image_topic, self._on_image, 1
-            )
+            self.node.create_subscription(Image, vehicle.image_topic, self._on_image, 1)
 
         self._done = False
         self._stopping = False
@@ -311,7 +309,9 @@ class PayloadColorStringApproachMode(Mode):
         lateral_error: Optional[float] = None
         if cx is not None and area >= self.min_detect_pixels:
             lateral_error = cx - self._image_width / 2.0
-            phase = "ALIGN" if abs(lateral_error) > self.centering_threshold_px else "DRIVE"
+            phase = (
+                "ALIGN" if abs(lateral_error) > self.centering_threshold_px else "DRIVE"
+            )
 
         if self.debug:
             self._publish_debug(
@@ -326,7 +326,10 @@ class PayloadColorStringApproachMode(Mode):
             )
 
         if cx is None or area < self.min_detect_pixels:
-            if self._last_seen_time is not None and (now - self._last_seen_time) > self.lost_timeout_s:
+            if (
+                self._last_seen_time is not None
+                and (now - self._last_seen_time) > self.lost_timeout_s
+            ):
                 self.vehicle.stop()
                 self._last_seen_time = None
                 if now - self._last_log_time >= 2.0:
@@ -338,7 +341,9 @@ class PayloadColorStringApproachMode(Mode):
 
         if area >= self.stop_area:
             self._stopping = True
-            self.log(f"PayloadColorStringApproachMode: stop_area hit (area={area}), driving one more frame")
+            self.log(
+                f"PayloadColorStringApproachMode: stop_area hit (area={area}), driving one more frame"
+            )
 
         image_center = self._image_width / 2.0
         lateral_error = cx - image_center

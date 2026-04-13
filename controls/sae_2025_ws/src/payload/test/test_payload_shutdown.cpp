@@ -79,4 +79,23 @@ TEST_F(PayloadShutdownTest, DestructorInvokesControllerSafeShutdownOnce) {
   EXPECT_DOUBLE_EQ(controller->servo_commands.back(), 0.0);
 }
 
+TEST_F(PayloadShutdownTest, PrepareForShutdownIsIdempotent) {
+  auto controller = std::make_shared<RecordingController>();
+
+  {
+    auto payload = std::make_unique<Payload>("payload_shutdown_test", controller);
+    payload->init();
+    payload->prepare_for_shutdown();
+    payload->prepare_for_shutdown();
+  }
+
+  EXPECT_EQ(controller->initialize_calls, 1);
+  EXPECT_EQ(controller->safe_shutdown_calls, 1);
+  ASSERT_FALSE(controller->drive_commands.empty());
+  EXPECT_DOUBLE_EQ(controller->drive_commands.back().first, 0.0);
+  EXPECT_DOUBLE_EQ(controller->drive_commands.back().second, 0.0);
+  ASSERT_FALSE(controller->servo_commands.empty());
+  EXPECT_DOUBLE_EQ(controller->servo_commands.back(), 0.0);
+}
+
 }  // namespace

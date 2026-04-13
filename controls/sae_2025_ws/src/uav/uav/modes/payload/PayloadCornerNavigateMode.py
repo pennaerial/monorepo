@@ -209,9 +209,7 @@ class PayloadCornerNavigateMode(Mode):
                 Image, cam_topic, self._image_cb, 1
             )
 
-        annotated_topic = self.vehicle.namespaced_path(
-            "annotated_image/compressed"
-        )
+        annotated_topic = self.vehicle.namespaced_path("annotated_image/compressed")
         self._annotated_pub = self.node.create_publisher(
             CompressedImage, annotated_topic, 1
         )
@@ -381,8 +379,7 @@ class PayloadCornerNavigateMode(Mode):
 
         count_a, count_b = self._lower_strip_color_counts(bgr)
         color_seen = (
-            count_a >= self.drive_out_min_pixels
-            or count_b >= self.drive_out_min_pixels
+            count_a >= self.drive_out_min_pixels or count_b >= self.drive_out_min_pixels
         )
 
         if self._do_substate == "seeking_tape":
@@ -551,8 +548,8 @@ class PayloadCornerNavigateMode(Mode):
                     self._prev_color = other
                     current, other = other, current
                     cur_count, cur_lateral_px = other_count, other_lateral_px
-                    other_count, other_lateral_px = (
-                        self._single_color_strip_metrics(bgr, other)
+                    other_count, other_lateral_px = self._single_color_strip_metrics(
+                        bgr, other
                     )
 
         # Stop condition: corner has been detected and the colour we are
@@ -641,8 +638,7 @@ class PayloadCornerNavigateMode(Mode):
             self._tape_align_stable = 0
             self._annotate_tape_align(bgr, count, lateral_px, "searching")
             self.log(
-                f"PayloadCornerNavigateMode: TAPE_ALIGN searching "
-                f"(black_px={count})"
+                f"PayloadCornerNavigateMode: TAPE_ALIGN searching (black_px={count})"
             )
             return
 
@@ -692,9 +688,7 @@ class PayloadCornerNavigateMode(Mode):
         color: Tuple[int, int, int],
         thickness: int,
     ) -> None:
-        contours, _ = cv2.findContours(
-            mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
-        )
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         if not contours:
             return
         shift = np.array([[[x_offset, y_offset]]])
@@ -732,9 +726,7 @@ class PayloadCornerNavigateMode(Mode):
                 f"PayloadCornerNavigateMode: annotated publish failed: {exc}"
             )
 
-    def _annotate_drive_out(
-        self, bgr: np.ndarray, count_a: int, count_b: int
-    ) -> None:
+    def _annotate_drive_out(self, bgr: np.ndarray, count_a: int, count_b: int) -> None:
         if self._annotated_pub is None or bgr is None:
             return
         debug = bgr.copy()
@@ -862,12 +854,8 @@ class PayloadCornerNavigateMode(Mode):
         cv2.rectangle(debug, (0, y0), (w - 1, h - 1), self._DBG_CROP, 1)
         # Current colour is drawn thick (what we're steering on); the other
         # colour thin (what we're watching for a transition).
-        self._draw_shifted_contours(
-            debug, mask_current, 0, y0, self._DBG_OK, 3
-        )
-        self._draw_shifted_contours(
-            debug, mask_other, 0, y0, self._DBG_WARN, 1
-        )
+        self._draw_shifted_contours(debug, mask_current, 0, y0, self._DBG_OK, 3)
+        self._draw_shifted_contours(debug, mask_other, 0, y0, self._DBG_WARN, 1)
         strip_center_x = w // 2
         cv2.line(
             debug,

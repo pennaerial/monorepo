@@ -103,7 +103,10 @@ def _build_archive_url(ctx: AppContext) -> str | None:
 
 def _fleet_catalog_dir(ctx: AppContext) -> Path:
     current = ctx.build_source_store.current()
-    return ctx.build_source_store.cache_dir / f"fleet-catalog-{_source_catalog_key(current)}"
+    return (
+        ctx.build_source_store.cache_dir
+        / f"fleet-catalog-{_source_catalog_key(current)}"
+    )
 
 
 def _catalog_yaml_paths(root: Path) -> list[Path]:
@@ -120,7 +123,9 @@ def _catalog_yaml_paths(root: Path) -> list[Path]:
 
 def _path_endswith_parts(path: Path, suffix_parts: tuple[str, ...]) -> bool:
     parts = tuple(part.lower() for part in path.parts)
-    return len(parts) >= len(suffix_parts) and parts[-len(suffix_parts) :] == suffix_parts
+    return (
+        len(parts) >= len(suffix_parts) and parts[-len(suffix_parts) :] == suffix_parts
+    )
 
 
 def _fleet_catalog_candidate_key(path: Path) -> tuple[int, int, int, str]:
@@ -311,7 +316,9 @@ def _fleet_catalog_lookup_from_current_source(
     catalog_dir.mkdir(parents=True, exist_ok=True)
     try:
         with httpx.Client(timeout=300, follow_redirects=True) as client:
-            with client.stream("GET", archive_url, headers=_github_headers(ctx)) as resp:
+            with client.stream(
+                "GET", archive_url, headers=_github_headers(ctx)
+            ) as resp:
                 resp.raise_for_status()
                 with archive_path.open("wb") as out:
                     for chunk in resp.iter_bytes():
@@ -345,7 +352,9 @@ def _resolve_catalog_fleet_path(ctx: AppContext, fleet_file: str) -> tuple[str, 
     if catalog_error:
         raise ValueError(catalog_error)
     if not catalog:
-        raise ValueError("The selected build source does not expose any fleet YAML files.")
+        raise ValueError(
+            "The selected build source does not expose any fleet YAML files."
+        )
 
     fleet_path = catalog.get(selected)
     if fleet_path is None:
@@ -357,7 +366,9 @@ def _resolve_catalog_fleet_path(ctx: AppContext, fleet_file: str) -> tuple[str, 
 def _reconcile_selected_fleet_with_current_source(
     ctx: AppContext, previous_fleet_file: str
 ) -> None:
-    selected = Path(str(previous_fleet_file or "").strip().replace("\\", "/")).name.strip()
+    selected = Path(
+        str(previous_fleet_file or "").strip().replace("\\", "/")
+    ).name.strip()
     if not selected:
         if _selected_fleet_file(ctx):
             ctx.build_source_store.set_fleet_file(fleet_file="")
@@ -629,9 +640,7 @@ def _runtime_vehicle_from_config(
         "mission_path": mission_path_override or str(local_mission_path),
         "auto_launch": _bool_value(merged_vehicle.get("auto_launch"), default=False),
         "debug": _bool_value(merged_vehicle.get("debug"), default=False),
-        "vision_debug": _bool_value(
-            merged_vehicle.get("vision_debug"), default=False
-        ),
+        "vision_debug": _bool_value(merged_vehicle.get("vision_debug"), default=False),
         "save_vision_milliseconds": int(
             merged_vehicle.get("save_vision_milliseconds", 0) or 0
         ),
@@ -704,8 +713,7 @@ def _fleet_preview(ctx: AppContext, fleet_file: str) -> dict[str, object]:
                     "name": str(vehicle.get("name", "")).strip(),
                     "kind": str(merged.get("kind", "")).strip() or None,
                     "mission": str(merged.get("mission", "")).strip() or None,
-                    "mission_path": str(merged.get("mission_path", "")).strip()
-                    or None,
+                    "mission_path": str(merged.get("mission_path", "")).strip() or None,
                 }
                 local_mission_path = None
             fleet_vehicles.append(
@@ -1423,7 +1431,9 @@ async def _run_remote_deploy_lib(
         source "$remote_helper"
         {helper_invocation}
     """
-    result = await target_ctx.ssh.run(f"bash -lc {target_ctx.ssh.q(cmd)}", timeout=timeout)
+    result = await target_ctx.ssh.run(
+        f"bash -lc {target_ctx.ssh.q(cmd)}", timeout=timeout
+    )
     if result.returncode != 0:
         raise RuntimeError(
             target_ctx.ssh.format_remote_error(
@@ -1917,8 +1927,8 @@ async def get_build_source(ctx: AppContext) -> dict[str, object]:
 
 async def get_fleet_catalog(ctx: AppContext) -> dict[str, object]:
     current = ctx.build_source_store.current()
-    available_fleets, catalog_source, catalog_error = _fleet_catalog_from_current_source(
-        ctx
+    available_fleets, catalog_source, catalog_error = (
+        _fleet_catalog_from_current_source(ctx)
     )
     selected_fleet_file = (
         _selected_fleet_file(ctx) if current.kind != "none" else ""
@@ -2490,7 +2500,14 @@ async def list_builds(
                     break
                 if len(rows) < artifact_page_size:
                     break
-                if not include_fallback and page >= artifact_page and not q and not sha and not commit_subject and not branch:
+                if (
+                    not include_fallback
+                    and page >= artifact_page
+                    and not q
+                    and not sha
+                    and not commit_subject
+                    and not branch
+                ):
                     break
                 page += 1
             return collected
@@ -2619,7 +2636,9 @@ async def list_builds(
                     f"https://api.github.com/repos/{ctx.operator_config.github_repo}"
                     f"/actions/artifacts/{artifact.get('id')}/zip"
                 ),
-                "size_mb": round((artifact.get("size_in_bytes", 0) or 0) / 1_000_000, 1),
+                "size_mb": round(
+                    (artifact.get("size_in_bytes", 0) or 0) / 1_000_000, 1
+                ),
                 "run_id": str(workflow_run.get("id", "")) or None,
                 "artifact_id": str(artifact.get("id", "")) or None,
                 "artifact_name": artifact.get("name"),
@@ -2642,13 +2661,19 @@ async def list_builds(
 
         combined = releases_builds + artifact_builds
         combined.sort(key=lambda item: str(item.get("date", "")), reverse=True)
-        artifact_has_more = False if (q or sha or commit_subject or branch or include_fallback) else len(artifact_rows) >= artifact_page_size
+        artifact_has_more = (
+            False
+            if (q or sha or commit_subject or branch or include_fallback)
+            else len(artifact_rows) >= artifact_page_size
+        )
         response_payload = {
             "success": True,
             "builds": combined,
             "releases": releases_builds,
             "artifacts": artifact_builds,
-            "artifact_page": 1 if (q or sha or commit_subject or branch or include_fallback) else artifact_page,
+            "artifact_page": 1
+            if (q or sha or commit_subject or branch or include_fallback)
+            else artifact_page,
             "artifact_page_size": artifact_page_size,
             "artifact_has_more": artifact_has_more,
             "error": commit_lookup_warning,

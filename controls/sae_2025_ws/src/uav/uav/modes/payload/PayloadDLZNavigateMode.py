@@ -263,9 +263,9 @@ class PayloadDLZNavigateMode(Mode):
             )
             return None
 
-    def _detect_color(self, bgr: np.ndarray) -> Tuple[
-        str, bool, float, float, np.ndarray, np.ndarray, np.ndarray, int
-    ]:
+    def _detect_color(
+        self, bgr: np.ndarray
+    ) -> Tuple[str, bool, float, float, np.ndarray, np.ndarray, np.ndarray, int]:
         """Run the full colour detection pipeline on a BGR frame.
 
         Returns (current_color, boundary_detected, lateral_error_px,
@@ -280,8 +280,14 @@ class PayloadDLZNavigateMode(Mode):
             orange_mask, blue_mask
         )
         return (
-            current_color, detected, lateral_error_px, boundary_angle,
-            orange_mask, blue_mask, strip, strip_start,
+            current_color,
+            detected,
+            lateral_error_px,
+            boundary_angle,
+            orange_mask,
+            blue_mask,
+            strip,
+            strip_start,
         )
 
     def _publish_annotated(self, debug: np.ndarray) -> None:
@@ -349,9 +355,7 @@ class PayloadDLZNavigateMode(Mode):
                 Image, cam_topic, self._image_cb, 1
             )
 
-        annotated_topic = self.vehicle.namespaced_path(
-            "annotated_image/compressed"
-        )
+        annotated_topic = self.vehicle.namespaced_path("annotated_image/compressed")
         self._annotated_pub = self.node.create_publisher(
             CompressedImage, annotated_topic, 1
         )
@@ -511,8 +515,14 @@ class PayloadDLZNavigateMode(Mode):
 
         # Inline colour detection
         (
-            curr, boundary_detected, lateral_error_px, boundary_angle,
-            orange_mask, blue_mask, strip, strip_start,
+            curr,
+            boundary_detected,
+            lateral_error_px,
+            boundary_angle,
+            orange_mask,
+            blue_mask,
+            strip,
+            strip_start,
         ) = self._detect_color(bgr)
 
         transitioned = False
@@ -531,9 +541,17 @@ class PayloadDLZNavigateMode(Mode):
             if self._transitions >= self.target_transitions:
                 self.vehicle.stop()
                 self._annotate_line_follow(
-                    bgr, strip_start, orange_mask, blue_mask,
-                    curr, boundary_detected, lateral_error_px, boundary_angle,
-                    0.0, transitioned, is_corner,
+                    bgr,
+                    strip_start,
+                    orange_mask,
+                    blue_mask,
+                    curr,
+                    boundary_detected,
+                    lateral_error_px,
+                    boundary_angle,
+                    0.0,
+                    transitioned,
+                    is_corner,
                 )
                 self._done = True
                 self.log("PayloadDLZNavigateMode: target_transitions reached → done")
@@ -543,9 +561,17 @@ class PayloadDLZNavigateMode(Mode):
                 self._lf_phase = "corner_turn"
                 self._corner_turned = 0.0
                 self._annotate_line_follow(
-                    bgr, strip_start, orange_mask, blue_mask,
-                    curr, boundary_detected, lateral_error_px, boundary_angle,
-                    0.0, transitioned, is_corner,
+                    bgr,
+                    strip_start,
+                    orange_mask,
+                    blue_mask,
+                    curr,
+                    boundary_detected,
+                    lateral_error_px,
+                    boundary_angle,
+                    0.0,
+                    transitioned,
+                    is_corner,
                 )
                 self.vehicle.drive(0.0, 0.0)
                 return
@@ -554,8 +580,7 @@ class PayloadDLZNavigateMode(Mode):
         if boundary_detected:
             angular = float(
                 np.clip(
-                    -self.k_lat * lateral_error_px
-                    + self.k_ang * boundary_angle,
+                    -self.k_lat * lateral_error_px + self.k_ang * boundary_angle,
                     -self.max_angular,
                     self.max_angular,
                 )
@@ -564,9 +589,17 @@ class PayloadDLZNavigateMode(Mode):
             angular = 0.0
 
         self._annotate_line_follow(
-            bgr, strip_start, orange_mask, blue_mask,
-            curr, boundary_detected, lateral_error_px, boundary_angle,
-            angular, transitioned, is_corner,
+            bgr,
+            strip_start,
+            orange_mask,
+            blue_mask,
+            curr,
+            boundary_detected,
+            lateral_error_px,
+            boundary_angle,
+            angular,
+            transitioned,
+            is_corner,
         )
         self.vehicle.drive(self.line_follow_speed_mps, angular)
 
@@ -613,17 +646,13 @@ class PayloadDLZNavigateMode(Mode):
         orange_contours, _ = cv2.findContours(
             orange_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
         )
-        shifted_orange = [
-            c + np.array([[[0, strip_start]]]) for c in orange_contours
-        ]
+        shifted_orange = [c + np.array([[[0, strip_start]]]) for c in orange_contours]
         cv2.drawContours(debug, shifted_orange, -1, (255, 255, 255), 2)
 
         blue_contours, _ = cv2.findContours(
             blue_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
         )
-        shifted_blue = [
-            c + np.array([[[0, strip_start]]]) for c in blue_contours
-        ]
+        shifted_blue = [c + np.array([[[0, strip_start]]]) for c in blue_contours]
         cv2.drawContours(debug, shifted_blue, -1, (255, 255, 255), 2)
 
         # Strip boundary line
@@ -632,14 +661,10 @@ class PayloadDLZNavigateMode(Mode):
         # Frame centre reference (white) and tape centre (green) — exactly
         # the lateral_error_px the steering uses.
         frame_cx = strip_w // 2
-        cv2.line(
-            debug, (frame_cx, strip_start), (frame_cx, h), (255, 255, 255), 1
-        )
+        cv2.line(debug, (frame_cx, strip_start), (frame_cx, h), (255, 255, 255), 1)
         if boundary_detected:
             tape_cx = int(frame_cx + lateral_error_px)
-            cv2.line(
-                debug, (tape_cx, strip_start), (tape_cx, h), (0, 255, 0), 2
-            )
+            cv2.line(debug, (tape_cx, strip_start), (tape_cx, h), (0, 255, 0), 2)
 
         # Pixel counts (same values the algorithm used for dominance)
         a_count = int(np.count_nonzero(orange_mask))

@@ -77,7 +77,9 @@ def _resolve_force_camera(params: dict, *, logger=None) -> bool:
             logger,
             "Launch parameter 'use_camera' is deprecated; use 'force_camera' instead.",
         )
-        return _yaml_bool_value(params.get("use_camera"), name="use_camera", default=False)
+        return _yaml_bool_value(
+            params.get("use_camera"), name="use_camera", default=False
+        )
 
     return False
 
@@ -273,6 +275,7 @@ def _single_vehicle_config(context, params: dict) -> tuple[dict, dict | None]:
         return vehicle_config, None
 
     from sim.utils import load_sim_launch_parameters
+
     sim_params = load_sim_launch_parameters()
     backend, world_name = _legacy_backend_override(
         mission_spec=mission_spec,
