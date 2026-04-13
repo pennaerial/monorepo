@@ -5,8 +5,9 @@ import math
 import cv2
 import numpy as np
 import rclpy
+from cv_bridge import CvBridge
 from rclpy.executors import ExternalShutdownException
-from sensor_msgs.msg import CameraInfo
+from sensor_msgs.msg import CameraInfo, CompressedImage
 
 from .VisionNode import VisionNode
 from uav.vision_nodes.payload_perception_common import (
@@ -34,12 +35,17 @@ class PayloadAprilTagNode(VisionNode):
         self._detector_cache = AprilTagDetectorCache()
         self._last_tag_family = DEFAULT_TAG_FAMILY
         self._last_tag_size_m = 0.1
+        self._debug_bridge = CvBridge()
         self.create_service(
             self.srv,
             self.vision_service,
             self.service_callback,
         )
+        self._debug_pub = None
         if self.debug:
+            debug_topic = self.vision_service + "/debug_image/compressed"
+            self._debug_pub = self.create_publisher(CompressedImage, debug_topic, 1)
+            self.get_logger().info(f"Debug image publishing on: {debug_topic}")
             self.create_timer(1.0 / 30.0, self._debug_timer_callback)
 
     def service_callback(
@@ -329,7 +335,15 @@ class PayloadAprilTagNode(VisionNode):
                 2,
             )
 
-        self.display_frame(vis, "PayloadAprilTagNode")
+        if self._debug_pub is not None:
+            try:
+                msg = self._debug_bridge.cv2_to_compressed_imgmsg(vis, dst_format="jpeg")
+                msg.header.stamp = self.get_clock().now().to_msg()
+                self._debug_pub.publish(msg)
+            except Exception as exc:
+                self.get_logger().warn(
+                    f"PayloadAprilTagNode: debug publish failed: {exc}"
+                )
 
 
 def main() -> None:
