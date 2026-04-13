@@ -1,14 +1,11 @@
 # Full payload run: wait for drive-out → corner navigate → AprilTag approach.
 # PayloadWaitForDriveOutMode returns "complete" → corner_nav
-# PayloadCornerNavigateMode returns "done" → approach
-# PayloadAprilTagApproachMode returns "terminate" → mission ends
+# PayloadCornerNavigateMode returns "complete" → approach
+# PayloadAprilTagApproachMode returns "done" → mission ends
 modes:
   start:
     class: uav.modes.payload.PayloadWaitForDriveOutMode.PayloadWaitForDriveOutMode
     params:
-      confirm_frames: 5
-      lower_hsv: [0, 0, 180]
-      upper_hsv: [180, 46, 255]
       turn_angular: 3.14
       turn_speed: 1.5
     transitions:
@@ -32,16 +29,13 @@ modes:
       center_tol_px: 30.0
       center_min_pixels: 150
       center_stable_frames: 1
-      align_lat_tol_px: 25.0
-      align_stable_frames: 3
       line_follow_speed_mps: 0.10
       line_follow_strip_frac: 0.55
       line_follow_min_pixels: 50
       k_lat: 0.003
-      k_ang: 0.4
       max_angular: 1.3
     transitions:
-      done: approach
+      complete: approach
 
   approach:
     class: uav.modes.payload.PayloadAprilTagApproachMode

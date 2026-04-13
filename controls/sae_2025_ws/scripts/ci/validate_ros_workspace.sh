@@ -61,5 +61,7 @@ PYTHONPATH="$WORKSPACE_ROOT/src/uav:${PYTHONPATH:-}" \
 
 ci_log "Running pytest suite"
 ci_source_workspace "$WORKSPACE_ROOT"
+# Ignore globally installed pytest entrypoints from unrelated packages like anyio.
 PYTHONPATH="$WORKSPACE_ROOT/src/uav:$WORKSPACE_ROOT/src/sim:${PYTHONPATH:-}" \
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 \
     python3 -m pytest $PYTEST_TARGETS

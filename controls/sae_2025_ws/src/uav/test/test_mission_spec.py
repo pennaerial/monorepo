@@ -130,7 +130,7 @@ def test_mission_spec_from_dict():
 
     assert mission_spec.target == "payload"
     assert mission_spec.path is None
-    assert mission_spec.vision_nodes == ("PayloadAprilTagNode",)
+    assert mission_spec.vision_nodes == ()
     assert mission_spec.requires_camera is True
     assert mission_spec.modes["start"].params["tag_id"] == 0
 
