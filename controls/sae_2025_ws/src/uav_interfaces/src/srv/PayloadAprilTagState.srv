@@ -13,4 +13,13 @@ float64[] tvec_y
 float64[] tvec_z
 float64[] center_x
 float64[] center_y
+float64[] yaw_error
+int32[] all_tag_ids
+float64[] all_tvec_x
+float64[] all_tvec_y
+float64[] all_tvec_z
+float64[] all_center_x
+float64[] all_center_y
+float64[] all_yaw_error
+float64[] all_tag_area
 uint32 image_width

@@ -1,85 +1,94 @@
 #!/usr/bin/env bash
-# Syncs ROS2 source packages to the Pi over rsync.
+# Dev-only helper that syncs ROS2 source packages to a Pi over rsync.
+# This does not create a release-managed deployment under ~/pennair-deploy and is
+# not the supported production deploy path.
 #
 # Usage:
-#   ./sync-src.sh <user@host>                                  # Deploy default packages
-#   ./sync-src.sh <user@host> --packages-select pkg_a pkg_b   # Deploy specific packages
-#   ./sync-src.sh <user@host> --password                       # Prompt for SSH password
+#   ./sync-src.sh <user@host>                                  # Deploy default packages
+#   ./sync-src.sh <user@host> --packages-select pkg_a pkg_b   # Deploy specific packages
+#   ./sync-src.sh <user@host> --password                       # Prompt for SSH password
+#   ./sync-src.sh <user@host> --sync-time                      # Sync Pi clock from laptop before deploy
 set -euo pipefail
-
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 SRC_DIR="$SCRIPT_DIR/../src"
-
 # Packages copied in a normal deploy — no sim, no Gazebo, no bridges.
 DEPLOY_PACKAGES=(
-    actuator_msgs
-    payload
-    payload_interfaces
-    px4_msgs
-    uav
-    uav_interfaces
+	actuator_msgs
+	payload
+	payload_interfaces
+	px4_msgs
+	uav
+	uav_interfaces
 )
-
 # --- Argument parsing ---
 if [[ $# -eq 0 || "$1" == --* ]]; then
-    echo "Usage: $0 <user@host> [--packages-select pkg...] [--password]" >&2
-    exit 1
+	echo "Usage: $0 <user@host> [--packages-select pkg...] [--password]" >&2
+	echo "Note: dev-only fast path; production deploys should use the release-based dashboard or deploy scripts." >&2
+	exit 1
 fi
 REMOTE="$1"
 shift
-
 PACKAGES=("${DEPLOY_PACKAGES[@]}")
 SSH_OPTS=()
-
+SSH_CMD="ssh"
+SYNC_TIME=false
 while [[ $# -gt 0 ]]; do
-    case "$1" in
-        --packages-select)
-            shift
-            PACKAGES=()
-            while [[ $# -gt 0 && "$1" != --* ]]; do
-                PACKAGES+=("$1")
-                shift
-            done
-            ;;
-        --password)
-            if ! command -v sshpass &>/dev/null; then
-                echo "sshpass is not installed. Install it with: sudo apt install sshpass" >&2
-                exit 1
-            fi
-            read -rsp "SSH password for $REMOTE: " SSH_PASSWORD
-            echo
-            SSH_OPTS=(-e "sshpass -p '$SSH_PASSWORD' ssh")
-            shift
-            ;;
-        *)
-            echo "Unknown argument: $1" >&2
-            exit 1
-            ;;
-    esac
+	case "$1" in
+	--packages-select)
+		shift
+		PACKAGES=()
+		while [[ $# -gt 0 && "$1" != --* ]]; do
+			PACKAGES+=("$1")
+			shift
+		done
+		;;
+	--password)
+		if ! command -v sshpass &>/dev/null; then
+			echo "sshpass is not installed. Install it with: sudo apt install sshpass" >&2
+			exit 1
+		fi
+		read -rsp "SSH password for $REMOTE: " SSH_PASSWORD
+		echo
+		SSH_CMD="sshpass -p '$SSH_PASSWORD' ssh"
+		SSH_OPTS=(-e "$SSH_CMD")
+		shift
+		;;
+	--sync-time)
+		SYNC_TIME=true
+		shift
+		;;
+	*)
+		echo "Unknown argument: $1" >&2
+		exit 1
+		;;
+	esac
 done
-
 if [[ ${#PACKAGES[@]} -eq 0 ]]; then
-    echo "No packages selected." >&2
-    exit 1
+	echo "No packages selected." >&2
+	exit 1
 fi
-
 # Build source list, verifying each package exists locally.
 SOURCES=()
 for pkg in "${PACKAGES[@]}"; do
-    pkg_path="$SRC_DIR/$pkg"
-    if [[ ! -d "$pkg_path" ]]; then
-        echo "Package not found: $pkg_path" >&2
-        exit 1
-    fi
-    SOURCES+=("$pkg_path")
+	pkg_path="$SRC_DIR/$pkg"
+	if [[ ! -d "$pkg_path" ]]; then
+		echo "Package not found: $pkg_path" >&2
+		exit 1
+	fi
+	SOURCES+=("$pkg_path")
 done
-
+if [[ "$SYNC_TIME" == true ]]; then
+	echo "Syncing clock on $REMOTE..."
+	ssh -t "$REMOTE" "sudo date -s '$(date)'" || echo "Warning: clock sync failed (ensure passwordless sudo for /bin/date on Pi)" >&2
+fi
 echo "Syncing packages: ${PACKAGES[*]}"
-
-rsync -rv \
-    --no-times \
+# -c (checksum) compares file contents rather than timestamps, so clock skew
+# between laptop and Pi does not cause unnecessary transfers or rebuilds.
+#Made a change to work with bash versions <4.4
+# ...existing code...
+rsync -rvc \
     --no-perms --no-owner --no-group \
     --delete \
-    "${SSH_OPTS[@]}" \
+    ${SSH_OPTS[@]+"${SSH_OPTS[@]}"} \
     "${SOURCES[@]}" \
     "$REMOTE:~/monorepo/controls/sae_2025_ws/src/"

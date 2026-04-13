@@ -1,5 +1,6 @@
 import numpy as np
 from rclpy.node import Node
+from typing import Literal
 
 from uav.vehicles.UAV import UAV
 
@@ -12,8 +13,9 @@ class TransitionMode(Mode):
     """
 
     mission_target = "uav"
+    transition_labels = ("complete",)
 
-    def __init__(self, node: Node, vehicle: UAV, to_mode: str):
+    def __init__(self, node: Node, vehicle: UAV, to_mode: Literal["MC", "FW"]):
         """
         Initialize the Transition Mode
 

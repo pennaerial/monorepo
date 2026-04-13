@@ -1,4 +1,4 @@
-from typing import List
+from typing import Literal
 from rclpy.node import Node
 
 from uav.vehicles.UAV import UAV
@@ -12,6 +12,7 @@ class NavGPSMode(Mode):
     """
 
     mission_target = "uav"
+    transition_labels = ("complete",)
 
     # TODO: Create "RELATIVE" navigation system, which initializes direction vectors once in the beginning
     # and converts all coordinates to that frame. +X should point to forward, +Y should point to the right, -Z should point up
@@ -20,7 +21,9 @@ class NavGPSMode(Mode):
         self,
         node: Node,
         vehicle: UAV,
-        coordinates: List[tuple[tuple[float, float, float], float, str]],
+        coordinates: list[
+            tuple[tuple[float, float, float], float, Literal["GPS", "LOCAL"]]
+        ],
         margin: float = 1,
     ):
         """
@@ -29,7 +32,7 @@ class NavGPSMode(Mode):
         Args:
             node (Node): ROS 2 node managing the UAV.
             vehicle (UAV): The UAV instance to control.
-            coordinates (List[tuple[tuple[float, float, float], float, str]]): The coordinates to navigate to (x/y/z or lon/lat/alt, wait time, GPS/LOCAL).
+            coordinates (list[tuple[tuple[float, float, float], float, Literal["GPS", "LOCAL"]]]): The coordinates to navigate to (x/y/z or lon/lat/alt, wait time, GPS/LOCAL).
                                                                                Local are NED coordinates, relative to the starting position (https://docs.px4.io/main/en/ros2/user_guide.html#ros-2-px4-frame-conventions).
             margin (float): The margin of error for the GPS coordinate.
         """

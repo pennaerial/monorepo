@@ -1,4 +1,5 @@
 import time
+from typing import Literal
 
 import numpy as np
 from px4_msgs.msg import VehicleStatus, VtolVehicleStatus
@@ -19,12 +20,13 @@ class TakeoffMode(Mode):
     """
 
     mission_target = "uav"
+    transition_labels = ("complete",)
 
     def __init__(
         self,
         node: Node,
         vehicle: UAV,
-        takeoff_type: str = "vertical",
+        takeoff_type: Literal["vertical", "horizontal"] = "vertical",
         fw_tko_pitch: float = float("nan"),
         yaw: float = float("nan"),
         latitude: float = float("nan"),

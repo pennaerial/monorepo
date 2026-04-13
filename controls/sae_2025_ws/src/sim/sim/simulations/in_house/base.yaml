@@ -5,6 +5,14 @@ world:
     course: "ascent"
     dlz: [10, 5, 0]     # Drop zone coordinates [x, y, z]
     uav: [0, 0, 0]       # UAV starting position [x, y, z]
+    controllables:
+      uav_0:
+        kind: uav
+        model: gz_x500_mono_cam
+        px4_airframe_id: 4010
+        path_to_sdf: "~/.simulation-gazebo/models/x500_mono_cam/model.sdf"
+        position: [0, 0, 0]
+        rpy: [0.0, 0.0, 0.0]
     num_hoops: 2          # Number of hoops to generate
     height: 5
     max_dist: 1

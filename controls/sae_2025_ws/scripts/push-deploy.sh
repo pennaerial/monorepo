@@ -1,198 +1,269 @@
-#!/bin/bash
-# push-deploy.sh - Deploy ROS 2 build to Raspberry Pi from your laptop
+#!/usr/bin/env bash
+# push-deploy.sh - Deploy a hardware release into one or more remote deploy roots
 #
 # Usage:
 #   ./push-deploy.sh pi@192.168.1.50              # Deploy latest to one Pi
 #   ./push-deploy.sh pi@drone1 pi@drone2          # Deploy to multiple Pis
 #   ./push-deploy.sh --build abc123f pi@drone     # Deploy specific build
-#   ./push-deploy.sh --local ./build.tar.gz pi@drone  # Deploy local file
+#   ./push-deploy.sh --local ./build.tar.gz pi@drone
 #   ./push-deploy.sh --list                       # List available builds
+#   ./push-deploy.sh --status pi@drone            # Show remote release state
 #
 # Environment:
-#   GITHUB_REPO     - Repository (default: auto-detect from git remote)
-#   REMOTE_DIR      - Install directory on Pi (default: ~/uav_ws)
-#   SSH_KEY         - Path to SSH key (optional)
-#   SSH_PASS        - SSH password (optional, requires sshpass)
+#   GITHUB_REPO    Repository (default: auto-detect from git remote)
+#   DEPLOY_ROOT    Remote deploy root (default: ~/pennair-deploy)
+#   SSH_KEY        Path to SSH key (optional)
+#   SSH_PASS       SSH password (optional, requires sshpass)
 #
 
-set -e
+set -euo pipefail
 
-# Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+. "$SCRIPT_DIR/hardware/deploy-lib.sh"
 
-info() { echo -e "${GREEN}[INFO]${NC} $1"; }
-warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
-error() { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
-step() { echo -e "${BLUE}[STEP]${NC} $1"; }
-
-# Configuration
-REMOTE_DIR="${REMOTE_DIR:-/home/penn/monorepo/controls/sae_2025_ws}"
+REMOTE_DEPLOY_ROOT="${DEPLOY_ROOT:-${REMOTE_DEPLOY_ROOT:-~/pennair-deploy}}"
 BUILD_SHA=""
 LOCAL_FILE=""
+LOCAL_RELEASE_NAME=""
 SSH_PASS="${SSH_PASS:-}"
 TARGETS=()
+INSTALL_RUNTIME_HELPER="${INSTALL_RUNTIME_HELPER:-1}"
+STATUS_MODE=0
 
-# Auto-detect GitHub repo from git remote
-detect_repo() {
-    if [ -n "$GITHUB_REPO" ]; then
-        echo "$GITHUB_REPO"
-        return
-    fi
-    
-    local remote_url
-    remote_url=$(git remote get-url origin 2>/dev/null || echo "")
-    
-    if [[ "$remote_url" =~ github\.com[:/]([^/]+/[^/.]+) ]]; then
-        echo "${BASH_REMATCH[1]}"
-    else
-        error "Could not detect GITHUB_REPO. Set it manually: export GITHUB_REPO=org/repo"
-    fi
-}
+info() { deploy_info "$*"; }
+warn() { deploy_warn "$*"; }
+error() { deploy_error "$*"; }
+step() { printf '[STEP] %s\n' "$*"; }
 
-# SSH options
 ssh_opts() {
     local opts="-o StrictHostKeyChecking=accept-new -o ConnectTimeout=10"
-    if [ -n "$SSH_KEY" ]; then
+    if [[ -n "${SSH_KEY:-}" ]]; then
         opts="$opts -i $SSH_KEY"
     fi
-    echo "$opts"
+    printf '%s\n' "$opts"
 }
 
-# Wrap ssh command with sshpass if password is set
 run_ssh() {
-    if [ -n "$SSH_PASS" ]; then
+    if [[ -n "$SSH_PASS" ]]; then
         sshpass -p "$SSH_PASS" ssh $(ssh_opts) "$@"
     else
         ssh $(ssh_opts) "$@"
     fi
 }
 
-# Wrap scp command with sshpass if password is set
 run_scp() {
-    if [ -n "$SSH_PASS" ]; then
+    if [[ -n "$SSH_PASS" ]]; then
         sshpass -p "$SSH_PASS" scp $(ssh_opts) "$@"
     else
         scp $(ssh_opts) "$@"
     fi
 }
 
-# List available builds
-list_builds() {
-    local repo
-    repo=$(detect_repo)
-    info "Fetching builds from $repo..."
-    curl -s "https://api.github.com/repos/$repo/releases" | \
-        jq -r '.[] | select(.tag_name | startswith("build-")) | "\(.tag_name | ltrimstr("build-"))\t\(.published_at)\t\(.name)"' | \
-        head -20 | \
-        column -t -s $'\t'
-}
-
-# Get download URL for a build
-get_build_url() {
-    local repo sha
-    repo=$(detect_repo)
-    sha="${1:-}"
-    
-    if [ -z "$sha" ]; then
-        # Get latest
-        curl -s "https://api.github.com/repos/$repo/releases" | \
-            jq -r '[.[] | select(.tag_name | startswith("build-"))][0].assets[0].browser_download_url'
+print_release_table() {
+    local releases="$1"
+    if command -v column >/dev/null 2>&1; then
+        printf '%s\n' "$releases" | column -t -s $'\t'
     else
-        # Get specific build
-        curl -s "https://api.github.com/repos/$repo/releases/tags/build-$sha" | \
-            jq -r '.assets[0].browser_download_url'
+        printf 'TAG\tPUBLISHED\tNAME\n'
+        printf '%s\n' "$releases"
     fi
 }
 
-# Download build artifact
+list_builds() {
+    local repo releases
+    repo="$(deploy_detect_repo)"
+    info "Fetching builds from $repo"
+    releases="$(deploy_fetch_release_list "$repo" | deploy_release_list_from_json)"
+    if [[ -z "$releases" ]]; then
+        warn "No build releases found"
+        return 0
+    fi
+    print_release_table "$releases"
+}
+
+status_target() {
+    local target="$1"
+    [[ -n "$target" ]] || error "Status mode requires at least one target"
+    step "Status for $target"
+    run_ssh "$target" "DEPLOY_ROOT=$(printf '%q' "$REMOTE_DEPLOY_ROOT") bash -s" <<'REMOTE_STATUS'
+set -euo pipefail
+deploy_root="${DEPLOY_ROOT%/}"
+deploy_root="${deploy_root/#\~/$HOME}"
+current="${deploy_root}/current"
+previous="${deploy_root}/previous"
+config="${deploy_root}/config/runtime_fleet.yaml"
+runtime="${deploy_root}/bin/runtime_fleet"
+systemd="/etc/systemd/system/pennair-autonomy.service"
+
+current_target=""
+previous_target=""
+if [ -L "$current" ]; then
+    current_target="$(readlink -f "$current" 2>/dev/null || true)"
+elif [ -e "$current" ]; then
+    current_target="$current"
+fi
+if [ -L "$previous" ]; then
+    previous_target="$(readlink -f "$previous" 2>/dev/null || true)"
+elif [ -e "$previous" ]; then
+    previous_target="$previous"
+fi
+
+printf 'Deploy root: %s\n' "$deploy_root"
+printf 'Current release: %s\n' "${current_target:-<none>}"
+printf 'Previous release: %s\n' "${previous_target:-<none>}"
+printf 'Runtime config: %s\n' "$config"
+printf 'Runtime helper: %s\n' "$runtime"
+printf 'Systemd unit: %s\n' "$systemd"
+REMOTE_STATUS
+}
+
+prepare_remote_root() {
+    local target="$1"
+    local remote_root
+    remote_root="$(printf '%q' "$REMOTE_DEPLOY_ROOT")"
+    run_ssh "$target" "mkdir -p ${remote_root}/releases ${remote_root}/config ${remote_root}/bin ${remote_root}/systemd"
+}
+
+infer_release_name_from_tarball() {
+    local file="$1"
+    local base
+    base="$(basename "$file")"
+    base="${base%.tar.gz}"
+    base="${base#ros2-}"
+    base="${base#release-}"
+    if [[ "$base" == build-* ]]; then
+        printf '%s\n' "$base"
+    elif [[ "$base" == *-* ]]; then
+        printf '%s\n' "$base"
+    else
+        printf 'build-%s\n' "$base"
+    fi
+}
+
+get_build_url() {
+    local repo sha release_name
+    repo="$(deploy_detect_repo)"
+    release_name="$(deploy_release_name_for_sha "${1:-}")"
+    deploy_fetch_release_by_tag "$repo" "$release_name" | deploy_release_download_url_from_json
+}
+
 download_build() {
     local url="$1"
     local dest="$2"
-    
-    if [ "$url" == "null" ] || [ -z "$url" ]; then
-        error "No build found. Run with --list to see available builds."
-    fi
-    
+    [[ -n "$url" && "$url" != "null" ]] || error "No build found. Run with --list to see available builds."
     info "Downloading: $url"
-    curl -L -o "$dest" "$url"
+    curl -fL "$url" -o "$dest"
 }
 
-# Deploy to a single Pi
-deploy_to_pi() {
+copy_runtime_helper() {
+    local target="$1"
+    local helper="$SCRIPT_DIR/hardware/runtime_fleet.sh"
+    if [[ "$INSTALL_RUNTIME_HELPER" != "1" || ! -f "$helper" ]]; then
+        return 0
+    fi
+
+    prepare_remote_root "$target"
+    run_scp "$helper" "$target:$REMOTE_DEPLOY_ROOT/bin/runtime_fleet"
+}
+
+copy_deploy_lib() {
+    local target="$1"
+    local helper="$SCRIPT_DIR/hardware/deploy-lib.sh"
+    [[ -f "$helper" ]] || error "Missing deploy helper library: $helper"
+
+    prepare_remote_root "$target"
+    run_scp "$helper" "$target:$REMOTE_DEPLOY_ROOT/systemd/deploy-lib.sh"
+}
+
+deploy_to_target() {
     local target="$1"
     local tarball="$2"
-    local filename
-    filename=$(basename "$tarball")
-    
+    local release_name="$3"
+    local archive_remote remote_cmd
+
+    archive_remote="/tmp/${release_name}.tar.gz"
+
     step "Deploying to $target"
-    
-    # Check connectivity
-    info "Checking connection..."
-    if ! run_ssh "$target" "echo 'Connected'" 2>/dev/null; then
+    info "Checking connection"
+    if ! run_ssh "$target" "echo connected" >/dev/null 2>&1; then
         error "Cannot connect to $target"
     fi
-    
-    # Create remote directory
-    info "Preparing remote directory..."
-    run_ssh "$target" "mkdir -p $REMOTE_DIR"
-    
-    # Copy tarball
-    info "Copying build artifact..."
-    run_scp "$tarball" "$target:$REMOTE_DIR/$filename"
-    
-    # Extract and set up on remote
-    info "Extracting and configuring..."
-    run_ssh "$target" bash << REMOTE_SCRIPT
-set -e
-cd $REMOTE_DIR
 
-# Backup existing install
-if [ -d "install" ]; then
-    echo "Backing up existing install..."
-    rm -rf install.bak src.bak
-    mv install install.bak 2>/dev/null || true
-    mv src src.bak 2>/dev/null || true
-fi
+    prepare_remote_root "$target"
+    copy_runtime_helper "$target"
+    copy_deploy_lib "$target"
 
-# Extract
-echo "Extracting $filename..."
-tar -xzf "$filename"
-rm "$filename"
+    info "Copying build artifact"
+    run_scp "$tarball" "$target:$archive_remote"
 
-# Create activation script
-cat > activate.sh << 'EOF'
-#!/bin/bash
-SCRIPT_DIR="\$(cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)"
-cd "\$SCRIPT_DIR"
-source /opt/ros/humble/setup.bash
-source install/setup.bash
-export UAV_SIM=false
-echo "ROS 2 workspace activated (sim=false)"
-EOF
-chmod +x activate.sh
+    remote_cmd=$(printf 'DEPLOY_ROOT=%q RELEASE_NAME=%q ARCHIVE=%q bash -s' "$REMOTE_DEPLOY_ROOT" "$release_name" "$archive_remote")
+    info "Activating release ${release_name}"
+    run_ssh "$target" "$remote_cmd" <<'REMOTE_INSTALL'
+set -euo pipefail
 
-# Create run script  
-cat > run.sh << 'EOF'
-#!/bin/bash
-SCRIPT_DIR="\$(cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)"
-cd "\$SCRIPT_DIR"
-source activate.sh
-ros2 launch uav main.launch.py "\$@"
-EOF
-chmod +x run.sh
+deploy_root="${DEPLOY_ROOT/#\~/$HOME}"
+deploy_root="${deploy_root%/}"
+release_name="${RELEASE_NAME}"
+archive="${ARCHIVE}"
 
-echo "Deployment complete!"
-cat install/BUILD_INFO.txt 2>/dev/null || true
-REMOTE_SCRIPT
+releases_dir="${deploy_root}/releases"
+release_dir="${releases_dir}/${release_name}"
+current_link="${deploy_root}/current"
+previous_link="${deploy_root}/previous"
+deploy_lib="${deploy_root}/systemd/deploy-lib.sh"
+stage_dir="$(mktemp -d "${releases_dir}/.staging.${release_name}.XXXXXX")"
 
-    info "✓ Deployed to $target"
+run_root() {
+    if [[ "$(id -u)" -eq 0 ]]; then
+        "$@"
+    else
+        sudo -n "$@"
+    fi
 }
 
-# Parse arguments
+source "$deploy_lib"
+
+mkdir -p "$releases_dir" "${deploy_root}/config" "${deploy_root}/bin" "${deploy_root}/systemd"
+tar -xzf "$archive" -C "$stage_dir"
+rm -f "$archive"
+
+rm -rf "$release_dir"
+mv "$stage_dir" "$release_dir"
+
+current_target=""
+if [ -L "$current_link" ]; then
+    current_target="$(readlink -f "$current_link" 2>/dev/null || true)"
+elif [ -e "$current_link" ]; then
+    rm -rf "$previous_link"
+    mv "$current_link" "$previous_link"
+fi
+
+if [ -n "$current_target" ] && [ "$current_target" != "$release_dir" ]; then
+    ln -sfn "$current_target" "$previous_link"
+fi
+
+ln -sfn "$release_dir" "$current_link"
+chmod +x "${deploy_root}/bin/runtime_fleet" 2>/dev/null || true
+
+deploy_ensure_uav_python_runtime run_root "$(id -un)"
+
+if command -v sudo >/dev/null 2>&1 && sudo -n systemctl list-unit-files pennair-autonomy.service >/dev/null 2>&1; then
+    if sudo -n systemctl restart pennair-autonomy.service >/dev/null 2>&1; then
+        printf 'Activated pennair-autonomy.service\n'
+    else
+        printf 'Release installed, but automatic restart of pennair-autonomy.service failed\n' >&2
+    fi
+else
+    printf 'Release installed, but pennair-autonomy.service is not installed or sudo is unavailable\n' >&2
+fi
+
+printf 'Deployed %s\n' "$release_name"
+REMOTE_INSTALL
+
+    info "Deployed to $target"
+}
+
 parse_args() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -200,41 +271,65 @@ parse_args() {
                 list_builds
                 exit 0
                 ;;
+            --status|-s)
+                STATUS_MODE=1
+                shift
+                while [[ $# -gt 0 && "$1" != --* ]]; do
+                    TARGETS+=("$1")
+                    shift
+                done
+                ;;
             --build|-b)
-                BUILD_SHA="$2"
+                BUILD_SHA="${2:-}"
                 shift 2
                 ;;
             --local|-f)
-                LOCAL_FILE="$2"
+                LOCAL_FILE="${2:-}"
                 shift 2
                 ;;
+            --deploy-root)
+                REMOTE_DEPLOY_ROOT="${2:-}"
+                shift 2
+                ;;
+            --no-runtime-helper)
+                INSTALL_RUNTIME_HELPER=0
+                shift
+                ;;
             --password|-p)
-                SSH_PASS="$2"
+                SSH_PASS="${2:-}"
                 shift 2
                 ;;
             --help|-h)
-                echo "Usage: $0 [OPTIONS] TARGET [TARGET...]"
-                echo ""
-                echo "Deploy ROS 2 builds to Raspberry Pi(s) via SSH"
-                echo ""
-                echo "Options:"
-                echo "  --list, -l              List available builds"
-                echo "  --build, -b SHA         Deploy specific build by short SHA"
-                echo "  --local, -f FILE        Deploy a local .tar.gz file"
-                echo "  --password, -p PASS     SSH password (requires sshpass)"
-                echo "  --help, -h              Show this help"
-                echo ""
-                echo "Examples:"
-                echo "  $0 pi@192.168.1.50                    # Latest build to one Pi"
-                echo "  $0 pi@drone1 pi@drone2                # Latest to multiple Pis"  
-                echo "  $0 --build abc123f pi@drone           # Specific build"
-                echo "  $0 --local ./my-build.tar.gz pi@drone # Local file"
-                echo "  $0 -p 123 penn@172.20.10.2            # With password"
-                echo ""
-                echo "Environment:"
-                echo "  GITHUB_REPO   Repository (auto-detected from git)"
-                echo "  REMOTE_DIR    Install path on Pi (default: /home/penn/monorepo/controls/sae_2025_ws)"
-                echo "  SSH_KEY       Path to SSH key file"
+                cat <<EOF
+Usage: $0 [OPTIONS] TARGET [TARGET...]
+
+Deploy hardware release artifacts to one or more Pis via SSH.
+
+Options:
+  --list, -l              List available builds
+  --status, -s [TARGET]    Show deploy-root release state on a target
+  --build, -b SHA         Deploy a specific build by short SHA
+  --local, -f FILE        Deploy a local .tar.gz file
+  --deploy-root PATH      Remote deploy root (default: ~/pennair-deploy)
+  --password, -p PASS     SSH password (requires sshpass)
+  --no-runtime-helper     Skip copying the runtime_fleet helper
+  --help, -h              Show this help
+
+Examples:
+  $0 pi@192.168.1.50                    # Latest build to one Pi
+  $0 pi@drone1 pi@drone2                # Latest to multiple Pis
+  $0 --build abc123f pi@drone           # Specific build
+  $0 --local ./my-build.tar.gz pi@drone # Local file
+  $0 --status pi@drone                  # Remote status
+
+Bootstrap the Pi once with:
+  scripts/hardware/bootstrap-pi.sh
+
+Environment:
+  GITHUB_REPO   Repository (auto-detected from git)
+  DEPLOY_ROOT   Remote deploy root (default: ~/pennair-deploy)
+  SSH_KEY       Path to SSH key file
+EOF
                 exit 0
                 ;;
             -*)
@@ -246,68 +341,81 @@ parse_args() {
                 ;;
         esac
     done
-    
-    if [ ${#TARGETS[@]} -eq 0 ]; then
-        error "No target specified. Usage: $0 [OPTIONS] pi@hostname"
+
+    if [[ "$STATUS_MODE" == "1" && ${#TARGETS[@]} -eq 0 ]]; then
+        error "Status mode requires at least one target"
     fi
 }
 
-# Main
 main() {
     parse_args "$@"
-    
-    local tarball
-    local cleanup=false
-    
-    # Get the build artifact
-    if [ -n "$LOCAL_FILE" ]; then
-        if [ ! -f "$LOCAL_FILE" ]; then
-            error "Local file not found: $LOCAL_FILE"
-        fi
+
+    if [[ "$STATUS_MODE" == "1" ]]; then
+        local target
+        for target in "${TARGETS[@]}"; do
+            status_target "$target"
+        done
+        return 0
+    fi
+
+    local tarball cleanup=false release_name
+    if [[ -n "$LOCAL_FILE" ]]; then
+        [[ -f "$LOCAL_FILE" ]] || error "Local file not found: $LOCAL_FILE"
         tarball="$LOCAL_FILE"
+        release_name="${LOCAL_RELEASE_NAME:-$(infer_release_name_from_tarball "$tarball")}"
         info "Using local file: $tarball"
     else
-        # Download from GitHub
         local url
-        url=$(get_build_url "$BUILD_SHA")
-        
-        tarball="/tmp/ros2-build-$$.tar.gz"
+        if [[ -n "$BUILD_SHA" ]]; then
+            url="$(get_build_url "$BUILD_SHA")"
+            release_name="$(deploy_release_name_for_sha "$BUILD_SHA")"
+        else
+            local repo release_json
+            repo="$(deploy_detect_repo)"
+            release_json="$(deploy_fetch_release_list "$repo" | jq -r '[.[] | select(.tag_name | startswith("build-"))][0]')"
+            release_name="$(printf '%s' "$release_json" | deploy_release_name_from_json)"
+            url="$(printf '%s' "$release_json" | deploy_release_download_url_from_json)"
+        fi
+        if [[ -z "$release_name" || "$release_name" == "null" ]]; then
+            error "Unable to resolve a build release name"
+        fi
+        if [[ -z "$url" || "$url" == "null" ]]; then
+            error "Unable to resolve a build download URL"
+        fi
+        tarball="/tmp/${release_name}.tar.gz"
         cleanup=true
-        
         download_build "$url" "$tarball"
     fi
-    
-    # Deploy to each target
+
+    if [[ ${#TARGETS[@]} -eq 0 ]]; then
+        error "No target specified. Usage: $0 [OPTIONS] pi@hostname"
+    fi
+
     local failed=()
+    local target
     for target in "${TARGETS[@]}"; do
-        if deploy_to_pi "$target" "$tarball"; then
-            :
-        else
+        if ! deploy_to_target "$target" "$tarball" "$release_name"; then
             failed+=("$target")
         fi
     done
-    
-    # Cleanup
-    if [ "$cleanup" = true ]; then
+
+    if [[ "$cleanup" == true ]]; then
         rm -f "$tarball"
     fi
-    
-    # Summary
-    echo ""
+
+    printf '\n'
     info "===== Deployment Summary ====="
     info "Successful: $((${#TARGETS[@]} - ${#failed[@]}))/${#TARGETS[@]}"
-    
-    if [ ${#failed[@]} -gt 0 ]; then
+    if [[ ${#failed[@]} -gt 0 ]]; then
         warn "Failed: ${failed[*]}"
         exit 1
     fi
-    
-    echo ""
-    info "To run on Pi:"
-    echo "  ssh ${TARGETS[0]}"
-    echo "  cd $REMOTE_DIR"
-    echo "  ./run.sh"
+
+    printf '\n'
+    info "To start the hardware runtime on a Pi:"
+    printf '  %s/bin/runtime_fleet\n' "$REMOTE_DEPLOY_ROOT"
+    printf '  sudo systemctl restart pennair-autonomy.service\n'
+    printf '  sudo systemctl status pennair-autonomy.service\n'
 }
 
 main "$@"
-

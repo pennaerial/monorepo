@@ -6,15 +6,15 @@ Developer tools for the SAE 2025 workspace.
 
 ## keyboard_teleop
 
-Keyboard-driven teleoperation for a payload. Publishes `payload_interfaces/DriveCommand` messages at 10 Hz.
+Keyboard-driven teleoperation for a payload. Publishes `payload_interfaces/DriveCommand` and `payload_interfaces/ServoCommand` messages at 10 Hz.
 
 ### Run
 
 ```bash
-ros2 run tools keyboard_teleop --ros-args -p topic:=/payload_0/drive_command
+ros2 run tools keyboard_teleop --ros-args -p payload_name:=payload_0
 ```
 
-The `topic` parameter is **required** — the node will error out if it is left empty.
+The `payload_name` parameter is **required** — the node will error out if it is left empty.
 
 ### Controls
 
@@ -27,13 +27,15 @@ The `topic` parameter is **required** — the node will error out if it is left 
 | Any other key | Stop (zero command) |
 | `m` / `M` | Increase / decrease linear speed by 0.1 |
 | `n` / `N` | Increase / decrease angular speed by 0.1 |
+| `[` / `]` | Decrease / increase servo angle |
+| `p` / `P` | Increase / decrease servo step by 5.0 |
 | `Ctrl-C` | Quit |
 
 ### Parameters
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `topic` | string | `""` | Topic to publish `DriveCommand` on (**required**) |
+| `payload_name` | string | `""` | Payload name used to derive `/{payload_name}/cmd_drive` and `/{payload_name}/servo` (**required**) |
 
 ---
 
@@ -45,10 +47,10 @@ Subscribes to a camera topic, runs AprilTag detection, and opens a live `cv2.ims
 
 ```bash
 # Raw image
-ros2 run tools apriltag_debug --ros-args -p topic:=/camera/image_raw -p compressed:=false
+ros2 run tools apriltag_debug --ros-args -p topic:=/camera -p compressed:=false
 
 # Compressed image
-ros2 run tools apriltag_debug --ros-args -p topic:=/camera/image_raw/compressed -p compressed:=true
+ros2 run tools apriltag_debug --ros-args -p topic:=/camera/compressed -p compressed:=true
 ```
 
 ### Visualization
@@ -64,7 +66,7 @@ Each detected tag is annotated with:
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `topic` | string | `""` | Camera topic to subscribe to. Defaults to `/camera/image_raw` (raw) or `/camera/image_raw/compressed` (compressed) if left empty |
+| `topic` | string | `""` | Camera topic to subscribe to. Defaults to `/camera` (raw) or `/camera/compressed` (compressed) if left empty |
 | `compressed` | bool | `false` | Set `true` to subscribe to `sensor_msgs/CompressedImage` instead of `sensor_msgs/Image` |
 | `tag_size_m` | double | `0.1` | Physical side length of the AprilTag in meters (used for pose estimation) |
 | `camera_fx` | double | `600.0` | Camera intrinsic — focal length X |

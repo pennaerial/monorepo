@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from pydantic import BaseModel, ConfigDict, Field
 
 try:
     from ament_index_python.packages import (
@@ -24,6 +25,20 @@ except ModuleNotFoundError:
 VALID_MISSION_TARGETS = {"uav", "payload"}
 _TOP_LEVEL_KEYS = {"modes"}
 _MODE_KEYS = {"class", "params", "transitions"}
+
+
+class MissionModeDocumentModel(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    class_path: str = Field(alias="class")
+    params: dict[str, Any] = Field(default_factory=dict)
+    transitions: dict[str, str] = Field(default_factory=dict)
+
+
+class MissionDocumentModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    modes: dict[str, MissionModeDocumentModel]
 
 
 def mission_root() -> Path:
@@ -66,6 +81,7 @@ class MissionSpec:
     target: str
     modes: dict[str, ModeSpec]
     vision_nodes: tuple[str, ...] = ()
+    requires_camera: bool = False
     path: Path | None = None
 
     @property
@@ -118,6 +134,7 @@ def load_mission_spec(path: str | Path | dict[str, Any]) -> MissionSpec:
     modes: dict[str, ModeSpec] = {}
     mode_targets: set[str] = set()
     vision_nodes: set[str] = set()
+    requires_camera = False
 
     for mode_name, mode_info in raw_modes.items():
         if not isinstance(mode_name, str) or not mode_name:
@@ -156,18 +173,41 @@ def load_mission_spec(path: str | Path | dict[str, Any]) -> MissionSpec:
                 f"Mode '{mode_name}' in '{mission_label}' must define transitions as a string-to-string mapping."
             )
 
-        mode_class = load_mode_class(class_path)
-        mission_target = getattr(mode_class, "mission_target", None)
+        from .schema import mode_entry_for_class_path, validate_mode_params
+
+        mode_entry = mode_entry_for_class_path(class_path)
+        mission_target = mode_entry.mission_target
         if mission_target not in VALID_MISSION_TARGETS:
             raise ValueError(
                 f"Mode '{class_path}' must declare mission_target as one of {sorted(VALID_MISSION_TARGETS)}."
             )
         mode_targets.add(mission_target)
-        vision_nodes.update(mode_class.required_vision_node_names())
+        vision_nodes.update(mode_entry.required_vision_nodes)
+        requires_camera = requires_camera or bool(mode_entry.required_vision_nodes)
+        requires_camera = requires_camera or bool(
+            getattr(mode_entry, "requires_camera", False)
+        )
+
+        try:
+            validated_params = validate_mode_params(class_path, dict(params))
+        except Exception as exc:
+            raise ValueError(
+                f"Mode '{mode_name}' in '{mission_label}' has invalid params for '{class_path}': {exc}"
+            ) from exc
+
+        unknown_transition_labels = sorted(
+            state
+            for state in transitions
+            if state not in set(mode_entry.transition_labels)
+        )
+        if unknown_transition_labels:
+            raise ValueError(
+                f"Mode '{mode_name}' in '{mission_label}' uses unsupported transition label(s) for '{class_path}': {unknown_transition_labels}"
+            )
 
         modes[mode_name] = ModeSpec(
             class_path=class_path,
-            params=dict(params),
+            params=validated_params,
             transitions=dict(transitions),
         )
 
@@ -191,5 +231,6 @@ def load_mission_spec(path: str | Path | dict[str, Any]) -> MissionSpec:
         target=next(iter(mode_targets)),
         modes=modes,
         vision_nodes=tuple(sorted(vision_nodes)),
+        requires_camera=requires_camera,
         path=mission_path,
     )

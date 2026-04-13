@@ -1,4 +1,4 @@
-import lgpio
+import pigpio
 import time
 
 # ----------------------
@@ -14,21 +14,26 @@ B_IN1 = 16
 B_IN2 = 20
 
 PWM_FREQ = 1000  # Hz
-PWM_DUTY = 50  # Percent (0–100)
+PWM_DUTY = 128  # ~50% of default range 0-255
 
 # ----------------------
 # Setup
 # ----------------------
 
-h = lgpio.gpiochip_open(0)
+pi = pigpio.pi()
+if not pi.connected:
+    print("ERROR: Could not connect to pigpiod — is the daemon running? (sudo pigpiod)")
+    exit(1)
 
 # Claim direction pins as outputs
 for pin in [A_IN1, A_IN2, B_IN1, B_IN2]:
-    lgpio.gpio_claim_output(h, pin, 0)
+    pi.set_mode(pin, pigpio.OUTPUT)
+    pi.write(pin, 0)
 
-# Claim PWM pins as outputs (needed before PWM)
+# Claim PWM pins as outputs
 for pin in [A_PWM, B_PWM]:
-    lgpio.gpio_claim_output(h, pin, 0)
+    pi.set_mode(pin, pigpio.OUTPUT)
+    pi.write(pin, 0)
 
 # ----------------------
 # Motor Control Functions
@@ -36,21 +41,23 @@ for pin in [A_PWM, B_PWM]:
 
 
 def motor_forward(pwm, in1, in2):
-    lgpio.gpio_write(h, in1, 1)
-    lgpio.gpio_write(h, in2, 0)
-    lgpio.tx_pwm(h, pwm, PWM_FREQ, PWM_DUTY)
+    pi.write(in1, 1)
+    pi.write(in2, 0)
+    pi.set_PWM_frequency(pwm, PWM_FREQ)
+    pi.set_PWM_dutycycle(pwm, PWM_DUTY)
 
 
 def motor_reverse(pwm, in1, in2):
-    lgpio.gpio_write(h, in1, 0)
-    lgpio.gpio_write(h, in2, 1)
-    lgpio.tx_pwm(h, pwm, PWM_FREQ, PWM_DUTY)
+    pi.write(in1, 0)
+    pi.write(in2, 1)
+    pi.set_PWM_frequency(pwm, PWM_FREQ)
+    pi.set_PWM_dutycycle(pwm, PWM_DUTY)
 
 
 def motor_stop(pwm, in1, in2):
-    lgpio.tx_pwm(h, pwm, PWM_FREQ, 0)  # stop PWM
-    lgpio.gpio_write(h, in1, 0)
-    lgpio.gpio_write(h, in2, 0)  # coast
+    pi.set_PWM_dutycycle(pwm, 0)
+    pi.write(in1, 0)
+    pi.write(in2, 0)
 
 
 # ----------------------
@@ -83,7 +90,7 @@ try:
 
 finally:
     # Cleanup
-    lgpio.tx_pwm(h, A_PWM, 0, 0)
-    lgpio.tx_pwm(h, B_PWM, 0, 0)
-    lgpio.gpiochip_close(h)
+    pi.set_PWM_dutycycle(A_PWM, 0)
+    pi.set_PWM_dutycycle(B_PWM, 0)
+    pi.stop()
     print("Done.")

@@ -1,0 +1,6 @@
+---
+bool has_image
+string current_color
+bool boundary_detected
+float64 lateral_error_px
+float64 boundary_angle

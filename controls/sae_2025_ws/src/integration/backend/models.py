@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -15,28 +15,77 @@ class MessageResponse(BaseModel):
     output: str
 
 
-class ConfigPayload(BaseModel):
-    pi_user: str
-    pi_host: str
-    remote_dir: str
-    ssh_key: str
-    ssh_pass: str
+class OperatorConfigPayload(BaseModel):
     github_repo: str
+    github_token: str
     hotspot_name: str
+    inventory_path: str
+    default_deploy_root: str
+    default_pi_user: str
+    default_ssh_key: str
+    default_ssh_pass: str
 
 
 class WorkspacePathsPayload(BaseModel):
-    workspace_root: str
-    launch_params: str
+    deploy_root: str
+    current_release: str
+    runtime_fleet: str
+    fleet_file: str
+    overlay_file: str
     missions_dir: str
-    uav_modes_dir: str
-    payload_modes_dir: str
+
+
+class TargetPayload(BaseModel):
+    target_id: str
+    label: str
+    pi_user: str
+    pi_host: str
+    deploy_root: str
+    ssh_key: str
+    ssh_pass: str
+    vehicle_name: str
+    overlay_yaml: str
+    service_unit: str
+    enabled: bool
+    ssh_target: str
+    workspace_paths: WorkspacePathsPayload
 
 
 class ConfigResponse(BaseModel):
     success: Literal[True] = True
-    config: ConfigPayload
-    workspace_paths: WorkspacePathsPayload
+    config: OperatorConfigPayload
+
+
+class LiveHardwareDeviceResponse(BaseModel):
+    hardware_id: str
+    hostname: str
+    addresses: list[str] = Field(default_factory=list)
+    service_name: str | None = None
+    service_type: str | None = None
+    last_seen_at: str | None = None
+    discovery_stale: bool = False
+    matched_target_id: str | None = None
+    matched_label: str | None = None
+    saved: bool = False
+
+
+class HardwareDiscoveryResponse(BaseModel):
+    success: bool
+    devices: list[LiveHardwareDeviceResponse] = Field(default_factory=list)
+    error: str | None = None
+
+
+class InventoryResponse(BaseModel):
+    success: Literal[True] = True
+    active_target_id: str
+    targets: list[TargetPayload] = Field(default_factory=list)
+
+
+class InventoryMutationResponse(BaseModel):
+    success: Literal[True] = True
+    output: str
+    target: TargetPayload | None = None
+    active_target_id: str | None = None
 
 
 class ConnectionStatusResponse(BaseModel):
@@ -83,20 +132,219 @@ class BuildCurrentResponse(BaseModel):
     success: Literal[True] = True
     installed: bool
     info: str
+    release_id: str | None = None
 
 
 class BuildListItem(BaseModel):
+    source: Literal["release", "actions"]
     tag: str
     sha: str
+    commit_sha: str | None = None
+    commit_subject: str | None = None
     name: str
     date: str
     download_url: str | None = None
     size_mb: float | None = None
+    run_id: str | None = None
+    artifact_id: str | None = None
+    artifact_name: str | None = None
+    branch: str | None = None
+    workflow_name: str | None = None
+    workflow_event: str | None = None
+    workflow_conclusion: str | None = None
+    deployable: bool = True
+    fallback: bool = False
 
 
 class BuildListResponse(BaseModel):
     success: bool
     builds: list[BuildListItem] = Field(default_factory=list)
+    releases: list[BuildListItem] = Field(default_factory=list)
+    artifacts: list[BuildListItem] = Field(default_factory=list)
+    artifact_page: int = 1
+    artifact_page_size: int = 20
+    artifact_has_more: bool = False
+    error: str | None = None
+
+
+class FleetVehiclePreview(BaseModel):
+    name: str
+    kind: str | None = None
+    mission: str | None = None
+    mission_path: str | None = None
+    auto_launch: bool | None = None
+    debug: bool | None = None
+    vision_debug: bool | None = None
+    save_vision_milliseconds: int | None = None
+    servo_only: bool | None = None
+    camera_mount_offsets: list[float] = Field(default_factory=list)
+    camera_input_transport: str | None = None
+    camera_rotate_degrees: float | None = None
+    camera_preprocess_hook: str | None = None
+    px4_airframe_id: int | None = None
+    px4_namespace: str | None = None
+    payload_controller: str | None = None
+
+
+class BuildSourcePayload(BaseModel):
+    kind: Literal["none", "github", "local_artifact", "local_codebase"]
+    summary: str
+    github_source: Literal["release", "actions"] | None = None
+    tag: str | None = None
+    artifact_id: str | None = None
+    run_id: str | None = None
+    sha: str | None = None
+    commit_subject: str | None = None
+    name: str | None = None
+    date: str | None = None
+    download_url: str | None = None
+    size_mb: float | None = None
+    branch: str | None = None
+    artifact_name: str | None = None
+    workflow_name: str | None = None
+    workflow_event: str | None = None
+    workflow_conclusion: str | None = None
+    local_artifact_path: str | None = None
+    local_artifact_exists: bool | None = None
+    local_artifact_size_bytes: int | None = None
+    codebase_root: str | None = None
+    fleet_file: str | None = None
+    available_fleets: list[str] = Field(default_factory=list)
+    fleet_options: list[str] = Field(default_factory=list)
+    fleet_catalog_source: str | None = None
+    fleet_catalog_error: str | None = None
+    fleet_catalog_stale: bool = False
+    fleet_exists: bool | None = None
+    fleet_error: str | None = None
+    fleet_vehicles: list[FleetVehiclePreview] = Field(default_factory=list)
+    updated_at: str | None = None
+
+
+class BuildSourceResponse(BaseModel):
+    success: bool
+    source: BuildSourcePayload | None = None
+    output: str | None = None
+    error: str | None = None
+
+
+class FleetCatalogResponse(BaseModel):
+    success: bool
+    source_kind: str
+    source_label: str | None = None
+    selected_fleet_file: str | None = None
+    available_fleets: list[str] = Field(default_factory=list)
+    fleet_options: list[str] = Field(default_factory=list)
+    fleet_catalog_source: str | None = None
+    fleet_catalog_error: str | None = None
+    fleet_catalog_stale: bool = False
+    fleet_exists: bool | None = None
+    fleet_error: str | None = None
+    fleet_vehicles: list[FleetVehiclePreview] = Field(default_factory=list)
+    error: str | None = None
+
+
+class FleetConnectionSummary(BaseModel):
+    success: bool
+    connected: bool
+    target: str | None = None
+    info: str = ""
+    error: str | None = None
+
+
+class FleetCurrentBuildSummary(BaseModel):
+    success: bool
+    installed: bool
+    info: str
+    release_id: str | None = None
+
+
+class FleetRuntimeSummary(BaseModel):
+    success: bool
+    running: bool
+    state: str
+    pid: str | None = None
+    error: str | None = None
+
+
+class FleetReadinessSummary(BaseModel):
+    connected: bool = False
+    build_installed: bool = False
+    runtime_ready: bool = False
+    vehicle_assigned: bool = False
+    ready: bool = False
+    notes: list[str] = Field(default_factory=list)
+
+
+class FleetBoardDeviceResponse(LiveHardwareDeviceResponse):
+    target_id: str | None = None
+    vehicle_name: str | None = None
+    fleet_vehicle: FleetVehiclePreview | None = None
+    connection: FleetConnectionSummary | None = None
+    current_build: FleetCurrentBuildSummary | None = None
+    runtime: FleetRuntimeSummary | None = None
+    readiness: FleetReadinessSummary | None = None
+
+
+class FleetBoardSummary(BaseModel):
+    total_devices: int = 0
+    saved_devices: int = 0
+    stale_devices: int = 0
+    connected_devices: int = 0
+    build_installed_devices: int = 0
+    running_devices: int = 0
+    ready_devices: int = 0
+
+
+class FleetBoardResponse(BaseModel):
+    success: bool
+    build_source: BuildSourceResponse
+    fleet_catalog: FleetCatalogResponse
+    fleet_vehicles: list[FleetVehiclePreview] = Field(default_factory=list)
+    devices: list[FleetBoardDeviceResponse] = Field(default_factory=list)
+    summary: FleetBoardSummary = Field(default_factory=FleetBoardSummary)
+    error: str | None = None
+
+
+class FleetDeviceSelection(BaseModel):
+    target_id: str | None = None
+    hostname: str | None = None
+    vehicle_name: str | None = None
+    label: str | None = None
+    pi_user: str | None = None
+    deploy_root: str | None = None
+    service_unit: str | None = None
+    ssh_key: str | None = None
+    ssh_pass: str | None = None
+
+
+class FleetBatchRequest(BaseModel):
+    devices: list[FleetDeviceSelection] = Field(default_factory=list)
+
+
+class FleetActionDeviceResponse(FleetBoardDeviceResponse):
+    action: str
+    success: bool
+    attempted_release_id: str | None = None
+    active_release_id: str | None = None
+    rolled_back: bool = False
+    output: str | None = None
+    error: str | None = None
+
+
+class FleetActionSummary(BaseModel):
+    requested_devices: int = 0
+    successful_devices: int = 0
+    failed_devices: int = 0
+
+
+class FleetActionResponse(BaseModel):
+    success: bool
+    action: str
+    build_source: BuildSourceResponse
+    fleet_catalog: FleetCatalogResponse
+    fleet_vehicles: list[FleetVehiclePreview] = Field(default_factory=list)
+    results: list[FleetActionDeviceResponse] = Field(default_factory=list)
+    summary: FleetActionSummary = Field(default_factory=FleetActionSummary)
     error: str | None = None
 
 
@@ -171,3 +419,84 @@ class TerminalInfoMessage(BaseModel):
 class BuildTransferResult(BaseModel):
     artifact_name: str
     output: str
+
+
+class SchemaFieldResponse(BaseModel):
+    name: str
+    schema_type: str
+    annotation: str
+    required: bool
+    default: Any | None = None
+    default_kind: Literal["missing", "none", "value", "nan"] = "missing"
+    nullable: bool = False
+    choices: list[Any] = Field(default_factory=list)
+    description: str | None = None
+    editable: bool = True
+    derived: bool = False
+    applies_to: list[str] = Field(default_factory=list)
+
+
+class ModeMetadataResponse(BaseModel):
+    name: str
+    class_path: str
+    module: str
+    mission_target: str
+    description: str | None = None
+    required_vision_nodes: list[str] = Field(default_factory=list)
+    transition_labels: list[str] = Field(default_factory=list)
+    params: list[SchemaFieldResponse] = Field(default_factory=list)
+    params_schema: dict[str, Any] = Field(default_factory=dict)
+
+
+class MissionModeResponse(BaseModel):
+    name: str
+    class_path: str
+    params: dict[str, Any] = Field(default_factory=dict)
+    transitions: dict[str, str] = Field(default_factory=dict)
+    metadata: ModeMetadataResponse
+
+
+class MissionSchemaResponse(BaseModel):
+    success: Literal[True] = True
+    name: str
+    path: str
+    target: str
+    start_mode: str
+    vision_nodes: list[str] = Field(default_factory=list)
+    modes: list[MissionModeResponse] = Field(default_factory=list)
+    document_schema: dict[str, Any] = Field(default_factory=dict)
+
+
+class MissionCatalogResponse(BaseModel):
+    success: Literal[True] = True
+    available_missions: list[str] = Field(default_factory=list)
+    missions: list[MissionSchemaResponse] = Field(default_factory=list)
+
+
+class ModeRegistryResponse(BaseModel):
+    success: Literal[True] = True
+    targets: dict[str, list[ModeMetadataResponse]] = Field(default_factory=dict)
+
+
+class FleetSectionSchemaResponse(BaseModel):
+    name: str
+    description: str | None = None
+    applies_to: list[str] = Field(default_factory=list)
+    constraints: list[str] = Field(default_factory=list)
+    fields: list[SchemaFieldResponse] = Field(default_factory=list)
+
+
+class FleetSchemaResponse(BaseModel):
+    success: Literal[True] = True
+    available_fleets: list[str] = Field(default_factory=list)
+    backend_kinds: list[str] = Field(default_factory=list)
+    sections: list[FleetSectionSchemaResponse] = Field(default_factory=list)
+    excluded_keys: list[str] = Field(default_factory=list)
+    document_schema: dict[str, Any] = Field(default_factory=dict)
+
+
+class SchemaIndexResponse(BaseModel):
+    success: Literal[True] = True
+    missions: MissionCatalogResponse
+    fleet: FleetSchemaResponse
+    modes: ModeRegistryResponse

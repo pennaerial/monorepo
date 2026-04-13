@@ -5,19 +5,30 @@ world:
     vehicle_pose: [5.0, 5.0, 0.0, 0.0, 0.0, 0.0]  # [x, y, z, roll, pitch, yaw]
     physics:
       friction: 0.0 # friction coefficient for the ground plane
-    dlz:
-      path_to_sdf: "~/.simulation-gazebo/models/dlz/model.sdf"
-      position: [25.0, -20.0, 0.0]
-      rpy: [0.0, 0.0, 0.0]
-    # payload_0:
-    #   path_to_sdf: "~/.simulation-gazebo/models/payload/model.sdf"
-    #   position: [0.0, 0.0, 0.0]
-    #   rpy: [0.0, 0.0, 0.0]
-    # payload_1:
-    #   path_to_sdf: "~/.simulation-gazebo/models/payload/model.sdf"
-    #   position: [0.0, 0.0, 0.0]
-    #   rpy: [0.0, 0.0, 0.0]
-    # entities:  # misc entities not specific to SAE (e.g. debug markers, extra props)
+    entities:
+      dlz:
+        path_to_sdf: "~/.simulation-gazebo/models/dlz/model.sdf"
+        position: [20.0, -20.0, 0.0]
+        rpy: [0.0, 0.0, 0.0]
+    controllables:
+      uav_0:
+        kind: uav
+        model: gz_standard_vtol
+        px4_airframe_id: 4004
+        path_to_sdf: "~/.simulation-gazebo/models/standard_vtol/model.sdf"
+        position: [5.0, 5.0, 0.0]
+        rpy: [0.0, 0.0, 0.0]
+    #   payload_0:
+    #     kind: payload
+    #     path_to_sdf: "~/.simulation-gazebo/models/payload/model.sdf"
+    #     position: [0.0, 0.0, 0.0]
+    #     rpy: [0.0, 0.0, 0.0]
+    #   payload_1:
+    #     kind: payload
+    #     path_to_sdf: "~/.simulation-gazebo/models/payload/model.sdf"
+    #     position: [0.0, 0.0, 0.0]
+    #     rpy: [0.0, 0.0, 0.0]
+    #   # misc entities not specific to SAE (e.g. debug markers, extra props)
     #   my_marker:
     #     path_to_sdf: "~/.simulation-gazebo/models/my_marker/model.sdf"
     #     position: [0.0, 0.0, 0.0]

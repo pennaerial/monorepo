@@ -4,7 +4,6 @@ from sim.world_gen.entity import Entity
 from abc import ABC, abstractmethod
 from typing import List, Tuple, Optional
 from sim_interfaces.srv import HoopList
-from ros_gz_interfaces.srv import SpawnEntity
 import math
 import rclpy
 from rclpy.executors import ExternalShutdownException
@@ -621,6 +620,7 @@ class HoopCourseNode(WorldNode):
             else:
                 raise ValueError(f"Invalid course: {self.course}")
 
+            success = True
             hoop_positions = course.generate_course()
             for idx, (x, y, z, roll, pitch, yaw) in enumerate(hoop_positions, start=1):
                 z = 1 if z < 1 else z
@@ -632,15 +632,11 @@ class HoopCourseNode(WorldNode):
                     world=self.competition_name,
                 )
                 self.hoops.append(hoop_entity)
-                req = SpawnEntity.Request()
-                req.entity_factory = hoop_entity.to_entity_factory_msg()
-                self.spawn_entity_client.call_async(req)
+                success = self.spawn_entity_object(hoop_entity) and success
 
             self.dlz_entities = self.create_dlzs_from_hoops(self.hoops)
             for idx, dlz_ent in enumerate(self.dlz_entities, start=1):
-                req = SpawnEntity.Request()
-                req.entity_factory = dlz_ent.to_entity_factory_msg()
-                self.spawn_entity_client.call_async(req)
+                success = self.spawn_entity_object(dlz_ent) and success
 
             self.get_logger().info(
                 f"Generated {len(self.hoops)} hoops for {self.course} course"
@@ -648,7 +644,7 @@ class HoopCourseNode(WorldNode):
         except Exception as e:
             self.get_logger().error(f"Failed to generate world: {e}")
             return False
-        return super().generate_world()
+        return super().generate_world() and success
 
 
 def main(args=None):

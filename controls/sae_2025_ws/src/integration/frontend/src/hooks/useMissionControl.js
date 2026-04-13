@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 
-import { api } from '../services/api'
+import { api, normalizeFleetActionResult, withDeviceFormData, withDeviceScope } from '../services/api'
 
 const MAX_TERMINAL_BUFFER_CHARS = 1_000_000
 
@@ -17,7 +17,7 @@ function offlineMissionState() {
     launch_state: 'offline',
     running: false,
     pid: null,
-    message: 'Pi offline',
+    message: 'Target offline',
     error: null,
     updated_at: Date.now() / 1000,
   }
@@ -36,7 +36,7 @@ function initialMissionState(connected) {
   }
 }
 
-export function useMissionControl({ connected, onRefresh }) {
+export function useMissionControl({ connected, onRefresh, targetId, hostname = '', vehicleName = '' }) {
   const [actionLoading, setActionLoading] = useState('')
   const [actionResult, setActionResult] = useState(null)
 
@@ -50,6 +50,11 @@ export function useMissionControl({ connected, onRefresh }) {
   const [missionNames, setMissionNames] = useState([])
   const [missionNamesLoading, setMissionNamesLoading] = useState(false)
   const [missionNamesError, setMissionNamesError] = useState(null)
+  const [modeRegistry, setModeRegistry] = useState({})
+  const [schemaLoading, setSchemaLoading] = useState(false)
+  const [schemaError, setSchemaError] = useState(null)
+  const [missionDocumentSchema, setMissionDocumentSchema] = useState(null)
+  const [fleetDocumentSchema, setFleetDocumentSchema] = useState(null)
   const [missionFileText, setMissionFileText] = useState('')
   const [missionFileLoading, setMissionFileLoading] = useState(false)
   const [missionFileSaving, setMissionFileSaving] = useState(false)
@@ -66,6 +71,11 @@ export function useMissionControl({ connected, onRefresh }) {
   const streamReconnectTimerRef = useRef(null)
   const hasLoadedLogsRef = useRef(false)
   const logCursorRef = useRef({ offset: 0, inode: 0 })
+
+  const targetUrl = useCallback(
+    (url) => withDeviceScope(url, { hostname, vehicleName }),
+    [hostname, targetId, vehicleName]
+  )
 
   const resetTerminal = useCallback((text = '') => {
     const normalized = trimTerminalBuffer(text)
@@ -164,7 +174,7 @@ export function useMissionControl({ connected, onRefresh }) {
 
     const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
     const cursor = logCursorRef.current
-    const url = `${proto}://${window.location.host}/ws/mission/terminal?offset=${cursor.offset}&inode=${cursor.inode}`
+    const url = `${proto}://${window.location.host}${targetUrl(`/ws/mission/terminal?offset=${cursor.offset}&inode=${cursor.inode}`)}`
     const ws = new WebSocket(url)
 
     streamRef.current = ws
@@ -238,7 +248,7 @@ export function useMissionControl({ connected, onRefresh }) {
         }, 1000)
       }
     }
-  }, [appendTerminal, connected, resetTerminal])
+  }, [appendTerminal, connected, resetTerminal, targetUrl])
 
   const loadFullLogs = useCallback(async () => {
     if (!connected) {
@@ -246,7 +256,7 @@ export function useMissionControl({ connected, onRefresh }) {
       return false
     }
 
-    const data = await api('/api/mission/launch/logs?offset=0&inode=0')
+    const data = await api(targetUrl('/api/mission/launch/logs?offset=0&inode=0'))
     if (data.success) {
       const text = data.logs || ''
       resetTerminal(text)
@@ -261,7 +271,7 @@ export function useMissionControl({ connected, onRefresh }) {
 
     setLogsResult(data)
     return false
-  }, [connected, resetTerminal])
+  }, [connected, resetTerminal, targetUrl])
 
   const refreshMissionState = useCallback(async (forceFullLogs = false) => {
     if (!connected) {
@@ -277,7 +287,7 @@ export function useMissionControl({ connected, onRefresh }) {
     statusInFlightRef.current = true
 
     try {
-      const stateRes = await api('/api/mission/state')
+      const stateRes = await api(targetUrl('/api/mission/state'))
       if (!stateRes.success || !stateRes.state) {
         const fallbackError = stateRes?.error || 'Failed to refresh mission state'
         streamActiveRef.current = false
@@ -317,7 +327,7 @@ export function useMissionControl({ connected, onRefresh }) {
     } finally {
       statusInFlightRef.current = false
     }
-  }, [closeTerminalStream, connected, loadFullLogs, openTerminalStream])
+  }, [closeTerminalStream, connected, loadFullLogs, openTerminalStream, targetUrl])
 
   const refreshLaunchData = useCallback(async (forceFullLogs = false) => {
     await refreshMissionState(forceFullLogs)
@@ -332,7 +342,7 @@ export function useMissionControl({ connected, onRefresh }) {
     }
 
     setMissionNamesLoading(true)
-    const data = await api('/api/mission/mission-names')
+    const data = await api(targetUrl('/api/mission/mission-names'))
     if (data.success && Array.isArray(data.missions)) {
       setMissionNames(data.missions)
       setMissionNamesError(null)
@@ -341,7 +351,33 @@ export function useMissionControl({ connected, onRefresh }) {
       setMissionNamesError(data?.error || 'Failed to load mission names')
     }
     setMissionNamesLoading(false)
-  }, [connected])
+  }, [connected, targetUrl])
+
+  const loadSchema = useCallback(async () => {
+    if (!connected) {
+      setModeRegistry({})
+      setSchemaError(null)
+      setSchemaLoading(false)
+      setMissionDocumentSchema(null)
+      setFleetDocumentSchema(null)
+      return
+    }
+
+    setSchemaLoading(true)
+    const data = await api(targetUrl('/api/schema'))
+    if (data.success) {
+      setModeRegistry(data?.modes?.targets || {})
+      setMissionDocumentSchema(data?.missions?.missions?.[0]?.document_schema || null)
+      setFleetDocumentSchema(data?.fleet?.document_schema || null)
+      setSchemaError(null)
+    } else {
+      setModeRegistry({})
+      setMissionDocumentSchema(null)
+      setFleetDocumentSchema(null)
+      setSchemaError(data?.error || 'Failed to load schema metadata')
+    }
+    setSchemaLoading(false)
+  }, [connected, targetUrl])
 
   const loadParams = useCallback(async () => {
     if (!connected) {
@@ -352,7 +388,7 @@ export function useMissionControl({ connected, onRefresh }) {
     setParamsLoading(true)
     setParamsResult(null)
 
-    const data = await api('/api/mission/launch-params')
+    const data = await api(targetUrl('/api/mission/launch-params'))
     if (data.success) {
       setParamsText(data.content || '')
     } else {
@@ -360,8 +396,9 @@ export function useMissionControl({ connected, onRefresh }) {
     }
 
     await loadMissionNames()
+    await loadSchema()
     setParamsLoading(false)
-  }, [connected, loadMissionNames])
+  }, [connected, loadMissionNames, loadSchema, targetUrl])
 
   const loadMissionFile = useCallback(async (missionName) => {
     if (!connected) {
@@ -380,7 +417,7 @@ export function useMissionControl({ connected, onRefresh }) {
 
     setMissionFileLoading(true)
     setMissionFileResult(null)
-    const data = await api(`/api/mission/mission-file?name=${encodeURIComponent(name)}`)
+    const data = await api(targetUrl(`/api/mission/mission-file?name=${encodeURIComponent(name)}`))
     if (data.success) {
       setMissionFileText(data.content || '')
       setMissionFileResult(null)
@@ -392,17 +429,17 @@ export function useMissionControl({ connected, onRefresh }) {
     setMissionFileResult(data)
     setMissionFileLoading(false)
     return false
-  }, [connected])
+  }, [connected, targetUrl])
 
   const saveMissionFile = useCallback(async (missionName) => {
     if (!connected) {
-      setMissionFileResult({ success: false, error: 'Connect to the Pi WiFi before editing mission YAML.' })
+      setMissionFileResult({ success: false, error: 'Connect to the target WiFi before editing mission YAML.' })
       return false
     }
 
     const name = `${missionName || ''}`.trim()
     if (!name) {
-      setMissionFileResult({ success: false, error: 'Set mission_name in launch params before saving mission YAML.' })
+      setMissionFileResult({ success: false, error: 'Select a mission from the fleet context before saving mission YAML.' })
       return false
     }
 
@@ -411,15 +448,18 @@ export function useMissionControl({ connected, onRefresh }) {
     const fd = new FormData()
     fd.append('name', name)
     fd.append('content', missionFileText)
-    const data = await api('/api/mission/mission-file', { method: 'POST', body: fd })
+    const data = await api(targetUrl('/api/mission/mission-file'), {
+      method: 'POST',
+      body: withDeviceFormData(fd, { hostname, vehicleName }),
+    })
     setMissionFileResult(data)
     setMissionFileSaving(false)
     return Boolean(data.success)
-  }, [connected, missionFileText])
+  }, [connected, missionFileText, targetId, targetUrl])
 
   const saveParams = useCallback(async () => {
     if (!connected) {
-      setParamsResult({ success: false, error: 'Connect to the Pi WiFi before editing launch params.' })
+      setParamsResult({ success: false, error: 'Connect to the target WiFi before editing deploy overrides.' })
       return
     }
 
@@ -429,14 +469,17 @@ export function useMissionControl({ connected, onRefresh }) {
     const fd = new FormData()
     fd.append('content', paramsText)
 
-    const data = await api('/api/mission/launch-params', { method: 'POST', body: fd })
+    const data = await api(targetUrl('/api/mission/launch-params'), {
+      method: 'POST',
+      body: withDeviceFormData(fd, { hostname, vehicleName }),
+    })
     setParamsResult(data)
     setParamsLoading(false)
-  }, [connected, paramsText])
+  }, [connected, paramsText, targetId, targetUrl])
 
   const runAction = useCallback(async (name, url) => {
     if (!connected) {
-      setActionResult({ success: false, error: 'Connect to the Pi WiFi before running mission actions.' })
+      setActionResult({ success: false, error: 'Connect to the target WiFi before running mission actions.' })
       return
     }
 
@@ -449,13 +492,13 @@ export function useMissionControl({ connected, onRefresh }) {
       logCursorRef.current = { offset: 0, inode: 0 }
     }
 
-    const data = await api(url, { method: 'POST' })
+    const data = normalizeFleetActionResult(await api(targetUrl(url), { method: 'POST' }))
     setActionResult(data)
     setActionLoading('')
 
     await refreshLaunchData(true)
     await onRefresh()
-  }, [connected, onRefresh, refreshLaunchData, resetTerminal])
+  }, [connected, onRefresh, refreshLaunchData, resetTerminal, targetUrl])
 
   useEffect(() => {
     if (!connected) {
@@ -467,6 +510,11 @@ export function useMissionControl({ connected, onRefresh }) {
       setMissionNames([])
       setMissionNamesError(null)
       setMissionNamesLoading(false)
+      setModeRegistry({})
+      setSchemaLoading(false)
+      setSchemaError(null)
+      setMissionDocumentSchema(null)
+      setFleetDocumentSchema(null)
       setMissionFileText('')
       setMissionFileLoading(false)
       setMissionFileSaving(false)
@@ -476,9 +524,31 @@ export function useMissionControl({ connected, onRefresh }) {
       setStreamConnected(false)
       hasLoadedLogsRef.current = false
       logCursorRef.current = { offset: 0, inode: 0 }
-      resetTerminal('Connect to the Pi WiFi to view launch output.\r\n')
+      resetTerminal('Connect to the target WiFi to view runtime output.\r\n')
       return undefined
     }
+
+    setParamsText('')
+    setParamsResult(null)
+    setMissionNames([])
+    setMissionNamesError(null)
+    setMissionNamesLoading(false)
+    setModeRegistry({})
+    setSchemaLoading(false)
+    setSchemaError(null)
+    setMissionDocumentSchema(null)
+    setFleetDocumentSchema(null)
+    setMissionFileText('')
+    setMissionFileLoading(false)
+    setMissionFileSaving(false)
+    setMissionFileResult(null)
+    setActionResult(null)
+    setActionLoading('')
+    setLogsResult(null)
+    setStreamConnected(false)
+    hasLoadedLogsRef.current = false
+    logCursorRef.current = { offset: 0, inode: 0 }
+    resetTerminal('Loading target runtime...\r\n')
 
     loadFullLogs()
     refreshMissionState(false)
@@ -493,7 +563,7 @@ export function useMissionControl({ connected, onRefresh }) {
       streamActiveRef.current = false
       closeTerminalStream()
     }
-  }, [closeTerminalStream, connected, loadFullLogs, loadParams, refreshMissionState, resetTerminal])
+  }, [closeTerminalStream, connected, loadFullLogs, loadParams, refreshMissionState, resetTerminal, targetId])
 
   return {
     terminalHostRef,
@@ -510,6 +580,11 @@ export function useMissionControl({ connected, onRefresh }) {
     missionNames,
     missionNamesLoading,
     missionNamesError,
+    modeRegistry,
+    schemaLoading,
+    schemaError,
+    missionDocumentSchema,
+    fleetDocumentSchema,
     missionFileText,
     setMissionFileText,
     missionFileLoading,
@@ -517,6 +592,7 @@ export function useMissionControl({ connected, onRefresh }) {
     missionFileResult,
     setMissionFileResult,
     loadParams,
+    loadSchema,
     loadMissionFile,
     saveMissionFile,
     saveParams,

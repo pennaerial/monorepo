@@ -4,8 +4,8 @@ import importlib
 from time import time
 from typing import Any, get_type_hints
 
-import rclpy
 from rclpy.node import Node
+from std_srvs.srv import Trigger
 
 from uav.vehicles.Vehicle import Vehicle
 from uav.modes.Mode import Mode
@@ -17,7 +17,7 @@ VISION_NODE_PATH = "uav.vision_nodes"
 class ModeManager(Node):
     """Shared mission manager plumbing for a single bound vehicle."""
 
-    def __init__(self, node_name: str) -> None:
+    def __init__(self, node_name: str, *, auto_launch: bool = True) -> None:
         super().__init__(node_name)
         self.vehicle = None
         self.modes = {}
@@ -25,6 +25,14 @@ class ModeManager(Node):
         self.active_mode = None
         self.last_update_time = time()
         self._vision_clients = {}
+        self.timer = None
+        self.auto_launch = bool(auto_launch)
+        self._auto_launch_timer = None
+        self.start_mission_service = self.create_service(
+            Trigger, "mode_manager/start_mission", self._start_mission_callback
+        )
+        if self.auto_launch:
+            self._auto_launch_timer = self.create_timer(0.1, self._maybe_auto_launch)
 
     def get_active_mode(self) -> Mode:
         return self.modes[self.active_mode]
@@ -158,8 +166,25 @@ class ModeManager(Node):
         state = self.get_active_mode().check_status()
         self.handle_mode_state(state)
 
+    def _deactivate_active_mode(self) -> None:
+        if not self.active_mode:
+            return
+
+        mode_name = self.active_mode
+        mode = self.modes.get(mode_name)
+        self.active_mode = None
+        if mode is None or not getattr(mode, "active", False):
+            return
+
+        try:
+            mode.deactivate()
+        except Exception as exc:
+            self.get_logger().warn(
+                f"Failed to deactivate mode {mode_name} during shutdown: {exc}"
+            )
+
     def _stop_vehicle(self) -> None:
-        if self.vehicle is None or not rclpy.ok():
+        if self.vehicle is None:
             return
         stop_method = getattr(self.vehicle, "stop", None)
         if callable(stop_method):
@@ -168,15 +193,54 @@ class ModeManager(Node):
             except Exception as exc:
                 self.get_logger().warn(f"Failed to stop vehicle during shutdown: {exc}")
 
+    def _start_mission_callback(self, request, response):
+        started = self.start_mission()
+        response.success = True
+        response.message = (
+            "Starting Mission!" if started else "Mission already started."
+        )
+        return response
+
+    def start_mission(self) -> bool:
+        if self.timer is not None:
+            return False
+        self._cancel_auto_launch_timer()
+        self.last_update_time = time()
+        self.get_logger().info("MODE MANAGER | Starting Mission!")
+        self.timer = self.create_timer(0.1, self.spin_once)
+        return True
+
+    def _cancel_auto_launch_timer(self) -> None:
+        if self._auto_launch_timer is None:
+            return
+        cancel = getattr(self._auto_launch_timer, "cancel", None)
+        if callable(cancel):
+            cancel()
+        self._auto_launch_timer = None
+
+    def _auto_launch_ready(self) -> bool:
+        return True
+
+    def _maybe_auto_launch(self) -> None:
+        if self.timer is not None:
+            self._cancel_auto_launch_timer()
+            return
+        if not self._auto_launch_ready():
+            return
+        self.get_logger().info("MODE MANAGER | Auto-launch conditions satisfied.")
+        self.start_mission()
+
     def handle_mode_state(self, state: str) -> None:
         if state == "error":
             self.get_logger().error(
                 f"Error in mode {self.active_mode}. Switching to safe stop behavior."
             )
+            self._deactivate_active_mode()
             self._stop_vehicle()
             self.destroy_node()
         elif state == "terminate":
             self.get_logger().info("Mission has completed.")
+            self._deactivate_active_mode()
             self._stop_vehicle()
             self.destroy_node()
         elif state != "continue":

@@ -1,0 +1,27 @@
+<?xml version="1.0" ?>
+<sdf version="1.9">
+  <!-- Tall narrow strip: side view of a standing cylinder / vertical tape. -->
+  <model name="string_obstacle">
+    <static>true</static>
+    <link name="link">
+      <visual name="visual">
+        <geometry>
+          <box>
+            <size>0.025 0.025 0.35</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0.14 0.14 0.14 1</ambient>
+          <diffuse>0.22 0.22 0.22 1</diffuse>
+        </material>
+      </visual>
+      <collision name="collision">
+        <geometry>
+          <box>
+            <size>0.025 0.025 0.35</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+  </model>
+</sdf>

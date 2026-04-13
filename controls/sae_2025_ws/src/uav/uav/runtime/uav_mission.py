@@ -13,12 +13,30 @@ class UAVMissionBootstrap(Node):
     def __init__(self) -> None:
         super().__init__("uav_mission_bootstrap")
         self.declare_parameter("mode_map", mission_path_for_name("basic"))
+        self.declare_parameter("auto_launch", True)
         self.declare_parameter("debug", False)
         self.declare_parameter("servo_only", False)
+        self.declare_parameter("vehicle_name", "uav")
+        self.declare_parameter("px4_namespace", "")
         self.declare_parameter("vehicle_class", AirframeClass.MULTICOPTER.name)
-        self.declare_parameter("uav_camera_offsets", [0.0, 0.0, 0.0])
+        self.declare_parameter("camera_mount_offsets", [0.0, 0.0, 0.0])
 
-    def build_manager(self) -> UAVModeManager:
+    def _string_parameter(self, name: str, default: str = "") -> str:
+        try:
+            value = self.get_parameter(name).value
+        except (AttributeError, KeyError):
+            return default
+        return default if value is None else str(value).strip()
+
+    def _bool_parameter(self, name: str) -> bool:
+        value = self.get_parameter(name).value
+        if not isinstance(value, bool):
+            raise ValueError(
+                f"uav_mission requires boolean parameter '{name}', received {value!r}."
+            )
+        return value
+
+    def manager_kwargs(self) -> dict:
         mission_path = str(self.get_parameter("mode_map").value)
         if not mission_path:
             raise ValueError("uav_mission requires a non-empty 'mode_map'.")
@@ -29,16 +47,20 @@ class UAVMissionBootstrap(Node):
                 f"uav_mission requires a UAV mission spec, received target '{mission_spec.target}'."
             )
 
-        return UAVModeManager(
-            mission_spec=mission_spec,
-            debug=bool(self.get_parameter("debug").value),
-            servo_only=bool(self.get_parameter("servo_only").value),
-            vehicle_class=AirframeClass.parse(
+        return {
+            "mission_spec": mission_spec,
+            "auto_launch": self._bool_parameter("auto_launch"),
+            "debug": bool(self.get_parameter("debug").value),
+            "servo_only": bool(self.get_parameter("servo_only").value),
+            "vehicle_name": str(self.get_parameter("vehicle_name").value).strip()
+            or "uav",
+            "px4_namespace": self._string_parameter("px4_namespace"),
+            "vehicle_class": AirframeClass.parse(
                 self.get_parameter("vehicle_class").value
             ),
-            camera_offsets=list(self.get_parameter("uav_camera_offsets").value),
-            node_name="mission",
-        )
+            "camera_offsets": list(self.get_parameter("camera_mount_offsets").value),
+            "node_name": "mission",
+        }
 
 
 def main(args=None) -> None:
@@ -47,9 +69,10 @@ def main(args=None) -> None:
     mission_node = None
 
     try:
-        mission_node = bootstrap.build_manager()
+        manager_kwargs = bootstrap.manager_kwargs()
         bootstrap.destroy_node()
         bootstrap = None
+        mission_node = UAVModeManager(**manager_kwargs)
         rclpy.spin(mission_node)
     except (KeyboardInterrupt, ExternalShutdownException):
         pass

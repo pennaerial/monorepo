@@ -35,11 +35,11 @@ class AprilTagDebugger(Node):
         self.detector = pupil_apriltags.Detector(families="tag36h11")
 
         if self.compressed:
-            topic = self.topic if self.topic else "/camera/image_raw/compressed"
+            topic = self.topic if self.topic else "/camera/compressed"
             self.create_subscription(CompressedImage, topic, self._compressed_cb, 10)
             self.get_logger().info(f"Subscribing to compressed topic: {topic}")
         else:
-            topic = self.topic if self.topic else "/camera/image_raw"
+            topic = self.topic if self.topic else "/camera"
             self.create_subscription(Image, topic, self._image_cb, 10)
             self.get_logger().info(f"Subscribing to raw image topic: {topic}")
 

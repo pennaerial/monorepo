@@ -7,6 +7,7 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
+find_package(generate_parameter_library REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(payload_interfaces REQUIRED)
 find_package(pluginlib REQUIRED)
@@ -23,6 +24,11 @@ string(TOUPPER "${PAYLOAD_BUILD_SIM_CONTROLLER}" PAYLOAD_BUILD_SIM_CONTROLLER)
 string(TOUPPER "${PAYLOAD_BUILD_GPIO_CONTROLLER}" PAYLOAD_BUILD_GPIO_CONTROLLER)
 
 include_directories(include)
+
+generate_parameter_library(
+  payload_parameters
+  config/payload_params.schema.yaml
+)
 
 set(payload_controller_targets "")
 set(build_payload_sim_controller FALSE)
@@ -48,7 +54,6 @@ endif()
 
 if(build_payload_sim_controller)
   add_library(payload_sim_controller SHARED
-    src/payload_parameters.cpp
     src/sim_controller.cpp
   )
   ament_target_dependencies(payload_sim_controller
@@ -57,6 +62,7 @@ if(build_payload_sim_controller)
     pluginlib
   )
   target_link_libraries(payload_sim_controller
+    payload_parameters
     gz-transport13::gz-transport13
     gz-msgs10::gz-msgs10
   )
@@ -65,18 +71,18 @@ if(build_payload_sim_controller)
 endif()
 
 if(PAYLOAD_BUILD_GPIO_CONTROLLER STREQUAL "ON")
-  find_library(LGPIO_LIBRARY NAMES lgpio REQUIRED)
-  find_path(LGPIO_INCLUDE_DIR NAMES lgpio.h REQUIRED)
+  find_library(PIGPIO_LIBRARY NAMES pigpiod_if2 REQUIRED)
+  find_path(PIGPIO_INCLUDE_DIR NAMES pigpiod_if2.h REQUIRED)
   set(build_payload_gpio_controller TRUE)
 elseif(PAYLOAD_BUILD_GPIO_CONTROLLER STREQUAL "AUTO")
-  find_library(LGPIO_LIBRARY NAMES lgpio)
-  find_path(LGPIO_INCLUDE_DIR NAMES lgpio.h)
-  if(LGPIO_LIBRARY AND LGPIO_INCLUDE_DIR)
+  find_library(PIGPIO_LIBRARY NAMES pigpiod_if2)
+  find_path(PIGPIO_INCLUDE_DIR NAMES pigpiod_if2.h)
+  if(PIGPIO_LIBRARY AND PIGPIO_INCLUDE_DIR)
     set(build_payload_gpio_controller TRUE)
   else()
     message(STATUS
-      "Skipping GPIOController because lgpio development files were not found. "
-      "Install liblgpio-dev to enable the hardware backend.")
+      "Skipping GPIOController because pigpiod_if2 development files were not found. "
+      "Install pigpio to enable the hardware backend.")
   endif()
 elseif(NOT PAYLOAD_BUILD_GPIO_CONTROLLER STREQUAL "OFF")
   message(FATAL_ERROR
@@ -85,18 +91,23 @@ endif()
 
 if(build_payload_gpio_controller)
   add_library(payload_gpio_controller SHARED
-    src/payload_parameters.cpp
     src/gpio_controller.cpp
     src/encoder.cpp
     src/control_math.cpp
+    src/motor.cpp
+    src/servo.cpp
+    src/gpio.cpp
   )
   ament_target_dependencies(payload_gpio_controller
     rclcpp
     payload_interfaces
     pluginlib
   )
-  target_link_libraries(payload_gpio_controller ${LGPIO_LIBRARY})
-  target_include_directories(payload_gpio_controller PUBLIC ${LGPIO_INCLUDE_DIR})
+  target_link_libraries(payload_gpio_controller
+    payload_parameters
+    ${PIGPIO_LIBRARY}
+  )
+  target_include_directories(payload_gpio_controller PUBLIC ${PIGPIO_INCLUDE_DIR})
   target_compile_definitions(payload_gpio_controller PRIVATE BUILD_GPIO)
   list(APPEND payload_controller_targets payload_gpio_controller)
 
@@ -108,24 +119,33 @@ if(build_payload_gpio_controller)
     src/gpio.cpp
     src/encoder.cpp
   )
-  target_include_directories(test_motor PRIVATE include ${LGPIO_INCLUDE_DIR})
+  target_include_directories(test_motor PRIVATE include ${PIGPIO_INCLUDE_DIR})
   ament_target_dependencies(test_motor rclcpp)
-  target_link_libraries(test_motor ${LGPIO_LIBRARY})
+  target_link_libraries(test_motor ${PIGPIO_LIBRARY})
   install(TARGETS test_motor DESTINATION lib/${PROJECT_NAME})
+
+  add_executable(test_servo
+    test/test_servo.cpp
+    src/servo.cpp
+    src/gpio.cpp
+  )
+  target_include_directories(test_servo PRIVATE include ${PIGPIO_INCLUDE_DIR})
+  ament_target_dependencies(test_servo rclcpp)
+  target_link_libraries(test_servo ${PIGPIO_LIBRARY})
+  install(TARGETS test_servo DESTINATION lib/${PROJECT_NAME})
 endif()
 
 if(NOT payload_controller_targets)
   message(FATAL_ERROR
     "payload requires at least one controller backend. Enable the simulation "
     "backend by installing Gazebo development packages, or enable the hardware "
-    "backend by installing liblgpio-dev.")
+    "backend by installing pigpio.")
 endif()
 
 pluginlib_export_plugin_description_file(payload plugins.xml)
 
 # --- Payload executable ---
 add_executable(payload
-  src/payload_parameters.cpp
   src/payload.cpp
   src/main.cpp
 )
@@ -134,6 +154,9 @@ ament_target_dependencies(payload
   rclcpp
   payload_interfaces
   pluginlib
+)
+target_link_libraries(payload
+  payload_parameters
 )
 
 install(TARGETS ${payload_controller_targets}
@@ -150,11 +173,11 @@ install(TARGETS payload
 install(DIRECTORY include/
   DESTINATION include
 )
-install(DIRECTORY 
-  launch 
+install(DIRECTORY
+  launch
   DESTINATION share/${PROJECT_NAME}
 )
-install(DIRECTORY 
+install(DIRECTORY
   config
   DESTINATION share/${PROJECT_NAME}
 )
@@ -181,6 +204,20 @@ if(BUILD_TESTING)
   )
   if(TARGET test_control_math)
     target_include_directories(test_control_math PRIVATE include)
+  endif()
+
+  ament_add_gtest(test_payload_shutdown
+    test/test_payload_shutdown.cpp
+    src/payload.cpp
+  )
+  if(TARGET test_payload_shutdown)
+    target_include_directories(test_payload_shutdown PRIVATE include)
+    ament_target_dependencies(test_payload_shutdown
+      rclcpp
+      payload_interfaces
+      pluginlib
+    )
+    target_link_libraries(test_payload_shutdown payload_parameters)
   endif()
 endif()
 

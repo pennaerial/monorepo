@@ -1,111 +1,91 @@
 #ifndef GPIO_CONTROLLER_HPP
 #define GPIO_CONTROLLER_HPP
 
+#include <pigpiod_if2.h>
 #include <rclcpp/rclcpp.hpp>
-#include <rcl_interfaces/msg/set_parameters_result.hpp>
-#include <lgpio.h>
 
 #include <atomic>
 #include <chrono>
 #include <memory>
-#include <mutex>
 #include <thread>
-#include <vector>
 
 #include "payload/controller.hpp"
 #include "payload/control_math.hpp"
 #include "payload/encoder.hpp"
+#include "payload/motor.hpp"
+#include "payload/payload_parameters.hpp"
+#include "payload/servo.hpp"
 #include "payload_interfaces/msg/motor_state.hpp"
 #include "payload_interfaces/srv/compute_pid_ziegler_nichols.hpp"
+#include "payload_interfaces/srv/dead_reckon.hpp"
 
-class GPIOController : public Controller {
+enum class ControlMode { NORMAL, DEAD_RECKONING };
+
+class GPIOController : public Controller
+{
 public:
-    GPIOController();
-    ~GPIOController() override;
+  GPIOController();
+  ~GPIOController() override;
 
-    void initialize(rclcpp::Node* node) override;
-    void drive_command(double linear, double angular) override;
+  void initialize(rclcpp::Node * node) override;
+  void drive_command(double linear, double angular) override;
+  void servo_command(double degree) override;
+  void safe_shutdown() override;
 
 private:
-    struct ControllerConfig {
-        int left_pwm_pin {13};
-        int left_in1_pin {16};
-        int left_in2_pin {20};
-        int right_pwm_pin {18};
-        int right_in1_pin {15};
-        int right_in2_pin {14};
+  void compute_pid_zn_callback(
+    const std::shared_ptr<payload_interfaces::srv::ComputePidZieglerNichols::Request> request,
+    std::shared_ptr<payload_interfaces::srv::ComputePidZieglerNichols::Response> response);
 
-        int enc_left_a {0};
-        int enc_left_b {9};
-        int enc_right_a {11};
-        int enc_right_b {10};
+  void dead_reckon_callback(
+    const std::shared_ptr<payload_interfaces::srv::DeadReckon::Request> request,
+    std::shared_ptr<payload_interfaces::srv::DeadReckon::Response> response);
 
-        int pwm_hz {500};
-        int loop_ms {50};
+  void control_loop();
 
-        int encoder_output_cpr {617};
-        int encoder_left_sign {1};
-        int encoder_right_sign {1};
+  rclcpp::Node * node_ {nullptr};
+  bool initialized_ {false};
+  int pi_ {-1};
 
-        double wheel_radius_m {0.01611839};
-        double wheel_separation_m {0.12132};
-        double max_wheel_rpm {120.0};
+  std::shared_ptr<payload::ParamListener> param_listener_;
 
-        payload::control_math::PidConfig left_pid {
-            0.02,
-            0.0,
-            0.0,
-            1.0,
-            1.0,
-            1.0,
-        };
-        payload::control_math::PidConfig right_pid {
-            0.02,
-            0.0,
-            0.0,
-            1.0,
-            1.0,
-            1.0,
-        };
-        double velocity_alpha {1.0};
-    };
+  std::unique_ptr<SNMotor> left_motor_;
+  std::unique_ptr<SNMotor> right_motor_;
 
-    void load_initial_config_from_parameters();
-    rcl_interfaces::msg::SetParametersResult on_parameters_set(
-        const std::vector<rclcpp::Parameter>& params);
+  std::atomic<double> cmd_linear_ {0.0};
+  std::atomic<double> cmd_angular_ {0.0};
+  std::atomic<bool> running_ {false};
+  std::atomic<bool> shutdown_requested_ {false};
 
-    void compute_pid_zn_callback(
-        const std::shared_ptr<payload_interfaces::srv::ComputePidZieglerNichols::Request> request,
-        std::shared_ptr<payload_interfaces::srv::ComputePidZieglerNichols::Response> response);
+  std::unique_ptr<QuadratureEncoder> left_encoder_;
+  std::unique_ptr<QuadratureEncoder> right_encoder_;
 
-    void control_loop();
+  int64_t prev_left_count_ {0};
+  int64_t prev_right_count_ {0};
+  std::chrono::steady_clock::time_point prev_loop_time_ {};
 
-    int handle_ {-1};
+  double left_filtered_rpm_ {0.0};
+  double right_filtered_rpm_ {0.0};
+  payload::control_math::PidState left_pid_state_ {};
+  payload::control_math::PidState right_pid_state_ {};
 
-    std::mutex config_mutex_;
-    ControllerConfig config_;
+  std::unique_ptr<Servo> servo_;
 
-    std::atomic<double> cmd_linear_ {0.0};
-    std::atomic<double> cmd_angular_ {0.0};
-    std::atomic<bool> running_ {false};
+  std::thread control_thread_;
 
-    std::unique_ptr<QuadratureEncoder> left_encoder_;
-    std::unique_ptr<QuadratureEncoder> right_encoder_;
+  // Dead reckoning state
+  std::atomic<ControlMode> control_mode_   {ControlMode::NORMAL};
+  std::atomic<int64_t> dr_left_goal_   {0};        // absolute encoder count to reach
+  std::atomic<int64_t> dr_right_goal_  {0};
+  std::atomic<int64_t> dr_left_start_  {0};        // snapshot at service call time
+  std::atomic<int64_t> dr_right_start_ {0};
+  std::atomic<bool> dr_left_done_   {false};
+  std::atomic<bool> dr_right_done_  {false};
 
-    int64_t prev_left_count_ {0};
-    int64_t prev_right_count_ {0};
-    std::chrono::steady_clock::time_point prev_loop_time_ {};
-
-    double left_filtered_rpm_ {0.0};
-    double right_filtered_rpm_ {0.0};
-    payload::control_math::PidState left_pid_state_ {};
-    payload::control_math::PidState right_pid_state_ {};
-
-    std::thread control_thread_;
-
-    rclcpp::Publisher<payload_interfaces::msg::MotorState>::SharedPtr motor_state_pub_;
-    rclcpp::Service<payload_interfaces::srv::ComputePidZieglerNichols>::SharedPtr zn_service_;
-    rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr parameter_callback_handle_;
+  rclcpp::Publisher<payload_interfaces::msg::MotorState>::SharedPtr motor_state_pub_;
+  rclcpp::Service<payload_interfaces::srv::ComputePidZieglerNichols>::SharedPtr zn_service_;
+  rclcpp::CallbackGroup::SharedPtr dead_reckon_cbg_;
+  rclcpp::Service<payload_interfaces::srv::DeadReckon>::SharedPtr dead_reckon_srv_;
 };
 
 #endif

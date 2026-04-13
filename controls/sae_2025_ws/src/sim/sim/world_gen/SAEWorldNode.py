@@ -20,38 +20,35 @@ class SAEWorldNode(WorldNode):
         physics: Optional[dict] = None,
         output_filename: Optional[str] = None,
         seed: Optional[int] = None,
-        dlz: Optional[dict] = None,
-        payload_0: Optional[dict] = None,
-        payload_1: Optional[dict] = None,
+        entities: Optional[dict] = None,
+        controllables: Optional[dict] = None,
         **kwargs,
     ):
         super().__init__(
-            competition_name="sae", output_filename=output_filename, seed=seed, **kwargs
+            competition_name="sae",
+            output_filename=output_filename,
+            seed=seed,
+            entities=entities,
+            controllables=controllables,
+            **kwargs,
         )
         self.world_name = template_world
         self.vehicle_pose = vehicle_pose
         self.physics = physics
-        self.dlz = dlz
-        self.payload_0 = payload_0
-        self.payload_1 = payload_1
+        self.entities = entities or {}
+        self.controllables = controllables or {}
         self.instantiate_static_world(
             template_world_path=template_world, physics=physics
         )
 
     def generate_world(self):
-        named_entities = [
-            ("dlz", self.dlz),
-            ("payload_0", self.payload_0),
-            ("payload_1", self.payload_1),
-        ]
-        for name, cfg in named_entities:
-            if cfg is not None:
-                self.get_logger().info(f"Spawning entity: {name}")
-                self.spawn_entity(name, cfg)
-            else:
-                self.get_logger().info(f"Skipping entity (not defined): {name}")
+        success = True
+        success = self.spawn_entities(self.entities, label="static entity") and success
+        success = (
+            self.spawn_entities(self.controllables, label="controllable") and success
+        )
 
-        return super().generate_world()
+        return super().generate_world() and success
 
 
 def main(args=None):

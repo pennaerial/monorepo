@@ -1,0 +1,51 @@
+name: Static Checks
+
+on:
+  push:
+    branches: [main, master, integration]
+    paths:
+      - ".github/workflows/**"
+      - ".github/ci/**"
+      - "controls/sae_2025_ws/**"
+  pull_request:
+    branches: [main, master]
+    paths:
+      - ".github/workflows/**"
+      - ".github/ci/**"
+      - "controls/sae_2025_ws/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: static-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static_checks:
+    name: Static Checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Ruff
+        run: python -m pip install ruff==0.15.10
+
+      - name: Check Ruff formatting
+        working-directory: controls/sae_2025_ws
+        run: ruff --config .ruff.toml format --check --diff .
+
+      - name: Check Ruff lint
+        working-directory: controls/sae_2025_ws
+        run: ruff --config .ruff.toml check .
+
+      - name: Run actionlint
+        uses: rhysd/actionlint@v1.7.8

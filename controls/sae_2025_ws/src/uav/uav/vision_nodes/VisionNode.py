@@ -4,9 +4,10 @@ import uuid
 import cv2
 import numpy as np
 import rclpy
+from cv_bridge import CvBridge
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
-from sensor_msgs.msg import CameraInfo, Image
+from sensor_msgs.msg import CameraInfo, CompressedImage, Image
 from std_srvs.srv import Trigger
 from uav.utils import camel_to_snake
 from uav_interfaces.srv import CameraData
@@ -60,6 +61,7 @@ class VisionNode(Node):
         self.declare_parameter("camera_service_name", "")
         self.declare_parameter("camera_image_topic", "")
         self.declare_parameter("camera_info_topic", "")
+        self.declare_parameter("preferred_image_transport", "raw")
         self.declare_parameter("vision_service_name", "")
         self.declare_parameter("use_camera_service", use_service)
         self.declare_parameter("enable_failsafe_service", False)
@@ -88,21 +90,28 @@ class VisionNode(Node):
             default_suffix="camera",
             legacy_default="/camera",
         )
+        self.compressed_image_topic = self._compressed_topic_for(self.image_topic)
         self.camera_info_topic = self._resolve_transport_path(
             explicit=camera_info_topic,
             param_name="camera_info_topic",
             default_suffix="camera_info",
             legacy_default="/camera_info",
         )
+        self.preferred_image_transport = self._resolve_preferred_image_transport(
+            str(self.get_parameter("preferred_image_transport").value).strip()
+        )
         self.vision_service = self._resolve_vision_service_name(vision_service_name)
         self.use_service = bool(self.get_parameter("use_camera_service").value)
 
         self.client = None
         self.image = None
+        self.image_transport = None
         self.camera_info = None
+        self.bridge = CvBridge()
         self._camera_request_future = None
         self._camera_service_warned = False
         self._camera_wait_warned = False
+        self._camera_fallback_warned = False
         if self.use_service:
             self.client = self.create_client(CameraData, self.camera_service_name)
             # Poll camera_data asynchronously so service callbacks can read cached data
@@ -111,17 +120,20 @@ class VisionNode(Node):
                 0.1, self._refresh_camera_cache_from_service
             )
         else:
-            self.image_subscription = self.create_subscription(
-                Image, self.image_topic, self.image_callback, 10
-            )
+            if self.preferred_image_transport == "compressed":
+                self.image_subscription = self.create_subscription(
+                    CompressedImage,
+                    self.compressed_image_topic,
+                    self.compressed_image_callback,
+                    1,
+                )
+            else:
+                self.image_subscription = self.create_subscription(
+                    Image, self.image_topic, self.image_callback, 1
+                )
             self.camera_info_subscription = self.create_subscription(
-                CameraInfo, self.camera_info_topic, self.camera_info_callback, 10
+                CameraInfo, self.camera_info_topic, self.camera_info_callback, 1
             )
-
-        if not self.sim:
-            from cv_bridge import CvBridge
-
-            self.bridge = CvBridge()
 
         resolved_enable_failsafe = (
             bool(enable_failsafe)
@@ -185,11 +197,30 @@ class VisionNode(Node):
             return configured
         return self.service_name(self.vehicle_namespace)
 
+    @staticmethod
+    def _compressed_topic_for(raw_topic: str) -> str:
+        return f"{raw_topic.rstrip('/')}/compressed"
+
+    @staticmethod
+    def _resolve_preferred_image_transport(transport: str) -> str:
+        normalized = transport.lower() or "raw"
+        if normalized not in {"raw", "compressed"}:
+            raise ValueError(
+                f"Unsupported preferred_image_transport '{transport}'. Expected raw or compressed."
+            )
+        return normalized
+
     def image_callback(self, msg: Image):
         """
         Callback for receiving image requests.
         """
-        self.image = msg
+        self._cache_image(msg, "raw")
+
+    def compressed_image_callback(self, msg: CompressedImage):
+        """
+        Callback for receiving compressed image requests.
+        """
+        self._cache_image(msg, "compressed")
 
     def camera_info_callback(self, msg: CameraInfo):
         """
@@ -201,13 +232,23 @@ class VisionNode(Node):
         """
         self.camera_info = msg
 
-    def convert_image_msg_to_frame(self, msg: Image) -> np.ndarray:
+    def _cache_image(self, msg: Image | CompressedImage, transport: str) -> None:
+        self.image = msg
+        self.image_transport = transport
+        if self.display:
+            self.display_frame(self.convert_image_msg_to_frame(msg), self.node_name())
+
+    def convert_image_msg_to_frame(self, msg: Image | CompressedImage) -> np.ndarray:
         """
         Converts a ROS 2 Image message to a NumPy array.
         """
+        if isinstance(msg, CompressedImage):
+            return self.bridge.compressed_imgmsg_to_cv2(msg, desired_encoding="bgr8")
         if self.sim:
             img_data = np.frombuffer(msg.data, dtype=np.uint8)
             frame = img_data.reshape((msg.height, msg.width, 3))
+            if msg.encoding == "rgb8":
+                return cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
         else:
             frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
         return frame
@@ -235,10 +276,30 @@ class VisionNode(Node):
 
         self._camera_wait_warned = False
         request = CameraData.Request()
-        request.cam_image = True
+        request.cam_image_raw = self.preferred_image_transport == "raw"
+        request.cam_image_compressed = self.preferred_image_transport == "compressed"
         request.cam_info = True
         self._camera_request_future = self.send_req(request)
         self._camera_request_future.add_done_callback(self._handle_camera_response)
+
+    def _select_camera_response_image(
+        self, response: CameraData.Response
+    ) -> tuple[Image | CompressedImage | None, str | None]:
+        if self.preferred_image_transport == "raw":
+            candidates = (
+                (response.image_raw, "raw"),
+                (response.image_compressed, "compressed"),
+            )
+        else:
+            candidates = (
+                (response.image_compressed, "compressed"),
+                (response.image_raw, "raw"),
+            )
+
+        for image, transport in candidates:
+            if image is not None and getattr(image, "data", None):
+                return image, transport
+        return None, None
 
     def _handle_camera_response(self, future) -> None:
         self._camera_request_future = None
@@ -253,12 +314,20 @@ class VisionNode(Node):
         self._camera_service_warned = False
         if response is None:
             return
-        if response.image.data:
-            self.image = response.image
-            if self.display:
-                self.display_frame(
-                    self.convert_image_msg_to_frame(response.image), self.node_name()
+        image_msg, transport = self._select_camera_response_image(response)
+        if image_msg is not None and transport is not None:
+            if (
+                transport != self.preferred_image_transport
+                and not self._camera_fallback_warned
+            ):
+                self.get_logger().warn(
+                    f"Camera service returned {transport} instead of preferred {self.preferred_image_transport}.",
+                    throttle_duration_sec=5.0,
                 )
+                self._camera_fallback_warned = True
+            elif transport == self.preferred_image_transport:
+                self._camera_fallback_warned = False
+            self._cache_image(image_msg, transport)
         if response.camera_info.header.frame_id or response.camera_info.width > 0:
             self.camera_info = response.camera_info
 

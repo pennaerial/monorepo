@@ -1,0 +1,28 @@
+modes:
+  start:
+    class: uav.modes.payload.PayloadWaitForDriveOutMode.PayloadWaitForDriveOutMode
+    params:
+      dark_threshold: 100
+      clear_ratio: 0.3
+      wait_seconds: 15.0
+      turn_angular: 3.14
+      turn_speed: 1.5
+      compressed_image: false
+      debug: true
+    #transitions:
+    #  complete: retreat
+
+  # retreat:
+  #     class: uav.modes.payload.PayloadRetreatMode
+  #     params:
+  #       forward_speed_mps: 0.12
+  #       edge_threshold: 0.30
+  #       edge_stable_frames: 5
+  #       edge_min_pixels: 700
+  #       edge_invalid_max_frames: 30
+  #       turn_direction: 1
+  #       turn_angular: 3.14
+  #       turn_speed: 1.4
+  #       camera_debug: false
+  #       compressed_image: false
+

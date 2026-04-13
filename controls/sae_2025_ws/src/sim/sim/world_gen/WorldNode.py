@@ -13,6 +13,7 @@ from typing import Optional
 from abc import ABC, abstractmethod
 from rclpy.impl.rcutils_logger import RcutilsLogger
 from rclpy.node import Node
+from sim.orchestration import normalize_named_records
 from sim.utils import camel_to_snake, find_package_resource, copy_models_to_gazebo
 import xml.etree.ElementTree as ET
 import random
@@ -36,6 +37,7 @@ class WorldNode(Node, ABC):
         output_filename: Optional[str] = None,
         seed: Optional[int] = None,
         entities: Optional[dict] = None,
+        controllables: Optional[dict] = None,
     ):
         """
         Initialize the WorldNode.
@@ -63,6 +65,7 @@ class WorldNode(Node, ABC):
         self.output_path = self.output_dir / output_filename
 
         self.entities = entities or {}
+        self.controllables = controllables or {}
 
         self.get_logger().info(
             f"Initializing world node for competition: {competition_name}"
@@ -172,7 +175,25 @@ class WorldNode(Node, ABC):
         except Exception as e:
             raise RuntimeError(f"Failed to write output SDF to {out_path}: {e}")
 
-    def spawn_entity(self, name: str, cfg: dict) -> None:
+    def spawn_entity_object(self, entity: Entity) -> bool:
+        if not self.spawn_entity_client.service_is_ready():
+            self.get_logger().error(
+                f"Cannot spawn entity '{entity.name}': "
+                f"/world/{self.competition_name}/create is not ready"
+            )
+            return False
+
+        req = SpawnEntity.Request()
+        req.entity_factory = entity.to_entity_factory_msg()
+        future = self.spawn_entity_client.call_async(req)
+        future.add_done_callback(
+            lambda completed_future, entity_name=entity.name: self._log_spawn_result(
+                entity_name, completed_future
+            )
+        )
+        return True
+
+    def spawn_entity(self, name: str, cfg: dict) -> bool:
         """
         Spawn a named entity from a config dict with keys: path_to_sdf, position, rpy.
         """
@@ -183,14 +204,29 @@ class WorldNode(Node, ABC):
             rpy=tuple(cfg["rpy"]),
             world=self.competition_name,
         )
-        req = SpawnEntity.Request()
-        req.entity_factory = entity.to_entity_factory_msg()
-        future = self.spawn_entity_client.call_async(req)
-        future.add_done_callback(
-            lambda completed_future, entity_name=name: self._log_spawn_result(
-                entity_name, completed_future
-            )
+        return self.spawn_entity_object(entity)
+
+    def spawn_entities(self, entries: dict | list | None, *, label: str) -> bool:
+        normalized_entries = normalize_named_records(entries, record_type=label)
+        success = True
+        for name, cfg in normalized_entries.items():
+            self.get_logger().info(f"Spawning {label}: {name}")
+            success = self.spawn_entity(name, cfg) and success
+        return success
+
+    def _wait_for_spawn_service(self, timeout_sec: float = 10.0) -> bool:
+        if self.spawn_entity_client.service_is_ready():
+            return True
+
+        self.get_logger().info(
+            f"Waiting for spawn service /world/{self.competition_name}/create..."
         )
+        ready = self.spawn_entity_client.wait_for_service(timeout_sec=timeout_sec)
+        if not ready:
+            self.get_logger().error(
+                f"Spawn service /world/{self.competition_name}/create not ready after {timeout_sec:.1f}s"
+            )
+        return ready
 
     def _log_spawn_result(self, name: str, future) -> None:
         try:
@@ -208,6 +244,10 @@ class WorldNode(Node, ABC):
 
     def trigger_world_gen_req(self, request, response):
         self.get_logger().info("Starting Dynamic World Generation!")
+        if not self._wait_for_spawn_service():
+            response.success = False
+            response.message = "Spawn service not ready"
+            return response
         response.success = self.generate_world()
         response.message = (
             "World generation successful"
@@ -228,9 +268,6 @@ class WorldNode(Node, ABC):
 
         return True if dynamic generation is successful, False otherwise
         """
-        for name, cfg in self.entities.items():
-            self.get_logger().info(f"Spawning entity: {name}")
-            self.spawn_entity(name, cfg)
         return True
 
     def get_world_path(self) -> Path:

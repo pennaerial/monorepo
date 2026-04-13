@@ -20,7 +20,13 @@ class VTOL(UAV):
     """
 
     def __init__(
-        self, node: Node, takeoff_amount=5.0, DEBUG=False, camera_offsets=[0, 0, 0]
+        self,
+        node: Node,
+        takeoff_amount=5.0,
+        DEBUG=False,
+        camera_offsets=[0, 0, 0],
+        vehicle_name: str = "uav",
+        px4_namespace: str = "",
     ):
         # Initialize VTOL-specific attributes before calling super().__init__
         self.vehicle_type = None  # 'MC' or 'FW' from VtolVehicleStatus
@@ -28,7 +34,14 @@ class VTOL(UAV):
         self._fw_takeoff_phase = 0  # state machine phase for FW takeoff
         self.attempted_takeoff = False
 
-        super().__init__(node, takeoff_amount, DEBUG, camera_offsets)
+        super().__init__(
+            node,
+            takeoff_amount,
+            DEBUG,
+            camera_offsets,
+            vehicle_name=vehicle_name,
+            px4_namespace=px4_namespace,
+        )
 
     @property
     def is_vtol(self) -> bool:
@@ -191,7 +204,7 @@ class VTOL(UAV):
 
         self.vtol_vehicle_status_sub = self.node.create_subscription(
             VtolVehicleStatus,
-            "/fmu/out/vtol_vehicle_status",
+            self.px4_transport_path("out/vtol_vehicle_status"),
             self._vtol_vehicle_status_callback,
             qos_profile,
         )

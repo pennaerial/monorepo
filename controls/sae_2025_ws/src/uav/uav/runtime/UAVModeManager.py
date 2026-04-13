@@ -20,13 +20,14 @@ class UAVModeManager(ModeManager):
         mission_spec: MissionSpec,
         debug: bool = False,
         servo_only: bool = False,
+        vehicle_name: str = "uav",
+        px4_namespace: str = "",
         vehicle_class: AirframeClass = AirframeClass.MULTICOPTER,
         camera_offsets=None,
+        auto_launch: bool = True,
         node_name: str = "mission",
     ) -> None:
-        super().__init__(node_name)
-
-        self.timer = None
+        super().__init__(node_name, auto_launch=auto_launch)
         if not mission_spec.is_uav:
             raise ValueError(
                 f"UAVModeManager requires a UAV mission spec, received target '{mission_spec.target}'."
@@ -35,35 +36,45 @@ class UAVModeManager(ModeManager):
         camera_offsets = list(camera_offsets or [0.0, 0.0, 0.0])
         if len(camera_offsets) != 3:
             raise ValueError(
-                f"'uav_camera_offsets' must have exactly 3 values. Received: {camera_offsets}"
+                f"'camera_mount_offsets' must have exactly 3 values. Received: {camera_offsets}"
             )
 
         self.servo_only = bool(servo_only)
         vehicle_class = AirframeClass.parse(vehicle_class)
 
-        self.start_mission_trigger = self.create_service(
-            Trigger, "/mode_manager/start_mission", self.trigger_world_gen_req
-        )
         self.failsafe_trigger_service = self.create_service(
-            Trigger, "/mode_manager/failsafe", self.trigger_failsafe
+            Trigger, "mode_manager/failsafe", self.trigger_failsafe
         )
 
+        vehicle_kwargs = {
+            "DEBUG": debug,
+            "camera_offsets": camera_offsets,
+            "vehicle_name": vehicle_name,
+        }
+        normalized_px4_namespace = str(px4_namespace).strip()
+        if normalized_px4_namespace:
+            vehicle_kwargs["px4_namespace"] = normalized_px4_namespace
+
         if vehicle_class == AirframeClass.VTOL:
-            self.vehicle = VTOL(self, DEBUG=debug, camera_offsets=camera_offsets)
+            self.vehicle = VTOL(self, **vehicle_kwargs)
         else:
-            self.vehicle = Multicopter(self, DEBUG=debug, camera_offsets=camera_offsets)
+            self.vehicle = Multicopter(self, **vehicle_kwargs)
 
         self.get_logger().info("Mission Node has started.")
         self.setup_vision(list(mission_spec.vision_nodes))
         self.setup_modes(mission_spec)
 
-    def trigger_world_gen_req(self, request, response):
-        self.get_logger().info("MODE MANAGER | Starting Mission!")
-        if self.timer is None:
-            self.timer = self.create_timer(0.1, self.spin_once)
-        response.success = True
-        response.message = "Starting Mission!"
-        return response
+    def _auto_launch_ready(self) -> bool:
+        if self.vehicle is None:
+            return False
+        return (
+            self.vehicle.vehicle_status is not None
+            and self.vehicle.vehicle_attitude is not None
+            and self.vehicle.yaw is not None
+            and self.vehicle.local_position is not None
+            and self.vehicle.global_position is not None
+            and bool(self.vehicle.flight_check)
+        )
 
     def trigger_failsafe(self, request, response):
         self.get_logger().info("Failsafe triggered via service call")

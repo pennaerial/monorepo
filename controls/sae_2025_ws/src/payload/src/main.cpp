@@ -1,33 +1,24 @@
-#include <cstdlib>
-#include <csignal>
-
 #include "rclcpp/rclcpp.hpp"
 #include "payload/payload.hpp"
 
-namespace {
-void payload_signal_exit(int) {
-    std::_Exit(0);
-}
-}  // namespace
+int main(int argc, char ** argv)
+{
+  rclcpp::init(argc, argv);
 
-
-int main(int argc, char **argv){
-    rclcpp::init(argc, argv);
-    std::signal(SIGINT, payload_signal_exit);
-    std::signal(SIGTERM, payload_signal_exit);
-    bool interrupted_shutdown = false;
-
-    {
-        auto node = std::make_shared<Payload>("payload_main");
-        node->init();
-        rclcpp::spin(node);
-        interrupted_shutdown = !rclcpp::ok();
-        node.reset();
+  auto node = std::make_shared<Payload>("vehicle_main");
+  rclcpp::on_shutdown([weak_node = std::weak_ptr<Payload>(node)]() {
+    if (auto locked_node = weak_node.lock()) {
+      locked_node->prepare_for_shutdown();
     }
+  });
+  node->init();
+  rclcpp::spin(node);
+  node->prepare_for_shutdown();
+  node.reset();
+
+  if (rclcpp::ok()) {
     rclcpp::shutdown();
-    if (interrupted_shutdown) {
-        std::_Exit(0);
-    }
+  }
 
-    return 0;
+  return 0;
 }

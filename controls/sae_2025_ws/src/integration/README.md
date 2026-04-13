@@ -40,7 +40,7 @@ npm install
 
 `./launch.sh` also auto-checks dependencies at startup:
 - frontend deps (`npm install` when needed)
-- backend Python deps in conda mode (`fastapi[standard]`, `python-multipart`, `httpx`)
+- backend Python deps in conda mode (`fastapi[standard]`, `python-multipart`, `httpx`, `pydantic>=2,<3`)
 - `sshpass` via package manager when available (`brew`, `apt`, or `dnf`)
 
 ### 2. Launch Backend + Frontend Together
@@ -77,3 +77,37 @@ npm run build
 ```
 
 This creates a `dist/` folder with optimized static files you can serve with any web server.
+
+## Provisioning a Pi
+
+For first-time Pi setup, use (where `x` is a number):
+
+```bash
+cd /home/penn/monorepo/controls/sae_2025_ws
+scripts/hardware/provision-pi.sh \
+  --hostname air-0x \
+  --authorized-key-url https://raw.githubusercontent.com/pennaerial/monorepo/main/controls/sae_2025_ws/ops/keys/pennair_pi_ed25519.pub
+```
+
+That script configures:
+- hostname / mDNS identity
+- `openssh-server` and `avahi-daemon`
+- explicit Avahi `_ssh._tcp` service advertisement for dashboard discovery
+- the deploy user (default: `penn`)
+- SSH authorized keys
+- optional passwordless sudo for the deploy user
+- the existing hardware bootstrap path
+
+Recommended naming:
+- hostname: `air-0x.local`
+- inventory `target_id`: `air-0x`
+
+Keep physical Pi identity in the hostname. Use inventory `vehicle_name` for the current assigned controllable.
+
+Notes:
+- run the provisioning script on the Pi itself
+- ROS 2 Humble still needs to exist on the Pi at `/opt/ros/humble`
+- the script now attempts NTP time sync before any `apt` work and falls back to an HTTP `Date` header if NTP is unreachable, but broken third-party apt repos on the Pi can still block provisioning
+- if an existing Pi was provisioned before this change, rerun `provision-pi.sh` once so `/etc/avahi/services/ssh.service` is installed
+- `--no-bootstrap` skips the deploy-root/systemd install if you only want hostname/user/SSH setup
+- if you do not want a hosted public key, use `--authorized-key-file` or `--authorized-key` instead

@@ -1,99 +1,74 @@
 payload:
   controller:
     type: string
-    default_value: "SimController"
-    description: "Controller type"
+    default_value: "GPIOController"
+    description: "Controller plugin to instantiate"
     validation:
       one_of<>: [["SimController", "GPIOController"]]
-  
 
   pins:
     LEFT_PWM:
       type: int
-      default_value: 18
-      description: "Preferred: left motor SN754410 enable/PWM pin"
+      default_value: 13
+      description: "Left motor SN754410 enable/PWM pin"
     LEFT_IN1:
       type: int
-      default_value: 15
-      description: "Preferred: left motor SN754410 IN1"
+      default_value: 20
+      description: "Left motor SN754410 IN1 pin"
     LEFT_IN2:
       type: int
-      default_value: 14
-      description: "Preferred: left motor SN754410 IN2"
+      default_value: 16
+      description: "Left motor SN754410 IN2 pin"
     RIGHT_PWM:
       type: int
-      default_value: 13
-      description: "Preferred: right motor SN754410 enable/PWM pin"
+      default_value: 18
+      description: "Right motor SN754410 enable/PWM pin"
     RIGHT_IN1:
       type: int
-      default_value: 16
-      description: "Preferred: right motor SN754410 IN1"
+      default_value: 15
+      description: "Right motor SN754410 IN1 pin"
     RIGHT_IN2:
       type: int
-      default_value: 20
-      description: "Preferred: right motor SN754410 IN2"
-
-    # Legacy A/B aliases retained for compatibility.
-    APWM:
-      type: int
-      default_value: 13
-      description: "Legacy alias: SN754410 Motor A enable/PWM pin"
-    AIN1:
-      type: int
-      default_value: 16
-      description: "Legacy alias: SN754410 Motor A logic input IN1"
-    AIN2:
-      type: int
-      default_value: 20
-      description: "Legacy alias: SN754410 Motor A logic input IN2"
-    BPWM:
-      type: int
-      default_value: 18
-      description: "Legacy alias: SN754410 Motor B enable/PWM pin"
-    BIN1:
-      type: int
-      default_value: 15
-      description: "Legacy alias: SN754410 Motor B logic input IN1"
-    BIN2:
-      type: int
       default_value: 14
-      description: "Legacy alias: SN754410 Motor B logic input IN2"
+      description: "Right motor SN754410 IN2 pin"
     ENCA_CH1:
       type: int
-      default_value: 0
-      description: "Pin number for Encoder A1"
+      default_value: 5
+      description: "Encoder A channel 1 GPIO pin"
     ENCA_CH2:
       type: int
-      default_value: 11
-      description: "Pin number for Encoder A2"
+      default_value: 6
+      description: "Encoder A channel 2 GPIO pin"
     ENCB_CH1:
       type: int
-      default_value: 9
-      description: "Pin number for Encoder B1"
+      default_value: 10
+      description: "Encoder B channel 1 GPIO pin"
     ENCB_CH2:
       type: int
-      default_value: 10
-      description: "Pin number for Encoder B2"
+      default_value: 9
+      description: "Encoder B channel 2 GPIO pin"
     SERVO:
       type: int
-      default_value: 14
-      description: "Pin number for hook servo"
+      default_value: 23
+      description: "Hook servo GPIO pin"
 
   motor:
     pwm_frequency:
       type: double
-      default_value: 500.0
-      description: "PWM frequency for motors"
+      default_value: 200.0
+      description: "PWM frequency for drive motors"
+      validation:
+        bounds<>: [1.0, 100000.0]
     max_wheel_rpm:
       type: double
-      default_value: 120.0
+      default_value: 200.0
       description: "Maximum absolute wheel speed setpoint in RPM"
       validation:
         bounds<>: [0.0, 10000.0]
     max_norm_speed:
       type: double
       default_value: 1.0
-      description: "Maximum normalized speed for motors. Uses this value for clamping"
+      description: "Maximum normalized speed command"
       validation:
         bounds<>: [0.0, 1.0]
 
@@ -101,7 +76,7 @@ payload:
     output_cpr:
       type: int
       default_value: 617
-      description: "Encoder counts-per-revolution at the output shaft after decode"
+      description: "Encoder counts-per-revolution at the output shaft"
       validation:
         bounds<>: [1, 1000000]
     left_sign:
@@ -132,58 +107,40 @@ payload:
         bounds<>: [0.0, 10.0]
 
   pid:
-    kp:
-      type: double
-      default_value: 0.02
-      description: "Shared velocity proportional gain applied to both wheels"
-      validation:
-        bounds<>: [0.0, 100000.0]
-    ki:
-      type: double
-      default_value: 0.0
-      description: "Shared velocity integral gain applied to both wheels"
-      validation:
-        bounds<>: [0.0, 100000.0]
-    kd:
-      type: double
-      default_value: 0.0
-      description: "Shared velocity derivative gain applied to both wheels"
-      validation:
-        bounds<>: [0.0, 100000.0]
     left_kp:
       type: double
-      default_value: 0.02
-      description: "Left wheel velocity proportional gain override"
+      default_value: 0.004
+      description: "Left wheel proportional gain"
       validation:
         bounds<>: [0.0, 100000.0]
     left_ki:
       type: double
-      default_value: 0.0
-      description: "Left wheel velocity integral gain override"
+      default_value: 0.0036
+      description: "Left wheel integral gain"
       validation:
         bounds<>: [0.0, 100000.0]
     left_kd:
       type: double
       default_value: 0.0
-      description: "Left wheel velocity derivative gain override"
+      description: "Left wheel derivative gain"
       validation:
         bounds<>: [0.0, 100000.0]
     right_kp:
       type: double
-      default_value: 0.02
-      description: "Right wheel velocity proportional gain override"
+      default_value: 0.004
+      description: "Right wheel proportional gain"
       validation:
         bounds<>: [0.0, 100000.0]
     right_ki:
       type: double
-      default_value: 0.0
-      description: "Right wheel velocity integral gain override"
+      default_value: 0.0036
+      description: "Right wheel integral gain"
       validation:
         bounds<>: [0.0, 100000.0]
     right_kd:
       type: double
       default_value: 0.0
-      description: "Right wheel velocity derivative gain override"
+      description: "Right wheel derivative gain"
       validation:
         bounds<>: [0.0, 100000.0]
     i_clamp:
@@ -218,9 +175,29 @@ payload:
       description: "Control-loop period in milliseconds"
       validation:
         bounds<>: [1, 1000]
-  
+
+  servo:
+    pulse_min_us:
+      type: double
+      default_value: 700.0
+      description: "Servo minimum pulse width in microseconds"
+      validation:
+        bounds<>: [100.0, 5000.0]
+    pulse_max_us:
+      type: double
+      default_value: 2300.0
+      description: "Servo maximum pulse width in microseconds"
+      validation:
+        bounds<>: [100.0, 5000.0]
+    frequency:
+      type: int
+      default_value: 50
+      description: "Servo PWM frequency in Hz"
+      validation:
+        bounds<>: [1, 1000]
+
   sim:
     world_name:
-      type: string 
+      type: string
       default_value: "sae"
-      description: "Simulation World name"
+      description: "Simulation world name"

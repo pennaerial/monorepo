@@ -9,12 +9,26 @@ from contextlib import suppress
 from pathlib import Path
 
 from fastapi import WebSocket, WebSocketDisconnect
+import yaml
+from uav.runtime.mission_spec import MissionSpec
 
-from ..context import AppContext
+from ..context import AppContext, TargetContext
 from ..models import TerminalChunkMessage, TerminalInfoMessage
+from . import deploy as deploy_service
 
 
 MISSION_NAME_RE = re.compile(r"^[A-Za-z0-9_-]+$")
+
+
+def _target_context(
+    ctx: AppContext,
+    *,
+    target_ctx: TargetContext | None = None,
+    target_id: str | None = None,
+) -> TargetContext:
+    if target_ctx is not None:
+        return target_ctx
+    return ctx.resolve_target(target_id)
 
 
 def _is_offline_error(message: str) -> bool:
@@ -33,29 +47,82 @@ def _normalize_mission_name(name: str) -> str:
     return mission
 
 
-async def probe_launch_status(ctx: AppContext) -> dict:
-    paths = ctx.config.mission_paths()
+def _runtime_paths(target_ctx: TargetContext) -> dict[str, str]:
+    return target_ctx.target.deploy_paths()
+
+
+def _runtime_shell(target_ctx: TargetContext, command: str) -> str:
+    paths = _runtime_paths(target_ctx)
+    return f"""
+        set -e
+        cd {target_ctx.ssh.q(paths["deploy_root"])}
+        source /opt/ros/humble/setup.bash
+        source {target_ctx.ssh.q(paths["current_link"])}/install/setup.bash
+        {command}
+    """
+
+
+def _systemd_access_error(target_ctx: TargetContext, raw: str) -> str:
+    lower = (raw or "").lower()
+    if "password is required" in lower or "sudo:" in lower:
+        return (
+            f"Systemd control on {target_ctx.target.ssh_target()} requires sudo. "
+            "Bootstrap the Pi or grant passwordless sudo for install/systemctl."
+        )
+    return target_ctx.ssh.friendly_error(raw)
+
+
+def _require_runtime_target(ctx: AppContext, target_ctx: TargetContext) -> None:
+    ctx.require_deploy_context()
+    if not target_ctx.target.vehicle_name:
+        raise ValueError(
+            f"Target '{target_ctx.target.target_id}' must be assigned to a controllable before using runtime controls."
+        )
+
+
+async def probe_launch_status(
+    ctx: AppContext,
+    *,
+    target_ctx: TargetContext | None = None,
+    target_id: str | None = None,
+) -> dict:
+    target_ctx = _target_context(ctx, target_ctx=target_ctx, target_id=target_id)
+    try:
+        _require_runtime_target(ctx, target_ctx)
+    except ValueError as exc:
+        return {
+            "success": False,
+            "running": False,
+            "state": "error",
+            "error": str(exc),
+        }
+    paths = _runtime_paths(target_ctx)
     cmd = f"""
-        pid_file={ctx.ssh.q(paths["pid"])}
-        log_file={ctx.ssh.q(paths["log"])}
-        if [ -f "$pid_file" ]; then
-            pid="$(cat "$pid_file" 2>/dev/null)"
-            if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
-                echo "RUNNING:$pid"
-                exit 0
-            fi
-            echo "STOPPED"
+        current_link={target_ctx.ssh.q(paths["current_link"])}
+        runtime_fleet={target_ctx.ssh.q(paths["runtime_fleet"])}
+        if [ ! -d "$current_link" ] || [ ! -f "$runtime_fleet" ]; then
+            echo "NOT_PREPARED"
             exit 0
         fi
-        if [ -f "$log_file" ]; then
-            echo "STOPPED"
-        else
-            echo "NOT_PREPARED"
-        fi
+
+        state="$(sudo -n systemctl is-active {target_ctx.target.service_unit} 2>/dev/null || true)"
+        pid="$(sudo -n systemctl show -p MainPID --value {target_ctx.target.service_unit} 2>/dev/null || echo 0)"
+
+        case "$state" in
+            active)
+                echo "RUNNING:${{pid:-0}}"
+                ;;
+            inactive|failed|activating|deactivating)
+                echo "STOPPED"
+                ;;
+            *)
+                echo "STOPPED"
+                ;;
+        esac
     """
-    result = await ctx.ssh.run(cmd, timeout=8)
+    result = await target_ctx.ssh.run(f"bash -lc {target_ctx.ssh.q(cmd)}", timeout=8)
     if result.returncode != 0:
-        error = ctx.ssh.friendly_error(result.stderr)
+        error = _systemd_access_error(target_ctx, result.stderr or result.stdout)
         return {
             "success": False,
             "running": False,
@@ -76,9 +143,15 @@ async def probe_launch_status(ctx: AppContext) -> dict:
     return {"success": True, "running": False, "state": "stopped"}
 
 
-async def refresh_runtime_state(ctx: AppContext) -> dict:
-    status = await probe_launch_status(ctx)
-    await ctx.mission_state.apply_launch_status(
+async def refresh_runtime_state(
+    ctx: AppContext,
+    *,
+    target_ctx: TargetContext | None = None,
+    target_id: str | None = None,
+) -> dict:
+    target_ctx = _target_context(ctx, target_ctx=target_ctx, target_id=target_id)
+    status = await probe_launch_status(ctx, target_ctx=target_ctx)
+    await target_ctx.mission_state.apply_launch_status(
         success=status.get("success", False),
         state=status.get("state", "error"),
         running=status.get("running", False),
@@ -88,126 +161,69 @@ async def refresh_runtime_state(ctx: AppContext) -> dict:
     return status
 
 
-async def mission_state(ctx: AppContext) -> dict:
-    await refresh_runtime_state(ctx)
-    state = await ctx.mission_state.snapshot()
+async def mission_state(
+    ctx: AppContext,
+    *,
+    target_ctx: TargetContext | None = None,
+    target_id: str | None = None,
+) -> dict:
+    target_ctx = _target_context(ctx, target_ctx=target_ctx, target_id=target_id)
+    await refresh_runtime_state(ctx, target_ctx=target_ctx)
+    state = await target_ctx.mission_state.snapshot()
     return {"success": True, "state": state.model_dump()}
 
 
-async def launch_status(ctx: AppContext) -> dict:
-    status = await refresh_runtime_state(ctx)
-    return status
+async def launch_status(
+    ctx: AppContext,
+    *,
+    target_ctx: TargetContext | None = None,
+    target_id: str | None = None,
+) -> dict:
+    return await refresh_runtime_state(ctx, target_ctx=target_ctx, target_id=target_id)
 
 
 async def launch_logs(
     ctx: AppContext,
     *,
+    target_ctx: TargetContext | None = None,
+    target_id: str | None = None,
     lines: int = 200,
     offset: int | None = None,
     inode: int | None = None,
 ) -> dict:
+    target_ctx = _target_context(ctx, target_ctx=target_ctx, target_id=target_id)
     try:
-        status = await refresh_runtime_state(ctx)
-        paths = ctx.config.mission_paths()
-
-        if offset is not None:
-            start = max(0, int(offset))
-            inode_value = max(0, int(inode or 0))
-            cmd = f"""
-                log_file={ctx.ssh.q(paths["log"])}
-                start={start}
-                req_inode={inode_value}
-
-                if [ ! -f "$log_file" ]; then
-                    echo "__META__:0:0:0:1"
-                    exit 0
-                fi
-
-                inode_now="$(stat -c %i "$log_file" 2>/dev/null || stat -f %i "$log_file" 2>/dev/null || echo 0)"
-                size="$(wc -c < "$log_file" | tr -d ' ')"
-                reset=0
-
-                if [ "$req_inode" -gt 0 ] && [ "$inode_now" -ne "$req_inode" ]; then
-                    start=0
-                    reset=1
-                fi
-
-                if [ "$start" -gt "$size" ]; then
-                    start=0
-                    reset=1
-                fi
-
-                echo "__META__:$size:$reset:$inode_now:0"
-                if [ "$size" -gt "$start" ]; then
-                    tail -c +$((start + 1)) "$log_file"
-                fi
-            """
-            result = await ctx.ssh.run(cmd, timeout=10)
-            if result.returncode != 0:
-                return {
-                    "success": False,
-                    "running": status.get("running", False),
-                    "error": ctx.ssh.friendly_error(result.stderr),
-                }
-
-            out = result.stdout or ""
-            first_line, sep, rest = out.partition("\n")
-            meta_match = re.match(
-                r"^__META__:(\d+):([01]):(\d+):([01])$", first_line.strip()
-            )
-            if not meta_match:
-                return {
-                    "success": False,
-                    "running": status.get("running", False),
-                    "error": "Failed to parse mission logs metadata",
-                }
-
-            if not sep:
-                rest = ""
-
-            next_offset = int(meta_match.group(1))
-            reset = meta_match.group(2) == "1"
-            next_inode = int(meta_match.group(3))
-
-            return {
-                "success": True,
-                "running": status.get("running", False),
-                "logs": rest,
-                "next_offset": next_offset,
-                "inode": next_inode,
-                "reset": reset,
-            }
-
-        line_count = 0 if lines <= 0 else max(20, min(lines, 20000))
-        cat_cmd = (
-            'cat "$log_file"'
-            if line_count == 0
-            else f'tail -n {line_count} "$log_file"'
-        )
+        status = await refresh_runtime_state(ctx, target_ctx=target_ctx)
+        line_count = 400 if lines <= 0 else max(20, min(lines, 4000))
         cmd = f"""
-            log_file={ctx.ssh.q(paths["log"])}
-            if [ -f "$log_file" ]; then
-                {cat_cmd}
-            fi
+            sudo -n journalctl -u {target_ctx.target.service_unit} --no-pager -n {line_count} -o short-iso 2>/dev/null || true
         """
-        result = await ctx.ssh.run(cmd, timeout=10)
+        result = await target_ctx.ssh.run(
+            f"bash -lc {target_ctx.ssh.q(cmd)}", timeout=10
+        )
         if result.returncode != 0:
             return {
                 "success": False,
                 "running": status.get("running", False),
-                "error": ctx.ssh.friendly_error(result.stderr),
+                "error": _systemd_access_error(
+                    target_ctx, result.stderr or result.stdout
+                ),
             }
 
+        text = result.stdout or ""
         return {
             "success": True,
             "running": status.get("running", False),
-            "logs": result.stdout,
+            "logs": text,
+            "next_offset": len(text),
+            "inode": 0 if inode is None else inode,
+            "reset": True,
         }
     except Exception as exc:
         return {
             "success": False,
             "running": False,
-            "error": ctx.ssh.friendly_error(str(exc)),
+            "error": target_ctx.ssh.friendly_error(str(exc)),
         }
 
 
@@ -215,19 +231,22 @@ async def stream_terminal(
     ctx: AppContext,
     websocket: WebSocket,
     *,
+    target_ctx: TargetContext | None = None,
+    target_id: str | None = None,
     offset: int = 0,
     inode: int = 0,
 ) -> None:
     await websocket.accept()
-    current_offset = max(0, offset)
-    current_inode = max(0, inode)
-
+    previous = ""
     try:
         while True:
             chunk = await launch_logs(
                 ctx,
-                offset=current_offset,
-                inode=current_inode,
+                target_ctx=target_ctx,
+                target_id=target_id,
+                lines=400,
+                offset=offset,
+                inode=inode,
             )
             if not chunk.get("success"):
                 message = TerminalInfoMessage(
@@ -237,36 +256,33 @@ async def stream_terminal(
                 await websocket.send_text(message.model_dump_json())
                 if _is_offline_error(chunk.get("error") or ""):
                     break
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(1.0)
                 continue
 
             text = chunk.get("logs") or ""
-            next_offset = int(chunk.get("next_offset") or current_offset)
-            next_inode = int(chunk.get("inode") or current_inode)
-            reset = bool(chunk.get("reset"))
-
-            if text or reset:
+            reset = text != previous
+            previous = text
+            if reset:
                 payload = TerminalChunkMessage(
                     data=text,
-                    next_offset=next_offset,
-                    inode=next_inode,
-                    reset=reset,
+                    next_offset=len(text),
+                    inode=0,
+                    reset=True,
                 )
                 await websocket.send_text(payload.model_dump_json())
 
-            current_offset = next_offset
-            current_inode = next_inode
-
             with suppress(asyncio.TimeoutError):
                 await asyncio.wait_for(websocket.receive_text(), timeout=0.01)
-
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(1.0)
     except WebSocketDisconnect:
         return
     except Exception as exc:
         with suppress(Exception):
             message = TerminalInfoMessage(
-                type="error", message=ctx.ssh.friendly_error(str(exc))
+                type="error",
+                message=_target_context(
+                    ctx, target_ctx=target_ctx, target_id=target_id
+                ).ssh.friendly_error(str(exc)),
             )
             await websocket.send_text(message.model_dump_json())
     finally:
@@ -274,123 +290,47 @@ async def stream_terminal(
             await websocket.close()
 
 
-async def prepare_mission(ctx: AppContext) -> dict:
-    await ctx.mission_state.set(
+async def prepare_mission(
+    ctx: AppContext,
+    *,
+    target_ctx: TargetContext | None = None,
+    target_id: str | None = None,
+) -> dict:
+    target_ctx = _target_context(ctx, target_ctx=target_ctx, target_id=target_id)
+    try:
+        _require_runtime_target(ctx, target_ctx)
+    except ValueError as exc:
+        return {"success": False, "error": str(exc)}
+    await target_ctx.mission_state.set(
         phase="preparing",
         launch_state="running",
         running=False,
-        message="Starting mission launch",
+        message="Starting mission runtime",
         error=None,
     )
     try:
-        paths = ctx.config.mission_paths()
+        paths = _runtime_paths(target_ctx)
         cmd = f"""
-            set -e
-            cd {ctx.ssh.q(ctx.config.remote_dir)}
-            source /opt/ros/humble/setup.bash
-            source install/setup.bash
-
-            pid_file={ctx.ssh.q(paths["pid"])}
-            pgid_file={ctx.ssh.q(paths["pgid"])}
-            log_file={ctx.ssh.q(paths["log"])}
-            had_previous=0
-
-            if [ -f "$pid_file" ]; then
-                old_pid="$(cat "$pid_file" 2>/dev/null || true)"
-                old_pgid=""
-                if [ -f "$pgid_file" ]; then
-                    old_pgid="$(cat "$pgid_file" 2>/dev/null || true)"
-                fi
-                if [ -z "$old_pgid" ] && [ -n "$old_pid" ]; then
-                    old_pgid="$(ps -o pgid= "$old_pid" 2>/dev/null | tr -d ' ' || true)"
-                fi
-
-                target=""
-                if [ -n "$old_pgid" ] && kill -0 "-$old_pgid" 2>/dev/null; then
-                    target="-$old_pgid"
-                elif [ -n "$old_pid" ] && kill -0 "$old_pid" 2>/dev/null; then
-                    target="$old_pid"
-                fi
-
-                if [ -n "$target" ]; then
-                    had_previous=1
-                    kill -INT "$target" 2>/dev/null || true
-                    for _ in 1 2 3 4 5; do
-                        if [ -n "$old_pid" ] && kill -0 "$old_pid" 2>/dev/null; then
-                            sleep 1
-                        else
-                            break
-                        fi
-                    done
-                    if [ -n "$old_pid" ] && kill -0 "$old_pid" 2>/dev/null; then
-                        kill -TERM "$target" 2>/dev/null || true
-                        sleep 1
-                    fi
-                    if [ -n "$old_pid" ] && kill -0 "$old_pid" 2>/dev/null; then
-                        kill -KILL "$target" 2>/dev/null || true
-                    fi
-                fi
-
-                rm -f "$pid_file"
+            current_link={target_ctx.ssh.q(paths["current_link"])}
+            runtime_fleet={target_ctx.ssh.q(paths["runtime_fleet"])}
+            if [ ! -d "$current_link" ] || [ ! -f "$runtime_fleet" ]; then
+                echo "NOT_PREPARED"
+                exit 1
             fi
-            rm -f "$pgid_file"
-
-            : > "$log_file"
-            nohup setsid ros2 launch uav main.launch.py >> "$log_file" 2>&1 < /dev/null &
-            new_pid=$!
-            new_pgid="$(ps -o pgid= "$new_pid" 2>/dev/null | tr -d ' ' || true)"
-            echo "$new_pid" > "$pid_file"
-            if [ -n "$new_pgid" ]; then
-                echo "$new_pgid" > "$pgid_file"
-            fi
-            sleep 1
-
-            if kill -0 "$new_pid" 2>/dev/null; then
-                if [ "$had_previous" -eq 1 ]; then
-                    echo "RESTARTED:$new_pid"
-                else
-                    echo "STARTED:$new_pid"
-                fi
-                exit 0
-            fi
-
-            echo "FAILED"
-            exit 1
+            sudo -n systemctl restart {target_ctx.target.service_unit}
+            pid="$(sudo -n systemctl show -p MainPID --value {target_ctx.target.service_unit} 2>/dev/null || echo 0)"
+            echo "STARTED:${{pid:-0}}"
         """
-        result = await ctx.ssh.run(f"bash -lc {ctx.ssh.q(cmd)}", timeout=20)
-        stdout = (result.stdout or "").strip()
-        stderr = (result.stderr or "").strip()
-        combined = "\n".join(part for part in (stdout, stderr) if part)
-        match = re.search(r"(STARTED|RESTARTED)\s*:\s*([0-9]+)", combined)
-        if match:
-            pid = match.group(2)
-            await ctx.mission_state.set(
-                phase="running",
-                launch_state="running",
-                running=True,
-                pid=pid,
-                message="Mission launch running",
-                error=None,
-            )
-            if match.group(1) == "RESTARTED":
-                return {
-                    "success": True,
-                    "output": "Mission launch restarted",
-                    "running": True,
-                    "pid": pid,
-                }
-            return {
-                "success": True,
-                "output": "Mission launch started",
-                "running": True,
-                "pid": pid,
-            }
-
+        result = await target_ctx.ssh.run(
+            f"bash -lc {target_ctx.ssh.q(cmd)}", timeout=25
+        )
         if result.returncode != 0:
-            error = ctx.ssh.format_remote_error(
-                result.stderr or result.stdout, "Prepare mission failed"
-            )
-            await ctx.mission_state.set(
+            combined = result.stderr or result.stdout
+            if "NOT_PREPARED" in combined:
+                error = "No prepared runtime is available on the Pi. Deploy a build and target overlay first."
+            else:
+                error = _systemd_access_error(target_ctx, combined)
+            await target_ctx.mission_state.set(
                 phase="error",
                 launch_state="error",
                 running=False,
@@ -399,18 +339,20 @@ async def prepare_mission(ctx: AppContext) -> dict:
             )
             return {"success": False, "error": error}
 
-        error = "Prepare mission failed (launch did not start)"
-        await ctx.mission_state.set(
-            phase="error",
-            launch_state="error",
-            running=False,
-            pid=None,
-            error=error,
+        match = re.search(r"STARTED:([0-9]+)", result.stdout or "")
+        pid = match.group(1) if match else None
+        await target_ctx.mission_state.set(
+            phase="running",
+            launch_state="running",
+            running=True,
+            pid=pid,
+            message="Mission runtime running",
+            error=None,
         )
-        return {"success": False, "error": error}
+        return {"success": True, "output": "Mission runtime started", "pid": pid}
     except Exception as exc:
-        error = ctx.ssh.friendly_error(str(exc))
-        await ctx.mission_state.set(
+        error = target_ctx.ssh.friendly_error(str(exc))
+        await target_ctx.mission_state.set(
             phase="error",
             launch_state="error",
             running=False,
@@ -420,67 +362,27 @@ async def prepare_mission(ctx: AppContext) -> dict:
         return {"success": False, "error": error}
 
 
-async def stop_mission(ctx: AppContext) -> dict:
-    await ctx.mission_state.set(
+async def stop_mission(
+    ctx: AppContext,
+    *,
+    target_ctx: TargetContext | None = None,
+    target_id: str | None = None,
+) -> dict:
+    target_ctx = _target_context(ctx, target_ctx=target_ctx, target_id=target_id)
+    await target_ctx.mission_state.set(
         phase="stopping",
         launch_state="stopped",
         running=True,
-        message="Stopping mission launch",
+        message="Stopping mission runtime",
         error=None,
     )
     try:
-        paths = ctx.config.mission_paths()
-        cmd = f"""
-            pid_file={ctx.ssh.q(paths["pid"])}
-            pgid_file={ctx.ssh.q(paths["pgid"])}
-
-            if [ ! -f "$pid_file" ]; then
-                echo "NOT_RUNNING"
-                exit 0
-            fi
-
-            pid="$(cat "$pid_file" 2>/dev/null || true)"
-            pgid=""
-            if [ -f "$pgid_file" ]; then
-                pgid="$(cat "$pgid_file" 2>/dev/null || true)"
-            fi
-
-            target=""
-            if [ -n "$pgid" ] && kill -0 "-$pgid" 2>/dev/null; then
-                target="-$pgid"
-            elif [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
-                target="$pid"
-            else
-                rm -f "$pid_file" "$pgid_file"
-                echo "NOT_RUNNING"
-                exit 0
-            fi
-
-            kill -INT "$target" 2>/dev/null || true
-            for _ in 1 2 3 4 5; do
-                if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
-                    sleep 1
-                else
-                    rm -f "$pid_file" "$pgid_file"
-                    echo "STOPPED"
-                    exit 0
-                fi
-            done
-
-            kill -TERM "$target" 2>/dev/null || true
-            sleep 1
-            if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
-                kill -KILL "$target" 2>/dev/null || true
-            fi
-            rm -f "$pid_file" "$pgid_file"
-            echo "STOPPED"
-        """
-        result = await ctx.ssh.run(f"bash -lc {ctx.ssh.q(cmd)}", timeout=20)
+        result = await target_ctx.ssh.run(
+            f"sudo -n systemctl stop {target_ctx.target.service_unit}", timeout=20
+        )
         if result.returncode != 0:
-            error = ctx.ssh.format_remote_error(
-                result.stderr or result.stdout, "Stop mission failed"
-            )
-            await ctx.mission_state.set(
+            error = _systemd_access_error(target_ctx, result.stderr or result.stdout)
+            await target_ctx.mission_state.set(
                 phase="error",
                 launch_state="error",
                 running=False,
@@ -489,21 +391,18 @@ async def stop_mission(ctx: AppContext) -> dict:
             )
             return {"success": False, "error": error}
 
-        out = (result.stdout or "").strip()
-        await ctx.mission_state.set(
+        await target_ctx.mission_state.set(
             phase="idle",
             launch_state="stopped",
             running=False,
             pid=None,
-            message="Mission launch stopped",
+            message="Mission runtime stopped",
             error=None,
         )
-        if "NOT_RUNNING" in out:
-            return {"success": True, "output": "Mission launch is not running"}
-        return {"success": True, "output": "Mission launch stopped"}
+        return {"success": True, "output": "Mission runtime stopped"}
     except Exception as exc:
-        error = ctx.ssh.friendly_error(str(exc))
-        await ctx.mission_state.set(
+        error = target_ctx.ssh.friendly_error(str(exc))
+        await target_ctx.mission_state.set(
             phase="error",
             launch_state="error",
             running=False,
@@ -513,91 +412,127 @@ async def stop_mission(ctx: AppContext) -> dict:
         return {"success": False, "error": error}
 
 
-async def start_mission(ctx: AppContext) -> dict:
+async def _call_vehicle_service(
+    ctx: AppContext,
+    *,
+    target_ctx: TargetContext | None = None,
+    target_id: str | None = None,
+    service_name: str,
+    timeout: int,
+    error_prefix: str,
+) -> dict:
+    target_ctx = _target_context(ctx, target_ctx=target_ctx, target_id=target_id)
     try:
-        cmd = (
-            f"cd {ctx.ssh.q(ctx.config.remote_dir)} && "
-            "source /opt/ros/humble/setup.bash && "
-            "source install/setup.bash && "
-            'ros2 service call /mode_manager/start_mission std_srvs/srv/Trigger "{}"'
+        _require_runtime_target(ctx, target_ctx)
+        cmd = _runtime_shell(
+            target_ctx,
+            (
+                f"ros2 service call /{target_ctx.target.vehicle_name}/{service_name} "
+                'std_srvs/srv/Trigger "{}"'
+            ),
         )
-        result = await ctx.ssh.run(f"bash -lc {ctx.ssh.q(cmd)}", timeout=20)
+        result = await target_ctx.ssh.run(
+            f"bash -lc {target_ctx.ssh.q(cmd)}", timeout=timeout
+        )
         if result.returncode != 0:
-            error = ctx.ssh.format_remote_error(
-                result.stderr or result.stdout, "Start mission failed"
-            )
-            await ctx.mission_state.set(
-                phase="error",
-                launch_state="error",
-                running=False,
-                pid=None,
-                error=error,
-            )
-            return {"success": False, "error": error}
-
-        await refresh_runtime_state(ctx)
+            return {
+                "success": False,
+                "error": target_ctx.ssh.format_remote_error(
+                    result.stderr or result.stdout, error_prefix
+                ),
+            }
         return {
             "success": True,
-            "output": result.stdout.strip() or "Start mission service called",
+            "output": result.stdout.strip() or f"{service_name} called",
         }
     except subprocess.TimeoutExpired:
-        return {"success": False, "error": "Start mission service call timed out"}
+        return {"success": False, "error": f"{error_prefix} timed out"}
     except Exception as exc:
-        error = ctx.ssh.friendly_error(str(exc))
-        await ctx.mission_state.set(
+        return {"success": False, "error": target_ctx.ssh.friendly_error(str(exc))}
+
+
+async def start_mission(
+    ctx: AppContext,
+    *,
+    target_ctx: TargetContext | None = None,
+    target_id: str | None = None,
+) -> dict:
+    target_ctx = _target_context(ctx, target_ctx=target_ctx, target_id=target_id)
+    result = await _call_vehicle_service(
+        ctx,
+        target_ctx=target_ctx,
+        target_id=target_id,
+        service_name="mode_manager/start_mission",
+        timeout=20,
+        error_prefix="Start mission failed",
+    )
+    if result.get("success"):
+        await refresh_runtime_state(ctx, target_ctx=target_ctx)
+    else:
+        await target_ctx.mission_state.set(
             phase="error",
             launch_state="error",
             running=False,
             pid=None,
-            error=error,
+            error=result.get("error"),
         )
-        return {"success": False, "error": error}
+    return result
 
 
-async def trigger_failsafe(ctx: AppContext) -> dict:
+async def trigger_failsafe(
+    ctx: AppContext,
+    *,
+    target_ctx: TargetContext | None = None,
+    target_id: str | None = None,
+) -> dict:
+    return await _call_vehicle_service(
+        ctx,
+        target_ctx=target_ctx,
+        target_id=target_id,
+        service_name="mode_manager/failsafe",
+        timeout=15,
+        error_prefix="Failsafe command failed",
+    )
+
+
+async def get_launch_params(
+    ctx: AppContext,
+    *,
+    target_ctx: TargetContext | None = None,
+    target_id: str | None = None,
+) -> dict:
+    target_ctx = _target_context(ctx, target_ctx=target_ctx, target_id=target_id)
     try:
-        cmd = (
-            f"cd {ctx.ssh.q(ctx.config.remote_dir)} && "
-            "source /opt/ros/humble/setup.bash && "
-            "source install/setup.bash && "
-            'ros2 service call /mode_manager/failsafe std_srvs/srv/Trigger "{}"'
+        _require_runtime_target(ctx, target_ctx)
+        overlay_path = target_ctx.target.mission_paths()["overlay_file"]
+        result = await target_ctx.ssh.run(
+            f"cat {target_ctx.ssh.q(overlay_path)}", timeout=10
         )
-        result = await ctx.ssh.run(f"bash -lc {ctx.ssh.q(cmd)}", timeout=15)
-        if result.returncode not in (0, 124):
-            return {
-                "success": False,
-                "error": ctx.ssh.format_remote_error(
-                    result.stderr, "Failsafe command failed"
-                ),
-            }
-        return {"success": True, "output": "Failsafe triggered"}
-    except subprocess.TimeoutExpired:
-        return {"success": False, "error": ctx.ssh.friendly_timeout()}
-    except Exception as exc:
-        return {"success": False, "error": ctx.ssh.friendly_error(str(exc))}
-
-
-async def get_launch_params(ctx: AppContext) -> dict:
-    try:
-        params_path = ctx.config.mission_paths()["launch_params"]
-        result = await ctx.ssh.run(f"cat {ctx.ssh.q(params_path)}", timeout=10)
         if result.returncode != 0:
             return {
                 "success": False,
-                "error": ctx.ssh.format_remote_error(
-                    result.stderr, "Read launch params failed"
+                "error": target_ctx.ssh.format_remote_error(
+                    result.stderr, "Read target overlay failed"
                 ),
             }
+        target_ctx.target.overlay_yaml = result.stdout
         return {"success": True, "content": result.stdout}
     except Exception as exc:
-        return {"success": False, "error": ctx.ssh.friendly_error(str(exc))}
+        return {"success": False, "error": target_ctx.ssh.friendly_error(str(exc))}
 
 
-async def list_mission_names(ctx: AppContext) -> dict:
+async def list_mission_names(
+    ctx: AppContext,
+    *,
+    target_ctx: TargetContext | None = None,
+    target_id: str | None = None,
+) -> dict:
+    target_ctx = _target_context(ctx, target_ctx=target_ctx, target_id=target_id)
     try:
-        missions_dir = ctx.config.mission_paths()["missions_dir"]
+        _require_runtime_target(ctx, target_ctx)
+        missions_dir = target_ctx.target.mission_paths()["missions_dir"]
         cmd = f"""
-            missions_dir={ctx.ssh.q(missions_dir)}
+            missions_dir={target_ctx.ssh.q(missions_dir)}
             if [ ! -d "$missions_dir" ]; then
                 echo "__ERR__:missing_dir"
                 exit 0
@@ -611,12 +546,12 @@ async def list_mission_names(ctx: AppContext) -> dict:
                 esac
             done | sort -u
         """
-        result = await ctx.ssh.run(cmd, timeout=10)
+        result = await target_ctx.ssh.run(cmd, timeout=10)
         if result.returncode != 0:
             return {
                 "success": False,
                 "missions": [],
-                "error": ctx.ssh.format_remote_error(
+                "error": target_ctx.ssh.format_remote_error(
                     result.stderr, "Read mission names failed"
                 ),
             }
@@ -636,17 +571,27 @@ async def list_mission_names(ctx: AppContext) -> dict:
         return {
             "success": False,
             "missions": [],
-            "error": ctx.ssh.friendly_error(str(exc)),
+            "error": target_ctx.ssh.friendly_error(str(exc)),
         }
 
 
 async def _resolve_mission_file_path(
-    ctx: AppContext, mission_name: str, *, allow_create: bool
+    ctx: AppContext,
+    mission_name: str,
+    *,
+    target_ctx: TargetContext | None = None,
+    target_id: str | None,
+    allow_create: bool,
 ) -> dict:
-    missions_dir = ctx.config.mission_paths()["missions_dir"]
+    target_ctx = _target_context(ctx, target_ctx=target_ctx, target_id=target_id)
+    try:
+        _require_runtime_target(ctx, target_ctx)
+    except ValueError as exc:
+        return {"success": False, "error": str(exc)}
+    missions_dir = target_ctx.target.mission_paths()["missions_dir"]
     cmd = f"""
-        missions_dir={ctx.ssh.q(missions_dir)}
-        mission_name={ctx.ssh.q(mission_name)}
+        missions_dir={target_ctx.ssh.q(missions_dir)}
+        mission_name={target_ctx.ssh.q(mission_name)}
         yaml_path="$missions_dir/$mission_name.yaml"
         yml_path="$missions_dir/$mission_name.yml"
 
@@ -664,11 +609,11 @@ async def _resolve_mission_file_path(
         fi
         echo "__ERR__:not_found"
     """
-    result = await ctx.ssh.run(cmd, timeout=10)
+    result = await target_ctx.ssh.run(cmd, timeout=10)
     if result.returncode != 0:
         return {
             "success": False,
-            "error": ctx.ssh.format_remote_error(
+            "error": target_ctx.ssh.format_remote_error(
                 result.stderr, "Resolve mission file failed"
             ),
         }
@@ -679,22 +624,33 @@ async def _resolve_mission_file_path(
             "success": False,
             "error": (
                 f"Mission file '{mission_name}.yaml' was not found in "
-                f"{missions_dir}. Select a valid mission in launch params."
+                f"{missions_dir}. Select a valid mission in the target overlay."
             ),
         }
 
     return {"success": True, "path": resolved}
 
 
-async def get_mission_file(ctx: AppContext, *, name: str) -> dict:
+async def get_mission_file(
+    ctx: AppContext,
+    *,
+    target_ctx: TargetContext | None = None,
+    target_id: str | None = None,
+    name: str,
+) -> dict:
     try:
         mission_name = _normalize_mission_name(name)
     except ValueError as exc:
         return {"success": False, "mission": None, "error": str(exc)}
 
+    target_ctx = _target_context(ctx, target_ctx=target_ctx, target_id=target_id)
     try:
         resolved = await _resolve_mission_file_path(
-            ctx, mission_name, allow_create=False
+            ctx,
+            mission_name,
+            target_ctx=target_ctx,
+            target_id=target_id,
+            allow_create=False,
         )
         if not resolved.get("success"):
             return {
@@ -704,13 +660,15 @@ async def get_mission_file(ctx: AppContext, *, name: str) -> dict:
             }
 
         mission_path = resolved["path"]
-        result = await ctx.ssh.run(f"cat {ctx.ssh.q(mission_path)}", timeout=10)
+        result = await target_ctx.ssh.run(
+            f"cat {target_ctx.ssh.q(mission_path)}", timeout=10
+        )
         if result.returncode != 0:
             return {
                 "success": False,
                 "mission": mission_name,
                 "path": mission_path,
-                "error": ctx.ssh.format_remote_error(
+                "error": target_ctx.ssh.format_remote_error(
                     result.stderr, "Read mission YAML failed"
                 ),
             }
@@ -725,34 +683,51 @@ async def get_mission_file(ctx: AppContext, *, name: str) -> dict:
         return {
             "success": False,
             "mission": mission_name,
-            "error": ctx.ssh.friendly_error(str(exc)),
+            "error": target_ctx.ssh.friendly_error(str(exc)),
         }
 
 
-async def set_mission_file(ctx: AppContext, *, name: str, content: str) -> dict:
+async def set_mission_file(
+    ctx: AppContext,
+    *,
+    target_ctx: TargetContext | None = None,
+    target_id: str | None = None,
+    name: str,
+    content: str,
+) -> dict:
     tmp_path = ""
     try:
         mission_name = _normalize_mission_name(name)
     except ValueError as exc:
         return {"success": False, "mission": None, "error": str(exc)}
 
+    target_ctx = _target_context(ctx, target_ctx=target_ctx, target_id=target_id)
     try:
-        missions_dir = ctx.config.mission_paths()["missions_dir"]
-        mkdir_result = await ctx.ssh.run(
-            f"mkdir -p {ctx.ssh.q(missions_dir)}", timeout=10
+        parsed = yaml.safe_load(content) or {}
+        if not isinstance(parsed, dict):
+            raise ValueError("Mission YAML must define a mapping at the top level.")
+        MissionSpec.from_dict(parsed)
+
+        missions_dir = target_ctx.target.mission_paths()["missions_dir"]
+        mkdir_result = await target_ctx.ssh.run(
+            f"mkdir -p {target_ctx.ssh.q(missions_dir)}", timeout=10
         )
         if mkdir_result.returncode != 0:
             return {
                 "success": False,
                 "mission": mission_name,
-                "error": ctx.ssh.format_remote_error(
+                "error": target_ctx.ssh.format_remote_error(
                     mkdir_result.stderr,
                     "Write mission YAML failed",
                 ),
             }
 
         resolved = await _resolve_mission_file_path(
-            ctx, mission_name, allow_create=True
+            ctx,
+            mission_name,
+            target_ctx=target_ctx,
+            target_id=target_id,
+            allow_create=True,
         )
         if not resolved.get("success"):
             return {
@@ -767,13 +742,13 @@ async def set_mission_file(ctx: AppContext, *, name: str, content: str) -> dict:
             tmp.write(content)
             tmp_path = tmp.name
 
-        scp_result = await ctx.ssh.scp(tmp_path, mission_path, timeout=30)
+        scp_result = await target_ctx.ssh.scp(tmp_path, mission_path, timeout=30)
         if scp_result.returncode != 0:
             return {
                 "success": False,
                 "mission": mission_name,
                 "path": mission_path,
-                "error": ctx.ssh.format_remote_error(
+                "error": target_ctx.ssh.format_remote_error(
                     scp_result.stderr, "Write mission YAML failed"
                 ),
             }
@@ -788,26 +763,35 @@ async def set_mission_file(ctx: AppContext, *, name: str, content: str) -> dict:
         return {
             "success": False,
             "mission": mission_name,
-            "error": ctx.ssh.friendly_error(str(exc)),
+            "error": target_ctx.ssh.friendly_error(str(exc)),
         }
     finally:
         if tmp_path and os.path.exists(tmp_path):
             os.unlink(tmp_path)
 
 
-async def set_launch_params(ctx: AppContext, content: str) -> dict:
+async def set_launch_params(
+    ctx: AppContext,
+    *,
+    target_ctx: TargetContext | None = None,
+    target_id: str | None = None,
+    content: str,
+) -> dict:
     tmp_path = ""
+    target_ctx = _target_context(ctx, target_ctx=target_ctx, target_id=target_id)
     try:
-        params_path = ctx.config.mission_paths()["launch_params"]
-        mkdir_result = await ctx.ssh.run(
-            f"mkdir -p {ctx.ssh.q(str(Path(params_path).parent))}", timeout=10
+        _require_runtime_target(ctx, target_ctx)
+        deploy_service.validate_overlay_preview(ctx, target_ctx, content)
+        overlay_path = target_ctx.target.mission_paths()["overlay_file"]
+        mkdir_result = await target_ctx.ssh.run(
+            f"mkdir -p {target_ctx.ssh.q(str(Path(overlay_path).parent))}", timeout=10
         )
         if mkdir_result.returncode != 0:
             return {
                 "success": False,
-                "error": ctx.ssh.format_remote_error(
+                "error": target_ctx.ssh.format_remote_error(
                     mkdir_result.stderr,
-                    "Write launch params failed",
+                    "Write target overlay failed",
                 ),
             }
 
@@ -815,18 +799,19 @@ async def set_launch_params(ctx: AppContext, content: str) -> dict:
             tmp.write(content)
             tmp_path = tmp.name
 
-        result = await ctx.ssh.scp(tmp_path, params_path, timeout=30)
+        result = await target_ctx.ssh.scp(tmp_path, overlay_path, timeout=30)
         if result.returncode != 0:
             return {
                 "success": False,
-                "error": ctx.ssh.format_remote_error(
-                    result.stderr, "Write launch params failed"
+                "error": target_ctx.ssh.format_remote_error(
+                    result.stderr, "Write target overlay failed"
                 ),
             }
 
-        return {"success": True, "output": "launch_params.yaml updated"}
+        target_ctx.target.overlay_yaml = content
+        return {"success": True, "output": "Target overlay updated"}
     except Exception as exc:
-        return {"success": False, "error": ctx.ssh.friendly_error(str(exc))}
+        return {"success": False, "error": target_ctx.ssh.friendly_error(str(exc))}
     finally:
         if tmp_path and os.path.exists(tmp_path):
             os.unlink(tmp_path)

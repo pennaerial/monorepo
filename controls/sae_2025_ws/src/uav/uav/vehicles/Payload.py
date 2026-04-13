@@ -1,7 +1,7 @@
 from rclpy.node import Node
 
-from payload_interfaces.msg import DriveCommand
-from payload_interfaces.srv import TimedDrive
+from payload_interfaces.msg import DriveCommand, ServoCommand
+from payload_interfaces.srv import DeadReckon, TimedDrive
 
 from .Vehicle import Vehicle
 
@@ -9,11 +9,11 @@ from .Vehicle import Vehicle
 class Payload(Vehicle):
     """Mission-side adapter for one payload node namespace."""
 
-    def __init__(self, node: Node, payload_name: str):
-        namespace = f"/{payload_name}"
+    def __init__(self, node: Node, vehicle_name: str):
+        namespace = f"/{vehicle_name}"
         super().__init__(
             node,
-            payload_name,
+            vehicle_name,
             has_camera=True,
             camera_namespace=namespace,
             image_topic=f"{namespace}/camera",
@@ -24,8 +24,14 @@ class Payload(Vehicle):
         self.drive_publisher = self.node.create_publisher(
             DriveCommand, self.namespaced_path("cmd_drive", namespace=namespace), 10
         )
+        self.servo_publisher = self.node.create_publisher(
+            ServoCommand, self.namespaced_path("servo", namespace=namespace), 10
+        )
         self.timed_drive_client = self.node.create_client(
             TimedDrive, self.namespaced_path("timed_drive", namespace=namespace)
+        )
+        self.dead_reckon_client = self.node.create_client(
+            DeadReckon, self.namespaced_path("dead_reckon", namespace=namespace)
         )
 
     def drive(self, linear: float, angular: float) -> None:
@@ -35,6 +41,16 @@ class Payload(Vehicle):
 
     def stop(self) -> None:
         self.drive(0.0, 0.0)
+
+    def set_servo(self, degree: float) -> None:
+        self.servo_publisher.publish(ServoCommand(degree=float(degree)))
+
+    def dead_reckon(self, linear: float, angular: float, speed: float):
+        request = DeadReckon.Request()
+        request.linear = float(linear)
+        request.angular = float(angular)
+        request.speed = float(speed)
+        return self.dead_reckon_client.call_async(request)
 
     def timed_drive(self, linear: float, angular: float, duration_sec: float):
         request = TimedDrive.Request()

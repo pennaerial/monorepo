@@ -17,6 +17,8 @@ class Mode(ABC):
 
     mission_target: ClassVar[str | None] = None
     required_vision_nodes: ClassVar[tuple[object, ...]] = ()
+    requires_camera: ClassVar[bool] = False
+    transition_labels: ClassVar[tuple[str, ...]] = ()
 
     def __init__(self, node: Node, vehicle: Vehicle):
         """
@@ -40,6 +42,10 @@ class Mode(ABC):
             else:
                 names.append(node.__name__)
         return tuple(names)
+
+    @classmethod
+    def declared_transition_labels(cls) -> tuple[str, ...]:
+        return tuple(cls.transition_labels)
 
     def on_enter(self) -> None:
         """
