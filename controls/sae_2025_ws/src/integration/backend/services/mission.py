@@ -20,6 +20,17 @@ from . import deploy as deploy_service
 MISSION_NAME_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 
 
+def _target_context(
+    ctx: AppContext,
+    *,
+    target_ctx: TargetContext | None = None,
+    target_id: str | None = None,
+) -> TargetContext:
+    if target_ctx is not None:
+        return target_ctx
+    return ctx.resolve_target(target_id)
+
+
 def _is_offline_error(message: str) -> bool:
     lower = (message or "").lower()
     return "cannot find " in lower or "cannot reach " in lower or "timed out" in lower
@@ -69,8 +80,13 @@ def _require_runtime_target(ctx: AppContext, target_ctx: TargetContext) -> None:
         )
 
 
-async def probe_launch_status(ctx: AppContext, *, target_id: str | None = None) -> dict:
-    target_ctx = ctx.resolve_target(target_id)
+async def probe_launch_status(
+    ctx: AppContext,
+    *,
+    target_ctx: TargetContext | None = None,
+    target_id: str | None = None,
+) -> dict:
+    target_ctx = _target_context(ctx, target_ctx=target_ctx, target_id=target_id)
     try:
         _require_runtime_target(ctx, target_ctx)
     except ValueError as exc:
@@ -128,10 +144,13 @@ async def probe_launch_status(ctx: AppContext, *, target_id: str | None = None) 
 
 
 async def refresh_runtime_state(
-    ctx: AppContext, *, target_id: str | None = None
+    ctx: AppContext,
+    *,
+    target_ctx: TargetContext | None = None,
+    target_id: str | None = None,
 ) -> dict:
-    target_ctx = ctx.resolve_target(target_id)
-    status = await probe_launch_status(ctx, target_id=target_id)
+    target_ctx = _target_context(ctx, target_ctx=target_ctx, target_id=target_id)
+    status = await probe_launch_status(ctx, target_ctx=target_ctx)
     await target_ctx.mission_state.apply_launch_status(
         success=status.get("success", False),
         state=status.get("state", "error"),
@@ -142,28 +161,39 @@ async def refresh_runtime_state(
     return status
 
 
-async def mission_state(ctx: AppContext, *, target_id: str | None = None) -> dict:
-    target_ctx = ctx.resolve_target(target_id)
-    await refresh_runtime_state(ctx, target_id=target_id)
+async def mission_state(
+    ctx: AppContext,
+    *,
+    target_ctx: TargetContext | None = None,
+    target_id: str | None = None,
+) -> dict:
+    target_ctx = _target_context(ctx, target_ctx=target_ctx, target_id=target_id)
+    await refresh_runtime_state(ctx, target_ctx=target_ctx)
     state = await target_ctx.mission_state.snapshot()
     return {"success": True, "state": state.model_dump()}
 
 
-async def launch_status(ctx: AppContext, *, target_id: str | None = None) -> dict:
-    return await refresh_runtime_state(ctx, target_id=target_id)
+async def launch_status(
+    ctx: AppContext,
+    *,
+    target_ctx: TargetContext | None = None,
+    target_id: str | None = None,
+) -> dict:
+    return await refresh_runtime_state(ctx, target_ctx=target_ctx, target_id=target_id)
 
 
 async def launch_logs(
     ctx: AppContext,
     *,
+    target_ctx: TargetContext | None = None,
     target_id: str | None = None,
     lines: int = 200,
     offset: int | None = None,
     inode: int | None = None,
 ) -> dict:
-    target_ctx = ctx.resolve_target(target_id)
+    target_ctx = _target_context(ctx, target_ctx=target_ctx, target_id=target_id)
     try:
-        status = await refresh_runtime_state(ctx, target_id=target_id)
+        status = await refresh_runtime_state(ctx, target_ctx=target_ctx)
         line_count = 400 if lines <= 0 else max(20, min(lines, 4000))
         cmd = f"""
             sudo -n journalctl -u {target_ctx.target.service_unit} --no-pager -n {line_count} -o short-iso 2>/dev/null || true
@@ -201,6 +231,7 @@ async def stream_terminal(
     ctx: AppContext,
     websocket: WebSocket,
     *,
+    target_ctx: TargetContext | None = None,
     target_id: str | None = None,
     offset: int = 0,
     inode: int = 0,
@@ -211,6 +242,7 @@ async def stream_terminal(
         while True:
             chunk = await launch_logs(
                 ctx,
+                target_ctx=target_ctx,
                 target_id=target_id,
                 lines=400,
                 offset=offset,
@@ -248,7 +280,9 @@ async def stream_terminal(
         with suppress(Exception):
             message = TerminalInfoMessage(
                 type="error",
-                message=ctx.resolve_target(target_id).ssh.friendly_error(str(exc)),
+                message=_target_context(
+                    ctx, target_ctx=target_ctx, target_id=target_id
+                ).ssh.friendly_error(str(exc)),
             )
             await websocket.send_text(message.model_dump_json())
     finally:
@@ -256,8 +290,13 @@ async def stream_terminal(
             await websocket.close()
 
 
-async def prepare_mission(ctx: AppContext, *, target_id: str | None = None) -> dict:
-    target_ctx = ctx.resolve_target(target_id)
+async def prepare_mission(
+    ctx: AppContext,
+    *,
+    target_ctx: TargetContext | None = None,
+    target_id: str | None = None,
+) -> dict:
+    target_ctx = _target_context(ctx, target_ctx=target_ctx, target_id=target_id)
     try:
         _require_runtime_target(ctx, target_ctx)
     except ValueError as exc:
@@ -323,8 +362,13 @@ async def prepare_mission(ctx: AppContext, *, target_id: str | None = None) -> d
         return {"success": False, "error": error}
 
 
-async def stop_mission(ctx: AppContext, *, target_id: str | None = None) -> dict:
-    target_ctx = ctx.resolve_target(target_id)
+async def stop_mission(
+    ctx: AppContext,
+    *,
+    target_ctx: TargetContext | None = None,
+    target_id: str | None = None,
+) -> dict:
+    target_ctx = _target_context(ctx, target_ctx=target_ctx, target_id=target_id)
     await target_ctx.mission_state.set(
         phase="stopping",
         launch_state="stopped",
@@ -371,12 +415,13 @@ async def stop_mission(ctx: AppContext, *, target_id: str | None = None) -> dict
 async def _call_vehicle_service(
     ctx: AppContext,
     *,
-    target_id: str | None,
+    target_ctx: TargetContext | None = None,
+    target_id: str | None = None,
     service_name: str,
     timeout: int,
     error_prefix: str,
 ) -> dict:
-    target_ctx = ctx.resolve_target(target_id)
+    target_ctx = _target_context(ctx, target_ctx=target_ctx, target_id=target_id)
     try:
         _require_runtime_target(ctx, target_ctx)
         cmd = _runtime_shell(
@@ -406,17 +451,23 @@ async def _call_vehicle_service(
         return {"success": False, "error": target_ctx.ssh.friendly_error(str(exc))}
 
 
-async def start_mission(ctx: AppContext, *, target_id: str | None = None) -> dict:
-    target_ctx = ctx.resolve_target(target_id)
+async def start_mission(
+    ctx: AppContext,
+    *,
+    target_ctx: TargetContext | None = None,
+    target_id: str | None = None,
+) -> dict:
+    target_ctx = _target_context(ctx, target_ctx=target_ctx, target_id=target_id)
     result = await _call_vehicle_service(
         ctx,
+        target_ctx=target_ctx,
         target_id=target_id,
         service_name="mode_manager/start_mission",
         timeout=20,
         error_prefix="Start mission failed",
     )
     if result.get("success"):
-        await refresh_runtime_state(ctx, target_id=target_id)
+        await refresh_runtime_state(ctx, target_ctx=target_ctx)
     else:
         await target_ctx.mission_state.set(
             phase="error",
@@ -428,9 +479,15 @@ async def start_mission(ctx: AppContext, *, target_id: str | None = None) -> dic
     return result
 
 
-async def trigger_failsafe(ctx: AppContext, *, target_id: str | None = None) -> dict:
+async def trigger_failsafe(
+    ctx: AppContext,
+    *,
+    target_ctx: TargetContext | None = None,
+    target_id: str | None = None,
+) -> dict:
     return await _call_vehicle_service(
         ctx,
+        target_ctx=target_ctx,
         target_id=target_id,
         service_name="mode_manager/failsafe",
         timeout=15,
@@ -438,8 +495,13 @@ async def trigger_failsafe(ctx: AppContext, *, target_id: str | None = None) -> 
     )
 
 
-async def get_launch_params(ctx: AppContext, *, target_id: str | None = None) -> dict:
-    target_ctx = ctx.resolve_target(target_id)
+async def get_launch_params(
+    ctx: AppContext,
+    *,
+    target_ctx: TargetContext | None = None,
+    target_id: str | None = None,
+) -> dict:
+    target_ctx = _target_context(ctx, target_ctx=target_ctx, target_id=target_id)
     try:
         _require_runtime_target(ctx, target_ctx)
         overlay_path = target_ctx.target.mission_paths()["overlay_file"]
@@ -454,14 +516,18 @@ async def get_launch_params(ctx: AppContext, *, target_id: str | None = None) ->
                 ),
             }
         target_ctx.target.overlay_yaml = result.stdout
-        ctx.inventory.save()
         return {"success": True, "content": result.stdout}
     except Exception as exc:
         return {"success": False, "error": target_ctx.ssh.friendly_error(str(exc))}
 
 
-async def list_mission_names(ctx: AppContext, *, target_id: str | None = None) -> dict:
-    target_ctx = ctx.resolve_target(target_id)
+async def list_mission_names(
+    ctx: AppContext,
+    *,
+    target_ctx: TargetContext | None = None,
+    target_id: str | None = None,
+) -> dict:
+    target_ctx = _target_context(ctx, target_ctx=target_ctx, target_id=target_id)
     try:
         _require_runtime_target(ctx, target_ctx)
         missions_dir = target_ctx.target.mission_paths()["missions_dir"]
@@ -510,9 +576,14 @@ async def list_mission_names(ctx: AppContext, *, target_id: str | None = None) -
 
 
 async def _resolve_mission_file_path(
-    ctx: AppContext, mission_name: str, *, target_id: str | None, allow_create: bool
+    ctx: AppContext,
+    mission_name: str,
+    *,
+    target_ctx: TargetContext | None = None,
+    target_id: str | None,
+    allow_create: bool,
 ) -> dict:
-    target_ctx = ctx.resolve_target(target_id)
+    target_ctx = _target_context(ctx, target_ctx=target_ctx, target_id=target_id)
     try:
         _require_runtime_target(ctx, target_ctx)
     except ValueError as exc:
@@ -561,17 +632,25 @@ async def _resolve_mission_file_path(
 
 
 async def get_mission_file(
-    ctx: AppContext, *, target_id: str | None = None, name: str
+    ctx: AppContext,
+    *,
+    target_ctx: TargetContext | None = None,
+    target_id: str | None = None,
+    name: str,
 ) -> dict:
     try:
         mission_name = _normalize_mission_name(name)
     except ValueError as exc:
         return {"success": False, "mission": None, "error": str(exc)}
 
-    target_ctx = ctx.resolve_target(target_id)
+    target_ctx = _target_context(ctx, target_ctx=target_ctx, target_id=target_id)
     try:
         resolved = await _resolve_mission_file_path(
-            ctx, mission_name, target_id=target_id, allow_create=False
+            ctx,
+            mission_name,
+            target_ctx=target_ctx,
+            target_id=target_id,
+            allow_create=False,
         )
         if not resolved.get("success"):
             return {
@@ -609,7 +688,12 @@ async def get_mission_file(
 
 
 async def set_mission_file(
-    ctx: AppContext, *, target_id: str | None = None, name: str, content: str
+    ctx: AppContext,
+    *,
+    target_ctx: TargetContext | None = None,
+    target_id: str | None = None,
+    name: str,
+    content: str,
 ) -> dict:
     tmp_path = ""
     try:
@@ -617,7 +701,7 @@ async def set_mission_file(
     except ValueError as exc:
         return {"success": False, "mission": None, "error": str(exc)}
 
-    target_ctx = ctx.resolve_target(target_id)
+    target_ctx = _target_context(ctx, target_ctx=target_ctx, target_id=target_id)
     try:
         parsed = yaml.safe_load(content) or {}
         if not isinstance(parsed, dict):
@@ -639,7 +723,11 @@ async def set_mission_file(
             }
 
         resolved = await _resolve_mission_file_path(
-            ctx, mission_name, target_id=target_id, allow_create=True
+            ctx,
+            mission_name,
+            target_ctx=target_ctx,
+            target_id=target_id,
+            allow_create=True,
         )
         if not resolved.get("success"):
             return {
@@ -683,10 +771,14 @@ async def set_mission_file(
 
 
 async def set_launch_params(
-    ctx: AppContext, *, target_id: str | None = None, content: str
+    ctx: AppContext,
+    *,
+    target_ctx: TargetContext | None = None,
+    target_id: str | None = None,
+    content: str,
 ) -> dict:
     tmp_path = ""
-    target_ctx = ctx.resolve_target(target_id)
+    target_ctx = _target_context(ctx, target_ctx=target_ctx, target_id=target_id)
     try:
         _require_runtime_target(ctx, target_ctx)
         deploy_service.validate_overlay_preview(ctx, target_ctx, content)
@@ -717,7 +809,6 @@ async def set_launch_params(
             }
 
         target_ctx.target.overlay_yaml = content
-        ctx.inventory.save()
         return {"success": True, "output": "Target overlay updated"}
     except Exception as exc:
         return {"success": False, "error": target_ctx.ssh.friendly_error(str(exc))}

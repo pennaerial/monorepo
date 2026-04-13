@@ -41,6 +41,9 @@ def build_router(ctx: AppContext) -> APIRouter:
         size_mb: Annotated[float | None, Form()] = None,
         branch: Annotated[str, Form()] = "",
         artifact_name: Annotated[str, Form()] = "",
+        workflow_name: Annotated[str, Form()] = "",
+        workflow_event: Annotated[str, Form()] = "",
+        workflow_conclusion: Annotated[str, Form()] = "",
     ) -> BuildSourceResponse:
         from ..services import deploy as deploy_service
 
@@ -59,6 +62,9 @@ def build_router(ctx: AppContext) -> APIRouter:
                 size_mb=size_mb,
                 branch=branch,
                 artifact_name=artifact_name,
+                workflow_name=workflow_name,
+                workflow_event=workflow_event,
+                workflow_conclusion=workflow_conclusion,
             )
         )
 

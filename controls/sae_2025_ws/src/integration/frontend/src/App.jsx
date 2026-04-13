@@ -1,8 +1,14 @@
-import { useState, useEffect, useCallback, useDeferredValue, useMemo } from 'react'
+import { useState, useEffect, useCallback, useDeferredValue, useMemo, useRef } from 'react'
 import '@xterm/xterm/css/xterm.css'
 import './App.css'
 import { useMissionControl } from './hooks/useMissionControl'
-import { api, withQueryParams, withTargetFormData, withTargetId } from './services/api'
+import {
+  api,
+  normalizeFleetActionResult,
+  withDeviceFormData,
+  withDeviceScope,
+  withQueryParams,
+} from './services/api'
 
 const LAUNCH_PARAM_FIELDS = [
   {
@@ -115,21 +121,21 @@ const LAUNCH_PARAM_STRUCTURE_FIELDS = LAUNCH_PARAM_CORE_FIELDS.filter(
 const MISSION_ACTIONS = [
   {
     key: 'prepare',
-    url: '/api/mission/prepare',
+    url: '/api/fleet/prepare',
     className: 'btn btn-mission-prepare',
     label: 'PREPARE MISSION',
     loadingLabel: 'PREPARING...',
   },
   {
     key: 'start',
-    url: '/api/mission/start',
+    url: '/api/fleet/start',
     className: 'btn btn-mission-start',
     label: 'START MISSION',
     loadingLabel: 'STARTING...',
   },
   {
     key: 'stop',
-    url: '/api/mission/stop',
+    url: '/api/fleet/stop',
     className: 'btn btn-mission-stop',
     label: 'STOP MISSION',
     loadingLabel: 'STOPPING...',
@@ -659,7 +665,7 @@ function uniqueModeName(doc, baseName = 'mode') {
   return `${baseName}_${index}`
 }
 
-function WifiCard({ connected, wifiStatus, onRefresh, targetId }) {
+function WifiCard({ connected, wifiStatus, onRefresh, targetId, hostname = '', vehicleName = '' }) {
   const [networks, setNetworks] = useState([])
   const [scanning, setScanning] = useState(false)
   const [selectedSsid, setSelectedSsid] = useState('')
@@ -671,7 +677,7 @@ function WifiCard({ connected, wifiStatus, onRefresh, targetId }) {
     setNetworks([])
     setSelectedSsid('')
     setResult(null)
-  }, [targetId])
+  }, [targetId, hostname, vehicleName])
 
   useEffect(() => {
     if (!connected) {
@@ -685,7 +691,7 @@ function WifiCard({ connected, wifiStatus, onRefresh, targetId }) {
     if (!connected) return
     setScanning(true)
     setResult(null)
-    const data = await api(withTargetId('/api/wifi/scan', targetId))
+    const data = await api(withDeviceScope('/api/wifi/scan', { targetId, hostname, vehicleName }))
     if (data.success) {
       setNetworks(data.networks)
       if (data.networks.length > 0 && !selectedSsid) {
@@ -704,14 +710,17 @@ function WifiCard({ connected, wifiStatus, onRefresh, targetId }) {
     const fd = new FormData()
     fd.append('ssid', selectedSsid)
     fd.append('password', password)
-    const data = await api(withTargetId('/api/wifi/connect', targetId), { method: 'POST', body: withTargetFormData(fd, targetId) })
+    const data = await api(withDeviceScope('/api/wifi/connect', { targetId, hostname, vehicleName }), {
+      method: 'POST',
+      body: withDeviceFormData(fd, { targetId, hostname, vehicleName }),
+    })
     setResult(data)
     setLoading(false)
     if (data.success) {
       const macFd = new FormData()
       macFd.append('ssid', selectedSsid)
       macFd.append('password', password)
-      await api(withTargetId('/api/wifi/switch-local', targetId), { method: 'POST', body: withTargetFormData(macFd, targetId) })
+      await api('/api/wifi/switch-local', { method: 'POST', body: macFd })
     }
     onRefresh()
   }
@@ -720,7 +729,10 @@ function WifiCard({ connected, wifiStatus, onRefresh, targetId }) {
     if (!connected) return
     setLoading(true)
     setResult(null)
-    const data = await api(withTargetId('/api/wifi/hotspot', targetId), { method: 'POST' })
+    const data = await api(withDeviceScope('/api/wifi/hotspot', { targetId, hostname, vehicleName }), {
+      method: 'POST',
+      body: withDeviceFormData(new FormData(), { targetId, hostname, vehicleName }),
+    })
     setResult(data)
     setLoading(false)
     onRefresh()
@@ -774,13 +786,23 @@ function WifiCard({ connected, wifiStatus, onRefresh, targetId }) {
   )
 }
 
-function MissionControl({ connected, buildInfo, onRefresh, workspacePaths, buildSource, targetId, selectedTarget }) {
+function MissionControl({
+  connected,
+  buildInfo,
+  onRefresh,
+  workspacePaths,
+  buildSource,
+  targetId,
+  hostname = '',
+  vehicleName = '',
+  selectedTarget,
+}) {
   const [missionViewMode, setMissionViewMode] = useState('graph')
   const [showAdvancedRaw, setShowAdvancedRaw] = useState(false)
   const [integerDrafts, setIntegerDrafts] = useState({})
   const selectedVehicle = useMemo(
-    () => selectedFleetVehicle(buildSource, selectedTarget),
-    [buildSource, selectedTarget]
+    () => fleetVehicleByName(buildSource, selectedTarget?.vehicle_name || vehicleName || ''),
+    [buildSource, selectedTarget?.vehicle_name, vehicleName]
   )
   const selectedMissionName = useMemo(
     () => missionNameFromVehicle(selectedVehicle),
@@ -813,7 +835,7 @@ function MissionControl({ connected, buildInfo, onRefresh, workspacePaths, build
     saveParams,
     runAction,
     refreshLaunchData,
-  } = useMissionControl({ connected, onRefresh, targetId })
+  } = useMissionControl({ connected, onRefresh, targetId, hostname, vehicleName })
   const parsedMission = useMemo(() => parseMissionDocument(missionFileText), [missionFileText])
 
   useEffect(() => {
@@ -999,7 +1021,7 @@ function MissionControl({ connected, buildInfo, onRefresh, workspacePaths, build
             <p className="subtext left-note">Connect to the target WiFi to load and edit runtime overrides.</p>
           )}
           {connected && (!selectedVehicle || !selectedMissionName) && (
-            <p className="subtext left-note">Assign a controllable in Inventory before editing deploy overrides.</p>
+            <p className="subtext left-note">Assign a controllable in Launch Prep before editing runtime overrides.</p>
           )}
 
           <div className="mission-context-summary">
@@ -1100,7 +1122,7 @@ function MissionControl({ connected, buildInfo, onRefresh, workspacePaths, build
             <p className="subtext left-note">Connect to the target WiFi to view and edit mission YAML.</p>
           )}
           {connected && !selectedMissionName && (
-            <p className="subtext left-note">Assign a controllable with a mission to load its mission YAML file.</p>
+            <p className="subtext left-note">Assign a controllable in Launch Prep to load its mission YAML file.</p>
           )}
           {connected && selectedMissionName && (
             <>
@@ -1631,6 +1653,60 @@ function normalizeHostname(hostname) {
   return `${hostname || ''}`.trim().replace(/\.$/, '').replace(/\.local$/i, '').toLowerCase()
 }
 
+const DISCOVERY_STALE_WINDOW_MS = 5 * 60 * 1000
+
+function timestampToMs(value) {
+  const raw = `${value || ''}`.trim()
+  if (!raw) return 0
+  const parsed = Date.parse(raw)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+function formatRelativeTimestamp(value) {
+  const parsed = timestampToMs(value)
+  if (!parsed) return ''
+  const deltaSeconds = Math.max(0, Math.round((Date.now() - parsed) / 1000))
+  if (deltaSeconds < 15) return 'seen just now'
+  if (deltaSeconds < 60) return `seen ${deltaSeconds}s ago`
+  const deltaMinutes = Math.round(deltaSeconds / 60)
+  if (deltaMinutes < 60) return `seen ${deltaMinutes}m ago`
+  const deltaHours = Math.round(deltaMinutes / 60)
+  if (deltaHours < 24) return `seen ${deltaHours}h ago`
+  return `seen ${Math.round(deltaHours / 24)}d ago`
+}
+
+function discoveryDeviceKey(device) {
+  if (!device || typeof device !== 'object') return ''
+  return normalizeHostname(device.hostname) || `${device.hardware_id || device.id || ''}`.trim()
+}
+
+function mergeDiscoveryDevices(previousDevices, nextDevices) {
+  const nextMap = new Map()
+  ;(nextDevices || []).forEach(device => {
+    const key = discoveryDeviceKey(device)
+    if (!key) return
+    nextMap.set(key, device)
+  })
+
+  ;(previousDevices || []).forEach(device => {
+    const key = discoveryDeviceKey(device)
+    if (!key || nextMap.has(key)) return
+    const lastSeen = timestampToMs(device.last_seen_at)
+    if (!lastSeen || Date.now() - lastSeen > DISCOVERY_STALE_WINDOW_MS) return
+    nextMap.set(key, {
+      ...device,
+      discovery_stale: true,
+    })
+  })
+
+  return Array.from(nextMap.values()).sort((left, right) => {
+    const leftSeen = timestampToMs(left.last_seen_at)
+    const rightSeen = timestampToMs(right.last_seen_at)
+    if (leftSeen !== rightSeen) return rightSeen - leftSeen
+    return discoveryDeviceKey(left).localeCompare(discoveryDeviceKey(right))
+  })
+}
+
 function suggestedTargetId(hostname) {
   const normalized = normalizeHostname(hostname).replace(/[^a-z0-9._-]+/g, '-')
   return normalized || 'target'
@@ -1661,8 +1737,8 @@ function normalizeBuildRecord(build) {
     branch: build.branch || '',
     workflowName: build.workflow_name || build.workflowName || build.workflow || '',
     jobName: build.job_name || build.jobName || '',
-    event: build.event || '',
-    conclusion: build.conclusion || '',
+    event: build.workflow_event || build.event || '',
+    conclusion: build.workflow_conclusion || build.conclusion || '',
     runNumber: build.run_number || build.runNumber || '',
   }
 }
@@ -1763,6 +1839,104 @@ function selectedFleetVehicle(buildSource, selectedTarget) {
   return fleetVehicleByName(buildSource, selectedTarget?.vehicle_name || '')
 }
 
+function deviceReadinessSummary(device, buildSource, buildSourceLoaded = true, assignedVehicleName = '') {
+  const sourceReady = describeBuildSource(buildSource, buildSourceLoaded).ready
+  const assigned = Boolean(assignedVehicleName || device?.vehicle_name)
+  const backendReadiness = device?.readiness && typeof device.readiness === 'object'
+    ? {
+      connected: Boolean(device.readiness.connected),
+      build_installed: Boolean(device.readiness.build_installed),
+      runtime_ready: Boolean(device.readiness.runtime_ready),
+      vehicle_assigned: Boolean(device.readiness.vehicle_assigned) || assigned,
+      ready: Boolean(device.readiness.ready),
+      notes: Array.isArray(device.readiness.notes) ? device.readiness.notes.filter(Boolean) : [],
+    }
+    : null
+
+  if (!buildSourceLoaded) {
+    return {
+      label: 'Loading setup',
+      detail: 'Waiting for the global build and fleet selection to load.',
+      ready: false,
+    }
+  }
+
+  if (device?.discovery_stale) {
+    return {
+      label: 'Offline',
+      detail: formatRelativeTimestamp(device.last_seen_at) || 'Recently seen on the network, but not present in the latest discovery pass.',
+      ready: false,
+    }
+  }
+
+  if (!sourceReady) {
+    return {
+      label: 'Needs setup',
+      detail: 'Select a build and fleet before launching devices.',
+      ready: false,
+    }
+  }
+
+  if (backendReadiness) {
+    const mergedReady = backendReadiness.connected
+      && backendReadiness.build_installed
+      && backendReadiness.runtime_ready
+      && backendReadiness.vehicle_assigned
+
+    if (mergedReady) {
+      return {
+        label: 'Ready for launch',
+        detail: backendReadiness.notes[0] || 'Build, fleet, and device assignment are aligned.',
+        ready: true,
+      }
+    }
+
+    if (!backendReadiness.vehicle_assigned) {
+      return {
+        label: 'Needs assignment',
+        detail: backendReadiness.notes[0] || 'Open the device drilldown and choose a controllable.',
+        ready: false,
+      }
+    }
+
+    if (!backendReadiness.connected) {
+      return {
+        label: 'Offline',
+        detail: backendReadiness.notes[0] || 'SSH is unavailable for this device.',
+        ready: false,
+      }
+    }
+
+    if (!backendReadiness.build_installed) {
+      return {
+        label: 'Needs deploy',
+        detail: backendReadiness.notes[0] || 'Deploy the selected build to this device.',
+        ready: false,
+      }
+    }
+
+    return {
+      label: 'Runtime blocked',
+      detail: backendReadiness.notes[0] || 'Runtime is not ready on this device.',
+      ready: false,
+    }
+  }
+
+  if (!assigned) {
+    return {
+      label: 'Needs assignment',
+      detail: 'Open the device drilldown and choose a controllable.',
+      ready: false,
+    }
+  }
+
+  return {
+    label: 'Ready for launch',
+    detail: 'Build, fleet, and device assignment are aligned.',
+    ready: true,
+  }
+}
+
 function missionNameFromVehicle(vehicle) {
   if (!vehicle) return ''
   const missionPath = `${vehicle.missionPath || ''}`.trim()
@@ -1800,12 +1974,14 @@ function normalizeBackendBuildSource(raw) {
     })).filter(vehicle => vehicle.name)
     : []
   const fleetOptions = normalizeFleetOptions(
-    payload.fleet_options || payload.fleetOptions || payload.fleet_files || payload.fleetFiles || payload.fleet_catalog || payload.fleetCatalog
+    payload.available_fleets || payload.availableFleets || payload.fleet_options || payload.fleetOptions || payload.fleet_files || payload.fleetFiles || payload.fleet_catalog || payload.fleetCatalog
   )
   const contextFields = {
     fleetFile: fleetSelectionId(payload.fleet_file || ''),
     fleetExists: payload.fleet_exists !== false,
     fleetError: payload.fleet_error || '',
+    fleetCatalogError: payload.fleet_catalog_error || '',
+    fleetCatalogStale: Boolean(payload.fleet_catalog_stale),
     fleetVehicles,
     fleetOptions,
   }
@@ -1814,7 +1990,10 @@ function normalizeBackendBuildSource(raw) {
   }
 
   if (normalizedKind === 'github' || normalizedKind === 'release' || normalizedKind === 'actions') {
-    const build = normalizeBuildRecord(payload.build || payload.selected_build || payload.build_info || payload)
+    const build = normalizeBuildRecord({
+      ...(payload.build || payload.selected_build || payload.build_info || payload),
+      source: payload.github_source || payload.source || payload.source_type || sourceString || 'release',
+    })
     return {
       kind: 'github',
       build,
@@ -1858,7 +2037,7 @@ function normalizeBackendBuildSource(raw) {
 function describeBuildSource(buildSource, loaded = true) {
   if (!loaded) {
     return {
-      title: 'Loading deploy context...',
+      title: 'Loading build and fleet...',
       detail: 'Fetching the current build and fleet selection.',
       ready: false,
     }
@@ -1866,8 +2045,8 @@ function describeBuildSource(buildSource, loaded = true) {
 
   if (!buildSource || buildSource.kind === 'none') {
     return {
-      title: 'No deploy context selected',
-      detail: 'Select a build and fleet before opening hardware controls.',
+      title: 'No build and fleet selected',
+      detail: 'Select a build and fleet before opening device controls.',
       fleetDetail: buildSource?.fleetFile
         ? `Fleet: ${buildSource.fleetFile}`
         : 'Fleet file not selected.',
@@ -1875,9 +2054,12 @@ function describeBuildSource(buildSource, loaded = true) {
     }
   }
   if (!buildSource.fleetFile || buildSource.fleetExists === false) {
+    const fleetDetail = buildSource.fleetCatalogError && (!buildSource.fleetOptions || buildSource.fleetOptions.length === 0)
+      ? buildSource.fleetCatalogError
+      : buildSource.fleetError
     return {
       title: buildSource.fleetFile ? 'Fleet selection needs attention' : 'Fleet file not selected',
-      detail: buildSource.fleetError || 'Choose a valid fleet file before assigning and deploying hardware.',
+      detail: fleetDetail || 'Choose a valid fleet file before assigning and deploying devices.',
       fleetDetail: buildSource.fleetFile || 'No fleet file selected.',
       ready: false,
     }
@@ -1912,8 +2094,8 @@ function describeBuildSource(buildSource, loaded = true) {
     }
   }
   return {
-    title: 'Unknown deploy context',
-    detail: 'Select a supported deploy source.',
+    title: 'Unknown build and fleet context',
+    detail: 'Select a supported build source.',
     fleetDetail: buildSource?.fleetFile || 'No fleet file selected.',
     ready: false,
   }
@@ -2037,6 +2219,36 @@ function buildSearchText(build) {
     .toLowerCase()
 }
 
+function buildWorkflowMetadata(build) {
+  if (build?.workflowName) return build.workflowName
+  if (build?.jobName) return build.jobName
+  if (build?.source === 'actions') {
+    if (build?.run_id) return `GitHub Actions run ${build.run_id}`
+    return 'GitHub Actions artifact'
+  }
+  return 'Workflow metadata unavailable'
+}
+
+function normalizeFleetBoardDevices(rawDevices) {
+  if (!Array.isArray(rawDevices)) return []
+  return rawDevices
+    .map(device => {
+      if (!device || typeof device !== 'object') return null
+      const hardwareId = `${device.hardware_id || device.id || device.hostname || device.host || device.name || ''}`.trim()
+      const hostname = `${device.hostname || device.host || device.pi_host || device.address || device.device_name || ''}`.trim()
+      const deviceKey = hardwareId || hostname
+      return {
+        ...device,
+        hardware_id: deviceKey,
+        hostname,
+        addresses: Array.isArray(device.addresses) ? device.addresses : Array.isArray(device.addrs) ? device.addrs : [],
+        last_seen_at: `${device.last_seen_at || device.lastSeenAt || ''}`.trim(),
+        discovery_stale: Boolean(device.discovery_stale ?? device.discoveryStale),
+      }
+    })
+    .filter(device => Boolean(device?.hardware_id))
+}
+
 function inventoryDraftFromSelection(target, liveDevice, operatorConfig) {
   const hostname = target?.pi_host || liveDevice?.hostname || ''
   return {
@@ -2051,10 +2263,10 @@ function inventoryDraftFromSelection(target, liveDevice, operatorConfig) {
   }
 }
 
-function assignmentDraftFromTarget(target) {
+function assignmentDraftFromTarget(target, vehicleName = '') {
   return {
     target_id: target?.target_id || '',
-    vehicle_name: target?.vehicle_name || '',
+    vehicle_name: vehicleName || target?.vehicle_name || '',
     overlay_yaml: target?.overlay_yaml || '',
   }
 }
@@ -2078,24 +2290,43 @@ function EmptyState({ title, message, actionLabel, onAction }) {
   )
 }
 
-function AppHeader({ page, onPageChange, theme, onToggleTheme, liveCount, buildSource, buildSourceLoaded = true, buildSourceWorking = false }) {
+function AppHeader({
+  page,
+  onPageChange,
+  theme,
+  onToggleTheme,
+  liveCount,
+  readyCount,
+  assignedCount,
+  buildSource,
+  buildSourceLoaded = true,
+  buildSourceWorking = false,
+}) {
   const sourceSummary = describeBuildSource(buildSource, buildSourceLoaded)
   const sourceBadge = buildSourceWorking ? 'Updating...' : buildSourceBadge(buildSource, buildSourceLoaded)
 
   return (
     <header className="app-header">
       <div className="app-brand">
-        <div className="app-brand-kicker">PennAiR</div>
-        <h1 className="title">Autonomy Operations</h1>
-        <p className="app-subtitle">Live hardware, deploy context, and target-scoped runtime control.</p>
+        <div className="app-brand-kicker">PennAiR Fleet Ops</div>
+        <h1 className="title">Fleet-first operations</h1>
+        <p className="app-subtitle">Select the build and fleet globally, verify readiness, then drill into a device when runtime control is needed.</p>
       </div>
       <div className="app-header-meta">
         <div className="header-stat">
-          <span className="header-stat-label">Live Hardware</span>
+          <span className="header-stat-label">Live Devices</span>
           <strong>{liveCount}</strong>
         </div>
         <div className="header-stat">
-          <span className="header-stat-label">Deploy Context</span>
+          <span className="header-stat-label">Ready</span>
+          <strong>{readyCount}</strong>
+        </div>
+        <div className="header-stat">
+          <span className="header-stat-label">Assigned</span>
+          <strong>{assignedCount}</strong>
+        </div>
+        <div className="header-stat">
+          <span className="header-stat-label">Build/Fleet</span>
           <strong>{sourceBadge}</strong>
         </div>
         <button className="theme-toggle-btn" type="button" onClick={onToggleTheme}>
@@ -2103,14 +2334,14 @@ function AppHeader({ page, onPageChange, theme, onToggleTheme, liveCount, buildS
         </button>
       </div>
       <div className="page-tabs nav-tabs">
-        <button className={`tab-btn ${page === 'hardware' ? 'tab-active' : ''}`} onClick={() => onPageChange('hardware')} disabled={buildSourceWorking}>
-          Hardware
+        <button className={`tab-btn ${page === 'setup' ? 'tab-active' : ''}`} onClick={() => onPageChange('setup')} disabled={buildSourceWorking}>
+          Setup
         </button>
-        <button className={`tab-btn ${page === 'deploy-context' ? 'tab-active' : ''}`} onClick={() => onPageChange('deploy-context')} disabled={buildSourceWorking}>
-          Deploy Context
+        <button className={`tab-btn ${page === 'readiness' ? 'tab-active' : ''}`} onClick={() => onPageChange('readiness')} disabled={buildSourceWorking}>
+          Readiness
         </button>
-        <button className={`tab-btn ${page === 'inventory' ? 'tab-active' : ''}`} onClick={() => onPageChange('inventory')} disabled={buildSourceWorking}>
-          Inventory
+        <button className={`tab-btn ${page === 'launch-monitor' ? 'tab-active' : ''}`} onClick={() => onPageChange('launch-monitor')} disabled={buildSourceWorking}>
+          Launch &amp; Monitor
         </button>
       </div>
       <div className="build-source-banner">
@@ -2127,30 +2358,32 @@ function AppHeader({ page, onPageChange, theme, onToggleTheme, liveCount, buildS
 }
 
 function LiveHardwareCard({ device, buildSource, buildSourceLoaded = true, onOpen }) {
-  const sourceSummary = describeBuildSource(buildSource, buildSourceLoaded)
-  let footerText = buildSourceLoaded ? 'Select deploy context and fleet' : 'Loading deploy context'
-  if (sourceSummary.ready && !device.saved) {
-    footerText = 'Save in Inventory to continue'
-  } else if (sourceSummary.ready) {
-    footerText = 'Open assignment and deploy controls'
-  }
+  const assignedVehicleName = `${device?.session_vehicle_name || device?.vehicle_name || ''}`.trim()
+  const readiness = deviceReadinessSummary(device, buildSource, buildSourceLoaded, assignedVehicleName)
+  const discoveryText = device?.discovery_stale
+    ? (formatRelativeTimestamp(device.last_seen_at) || 'Recently seen on the network')
+    : (device.addresses?.[0] || 'mDNS')
   return (
     <button type="button" className="hardware-card" onClick={() => onOpen(device.hardware_id)}>
       <div className="hardware-card-top">
         <div>
-          <div className="hardware-card-kicker">{device.saved ? 'Managed Device' : 'Live Device'}</div>
-          <h3>{device.matched_label || device.hostname}</h3>
+          <div className="hardware-card-kicker">
+            {device.discovery_stale ? 'Recent device' : assignedVehicleName ? 'Assigned device' : 'Live device'}
+          </div>
+          <h3>{device.hostname}</h3>
         </div>
-        <span className="launch-pill pill-running">Live</span>
+        <span className={`launch-pill ${device.discovery_stale ? 'pill-offline' : readiness.ready ? 'pill-running' : 'pill-not-prepared'}`}>
+          {readiness.label}
+        </span>
       </div>
       <div className="hardware-card-host">{device.hostname}</div>
       <div className="hardware-card-meta">
-        <span>{device.addresses?.[0] || 'mDNS'}</span>
-        <span>{device.saved ? `Inventory: ${device.matched_target_id}` : 'Needs setup'}</span>
+        <span>{discoveryText}</span>
+        <span>{assignedVehicleName ? `Vehicle: ${assignedVehicleName}` : 'No session assignment'}</span>
       </div>
       <div className="hardware-card-footer">
         <span className="hardware-card-source">{buildSourceBadge(buildSource, buildSourceLoaded)}</span>
-        <span>{footerText}</span>
+        <span>{readiness.detail}</span>
       </div>
     </button>
   )
@@ -2160,8 +2393,8 @@ function HardwareGridPage({ devices, buildSource, buildSourceLoaded = true, disc
   if (devices.length === 0) {
     return (
       <EmptyState
-        title="No live hardware detected"
-        message={discoveryResult?.error || 'The dashboard only shows hardware currently visible on the local network. Check mDNS visibility and Pi power before retrying.'}
+        title="No live devices detected"
+        message={discoveryResult?.error || 'The dashboard only shows devices visible on the local network. Check mDNS visibility and Pi power before retrying.'}
         actionLabel="Refresh Discovery"
         onAction={onRefresh}
       />
@@ -2172,8 +2405,8 @@ function HardwareGridPage({ devices, buildSource, buildSourceLoaded = true, disc
     <>
       <div className="section-head">
         <div>
-          <div className="section-kicker">Live Hardware</div>
-          <h2>Detected devices</h2>
+          <div className="section-kicker">Fleet readiness</div>
+          <h2>Boarded devices</h2>
         </div>
         <button className="btn btn-secondary btn-inline" type="button" onClick={onRefresh}>
           Refresh
@@ -2203,21 +2436,21 @@ function SetupField({ label, value, onChange, placeholder, type = 'text' }) {
   )
 }
 
-function AssignmentCard({ draft, buildSource, buildSourceWorking, onChange, onSave, saving, saveResult }) {
+function AssignmentCard({ draft, buildSource, buildSourceWorking, onChange, onSave, saving, saveResult, hostname = '' }) {
   const fleetVehicles = Array.isArray(buildSource?.fleetVehicles) ? buildSource.fleetVehicles : []
   const selectedVehicle = fleetVehicleByName(buildSource, draft?.vehicle_name || '')
-  const canSave = Boolean(draft?.target_id && draft?.vehicle_name && buildSource?.fleetExists && !buildSourceWorking)
+  const canSave = Boolean(hostname && buildSource?.fleetExists && !buildSourceWorking)
 
   return (
     <div className="card">
-      <h2 className="card-title">Assignment</h2>
+      <h2 className="card-title">Launch Prep</h2>
       <div className="card-content settings-grid">
         <div className="info-box compact-info settings-field settings-field-full">
-          <strong>Global fleet</strong>
+          <strong>Fleet context</strong>
           <p>{buildSource?.fleetFile || 'No fleet file selected.'}</p>
         </div>
         <div className="settings-field">
-          <label>Assigned controllable</label>
+          <label>Controllable</label>
           <select value={draft?.vehicle_name || ''} onChange={e => onChange('vehicle_name', e.target.value)} disabled={buildSourceWorking}>
             <option value="">Select controllable</option>
             {fleetVehicles.map(vehicle => (
@@ -2248,13 +2481,13 @@ function AssignmentCard({ draft, buildSource, buildSourceWorking, onChange, onSa
         </div>
         <div className="settings-field settings-field-full">
           <div className="info-box compact-info">
-            <strong>Derived runtime context</strong>
-            <p>The selected fleet entry supplies the base mission and launch config. Common runtime overrides are edited in Mission Control, not here.</p>
+            <strong>Derived mission scope</strong>
+            <p>The selected fleet entry supplies the base mission and launch config. Runtime overrides live in Mission Control once the host is selected.</p>
           </div>
         </div>
         <div className="settings-field settings-save">
           <button className="btn btn-primary" type="button" onClick={onSave} disabled={saving || !canSave}>
-            {saving ? 'Saving...' : 'Save Assignment'}
+            {saving ? 'Saving...' : 'Save Session Assignment'}
           </button>
         </div>
         <Result data={saveResult} />
@@ -2269,6 +2502,7 @@ function DeployActionCard({
   buildSourceWorking = false,
   connected,
   targetId,
+  hostname = '',
   assignedVehicleName,
   buildInfo,
   deploying,
@@ -2277,11 +2511,11 @@ function DeployActionCard({
   onRollback,
 }) {
   const sourceSummary = describeBuildSource(buildSource, buildSourceLoaded)
-  const canDeploy = Boolean(targetId) && Boolean(assignedVehicleName) && buildSourceLoaded && sourceSummary.ready && !buildSourceWorking
+  const canDeploy = Boolean(assignedVehicleName) && Boolean(targetId || hostname) && buildSourceLoaded && sourceSummary.ready && !buildSourceWorking
 
   return (
     <div className="card">
-      <h2 className="card-title">Deploy</h2>
+      <h2 className="card-title">Fleet Deploy</h2>
       <div className="card-content">
         <div className="info-box compact-info">
           <strong>{sourceSummary.title}</strong>
@@ -2289,39 +2523,39 @@ function DeployActionCard({
         </div>
         {buildSourceWorking && (
           <div className="busy-banner" aria-live="polite">
-            Deploy context is updating. Deploy actions are locked.
+            Build and fleet context is updating. Deploy actions are locked.
           </div>
         )}
-        {!targetId && (
+        {!targetId && !hostname && (
           <p className="subtext left-note">
-            Save the device in Inventory first. Deploy and runtime actions only run on managed records.
+            Open a device drilldown to deploy or stop that host.
           </p>
         )}
-        {targetId && !sourceSummary.ready && !buildSourceLoaded && (
+        {(targetId || hostname) && !sourceSummary.ready && !buildSourceLoaded && (
           <p className="subtext left-note">
-            Loading deploy context...
+            Loading build and fleet context...
           </p>
         )}
-        {targetId && !sourceSummary.ready && buildSourceLoaded && (
+        {(targetId || hostname) && !sourceSummary.ready && buildSourceLoaded && (
           <p className="subtext left-note">
-            Choose a deploy context on the Deploy Context page before deploying to this Pi.
+            Choose a build and fleet in global setup before deploying to this host.
           </p>
         )}
-        {targetId && sourceSummary.ready && !assignedVehicleName && (
+        {(targetId || hostname) && sourceSummary.ready && !assignedVehicleName && (
           <p className="subtext left-note">
-            Choose and save a controllable assignment before deploying to this Pi.
+            Choose a controllable assignment before deploying to this host.
           </p>
         )}
         <button className="btn btn-primary" type="button" onClick={onDeploy} disabled={!canDeploy || deploying}>
-          {deploying ? 'Deploying...' : 'Deploy Selected Context'}
+          {deploying ? 'Deploying...' : 'Deploy Fleet Context'}
         </button>
         <button
           className="btn btn-secondary"
           type="button"
           onClick={onRollback}
-          disabled={!targetId || !connected || !buildInfo?.installed || deploying}
+          disabled={(!targetId && !hostname) || !connected || !buildInfo?.installed || deploying}
         >
-          Rollback
+          Stop Fleet
         </button>
         <Result data={deployResult} />
       </div>
@@ -2331,11 +2565,7 @@ function DeployActionCard({
 
 function RuntimeOverviewCard({ liveDevice, selectedTarget, connected, buildInfo, sshCommand, pollError }) {
   const [copied, setCopied] = useState(false)
-  const reachabilityText = !selectedTarget
-    ? 'Save device to enable SSH checks'
-    : connected
-      ? 'SSH reachable'
-      : 'Not reachable'
+  const reachabilityText = connected ? 'SSH reachable' : 'Not reachable'
 
   const copy = async () => {
     if (!sshCommand) return
@@ -2364,11 +2594,7 @@ function RuntimeOverviewCard({ liveDevice, selectedTarget, connected, buildInfo,
             <strong>{liveDevice?.addresses?.join(', ') || 'Unavailable'}</strong>
           </div>
           <div className="overview-row">
-            <span>Inventory</span>
-            <strong>{selectedTarget ? selectedTarget.target_id : 'Not saved'}</strong>
-          </div>
-          <div className="overview-row">
-            <span>Assigned controllable</span>
+            <span>Controllable</span>
             <strong>{selectedTarget?.vehicle_name || 'Not assigned'}</strong>
           </div>
           <div className="overview-row">
@@ -2399,6 +2625,8 @@ function RuntimeOverviewCard({ liveDevice, selectedTarget, connected, buildInfo,
 function HardwareDetailPage({
   liveDevice,
   selectedTarget,
+  hostname,
+  vehicleName,
   connected,
   wifiStatus,
   buildInfo,
@@ -2423,34 +2651,37 @@ function HardwareDetailPage({
   onRollback,
 }) {
   const sourceSummary = describeBuildSource(buildSource, buildSourceLoaded)
-  const selectedTargetId = selectedTarget?.target_id || ''
+  const selectedTargetId = selectedTarget?.target_id || hostname || ''
+  const missionReady = Boolean(hostname || selectedTargetId)
+  const liveStateLabel = liveDevice ? (liveDevice.discovery_stale ? 'Offline' : 'Live') : 'Offline'
+  const liveStateClass = liveDevice && !liveDevice.discovery_stale ? 'pill-running' : 'pill-offline'
 
   return (
     <div className="detail-page">
       <div className="detail-header">
         <button className="btn btn-secondary btn-inline" type="button" onClick={onBack}>
-          Back to hardware
+          Back to readiness
         </button>
         <div className="detail-header-copy">
-          <div className="section-kicker">Hardware Detail</div>
-          <h2>{selectedTarget?.label || liveDevice?.hostname || 'Hardware'}</h2>
-          <p>{selectedTarget ? `${selectedTarget.target_id} · ${selectedTarget.pi_host}` : `${liveDevice?.hostname || 'Unknown host'} · live only`}</p>
+          <div className="section-kicker">Launch & monitor</div>
+          <h2>{liveDevice?.hostname || hostname || 'Device'}</h2>
+          <p>{selectedTarget?.vehicle_name ? `${selectedTarget.vehicle_name} · ${liveDevice?.hostname || hostname || 'live only'}` : `${liveDevice?.hostname || hostname || 'Unknown host'} · live only`}</p>
         </div>
         <div className="detail-header-pills">
-          <span className={`launch-pill ${liveDevice ? 'pill-running' : 'pill-offline'}`}>{liveDevice ? 'Live' : 'Offline'}</span>
+          <span className={`launch-pill ${liveStateClass}`}>{liveStateLabel}</span>
           <span className={`launch-pill ${sourceSummary.ready ? 'pill-running' : 'pill-not-prepared'}`}>{buildSourceBadge(buildSource, buildSourceLoaded)}</span>
         </div>
       </div>
 
       <div className="mini-tabs detail-tabs">
         <button className={`mini-tab ${detailTab === 'setup' ? 'mini-tab-active' : ''}`} type="button" onClick={() => onDetailTabChange('setup')}>
-          Assignment & Deploy
+          Launch Prep
         </button>
         <button
           className={`mini-tab ${detailTab === 'mission' ? 'mini-tab-active' : ''}`}
           type="button"
           onClick={() => onDetailTabChange('mission')}
-          disabled={!selectedTargetId}
+          disabled={!missionReady}
         >
           Mission Control
         </button>
@@ -2467,6 +2698,7 @@ function HardwareDetailPage({
               onSave={onSaveAssignment}
               saving={savingAssignment}
               saveResult={assignmentResult}
+              hostname={hostname || liveDevice?.hostname || selectedTarget?.pi_host || ''}
             />
             <RuntimeOverviewCard
               liveDevice={liveDevice}
@@ -2479,41 +2711,51 @@ function HardwareDetailPage({
           </div>
 
           <div className="grid">
-            <DeployActionCard
-              buildSource={buildSource}
-              buildSourceLoaded={buildSourceLoaded}
-              buildSourceWorking={buildSourceWorking}
-              connected={connected}
-              targetId={selectedTargetId}
-              assignedVehicleName={assignmentDraft?.vehicle_name || selectedTarget?.vehicle_name || ''}
-              buildInfo={buildInfo}
-              deploying={deploying}
-              deployResult={deployResult}
-              onDeploy={onDeploy}
-              onRollback={onRollback}
-            />
-            {selectedTargetId ? (
-              <WifiCard connected={connected} wifiStatus={wifiStatus} onRefresh={onRefresh} targetId={selectedTargetId} />
+              <DeployActionCard
+                buildSource={buildSource}
+                buildSourceLoaded={buildSourceLoaded}
+                buildSourceWorking={buildSourceWorking}
+                connected={connected}
+                targetId={selectedTargetId}
+                hostname={hostname || liveDevice?.hostname || selectedTarget?.pi_host || ''}
+                assignedVehicleName={assignmentDraft?.vehicle_name || selectedTarget?.vehicle_name || ''}
+                buildInfo={buildInfo}
+                deploying={deploying}
+                deployResult={deployResult}
+                onDeploy={onDeploy}
+                onRollback={onRollback}
+              />
+            {(selectedTargetId || hostname || liveDevice?.hostname || selectedTarget?.pi_host) ? (
+              <WifiCard
+                connected={connected}
+                wifiStatus={wifiStatus}
+                onRefresh={onRefresh}
+                targetId={selectedTargetId}
+                hostname={hostname || liveDevice?.hostname || selectedTarget?.pi_host || ''}
+                vehicleName={vehicleName || selectedTarget?.vehicle_name || ''}
+              />
             ) : (
               <div className="card">
                 <h2 className="card-title">Target WiFi</h2>
-                <p className="subtext left-note">Save the device first to use SSH-driven WiFi management.</p>
+                <p className="subtext left-note">Select a live host before using SSH-driven WiFi management.</p>
               </div>
             )}
           </div>
         </>
       ) : (
-        <MissionControl
-          connected={connected}
-          buildInfo={buildInfo}
-          onRefresh={onRefresh}
-          workspacePaths={workspacePaths}
-          buildSource={buildSource}
-          targetId={selectedTargetId}
-          selectedTarget={selectedTarget}
-        />
-      )}
-    </div>
+            <MissionControl
+              connected={connected}
+              buildInfo={buildInfo}
+              onRefresh={onRefresh}
+              workspacePaths={workspacePaths}
+              buildSource={buildSource}
+              targetId={selectedTargetId}
+              hostname={hostname || liveDevice?.hostname || selectedTarget?.pi_host || ''}
+              vehicleName={vehicleName || selectedTarget?.vehicle_name || ''}
+              selectedTarget={selectedTarget}
+            />
+        )}
+      </div>
   )
 }
 
@@ -2556,9 +2798,16 @@ function BuildSourcePage({
   }, [buildSource?.fleetFile, fleetOptions])
   const allBuilds = useMemo(() => mergeBuildLists(releases, artifacts), [releases, artifacts])
   const deferredSearch = useDeferredValue(buildSearch.trim().toLowerCase())
+  const fleetCatalogWarning = buildSource?.fleetCatalogStale
+    ? (buildSource?.fleetCatalogError || 'Using the last exact-build fleet catalog because live GitHub access is degraded.')
+    : ''
   const fleetHelpText = buildSource?.kind === 'none'
     ? 'Select a build to load fleet choices.'
-    : 'Fleet choices come from the selected build source and are keyed by filename.'
+    : buildSource?.fleetCatalogError
+      ? buildSource.fleetCatalogError
+      : fleetOptions.length === 0
+        ? 'No fleet files were found in the selected build source.'
+        : 'Fleet choices come from the selected build source and are keyed by filename.'
   const filteredBuilds = useMemo(() => {
     if (!deferredSearch) return allBuilds
     return allBuilds.filter(build => buildSearchText(build).includes(deferredSearch))
@@ -2594,7 +2843,7 @@ function BuildSourcePage({
             <span>{formatBuildTimestamp(build) || 'No timestamp'}</span>
           </div>
           <div className="build-row-foot">
-            <span>{build.workflowName || build.jobName || 'Workflow metadata unavailable'}</span>
+            <span>{buildWorkflowMetadata(build)}</span>
             {artifactLabel && <span>{artifactLabel}</span>}
           </div>
         </button>
@@ -2609,21 +2858,24 @@ function BuildSourcePage({
     <>
       <div className="section-head">
         <div>
-          <div className="section-kicker">Deploy Context</div>
-          <h2>Choose the current build and fleet</h2>
+          <div className="section-kicker">Global setup</div>
+          <h2>Choose the build and fleet</h2>
         </div>
       </div>
 
       <div className="card card-full">
-        <h2 className="card-title">Current Context</h2>
+        <h2 className="card-title">Active build and fleet</h2>
         <div className="info-box compact-info">
           <strong>{sourceSummary.title}</strong>
           <p>{sourceSummary.detail}</p>
           <p>{sourceSummary.fleetDetail || 'No fleet file selected.'}</p>
+          {fleetCatalogWarning && (
+            <p className="param-help param-help-warn">{fleetCatalogWarning}</p>
+          )}
         </div>
         {buildSourceWorking && (
           <div className="busy-banner" aria-live="polite">
-            Updating deploy context. Controls are locked until the backend finishes.
+            Updating build and fleet context. Controls are locked until the backend finishes.
           </div>
         )}
         <div className="settings-actions">
@@ -2636,9 +2888,9 @@ function BuildSourcePage({
 
       <div className="grid">
         <div className="card">
-          <h2 className="card-title">Fleet</h2>
+          <h2 className="card-title">Fleet catalog</h2>
           <div className="card-content">
-            <p className="subtext left-note">One fleet is active at a time. Hardware pages only choose the controllable inside this fleet.</p>
+            <p className="subtext left-note">One fleet is active at a time. Device drilldowns only choose the controllable inside this fleet.</p>
             <label>Fleet</label>
             <select
               value={fleetDraft}
@@ -2655,6 +2907,9 @@ function BuildSourcePage({
             {!fleetOptions.length && (
               <p className="param-help">{fleetHelpText}</p>
             )}
+            {fleetOptions.length > 0 && fleetCatalogWarning && (
+              <p className="param-help param-help-warn">{fleetCatalogWarning}</p>
+            )}
             <button className="btn btn-primary" type="button" onClick={() => onSelectFleetFile(fleetDraft.trim())} disabled={buildSourceWorking || !fleetDraft.trim() || fleetOptions.length === 0}>
               {buildSourceWorking ? 'Saving...' : 'Save Fleet'}
             </button>
@@ -2662,7 +2917,7 @@ function BuildSourcePage({
         </div>
 
         <div className="card card-full">
-          <h2 className="card-title">Deployable Builds</h2>
+          <h2 className="card-title">Build catalog</h2>
           <div className="card-content">
             <div className="build-source-toolbar">
               <input
@@ -2704,7 +2959,7 @@ function BuildSourcePage({
         </div>
 
         <div className="card card-full">
-          <h2 className="card-title">Local Sources</h2>
+          <h2 className="card-title">Source options</h2>
           <div className="card-content local-source-actions">
             <div className="file-upload">
               <input
@@ -2917,7 +3172,7 @@ function readStoredTheme() {
 }
 
 function App() {
-  const [page, setPage] = useState('hardware')
+  const [page, setPage] = useState('setup')
   const [theme, setTheme] = useState(readStoredTheme)
   const [operatorConfig, setOperatorConfig] = useState(null)
   const [targets, setTargets] = useState([])
@@ -2947,6 +3202,7 @@ function App() {
   const [assignmentDirty, setAssignmentDirty] = useState(false)
   const [assignmentSaving, setAssignmentSaving] = useState(false)
   const [assignmentResult, setAssignmentResult] = useState(null)
+  const [sessionAssignments, setSessionAssignments] = useState({})
   const [inventoryDraft, setInventoryDraft] = useState(null)
   const [inventoryDirty, setInventoryDirty] = useState(false)
   const [operatorDraft, setOperatorDraft] = useState(null)
@@ -2958,6 +3214,12 @@ function App() {
   const [inventoryIoLoading, setInventoryIoLoading] = useState(false)
   const [deploying, setDeploying] = useState(false)
   const [deployResult, setDeployResult] = useState(null)
+  const buildSourceRefreshRequestRef = useRef(0)
+  const boardRefreshRequestRef = useRef(0)
+  const buildSourceRefreshInFlightRef = useRef(null)
+  const boardRefreshInFlightRef = useRef(null)
+  const assignmentScopeKeyRef = useRef('')
+  const deployScopeKeyRef = useRef('')
 
   const targetMap = useMemo(
     () => Object.fromEntries(uniqueTargets(targets).map(target => [target.target_id, target])),
@@ -2967,100 +3229,141 @@ function App() {
     () => new Map(liveDevices.map(device => [normalizeHostname(device.hostname), device])),
     [liveDevices]
   )
-  const selectedLiveDevice = useMemo(
-    () => liveDevices.find(device => device.hardware_id === selectedHardwareId) || null,
-    [liveDevices, selectedHardwareId]
+  const displayedLiveDevices = useMemo(
+    () => liveDevices.map(device => ({
+      ...device,
+      session_vehicle_name: sessionAssignments[normalizeHostname(device.hostname)] || `${device.vehicle_name || ''}`.trim(),
+    })),
+    [liveDevices, sessionAssignments]
   )
-  const selectedSavedTarget = useMemo(() => {
-    if (!selectedHardwareId) return null
-    return uniqueTargets(targets).find(
-      target => normalizeHostname(target.pi_host) === selectedHardwareId
-    ) || null
-  }, [selectedHardwareId, targets])
-  const selectedTarget = selectedLiveDevice?.matched_target_id
-    ? targetMap[selectedLiveDevice.matched_target_id] || null
-    : selectedSavedTarget
-  const selectedTargetId = selectedTarget?.target_id || ''
-  const workspacePaths = selectedTarget?.workspace_paths || null
+  const selectedLiveDevice = useMemo(
+    () => displayedLiveDevices.find(device => device.hardware_id === selectedHardwareId) || null,
+    [displayedLiveDevices, selectedHardwareId]
+  )
+  const selectedDeviceHostKey = normalizeHostname(selectedLiveDevice?.hostname || selectedHardwareId)
+  const selectedDeviceHostname = selectedLiveDevice?.hostname || ''
+  const selectedVehicleName = assignmentDraft?.vehicle_name
+    || sessionAssignments[selectedDeviceHostKey]
+    || `${selectedLiveDevice?.vehicle_name || ''}`.trim()
+    || ''
+  const selectedTarget = useMemo(() => {
+    if (!selectedDeviceHostname && !selectedVehicleName) return null
+    const hostname = `${selectedDeviceHostname || ''}`.trim()
+    return {
+      target_id: hostname || suggestedTargetId(hostname),
+      pi_host: hostname,
+      hostname,
+      label: hostname || 'Selected device',
+      vehicle_name: selectedVehicleName,
+      workspace_paths: null,
+    }
+  }, [selectedDeviceHostname, selectedVehicleName])
+  const selectedTargetId = selectedTarget?.target_id || selectedDeviceHostname || ''
+  const workspacePaths = null
   const buildSourceSummary = useMemo(
     () => describeBuildSource(buildSource, buildSourceLoaded),
     [buildSource, buildSourceLoaded]
   )
 
   const refreshBuildSource = useCallback(async ({ preserveResult = false } = {}) => {
-    const data = await api('/api/build-source')
-    if (data.success) {
-      setBuildSource(normalizeBackendBuildSource(data))
-      if (!preserveResult) {
-        setBuildSourceResult(prev => (prev && prev.success === false ? null : prev))
+    if (buildSourceRefreshInFlightRef.current) {
+      return buildSourceRefreshInFlightRef.current
+    }
+    const requestId = ++buildSourceRefreshRequestRef.current
+    const refreshPromise = (async () => {
+      const data = await api('/api/build-source')
+      if (requestId !== buildSourceRefreshRequestRef.current) {
+        return data
       }
-    } else if (!buildSourceLoaded) {
-      setBuildSource({ kind: 'none' })
-      if (!preserveResult) {
+      if (data.success) {
+        setBuildSource(normalizeBackendBuildSource(data))
+        if (!preserveResult) {
+          setBuildSourceResult(prev => (prev && prev.success === false ? null : prev))
+        }
+      } else if (!buildSourceLoaded) {
+        setBuildSource({ kind: 'none' })
+        if (!preserveResult) {
+          setBuildSourceResult(data)
+        }
+      } else if (!preserveResult) {
         setBuildSourceResult(data)
       }
-    } else if (!preserveResult) {
-      setBuildSourceResult(data)
+      setBuildSourceLoaded(true)
+      return data
+    })()
+    buildSourceRefreshInFlightRef.current = refreshPromise
+    try {
+      return await refreshPromise
+    } finally {
+      if (buildSourceRefreshInFlightRef.current === refreshPromise) {
+        buildSourceRefreshInFlightRef.current = null
+      }
     }
-    setBuildSourceLoaded(true)
-    return data
   }, [buildSourceLoaded])
 
   const refreshGlobal = useCallback(async () => {
-    const [configData, inventoryData, liveData, buildSourceData] = await Promise.all([
-      api('/api/config'),
-      api('/api/inventory'),
-      api('/api/hardware/live'),
-      api('/api/build-source'),
-    ])
-
-    if (configData.success) {
-      setOperatorConfig(configData.config)
+    if (boardRefreshInFlightRef.current) {
+      return boardRefreshInFlightRef.current
     }
+    const requestId = ++boardRefreshRequestRef.current
+    const refreshPromise = (async () => {
+      const [configData, boardData] = await Promise.all([
+        api('/api/config'),
+        api('/api/fleet/board'),
+      ])
+      if (requestId !== boardRefreshRequestRef.current) {
+        return
+      }
 
-    if (inventoryData.success) {
-      const nextTargets = uniqueTargets(inventoryData.targets || [])
-      const activeTargetId = inventoryData.active_target_id || ''
-      setTargets(nextTargets)
-      setInventoryResult(null)
-      setSelectedInventoryTargetId(prev => {
-        if (inventoryMode === 'new') {
-          return prev
-        }
-        if (prev && nextTargets.some(target => target.target_id === prev)) {
-          return prev
-        }
-        if (activeTargetId && nextTargets.some(target => target.target_id === activeTargetId)) {
-          return activeTargetId
-        }
-        return ''
-      })
-    } else {
-      setInventoryResult(inventoryData)
+      if (configData.success) {
+        setOperatorConfig(configData.config)
+      }
+
+      if (boardData.success) {
+        const boardTargets = uniqueTargets(
+          boardData.targets
+          || boardData.saved_targets
+          || boardData.board?.targets
+          || []
+        )
+        const boardDevices = normalizeFleetBoardDevices(
+          boardData.devices
+          || boardData.live_devices
+          || boardData.board?.devices
+          || boardData.hardware
+          || []
+        )
+        setTargets(prev => (boardTargets.length > 0 ? boardTargets : prev))
+        setLiveDevices(prev => mergeDiscoveryDevices(prev, boardDevices))
+        setDiscoveryResult(null)
+        return
+      }
+
+      const liveData = await api('/api/hardware/live')
+      if (requestId !== boardRefreshRequestRef.current) {
+        return
+      }
+
+      if (liveData.success) {
+        setLiveDevices(prev => mergeDiscoveryDevices(prev, normalizeFleetBoardDevices(liveData.devices || [])))
+        setDiscoveryResult(null)
+      } else {
+        setDiscoveryResult(liveData)
+        setLiveDevices(prev => mergeDiscoveryDevices(prev, []))
+      }
+    })()
+    boardRefreshInFlightRef.current = refreshPromise
+    try {
+      return await refreshPromise
+    } finally {
+      if (boardRefreshInFlightRef.current === refreshPromise) {
+        boardRefreshInFlightRef.current = null
+      }
     }
+  }, [])
 
-    if (liveData.success) {
-      setLiveDevices(liveData.devices || [])
-      setDiscoveryResult(null)
-    } else {
-      setDiscoveryResult(liveData)
-      setLiveDevices([])
-    }
-
-    if (buildSourceData.success) {
-      setBuildSource(normalizeBackendBuildSource(buildSourceData))
-      setBuildSourceResult(prev => (prev && prev.success === false ? null : prev))
-    } else if (!buildSourceLoaded) {
-      setBuildSource({ kind: 'none' })
-      setBuildSourceResult(buildSourceData)
-    } else {
-      setBuildSourceResult(buildSourceData)
-    }
-    setBuildSourceLoaded(true)
-  }, [buildSourceLoaded, inventoryMode])
-
-  const refreshDetail = useCallback(async (targetId) => {
-    if (!targetId) {
+  const refreshDetail = useCallback(async ({ targetId = '', hostname = '', vehicleName = '' } = {}) => {
+    if (!targetId && !hostname) {
       setConnected(false)
       setWifiStatus(null)
       setBuildInfo(null)
@@ -3069,7 +3372,7 @@ function App() {
       return
     }
 
-    const targetUrl = url => withTargetId(url, targetId)
+    const targetUrl = url => withDeviceScope(url, { targetId, hostname, vehicleName })
     const conn = await api(targetUrl('/api/connection/status'))
     const sshPromise = api(targetUrl('/api/connection/ssh-command'))
 
@@ -3098,19 +3401,83 @@ function App() {
     setPollError(err ? { success: false, error: err } : null)
   }, [])
 
-  useEffect(() => {
-    const refreshIntervalMs = page === 'hardware' ? 2000 : 5000
-    refreshGlobal()
-    const interval = setInterval(refreshGlobal, refreshIntervalMs)
-    return () => clearInterval(interval)
-  }, [page, refreshGlobal])
+  const refreshSelectedDeviceState = useCallback(async () => {
+    await Promise.allSettled([
+      refreshDetail({
+        targetId: selectedTargetId,
+        hostname: selectedDeviceHostname,
+        vehicleName: selectedVehicleName,
+      }),
+      refreshGlobal(),
+    ])
+  }, [refreshDetail, refreshGlobal, selectedDeviceHostname, selectedTargetId, selectedVehicleName])
 
   useEffect(() => {
-    refreshDetail(selectedTargetId)
-    if (!selectedTargetId) return undefined
-    const interval = setInterval(() => refreshDetail(selectedTargetId), 5000)
+    const refreshIntervalMs = page === 'launch-monitor' ? 2000 : page === 'readiness' ? 3000 : 5000
+    refreshBuildSource()
+    refreshGlobal()
+    const interval = setInterval(refreshGlobal, refreshIntervalMs)
+    const sourceInterval = setInterval(refreshBuildSource, refreshIntervalMs)
+    return () => {
+      clearInterval(interval)
+      clearInterval(sourceInterval)
+    }
+  }, [page, refreshBuildSource, refreshGlobal])
+
+  useEffect(() => {
+    if (page !== 'launch-monitor') {
+      refreshDetail()
+      return undefined
+    }
+    refreshDetail({
+      targetId: selectedTargetId,
+      hostname: selectedDeviceHostname,
+      vehicleName: selectedVehicleName,
+    })
+    if (!selectedTargetId && !selectedDeviceHostname) return undefined
+    const interval = setInterval(() => refreshDetail({
+      targetId: selectedTargetId,
+      hostname: selectedDeviceHostname,
+      vehicleName: selectedVehicleName,
+    }), 5000)
     return () => clearInterval(interval)
-  }, [refreshDetail, selectedTargetId])
+  }, [page, refreshDetail, selectedDeviceHostname, selectedTargetId, selectedVehicleName])
+
+  useEffect(() => {
+    const fleetVehicles = new Set((buildSource?.fleetVehicles || []).map(vehicle => vehicle.name))
+    setSessionAssignments(prev => {
+      const next = {}
+      const claimedVehicles = new Set()
+
+      Object.entries(prev).forEach(([hostKey, vehicleName]) => {
+        if (!liveLookup.has(hostKey)) return
+        if (fleetVehicles.size > 0 && !fleetVehicles.has(vehicleName)) return
+        if (claimedVehicles.has(vehicleName)) return
+        next[hostKey] = vehicleName
+        claimedVehicles.add(vehicleName)
+      })
+
+      liveDevices.forEach(device => {
+        const hostKey = normalizeHostname(device.hostname)
+        const vehicleName = `${device.vehicle_name || ''}`.trim()
+        if (!vehicleName) return
+        if (fleetVehicles.size > 0 && !fleetVehicles.has(vehicleName)) return
+        if (next[hostKey] || claimedVehicles.has(vehicleName)) return
+        next[hostKey] = vehicleName
+        claimedVehicles.add(vehicleName)
+      })
+
+      const prevEntries = Object.entries(prev).sort()
+      const nextEntries = Object.entries(next).sort()
+      if (
+        prevEntries.length === nextEntries.length
+        && prevEntries.every((entry, index) => entry[0] === nextEntries[index][0] && entry[1] === nextEntries[index][1])
+      ) {
+        return prev
+      }
+      return next
+    })
+  }, [buildSource?.fleetVehicles, liveDevices, liveLookup])
 
   useEffect(() => {
     if (!operatorConfig || operatorDirty) return
@@ -3119,25 +3486,55 @@ function App() {
 
   useEffect(() => {
     if (assignmentDirty) return
-    setAssignmentDraft(assignmentDraftFromTarget(selectedTarget))
-    setAssignmentResult(null)
-    setDeployResult(null)
+    const sessionVehicleName = sessionAssignments[selectedDeviceHostKey] || ''
+    if (selectedTarget) {
+      setAssignmentDraft(assignmentDraftFromTarget(selectedTarget, sessionVehicleName))
+    } else if (selectedLiveDevice) {
+      setAssignmentDraft(assignmentDraftFromTarget(selectedTarget, sessionVehicleName))
+    } else {
+      setAssignmentDraft(null)
+    }
+    const scopeKey = [
+      selectedDeviceHostKey,
+      selectedTarget?.target_id || '',
+      selectedLiveDevice?.hostname || '',
+    ].join('|')
+    if (assignmentScopeKeyRef.current && assignmentScopeKeyRef.current !== scopeKey) {
+      setAssignmentResult(null)
+    }
+    if (deployScopeKeyRef.current && deployScopeKeyRef.current !== scopeKey) {
+      setDeployResult(null)
+    }
+    assignmentScopeKeyRef.current = scopeKey
+    deployScopeKeyRef.current = scopeKey
     setDetailTab('setup')
   }, [
+    selectedLiveDevice?.hardware_id,
+    selectedLiveDevice?.hostname,
     selectedTarget?.overlay_yaml,
     selectedTarget?.target_id,
     selectedTarget?.vehicle_name,
     assignmentDirty,
+    selectedDeviceHostKey,
+    sessionAssignments,
   ])
 
   useEffect(() => {
-    if (page !== 'hardware' || !selectedHardwareId) return
+    if (page !== 'launch-monitor' || !selectedHardwareId) return
     if (buildSourceSummary.ready) return
     setSelectedHardwareId('')
     setDetailTab('setup')
     setDeployResult(null)
-    setPage('deploy-context')
+    setPage('setup')
   }, [buildSourceSummary.ready, page, selectedHardwareId])
+
+  useEffect(() => {
+    if (page === 'launch-monitor') return
+    if (!selectedHardwareId) return
+    setSelectedHardwareId('')
+    setDetailTab('setup')
+    setDeployResult(null)
+  }, [page, selectedHardwareId])
 
   useEffect(() => {
     if (inventoryMode === 'new') {
@@ -3269,15 +3666,24 @@ function App() {
     const url = withQueryParams('/api/builds/list', query)
     const data = await api(url)
     if (data.success) {
+      const normalizedReleases = Array.isArray(data.releases)
+        ? data.releases.map(normalizeBuildRecord).filter(Boolean)
+        : []
+      const normalizedArtifacts = Array.isArray(data.artifacts)
+        ? data.artifacts.map(normalizeBuildRecord).filter(Boolean)
+        : []
+      const normalizedBuilds = Array.isArray(data.builds)
+        ? data.builds.map(normalizeBuildRecord).filter(Boolean)
+        : []
       const nextReleases = Array.isArray(data.releases)
-        ? data.releases
+        ? normalizedReleases
         : Array.isArray(data.builds)
-          ? data.builds.filter(build => `${build?.source || ''}`.toLowerCase() !== 'actions')
+          ? normalizedBuilds.filter(build => `${build?.source || ''}`.toLowerCase() !== 'actions')
           : []
       const nextArtifacts = Array.isArray(data.artifacts)
-        ? data.artifacts
+        ? normalizedArtifacts
         : Array.isArray(data.builds)
-          ? data.builds.filter(build => `${build?.source || ''}`.toLowerCase() === 'actions')
+          ? normalizedBuilds.filter(build => `${build?.source || ''}`.toLowerCase() === 'actions')
           : []
       setReleaseBuilds(nextReleases)
       setArtifactBuilds(prev => (
@@ -3302,6 +3708,7 @@ function App() {
 
   const selectGithubBuildSource = async build => {
     if (!build) return
+    buildSourceRefreshRequestRef.current += 1
     setBuildSourceWorking(true)
     try {
       const fd = new FormData()
@@ -3311,11 +3718,14 @@ function App() {
       fd.append('commit_subject', build.commitSubject || '')
       fd.append('name', build.name || '')
       fd.append('date', build.date || '')
+      fd.append('download_url', build.download_url || '')
+      if (build.size_mb !== null && build.size_mb !== undefined && build.size_mb !== '') {
+        fd.append('size_mb', `${build.size_mb}`)
+      }
       fd.append('branch', build.branch || '')
       fd.append('workflow_name', build.workflowName || '')
-      fd.append('job_name', build.jobName || '')
-      fd.append('event', build.event || '')
-      fd.append('conclusion', build.conclusion || '')
+      fd.append('workflow_event', build.event || '')
+      fd.append('workflow_conclusion', build.conclusion || '')
       fd.append('run_number', build.runNumber || '')
       fd.append('timestamp', build.timestamp || '')
       if (build.artifact_id) {
@@ -3330,6 +3740,8 @@ function App() {
       const data = await api('/api/build-source/github', { method: 'POST', body: fd })
       setBuildSourceResult(data)
       if (data.success) {
+        setBuildSource(normalizeBackendBuildSource(data))
+        setBuildSourceLoaded(true)
         await refreshBuildSource({ preserveResult: true })
       }
     } finally {
@@ -3338,6 +3750,7 @@ function App() {
   }
 
   const saveGlobalFleetFile = async fleetFile => {
+    buildSourceRefreshRequestRef.current += 1
     setBuildSourceWorking(true)
     try {
       const selectedFleetId = fleetSelectionId(fleetFile)
@@ -3346,6 +3759,8 @@ function App() {
       const data = await api('/api/build-source/fleet', { method: 'POST', body: fd })
       setBuildSourceResult(data)
       if (data.success) {
+        setBuildSource(normalizeBackendBuildSource(data))
+        setBuildSourceLoaded(true)
         await refreshBuildSource({ preserveResult: true })
       }
     } finally {
@@ -3355,6 +3770,7 @@ function App() {
 
   const selectLocalArtifactSource = async file => {
     if (!file) return
+    buildSourceRefreshRequestRef.current += 1
     setBuildSourceWorking(true)
     try {
       const fd = new FormData()
@@ -3362,6 +3778,8 @@ function App() {
       const data = await api('/api/build-source/local-artifact', { method: 'POST', body: fd })
       setBuildSourceResult(data)
       if (data.success) {
+        setBuildSource(normalizeBackendBuildSource(data))
+        setBuildSourceLoaded(true)
         await refreshBuildSource({ preserveResult: true })
       }
     } finally {
@@ -3370,11 +3788,14 @@ function App() {
   }
 
   const selectLocalCodebaseSource = async () => {
+    buildSourceRefreshRequestRef.current += 1
     setBuildSourceWorking(true)
     try {
       const data = await api('/api/build-source/local-codebase', { method: 'POST', body: new FormData() })
       setBuildSourceResult(data)
       if (data.success) {
+        setBuildSource(normalizeBackendBuildSource(data))
+        setBuildSourceLoaded(true)
         await refreshBuildSource({ preserveResult: true })
       }
     } finally {
@@ -3383,11 +3804,14 @@ function App() {
   }
 
   const clearBuildSource = async () => {
+    buildSourceRefreshRequestRef.current += 1
     setBuildSourceWorking(true)
     try {
       const data = await api('/api/build-source/clear', { method: 'POST', body: new FormData() })
       setBuildSourceResult(data)
       if (data.success) {
+        setBuildSource(normalizeBackendBuildSource(data))
+        setBuildSourceLoaded(true)
         await refreshBuildSource({ preserveResult: true })
       }
     } finally {
@@ -3396,66 +3820,94 @@ function App() {
   }
 
   const handleDeploySelectedSource = async () => {
-    if (!selectedTargetId || !buildSourceLoaded || !buildSource || buildSource.kind === 'none') return
+    if (!buildSourceLoaded || !buildSource || buildSource.kind === 'none') return
+    if (!selectedTargetId && !selectedDeviceHostname) return
     setDeploying(true)
     setDeployResult(null)
-    const data = await api(withTargetId('/api/builds/deploy-selected', selectedTargetId), {
-      method: 'POST',
-      body: withTargetFormData(new FormData(), selectedTargetId),
-    })
+    try {
+      const data = normalizeFleetActionResult(await api(withDeviceScope('/api/fleet/deploy', {
+        targetId: selectedTargetId,
+        hostname: selectedDeviceHostname,
+        vehicleName: selectedVehicleName,
+      }), { method: 'POST' }))
 
-    setDeployResult(data)
-    setDeploying(false)
-    if (data.success) {
-      await refreshDetail(selectedTargetId)
+      setDeployResult(data)
+    } finally {
+      await refreshSelectedDeviceState()
+      setDeploying(false)
     }
   }
 
-  const handleRollback = async () => {
-    if (!selectedTargetId) return
+  const handleStopFleet = async () => {
+    if (!selectedTargetId && !selectedDeviceHostname) return
     setDeploying(true)
-    const data = await api(withTargetId('/api/builds/rollback', selectedTargetId), {
-      method: 'POST',
-      body: withTargetFormData(new FormData(), selectedTargetId),
-    })
-    setDeployResult(data)
-    setDeploying(false)
-    if (data.success) {
-      await refreshDetail(selectedTargetId)
+    try {
+      const data = normalizeFleetActionResult(await api(withDeviceScope('/api/fleet/stop', {
+        targetId: selectedTargetId,
+        hostname: selectedDeviceHostname,
+        vehicleName: selectedVehicleName,
+      }), { method: 'POST' }))
+      setDeployResult(data)
+    } finally {
+      await refreshSelectedDeviceState()
+      setDeploying(false)
     }
   }
 
   const openHardware = hardwareId => {
-    const liveDevice = liveDevices.find(device => device.hardware_id === hardwareId) || null
     if (!buildSourceSummary.ready) {
       setBuildSourceResult({
         success: false,
-        error: 'Select deploy context and fleet before opening hardware controls.',
+        error: 'Select the global build and fleet before opening device controls.',
       })
-      setPage('deploy-context')
-      return
-    }
-    if (!liveDevice?.saved) {
-      setInventoryMode('new')
-      setInventoryDirty(false)
-      setSelectedInventoryTargetId('')
-      setInventoryDraft(inventoryDraftFromSelection(null, liveDevice, operatorConfig))
-      setInventoryResult(null)
-      setPage('inventory')
+      setPage('setup')
       return
     }
     setAssignmentDirty(false)
     setSelectedHardwareId(hardwareId)
-    setPage('hardware')
+    setDetailTab('setup')
+    setPage('launch-monitor')
   }
 
-  const createInventoryTarget = () => {
-    setInventoryMode('new')
-    setInventoryDirty(false)
-    setSelectedInventoryTargetId('')
-    setInventoryDraft(inventoryDraftFromSelection(null, null, operatorConfig))
-    setInventoryResult(null)
-    setPage('inventory')
+  const handleSaveSessionAssignment = async () => {
+    const hostname = `${selectedDeviceHostname || ''}`.trim()
+    if (!hostname) return
+
+    setAssignmentSaving(true)
+    setAssignmentResult(null)
+    setDeployResult(null)
+
+    const hostKey = normalizeHostname(hostname)
+    const vehicleName = `${assignmentDraft?.vehicle_name || ''}`.trim()
+    const conflictingHost = Object.entries(sessionAssignments).find(
+      ([candidateHost, assignedVehicle]) => candidateHost !== hostKey && assignedVehicle === vehicleName
+    )?.[0]
+
+    if (vehicleName && conflictingHost) {
+      setAssignmentResult({
+        success: false,
+        error: `${vehicleName} is already assigned to ${conflictingHost}. Clear that session assignment first.`,
+      })
+      setAssignmentSaving(false)
+      return
+    }
+
+    setSessionAssignments(prev => {
+      const next = { ...prev }
+      delete next[hostKey]
+      if (vehicleName) {
+        next[hostKey] = vehicleName
+      }
+      return next
+    })
+    setAssignmentDirty(false)
+    setAssignmentResult({
+      success: true,
+      output: vehicleName
+        ? `Assigned ${vehicleName} to ${hostname} for this session.`
+        : `Cleared the session assignment for ${hostname}.`,
+    })
+    setAssignmentSaving(false)
   }
 
   return (
@@ -3465,62 +3917,15 @@ function App() {
         onPageChange={setPage}
         theme={theme}
         onToggleTheme={toggleTheme}
-        liveCount={liveDevices.length}
+        liveCount={displayedLiveDevices.length}
+        readyCount={displayedLiveDevices.filter(device => deviceReadinessSummary(device, buildSource, buildSourceLoaded, device.session_vehicle_name).ready).length}
+        assignedCount={displayedLiveDevices.filter(device => device.session_vehicle_name).length}
         buildSource={buildSource}
         buildSourceLoaded={buildSourceLoaded}
         buildSourceWorking={buildSourceWorking}
       />
 
-      {page === 'hardware' && !selectedHardwareId && (
-        <HardwareGridPage
-          devices={liveDevices}
-          buildSource={buildSource}
-          buildSourceLoaded={buildSourceLoaded}
-          discoveryResult={discoveryResult}
-          onRefresh={refreshGlobal}
-          onOpenHardware={openHardware}
-        />
-      )}
-
-      {page === 'hardware' && selectedHardwareId && (
-        <HardwareDetailPage
-          liveDevice={selectedLiveDevice}
-          selectedTarget={selectedTarget}
-          connected={connected}
-          wifiStatus={wifiStatus}
-          buildInfo={buildInfo}
-          sshCommand={sshCommand}
-          workspacePaths={workspacePaths}
-          pollError={pollError}
-          buildSource={buildSource}
-          buildSourceLoaded={buildSourceLoaded}
-          buildSourceWorking={buildSourceWorking}
-          assignmentDraft={assignmentDraft || assignmentDraftFromTarget(selectedTarget)}
-          onAssignmentChange={(field, value) => {
-            setAssignmentDirty(true)
-            setAssignmentDraft(prev => ({ ...(prev || {}), [field]: value }))
-          }}
-          onSaveAssignment={() => handleSaveTargetDraft(assignmentDraft, setAssignmentSaving, setAssignmentResult, 'assignment')}
-          savingAssignment={assignmentSaving}
-          assignmentResult={assignmentResult}
-          onRefresh={() => {
-            refreshGlobal()
-            refreshDetail(selectedTargetId)
-          }}
-          onBack={() => {
-            setAssignmentDirty(false)
-            setSelectedHardwareId('')
-          }}
-          detailTab={detailTab}
-          onDetailTabChange={setDetailTab}
-          onDeploy={handleDeploySelectedSource}
-          deploying={deploying}
-          deployResult={deployResult}
-          onRollback={handleRollback}
-        />
-      )}
-
-      {page === 'deploy-context' && (
+      {page === 'setup' && (
         <BuildSourcePage
           buildSource={buildSource}
           buildSourceLoaded={buildSourceLoaded}
@@ -3540,58 +3945,75 @@ function App() {
         />
       )}
 
-      {page === 'inventory' && (
-        <InventoryPage
-          operatorDraft={operatorDraft || operatorConfig || {
-            github_repo: '',
-            github_token: '',
-            hotspot_name: '',
-            inventory_path: '',
-            default_deploy_root: '/home/penn/pennair-deploy',
-            default_pi_user: 'penn',
-            default_ssh_key: '~/.ssh/pennair_pi_ed25519',
-            default_ssh_pass: '',
+      {page === 'readiness' && (
+        <HardwareGridPage
+          devices={displayedLiveDevices}
+          buildSource={buildSource}
+          buildSourceLoaded={buildSourceLoaded}
+          discoveryResult={discoveryResult}
+          onRefresh={refreshGlobal}
+          onOpenHardware={openHardware}
+        />
+      )}
+
+      {page === 'launch-monitor' && !selectedHardwareId && (
+        <div className="card card-full">
+          <h2 className="card-title">Launch Monitor</h2>
+          <div className="card-content">
+            <div className="info-box compact-info">
+              <strong>{buildSourceSummary.title}</strong>
+              <p>{buildSourceSummary.detail}</p>
+              <p>{buildSourceSummary.fleetDetail || 'No fleet file selected.'}</p>
+            </div>
+            <p className="subtext left-note">
+              Select a live device from the readiness board to open mission control, launch prep, and runtime monitoring.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {page === 'launch-monitor' && selectedHardwareId && (
+        <HardwareDetailPage
+          liveDevice={selectedLiveDevice}
+          selectedTarget={selectedTarget}
+          hostname={selectedDeviceHostname}
+          vehicleName={selectedVehicleName}
+          connected={connected}
+          wifiStatus={wifiStatus}
+          buildInfo={buildInfo}
+          sshCommand={sshCommand}
+          workspacePaths={workspacePaths}
+          pollError={pollError}
+          buildSource={buildSource}
+          buildSourceLoaded={buildSourceLoaded}
+          buildSourceWorking={buildSourceWorking}
+          assignmentDraft={assignmentDraft || assignmentDraftFromTarget(selectedTarget, selectedVehicleName)}
+          onAssignmentChange={(field, value) => {
+            setAssignmentDirty(true)
+            setAssignmentDraft(prev => ({ ...(prev || {}), [field]: value }))
           }}
-          onOperatorChange={(field, value) => {
-            setOperatorDirty(true)
-            setOperatorDraft(prev => ({ ...(prev || {}), [field]: value }))
-          }}
-          onSaveOperator={handleSaveOperator}
-          operatorSaving={operatorSaving}
-          operatorResult={operatorResult}
-          targets={targets}
-          selectedInventoryTargetId={selectedInventoryTargetId}
-          onSelectInventoryTarget={targetId => {
-            setInventoryMode('existing')
-            setInventoryDirty(false)
-            setSelectedInventoryTargetId(targetId)
-          }}
-          inventoryDraft={inventoryDraft}
-          onInventoryDraftChange={(field, value) => {
-            setInventoryDirty(true)
-            setInventoryDraft(prev => {
-              const next = { ...(prev || {}), [field]: value }
-              if (inventoryMode === 'new' && field === 'pi_host') {
-                next.target_id = suggestedTargetId(value)
-                if (!prev?.label || prev.label === '' || prev.label === prev.pi_host) {
-                  next.label = value || 'Unnamed device'
-                }
-              }
-              return next
+          onSaveAssignment={handleSaveSessionAssignment}
+          savingAssignment={assignmentSaving}
+          assignmentResult={assignmentResult}
+          onRefresh={() => {
+            refreshGlobal()
+            refreshDetail({
+              targetId: selectedTargetId,
+              hostname: selectedDeviceHostname,
+              vehicleName: selectedVehicleName,
             })
           }}
-          onSaveInventoryTarget={() => handleSaveTargetDraft(inventoryDraft, setInventorySaving, setInventoryResult, 'inventory')}
-          onDeleteInventoryTarget={handleDeleteInventoryTarget}
-          inventorySaving={inventorySaving}
-          inventoryResult={inventoryResult}
-          inventoryFile={inventoryFile}
-          onInventoryFileChange={setInventoryFile}
-          onExportInventory={handleExportInventory}
-          onImportInventory={handleImportInventory}
-          inventoryIoLoading={inventoryIoLoading}
-          liveLookup={liveLookup}
-          inventoryMode={inventoryMode}
-          onCreateInventoryTarget={createInventoryTarget}
+          onBack={() => {
+            setAssignmentDirty(false)
+            setSelectedHardwareId('')
+            setPage('readiness')
+          }}
+          detailTab={detailTab}
+          onDetailTabChange={setDetailTab}
+          onDeploy={handleDeploySelectedSource}
+          deploying={deploying}
+          deployResult={deployResult}
+          onRollback={handleStopFleet}
         />
       )}
     </div>

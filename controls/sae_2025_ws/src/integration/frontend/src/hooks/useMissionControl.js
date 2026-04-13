@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 
-import { api, withTargetFormData, withTargetId } from '../services/api'
+import { api, normalizeFleetActionResult, withDeviceFormData, withDeviceScope } from '../services/api'
 
 const MAX_TERMINAL_BUFFER_CHARS = 1_000_000
 
@@ -36,7 +36,7 @@ function initialMissionState(connected) {
   }
 }
 
-export function useMissionControl({ connected, onRefresh, targetId }) {
+export function useMissionControl({ connected, onRefresh, targetId, hostname = '', vehicleName = '' }) {
   const [actionLoading, setActionLoading] = useState('')
   const [actionResult, setActionResult] = useState(null)
 
@@ -72,7 +72,10 @@ export function useMissionControl({ connected, onRefresh, targetId }) {
   const hasLoadedLogsRef = useRef(false)
   const logCursorRef = useRef({ offset: 0, inode: 0 })
 
-  const targetUrl = useCallback((url) => withTargetId(url, targetId), [targetId])
+  const targetUrl = useCallback(
+    (url) => withDeviceScope(url, { hostname, vehicleName }),
+    [hostname, targetId, vehicleName]
+  )
 
   const resetTerminal = useCallback((text = '') => {
     const normalized = trimTerminalBuffer(text)
@@ -447,7 +450,7 @@ export function useMissionControl({ connected, onRefresh, targetId }) {
     fd.append('content', missionFileText)
     const data = await api(targetUrl('/api/mission/mission-file'), {
       method: 'POST',
-      body: withTargetFormData(fd, targetId),
+      body: withDeviceFormData(fd, { hostname, vehicleName }),
     })
     setMissionFileResult(data)
     setMissionFileSaving(false)
@@ -468,7 +471,7 @@ export function useMissionControl({ connected, onRefresh, targetId }) {
 
     const data = await api(targetUrl('/api/mission/launch-params'), {
       method: 'POST',
-      body: withTargetFormData(fd, targetId),
+      body: withDeviceFormData(fd, { hostname, vehicleName }),
     })
     setParamsResult(data)
     setParamsLoading(false)
@@ -489,7 +492,7 @@ export function useMissionControl({ connected, onRefresh, targetId }) {
       logCursorRef.current = { offset: 0, inode: 0 }
     }
 
-    const data = await api(targetUrl(url), { method: 'POST' })
+    const data = normalizeFleetActionResult(await api(targetUrl(url), { method: 'POST' }))
     setActionResult(data)
     setActionLoading('')
 

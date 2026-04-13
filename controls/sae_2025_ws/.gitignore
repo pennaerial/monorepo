@@ -4,3 +4,6 @@ dist/
 __pycache__/
 .pytest_cache/
 src/integration/.integration_inventory.json
+src/integration/.integration_build_source.json
+src/integration/.integration_build_source_cache/
+.playwright-cli/

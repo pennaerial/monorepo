@@ -1,9 +1,10 @@
 from importlib import import_module
 
-__all__ = ["wifi", "deploy", "mission"]
+__all__ = ["wifi", "deploy", "mission", "fleet"]
 
 _EXPORTS = {
     "deploy": ".deploy",
+    "fleet": ".fleet",
     "mission": ".mission",
     "wifi": ".wifi",
 }

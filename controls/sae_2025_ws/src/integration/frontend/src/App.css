@@ -1,13 +1,16 @@
 /* ── Layout ─────────────────────────────────────────────── */
 
 .app {
-  max-width: 1440px;
+  max-width: 1360px;
   margin: 0 auto;
-  padding: 1.15rem 0.9rem 2.2rem;
+  padding: 0.8rem 0.85rem 1.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
 }
 
 .title {
-  font-size: 1.55rem;
+  font-size: 1.95rem;
   font-weight: 700;
   color: var(--text);
   letter-spacing: -0.04em;
@@ -17,15 +20,20 @@
 .app-header {
   display: grid;
   grid-template-columns: minmax(0, 1.6fr) minmax(260px, 0.6fr);
-  gap: 0.85rem 1rem;
+  gap: 0.9rem 1rem;
   align-items: start;
-  margin-bottom: 0.9rem;
+  margin-bottom: 0;
+  padding: 1rem 1rem 0.95rem;
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0.01)), var(--card);
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.12);
 }
 
 .app-brand {
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
+  gap: 0.22rem;
 }
 
 .app-brand-kicker,
@@ -40,7 +48,7 @@
 
 .app-subtitle {
   color: var(--text-secondary);
-  font-size: 0.84rem;
+  font-size: 0.9rem;
   max-width: 60ch;
 }
 
@@ -56,8 +64,8 @@
   min-width: 132px;
   padding: 0.68rem 0.8rem;
   border: 1px solid var(--border);
-  border-radius: 14px;
-  background: var(--card);
+  border-radius: 16px;
+  background: linear-gradient(180deg, var(--surface), var(--card));
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
@@ -85,8 +93,8 @@
   gap: 0.8rem;
   padding: 0.8rem 0.9rem;
   border: 1px solid var(--border);
-  border-radius: 14px;
-  background: linear-gradient(135deg, var(--card), var(--surface));
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.03), transparent), var(--surface);
 }
 
 .build-source-banner p {
@@ -128,9 +136,9 @@
 
 .hardware-card {
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: 18px;
   background: linear-gradient(180deg, var(--card), var(--surface));
-  padding: 0.88rem;
+  padding: 0.92rem;
   display: flex;
   flex-direction: column;
   gap: 0.65rem;
@@ -193,10 +201,10 @@
 }
 
 .detail-header {
-  padding: 0.9rem 0.95rem;
+  padding: 0.95rem 0.98rem;
   border: 1px solid var(--border);
-  border-radius: 14px;
-  background: var(--card);
+  border-radius: 18px;
+  background: linear-gradient(180deg, var(--card), var(--surface));
 }
 
 .detail-header-copy p {
@@ -217,7 +225,8 @@
 }
 
 .section-head {
-  margin-bottom: 0.8rem;
+  margin-bottom: 0.4rem;
+  align-items: center;
 }
 
 .section-head h2,
@@ -250,6 +259,16 @@
 }
 
 @media (max-width: 860px) {
+  .page-tabs,
+  .mini-tabs {
+    width: 100%;
+  }
+
+  .tab-btn,
+  .mini-tab {
+    flex: 1;
+  }
+
   .app-header,
   .grid,
   .mission-grid {
@@ -266,9 +285,9 @@
 .card {
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 0.9rem;
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+  border-radius: 18px;
+  padding: 0.95rem;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
 }
 
 .card-full {
@@ -579,20 +598,26 @@ select {
 
 .page-tabs {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.35rem;
   margin-top: 0;
   flex-wrap: wrap;
+  padding: 0.28rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  width: fit-content;
 }
 
 .tab-btn {
-  background: var(--surface);
+  background: transparent;
   color: var(--text-secondary);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 0.45rem 0.7rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 0.48rem 0.86rem;
   font-size: 0.78rem;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
 .tab-btn:hover {
@@ -609,20 +634,27 @@ select {
   color: #fff;
   background: var(--accent);
   border-color: var(--accent);
+  box-shadow: 0 8px 16px rgba(37, 99, 235, 0.18);
 }
 
 .mini-tabs {
   display: flex;
-  gap: 0.4rem;
+  gap: 0.35rem;
+  padding: 0.22rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  width: fit-content;
+  background: var(--surface);
 }
 
 .mini-tab {
-  background: var(--surface);
+  background: transparent;
   color: var(--text-secondary);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 0.35rem 0.6rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 0.38rem 0.68rem;
   font-size: 0.73rem;
+  font-weight: 600;
   cursor: pointer;
 }
 

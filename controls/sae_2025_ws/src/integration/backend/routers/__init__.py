@@ -3,6 +3,7 @@ from .config import build_router as config_router
 from .connection import build_router as connection_router
 from .discovery import build_router as discovery_router
 from .deploy import build_router as deploy_router
+from .fleet import build_router as fleet_router
 from .inventory import build_router as inventory_router
 from .mission import build_router as mission_router
 from .schema import build_router as schema_router
@@ -17,6 +18,7 @@ __all__ = [
     "discovery_router",
     "wifi_router",
     "deploy_router",
+    "fleet_router",
     "mission_router",
     "schema_router",
     "terminal_ws_router",

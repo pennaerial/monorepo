@@ -17,6 +17,9 @@ import yaml
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 if str(PACKAGE_ROOT) not in sys.path:
     sys.path.insert(0, str(PACKAGE_ROOT))
+UAV_ROOT = PACKAGE_ROOT.parent / "uav"
+if str(UAV_ROOT) not in sys.path:
+    sys.path.insert(0, str(UAV_ROOT))
 
 backend_pkg = types.ModuleType("backend")
 backend_pkg.__path__ = [str(PACKAGE_ROOT / "backend")]
@@ -186,10 +189,14 @@ class _FakeHTTPXClient:
 @pytest.fixture(autouse=True)
 def _clear_deploy_service_caches():
     deploy_service._BUILD_LIST_CACHE.clear()
+    deploy_service._FLEET_CATALOG_CACHE.clear()
     deploy_service._COMMIT_SUBJECT_CACHE.clear()
+    deploy_service._WORKFLOW_RUN_CACHE.clear()
     yield
     deploy_service._BUILD_LIST_CACHE.clear()
+    deploy_service._FLEET_CATALOG_CACHE.clear()
     deploy_service._COMMIT_SUBJECT_CACHE.clear()
+    deploy_service._WORKFLOW_RUN_CACHE.clear()
 
 
 def _make_operator(tmp_path: Path) -> OperatorConfig:
@@ -275,6 +282,38 @@ def _make_context(
                 "Select a fleet file before opening per-device deploy controls."
             )
 
+    def resolve_live_target(
+        *,
+        hostname: str | None,
+        vehicle_name: str | None = None,
+        label: str | None = None,
+        pi_user: str | None = None,
+        deploy_root: str | None = None,
+        ssh_key: str | None = None,
+        ssh_pass: str | None = None,
+        service_unit: str | None = None,
+        enabled: bool | None = None,
+    ):
+        if not hostname:
+            raise ValueError("hostname is required")
+        resolved = TargetRecord.for_host(
+            hostname=hostname,
+            target_id=hostname,
+            label=label,
+            pi_user=pi_user or operator.default_pi_user,
+            deploy_root=deploy_root or operator.default_deploy_root,
+            ssh_key=ssh_key if ssh_key is not None else operator.default_ssh_key,
+            ssh_pass=ssh_pass if ssh_pass is not None else operator.default_ssh_pass,
+            vehicle_name=vehicle_name or "",
+            service_unit=service_unit or "pennair-autonomy.service",
+            enabled=True if enabled is None else enabled,
+            default_deploy_root=operator.default_deploy_root,
+        )
+        return SimpleNamespace(
+            target=resolved,
+            ssh=_FakeSSH(result=_FakeSSHResult()),
+        )
+
     return SimpleNamespace(
         base_dir=base_dir,
         operator_config=operator,
@@ -285,6 +324,7 @@ def _make_context(
             target=inventory.get_target(target_id),
             ssh=_FakeSSH(result=_FakeSSHResult()),
         ),
+        resolve_live_target=resolve_live_target,
     )
 
 
@@ -903,6 +943,90 @@ def test_list_builds_combines_releases_and_artifacts(tmp_path, monkeypatch):
     assert filtered["builds"][0]["workflow_event"] == "workflow_dispatch"
 
 
+def test_list_builds_enriches_actions_artifacts_from_workflow_run_lookup(
+    tmp_path, monkeypatch
+):
+    ctx = SimpleNamespace(
+        base_dir=tmp_path / "src" / "integration",
+        operator_config=_make_operator(tmp_path),
+    )
+
+    run_id = "42"
+    artifact_id = "99"
+    commit_sha = "cafebabedeadbeef"
+    run_url = (
+        f"https://api.github.com/repos/{ctx.operator_config.github_repo}"
+        f"/actions/runs/{run_id}"
+    )
+
+    fake_httpx = SimpleNamespace(
+        AsyncClient=lambda timeout=20: _FakeAsyncClient(
+            releases_payload=[],
+            artifacts_payload={
+                "total_count": 1,
+                "artifacts": [
+                    {
+                        "id": int(artifact_id),
+                        "name": "ros2-build-cafebabe.tar.gz",
+                        "updated_at": "2026-04-11T01:00:00Z",
+                        "size_in_bytes": 8_000_000,
+                        "workflow_run": {
+                            "id": int(run_id),
+                            "head_sha": commit_sha,
+                            "head_branch": "feature/release-metadata",
+                        },
+                    }
+                ],
+            },
+            commit_payloads={
+                commit_sha: {"commit": {"message": "Artifact commit subject\n\nbody"}}
+            },
+            response_overrides={
+                run_url: _FakeResponse(
+                    {
+                        "id": int(run_id),
+                        "name": "ARM Artifact",
+                        "event": "push",
+                        "conclusion": "success",
+                        "head_sha": commit_sha,
+                        "head_branch": "feature/release-metadata",
+                    }
+                )
+            },
+        )
+    )
+    monkeypatch.setattr(deploy_service, "_require_httpx", lambda: fake_httpx)
+
+    result = asyncio.run(deploy_service.list_builds(ctx))
+
+    assert result["success"] is True
+    assert result["builds"] == [
+        {
+            "source": "actions",
+            "tag": f"run-{run_id}",
+            "sha": commit_sha[:7],
+            "commit_sha": commit_sha,
+            "commit_subject": "Artifact commit subject",
+            "name": "Artifact commit subject",
+            "date": "2026-04-11T01:00:00Z",
+            "download_url": (
+                f"https://api.github.com/repos/{ctx.operator_config.github_repo}"
+                f"/actions/artifacts/{artifact_id}/zip"
+            ),
+            "size_mb": 8.0,
+            "run_id": run_id,
+            "artifact_id": artifact_id,
+            "artifact_name": "ros2-build-cafebabe.tar.gz",
+            "branch": "feature/release-metadata",
+            "workflow_name": "ARM Artifact",
+            "workflow_event": "push",
+            "workflow_conclusion": "success",
+            "deployable": True,
+            "fallback": False,
+        }
+    ]
+
+
 def test_list_builds_uses_cached_response_for_repeat_requests(tmp_path, monkeypatch):
     ctx = SimpleNamespace(
         base_dir=tmp_path / "src" / "integration",
@@ -1023,6 +1147,136 @@ def test_list_builds_returns_stale_cache_when_github_rate_limited(
     assert second["builds"] == first["builds"]
     assert "cached build list" in (second["error"] or "").lower()
     assert "gITHUB_TOKEN".lower() in (second["error"] or "").lower()
+
+
+def test_source_catalog_key_is_stable_for_exact_build_sources(tmp_path):
+    target = _make_target(
+        target_id="pi-source-key",
+        vehicle_name="uav_0",
+        overlay_yaml="mission: hover\npx4_airframe_id: 4004\n",
+    )
+    ctx = _make_context(tmp_path, target)
+
+    asyncio.run(
+        deploy_service.set_github_build_source(
+            ctx,
+            source="actions",
+            artifact_id="6389816289",
+            run_id="24297396361",
+            sha="591aeed",
+            branch="user/ethayu/manual-merge",
+            name="ros2-build-2657150",
+            download_url="https://example.com/build.zip",
+        )
+    )
+    current = ctx.build_source_store.current()
+    baseline = deploy_service._source_catalog_key(current)
+
+    ctx.build_source_store.set_fleet_file(fleet_file="/tmp/runtime-fleet-a.yaml")
+    updated = deploy_service._source_catalog_key(ctx.build_source_store.current())
+    assert updated == baseline
+
+    ctx.build_source_store.current().updated_at = "2099-01-01T00:00:00Z"
+    ctx.build_source_store.save()
+    mutated = deploy_service._source_catalog_key(ctx.build_source_store.current())
+    assert mutated == baseline
+
+
+def test_get_fleet_catalog_reuses_stale_exact_build_cache_after_rate_limit(
+    tmp_path, monkeypatch
+):
+    target = _make_target(
+        target_id="pi-stale-cache",
+        vehicle_name="uav_0",
+        overlay_yaml="mission: hover\npx4_airframe_id: 4004\n",
+    )
+    ctx = _make_context(tmp_path, target)
+
+    zip_path = _write_actions_artifact_zip(
+        tmp_path,
+        fleet_names=("alpha.yaml", "beta.yaml"),
+        tarball_name="ros2-build-cafebabe.tar.gz",
+    )
+    archive_bytes = zip_path.read_bytes()
+    archive_url = (
+        f"https://api.github.com/repos/{ctx.operator_config.github_repo}"
+        "/actions/artifacts/6389816289/zip"
+    )
+    fake_httpx = SimpleNamespace(
+        Client=lambda timeout=300, follow_redirects=True: _FakeHTTPXClient(
+            body=archive_bytes
+        )
+    )
+    monkeypatch.setattr(deploy_service, "_require_httpx", lambda: fake_httpx)
+
+    asyncio.run(
+        deploy_service.set_github_build_source(
+            ctx,
+            source="actions",
+            artifact_id="6389816289",
+            run_id="24297396361",
+            sha="591aeed",
+            branch="user/ethayu/manual-merge",
+            name="ros2-build-2657150",
+        )
+    )
+
+    first = asyncio.run(deploy_service.get_fleet_catalog(ctx))
+    assert first["success"] is True
+    assert sorted(first["available_fleets"]) == ["alpha.yaml", "beta.yaml"]
+    first_catalog_dir = deploy_service._fleet_catalog_dir(ctx)
+    assert first_catalog_dir.exists()
+
+    # Simulate the operator re-selecting the same exact build later, after the
+    # selected-fleet stamp has changed and GitHub is rate-limiting.
+    ctx.build_source_store.current().updated_at = "2099-01-01T00:00:00Z"
+    ctx.build_source_store.current().fleet_file = "alpha.yaml"
+    ctx.build_source_store.save()
+
+    class _RateLimitedStream:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def raise_for_status(self) -> None:
+            raise _FakeHTTPStatusError(
+                _FakeResponse(
+                    {"message": "API rate limit exceeded"},
+                    status_code=403,
+                    headers={"x-ratelimit-reset": "1775976000"},
+                )
+            )
+
+        def iter_bytes(self, chunk_size: int = 65536):
+            yield b""
+
+    class _RateLimitedHTTPXClient:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def stream(self, method: str, url: str, headers=None):
+            assert method == "GET"
+            assert url == archive_url
+            return _RateLimitedStream()
+
+    monkeypatch.setattr(
+        deploy_service,
+        "_require_httpx",
+        lambda: SimpleNamespace(
+            Client=lambda timeout=300, follow_redirects=True: _RateLimitedHTTPXClient()
+        ),
+    )
+
+    second = asyncio.run(deploy_service.get_fleet_catalog(ctx))
+
+    assert second["success"] is True
+    assert sorted(second["available_fleets"]) == ["alpha.yaml", "beta.yaml"]
+    assert second["fleet_catalog_error"] is None
 
 
 def test_current_build_parses_release_marker(tmp_path):
@@ -1187,15 +1441,12 @@ def test_deploy_selected_source_dispatches_to_persisted_selection(
         deploy_service.deploy_selected_source(ctx, target_id="pi-dispatch")
     )
     assert result["success"] is True
-    assert calls[-1] == (
-        "github",
-        {
-            "target_id": "pi-dispatch",
-            "tag": "",
-            "source": "actions",
-            "artifact_id": "42",
-        },
-    )
+    kind, kwargs = calls[-1]
+    assert kind == "github"
+    assert kwargs["target_ctx"].target.target_id == "pi-dispatch"
+    assert kwargs["tag"] == ""
+    assert kwargs["source"] == "actions"
+    assert kwargs["artifact_id"] == "42"
 
     asyncio.run(
         deploy_service.set_local_artifact_build_source(
@@ -1209,7 +1460,7 @@ def test_deploy_selected_source_dispatches_to_persisted_selection(
     )
     assert result["success"] is True
     assert calls[-1][0] == "local_artifact"
-    assert calls[-1][1]["target_id"] == "pi-dispatch"
+    assert calls[-1][1]["target_ctx"].target.target_id == "pi-dispatch"
     assert calls[-1][1]["artifact_name"] == "artifact.tar.gz"
 
     asyncio.run(deploy_service.set_local_codebase_build_source(ctx))
@@ -1217,7 +1468,8 @@ def test_deploy_selected_source_dispatches_to_persisted_selection(
         deploy_service.deploy_selected_source(ctx, target_id="pi-dispatch")
     )
     assert result["success"] is True
-    assert calls[-1] == ("local_codebase", {"target_id": "pi-dispatch"})
+    assert calls[-1][0] == "local_codebase"
+    assert calls[-1][1]["target_ctx"].target.target_id == "pi-dispatch"
 
 
 def test_deploy_selected_source_requires_global_fleet_selection(tmp_path):
@@ -1356,6 +1608,289 @@ def test_ensure_source_build_prereqs_uses_shared_deploy_lib(tmp_path):
         for cmd in target_ctx.ssh.run_calls
     )
     assert any(target_ctx.target.pi_user in cmd for cmd in target_ctx.ssh.run_calls)
+
+
+def test_runner_script_disables_nounset_only_around_ros_setup(tmp_path):
+    target = _make_target(
+        target_id="pi-runner-script",
+        vehicle_name="uav_0",
+        overlay_yaml="mission: hover\npx4_airframe_id: 4004\n",
+    )
+    target_ctx = SimpleNamespace(
+        target=target,
+        ssh=_FakeSSH(result=_FakeSSHResult()),
+    )
+
+    script = deploy_service._runner_script(target_ctx)
+
+    assert "set -euo pipefail" in script
+    assert "set +u" in script
+    assert "source /opt/ros/humble/setup.bash" in script
+    assert 'source "$DEPLOY_ROOT/current/install/setup.bash"' in script
+    assert "set -u\nexec ros2 launch" in script
+    assert script.index("set +u") < script.index("source /opt/ros/humble/setup.bash")
+    assert script.index('source "$DEPLOY_ROOT/current/install/setup.bash"') < script.index(
+        "set -u\nexec ros2 launch"
+    )
+
+
+def test_activate_release_polls_stability_and_rolls_back_on_instability(tmp_path):
+    target = _make_target(
+        target_id="pi-activate-stability",
+        vehicle_name="uav_0",
+        overlay_yaml="mission: hover\npx4_airframe_id: 4004\n",
+    )
+
+    class _ActivationSSH:
+        def __init__(self):
+            self.run_calls: list[str] = []
+
+        def q(self, value: str) -> str:
+            return value
+
+        async def run(self, command: str, timeout: int = 15):
+            self.run_calls.append(command)
+            if "deadline=$((SECONDS + 8))" in command:
+                return _FakeSSHResult(
+                    returncode=1,
+                    stdout="",
+                    stderr="__ERR__:unstable:active:running:1234:1",
+                )
+            if "ln -sfn" in command and "previous_link" in command:
+                return _FakeSSHResult(returncode=0, stdout="", stderr="")
+            return _FakeSSHResult(returncode=0, stdout="ACTIVE", stderr="")
+
+        def friendly_error(self, message: str) -> str:
+            return message
+
+        def format_remote_error(self, raw_error: str, prefix: str) -> str:
+            return f"{prefix}: {raw_error}"
+
+    target_ctx = SimpleNamespace(
+        target=target,
+        ssh=_ActivationSSH(),
+    )
+
+    with pytest.raises(RuntimeError, match="Reverted to the previous release"):
+        asyncio.run(
+            deploy_service._activate_release(
+                target_ctx,
+                release_dir="/home/penn/pennair-deploy/releases/release-new",
+                previous_target="/home/penn/pennair-deploy/releases/release-old",
+            )
+        )
+
+    restart_cmd = target_ctx.ssh.run_calls[0]
+    assert "systemctl show" in restart_cmd
+    assert "ActiveState" in restart_cmd
+    assert "SubState" in restart_cmd
+    assert "MainPID" in restart_cmd
+    assert "NRestarts" in restart_cmd
+    assert "sleep 1" in restart_cmd
+    assert "deadline=$((SECONDS + 8))" in restart_cmd
+    assert any("ln -sfn" in cmd for cmd in target_ctx.ssh.run_calls[1:])
+
+
+def test_perform_action_refreshes_failed_deploy_rows_with_rollback_metadata(tmp_path, monkeypatch):
+    from backend.models import FleetDeviceSelection
+    from backend.services import fleet as fleet_service
+
+    target = _make_target(
+        target_id="pi-row-refresh",
+        vehicle_name="uav_0",
+        overlay_yaml="mission: hover\npx4_airframe_id: 4004\n",
+        pi_host="pi-row-refresh.local",
+    )
+    ctx = _make_context(tmp_path, target)
+    selection = FleetDeviceSelection.model_validate(
+        {"hostname": "pi-row-refresh.local", "vehicle_name": "uav_0"}
+    )
+
+    async def fake_deploy_selected_source(inner_ctx, target_ctx=None, target_id=None):
+        return {
+            "success": False,
+            "error": "Restart runtime service failed: __ERR__:unstable",
+            "attempted_release_id": "release-new",
+            "rolled_back": True,
+        }
+
+    async def fake_summarize_device(inner_ctx, device, fleet_vehicle_lookup):
+        return {
+            "hardware_id": "pi-row-refresh.local",
+            "hostname": "pi-row-refresh.local",
+            "addresses": [],
+            "service_name": None,
+            "service_type": None,
+            "last_seen_at": "2026-04-13T00:00:00Z",
+            "discovery_stale": False,
+            "target_id": "pi-row-refresh.local",
+            "vehicle_name": "uav_0",
+            "fleet_vehicle": None,
+            "connection": {
+                "success": True,
+                "connected": True,
+                "target": "pi-row-refresh.local",
+                "info": "ok",
+                "error": None,
+            },
+            "current_build": {
+                "success": True,
+                "installed": True,
+                "info": "ok",
+                "release_id": "release-old",
+            },
+            "runtime": {
+                "success": True,
+                "running": False,
+                "state": "stopped",
+                "pid": None,
+                "error": None,
+            },
+            "readiness": {
+                "connected": True,
+                "build_installed": True,
+                "runtime_ready": True,
+                "vehicle_assigned": True,
+                "ready": True,
+                "notes": [],
+            },
+        }
+
+    monkeypatch.setattr(
+        fleet_service.deploy_service, "deploy_selected_source", fake_deploy_selected_source
+    )
+    monkeypatch.setattr(fleet_service, "_summarize_device", fake_summarize_device)
+
+    result = asyncio.run(
+        fleet_service._perform_action(
+            ctx,
+            action="deploy",
+            selection=selection,
+            snapshot={"vehicle_lookup": {}},
+        )
+    )
+
+    assert result["success"] is False
+    assert result["attempted_release_id"] == "release-new"
+    assert result["active_release_id"] == "release-old"
+    assert result["rolled_back"] is True
+    assert result["error"] == "Restart runtime service failed: __ERR__:unstable"
+    assert result["current_build"]["release_id"] == "release-old"
+
+
+def test_batch_action_marks_top_level_failure_when_any_row_fails(tmp_path, monkeypatch):
+    from backend.models import FleetDeviceSelection
+    from backend.services import fleet as fleet_service
+
+    async def fake_build_snapshot(inner_ctx):
+        return {
+            "build_source": {"kind": "none"},
+            "fleet_catalog": {"success": True, "fleet_vehicles": []},
+            "fleet_vehicles": [],
+            "vehicle_lookup": {},
+        }
+
+    async def fake_resolve_action_devices(inner_ctx, devices):
+        return [
+            FleetDeviceSelection.model_validate(
+                {"hostname": "pi-1.local", "vehicle_name": "uav_0"}
+            ),
+            FleetDeviceSelection.model_validate(
+                {"hostname": "pi-2.local", "vehicle_name": "payload_0"}
+            ),
+        ]
+
+    async def fake_perform_action(inner_ctx, *, action, selection, snapshot):
+        if selection.hostname == "pi-1.local":
+            return {
+                "hardware_id": "pi-1.local",
+                "hostname": "pi-1.local",
+                "addresses": [],
+                "service_name": None,
+                "service_type": None,
+                "last_seen_at": "2026-04-13T00:00:00Z",
+                "discovery_stale": False,
+                "target_id": "pi-1.local",
+                "vehicle_name": "uav_0",
+                "fleet_vehicle": None,
+                "connection": None,
+                "current_build": {
+                    "success": True,
+                    "installed": True,
+                    "info": "ok",
+                    "release_id": "release-old",
+                },
+                "runtime": None,
+                "readiness": {
+                    "connected": True,
+                    "build_installed": True,
+                    "runtime_ready": True,
+                    "vehicle_assigned": True,
+                    "ready": True,
+                    "notes": [],
+                },
+                "action": action,
+                "success": True,
+                "attempted_release_id": "release-old",
+                "active_release_id": "release-old",
+                "rolled_back": False,
+                "output": "done",
+                "error": None,
+            }
+        return {
+            "hardware_id": "pi-2.local",
+            "hostname": "pi-2.local",
+            "addresses": [],
+            "service_name": None,
+            "service_type": None,
+            "last_seen_at": "2026-04-13T00:00:00Z",
+            "discovery_stale": False,
+            "target_id": "pi-2.local",
+            "vehicle_name": "payload_0",
+            "fleet_vehicle": None,
+            "connection": None,
+            "current_build": {
+                "success": True,
+                "installed": True,
+                "info": "ok",
+                "release_id": "release-old",
+            },
+            "runtime": None,
+            "readiness": {
+                "connected": True,
+                "build_installed": True,
+                "runtime_ready": True,
+                "vehicle_assigned": True,
+                "ready": True,
+                "notes": [],
+            },
+            "action": action,
+            "success": False,
+            "attempted_release_id": "release-new",
+            "active_release_id": "release-old",
+            "rolled_back": True,
+            "output": None,
+            "error": "Restart runtime service failed: __ERR__:unstable",
+        }
+
+    monkeypatch.setattr(fleet_service, "_build_snapshot", fake_build_snapshot)
+    monkeypatch.setattr(
+        fleet_service, "_resolve_action_devices", fake_resolve_action_devices
+    )
+    monkeypatch.setattr(fleet_service, "_perform_action", fake_perform_action)
+
+    result = asyncio.run(
+        fleet_service.batch_action(
+            SimpleNamespace(),
+            action="deploy",
+        )
+    )
+
+    assert result["success"] is False
+    assert result["summary"].requested_devices == 2
+    assert result["summary"].successful_devices == 1
+    assert result["summary"].failed_devices == 1
+    assert result["results"][1].rolled_back is True
 
 
 def test_build_source_change_preserves_matching_fleet_filename(tmp_path):

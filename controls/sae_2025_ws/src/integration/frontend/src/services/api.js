@@ -24,10 +24,67 @@ export function withTargetId(url, targetId) {
   return withQueryParams(url, { target_id: targetId })
 }
 
+export function withDeviceScope(url, { hostname = '', vehicleName = '' } = {}) {
+  return withQueryParams(url, {
+    hostname,
+    vehicle_name: vehicleName,
+  })
+}
+
 export function withTargetFormData(formData, targetId) {
   if (!formData || !targetId) return formData
   formData.set('target_id', targetId)
   return formData
+}
+
+export function withDeviceFormData(formData, { hostname = '', vehicleName = '' } = {}) {
+  if (!formData) return formData
+  if (hostname) {
+    formData.set('hostname', hostname)
+  }
+  if (vehicleName) {
+    formData.set('vehicle_name', vehicleName)
+  }
+  return formData
+}
+
+export function normalizeFleetActionResult(data) {
+  if (!data || typeof data !== 'object') return data
+  const results = Array.isArray(data.results)
+    ? data.results.filter(result => result && typeof result === 'object')
+    : []
+  if (results.length === 0) return data
+
+  const failedResult = results.find(result => result.success === false) || null
+  const referenceResult = failedResult || results[0] || null
+  if (!referenceResult) return data
+
+  const success = Boolean(referenceResult.success)
+  const activeReleaseId = `${referenceResult.active_release_id || ''}`.trim()
+  const failureError = `${referenceResult.error || data.error || ''}`.trim()
+  const rollbackMessage = !success && referenceResult.rolled_back && activeReleaseId
+    ? `Deploy failed. Rolled back to ${activeReleaseId}.`
+    : ''
+  let error = success
+    ? failureError
+    : failureError || rollbackMessage || 'Failed'
+  if (!success && rollbackMessage) {
+    if (!failureError || failureError.includes(activeReleaseId) || failureError.includes('Rolled back to')) {
+      error = failureError || rollbackMessage
+    } else {
+      error = `${failureError}. ${rollbackMessage}`
+    }
+  }
+  const output = success
+    ? `${referenceResult.output || data.output || ''}`.trim()
+    : `${data.output || ''}`.trim()
+
+  return {
+    ...data,
+    success,
+    error: error || undefined,
+    output: output || undefined,
+  }
 }
 
 export async function requestJson(url, opts) {

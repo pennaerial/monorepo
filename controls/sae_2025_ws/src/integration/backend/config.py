@@ -19,6 +19,10 @@ _BUILD_SOURCE_KINDS = {"none", "github", "local_artifact", "local_codebase"}
 _GITHUB_BUILD_SOURCES = {"release", "actions"}
 
 
+def _normalize_host_identity(value: object) -> str:
+    return str(value or "").strip().rstrip(".").lower()
+
+
 def _normalize_fleet_file(value: object) -> str:
     raw = str(value or "").strip()
     if not raw:
@@ -181,6 +185,42 @@ class TargetRecord:
             overlay_yaml=str(data.get("overlay_yaml", "") or ""),
             service_unit=service_unit,
             enabled=bool(data.get("enabled", True)),
+        )
+
+    @classmethod
+    def for_host(
+        cls,
+        *,
+        hostname: str,
+        default_deploy_root: str,
+        target_id: str | None = None,
+        label: str | None = None,
+        pi_user: str = "penn",
+        deploy_root: str = "",
+        ssh_key: str = "",
+        ssh_pass: str = "",
+        vehicle_name: str = "",
+        overlay_yaml: str = "",
+        service_unit: str = "pennair-autonomy.service",
+        enabled: bool = True,
+    ) -> "TargetRecord":
+        normalized_host = _normalize_host_identity(hostname)
+        identity = _normalize_host_identity(target_id) or normalized_host
+        return cls.from_dict(
+            {
+                "target_id": identity,
+                "label": label or normalized_host or identity,
+                "pi_user": pi_user,
+                "pi_host": normalized_host or identity,
+                "deploy_root": deploy_root or default_deploy_root,
+                "ssh_key": ssh_key,
+                "ssh_pass": ssh_pass,
+                "vehicle_name": vehicle_name,
+                "overlay_yaml": overlay_yaml,
+                "service_unit": service_unit,
+                "enabled": enabled,
+            },
+            default_deploy_root=default_deploy_root,
         )
 
     def ssh_target(self) -> str:
@@ -540,6 +580,9 @@ class BuildSourceRecord:
     size_mb: float | None = None
     branch: str = ""
     artifact_name: str = ""
+    workflow_name: str = ""
+    workflow_event: str = ""
+    workflow_conclusion: str = ""
     local_artifact_path: str = ""
     local_artifact_size_bytes: int | None = None
     codebase_root: str = ""
@@ -572,6 +615,9 @@ class BuildSourceRecord:
             ),
             branch=str(payload.get("branch", "")).strip(),
             artifact_name=str(payload.get("artifact_name", "")).strip(),
+            workflow_name=str(payload.get("workflow_name", "")).strip(),
+            workflow_event=str(payload.get("workflow_event", "")).strip(),
+            workflow_conclusion=str(payload.get("workflow_conclusion", "")).strip(),
             local_artifact_path=str(payload.get("local_artifact_path", "")).strip(),
             local_artifact_size_bytes=(
                 int(payload["local_artifact_size_bytes"])
@@ -618,6 +664,9 @@ class BuildSourceRecord:
             "size_mb": self.size_mb,
             "branch": self.branch,
             "artifact_name": self.artifact_name,
+            "workflow_name": self.workflow_name,
+            "workflow_event": self.workflow_event,
+            "workflow_conclusion": self.workflow_conclusion,
             "local_artifact_path": self.local_artifact_path,
             "local_artifact_size_bytes": self.local_artifact_size_bytes,
             "codebase_root": self.codebase_root,
@@ -656,6 +705,9 @@ class BuildSourceRecord:
             "size_mb": self.size_mb,
             "branch": self.branch or None,
             "artifact_name": self.artifact_name or None,
+            "workflow_name": self.workflow_name or None,
+            "workflow_event": self.workflow_event or None,
+            "workflow_conclusion": self.workflow_conclusion or None,
             "local_artifact_path": self.local_artifact_path or None,
             "local_artifact_exists": local_exists,
             "local_artifact_size_bytes": self.local_artifact_size_bytes,
@@ -730,6 +782,9 @@ class BuildSourceStore:
         size_mb: float | None = None,
         branch: str = "",
         artifact_name: str = "",
+        workflow_name: str = "",
+        workflow_event: str = "",
+        workflow_conclusion: str = "",
     ) -> BuildSourceRecord:
         record = BuildSourceRecord(
             kind="github",
@@ -745,6 +800,9 @@ class BuildSourceStore:
             size_mb=size_mb,
             branch=branch.strip(),
             artifact_name=artifact_name.strip(),
+            workflow_name=workflow_name.strip(),
+            workflow_event=workflow_event.strip(),
+            workflow_conclusion=workflow_conclusion.strip(),
             fleet_file=self._current.fleet_file,
             updated_at=_utc_now(),
         )

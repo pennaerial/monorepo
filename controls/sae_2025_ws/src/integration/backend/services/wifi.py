@@ -4,11 +4,27 @@ import asyncio
 import re
 import subprocess
 
-from ..context import AppContext
+from ..context import AppContext, TargetContext
 
 
-async def wifi_status(ctx: AppContext, *, target_id: str | None = None) -> dict:
-    session = ctx.resolve_target(target_id)
+def _target_context(
+    ctx: AppContext,
+    *,
+    target_ctx: TargetContext | None = None,
+    target_id: str | None = None,
+) -> TargetContext:
+    if target_ctx is not None:
+        return target_ctx
+    return ctx.resolve_target(target_id)
+
+
+async def wifi_status(
+    ctx: AppContext,
+    *,
+    target_ctx: TargetContext | None = None,
+    target_id: str | None = None,
+) -> dict:
+    session = _target_context(ctx, target_ctx=target_ctx, target_id=target_id)
     try:
         result = await session.ssh.run(
             "nmcli -f NAME,TYPE,DEVICE,STATE con show --active | tail -n +2",
@@ -53,8 +69,13 @@ async def wifi_status(ctx: AppContext, *, target_id: str | None = None) -> dict:
         return {"success": False, "error": session.ssh.friendly_error(str(exc))}
 
 
-async def wifi_scan(ctx: AppContext, *, target_id: str | None = None) -> dict:
-    session = ctx.resolve_target(target_id)
+async def wifi_scan(
+    ctx: AppContext,
+    *,
+    target_ctx: TargetContext | None = None,
+    target_id: str | None = None,
+) -> dict:
+    session = _target_context(ctx, target_ctx=target_ctx, target_id=target_id)
     try:
         result = await session.ssh.run(
             r"nmcli -f SSID,SIGNAL,SECURITY dev wifi list --rescan yes | tail -n +2",
@@ -104,9 +125,14 @@ async def wifi_scan(ctx: AppContext, *, target_id: str | None = None) -> dict:
 
 
 async def wifi_connect(
-    ctx: AppContext, *, target_id: str | None = None, ssid: str, password: str
+    ctx: AppContext,
+    *,
+    target_ctx: TargetContext | None = None,
+    target_id: str | None = None,
+    ssid: str,
+    password: str,
 ) -> dict:
-    session = ctx.resolve_target(target_id)
+    session = _target_context(ctx, target_ctx=target_ctx, target_id=target_id)
     hotspot_name = session.ssh.q(ctx.operator_config.hotspot_name)
     try:
         await session.ssh.run(
@@ -131,8 +157,13 @@ async def wifi_connect(
         return {"success": False, "error": session.ssh.friendly_error(str(exc))}
 
 
-async def wifi_hotspot(ctx: AppContext, *, target_id: str | None = None) -> dict:
-    session = ctx.resolve_target(target_id)
+async def wifi_hotspot(
+    ctx: AppContext,
+    *,
+    target_ctx: TargetContext | None = None,
+    target_id: str | None = None,
+) -> dict:
+    session = _target_context(ctx, target_ctx=target_ctx, target_id=target_id)
     try:
         await session.ssh.run(
             "nmcli dev disconnect wlan0 2>/dev/null; sleep 1", timeout=15

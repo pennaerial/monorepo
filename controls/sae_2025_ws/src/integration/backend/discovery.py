@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime, timezone
 import logging
 import socket
 import subprocess
 import sys
+from threading import Lock
 import time
 from dataclasses import dataclass, field
 
@@ -17,6 +19,12 @@ _DISCOVERY_SERVICE_TYPES = (
     "_ssh._tcp.local.",
     "_workstation._tcp.local.",
 )
+_DISCOVERY_REFRESH_INTERVAL_SECONDS = 5.0
+_DISCOVERY_STALE_WINDOW_SECONDS = 300.0
+_DISCOVERY_DEFAULT_TIMEOUT_SECONDS = 2.5 if sys.platform == "darwin" else 1.25
+_DISCOVERY_SNAPSHOT_LOCK = Lock()
+_DISCOVERY_LAST_REFRESH_MONOTONIC = 0.0
+_DISCOVERY_SNAPSHOT: dict[str, dict[str, object]] = {}
 
 
 def _require_zeroconf():
@@ -67,6 +75,98 @@ class _DiscoveredService:
     service_name: str
     service_type: str
     addresses: set[str] = field(default_factory=set)
+
+
+def _utc_now() -> str:
+    return (
+        datetime.now(timezone.utc)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
+
+
+def _snapshot_key(hostname: str) -> str:
+    normalized = _normalize_host(hostname)
+    return normalized or (hostname or "").strip().lower()
+
+
+def _mark_snapshot_stale(now_monotonic: float | None = None) -> None:
+    now_value = now_monotonic if now_monotonic is not None else time.monotonic()
+    for key, entry in list(_DISCOVERY_SNAPSHOT.items()):
+        last_seen = float(entry.get("last_seen_monotonic", 0.0) or 0.0)
+        age = now_value - last_seen if last_seen else _DISCOVERY_STALE_WINDOW_SECONDS + 1
+        if age > _DISCOVERY_STALE_WINDOW_SECONDS:
+            _DISCOVERY_SNAPSHOT.pop(key, None)
+            continue
+        entry["discovery_stale"] = True
+
+
+def _prune_snapshot(now_monotonic: float | None = None) -> None:
+    now_value = now_monotonic if now_monotonic is not None else time.monotonic()
+    for key, entry in list(_DISCOVERY_SNAPSHOT.items()):
+        last_seen = float(entry.get("last_seen_monotonic", 0.0) or 0.0)
+        age = now_value - last_seen if last_seen else _DISCOVERY_STALE_WINDOW_SECONDS + 1
+        if age > _DISCOVERY_STALE_WINDOW_SECONDS:
+            _DISCOVERY_SNAPSHOT.pop(key, None)
+
+
+def _update_snapshot(discovered: list[_DiscoveredService]) -> None:
+    global _DISCOVERY_LAST_REFRESH_MONOTONIC
+
+    now_monotonic = time.monotonic()
+    seen_at = _utc_now()
+    fresh_keys: set[str] = set()
+
+    for service in discovered:
+        key = _snapshot_key(service.hostname)
+        if not key:
+            continue
+        fresh_keys.add(key)
+        _DISCOVERY_SNAPSHOT[key] = {
+            "hardware_id": key,
+            "hostname": service.hostname,
+            "addresses": sorted(service.addresses),
+            "service_name": service.service_name,
+            "service_type": service.service_type,
+            "last_seen_at": seen_at,
+            "last_seen_monotonic": now_monotonic,
+            "discovery_stale": False,
+        }
+
+    for key, entry in list(_DISCOVERY_SNAPSHOT.items()):
+        if key in fresh_keys:
+            entry["discovery_stale"] = False
+            continue
+        last_seen = float(entry.get("last_seen_monotonic", 0.0) or 0.0)
+        age = now_monotonic - last_seen if last_seen else _DISCOVERY_STALE_WINDOW_SECONDS + 1
+        if age > _DISCOVERY_STALE_WINDOW_SECONDS:
+            _DISCOVERY_SNAPSHOT.pop(key, None)
+            continue
+        entry["discovery_stale"] = True
+
+    _DISCOVERY_LAST_REFRESH_MONOTONIC = now_monotonic
+
+
+def _snapshot_cards(ctx: AppContext) -> list[dict[str, object]]:
+    cards: list[dict[str, object]] = []
+    for entry in sorted(
+        _DISCOVERY_SNAPSHOT.values(),
+        key=lambda item: _snapshot_key(str(item.get("hostname", "") or "")),
+    ):
+        hostname = str(entry.get("hostname", "") or "")
+        cards.append(
+            {
+                "hardware_id": str(entry.get("hardware_id") or _snapshot_key(hostname) or hostname),
+                "hostname": hostname,
+                "addresses": list(entry.get("addresses", []) or []),
+                "service_name": entry.get("service_name"),
+                "service_type": entry.get("service_type"),
+                "last_seen_at": entry.get("last_seen_at"),
+                "discovery_stale": bool(entry.get("discovery_stale", False)),
+            }
+        )
+    return cards
 
 
 def _decode_process_output(value: str | bytes | None) -> str:
@@ -272,24 +372,35 @@ def _browse_services(timeout_s: float) -> list[_DiscoveredService]:
 
 
 async def live_hardware_cards(
-    ctx: AppContext, *, timeout_s: float = 1.25
+    ctx: AppContext, *, timeout_s: float | None = None
 ) -> list[dict[str, object]]:
-    discovered = await asyncio.to_thread(_browse_services, timeout_s)
-    cards: list[dict[str, object]] = []
-    for device in discovered:
-        matched_target_id, matched_label = _target_match(
-            ctx, device.hostname, device.addresses
+    refresh_timeout = (
+        _DISCOVERY_DEFAULT_TIMEOUT_SECONDS
+        if timeout_s is None
+        else float(timeout_s)
+    )
+    now_monotonic = time.monotonic()
+    with _DISCOVERY_SNAPSHOT_LOCK:
+        should_refresh = (
+            not _DISCOVERY_SNAPSHOT
+            or now_monotonic - _DISCOVERY_LAST_REFRESH_MONOTONIC
+            >= _DISCOVERY_REFRESH_INTERVAL_SECONDS
         )
-        cards.append(
-            {
-                "hardware_id": _normalize_host(device.hostname) or device.hostname,
-                "hostname": device.hostname,
-                "addresses": sorted(device.addresses),
-                "service_name": device.service_name,
-                "service_type": device.service_type,
-                "matched_target_id": matched_target_id,
-                "matched_label": matched_label,
-                "saved": matched_target_id is not None,
-            }
-        )
-    return cards
+
+    if should_refresh:
+        try:
+            discovered = await asyncio.to_thread(_browse_services, refresh_timeout)
+        except Exception:
+            with _DISCOVERY_SNAPSHOT_LOCK:
+                if not _DISCOVERY_SNAPSHOT:
+                    raise
+                _mark_snapshot_stale(now_monotonic)
+        else:
+            with _DISCOVERY_SNAPSHOT_LOCK:
+                _update_snapshot(discovered)
+    else:
+        with _DISCOVERY_SNAPSHOT_LOCK:
+            _prune_snapshot(now_monotonic)
+
+    with _DISCOVERY_SNAPSHOT_LOCK:
+        return _snapshot_cards(ctx)

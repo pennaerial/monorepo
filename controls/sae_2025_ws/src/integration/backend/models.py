@@ -62,6 +62,8 @@ class LiveHardwareDeviceResponse(BaseModel):
     addresses: list[str] = Field(default_factory=list)
     service_name: str | None = None
     service_type: str | None = None
+    last_seen_at: str | None = None
+    discovery_stale: bool = False
     matched_target_id: str | None = None
     matched_label: str | None = None
     saved: bool = False
@@ -199,14 +201,19 @@ class BuildSourcePayload(BaseModel):
     size_mb: float | None = None
     branch: str | None = None
     artifact_name: str | None = None
+    workflow_name: str | None = None
+    workflow_event: str | None = None
+    workflow_conclusion: str | None = None
     local_artifact_path: str | None = None
     local_artifact_exists: bool | None = None
     local_artifact_size_bytes: int | None = None
     codebase_root: str | None = None
     fleet_file: str | None = None
     available_fleets: list[str] = Field(default_factory=list)
+    fleet_options: list[str] = Field(default_factory=list)
     fleet_catalog_source: str | None = None
     fleet_catalog_error: str | None = None
+    fleet_catalog_stale: bool = False
     fleet_exists: bool | None = None
     fleet_error: str | None = None
     fleet_vehicles: list[FleetVehiclePreview] = Field(default_factory=list)
@@ -226,11 +233,118 @@ class FleetCatalogResponse(BaseModel):
     source_label: str | None = None
     selected_fleet_file: str | None = None
     available_fleets: list[str] = Field(default_factory=list)
+    fleet_options: list[str] = Field(default_factory=list)
     fleet_catalog_source: str | None = None
     fleet_catalog_error: str | None = None
+    fleet_catalog_stale: bool = False
     fleet_exists: bool | None = None
     fleet_error: str | None = None
     fleet_vehicles: list[FleetVehiclePreview] = Field(default_factory=list)
+    error: str | None = None
+
+
+class FleetConnectionSummary(BaseModel):
+    success: bool
+    connected: bool
+    target: str | None = None
+    info: str = ""
+    error: str | None = None
+
+
+class FleetCurrentBuildSummary(BaseModel):
+    success: bool
+    installed: bool
+    info: str
+    release_id: str | None = None
+
+
+class FleetRuntimeSummary(BaseModel):
+    success: bool
+    running: bool
+    state: str
+    pid: str | None = None
+    error: str | None = None
+
+
+class FleetReadinessSummary(BaseModel):
+    connected: bool = False
+    build_installed: bool = False
+    runtime_ready: bool = False
+    vehicle_assigned: bool = False
+    ready: bool = False
+    notes: list[str] = Field(default_factory=list)
+
+
+class FleetBoardDeviceResponse(LiveHardwareDeviceResponse):
+    target_id: str | None = None
+    vehicle_name: str | None = None
+    fleet_vehicle: FleetVehiclePreview | None = None
+    connection: FleetConnectionSummary | None = None
+    current_build: FleetCurrentBuildSummary | None = None
+    runtime: FleetRuntimeSummary | None = None
+    readiness: FleetReadinessSummary | None = None
+
+
+class FleetBoardSummary(BaseModel):
+    total_devices: int = 0
+    saved_devices: int = 0
+    stale_devices: int = 0
+    connected_devices: int = 0
+    build_installed_devices: int = 0
+    running_devices: int = 0
+    ready_devices: int = 0
+
+
+class FleetBoardResponse(BaseModel):
+    success: bool
+    build_source: BuildSourceResponse
+    fleet_catalog: FleetCatalogResponse
+    fleet_vehicles: list[FleetVehiclePreview] = Field(default_factory=list)
+    devices: list[FleetBoardDeviceResponse] = Field(default_factory=list)
+    summary: FleetBoardSummary = Field(default_factory=FleetBoardSummary)
+    error: str | None = None
+
+
+class FleetDeviceSelection(BaseModel):
+    target_id: str | None = None
+    hostname: str | None = None
+    vehicle_name: str | None = None
+    label: str | None = None
+    pi_user: str | None = None
+    deploy_root: str | None = None
+    service_unit: str | None = None
+    ssh_key: str | None = None
+    ssh_pass: str | None = None
+
+
+class FleetBatchRequest(BaseModel):
+    devices: list[FleetDeviceSelection] = Field(default_factory=list)
+
+
+class FleetActionDeviceResponse(FleetBoardDeviceResponse):
+    action: str
+    success: bool
+    attempted_release_id: str | None = None
+    active_release_id: str | None = None
+    rolled_back: bool = False
+    output: str | None = None
+    error: str | None = None
+
+
+class FleetActionSummary(BaseModel):
+    requested_devices: int = 0
+    successful_devices: int = 0
+    failed_devices: int = 0
+
+
+class FleetActionResponse(BaseModel):
+    success: bool
+    action: str
+    build_source: BuildSourceResponse
+    fleet_catalog: FleetCatalogResponse
+    fleet_vehicles: list[FleetVehiclePreview] = Field(default_factory=list)
+    results: list[FleetActionDeviceResponse] = Field(default_factory=list)
+    summary: FleetActionSummary = Field(default_factory=FleetActionSummary)
     error: str | None = None
 
 

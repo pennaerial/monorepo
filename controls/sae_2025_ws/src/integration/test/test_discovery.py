@@ -20,6 +20,24 @@ from backend import discovery  # noqa: E402
 from backend.config import InventoryStore, OperatorConfig  # noqa: E402
 
 
+def _reset_discovery_snapshot() -> None:
+    discovery._DISCOVERY_SNAPSHOT.clear()
+    discovery._DISCOVERY_LAST_REFRESH_MONOTONIC = 0.0
+
+
+def _assert_device_card(device: dict[str, object], *, discovery_stale: bool = False) -> None:
+    assert isinstance(device.get("last_seen_at"), str)
+    assert device["discovery_stale"] is discovery_stale
+
+
+def setup_function(_function):
+    _reset_discovery_snapshot()
+
+
+def teardown_function(_function):
+    _reset_discovery_snapshot()
+
+
 def _make_operator(tmp_path: Path) -> OperatorConfig:
     return OperatorConfig(
         github_repo="pennaerial/monorepo",
@@ -57,7 +75,7 @@ def _make_context(tmp_path: Path) -> SimpleNamespace:
     return SimpleNamespace(list_targets=inventory.list_targets)
 
 
-def test_live_hardware_cards_match_inventory_hosts(tmp_path, monkeypatch):
+def test_live_hardware_cards_return_hostname_scoped_devices(tmp_path, monkeypatch):
     ctx = _make_context(tmp_path)
 
     monkeypatch.setattr(
@@ -81,31 +99,31 @@ def test_live_hardware_cards_match_inventory_hosts(tmp_path, monkeypatch):
 
     devices = asyncio.run(discovery.live_hardware_cards(ctx, timeout_s=0))
 
-    assert devices == [
-        {
-            "hardware_id": "pi-1",
-            "hostname": "pi-1.local",
-            "addresses": ["10.0.0.2"],
-            "service_name": "Primary._ssh._tcp.local.",
-            "service_type": "_ssh._tcp.local.",
-            "matched_target_id": "pi-1",
-            "matched_label": "Primary Pi",
-            "saved": True,
-        },
-        {
-            "hardware_id": "payload",
-            "hostname": "payload.local",
-            "addresses": ["10.0.0.3"],
-            "service_name": "Payload._ssh._tcp.local.",
-            "service_type": "_ssh._tcp.local.",
-            "matched_target_id": None,
-            "matched_label": None,
-            "saved": False,
-        },
-    ]
+    assert len(devices) == 2
+    devices_by_host = {device["hostname"]: device for device in devices}
+    assert devices_by_host["pi-1.local"] == {
+        "hardware_id": "pi-1",
+        "hostname": "pi-1.local",
+        "addresses": ["10.0.0.2"],
+        "service_name": "Primary._ssh._tcp.local.",
+        "service_type": "_ssh._tcp.local.",
+        "last_seen_at": devices_by_host["pi-1.local"]["last_seen_at"],
+        "discovery_stale": False,
+    }
+    assert devices_by_host["payload.local"] == {
+        "hardware_id": "payload",
+        "hostname": "payload.local",
+        "addresses": ["10.0.0.3"],
+        "service_name": "Payload._ssh._tcp.local.",
+        "service_type": "_ssh._tcp.local.",
+        "last_seen_at": devices_by_host["payload.local"]["last_seen_at"],
+        "discovery_stale": False,
+    }
+    _assert_device_card(devices_by_host["pi-1.local"])
+    _assert_device_card(devices_by_host["payload.local"])
 
 
-def test_live_hardware_cards_match_saved_ip_hosts(tmp_path, monkeypatch):
+def test_live_hardware_cards_ignore_inventory_matches(tmp_path, monkeypatch):
     operator = _make_operator(tmp_path)
     inventory = InventoryStore(
         operator.inventory_path,
@@ -143,9 +161,9 @@ def test_live_hardware_cards_match_saved_ip_hosts(tmp_path, monkeypatch):
 
     devices = asyncio.run(discovery.live_hardware_cards(ctx, timeout_s=0))
 
-    assert devices[0]["matched_target_id"] == "payload"
-    assert devices[0]["matched_label"] == "Payload Pi"
-    assert devices[0]["saved"] is True
+    assert devices[0]["hostname"] == "payload.local"
+    assert devices[0]["hardware_id"] == "payload"
+    _assert_device_card(devices[0])
 
 
 def test_parse_dns_sd_browse_output_extracts_instances():

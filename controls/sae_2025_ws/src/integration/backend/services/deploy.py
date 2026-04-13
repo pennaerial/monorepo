@@ -46,9 +46,24 @@ _SHARED_OVERLAY_KEYS = {
 _UAV_OVERLAY_KEYS = _SHARED_OVERLAY_KEYS | {"px4_airframe_id", "px4_namespace"}
 _PAYLOAD_OVERLAY_KEYS = _SHARED_OVERLAY_KEYS | {"payload_controller"}
 _BUILD_LIST_CACHE_TTL_SECONDS = 60.0
+_FLEET_CATALOG_CACHE_TTL_SECONDS = 60.0
 _COMMIT_SUBJECT_CACHE_TTL_SECONDS = 1800.0
+_WORKFLOW_RUN_CACHE_TTL_SECONDS = 1800.0
 _BUILD_LIST_CACHE: dict[tuple[object, ...], tuple[float, dict[str, object]]] = {}
+_FLEET_CATALOG_CACHE: dict[str, tuple[float, dict[str, object]]] = {}
 _COMMIT_SUBJECT_CACHE: dict[str, tuple[float, str | None]] = {}
+_WORKFLOW_RUN_CACHE: dict[str, tuple[float, dict[str, object] | None]] = {}
+
+
+def _target_context(
+    ctx: AppContext,
+    *,
+    target_ctx: TargetContext | None = None,
+    target_id: str | None = None,
+) -> TargetContext:
+    if target_ctx is not None:
+        return target_ctx
+    return ctx.resolve_target(target_id)
 
 
 def _selected_fleet_file(ctx: AppContext) -> str:
@@ -66,11 +81,9 @@ def _source_catalog_key(current) -> str:
             current.run_id,
             current.sha,
             current.download_url,
-            current.name,
             current.artifact_name,
             current.local_artifact_path,
             current.codebase_root,
-            current.updated_at,
         )
     )
     return hashlib.sha1(payload.encode("utf-8")).hexdigest()[:12]
@@ -264,7 +277,7 @@ def _fleet_catalog_lookup_from_local_codebase(
     return _fleet_catalog_lookup_from_paths(paths), str(root)
 
 
-def _fleet_catalog_lookup_from_current_source(
+def _fleet_catalog_lookup_uncached_from_current_source(
     ctx: AppContext,
 ) -> tuple[dict[str, Path], str | None, str | None]:
     current = ctx.build_source_store.current()
@@ -327,16 +340,64 @@ def _fleet_catalog_lookup_from_current_source(
         catalog = _fleet_catalog_lookup_from_paths(_catalog_yaml_paths(extract_dir))
         return catalog, archive_url, None
     except Exception as exc:
-        return {}, archive_url, str(exc)
+        return (
+            {},
+            archive_url,
+            _github_fleet_catalog_error_message(
+                exc, token_configured=bool(ctx.operator_config.github_token)
+            )
+            or str(exc),
+        )
+
+
+def _fleet_catalog_lookup_from_current_source(
+    ctx: AppContext,
+) -> tuple[dict[str, Path], str | None, str | None, bool]:
+    current = ctx.build_source_store.current()
+    if current.kind == "none":
+        return {}, None, None, False
+
+    cache_key = _source_catalog_key(current)
+    cached = _fleet_catalog_cache_get(cache_key)
+    if cached is not None:
+        return (
+            deepcopy(cached.get("catalog", {})),
+            cached.get("source"),
+            None,
+            False,
+        )
+
+    catalog, catalog_source, catalog_error = _fleet_catalog_lookup_uncached_from_current_source(
+        ctx
+    )
+    if catalog and not catalog_error:
+        _fleet_catalog_cache_set(
+            cache_key,
+            {
+                "catalog": catalog,
+                "source": catalog_source,
+            },
+        )
+        return catalog, catalog_source, None, False
+
+    cached_stale = _fleet_catalog_cache_get(cache_key, allow_stale=True)
+    if cached_stale is not None and catalog_error:
+        return (
+            deepcopy(cached_stale.get("catalog", {})),
+            cached_stale.get("source"),
+            catalog_error,
+            True,
+        )
+    return catalog, catalog_source, catalog_error, False
 
 
 def _fleet_catalog_from_current_source(
     ctx: AppContext,
-) -> tuple[list[str], str | None, str | None]:
-    catalog, catalog_source, catalog_error = _fleet_catalog_lookup_from_current_source(
-        ctx
+) -> tuple[list[str], str | None, str | None, bool]:
+    catalog, catalog_source, catalog_error, catalog_stale = (
+        _fleet_catalog_lookup_from_current_source(ctx)
     )
-    return sorted(catalog), catalog_source, catalog_error
+    return sorted(catalog), catalog_source, catalog_error, catalog_stale
 
 
 def _resolve_catalog_fleet_path(ctx: AppContext, fleet_file: str) -> tuple[str, Path]:
@@ -348,7 +409,9 @@ def _resolve_catalog_fleet_path(ctx: AppContext, fleet_file: str) -> tuple[str, 
     if current_kind == "none":
         raise ValueError("Select a build source before selecting a fleet.")
 
-    catalog, _, catalog_error = _fleet_catalog_lookup_from_current_source(ctx)
+    catalog, _, catalog_error, _catalog_stale = _fleet_catalog_lookup_from_current_source(
+        ctx
+    )
     if catalog_error:
         raise ValueError(catalog_error)
     if not catalog:
@@ -374,7 +437,7 @@ def _reconcile_selected_fleet_with_current_source(
             ctx.build_source_store.set_fleet_file(fleet_file="")
         return
 
-    catalog, _, catalog_error = _fleet_catalog_from_current_source(ctx)
+    catalog, _, catalog_error, _catalog_stale = _fleet_catalog_from_current_source(ctx)
     if catalog_error or selected not in set(catalog):
         ctx.build_source_store.set_fleet_file(fleet_file="")
         return
@@ -446,6 +509,27 @@ def _build_list_cache_set(
     return deepcopy(cached_payload)
 
 
+def _fleet_catalog_cache_get(
+    cache_key: str, *, allow_stale: bool = False
+) -> dict[str, object] | None:
+    cached = _FLEET_CATALOG_CACHE.get(cache_key)
+    if cached is None:
+        return None
+    cached_at, payload = cached
+    age = monotonic() - cached_at
+    if not allow_stale and age > _FLEET_CATALOG_CACHE_TTL_SECONDS:
+        return None
+    return deepcopy(payload)
+
+
+def _fleet_catalog_cache_set(
+    cache_key: str, payload: dict[str, object]
+) -> dict[str, object]:
+    cached_payload = deepcopy(payload)
+    _FLEET_CATALOG_CACHE[cache_key] = (monotonic(), cached_payload)
+    return deepcopy(cached_payload)
+
+
 def _commit_subject_cache_get(commit_sha: str) -> str | None | object:
     cached = _COMMIT_SUBJECT_CACHE.get(commit_sha)
     if cached is None:
@@ -459,6 +543,21 @@ def _commit_subject_cache_get(commit_sha: str) -> str | None | object:
 
 def _commit_subject_cache_set(commit_sha: str, subject: str | None) -> None:
     _COMMIT_SUBJECT_CACHE[commit_sha] = (monotonic(), subject)
+
+
+def _workflow_run_cache_get(run_id: str) -> dict[str, object] | None | object:
+    cached = _WORKFLOW_RUN_CACHE.get(run_id)
+    if cached is None:
+        return ...
+    cached_at, payload = cached
+    if monotonic() - cached_at > _WORKFLOW_RUN_CACHE_TTL_SECONDS:
+        _WORKFLOW_RUN_CACHE.pop(run_id, None)
+        return ...
+    return deepcopy(payload)
+
+
+def _workflow_run_cache_set(run_id: str, payload: dict[str, object] | None) -> None:
+    _WORKFLOW_RUN_CACHE[run_id] = (monotonic(), deepcopy(payload))
 
 
 def _github_error_message(
@@ -497,7 +596,7 @@ def _github_error_message(
             retry_hint = f" GitHub resets at {reset_time:%Y-%m-%d %H:%M:%S UTC}."
 
     auth_hint = (
-        " Configure `GITHUB_TOKEN` in Operator Defaults under the Inventory tab or the backend environment for higher limits."
+        " Configure `GITHUB_TOKEN` in Operator Defaults or the backend environment for higher limits."
         if not token_configured
         else ""
     )
@@ -519,6 +618,24 @@ def _github_error_message(
         "GitHub API rate limit exceeded while loading deployable builds."
         f"{retry_hint}{auth_hint}"
     ).strip()
+
+
+def _github_fleet_catalog_error_message(
+    exc: Exception,
+    *,
+    token_configured: bool,
+    using_cached_response: bool = False,
+) -> str | None:
+    base = _github_error_message(
+        exc,
+        token_configured=token_configured,
+        using_cached_response=using_cached_response,
+    )
+    if not base:
+        return None
+    if using_cached_response:
+        return base.replace("cached build list", "cached fleet catalog")
+    return base.replace("deployable builds", "fleet files")
 
 
 def sanitize_artifact_name(filename: str) -> str:
@@ -547,18 +664,21 @@ def _build_source_payload(ctx: AppContext) -> dict[str, object]:
     payload["fleet_file"] = fleet_file or None
     payload.update(_fleet_preview(ctx, fleet_file))
     try:
-        available_fleets, fleet_catalog_source, fleet_catalog_error = (
+        available_fleets, fleet_catalog_source, fleet_catalog_error, fleet_catalog_stale = (
             _fleet_catalog_from_current_source(ctx)
         )
     except Exception as exc:
-        available_fleets, fleet_catalog_source, fleet_catalog_error = (
+        available_fleets, fleet_catalog_source, fleet_catalog_error, fleet_catalog_stale = (
             [],
             None,
             str(exc),
+            False,
         )
     payload["available_fleets"] = available_fleets
+    payload["fleet_options"] = available_fleets
     payload["fleet_catalog_source"] = fleet_catalog_source
     payload["fleet_catalog_error"] = fleet_catalog_error
+    payload["fleet_catalog_stale"] = fleet_catalog_stale
     return payload
 
 
@@ -1308,8 +1428,10 @@ DEPLOY_ROOT={target_ctx.ssh.q(paths["deploy_root"])}
 cd "$DEPLOY_ROOT"
 mkdir -p "$DEPLOY_ROOT/state/logs"
 export ROS_LOG_DIR="$DEPLOY_ROOT/state/logs"
+set +u
 source /opt/ros/humble/setup.bash
 source "$DEPLOY_ROOT/current/install/setup.bash"
+set -u
 exec ros2 launch uav fleet.launch.py fleet_file:="$DEPLOY_ROOT/config/runtime_fleet.yaml"
 """
 
@@ -1528,9 +1650,37 @@ async def _activate_release(
             exit 1
         fi
         sudo -n systemctl restart {target_ctx.target.service_unit}
-        state="$(sudo -n systemctl is-active {target_ctx.target.service_unit} 2>/dev/null || true)"
-        if [ "$state" != "active" ]; then
-            echo "__ERR__:inactive:$state"
+        deadline=$((SECONDS + 8))
+        stable_main_pid=""
+        stable_restarts=""
+        last_active_state=""
+        last_sub_state=""
+        last_main_pid=""
+        last_restart_count=""
+        while [ "$SECONDS" -lt "$deadline" ]; do
+            active_state="$(sudo -n systemctl show {target_ctx.target.service_unit} -p ActiveState --value 2>/dev/null || true)"
+            sub_state="$(sudo -n systemctl show {target_ctx.target.service_unit} -p SubState --value 2>/dev/null || true)"
+            main_pid="$(sudo -n systemctl show {target_ctx.target.service_unit} -p MainPID --value 2>/dev/null || echo 0)"
+            restart_count="$(sudo -n systemctl show {target_ctx.target.service_unit} -p NRestarts --value 2>/dev/null || echo 0)"
+            last_active_state="$active_state"
+            last_sub_state="$sub_state"
+            last_main_pid="$main_pid"
+            last_restart_count="$restart_count"
+            if [ "$active_state" != "active" ] || [ "$sub_state" != "running" ] || [ -z "$main_pid" ] || [ "$main_pid" = "0" ]; then
+                sleep 1
+                continue
+            fi
+            if [ -z "$stable_main_pid" ]; then
+                stable_main_pid="$main_pid"
+                stable_restarts="$restart_count"
+            elif [ "$main_pid" != "$stable_main_pid" ] || [ "$restart_count" != "$stable_restarts" ]; then
+                echo "__ERR__:unstable:$active_state:$sub_state:$main_pid:$restart_count"
+                exit 1
+            fi
+            sleep 1
+        done
+        if [ -z "$stable_main_pid" ]; then
+            echo "__ERR__:inactive:${{last_active_state:-unknown}}:${{last_sub_state:-unknown}}:${{last_main_pid:-0}}:${{last_restart_count:-0}}"
             exit 1
         fi
         echo "ACTIVE"
@@ -1679,13 +1829,12 @@ PY
 async def _deploy_artifact_path(
     ctx: AppContext,
     *,
-    target_id: str | None,
+    target_ctx: TargetContext,
     local_path: str,
     artifact_name: str,
     source_type: str,
     source_label: str,
 ) -> dict:
-    target_ctx = ctx.resolve_target(target_id)
     await _ensure_remote_layout(target_ctx)
     await _copy_artifact_to_pi(target_ctx, local_path, artifact_name)
 
@@ -1737,14 +1886,26 @@ async def _deploy_artifact_path(
     )
     await _ensure_runtime_service(target_ctx)
     await _ensure_runtime_prereqs(ctx, target_ctx)
-    await _activate_release(
-        target_ctx,
-        release_dir=release["release_dir"],
-        previous_target=release["previous_target"],
-    )
+    attempted_release_id = release["release_id"]
+    try:
+        await _activate_release(
+            target_ctx,
+            release_dir=release["release_dir"],
+            previous_target=release["previous_target"],
+        )
+    except Exception as exc:
+        return {
+            "success": False,
+            "attempted_release_id": attempted_release_id,
+            "rolled_back": bool(release.get("previous_target")),
+            "error": target_ctx.ssh.friendly_error(str(exc)),
+        }
 
     return {
         "success": True,
+        "attempted_release_id": attempted_release_id,
+        "active_release_id": attempted_release_id,
+        "rolled_back": False,
         "output": (
             f"Deployed {artifact_name} to {target_ctx.target.target_id} "
             f"({release['release_id']})"
@@ -1755,14 +1916,13 @@ async def _deploy_artifact_path(
 async def _deploy_source_bundle_path(
     ctx: AppContext,
     *,
-    target_id: str | None,
+    target_ctx: TargetContext,
     local_bundle_path: str,
     bundle_name: str,
     package_names: list[str],
     source_type: str,
     source_label: str,
 ) -> dict:
-    target_ctx = ctx.resolve_target(target_id)
     await _ensure_remote_layout(target_ctx)
     await _ensure_source_build_prereqs(ctx, target_ctx)
     await _copy_file_to_pi(
@@ -1831,14 +1991,26 @@ async def _deploy_source_bundle_path(
     )
     await _ensure_runtime_service(target_ctx)
     await _ensure_runtime_prereqs(ctx, target_ctx)
-    await _activate_release(
-        target_ctx,
-        release_dir=release["release_dir"],
-        previous_target=release["previous_target"],
-    )
+    attempted_release_id = release["release_id"]
+    try:
+        await _activate_release(
+            target_ctx,
+            release_dir=release["release_dir"],
+            previous_target=release["previous_target"],
+        )
+    except Exception as exc:
+        return {
+            "success": False,
+            "attempted_release_id": attempted_release_id,
+            "rolled_back": bool(release.get("previous_target")),
+            "error": target_ctx.ssh.friendly_error(str(exc)),
+        }
 
     return {
         "success": True,
+        "attempted_release_id": attempted_release_id,
+        "active_release_id": attempted_release_id,
+        "rolled_back": False,
         "output": (
             f"Built and deployed source bundle {bundle_name} to "
             f"{target_ctx.target.target_id} ({release['release_id']})"
@@ -1849,7 +2021,8 @@ async def _deploy_source_bundle_path(
 async def upload_source_bundle(
     ctx: AppContext,
     *,
-    target_id: str | None,
+    target_ctx: TargetContext | None = None,
+    target_id: str | None = None,
     filename: str,
     file_bytes: bytes,
 ) -> dict:
@@ -1873,7 +2046,7 @@ async def upload_source_bundle(
         )
         return await _deploy_source_bundle_path(
             ctx,
-            target_id=target_id,
+            target_ctx=_target_context(ctx, target_ctx=target_ctx, target_id=target_id),
             local_bundle_path=normalized_bundle,
             bundle_name=sanitized_name,
             package_names=package_names,
@@ -1895,17 +2068,18 @@ async def upload_source_bundle(
 async def deploy_local_codebase(
     ctx: AppContext,
     *,
-    target_id: str | None,
+    target_ctx: TargetContext | None = None,
+    target_id: str | None = None,
 ) -> dict:
     local_bundle = ""
     try:
-        target_ctx = ctx.resolve_target(target_id)
+        target_ctx = _target_context(ctx, target_ctx=target_ctx, target_id=target_id)
         local_bundle, package_names, bundle_name = _build_local_source_bundle(
             ctx, target_ctx
         )
         return await _deploy_source_bundle_path(
             ctx,
-            target_id=target_id,
+            target_ctx=target_ctx,
             local_bundle_path=local_bundle,
             bundle_name=bundle_name,
             package_names=package_names,
@@ -1927,9 +2101,12 @@ async def get_build_source(ctx: AppContext) -> dict[str, object]:
 
 async def get_fleet_catalog(ctx: AppContext) -> dict[str, object]:
     current = ctx.build_source_store.current()
-    available_fleets, catalog_source, catalog_error = (
-        _fleet_catalog_from_current_source(ctx)
-    )
+    (
+        available_fleets,
+        catalog_source,
+        catalog_error,
+        catalog_stale,
+    ) = _fleet_catalog_from_current_source(ctx)
     selected_fleet_file = (
         _selected_fleet_file(ctx) if current.kind != "none" else ""
     ) or None
@@ -1940,8 +2117,10 @@ async def get_fleet_catalog(ctx: AppContext) -> dict[str, object]:
         "source_label": current.summary(),
         "selected_fleet_file": selected_fleet_file,
         "available_fleets": available_fleets,
+        "fleet_options": available_fleets,
         "fleet_catalog_source": catalog_source,
         "fleet_catalog_error": catalog_error,
+        "fleet_catalog_stale": catalog_stale,
         "fleet_exists": fleet_preview.get("fleet_exists"),
         "fleet_error": fleet_preview.get("fleet_error"),
         "fleet_vehicles": fleet_preview.get("fleet_vehicles", []),
@@ -1964,6 +2143,9 @@ async def set_github_build_source(
     size_mb: float | None = None,
     branch: str = "",
     artifact_name: str = "",
+    workflow_name: str = "",
+    workflow_event: str = "",
+    workflow_conclusion: str = "",
 ) -> dict[str, object]:
     try:
         previous_fleet_file = (
@@ -1984,6 +2166,9 @@ async def set_github_build_source(
             size_mb=size_mb,
             branch=branch,
             artifact_name=artifact_name,
+            workflow_name=workflow_name,
+            workflow_event=workflow_event,
+            workflow_conclusion=workflow_conclusion,
         )
         _reconcile_selected_fleet_with_current_source(ctx, previous_fleet_file)
         return _build_source_response(
@@ -2066,7 +2251,7 @@ async def set_global_fleet_file(
         current_kind = ctx.build_source_store.current().kind
         if current_kind == "none":
             raise ValueError("Select a build source before selecting a fleet.")
-        catalog_lookup, catalog_source, catalog_error = (
+        catalog_lookup, catalog_source, catalog_error, _catalog_stale = (
             _fleet_catalog_lookup_from_current_source(ctx)
         )
         if catalog_error:
@@ -2092,6 +2277,7 @@ async def set_global_fleet_file(
         if response.get("source"):
             response["source"]["fleet_catalog_source"] = catalog_source
             response["source"]["available_fleets"] = sorted(catalog_lookup)
+            response["source"]["fleet_options"] = sorted(catalog_lookup)
         return response
     except Exception as exc:
         return _build_source_response(
@@ -2120,16 +2306,18 @@ async def clear_build_source(ctx: AppContext) -> dict[str, object]:
 async def deploy_selected_source(
     ctx: AppContext,
     *,
-    target_id: str | None,
+    target_ctx: TargetContext | None = None,
+    target_id: str | None = None,
 ) -> dict:
     current = ctx.build_source_store.current()
     if current.kind == "none":
         return {"success": False, "error": "No build source selected"}
+    target_ctx = _target_context(ctx, target_ctx=target_ctx, target_id=target_id)
 
     if current.kind == "github":
         return await download_build(
             ctx,
-            target_id=target_id,
+            target_ctx=target_ctx,
             tag=current.tag,
             source=current.github_source,
             artifact_id=current.artifact_id,
@@ -2147,7 +2335,7 @@ async def deploy_selected_source(
             }
         return await _deploy_artifact_path(
             ctx,
-            target_id=target_id,
+            target_ctx=target_ctx,
             local_path=str(artifact_path),
             artifact_name=current.artifact_name,
             source_type="local-artifact",
@@ -2155,7 +2343,7 @@ async def deploy_selected_source(
         )
 
     if current.kind == "local_codebase":
-        return await deploy_local_codebase(ctx, target_id=target_id)
+        return await deploy_local_codebase(ctx, target_ctx=target_ctx)
 
     return {
         "success": False,
@@ -2163,8 +2351,13 @@ async def deploy_selected_source(
     }
 
 
-async def current_build(ctx: AppContext, *, target_id: str | None = None) -> dict:
-    target_ctx = ctx.resolve_target(target_id)
+async def current_build(
+    ctx: AppContext,
+    *,
+    target_ctx: TargetContext | None = None,
+    target_id: str | None = None,
+) -> dict:
+    target_ctx = _target_context(ctx, target_ctx=target_ctx, target_id=target_id)
     try:
         ctx.require_deploy_context()
         paths = target_ctx.target.deploy_paths()
@@ -2277,7 +2470,8 @@ async def current_build(ctx: AppContext, *, target_id: str | None = None) -> dic
 async def upload_build(
     ctx: AppContext,
     *,
-    target_id: str | None,
+    target_ctx: TargetContext | None = None,
+    target_id: str | None = None,
     filename: str,
     file_bytes: bytes,
 ) -> dict:
@@ -2289,7 +2483,7 @@ async def upload_build(
             tmp_path = tmp.name
         return await _deploy_artifact_path(
             ctx,
-            target_id=target_id,
+            target_ctx=_target_context(ctx, target_ctx=target_ctx, target_id=target_id),
             local_path=tmp_path,
             artifact_name=artifact_name,
             source_type="upload",
@@ -2459,6 +2653,8 @@ async def list_builds(
         artifact_builds: list[dict[str, object]] = []
         commit_lookup_warning: str | None = None
         commit_lookup_rate_limited = False
+        workflow_lookup_warning: str | None = None
+        workflow_lookup_rate_limited = False
 
         async def _collect_releases(client) -> list[dict[str, object]]:
             collected: list[dict[str, object]] = []
@@ -2546,14 +2742,49 @@ async def list_builds(
                     return None
                 return None
 
+        async def _workflow_run_for(client, run_id: str) -> dict[str, object] | None:
+            nonlocal workflow_lookup_warning, workflow_lookup_rate_limited
+            if not run_id:
+                return None
+            cached_run = _workflow_run_cache_get(run_id)
+            if cached_run is not ...:
+                return cached_run
+            if workflow_lookup_rate_limited:
+                return None
+            try:
+                response = await client.get(
+                    f"https://api.github.com/repos/{ctx.operator_config.github_repo}/actions/runs/{run_id}",
+                    headers=_github_headers(ctx),
+                )
+                response.raise_for_status()
+                payload = response.json() or {}
+                workflow_payload = payload if isinstance(payload, dict) else None
+                _workflow_run_cache_set(run_id, workflow_payload)
+                return workflow_payload
+            except Exception as exc:
+                warning = _github_error_message(
+                    exc,
+                    token_configured=token_configured,
+                    during_commit_lookup=True,
+                )
+                if warning:
+                    workflow_lookup_rate_limited = True
+                    workflow_lookup_warning = (
+                        warning.replace("commit-title", "workflow metadata")
+                        .replace("fallback titles", "fallback workflow labels")
+                    )
+                _workflow_run_cache_set(run_id, None)
+                return None
+
         async with httpx.AsyncClient(timeout=20) as client:
             releases = await _collect_releases(client)
             artifact_payload_rows = await _collect_artifacts(client)
 
             release_commit_shas: list[str] = []
-            artifact_commit_shas: list[str] = []
             release_rows: list[tuple[dict, str]] = []
-            artifact_rows: list[tuple[dict, str]] = []
+            raw_artifact_rows: list[tuple[dict, dict[str, object], str]] = []
+            workflow_run_lookup: dict[str, dict[str, object] | None] = {}
+            artifact_rows: list[tuple[dict, dict[str, object], str]] = []
 
             for rel in releases:
                 tag_name = str(rel.get("tag_name", "")).strip()
@@ -2572,8 +2803,22 @@ async def list_builds(
                 workflow_run = artifact.get("workflow_run") or {}
                 if not isinstance(workflow_run, dict):
                     workflow_run = {}
-                commit_sha = str(workflow_run.get("head_sha", "")).strip()
-                artifact_rows.append((artifact, commit_sha))
+                run_id = str(workflow_run.get("id", "")).strip()
+                raw_artifact_rows.append((artifact, workflow_run, run_id))
+
+            for run_id in {run_id for _, _, run_id in raw_artifact_rows if run_id}:
+                workflow_run_lookup[run_id] = await _workflow_run_for(client, run_id)
+
+            artifact_commit_shas: list[str] = []
+            for artifact, workflow_run, run_id in raw_artifact_rows:
+                resolved_workflow_run = workflow_run_lookup.get(run_id) or workflow_run
+                if not isinstance(resolved_workflow_run, dict):
+                    resolved_workflow_run = workflow_run
+                commit_sha = str(
+                    resolved_workflow_run.get("head_sha", "")
+                    or workflow_run.get("head_sha", "")
+                ).strip()
+                artifact_rows.append((artifact, resolved_workflow_run, commit_sha))
                 if commit_sha:
                     artifact_commit_shas.append(commit_sha)
 
@@ -2618,10 +2863,7 @@ async def list_builds(
             ):
                 releases_builds.append(item)
 
-        for artifact, commit_sha in artifact_rows:
-            workflow_run = artifact.get("workflow_run") or {}
-            if not isinstance(workflow_run, dict):
-                workflow_run = {}
+        for artifact, workflow_run, commit_sha in artifact_rows:
             item = {
                 "source": "actions",
                 "tag": f"run-{workflow_run.get('id', artifact.get('id'))}",
@@ -2676,7 +2918,7 @@ async def list_builds(
             else artifact_page,
             "artifact_page_size": artifact_page_size,
             "artifact_has_more": artifact_has_more,
-            "error": commit_lookup_warning,
+            "error": workflow_lookup_warning or commit_lookup_warning,
         }
         return _build_list_cache_set(cache_key, response_payload)
     except Exception as exc:
@@ -2704,7 +2946,8 @@ async def list_builds(
 async def download_build(
     ctx: AppContext,
     *,
-    target_id: str | None,
+    target_ctx: TargetContext | None = None,
+    target_id: str | None = None,
     tag: str = "",
     source: str = "release",
     artifact_id: str = "",
@@ -2749,7 +2992,9 @@ async def download_build(
                 artifact_name = sanitize_artifact_name(local_tarball.name)
                 result = await _deploy_artifact_path(
                     ctx,
-                    target_id=target_id,
+                    target_ctx=_target_context(
+                        ctx, target_ctx=target_ctx, target_id=target_id
+                    ),
                     local_path=str(local_tarball),
                     artifact_name=artifact_name,
                     source_type="actions",
@@ -2779,7 +3024,7 @@ async def download_build(
 
         return await _deploy_artifact_path(
             ctx,
-            target_id=target_id,
+            target_ctx=_target_context(ctx, target_ctx=target_ctx, target_id=target_id),
             local_path=tmp_path,
             artifact_name=artifact_name,
             source_type="release",
@@ -2796,8 +3041,13 @@ async def download_build(
             shutil.rmtree(extract_dir, ignore_errors=True)
 
 
-async def rollback_build(ctx: AppContext, *, target_id: str | None = None) -> dict:
-    target_ctx = ctx.resolve_target(target_id)
+async def rollback_build(
+    ctx: AppContext,
+    *,
+    target_ctx: TargetContext | None = None,
+    target_id: str | None = None,
+) -> dict:
+    target_ctx = _target_context(ctx, target_ctx=target_ctx, target_id=target_id)
     try:
         paths = target_ctx.target.deploy_paths()
         rollback_cmd = f"""

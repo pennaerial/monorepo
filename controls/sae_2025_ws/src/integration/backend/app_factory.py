@@ -13,6 +13,7 @@ from .routers import (
     connection_router,
     discovery_router,
     deploy_router,
+    fleet_router,
     inventory_router,
     mission_router,
     schema_router,
@@ -40,6 +41,7 @@ def create_app(base_dir: Path) -> FastAPI:
     app.include_router(connection_router(ctx))
     app.include_router(discovery_router(ctx))
     app.include_router(wifi_router(ctx))
+    app.include_router(fleet_router(ctx))
     app.include_router(deploy_router(ctx))
     app.include_router(mission_router(ctx))
     app.include_router(schema_router(ctx))

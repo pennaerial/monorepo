@@ -8,6 +8,7 @@ import textwrap
 
 import uav.runtime.mission_spec as mission_spec_module
 from uav.runtime.mission_spec import load_mission_spec
+from uav.runtime.schema_registry import load_mode_registry_document
 
 
 def _write_mission(tmp_path: Path, contents: str) -> Path:
@@ -117,3 +118,10 @@ def test_load_fleet_document_works_without_ros_setup():
 
     assert '"backend_kind": "sim"' in result.stdout
     assert '"vehicle_count":' in result.stdout
+
+
+def test_committed_mode_registry_contains_required_modes():
+    modes = load_mode_registry_document().modes
+
+    assert "uav.modes.uav.TakeoffMode" in modes
+    assert "uav.modes.payload.PayloadRetreatMode" in modes
