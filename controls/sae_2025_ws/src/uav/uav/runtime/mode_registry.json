@@ -105,6 +105,15 @@
           "default_kind": "value",
           "name": "compressed",
           "required": false
+        },
+        {
+          "annotation": {
+            "kind": "str"
+          },
+          "default": "done",
+          "default_kind": "value",
+          "name": "completion_state",
+          "required": false
         }
       ],
       "params_schema": {
@@ -114,6 +123,11 @@
             "default": 0.003,
             "title": "Angular Gain",
             "type": "number"
+          },
+          "completion_state": {
+            "default": "done",
+            "title": "Completion State",
+            "type": "string"
           },
           "compressed": {
             "default": false,
@@ -173,7 +187,10 @@
       },
       "required_vision_nodes": [],
       "requires_camera": true,
-      "transition_labels": []
+      "transition_labels": [
+        "done",
+        "tag_lost"
+      ]
     },
     "uav.modes.payload.PayloadColorOrbitToRearMode": {
       "class_name": "PayloadColorOrbitToRearMode",
@@ -408,6 +425,194 @@
       "transition_labels": [
         "handoff_dock"
       ]
+    },
+    "uav.modes.payload.PayloadColorStringApproachMode": {
+      "class_name": "PayloadColorStringApproachMode",
+      "class_path": "uav.modes.payload.PayloadColorStringApproachMode",
+      "description": "Drive toward a coloured target using HSV blob detection.",
+      "display_name": "PayloadColorStringApproachMode",
+      "mission_target": "payload",
+      "module_path": "uav.modes.payload.PayloadColorStringApproachMode",
+      "param_fields": [
+        {
+          "annotation": {
+            "item": {
+              "kind": "int"
+            },
+            "kind": "list"
+          },
+          "default": [
+            20,
+            100,
+            100
+          ],
+          "default_kind": "value",
+          "name": "lower_hsv",
+          "required": false
+        },
+        {
+          "annotation": {
+            "item": {
+              "kind": "int"
+            },
+            "kind": "list"
+          },
+          "default": [
+            35,
+            255,
+            255
+          ],
+          "default_kind": "value",
+          "name": "upper_hsv",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.08,
+          "default_kind": "value",
+          "name": "forward_speed",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.003,
+          "default_kind": "value",
+          "name": "angular_gain",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "int"
+          },
+          "default": 15,
+          "default_kind": "value",
+          "name": "centering_threshold_px",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.3,
+          "default_kind": "value",
+          "name": "drive_angular_scale",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "int"
+          },
+          "default": 50,
+          "default_kind": "value",
+          "name": "min_detect_pixels",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "int"
+          },
+          "default": 5000,
+          "default_kind": "value",
+          "name": "stop_area",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 3.0,
+          "default_kind": "value",
+          "name": "lost_timeout_s",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "bool"
+          },
+          "default": false,
+          "default_kind": "value",
+          "name": "compressed",
+          "required": false
+        }
+      ],
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "angular_gain": {
+            "default": 0.003,
+            "title": "Angular Gain",
+            "type": "number"
+          },
+          "centering_threshold_px": {
+            "default": 15,
+            "title": "Centering Threshold Px",
+            "type": "integer"
+          },
+          "compressed": {
+            "default": false,
+            "title": "Compressed",
+            "type": "boolean"
+          },
+          "drive_angular_scale": {
+            "default": 0.3,
+            "title": "Drive Angular Scale",
+            "type": "number"
+          },
+          "forward_speed": {
+            "default": 0.08,
+            "title": "Forward Speed",
+            "type": "number"
+          },
+          "lost_timeout_s": {
+            "default": 3.0,
+            "title": "Lost Timeout S",
+            "type": "number"
+          },
+          "lower_hsv": {
+            "default": [
+              20,
+              100,
+              100
+            ],
+            "items": {
+              "type": "integer"
+            },
+            "title": "Lower Hsv",
+            "type": "array"
+          },
+          "min_detect_pixels": {
+            "default": 50,
+            "title": "Min Detect Pixels",
+            "type": "integer"
+          },
+          "stop_area": {
+            "default": 5000,
+            "title": "Stop Area",
+            "type": "integer"
+          },
+          "upper_hsv": {
+            "default": [
+              35,
+              255,
+              255
+            ],
+            "items": {
+              "type": "integer"
+            },
+            "title": "Upper Hsv",
+            "type": "array"
+          }
+        },
+        "title": "PayloadColorStringApproachModeParams",
+        "type": "object"
+      },
+      "required_vision_nodes": [],
+      "requires_camera": true,
+      "transition_labels": []
     },
     "uav.modes.payload.PayloadCornerNavigateMode": {
       "class_name": "PayloadCornerNavigateMode",

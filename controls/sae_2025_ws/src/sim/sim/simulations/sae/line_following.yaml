@@ -2,7 +2,7 @@ world:
   name: SAEWorldNode
   params:
     template_world: "src/sim/sim/world_gen/worlds/template.sdf"   # Gazebo world template
-    vehicle_pose: [0.0, 0.0, 0.1, 0.0, 0.0, 3.14159]  # [x, y, z, roll, pitch, yaw]
+    # vehicle_pose: [0.5, -0.5, 0.1, 0.0, 0.0, 2.35]  # [x, y, z, roll, pitch, yaw]
 
     physics:
       friction: 0.6 # friction coefficient for the ground plane
@@ -17,8 +17,8 @@ world:
         model: gz_standard_vtol
         px4_airframe_id: 4004
         path_to_sdf: "~/.simulation-gazebo/models/standard_vtol/model.sdf"
-        position: [0.3, 0.0, 0.1]
-        rpy: [0.0, 0.0, 0.0]
+        position: [0.5, 0.5, 0.1]
+        rpy: [0.0, 0.0, 5]
       payload_0:
         kind: payload
         path_to_sdf: "~/.simulation-gazebo/models/payload/model.sdf"

@@ -9,6 +9,10 @@ world:
         path_to_sdf: "~/.simulation-gazebo/models/dlz_alternating_border/model.sdf"
         position: [0.0, 0.0, -0.1]
         rpy: [0.0, 0.0, 0.0]
+      string_obstacle:
+        path_to_sdf: "~/.simulation-gazebo/models/string_obstacle/model.sdf"
+        position: [-0.25, 0.0, 0.0]
+        rpy: [0.0, 0.0, 0.0]
     controllables:
       uav_0:
         kind: uav
@@ -20,5 +24,5 @@ world:
       payload_0:
         kind: payload
         path_to_sdf: "~/.simulation-gazebo/models/payload/model.sdf"
-        position: [0.2, 0.2, 0.1]   # center of the white DLZ
-        rpy: [0.0, 0.0, 0.7854]
+        position: [1.1, 0.0, 0.1]
+        rpy: [0.0, 0.0, 3.14159]

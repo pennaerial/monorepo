@@ -36,7 +36,7 @@ class PayloadAprilTagApproachMode(Mode):
     mission_target = "payload"
     required_vision_nodes = ()
     requires_camera = True
-    transition_labels = ()
+    transition_labels = ("done", "tag_lost")
 
     def __init__(
         self,
@@ -52,9 +52,11 @@ class PayloadAprilTagApproachMode(Mode):
         stop_distance_m: float = 0.2,
         tag_lost_coast_s: float = 0.5,
         compressed: bool = False,
+        completion_state: str = "done",
     ):
         super().__init__(node, vehicle)
         self.vehicle: Payload = vehicle
+        self._completion_state = completion_state
         self.tag_id = None if tag_id is None else int(tag_id)
         self.tag_size_m = float(tag_size_m)
         self.tag_family = str(tag_family) if tag_family else DEFAULT_TAG_FAMILY
@@ -88,6 +90,7 @@ class PayloadAprilTagApproachMode(Mode):
         )
 
         self._done = False
+        self._tag_lost = False
         self._image_width = 0.0
         self._last_tag_time: Optional[float] = None
         self._first_response_logged = False
@@ -115,6 +118,7 @@ class PayloadAprilTagApproachMode(Mode):
 
     def on_enter(self) -> None:
         self._done = False
+        self._tag_lost = False
         self._image_width = 0.0
         self._last_tag_time = None
         self._first_response_logged = False
@@ -165,8 +169,9 @@ class PayloadAprilTagApproachMode(Mode):
         if now - self._last_tag_time <= self.tag_lost_coast_s:
             return False
         self._publish_drive(0.0, 0.0)
+        self._tag_lost = True
         self._last_tag_time = None
-        self.log("PayloadAprilTagApproachMode: tag lost; stopping")
+        self.log("PayloadAprilTagApproachMode: tag lost; transitioning")
         return True
 
     def _select_target(
@@ -256,7 +261,11 @@ class PayloadAprilTagApproachMode(Mode):
         self._publish_drive(linear, angular)
 
     def check_status(self) -> str:
-        return "terminate" if self._done else "continue"
+        if self._done:
+            return self._completion_state
+        if self._tag_lost:
+            return "tag_lost"
+        return "continue"
 
     def on_exit(self) -> None:
         self.vehicle.stop()

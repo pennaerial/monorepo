@@ -1,0 +1,55 @@
+# Full payload run: wait for drive-out → corner navigate → AprilTag approach.
+# PayloadWaitForDriveOutMode returns "complete" → corner_nav
+# PayloadCornerNavigateMode returns "done" → approach
+# PayloadAprilTagApproachMode returns "terminate" → mission ends
+modes:
+  start:
+    class: uav.modes.payload.PayloadWaitForDriveOutMode.PayloadWaitForDriveOutMode
+    params:
+      confirm_frames: 5
+      lower_hsv: [0, 0, 180]
+      upper_hsv: [180, 46, 255]
+      turn_angular: 3.14
+      turn_speed: 1.5
+    transitions:
+      complete: corner_nav
+
+  corner_nav:
+    class: uav.modes.payload.PayloadCornerNavigateMode
+    params:
+      direction: ccw
+      ccw_lower_hsv: [100, 100, 100]
+      ccw_upper_hsv: [140, 255, 255]
+      cw_lower_hsv: [146, 105, 172]
+      cw_upper_hsv: [180, 255, 255]
+      drive_out_speed_mps: 0.08
+      detect_frames: 3
+      max_drive_out_s: 20.0
+      drive_out_strip_frac: 0.20
+      drive_out_min_pixels: 150
+      compressed_image: true
+      align_angular_speed: 0.7
+      center_tol_px: 30.0
+      center_min_pixels: 150
+      center_stable_frames: 1
+      align_lat_tol_px: 25.0
+      align_stable_frames: 3
+      line_follow_speed_mps: 0.10
+      line_follow_strip_frac: 0.55
+      line_follow_min_pixels: 50
+      k_lat: 0.003
+      k_ang: 0.4
+      max_angular: 1.3
+    transitions:
+      done: approach
+
+  approach:
+    class: uav.modes.payload.PayloadAprilTagApproachMode
+    params:
+      tag_id: 0
+      tag_size_m: 0.0508
+      max_forward_speed: 0.2
+      forward_gain: 0.5
+      angular_gain: 0.005
+      yaw_gain: 0.6
+      stop_distance_m: 0.2
