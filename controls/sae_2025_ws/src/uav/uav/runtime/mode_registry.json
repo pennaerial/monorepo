@@ -1214,6 +1214,307 @@
         "done"
       ]
     },
+    "uav.modes.payload.PayloadDualApproachMode": {
+      "class_name": "PayloadDualApproachMode",
+      "class_path": "uav.modes.payload.PayloadDualApproachMode",
+      "description": "Approach using AprilTag when visible, HSV colour fallback otherwise.",
+      "display_name": "PayloadDualApproachMode",
+      "mission_target": "payload",
+      "module_path": "uav.modes.payload.PayloadDualApproachMode",
+      "param_fields": [
+        {
+          "annotation": {
+            "kind": "union",
+            "options": [
+              {
+                "kind": "int"
+              },
+              {
+                "kind": "none"
+              }
+            ]
+          },
+          "default": 0,
+          "default_kind": "value",
+          "name": "tag_id",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.0508,
+          "default_kind": "value",
+          "name": "tag_size_m",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "str"
+          },
+          "default": "tag36h11",
+          "default_kind": "value",
+          "name": "tag_family",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.5,
+          "default_kind": "value",
+          "name": "tag_forward_gain",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.2,
+          "default_kind": "value",
+          "name": "tag_max_forward_speed",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.003,
+          "default_kind": "value",
+          "name": "tag_angular_gain",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.6,
+          "default_kind": "value",
+          "name": "tag_yaw_gain",
+          "required": false
+        },
+        {
+          "annotation": {
+            "item": {
+              "kind": "int"
+            },
+            "kind": "list"
+          },
+          "default": [
+            20,
+            100,
+            100
+          ],
+          "default_kind": "value",
+          "name": "lower_hsv",
+          "required": false
+        },
+        {
+          "annotation": {
+            "item": {
+              "kind": "int"
+            },
+            "kind": "list"
+          },
+          "default": [
+            35,
+            255,
+            255
+          ],
+          "default_kind": "value",
+          "name": "upper_hsv",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.015,
+          "default_kind": "value",
+          "name": "color_forward_speed",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.003,
+          "default_kind": "value",
+          "name": "color_angular_gain",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "int"
+          },
+          "default": 15,
+          "default_kind": "value",
+          "name": "color_centering_threshold_px",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.3,
+          "default_kind": "value",
+          "name": "color_drive_angular_scale",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "int"
+          },
+          "default": 50,
+          "default_kind": "value",
+          "name": "color_min_detect_pixels",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "int"
+          },
+          "default": 100,
+          "default_kind": "value",
+          "name": "stop_height_px",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 3.0,
+          "default_kind": "value",
+          "name": "lost_timeout_s",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "bool"
+          },
+          "default": false,
+          "default_kind": "value",
+          "name": "compressed",
+          "required": false
+        }
+      ],
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "color_angular_gain": {
+            "default": 0.003,
+            "title": "Color Angular Gain",
+            "type": "number"
+          },
+          "color_centering_threshold_px": {
+            "default": 15,
+            "title": "Color Centering Threshold Px",
+            "type": "integer"
+          },
+          "color_drive_angular_scale": {
+            "default": 0.3,
+            "title": "Color Drive Angular Scale",
+            "type": "number"
+          },
+          "color_forward_speed": {
+            "default": 0.015,
+            "title": "Color Forward Speed",
+            "type": "number"
+          },
+          "color_min_detect_pixels": {
+            "default": 50,
+            "title": "Color Min Detect Pixels",
+            "type": "integer"
+          },
+          "compressed": {
+            "default": false,
+            "title": "Compressed",
+            "type": "boolean"
+          },
+          "lost_timeout_s": {
+            "default": 3.0,
+            "title": "Lost Timeout S",
+            "type": "number"
+          },
+          "lower_hsv": {
+            "default": [
+              20,
+              100,
+              100
+            ],
+            "items": {
+              "type": "integer"
+            },
+            "title": "Lower Hsv",
+            "type": "array"
+          },
+          "stop_height_px": {
+            "default": 100,
+            "title": "Stop Height Px",
+            "type": "integer"
+          },
+          "tag_angular_gain": {
+            "default": 0.003,
+            "title": "Tag Angular Gain",
+            "type": "number"
+          },
+          "tag_family": {
+            "default": "tag36h11",
+            "title": "Tag Family",
+            "type": "string"
+          },
+          "tag_forward_gain": {
+            "default": 0.5,
+            "title": "Tag Forward Gain",
+            "type": "number"
+          },
+          "tag_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": 0,
+            "title": "Tag Id"
+          },
+          "tag_max_forward_speed": {
+            "default": 0.2,
+            "title": "Tag Max Forward Speed",
+            "type": "number"
+          },
+          "tag_size_m": {
+            "default": 0.0508,
+            "title": "Tag Size M",
+            "type": "number"
+          },
+          "tag_yaw_gain": {
+            "default": 0.6,
+            "title": "Tag Yaw Gain",
+            "type": "number"
+          },
+          "upper_hsv": {
+            "default": [
+              35,
+              255,
+              255
+            ],
+            "items": {
+              "type": "integer"
+            },
+            "title": "Upper Hsv",
+            "type": "array"
+          }
+        },
+        "title": "PayloadDualApproachModeParams",
+        "type": "object"
+      },
+      "required_vision_nodes": [],
+      "requires_camera": true,
+      "transition_labels": []
+    },
     "uav.modes.payload.PayloadRetreatMode": {
       "class_name": "PayloadRetreatMode",
       "class_path": "uav.modes.payload.PayloadRetreatMode",

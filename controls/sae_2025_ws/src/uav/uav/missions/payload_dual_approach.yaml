@@ -1,0 +1,21 @@
+# Dual approach: AprilTag tracking with HSV colour fallback for string obstacle.
+modes:
+  start:
+    class: uav.modes.payload.PayloadDualApproachMode
+    params:
+      tag_id: 0
+      tag_size_m: 0.0508
+      tag_forward_gain: 0.5
+      tag_max_forward_speed: 0.2
+      tag_angular_gain: 0.003
+      tag_yaw_gain: 0.6
+      lower_hsv: [20, 100, 100]
+      upper_hsv: [35, 255, 255]
+      color_forward_speed: 0.015
+      color_angular_gain: 0.003
+      color_centering_threshold_px: 15
+      color_drive_angular_scale: 0.3
+      color_min_detect_pixels: 50
+      stop_height_px: 155
+      lost_timeout_s: 3.0
+      compressed: false
