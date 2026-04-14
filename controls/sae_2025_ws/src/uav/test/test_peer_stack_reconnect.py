@@ -334,7 +334,7 @@ def _write_test_mission(tmp_path: Path) -> Path:
         (
             "modes:\n"
             "  start:\n"
-            "    class: uav.modes.payload.PayloadPeerFleetTestMode\n"
+            "    mode: payload.PayloadPeerFleetTestMode\n"
             "    params:\n"
             "      publish_period_s: 0.2\n"
         ),

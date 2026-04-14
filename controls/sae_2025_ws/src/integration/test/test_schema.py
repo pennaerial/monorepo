@@ -161,6 +161,8 @@ def test_schema_mission_exposes_constructor_metadata():
     assert payload["target"] == "uav"
     assert payload["start_mode"] == "start"
     start_mode = next(mode for mode in payload["modes"] if mode["name"] == "start")
+    assert start_mode["mode"] == "uav.vtol.TakeoffMode"
+    assert start_mode["metadata"]["mode"] == "uav.vtol.TakeoffMode"
     takeoff_type = next(
         field
         for field in start_mode["metadata"]["params"]
@@ -188,7 +190,8 @@ def test_schema_mode_registry_can_filter_by_target():
     assert payload["success"] is True
     assert set(payload["targets"]) == {"payload"}
     assert any(
-        item["name"] == "PayloadRetreatMode" for item in payload["targets"]["payload"]
+        item["mode"] == "payload.PayloadRetreatMode"
+        for item in payload["targets"]["payload"]
     )
 
 

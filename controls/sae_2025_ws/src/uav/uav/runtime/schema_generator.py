@@ -17,7 +17,11 @@ from pydantic import BaseModel, ConfigDict, create_model
 
 from uav.modes.Mode import Mode
 
-from .mode_paths import canonical_mode_path
+from .mode_paths import (
+    implementation_mode_path,
+    mission_target_from_mode_id,
+    mode_id_for,
+)
 from .schema_registry import (
     ModeParamFieldSpec,
     ModeRegistryDocument,
@@ -64,7 +68,7 @@ def _iter_mode_classes() -> list[type[Mode]]:
                 and value is not Mode
                 and value.__module__ == module.__name__
             ):
-                discovered[canonical_mode_path(value)] = value
+                discovered[mode_id_for(value)] = value
     return [discovered[key] for key in sorted(discovered)]
 
 
@@ -80,19 +84,19 @@ def _normalized_annotation(
         }:
             return type(default)
         raise TypeError(
-            f"Mode '{canonical_mode_path(mode_class)}' parameter '{name}' requires an explicit schema-grade type annotation."
+            f"Mode '{mode_id_for(mode_class)}' parameter '{name}' requires an explicit schema-grade type annotation."
         )
 
     if annotation in {dict, list, tuple, set}:
         raise TypeError(
-            f"Mode '{canonical_mode_path(mode_class)}' parameter '{name}' must use a typed collection annotation, not bare '{annotation.__name__}'."
+            f"Mode '{mode_id_for(mode_class)}' parameter '{name}' must use a typed collection annotation, not bare '{annotation.__name__}'."
         )
 
     origin = get_origin(annotation)
     args = get_args(annotation)
     if origin in {dict, list, tuple, set} and not args:
         raise TypeError(
-            f"Mode '{canonical_mode_path(mode_class)}' parameter '{name}' must declare collection element types."
+            f"Mode '{mode_id_for(mode_class)}' parameter '{name}' must declare collection element types."
         )
     return annotation
 
@@ -273,10 +277,17 @@ def _field_specs_for_mode(mode_class: type[Mode]) -> tuple[ModeParamFieldSpec, .
 
 
 def build_mode_registry_entry(mode_class: type[Mode]) -> ModeRegistryEntry:
-    mission_target = getattr(mode_class, "mission_target", None)
+    mode_id = mode_id_for(mode_class)
+    mission_target = mission_target_from_mode_id(mode_id)
     if mission_target not in {"uav", "payload"}:
         raise ValueError(
-            f"Mode '{canonical_mode_path(mode_class)}' must declare mission_target as 'uav' or 'payload'."
+            f"Mode '{mode_id}' must live under the 'uav' or 'payload' public mode namespace."
+        )
+    declared_target = getattr(mode_class, "mission_target", None)
+    if declared_target is not None and declared_target != mission_target:
+        raise ValueError(
+            f"Mode '{mode_id}' declares mission_target '{declared_target}', "
+            f"but its namespace requires '{mission_target}'."
         )
     peer_vehicle_names = tuple(
         sorted(
@@ -289,7 +300,8 @@ def build_mode_registry_entry(mode_class: type[Mode]) -> ModeRegistryEntry:
     )
 
     return ModeRegistryEntry(
-        class_path=canonical_mode_path(mode_class),
+        mode_id=mode_id,
+        class_path=implementation_mode_path(mode_class),
         module_path=mode_class.__module__,
         class_name=mode_class.__name__,
         display_name=mode_class.__name__,
@@ -312,8 +324,7 @@ def build_mode_registry_document() -> ModeRegistryDocument:
     ]
     return ModeRegistryDocument(
         modes={
-            entry.class_path: entry
-            for entry in sorted(entries, key=lambda e: e.class_path)
+            entry.mode_id: entry for entry in sorted(entries, key=lambda e: e.mode_id)
         }
     )
 

@@ -1,11 +1,12 @@
 {
   "modes": {
-    "uav.modes.payload.PayloadAprilTagApproachMode": {
+    "payload.PayloadAprilTagApproachMode": {
       "class_name": "PayloadAprilTagApproachMode",
       "class_path": "uav.modes.payload.PayloadAprilTagApproachMode",
       "description": "Drive the payload toward one AprilTag and terminate once close enough.",
       "display_name": "PayloadAprilTagApproachMode",
       "mission_target": "payload",
+      "mode_id": "payload.PayloadAprilTagApproachMode",
       "module_path": "uav.modes.payload.PayloadAprilTagApproachMode",
       "param_fields": [
         {
@@ -193,12 +194,13 @@
         "tag_lost"
       ]
     },
-    "uav.modes.payload.PayloadColorStringApproachMode": {
+    "payload.PayloadColorStringApproachMode": {
       "class_name": "PayloadColorStringApproachMode",
       "class_path": "uav.modes.payload.PayloadColorStringApproachMode",
       "description": "Drive toward a coloured target using HSV blob detection.",
       "display_name": "PayloadColorStringApproachMode",
       "mission_target": "payload",
+      "mode_id": "payload.PayloadColorStringApproachMode",
       "module_path": "uav.modes.payload.PayloadColorStringApproachMode",
       "param_fields": [
         {
@@ -424,12 +426,13 @@
       "requires_camera": true,
       "transition_labels": []
     },
-    "uav.modes.payload.PayloadCornerNavigateMode": {
+    "payload.PayloadCornerNavigateMode": {
       "class_name": "PayloadCornerNavigateMode",
       "class_path": "uav.modes.payload.PayloadCornerNavigateMode",
       "description": "Base class for UAV operational modes within a ROS 2 node.",
       "display_name": "PayloadCornerNavigateMode",
       "mission_target": "payload",
+      "mode_id": "payload.PayloadCornerNavigateMode",
       "module_path": "uav.modes.payload.PayloadCornerNavigateMode",
       "param_fields": [
         {
@@ -909,12 +912,13 @@
         "complete"
       ]
     },
-    "uav.modes.payload.PayloadDLZNavigateMode": {
+    "payload.PayloadDLZNavigateMode": {
       "class_name": "PayloadDLZNavigateMode",
       "class_path": "uav.modes.payload.PayloadDLZNavigateMode",
       "description": "Navigate the payload along the alternating-colour square border of the DLZ.",
       "display_name": "PayloadDLZNavigateMode",
       "mission_target": "payload",
+      "mode_id": "payload.PayloadDLZNavigateMode",
       "module_path": "uav.modes.payload.PayloadDLZNavigateMode",
       "param_fields": [
         {
@@ -1218,12 +1222,13 @@
         "done"
       ]
     },
-    "uav.modes.payload.PayloadPeerFleetTestMode": {
+    "payload.PayloadPeerFleetTestMode": {
       "class_name": "PayloadPeerFleetTestMode",
       "class_path": "uav.modes.payload.PayloadPeerFleetTestMode",
       "description": "Passive multi-payload communication demo for fleet bring-up.",
       "display_name": "PayloadPeerFleetTestMode",
       "mission_target": "payload",
+      "mode_id": "payload.PayloadPeerFleetTestMode",
       "module_path": "uav.modes.payload.PayloadPeerFleetTestMode",
       "param_fields": [
         {
@@ -1284,12 +1289,13 @@
       "requires_camera": false,
       "transition_labels": []
     },
-    "uav.modes.payload.PayloadRetreatMode": {
+    "payload.PayloadRetreatMode": {
       "class_name": "PayloadRetreatMode",
       "class_path": "uav.modes.payload.PayloadRetreatMode",
       "description": "Drive the payload to the edge of the DLZ, then turn 180\u00b0 to face the center.",
       "display_name": "PayloadRetreatMode",
       "mission_target": "payload",
+      "mode_id": "payload.PayloadRetreatMode",
       "module_path": "uav.modes.payload.PayloadRetreatMode",
       "param_fields": [
         {
@@ -1461,12 +1467,13 @@
       "requires_camera": false,
       "transition_labels": []
     },
-    "uav.modes.payload.PayloadScanForTagMode": {
+    "payload.PayloadScanForTagMode": {
       "class_name": "PayloadScanForTagMode",
       "class_path": "uav.modes.payload.PayloadScanForTagMode",
       "description": "Spin in place looking for a specific AprilTag.",
       "display_name": "PayloadScanForTagMode",
       "mission_target": "payload",
+      "mode_id": "payload.PayloadScanForTagMode",
       "module_path": "uav.modes.payload.PayloadScanForTagMode",
       "param_fields": [
         {
@@ -1543,12 +1550,13 @@
         "not_found"
       ]
     },
-    "uav.modes.payload.PayloadWaitForDriveOutMode": {
+    "payload.PayloadWaitForDriveOutMode": {
       "class_name": "PayloadWaitForDriveOutMode",
       "class_path": "uav.modes.payload.PayloadWaitForDriveOutMode",
       "description": "Subscribe to the payload camera and measure frame brightness. Once the",
       "display_name": "PayloadWaitForDriveOutMode",
       "mission_target": "payload",
+      "mode_id": "payload.PayloadWaitForDriveOutMode",
       "module_path": "uav.modes.payload.PayloadWaitForDriveOutMode",
       "param_fields": [
         {
@@ -1664,12 +1672,13 @@
         "complete"
       ]
     },
-    "uav.modes.uav.LandingMode": {
+    "uav.LandingMode": {
       "class_name": "LandingMode",
       "class_path": "uav.modes.uav.LandingMode",
       "description": "A mode for taking off vertically.",
       "display_name": "LandingMode",
       "mission_target": "uav",
+      "mode_id": "uav.LandingMode",
       "module_path": "uav.modes.uav.LandingMode",
       "param_fields": [],
       "params_schema": {
@@ -1683,12 +1692,13 @@
       "requires_camera": false,
       "transition_labels": []
     },
-    "uav.modes.uav.NavGPSMode": {
+    "uav.NavGPSMode": {
       "class_name": "NavGPSMode",
       "class_path": "uav.modes.uav.NavGPSMode",
       "description": "A mode for navigating to a GPS coordinate",
       "display_name": "NavGPSMode",
       "mission_target": "uav",
+      "mode_id": "uav.NavGPSMode",
       "module_path": "uav.modes.uav.NavGPSMode",
       "param_fields": [
         {
@@ -1800,12 +1810,13 @@
         "complete"
       ]
     },
-    "uav.modes.uav.PayloadDropoffMode": {
+    "uav.PayloadDropoffMode": {
       "class_name": "PayloadDropoffMode",
       "class_path": "uav.modes.uav.PayloadDropoffMode",
       "description": "A mode for dropping off the payload.",
       "display_name": "PayloadDropoffMode",
       "mission_target": "uav",
+      "mode_id": "uav.PayloadDropoffMode",
       "module_path": "uav.modes.uav.PayloadDropoffMode",
       "param_fields": [
         {
@@ -1887,12 +1898,13 @@
         "complete"
       ]
     },
-    "uav.modes.uav.PayloadPickupMode": {
+    "uav.PayloadPickupMode": {
       "class_name": "PayloadPickupMode",
       "class_path": "uav.modes.uav.PayloadPickupMode",
       "description": "A mode for picking up a payload.",
       "display_name": "PayloadPickupMode",
       "mission_target": "uav",
+      "mode_id": "uav.PayloadPickupMode",
       "module_path": "uav.modes.uav.PayloadPickupMode",
       "param_fields": [
         {
@@ -1926,12 +1938,13 @@
         "complete"
       ]
     },
-    "uav.modes.uav.ServoDropoffMode": {
+    "uav.ServoDropoffMode": {
       "class_name": "ServoDropoffMode",
       "class_path": "uav.modes.uav.ServoDropoffMode",
       "description": "A mode for dropping off the payload.",
       "display_name": "ServoDropoffMode",
       "mission_target": "uav",
+      "mode_id": "uav.ServoDropoffMode",
       "module_path": "uav.modes.uav.ServoDropoffMode",
       "param_fields": [
         {
@@ -2073,169 +2086,13 @@
         "complete"
       ]
     },
-    "uav.modes.uav.TakeoffMode": {
-      "class_name": "TakeoffMode",
-      "class_path": "uav.modes.uav.TakeoffMode",
-      "description": "A mode for takeoff (vertical or horizontal).",
-      "display_name": "TakeoffMode",
-      "mission_target": "uav",
-      "module_path": "uav.modes.uav.TakeoffMode",
-      "param_fields": [
-        {
-          "annotation": {
-            "choices": [
-              "vertical",
-              "horizontal"
-            ],
-            "kind": "literal"
-          },
-          "default": "vertical",
-          "default_kind": "value",
-          "name": "takeoff_type",
-          "required": false
-        },
-        {
-          "annotation": {
-            "kind": "float"
-          },
-          "default": null,
-          "default_kind": "nan",
-          "name": "fw_tko_pitch",
-          "required": false
-        },
-        {
-          "annotation": {
-            "kind": "float"
-          },
-          "default": null,
-          "default_kind": "nan",
-          "name": "yaw",
-          "required": false
-        },
-        {
-          "annotation": {
-            "kind": "float"
-          },
-          "default": null,
-          "default_kind": "nan",
-          "name": "latitude",
-          "required": false
-        },
-        {
-          "annotation": {
-            "kind": "float"
-          },
-          "default": null,
-          "default_kind": "nan",
-          "name": "longitude",
-          "required": false
-        },
-        {
-          "annotation": {
-            "kind": "float"
-          },
-          "default": null,
-          "default_kind": "nan",
-          "name": "altitude",
-          "required": false
-        }
-      ],
-      "params_schema": {
-        "additionalProperties": false,
-        "properties": {
-          "altitude": {
-            "title": "Altitude",
-            "type": "number"
-          },
-          "fw_tko_pitch": {
-            "title": "Fw Tko Pitch",
-            "type": "number"
-          },
-          "latitude": {
-            "title": "Latitude",
-            "type": "number"
-          },
-          "longitude": {
-            "title": "Longitude",
-            "type": "number"
-          },
-          "takeoff_type": {
-            "default": "vertical",
-            "enum": [
-              "vertical",
-              "horizontal"
-            ],
-            "title": "Takeoff Type",
-            "type": "string"
-          },
-          "yaw": {
-            "title": "Yaw",
-            "type": "number"
-          }
-        },
-        "title": "TakeoffModeParams",
-        "type": "object"
-      },
-      "peer_vehicle_names": [],
-      "required_vision_nodes": [],
-      "requires_camera": false,
-      "transition_labels": [
-        "complete"
-      ]
-    },
-    "uav.modes.uav.TransitionMode": {
-      "class_name": "TransitionMode",
-      "class_path": "uav.modes.uav.TransitionMode",
-      "description": "A mode for transitioning between VTOL types",
-      "display_name": "TransitionMode",
-      "mission_target": "uav",
-      "module_path": "uav.modes.uav.TransitionMode",
-      "param_fields": [
-        {
-          "annotation": {
-            "choices": [
-              "MC",
-              "FW"
-            ],
-            "kind": "literal"
-          },
-          "default": null,
-          "default_kind": "missing",
-          "name": "to_mode",
-          "required": true
-        }
-      ],
-      "params_schema": {
-        "additionalProperties": false,
-        "properties": {
-          "to_mode": {
-            "enum": [
-              "MC",
-              "FW"
-            ],
-            "title": "To Mode",
-            "type": "string"
-          }
-        },
-        "required": [
-          "to_mode"
-        ],
-        "title": "TransitionModeParams",
-        "type": "object"
-      },
-      "peer_vehicle_names": [],
-      "required_vision_nodes": [],
-      "requires_camera": false,
-      "transition_labels": [
-        "complete"
-      ]
-    },
-    "uav.modes.uav.WaypointMission": {
+    "uav.WaypointMission": {
       "class_name": "WaypointMission",
       "class_path": "uav.modes.uav.WaypointMission",
       "description": "Simple waypoint mission for testing scoring node.",
       "display_name": "WaypointMission",
       "mission_target": "uav",
+      "mode_id": "uav.WaypointMission",
       "module_path": "uav.modes.uav.WaypointMission",
       "param_fields": [
         {
@@ -2347,7 +2204,166 @@
       "required_vision_nodes": [],
       "requires_camera": false,
       "transition_labels": []
+    },
+    "uav.vtol.TakeoffMode": {
+      "class_name": "TakeoffMode",
+      "class_path": "uav.modes.uav.vtol.TakeoffMode",
+      "description": "A VTOL takeoff mode that supports both vertical and runway-style launches.",
+      "display_name": "TakeoffMode",
+      "mission_target": "uav",
+      "mode_id": "uav.vtol.TakeoffMode",
+      "module_path": "uav.modes.uav.vtol.TakeoffMode",
+      "param_fields": [
+        {
+          "annotation": {
+            "choices": [
+              "vertical",
+              "horizontal"
+            ],
+            "kind": "literal"
+          },
+          "default": "vertical",
+          "default_kind": "value",
+          "name": "takeoff_type",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": null,
+          "default_kind": "nan",
+          "name": "fw_tko_pitch",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": null,
+          "default_kind": "nan",
+          "name": "yaw",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": null,
+          "default_kind": "nan",
+          "name": "latitude",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": null,
+          "default_kind": "nan",
+          "name": "longitude",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": null,
+          "default_kind": "nan",
+          "name": "altitude",
+          "required": false
+        }
+      ],
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "altitude": {
+            "title": "Altitude",
+            "type": "number"
+          },
+          "fw_tko_pitch": {
+            "title": "Fw Tko Pitch",
+            "type": "number"
+          },
+          "latitude": {
+            "title": "Latitude",
+            "type": "number"
+          },
+          "longitude": {
+            "title": "Longitude",
+            "type": "number"
+          },
+          "takeoff_type": {
+            "default": "vertical",
+            "enum": [
+              "vertical",
+              "horizontal"
+            ],
+            "title": "Takeoff Type",
+            "type": "string"
+          },
+          "yaw": {
+            "title": "Yaw",
+            "type": "number"
+          }
+        },
+        "title": "TakeoffModeParams",
+        "type": "object"
+      },
+      "peer_vehicle_names": [],
+      "required_vision_nodes": [],
+      "requires_camera": false,
+      "transition_labels": [
+        "complete"
+      ]
+    },
+    "uav.vtol.TransitionMode": {
+      "class_name": "TransitionMode",
+      "class_path": "uav.modes.uav.vtol.TransitionMode",
+      "description": "A VTOL-only mode for transitioning between multicopter and fixed-wing flight.",
+      "display_name": "TransitionMode",
+      "mission_target": "uav",
+      "mode_id": "uav.vtol.TransitionMode",
+      "module_path": "uav.modes.uav.vtol.TransitionMode",
+      "param_fields": [
+        {
+          "annotation": {
+            "choices": [
+              "MC",
+              "FW"
+            ],
+            "kind": "literal"
+          },
+          "default": null,
+          "default_kind": "missing",
+          "name": "to_mode",
+          "required": true
+        }
+      ],
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "to_mode": {
+            "enum": [
+              "MC",
+              "FW"
+            ],
+            "title": "To Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "to_mode"
+        ],
+        "title": "TransitionModeParams",
+        "type": "object"
+      },
+      "peer_vehicle_names": [],
+      "required_vision_nodes": [],
+      "requires_camera": false,
+      "transition_labels": [
+        "complete"
+      ]
     }
   },
-  "schema_version": 3
+  "schema_version": 4
 }

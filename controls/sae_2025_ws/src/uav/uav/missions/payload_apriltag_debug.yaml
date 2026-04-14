@@ -3,7 +3,7 @@
 # indefinitely without moving the vehicle.
 modes:
   start:
-    class: uav.modes.payload.PayloadScanForTagMode
+    mode: payload.PayloadScanForTagMode
     params:
       tag_id: 0
       tag_size_m: 0.0508

@@ -404,6 +404,7 @@ def test_build_mode_registry_entry_includes_peer_vehicle_names():
         def check_status(self) -> str:
             return "continue"
 
+    PeerAwareMode.__module__ = "uav.modes.payload.PeerAwareMode"
     entry = build_mode_registry_entry(PeerAwareMode)
 
     assert entry.peer_vehicle_names == ("payload_1", "uav_2")
@@ -428,6 +429,7 @@ def test_build_mode_registry_entry_allows_peer_mode_without_on_disconnect():
         def on_update(self, time_delta: float) -> None:
             pass
 
+    PeerAwareMode.__module__ = "uav.modes.payload.PeerAwareMode"
     entry = build_mode_registry_entry(PeerAwareMode)
 
     assert entry.peer_vehicle_names == ("uav_3",)
@@ -446,11 +448,11 @@ def test_load_mission_spec_collects_sorted_peer_vehicle_names_union(
         """
         modes:
           start:
-            class: fake.StartMode
+            mode: fake.StartMode
           support:
-            class: fake.SupportMode
+            mode: fake.SupportMode
           end:
-            class: fake.EndMode
+            mode: fake.EndMode
         """,
     )
 
@@ -480,13 +482,13 @@ def test_load_mission_spec_collects_sorted_peer_vehicle_names_union(
 
     monkeypatch.setattr(
         schema_module,
-        "mode_entry_for_class_path",
-        lambda class_path: fake_entries[class_path],
+        "mode_entry_for_mode_id",
+        lambda mode_id: fake_entries[mode_id],
     )
     monkeypatch.setattr(
         schema_module,
         "validate_mode_params",
-        lambda _class_path, params: params,
+        lambda _mode_id, params: params,
     )
 
     mission_spec = load_mission_spec(mission_path)
@@ -527,6 +529,11 @@ def test_mode_manager_validates_peer_and_shared_entity_namespaces(monkeypatch):
         mode_manager_module,
         "load_mode_class",
         lambda _path: PeerAwareMode,
+    )
+    monkeypatch.setattr(
+        mode_manager_module,
+        "mode_entry_for_mode_id",
+        lambda _mode_id: SimpleNamespace(class_path="fake.module.PeerAwareMode"),
     )
     monkeypatch.setattr(
         mode_manager_module.Node,
@@ -843,6 +850,11 @@ def test_managed_entity_descriptors_use_persistent_and_active_phases(monkeypatch
         mode_manager_module,
         "load_mode_class",
         lambda _path: PhaseAwareMode,
+    )
+    monkeypatch.setattr(
+        mode_manager_module,
+        "mode_entry_for_mode_id",
+        lambda _mode_id: SimpleNamespace(class_path="fake.module.PhaseAwareMode"),
     )
     monkeypatch.setattr(
         mode_manager_module.Node,

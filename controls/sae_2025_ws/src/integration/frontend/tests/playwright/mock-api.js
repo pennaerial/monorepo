@@ -292,9 +292,16 @@ export async function installApiMocks(page, scenario = {}) {
       const response = await resolveValue(
         scenario.missionFileGet || {
           success: true,
-          content: 'mission: hover\n',
+          content: 'modes:\n  hover:\n    mode: uav.HoverMode\n',
         },
-        { ...context, index, fallback: { success: true, content: 'mission: hover\n' } }
+        {
+          ...context,
+          index,
+          fallback: {
+            success: true,
+            content: 'modes:\n  hover:\n    mode: uav.HoverMode\n',
+          },
+        }
       )
       return fulfill(route, response)
     }
@@ -328,13 +335,13 @@ export async function installApiMocks(page, scenario = {}) {
       const response = await resolveValue(
         scenario.launchParamsGet || {
           success: true,
-          content: 'mission: hover\nmodes:\n  hover:\n    type: uav.modes.uav.HoverMode\n',
+          content: 'mission: hover\nmodes:\n  hover:\n    mode: uav.HoverMode\n',
         },
         {
           ...context,
           fallback: {
             success: true,
-            content: 'mission: hover\nmodes:\n  hover:\n    type: uav.modes.uav.HoverMode\n',
+            content: 'mission: hover\nmodes:\n  hover:\n    mode: uav.HoverMode\n',
           },
         }
       )

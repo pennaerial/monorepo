@@ -11,6 +11,7 @@ from uav.modes.Mode import Mode
 from .managed_comms import ManagedCommRegistry
 from .mode_paths import canonical_mode_path
 from .mission_spec import MissionSpec, load_mode_class
+from .schema import mode_entry_for_mode_id
 from .peer_connections import (
     PeerConnectionTracker,
     normalize_peer_vehicle_names,
@@ -165,8 +166,9 @@ class ModeManager(Node):
             raise KeyError(f"Vision client '{key}' is not registered.")
         return self._vision_clients[key]
 
-    def initialize_mode(self, mode_path: str, params: dict) -> Mode:
-        mode_class = load_mode_class(mode_path)
+    def initialize_mode(self, mode_id: str, params: dict) -> Mode:
+        mode_entry = mode_entry_for_mode_id(mode_id)
+        mode_class = load_mode_class(mode_entry.class_path)
         peer_vehicle_names = self._mode_peer_vehicle_names(mode_class)
         signature = inspect.signature(mode_class.__init__)
         type_hints = get_type_hints(mode_class.__init__)
@@ -180,7 +182,7 @@ class ModeManager(Node):
                 args[name] = self
                 continue
             if name == "vehicle":
-                self._validate_vehicle_annotation(mode_path, type_hints.get(name))
+                self._validate_vehicle_annotation(mode_id, type_hints.get(name))
                 args[name] = self.vehicle
                 continue
             if name in params:
@@ -191,20 +193,20 @@ class ModeManager(Node):
                 args[name] = param.default
                 continue
             raise ValueError(
-                f"Missing required parameter '{name}' for mode '{mode_path}'"
+                f"Missing required parameter '{name}' for mode '{mode_id}'"
             )
 
         unexpected_params = sorted(set(params) - consumed_params)
         if unexpected_params:
             raise ValueError(
-                f"Mode '{mode_path}' received unexpected parameter(s): {', '.join(unexpected_params)}"
+                f"Mode '{mode_id}' received unexpected parameter(s): {', '.join(unexpected_params)}"
             )
 
         owner_token = object()
         try:
             with self._managed_comms.scope(
                 owner=owner_token,
-                owner_label=mode_path,
+                owner_label=mode_id,
                 phase="persistent",
                 peer_vehicle_names=peer_vehicle_names,
             ):
@@ -229,7 +231,7 @@ class ModeManager(Node):
 
     def setup_modes(self, mission_spec: MissionSpec) -> None:
         for mode_name, mode_info in mission_spec.modes.items():
-            mode = self.initialize_mode(mode_info.class_path, mode_info.params)
+            mode = self.initialize_mode(mode_info.mode_id, mode_info.params)
             self.add_mode(mode_name, mode)
             self.transitions[mode_name] = mode_info.transitions
 

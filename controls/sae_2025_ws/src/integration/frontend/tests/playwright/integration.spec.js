@@ -486,7 +486,7 @@ for (const { actionKey, actionLabel, responseKey, errorText } of [
       },
       missionFileGet: {
         success: true,
-        content: 'modes:\n  hover:\n    type: uav.modes.uav.HoverMode\n',
+        content: 'modes:\n  hover:\n    mode: uav.HoverMode\n',
       },
       launchLogsGet: {
         success: true,

@@ -11,7 +11,7 @@ from typing_extensions import NotRequired, Required, TypedDict
 
 
 REGISTRY_FILENAME = "mode_registry.json"
-SCHEMA_REGISTRY_VERSION = 3
+SCHEMA_REGISTRY_VERSION = 4
 
 
 class ModeParamFieldSpec(BaseModel):
@@ -27,6 +27,7 @@ class ModeParamFieldSpec(BaseModel):
 class ModeRegistryEntry(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    mode_id: str
     class_path: str
     module_path: str
     class_name: str
@@ -189,11 +190,11 @@ def dump_mode_registry_document(
 
 
 @lru_cache
-def params_model_for_entry(class_path: str) -> type[BaseModel]:
-    entry = load_mode_registry_document().modes.get(class_path)
+def params_model_for_entry(mode_id: str) -> type[BaseModel]:
+    entry = load_mode_registry_document().modes.get(mode_id)
     if entry is None:
         raise ValueError(
-            f"Mode '{class_path}' is not present in the committed schema registry."
+            f"Mode '{mode_id}' is not present in the committed schema registry."
         )
 
     field_definitions: dict[str, tuple[object, object]] = {}

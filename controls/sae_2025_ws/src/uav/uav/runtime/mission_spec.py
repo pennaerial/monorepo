@@ -8,6 +8,8 @@ from typing import Any
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
+from .mode_paths import normalize_public_mode_id
+
 try:
     from ament_index_python.packages import (
         PackageNotFoundError,
@@ -24,13 +26,13 @@ except ModuleNotFoundError:
 
 VALID_MISSION_TARGETS = {"uav", "payload"}
 _TOP_LEVEL_KEYS = {"modes"}
-_MODE_KEYS = {"class", "params", "transitions"}
+_MODE_KEYS = {"mode", "params", "transitions"}
 
 
 class MissionModeDocumentModel(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
-    class_path: str = Field(alias="class")
+    mode_id: str = Field(alias="mode")
     params: dict[str, Any] = Field(default_factory=dict)
     transitions: dict[str, str] = Field(default_factory=dict)
 
@@ -71,9 +73,17 @@ def load_mode_class(class_path: str):
 
 @dataclass(frozen=True)
 class ModeSpec:
-    class_path: str
+    mode_id: str
     params: dict[str, Any] = field(default_factory=dict)
     transitions: dict[str, str] = field(default_factory=dict)
+
+    @property
+    def mode(self) -> str:
+        return self.mode_id
+
+    @property
+    def class_path(self) -> str:
+        return self.mode_id
 
 
 @dataclass(frozen=True)
@@ -154,11 +164,22 @@ def load_mission_spec(path: str | Path | dict[str, Any]) -> MissionSpec:
                 f"Mode '{mode_name}' in '{mission_label}' contains unsupported keys: {sorted(unknown_mode_keys)}"
             )
 
-        class_path = mode_info.get("class")
-        if not isinstance(class_path, str) or not class_path:
+        if "class" in mode_info and "mode" not in mode_info:
             raise ValueError(
-                f"Mode '{mode_name}' in '{mission_label}' must define a non-empty class path."
+                f"Mode '{mode_name}' in '{mission_label}' uses deprecated key 'class'. Use 'mode' instead."
             )
+
+        mode_id = mode_info.get("mode")
+        if not isinstance(mode_id, str) or not mode_id:
+            raise ValueError(
+                f"Mode '{mode_name}' in '{mission_label}' must define a non-empty mode identifier."
+            )
+        try:
+            mode_id = normalize_public_mode_id(mode_id)
+        except ValueError as exc:
+            raise ValueError(
+                f"Mode '{mode_name}' in '{mission_label}' has an invalid mode identifier: {exc}"
+            ) from exc
 
         params = mode_info.get("params", {})
         if not isinstance(params, dict):
@@ -175,13 +196,13 @@ def load_mission_spec(path: str | Path | dict[str, Any]) -> MissionSpec:
                 f"Mode '{mode_name}' in '{mission_label}' must define transitions as a string-to-string mapping."
             )
 
-        from .schema import mode_entry_for_class_path, validate_mode_params
+        from .schema import mode_entry_for_mode_id, validate_mode_params
 
-        mode_entry = mode_entry_for_class_path(class_path)
+        mode_entry = mode_entry_for_mode_id(mode_id)
         mission_target = mode_entry.mission_target
         if mission_target not in VALID_MISSION_TARGETS:
             raise ValueError(
-                f"Mode '{class_path}' must declare mission_target as one of {sorted(VALID_MISSION_TARGETS)}."
+                f"Mode '{mode_id}' must declare mission_target as one of {sorted(VALID_MISSION_TARGETS)}."
             )
         mode_targets.add(mission_target)
         vision_nodes.update(mode_entry.required_vision_nodes)
@@ -196,10 +217,10 @@ def load_mission_spec(path: str | Path | dict[str, Any]) -> MissionSpec:
         )
 
         try:
-            validated_params = validate_mode_params(class_path, dict(params))
+            validated_params = validate_mode_params(mode_id, dict(params))
         except Exception as exc:
             raise ValueError(
-                f"Mode '{mode_name}' in '{mission_label}' has invalid params for '{class_path}': {exc}"
+                f"Mode '{mode_name}' in '{mission_label}' has invalid params for '{mode_id}': {exc}"
             ) from exc
 
         unknown_transition_labels = sorted(
@@ -209,11 +230,11 @@ def load_mission_spec(path: str | Path | dict[str, Any]) -> MissionSpec:
         )
         if unknown_transition_labels:
             raise ValueError(
-                f"Mode '{mode_name}' in '{mission_label}' uses unsupported transition label(s) for '{class_path}': {unknown_transition_labels}"
+                f"Mode '{mode_name}' in '{mission_label}' uses unsupported transition label(s) for '{mode_id}': {unknown_transition_labels}"
             )
 
         modes[mode_name] = ModeSpec(
-            class_path=class_path,
+            mode_id=mode_id,
             params=validated_params,
             transitions=dict(transitions),
         )

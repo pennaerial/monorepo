@@ -23,13 +23,11 @@ def test_load_mission_spec_does_not_import_mode_classes(monkeypatch, tmp_path):
         """
         modes:
           start:
-            class: uav.modes.uav.TakeoffMode
-            params:
-              altitude: 3.0
+            mode: uav.vtol.TakeoffMode
             transitions:
               complete: land
           land:
-            class: uav.modes.uav.LandingMode
+            mode: uav.LandingMode
         """,
     )
 
@@ -43,7 +41,7 @@ def test_load_mission_spec_does_not_import_mode_classes(monkeypatch, tmp_path):
     mission_spec = load_mission_spec(mission_path)
 
     assert mission_spec.target == "uav"
-    assert mission_spec.modes["start"].params == {"altitude": 3.0}
+    assert mission_spec.modes["start"].params == {}
 
 
 def test_load_mission_spec_works_without_ros_setup(tmp_path):
@@ -52,7 +50,7 @@ def test_load_mission_spec_works_without_ros_setup(tmp_path):
         """
         modes:
           start:
-            class: uav.modes.payload.PayloadAprilTagApproachMode
+            mode: payload.PayloadAprilTagApproachMode
             params:
               tag_id: 3
               stop_distance_m: 0.05
@@ -123,5 +121,5 @@ def test_load_fleet_document_works_without_ros_setup():
 def test_committed_mode_registry_contains_required_modes():
     modes = load_mode_registry_document().modes
 
-    assert "uav.modes.uav.TakeoffMode" in modes
-    assert "uav.modes.payload.PayloadRetreatMode" in modes
+    assert "uav.vtol.TakeoffMode" in modes
+    assert "payload.PayloadRetreatMode" in modes

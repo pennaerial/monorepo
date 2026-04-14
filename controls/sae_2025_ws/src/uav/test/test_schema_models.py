@@ -27,9 +27,10 @@ def _write_yaml(tmp_path: Path, name: str, contents: str) -> Path:
 
 
 def test_mode_registry_entry_exposes_transition_labels_and_schema():
-    entry = mode_entry_for_class_path("uav.modes.uav.TakeoffMode")
+    entry = mode_entry_for_class_path("uav.vtol.TakeoffMode")
 
-    assert entry.class_path == "uav.modes.uav.TakeoffMode"
+    assert entry.mode_id == "uav.vtol.TakeoffMode"
+    assert entry.class_path == "uav.modes.uav.vtol.TakeoffMode"
     assert entry.mission_target == "uav"
     assert entry.requires_camera is False
     assert entry.transition_labels == ("complete",)
@@ -37,7 +38,7 @@ def test_mode_registry_entry_exposes_transition_labels_and_schema():
 
 
 def test_mode_registry_entry_marks_camera_only_modes():
-    entry = mode_entry_for_class_path("uav.modes.payload.PayloadWaitForDriveOutMode")
+    entry = mode_entry_for_class_path("payload.PayloadWaitForDriveOutMode")
 
     assert entry.mission_target == "payload"
     assert entry.required_vision_nodes == ()
@@ -46,6 +47,7 @@ def test_mode_registry_entry_marks_camera_only_modes():
 
 def test_mode_registry_entry_preserves_canonical_vision_node_paths():
     entry = ModeRegistryEntry(
+        mode_id="payload.PayloadScanForTagMode",
         class_path="uav.modes.payload.PayloadScanForTagMode",
         module_path="uav.modes.payload.PayloadScanForTagMode",
         class_name="PayloadScanForTagMode",
@@ -63,14 +65,14 @@ def test_mode_registry_entry_preserves_canonical_vision_node_paths():
 
 def test_mode_registry_entries_include_payload_modes():
     entries = mode_registry_entries(mission_target="payload")
-    class_paths = {entry.class_path for entry in entries}
+    mode_ids = {entry.mode_id for entry in entries}
 
-    assert "uav.modes.payload.PayloadDLZNavigateMode" in class_paths
-    assert "uav.modes.payload.PayloadAprilTagApproachMode" in class_paths
+    assert "payload.PayloadDLZNavigateMode" in mode_ids
+    assert "payload.PayloadAprilTagApproachMode" in mode_ids
 
 
 def test_mode_registry_entry_exposes_peer_vehicle_names():
-    entry = mode_entry_for_class_path("uav.modes.payload.PayloadPeerFleetTestMode")
+    entry = mode_entry_for_class_path("payload.PayloadPeerFleetTestMode")
 
     assert entry.mission_target == "payload"
     assert entry.peer_vehicle_names == ("payload_0", "payload_1")
@@ -94,10 +96,10 @@ def test_mode_schema_registry_loads_without_mode_imports():
         sys.path.insert(0, {str(package_root)!r})
         from uav.runtime.schema import mode_entry_for_class_path, mode_registry_entries
 
-        takeoff = mode_entry_for_class_path("uav.modes.uav.TakeoffMode")
-        payload_paths = [entry.class_path for entry in mode_registry_entries(mission_target="payload")]
+        takeoff = mode_entry_for_class_path("uav.vtol.TakeoffMode")
+        payload_paths = [entry.mode_id for entry in mode_registry_entries(mission_target="payload")]
         print(json.dumps({{
-            "takeoff": takeoff.class_path,
+            "takeoff": takeoff.mode_id,
             "payload_count": len(payload_paths),
         }}, sort_keys=True))
         """
@@ -111,7 +113,7 @@ def test_mode_schema_registry_loads_without_mode_imports():
         check=True,
     )
 
-    assert '"takeoff": "uav.modes.uav.TakeoffMode"' in result.stdout
+    assert '"takeoff": "uav.vtol.TakeoffMode"' in result.stdout
     assert '"payload_count":' in result.stdout
 
 
@@ -122,11 +124,11 @@ def test_mission_spec_rejects_unsupported_transition_labels(tmp_path):
         """
         modes:
           start:
-            class: uav.modes.uav.TakeoffMode
+            mode: uav.vtol.TakeoffMode
             transitions:
               invalid: end
           end:
-            class: uav.modes.uav.LandingMode
+            mode: uav.LandingMode
         """,
     )
 
@@ -141,7 +143,7 @@ def test_mission_spec_rejects_invalid_mode_params(tmp_path):
         """
         modes:
           start:
-            class: uav.modes.uav.TakeoffMode
+            mode: uav.vtol.TakeoffMode
             params:
               unexpected: true
         """,
