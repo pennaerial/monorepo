@@ -38,6 +38,7 @@ class FleetVehicleModel(FleetDefaultsModel):
     mission_path: str | None = None
     kind: Literal["uav", "payload"] | None = None
     px4_airframe_id: int | None = None
+    px4_namespace: str | None = None
     px4_instance: int | None = None
     payload_controller: str | None = None
     airframe: str | None = None

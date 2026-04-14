@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 import sys
 import types
 from types import SimpleNamespace
@@ -11,13 +12,24 @@ def _placeholder(name: str):
     return type(name, (), {})
 
 
+def _import_module_if_available(name: str):
+    try:
+        return importlib.import_module(name)
+    except ModuleNotFoundError:
+        return None
+
+
 def _install_ros_test_doubles() -> None:
     ament_index_python = sys.modules.get("ament_index_python")
+    if ament_index_python is None:
+        ament_index_python = _import_module_if_available("ament_index_python")
     if ament_index_python is None:
         ament_index_python = types.ModuleType("ament_index_python")
         sys.modules["ament_index_python"] = ament_index_python
 
     ament_index_packages = sys.modules.get("ament_index_python.packages")
+    if ament_index_packages is None:
+        ament_index_packages = _import_module_if_available("ament_index_python.packages")
     if ament_index_packages is None:
         ament_index_packages = types.ModuleType("ament_index_python.packages")
         sys.modules["ament_index_python.packages"] = ament_index_packages
@@ -33,12 +45,16 @@ def _install_ros_test_doubles() -> None:
 
     rclpy = sys.modules.get("rclpy")
     if rclpy is None:
+        rclpy = _import_module_if_available("rclpy")
+    if rclpy is None:
         rclpy = types.ModuleType("rclpy")
         sys.modules["rclpy"] = rclpy
     if not hasattr(rclpy, "ok"):
         rclpy.ok = lambda: True
 
     node_mod = sys.modules.get("rclpy.node")
+    if node_mod is None:
+        node_mod = _import_module_if_available("rclpy.node")
     if node_mod is None:
         node_mod = types.ModuleType("rclpy.node")
         sys.modules["rclpy.node"] = node_mod
@@ -51,6 +67,8 @@ def _install_ros_test_doubles() -> None:
 
     executors_mod = sys.modules.get("rclpy.executors")
     if executors_mod is None:
+        executors_mod = _import_module_if_available("rclpy.executors")
+    if executors_mod is None:
         executors_mod = types.ModuleType("rclpy.executors")
         sys.modules["rclpy.executors"] = executors_mod
     if not hasattr(executors_mod, "ExternalShutdownException"):
@@ -62,12 +80,16 @@ def _install_ros_test_doubles() -> None:
 
     clock_mod = sys.modules.get("rclpy.clock")
     if clock_mod is None:
+        clock_mod = _import_module_if_available("rclpy.clock")
+    if clock_mod is None:
         clock_mod = types.ModuleType("rclpy.clock")
         sys.modules["rclpy.clock"] = clock_mod
     if not hasattr(clock_mod, "Clock"):
         clock_mod.Clock = _placeholder("Clock")
 
     parameter_mod = sys.modules.get("rclpy.parameter")
+    if parameter_mod is None:
+        parameter_mod = _import_module_if_available("rclpy.parameter")
     if parameter_mod is None:
         parameter_mod = types.ModuleType("rclpy.parameter")
         sys.modules["rclpy.parameter"] = parameter_mod
@@ -76,6 +98,10 @@ def _install_ros_test_doubles() -> None:
 
     validate_namespace_mod = sys.modules.get("rclpy.validate_namespace")
     if validate_namespace_mod is None:
+        validate_namespace_mod = _import_module_if_available(
+            "rclpy.validate_namespace"
+        )
+    if validate_namespace_mod is None:
         validate_namespace_mod = types.ModuleType("rclpy.validate_namespace")
         sys.modules["rclpy.validate_namespace"] = validate_namespace_mod
     if not hasattr(validate_namespace_mod, "validate_namespace"):
@@ -83,12 +109,16 @@ def _install_ros_test_doubles() -> None:
 
     validate_node_name_mod = sys.modules.get("rclpy.validate_node_name")
     if validate_node_name_mod is None:
+        validate_node_name_mod = _import_module_if_available("rclpy.validate_node_name")
+    if validate_node_name_mod is None:
         validate_node_name_mod = types.ModuleType("rclpy.validate_node_name")
         sys.modules["rclpy.validate_node_name"] = validate_node_name_mod
     if not hasattr(validate_node_name_mod, "validate_node_name"):
         validate_node_name_mod.validate_node_name = lambda node_name: None
 
     qos_mod = sys.modules.get("rclpy.qos")
+    if qos_mod is None:
+        qos_mod = _import_module_if_available("rclpy.qos")
     if qos_mod is None:
         qos_mod = types.ModuleType("rclpy.qos")
         sys.modules["rclpy.qos"] = qos_mod
