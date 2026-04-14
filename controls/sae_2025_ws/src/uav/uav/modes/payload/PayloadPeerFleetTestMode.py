@@ -4,7 +4,7 @@ PayloadPeerFleetTestMode: passive two-payload peer communication example.
 This mode is intended for manual fleet testing of the peer-aware `ModeManager`
 plumbing. Each payload:
 
-- publishes a local status string on `peer_test/state`
+- publishes a local status payload on `peer_test/state`
 - subscribes to the other payload's namespaced `peer_test/state`
 - publishes and subscribes on `/shared/peer_test/broadcast`
 
@@ -14,6 +14,7 @@ operator verifies peer discovery, disconnect handling, and reconnect behavior.
 
 from __future__ import annotations
 
+import json
 from typing import Mapping
 
 from rclpy.node import Node
@@ -82,17 +83,62 @@ class PayloadPeerFleetTestMode(Mode):
         self._last_log_time = 0.0
         self._sequence = 0
         self._shared_message_count = 0
-        self._peer_messages: dict[str, str] = {}
+        self._peer_message_counts = {peer_name: 0 for peer_name in self._peer_names}
+        self._shared_remote_message_counts = {
+            peer_name: 0 for peer_name in self._peer_names
+        }
         self._last_disconnect_signature: tuple[str, ...] = ()
 
     def _now(self) -> float:
         return self.node.get_clock().now().nanoseconds * 1e-9
 
-    def _on_peer_message(self, peer_name: str, message: String) -> None:
-        self._peer_messages[peer_name] = str(message.data)
+    def _decode_status(self, message: String) -> dict[str, object] | None:
+        try:
+            payload = json.loads(str(message.data))
+        except json.JSONDecodeError:
+            return None
+        if not isinstance(payload, dict):
+            return None
+        return payload
 
-    def _on_shared_message(self, _message: String) -> None:
+    def _on_peer_message(self, peer_name: str, message: String) -> None:
+        payload = self._decode_status(message)
+        if payload is None:
+            return
+        self._peer_message_counts[peer_name] = (
+            self._peer_message_counts.get(peer_name, 0) + 1
+        )
+
+    def _on_shared_message(self, message: String) -> None:
         self._shared_message_count += 1
+        payload = self._decode_status(message)
+        if payload is None:
+            return
+        sender = str(payload.get("vehicle", "")).strip()
+        if sender and sender != self.vehicle.name and sender in self._peer_names:
+            self._shared_remote_message_counts[sender] = (
+                self._shared_remote_message_counts.get(sender, 0) + 1
+            )
+
+    def _status_payload(
+        self, *, state: str, disconnected_peers: tuple[str, ...]
+    ) -> dict[str, object]:
+        return {
+            "vehicle": self.vehicle.name,
+            "sequence": self._sequence,
+            "state": state,
+            "peer_names": list(self._peer_names),
+            "disconnected_peers": list(disconnected_peers),
+            "peer_received_total": int(sum(self._peer_message_counts.values())),
+            "peer_received_by_peer": dict(sorted(self._peer_message_counts.items())),
+            "shared_received_total": int(self._shared_message_count),
+            "shared_remote_received_total": int(
+                sum(self._shared_remote_message_counts.values())
+            ),
+            "shared_remote_received_by_peer": dict(
+                sorted(self._shared_remote_message_counts.items())
+            ),
+        }
 
     def _publish_status(
         self, *, now: float, state: str, disconnected_peers: tuple[str, ...] = ()
@@ -105,10 +151,10 @@ class PayloadPeerFleetTestMode(Mode):
 
         self._last_publish_time = now
         self._sequence += 1
-        suffix = ""
-        if disconnected_peers:
-            suffix = f" missing={','.join(disconnected_peers)}"
-        status = f"{self.vehicle.name} seq={self._sequence} state={state}{suffix}"
+        status = json.dumps(
+            self._status_payload(state=state, disconnected_peers=disconnected_peers),
+            sort_keys=True,
+        )
 
         local_message = String()
         local_message.data = status
@@ -122,12 +168,10 @@ class PayloadPeerFleetTestMode(Mode):
         if self._last_log_time and now - self._last_log_time < 5.0:
             return
         self._last_log_time = now
-        peers = ", ".join(
-            f"{peer_name}={self._peer_messages.get(peer_name, 'none')}"
-            for peer_name in self._peer_names
-        )
         self.log(
-            f"{state}: shared_messages={self._shared_message_count} peer_messages=[{peers}]"
+            f"{state}: peer_total={sum(self._peer_message_counts.values())} "
+            f"shared_total={self._shared_message_count} "
+            f"shared_remote_total={sum(self._shared_remote_message_counts.values())}"
         )
 
     def on_enter(self) -> None:
@@ -135,7 +179,9 @@ class PayloadPeerFleetTestMode(Mode):
         self._last_log_time = 0.0
         self._sequence = 0
         self._shared_message_count = 0
-        self._peer_messages.clear()
+        for peer_name in self._peer_names:
+            self._peer_message_counts[peer_name] = 0
+            self._shared_remote_message_counts[peer_name] = 0
         self._last_disconnect_signature = ()
         self.log(
             f"starting peer fleet test for {self.vehicle.name}; expecting peers {self._peer_names}"

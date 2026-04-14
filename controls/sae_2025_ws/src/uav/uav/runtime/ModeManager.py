@@ -369,10 +369,16 @@ class ModeManager(Node):
             self.switch_mode(self.transition(state))
 
     def create_publisher(self, msg_type, topic: str, *args, **kwargs):
-        return self._managed_comms.create_publisher(msg_type, topic, *args, **kwargs)
+        managed_comms = getattr(self, "_managed_comms", None)
+        if managed_comms is None:
+            return super().create_publisher(msg_type, topic, *args, **kwargs)
+        return managed_comms.create_publisher(msg_type, topic, *args, **kwargs)
 
     def create_subscription(self, msg_type, topic: str, *args, **kwargs):
-        return self._managed_comms.create_subscription(
+        managed_comms = getattr(self, "_managed_comms", None)
+        if managed_comms is None:
+            return super().create_subscription(msg_type, topic, *args, **kwargs)
+        return managed_comms.create_subscription(
             msg_type,
             topic,
             *args,
@@ -380,16 +386,31 @@ class ModeManager(Node):
         )
 
     def create_client(self, srv_type, srv_name: str, *args, **kwargs):
-        return self._managed_comms.create_client(srv_type, srv_name, *args, **kwargs)
+        managed_comms = getattr(self, "_managed_comms", None)
+        if managed_comms is None:
+            return super().create_client(srv_type, srv_name, *args, **kwargs)
+        return managed_comms.create_client(srv_type, srv_name, *args, **kwargs)
 
     def create_service(self, srv_type, srv_name: str, *args, **kwargs):
-        return self._managed_comms.create_service(srv_type, srv_name, *args, **kwargs)
+        managed_comms = getattr(self, "_managed_comms", None)
+        if managed_comms is None:
+            return super().create_service(srv_type, srv_name, *args, **kwargs)
+        return managed_comms.create_service(srv_type, srv_name, *args, **kwargs)
 
     def destroy_publisher(self, publisher) -> bool:
-        return self._managed_comms.destroy_publisher(publisher)
+        managed_comms = getattr(self, "_managed_comms", None)
+        if managed_comms is None:
+            return super().destroy_publisher(publisher)
+        return managed_comms.destroy_publisher(publisher)
 
     def destroy_subscription(self, subscription) -> bool:
-        return self._managed_comms.destroy_subscription(subscription)
+        managed_comms = getattr(self, "_managed_comms", None)
+        if managed_comms is None:
+            return super().destroy_subscription(subscription)
+        return managed_comms.destroy_subscription(subscription)
 
     def destroy_client(self, client) -> bool:
-        return self._managed_comms.destroy_client(client)
+        managed_comms = getattr(self, "_managed_comms", None)
+        if managed_comms is None:
+            return super().destroy_client(client)
+        return managed_comms.destroy_client(client)
