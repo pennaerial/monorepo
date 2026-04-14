@@ -15,8 +15,8 @@ modes:
       ccw_upper_hsv: [130, 255, 255] #        (was [140, 255, 255])
       # cw_lower_hsv: [170, 140, 120]   # red   (was [0, 100, 100])
       # cw_upper_hsv: [180, 255, 255]  #        (was [10, 255, 255])
-      cw_lower_hsv: [160, 153, 204]
-      cw_upper_hsv: [165, 191, 242]
+      cw_lower_hsv: [160, 102, 216] # pink
+      cw_upper_hsv: [170, 153, 255]
       drive_out_speed_mps: 0.1
       detect_frames: 3
       max_drive_out_s: 30.0
@@ -33,8 +33,10 @@ modes:
       k_lat: 0.003
       max_angular: 1.3
       # TAPE_ALIGN — rotate until diagonal black-tape centroid is centered
-      tape_align_lower_hsv: [0, 0, 0]
-      tape_align_upper_hsv: [180, 255, 60]
+      # tape_align_lower_hsv: [0, 0, 0] # black
+      # tape_align_upper_hsv: [180, 255, 60]
+      tape_align_lower_hsv: [20, 100, 100]
+      tape_align_upper_hsv: [35, 255, 255] # yellow
       tape_align_angular_speed: 0.6
       tape_align_center_tol_px: 20.0
       tape_align_min_pixels: 100

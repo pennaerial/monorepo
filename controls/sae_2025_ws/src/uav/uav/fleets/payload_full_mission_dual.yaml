@@ -9,17 +9,13 @@ defaults:
   save_vision_milliseconds: 0
   servo_only: false
   camera_mount_offsets: [0.0, 0.0, 0.0]
-  camera_input_transport: compressed
-  camera_rotate_degrees: 0.0
+  # camera_input_transport: compressed
+  # camera_rotate_degrees: 0.0
   camera_preprocess_hook: ""
 
 vehicles:
   - name: payload_0
     controllable: payload_0
-    mission: payload_full_mission
-    camera_mount_offsets: [0.2, 0.0, 0.0]
+    mission: payload_corner+approach_real
+    camera_mount_offsets: [0.0, 0.0, 0.0]
 
-  - name: payload_1
-    controllable: payload_1
-    mission: payload_full_mission
-    camera_mount_offsets: [0.2, 0.0, 0.0]
