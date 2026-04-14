@@ -14,6 +14,8 @@ operator verifies peer discovery, disconnect handling, and reconnect behavior.
 
 from __future__ import annotations
 
+from typing import Mapping
+
 from rclpy.node import Node
 from std_msgs.msg import String
 
@@ -146,10 +148,15 @@ class PayloadPeerFleetTestMode(Mode):
         self._log_status(now=now, state="connected")
 
     def on_disconnect(
-        self, time_delta: float, disconnected_peers: tuple[str, ...]
+        self, time_delta: float, connection_status: Mapping[str, bool]
     ) -> None:
         del time_delta
         now = self._now()
+        disconnected_peers = tuple(
+            peer_name
+            for peer_name in self._peer_names
+            if not bool(connection_status.get(peer_name, False))
+        )
         disconnect_signature = tuple(sorted(disconnected_peers))
         if disconnect_signature != self._last_disconnect_signature:
             self.log("waiting for peers: " + ", ".join(disconnect_signature))

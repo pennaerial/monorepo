@@ -1,8 +1,9 @@
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, ClassVar, Mapping
 
 from rclpy.node import Node
 
+from uav.runtime.mode_paths import canonical_mode_path
 from uav.vehicles.Vehicle import Vehicle
 from uav.runtime.vision_loader import canonical_vision_node_path
 
@@ -64,7 +65,10 @@ class Mode(ABC):
         future = self.pending_requests.get(service_name)
         if future is None:
             client = self.node.get_vision_client(vision_node)
-            self.pending_requests[service_name] = client.call_async(request)
+            future = client.call_async(request)
+            if future is None:
+                return None
+            self.pending_requests[service_name] = future
             return None
 
         if not future.done():
@@ -96,16 +100,36 @@ class Mode(ABC):
         pass
 
     def on_disconnect(
-        self, time_delta: float, disconnected_peers: tuple[str, ...]
+        self, time_delta: float, connection_status: Mapping[str, bool]
     ) -> None:
         """
         Periodic logic executed while one or more required peers are disconnected.
 
         Args:
             time_delta (float): Time in seconds since the last update.
-            disconnected_peers (tuple[str, ...]): Required peers currently disconnected.
+            connection_status (Mapping[str, bool]): Current mission peer connection map.
         """
         pass
+
+    def connection_ready(self, connection_status: Mapping[str, bool]) -> bool:
+        """
+        Return whether the mode has enough peer connectivity to run `on_update()`.
+
+        The default implementation treats every declared remote peer as required.
+        Modes may override this to express looser readiness rules.
+        """
+        vehicle_name = str(getattr(self.vehicle, "name", "") or "").strip().strip("/")
+        required_peers = tuple(
+            peer_name
+            for peer_name in self.peer_vehicle_names
+            if peer_name and peer_name != vehicle_name
+        )
+        if not required_peers:
+            return True
+        return all(
+            bool(connection_status.get(peer_name, False))
+            for peer_name in required_peers
+        )
 
     @abstractmethod
     def check_status(self) -> str:
@@ -142,17 +166,23 @@ class Mode(ABC):
             self.on_update(time_delta)
 
     def disconnect(
-        self, time_delta: float, disconnected_peers: tuple[str, ...]
+        self, time_delta: float, connection_status: Mapping[str, bool]
     ) -> None:
         """
         Update the mode's disconnected behavior if it is active.
 
         Args:
             time_delta (float): Time in seconds since the last update.
-            disconnected_peers (tuple[str, ...]): Required peers currently disconnected.
+            connection_status (Mapping[str, bool]): Current mission peer connection map.
         """
         if self.active:
-            self.on_disconnect(time_delta, disconnected_peers)
+            self.on_disconnect(time_delta, connection_status)
+
+    def shared_state(self) -> dict:
+        """
+        Return persistent ModeManager-owned state for this mode class.
+        """
+        return self.node.shared_state_for(canonical_mode_path(self))
 
     def log(self, message: str) -> None:
         """

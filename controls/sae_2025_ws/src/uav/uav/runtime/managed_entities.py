@@ -1,53 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any, Literal
-
-ManagedEntityKind = Literal["publisher", "subscription", "client"]
-ManagedEntityScope = Literal["peer", "shared"]
-ManagedEntityPhase = Literal["construct", "activate"]
-
-
-@dataclass
-class ManagedEntityDescriptor:
-    kind: ManagedEntityKind
-    scope: ManagedEntityScope
-    phase: ManagedEntityPhase
-    owner_label: str
-    interface_name: str
-    name: str
-    peers: tuple[str, ...]
-
-
-@dataclass
-class ManagedEntitySpec:
-    kind: ManagedEntityKind
-    scope: ManagedEntityScope
-    phase: ManagedEntityPhase
-    owner: object
-    owner_label: str
-    interface_type: object
-    name: str
-    args: tuple[Any, ...]
-    kwargs: dict[str, Any]
-    peers: tuple[str, ...]
-
-    def descriptor(self) -> ManagedEntityDescriptor:
-        return ManagedEntityDescriptor(
-            kind=self.kind,
-            scope=self.scope,
-            phase=self.phase,
-            owner_label=self.owner_label,
-            interface_name=getattr(
-                self.interface_type, "__name__", str(self.interface_type)
-            ),
-            name=self.name,
-            peers=self.peers,
-        )
-
 
 class ManagedEntity:
-    def __init__(self, spec: ManagedEntitySpec):
+    def __init__(self, spec):
         self.spec = spec
         self._entity = None
         self._destroyed = False
@@ -86,10 +41,6 @@ class ManagedPublisher(ManagedEntity):
         return entity.publish(message)
 
 
-class ManagedSubscription(ManagedEntity):
-    pass
-
-
 class ManagedClient(ManagedEntity):
     def wait_for_service(self, timeout_sec: float = 0.0) -> bool:
         entity = self.get_underlying()
@@ -107,3 +58,6 @@ class ManagedClient(ManagedEntity):
         if not self.wait_for_service(timeout_sec=0.0):
             return None
         return entity.call_async(request)
+
+
+ManagedSubscription = ManagedEntity

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import nullcontext
 import importlib
 import sys
 import types
@@ -266,6 +267,7 @@ class _TrackingMode:
         self.activated = 0
         self.deactivated = 0
         self.updates: list[float] = []
+        self.disconnects: list[tuple[float, dict[str, bool]]] = []
 
     def activate(self) -> None:
         self.activated += 1
@@ -273,10 +275,16 @@ class _TrackingMode:
     def deactivate(self) -> None:
         self.deactivated += 1
 
+    def connection_ready(self, _connection_status: dict[str, bool]) -> bool:
+        return True
+
     def update(self, time_delta: float) -> None:
         self.updates.append(time_delta)
         if self.raises is not None:
             raise self.raises
+
+    def disconnect(self, time_delta: float, connection_status: dict[str, bool]) -> None:
+        self.disconnects.append((time_delta, dict(connection_status)))
 
     def check_status(self) -> str:
         return self.status
@@ -296,14 +304,7 @@ def _make_mode_manager(*, vehicle=None, auto_launch: bool = False) -> ModeManage
     manager._runtime_vehicle_name = ""
     manager.peer_heartbeat_hz = 10.0
     manager.peer_stale_timeout_s = 0.5
-    manager._managed_entity_context = None
-    manager._managed_entities = {}
-    manager._peer_heartbeat_publisher = None
-    manager._peer_timer = None
-    manager._peer_heartbeat_subscriptions = {}
-    manager._peer_connected = {}
-    manager._peer_last_seen = {}
-    manager._mission_peer_names = ()
+    manager._shared_mode_state = {}
     manager._logger = _FakeLogger()
     manager.destroyed = False
     manager.stopped = False
@@ -313,6 +314,24 @@ def _make_mode_manager(*, vehicle=None, auto_launch: bool = False) -> ModeManage
     manager.destroy_client = lambda client: None
     manager.destroy_node = lambda: setattr(manager, "destroyed", True)
     manager._stop_vehicle = lambda: setattr(manager, "stopped", True)
+    manager._managed_comms = SimpleNamespace(
+        scope=lambda **_kwargs: nullcontext(),
+        destroy_for_owner=lambda *_args, **_kwargs: None,
+        bind_owner=lambda *_args, **_kwargs: None,
+        create_publisher=lambda *_args, **_kwargs: None,
+        create_subscription=lambda *_args, **_kwargs: None,
+        create_client=lambda *_args, **_kwargs: None,
+        create_service=lambda *_args, **_kwargs: object(),
+        destroy_publisher=lambda _publisher: True,
+        destroy_subscription=lambda _subscription: True,
+        destroy_client=lambda _client: True,
+        descriptors=(),
+    )
+    manager._peer_connections = SimpleNamespace(
+        configure=lambda _peer_names: None,
+        status=lambda: {},
+        peer_names=(),
+    )
     return manager
 
 
@@ -336,23 +355,32 @@ def _stub_mode_manager_init(
     self._runtime_vehicle_name = str(vehicle_name).strip().strip("/")
     self.peer_heartbeat_hz = float(peer_heartbeat_hz)
     self.peer_stale_timeout_s = float(peer_stale_timeout_s)
-    self._managed_entity_context = None
-    self._managed_entities = {}
-    self._peer_heartbeat_publisher = None
-    self._peer_timer = None
-    self._peer_heartbeat_subscriptions = {}
-    self._peer_connected = {}
-    self._peer_last_seen = {}
-    self._mission_peer_names = ()
+    self._shared_mode_state = {}
     self._auto_launch_timer = None
     self._logger = _FakeLogger()
     self.create_timer = lambda period, callback: _FakeTimer(callback)
-    self.create_service = lambda *args, **kwargs: object()
-    self.configure_peer_vehicle_names = lambda peer_names: setattr(
-        self, "_mission_peer_names", tuple(peer_names)
-    )
     self.get_logger = lambda: self._logger
     self.destroy_node = lambda: None
+    self._managed_comms = SimpleNamespace(
+        scope=lambda **_kwargs: nullcontext(),
+        destroy_for_owner=lambda *_args, **_kwargs: None,
+        bind_owner=lambda *_args, **_kwargs: None,
+        create_publisher=lambda *_args, **_kwargs: None,
+        create_subscription=lambda *_args, **_kwargs: None,
+        create_client=lambda *_args, **_kwargs: None,
+        create_service=lambda *_args, **_kwargs: object(),
+        destroy_publisher=lambda _publisher: True,
+        destroy_subscription=lambda _subscription: True,
+        destroy_client=lambda _client: True,
+        descriptors=(),
+    )
+    self._peer_connections = SimpleNamespace(
+        configure=lambda peer_names: setattr(
+            self, "_configured_peers", tuple(peer_names)
+        ),
+        status=lambda: {},
+        peer_names=(),
+    )
 
 
 def _make_bootstrap(module_cls, params: dict[str, object]):

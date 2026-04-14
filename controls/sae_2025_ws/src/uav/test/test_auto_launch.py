@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import nullcontext
 import importlib
 import importlib.util
 from pathlib import Path
@@ -288,6 +289,25 @@ def _make_mode_manager(*, ready: bool) -> ModeManager:
     manager._auto_launch_ready = lambda: manager._ready
     manager.create_timer = lambda period, callback: _FakeTimer(callback)
     manager.get_logger = lambda: manager._logger
+    manager._shared_mode_state = {}
+    manager._managed_comms = SimpleNamespace(
+        scope=lambda **_kwargs: nullcontext(),
+        destroy_for_owner=lambda *_args, **_kwargs: None,
+        bind_owner=lambda *_args, **_kwargs: None,
+        create_publisher=lambda *_args, **_kwargs: None,
+        create_subscription=lambda *_args, **_kwargs: None,
+        create_client=lambda *_args, **_kwargs: None,
+        create_service=lambda *_args, **_kwargs: object(),
+        destroy_publisher=lambda _publisher: True,
+        destroy_subscription=lambda _subscription: True,
+        destroy_client=lambda _client: True,
+        descriptors=(),
+    )
+    manager._peer_connections = SimpleNamespace(
+        configure=lambda _peer_names: None,
+        status=lambda: {},
+        peer_names=(),
+    )
     return manager
 
 
@@ -326,21 +346,30 @@ def _stub_mode_manager_init(
     self._runtime_vehicle_name = str(vehicle_name).strip().strip("/")
     self.peer_heartbeat_hz = float(peer_heartbeat_hz)
     self.peer_stale_timeout_s = float(peer_stale_timeout_s)
-    self._managed_entity_context = None
-    self._managed_entities = {}
-    self._peer_heartbeat_publisher = None
-    self._peer_timer = None
-    self._peer_heartbeat_subscriptions = {}
-    self._peer_connected = {}
-    self._peer_last_seen = {}
-    self._mission_peer_names = ()
     self._logger = _FakeLogger()
     self.create_timer = lambda period, callback: _FakeTimer(callback)
-    self.create_service = lambda *args, **kwargs: object()
-    self.configure_peer_vehicle_names = lambda peer_names: setattr(
-        self, "_mission_peer_names", tuple(peer_names)
-    )
     self.get_logger = lambda: self._logger
+    self._shared_mode_state = {}
+    self._managed_comms = SimpleNamespace(
+        scope=lambda **_kwargs: nullcontext(),
+        destroy_for_owner=lambda *_args, **_kwargs: None,
+        bind_owner=lambda *_args, **_kwargs: None,
+        create_publisher=lambda *_args, **_kwargs: None,
+        create_subscription=lambda *_args, **_kwargs: None,
+        create_client=lambda *_args, **_kwargs: None,
+        create_service=lambda *_args, **_kwargs: object(),
+        destroy_publisher=lambda _publisher: True,
+        destroy_subscription=lambda _subscription: True,
+        destroy_client=lambda _client: True,
+        descriptors=(),
+    )
+    self._peer_connections = SimpleNamespace(
+        configure=lambda peer_names: setattr(
+            self, "_configured_peers", tuple(peer_names)
+        ),
+        status=lambda: {},
+        peer_names=(),
+    )
     self.start_mission_service = object()
     self._auto_launch_timer = None
     if self.auto_launch:

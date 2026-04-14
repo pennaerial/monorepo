@@ -89,11 +89,17 @@ _install_ros_test_doubles()
 from uav.modes.Mode import Mode  # noqa: E402
 from uav.runtime.ModeManager import ModeManager  # noqa: E402
 import uav.runtime.ModeManager as mode_manager_module  # noqa: E402
+from uav.runtime.managed_comms import (  # noqa: E402
+    ManagedCommContext,
+    ManagedCommRegistry,
+)
 from uav.runtime.managed_entities import (  # noqa: E402
     ManagedClient,
     ManagedPublisher,
     ManagedSubscription,
 )
+from uav.runtime.mode_paths import canonical_mode_path  # noqa: E402
+from uav.runtime.peer_connections import PeerConnectionTracker  # noqa: E402
 from uav.runtime.mission_spec import MissionSpec, load_mission_spec  # noqa: E402
 import uav.runtime.schema as schema_module  # noqa: E402
 from uav.runtime.schema_generator import build_mode_registry_entry  # noqa: E402
@@ -115,6 +121,10 @@ def _xfail_if_missing_peer_features(*features: str) -> None:
             missing.append("Mode.peer_vehicle_names")
         elif feature == "mode_on_disconnect" and "on_disconnect" not in mode_fields:
             missing.append("Mode.on_disconnect")
+        elif (
+            feature == "mode_connection_ready" and "connection_ready" not in mode_fields
+        ):
+            missing.append("Mode.connection_ready")
         elif (
             feature == "mission_peer_vehicle_names"
             and "peer_vehicle_names" not in dataclass_fields
@@ -144,6 +154,17 @@ def _xfail_if_missing_peer_features(*features: str) -> None:
             and "create_service" not in manager_fields
         ):
             missing.append("ModeManager.create_service")
+        elif (
+            feature == "manager_shared_state_for"
+            and "shared_state_for" not in manager_fields
+        ):
+            missing.append("ModeManager.shared_state_for")
+        elif feature == "manager_connection_ready_runtime":
+            runtime_names = set(
+                getattr(ModeManager._run_active_mode, "__code__").co_names
+            )
+            if "connection_ready" not in runtime_names:
+                missing.append("ModeManager._run_active_mode connection_ready logic")
         elif feature == "manager_disconnect_runtime":
             runtime_names = set(
                 getattr(ModeManager._run_active_mode, "__code__").co_names
@@ -226,20 +247,93 @@ def _make_mode_manager() -> ModeManager:
     manager._runtime_vehicle_name = "payload_0"
     manager.peer_heartbeat_hz = 10.0
     manager.peer_stale_timeout_s = 0.5
-    manager._managed_entity_context = None
-    manager._managed_entities = {}
-    manager._peer_heartbeat_publisher = None
-    manager._peer_timer = None
-    manager._peer_heartbeat_subscriptions = {}
-    manager._peer_connected = {}
-    manager._peer_last_seen = {}
-    manager._mission_peer_names = ()
+    manager._shared_mode_state = {}
     manager.get_logger = lambda: _FakeLogger()
     manager.get_clock = lambda: SimpleNamespace(
         now=lambda: SimpleNamespace(nanoseconds=0)
     )
     manager.destroy_node = lambda: None
     manager.handle_mode_state = lambda state: state
+
+    def raw_create_publisher(msg_type, topic, *args, **kwargs):
+        create_publisher = getattr(mode_manager_module.Node, "create_publisher", None)
+        if create_publisher is None:
+            return SimpleNamespace(
+                kind="publisher",
+                name=topic,
+                publish=lambda _message: None,
+            )
+        return create_publisher(manager, msg_type, topic, *args, **kwargs)
+
+    def raw_create_subscription(msg_type, topic, *args, **kwargs):
+        create_subscription = getattr(
+            mode_manager_module.Node, "create_subscription", None
+        )
+        if create_subscription is None:
+            return SimpleNamespace(kind="subscription", name=topic)
+        return create_subscription(manager, msg_type, topic, *args, **kwargs)
+
+    def raw_create_client(srv_type, service_name, *args, **kwargs):
+        create_client = getattr(mode_manager_module.Node, "create_client", None)
+        if create_client is None:
+            return SimpleNamespace(
+                kind="client",
+                name=service_name,
+                wait_for_service=lambda timeout_sec=0.0: True,
+                call_async=lambda request: request,
+            )
+        return create_client(manager, srv_type, service_name, *args, **kwargs)
+
+    def raw_create_service(srv_type, service_name, *args, **kwargs):
+        create_service = getattr(mode_manager_module.Node, "create_service", None)
+        if create_service is None:
+            return SimpleNamespace(kind="service", name=service_name)
+        return create_service(manager, srv_type, service_name, *args, **kwargs)
+
+    def raw_destroy_publisher(publisher) -> bool:
+        destroy_publisher = getattr(mode_manager_module.Node, "destroy_publisher", None)
+        if destroy_publisher is None:
+            return True
+        return bool(destroy_publisher(manager, publisher))
+
+    def raw_destroy_subscription(subscription) -> bool:
+        destroy_subscription = getattr(
+            mode_manager_module.Node, "destroy_subscription", None
+        )
+        if destroy_subscription is None:
+            return True
+        return bool(destroy_subscription(manager, subscription))
+
+    def raw_destroy_client(client) -> bool:
+        destroy_client = getattr(mode_manager_module.Node, "destroy_client", None)
+        if destroy_client is None:
+            return True
+        return bool(destroy_client(manager, client))
+
+    manager._managed_comms = ManagedCommRegistry(
+        runtime_vehicle_name=manager._runtime_vehicle_name,
+        connection_status=lambda: manager._peer_connections.status(),
+        raw_create_publisher=raw_create_publisher,
+        raw_create_subscription=raw_create_subscription,
+        raw_create_client=raw_create_client,
+        raw_create_service=raw_create_service,
+        raw_destroy_publisher=raw_destroy_publisher,
+        raw_destroy_subscription=raw_destroy_subscription,
+        raw_destroy_client=raw_destroy_client,
+    )
+    manager._peer_connections = PeerConnectionTracker(
+        runtime_vehicle_name=manager._runtime_vehicle_name,
+        peer_heartbeat_hz=manager.peer_heartbeat_hz,
+        peer_stale_timeout_s=manager.peer_stale_timeout_s,
+        now_seconds=manager._now_seconds,
+        on_connection_change=manager._managed_comms.on_peer_connection_change,
+        raw_create_publisher=raw_create_publisher,
+        raw_create_subscription=raw_create_subscription,
+        raw_destroy_subscription=raw_destroy_subscription,
+        raw_create_timer=lambda _period, _callback: SimpleNamespace(
+            cancel=lambda: None
+        ),
+    )
     return manager
 
 
@@ -248,14 +342,11 @@ def _configure_manager_for_mode(manager: ModeManager, mode: Mode) -> None:
     manager.active_mode = "start"
     manager.get_active_mode = lambda: mode
     peer_vehicle_names = manager._mode_peer_vehicle_names(mode)
-    manager._mission_peer_names = peer_vehicle_names
-    for peer_name in peer_vehicle_names:
-        manager._peer_connected.setdefault(peer_name, False)
-        manager._peer_last_seen.setdefault(peer_name, None)
-    manager._managed_entity_context = mode_manager_module._ModeEntityContext(
+    manager._peer_connections.configure(peer_vehicle_names)
+    manager._managed_comms._context = ManagedCommContext(
         owner=mode,
         owner_label=type(mode).__name__,
-        phase="activate",
+        phase="active",
         peer_vehicle_names=peer_vehicle_names,
     )
 
@@ -263,8 +354,11 @@ def _configure_manager_for_mode(manager: ModeManager, mode: Mode) -> None:
 def _set_peer_connection_state(
     manager: ModeManager, peer_status: dict[str, bool]
 ) -> None:
-    manager._peer_connected = dict(peer_status)
-    manager._mission_peer_names = tuple(sorted(peer_status))
+    manager._peer_connections._connected = dict(peer_status)
+    manager._peer_connections._peer_names = tuple(sorted(peer_status))
+    manager._peer_connections._last_seen = {
+        peer_name: None for peer_name in manager._peer_connections._peer_names
+    }
 
 
 def _observed_peer_vehicle_names(
@@ -301,7 +395,7 @@ def test_build_mode_registry_entry_includes_peer_vehicle_names():
         def __init__(self, node, vehicle) -> None:
             super().__init__(node, vehicle)
 
-        def on_disconnect(self, time_delta: float, peers: tuple[str, ...]) -> None:
+        def on_disconnect(self, time_delta: float, peers: dict[str, bool]) -> None:
             pass
 
         def on_update(self, time_delta: float) -> None:
@@ -315,28 +409,28 @@ def test_build_mode_registry_entry_includes_peer_vehicle_names():
     assert entry.peer_vehicle_names == ("payload_1", "uav_2")
 
 
-def test_build_mode_registry_entry_rejects_peer_mode_without_on_disconnect():
+def test_build_mode_registry_entry_allows_peer_mode_without_on_disconnect():
     _xfail_if_missing_peer_features(
         "mode_peer_vehicle_names",
-        "mode_on_disconnect",
         "registry_peer_vehicle_names",
     )
 
-    class InvalidPeerAwareMode(Mode):
+    class PeerAwareMode(Mode):
         mission_target = "payload"
         peer_vehicle_names = ("uav_3",)
 
         def __init__(self, node, vehicle) -> None:
             super().__init__(node, vehicle)
 
-        def on_update(self, time_delta: float) -> None:
-            pass
-
         def check_status(self) -> str:
             return "continue"
 
-    with pytest.raises((TypeError, ValueError), match="on_disconnect"):
-        build_mode_registry_entry(InvalidPeerAwareMode)
+        def on_update(self, time_delta: float) -> None:
+            pass
+
+    entry = build_mode_registry_entry(PeerAwareMode)
+
+    assert entry.peer_vehicle_names == ("uav_3",)
 
 
 def test_load_mission_spec_collects_sorted_peer_vehicle_names_union(
@@ -415,8 +509,12 @@ def test_mode_manager_validates_peer_and_shared_entity_namespaces(monkeypatch):
 
         def __init__(self, node, vehicle) -> None:
             super().__init__(node, vehicle)
+            self.peer_sub = self.node.create_subscription(
+                object, "/uav_1/status", lambda _msg: None, 1
+            )
+            self.shared_pub = self.node.create_publisher(object, "/shared/debug", 1)
 
-        def on_disconnect(self, time_delta: float, peers: tuple[str, ...]) -> None:
+        def on_disconnect(self, time_delta: float, peers: dict[str, bool]) -> None:
             pass
 
         def on_update(self, time_delta: float) -> None:
@@ -425,6 +523,11 @@ def test_mode_manager_validates_peer_and_shared_entity_namespaces(monkeypatch):
         def check_status(self) -> str:
             return "continue"
 
+    monkeypatch.setattr(
+        mode_manager_module,
+        "load_mode_class",
+        lambda _path: PeerAwareMode,
+    )
     monkeypatch.setattr(
         mode_manager_module.Node,
         "create_subscription",
@@ -451,16 +554,18 @@ def test_mode_manager_validates_peer_and_shared_entity_namespaces(monkeypatch):
     )
 
     manager = _make_mode_manager()
-    mode = PeerAwareMode(manager, manager.vehicle)
+    mode = ModeManager.initialize_mode(manager, "fake.module.PeerAwareMode", {})
     _configure_manager_for_mode(manager, mode)
 
     peer_sub = ModeManager.create_subscription(
         manager, object, "/uav_1/status", lambda _msg: None, 1
     )
-    shared_pub = ModeManager.create_publisher(manager, object, "/shared/debug", 1)
+    peer_client = ModeManager.create_client(manager, object, "/uav_1/camera")
 
     assert isinstance(peer_sub, ManagedSubscription)
-    assert isinstance(shared_pub, ManagedPublisher)
+    assert isinstance(peer_client, ManagedClient)
+    assert isinstance(mode.shared_pub, ManagedPublisher)
+    assert isinstance(mode.peer_sub, ManagedSubscription)
 
     with pytest.raises(ValueError):
         ModeManager.create_subscription(
@@ -476,10 +581,12 @@ def test_mode_manager_validates_peer_and_shared_entity_namespaces(monkeypatch):
         )
 
 
-def test_run_active_mode_calls_disconnect_handler_for_missing_required_peers():
+def test_run_active_mode_uses_connection_ready_for_gating():
     _xfail_if_missing_peer_features(
         "mode_peer_vehicle_names",
         "mode_on_disconnect",
+        "mode_connection_ready",
+        "manager_connection_ready_runtime",
         "manager_disconnect_runtime",
     )
 
@@ -490,11 +597,72 @@ def test_run_active_mode_calls_disconnect_handler_for_missing_required_peers():
         def __init__(self, node, vehicle) -> None:
             super().__init__(node, vehicle)
             self.update_calls: list[float] = []
-            self.disconnect_calls: list[tuple[float, tuple[str, ...]]] = []
+            self.disconnect_calls: list[tuple[float, dict[str, bool]]] = []
+            self.connection_checks: list[dict[str, bool]] = []
             self.status_checks = 0
 
-        def on_disconnect(self, time_delta: float, peers: tuple[str, ...]) -> None:
-            self.disconnect_calls.append((time_delta, peers))
+        def connection_ready(self, connection_status: dict[str, bool]) -> bool:
+            self.connection_checks.append(dict(connection_status))
+            return True
+
+        def on_update(self, time_delta: float) -> None:
+            self.update_calls.append(time_delta)
+
+        def on_disconnect(
+            self, time_delta: float, connection_status: dict[str, bool]
+        ) -> None:
+            self.disconnect_calls.append((time_delta, dict(connection_status)))
+
+        def check_status(self) -> str:
+            self.status_checks += 1
+            return "continue"
+
+    manager = _make_mode_manager()
+    mode = PeerAwareMode(manager, manager.vehicle)
+    mode.active = True
+    _configure_manager_for_mode(manager, mode)
+    _set_peer_connection_state(manager, {"uav_1": False, "uav_2": True})
+    handled_states: list[str] = []
+    manager.handle_mode_state = lambda state: handled_states.append(state)
+    manager.last_update_time = 10.0
+
+    ModeManager._run_active_mode(manager, 10.25)
+
+    assert mode.connection_checks == [{"uav_1": False, "uav_2": True}]
+    assert mode.update_calls == [0.25]
+    assert mode.disconnect_calls == []
+    assert mode.status_checks == 1
+    assert handled_states == ["continue"]
+
+
+def test_run_active_mode_passes_full_connection_status_to_disconnect():
+    _xfail_if_missing_peer_features(
+        "mode_peer_vehicle_names",
+        "mode_on_disconnect",
+        "mode_connection_ready",
+        "manager_connection_ready_runtime",
+        "manager_disconnect_runtime",
+    )
+
+    class PeerAwareMode(Mode):
+        mission_target = "payload"
+        peer_vehicle_names = ("uav_1", "uav_2")
+
+        def __init__(self, node, vehicle) -> None:
+            super().__init__(node, vehicle)
+            self.update_calls: list[float] = []
+            self.disconnect_calls: list[tuple[float, dict[str, bool]]] = []
+            self.connection_checks: list[dict[str, bool]] = []
+            self.status_checks = 0
+
+        def connection_ready(self, connection_status: dict[str, bool]) -> bool:
+            self.connection_checks.append(dict(connection_status))
+            return False
+
+        def on_disconnect(
+            self, time_delta: float, connection_status: dict[str, bool]
+        ) -> None:
+            self.disconnect_calls.append((time_delta, dict(connection_status)))
 
         def on_update(self, time_delta: float) -> None:
             self.update_calls.append(time_delta)
@@ -514,10 +682,37 @@ def test_run_active_mode_calls_disconnect_handler_for_missing_required_peers():
 
     ModeManager._run_active_mode(manager, 10.25)
 
+    assert mode.connection_checks == [{"uav_1": False, "uav_2": True}]
     assert mode.update_calls == []
-    assert mode.disconnect_calls == [(0.25, ("uav_1",))]
+    assert mode.disconnect_calls == [(0.25, {"uav_1": False, "uav_2": True})]
     assert mode.status_checks == 1
     assert handled_states == ["continue"]
+
+
+def test_mode_connection_ready_defaults_to_all_declared_peers_connected():
+    _xfail_if_missing_peer_features("mode_peer_vehicle_names", "mode_connection_ready")
+
+    class PeerAwareMode(Mode):
+        mission_target = "payload"
+        peer_vehicle_names = ("uav_1", "uav_2")
+
+        def __init__(self, node, vehicle) -> None:
+            super().__init__(node, vehicle)
+
+        def on_disconnect(self, time_delta: float, peers: dict[str, bool]) -> None:
+            pass
+
+        def on_update(self, time_delta: float) -> None:
+            pass
+
+        def check_status(self) -> str:
+            return "continue"
+
+    mode = PeerAwareMode(_RecordingNode(), _FakeVehicle())
+
+    assert mode.connection_ready({"uav_1": True, "uav_2": True}) is True
+    assert mode.connection_ready({"uav_1": True, "uav_2": False}) is False
+    assert mode.connection_ready({"uav_1": False, "uav_2": True}) is False
 
 
 def test_peer_client_wrapper_rebinds_on_connection_changes(monkeypatch):
@@ -533,7 +728,7 @@ def test_peer_client_wrapper_rebinds_on_connection_changes(monkeypatch):
         def __init__(self, node, vehicle) -> None:
             super().__init__(node, vehicle)
 
-        def on_disconnect(self, time_delta: float, peers: tuple[str, ...]) -> None:
+        def on_disconnect(self, time_delta: float, peers: dict[str, bool]) -> None:
             pass
 
         def on_update(self, time_delta: float) -> None:
@@ -575,14 +770,14 @@ def test_peer_client_wrapper_rebinds_on_connection_changes(monkeypatch):
     assert isinstance(client, ManagedClient)
     assert client.get_underlying() is None
 
-    manager._peer_connected["uav_1"] = True
-    ModeManager._handle_peer_connection_change(manager, "uav_1", connected=True)
+    manager._peer_connections._connected["uav_1"] = True
+    manager._managed_comms.on_peer_connection_change("uav_1", connected=True)
 
     assert create_calls == ["/uav_1/camera"]
     assert client.get_underlying() is not None
 
-    manager._peer_connected["uav_1"] = False
-    ModeManager._handle_peer_connection_change(manager, "uav_1", connected=False)
+    manager._peer_connections._connected["uav_1"] = False
+    manager._managed_comms.on_peer_connection_change("uav_1", connected=False)
 
     assert client.get_underlying() is None
     assert len(destroy_calls) == 1
@@ -595,25 +790,115 @@ def test_peer_timer_publishes_heartbeat_and_marks_stale_connections():
     published: list[object] = []
     connection_events: list[tuple[str, bool]] = []
 
-    manager._peer_heartbeat_publisher = SimpleNamespace(
+    manager._peer_connections._heartbeat_publisher = SimpleNamespace(
         publish=lambda msg: published.append(msg)
     )
-    manager._mission_peer_names = ("uav_1",)
-    manager._peer_connected = {"uav_1": True}
-    manager._peer_last_seen = {"uav_1": 0.0}
+    manager._peer_connections._peer_names = ("uav_1",)
+    manager._peer_connections._connected = {"uav_1": True}
+    manager._peer_connections._last_seen = {"uav_1": 0.0}
     manager.peer_stale_timeout_s = 0.5
     manager.get_clock = lambda: SimpleNamespace(
         now=lambda: SimpleNamespace(nanoseconds=1_000_000_000)
     )
-    manager._handle_peer_connection_change = lambda peer_name, *, connected: (
+    manager._peer_connections._on_connection_change = lambda peer_name, *, connected: (
         connection_events.append((peer_name, connected))
     )
 
-    ModeManager._peer_timer_callback(manager)
+    manager._peer_connections._peer_timer_callback()
 
     assert len(published) == 1
-    assert manager._peer_connected["uav_1"] is False
+    assert manager._peer_connections._connected["uav_1"] is False
     assert connection_events == [("uav_1", False)]
+
+
+def test_managed_entity_descriptors_use_persistent_and_active_phases(monkeypatch):
+    _xfail_if_missing_peer_features(
+        "mode_peer_vehicle_names",
+        "mode_on_disconnect",
+        "manager_create_subscription",
+        "manager_create_publisher",
+    )
+
+    class PhaseAwareMode(Mode):
+        mission_target = "payload"
+        peer_vehicle_names = ("uav_1",)
+
+        def __init__(self, node, vehicle) -> None:
+            super().__init__(node, vehicle)
+            self.node.create_publisher(object, "/shared/debug", 1)
+
+        def on_disconnect(self, time_delta: float, peers: dict[str, bool]) -> None:
+            pass
+
+        def on_enter(self) -> None:
+            self.node.create_client(object, "/uav_1/camera")
+
+        def on_update(self, time_delta: float) -> None:
+            pass
+
+        def check_status(self) -> str:
+            return "continue"
+
+    monkeypatch.setattr(
+        mode_manager_module,
+        "load_mode_class",
+        lambda _path: PhaseAwareMode,
+    )
+    monkeypatch.setattr(
+        mode_manager_module.Node,
+        "create_subscription",
+        lambda *_args, **_kwargs: SimpleNamespace(kind="subscription"),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        mode_manager_module.Node,
+        "create_publisher",
+        lambda *_args, **_kwargs: SimpleNamespace(kind="publisher"),
+        raising=False,
+    )
+
+    manager = _make_mode_manager()
+    mode = ModeManager.initialize_mode(manager, "fake.module.PhaseAwareMode", {})
+    manager.modes = {"start": mode}
+    manager.active_mode = None
+
+    ModeManager.switch_mode(manager, "start")
+
+    phases = {descriptor.phase for descriptor in manager.managed_entity_descriptors}
+    assert phases == {"active", "persistent"}
+
+
+def test_shared_state_for_is_keyed_by_canonical_mode_path():
+    _xfail_if_missing_peer_features("manager_shared_state_for")
+
+    manager = _make_mode_manager()
+
+    class SharedStateMode(Mode):
+        mission_target = "payload"
+
+        def __init__(self, node, vehicle) -> None:
+            super().__init__(node, vehicle)
+
+        def on_disconnect(self, time_delta: float, peers: dict[str, bool]) -> None:
+            pass
+
+        def on_update(self, time_delta: float) -> None:
+            pass
+
+        def check_status(self) -> str:
+            return "continue"
+
+    canonical_path = canonical_mode_path(SharedStateMode)
+    state_a = ModeManager.shared_state_for(manager, canonical_path)
+    state_b = ModeManager.shared_state_for(manager, canonical_path)
+    state_other = ModeManager.shared_state_for(
+        manager, f"{SharedStateMode.__module__}.OtherMode"
+    )
+
+    assert state_a is state_b
+    assert state_a is not state_other
+    state_a["example"] = "value"
+    assert ModeManager.shared_state_for(manager, canonical_path)["example"] == "value"
 
 
 def test_peer_entity_usage_instrumentation_matches_declared_peers():
@@ -630,7 +915,7 @@ def test_peer_entity_usage_instrumentation_matches_declared_peers():
             super().__init__(node, vehicle)
             self.node.create_subscription(object, "/uav_2/status", lambda _msg: None, 1)
 
-        def on_disconnect(self, time_delta: float, peers: tuple[str, ...]) -> None:
+        def on_disconnect(self, time_delta: float, peers: dict[str, bool]) -> None:
             pass
 
         def on_enter(self) -> None:

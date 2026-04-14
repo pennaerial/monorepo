@@ -17,6 +17,7 @@ from pydantic import BaseModel, ConfigDict, create_model
 
 from uav.modes.Mode import Mode
 
+from .mode_paths import canonical_mode_path
 from .schema_registry import (
     ModeParamFieldSpec,
     ModeRegistryDocument,
@@ -24,13 +25,6 @@ from .schema_registry import (
     dump_mode_registry_document,
     registry_path,
 )
-
-
-def _canonical_mode_path(mode_class: type[Mode]) -> str:
-    module_path = mode_class.__module__
-    if module_path.rsplit(".", 1)[-1] == mode_class.__name__:
-        return module_path
-    return f"{module_path}.{mode_class.__name__}"
 
 
 def _doc_summary(obj: object) -> str:
@@ -70,7 +64,7 @@ def _iter_mode_classes() -> list[type[Mode]]:
                 and value is not Mode
                 and value.__module__ == module.__name__
             ):
-                discovered[_canonical_mode_path(value)] = value
+                discovered[canonical_mode_path(value)] = value
     return [discovered[key] for key in sorted(discovered)]
 
 
@@ -86,19 +80,19 @@ def _normalized_annotation(
         }:
             return type(default)
         raise TypeError(
-            f"Mode '{_canonical_mode_path(mode_class)}' parameter '{name}' requires an explicit schema-grade type annotation."
+            f"Mode '{canonical_mode_path(mode_class)}' parameter '{name}' requires an explicit schema-grade type annotation."
         )
 
     if annotation in {dict, list, tuple, set}:
         raise TypeError(
-            f"Mode '{_canonical_mode_path(mode_class)}' parameter '{name}' must use a typed collection annotation, not bare '{annotation.__name__}'."
+            f"Mode '{canonical_mode_path(mode_class)}' parameter '{name}' must use a typed collection annotation, not bare '{annotation.__name__}'."
         )
 
     origin = get_origin(annotation)
     args = get_args(annotation)
     if origin in {dict, list, tuple, set} and not args:
         raise TypeError(
-            f"Mode '{_canonical_mode_path(mode_class)}' parameter '{name}' must declare collection element types."
+            f"Mode '{canonical_mode_path(mode_class)}' parameter '{name}' must declare collection element types."
         )
     return annotation
 
@@ -282,7 +276,7 @@ def build_mode_registry_entry(mode_class: type[Mode]) -> ModeRegistryEntry:
     mission_target = getattr(mode_class, "mission_target", None)
     if mission_target not in {"uav", "payload"}:
         raise ValueError(
-            f"Mode '{_canonical_mode_path(mode_class)}' must declare mission_target as 'uav' or 'payload'."
+            f"Mode '{canonical_mode_path(mode_class)}' must declare mission_target as 'uav' or 'payload'."
         )
     peer_vehicle_names = tuple(
         sorted(
@@ -293,13 +287,9 @@ def build_mode_registry_entry(mode_class: type[Mode]) -> ModeRegistryEntry:
             }
         )
     )
-    if peer_vehicle_names and mode_class.on_disconnect is Mode.on_disconnect:
-        raise ValueError(
-            f"Mode '{_canonical_mode_path(mode_class)}' must override on_disconnect() when peer_vehicle_names is non-empty."
-        )
 
     return ModeRegistryEntry(
-        class_path=_canonical_mode_path(mode_class),
+        class_path=canonical_mode_path(mode_class),
         module_path=mode_class.__module__,
         class_name=mode_class.__name__,
         display_name=mode_class.__name__,
