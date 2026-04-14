@@ -3,6 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 import textwrap
 from types import SimpleNamespace
+import sys
+import types
 
 import pytest
 
@@ -331,7 +333,26 @@ def test_invalid_mode_target_is_rejected(monkeypatch, mission_target):
         load_mission_spec({"modes": {"start": {"class": "fake.module.FakeMode"}}})
 
 
-def test_load_mode_class_accepts_module_path():
+def test_load_mode_class_accepts_module_path(monkeypatch):
+    module_name = "uav.modes.payload.PayloadAprilTagApproachMode"
+    fake_module = types.ModuleType(module_name)
+
+    class PayloadAprilTagApproachMode(Mode):
+        mission_target = "payload"
+
+        def __init__(self, node, vehicle) -> None:
+            super().__init__(node, vehicle)
+
+        def on_update(self, time_delta: float) -> None:
+            pass
+
+        def check_status(self) -> str:
+            return "continue"
+
+    PayloadAprilTagApproachMode.__module__ = module_name
+    fake_module.PayloadAprilTagApproachMode = PayloadAprilTagApproachMode
+    monkeypatch.setitem(sys.modules, module_name, fake_module)
+
     mode_class = load_mode_class("uav.modes.payload.PayloadAprilTagApproachMode")
 
     assert mode_class.__name__ == "PayloadAprilTagApproachMode"

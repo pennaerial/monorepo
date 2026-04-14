@@ -283,6 +283,19 @@ def build_mode_registry_entry(mode_class: type[Mode]) -> ModeRegistryEntry:
         raise ValueError(
             f"Mode '{_canonical_mode_path(mode_class)}' must declare mission_target as 'uav' or 'payload'."
         )
+    peer_vehicle_names = tuple(
+        sorted(
+            {
+                str(peer_name).strip()
+                for peer_name in getattr(mode_class, "peer_vehicle_names", ())
+                if str(peer_name).strip()
+            }
+        )
+    )
+    if peer_vehicle_names and mode_class.on_disconnect is Mode.on_disconnect:
+        raise ValueError(
+            f"Mode '{_canonical_mode_path(mode_class)}' must override on_disconnect() when peer_vehicle_names is non-empty."
+        )
 
     return ModeRegistryEntry(
         class_path=_canonical_mode_path(mode_class),
@@ -292,6 +305,7 @@ def build_mode_registry_entry(mode_class: type[Mode]) -> ModeRegistryEntry:
         description=_doc_summary(mode_class),
         mission_target=mission_target,
         required_vision_nodes=mode_class.required_vision_node_paths(),
+        peer_vehicle_names=peer_vehicle_names,
         requires_camera=bool(getattr(mode_class, "requires_camera", False)),
         transition_labels=mode_class.declared_transition_labels(),
         params_schema=_sanitize_json_schema(

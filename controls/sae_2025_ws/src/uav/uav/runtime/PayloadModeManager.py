@@ -15,9 +15,17 @@ class PayloadModeManager(ModeManager):
         mission_spec: MissionSpec,
         vehicle_name: str,
         auto_launch: bool = True,
+        peer_heartbeat_hz: float = 10.0,
+        peer_stale_timeout_s: float = 0.5,
         node_name: str = "mission",
     ) -> None:
-        super().__init__(node_name, auto_launch=auto_launch)
+        super().__init__(
+            node_name,
+            vehicle_name=vehicle_name,
+            auto_launch=auto_launch,
+            peer_heartbeat_hz=peer_heartbeat_hz,
+            peer_stale_timeout_s=peer_stale_timeout_s,
+        )
         if not mission_spec.is_payload:
             raise ValueError(
                 f"PayloadModeManager requires a payload mission spec, received target '{mission_spec.target}'."
@@ -25,6 +33,9 @@ class PayloadModeManager(ModeManager):
 
         self.vehicle = Payload(self, str(vehicle_name))
         self.setup_vision(list(mission_spec.vision_nodes))
+        self.configure_peer_vehicle_names(
+            getattr(mission_spec, "peer_vehicle_names", ())
+        )
         self.setup_modes(mission_spec)
         self.timer = None
 

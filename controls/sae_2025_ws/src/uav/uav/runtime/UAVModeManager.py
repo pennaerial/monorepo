@@ -24,9 +24,17 @@ class UAVModeManager(ModeManager):
         vehicle_class: AirframeClass = AirframeClass.MULTICOPTER,
         camera_offsets=None,
         auto_launch: bool = True,
+        peer_heartbeat_hz: float = 10.0,
+        peer_stale_timeout_s: float = 0.5,
         node_name: str = "mission",
     ) -> None:
-        super().__init__(node_name, auto_launch=auto_launch)
+        super().__init__(
+            node_name,
+            vehicle_name=vehicle_name,
+            auto_launch=auto_launch,
+            peer_heartbeat_hz=peer_heartbeat_hz,
+            peer_stale_timeout_s=peer_stale_timeout_s,
+        )
         if not mission_spec.is_uav:
             raise ValueError(
                 f"UAVModeManager requires a UAV mission spec, received target '{mission_spec.target}'."
@@ -58,6 +66,9 @@ class UAVModeManager(ModeManager):
 
         self.get_logger().info("Mission Node has started.")
         self.setup_vision(list(mission_spec.vision_nodes))
+        self.configure_peer_vehicle_names(
+            getattr(mission_spec, "peer_vehicle_names", ())
+        )
         self.setup_modes(mission_spec)
 
     def _auto_launch_ready(self) -> bool:

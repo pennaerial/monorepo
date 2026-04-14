@@ -185,6 +185,7 @@
         "title": "PayloadAprilTagApproachModeParams",
         "type": "object"
       },
+      "peer_vehicle_names": [],
       "required_vision_nodes": [],
       "requires_camera": true,
       "transition_labels": [
@@ -418,6 +419,7 @@
         "title": "PayloadColorStringApproachModeParams",
         "type": "object"
       },
+      "peer_vehicle_names": [],
       "required_vision_nodes": [],
       "requires_camera": true,
       "transition_labels": []
@@ -900,6 +902,7 @@
         "title": "PayloadCornerNavigateModeParams",
         "type": "object"
       },
+      "peer_vehicle_names": [],
       "required_vision_nodes": [],
       "requires_camera": true,
       "transition_labels": [
@@ -1206,6 +1209,7 @@
         "title": "PayloadDLZNavigateModeParams",
         "type": "object"
       },
+      "peer_vehicle_names": [],
       "required_vision_nodes": [
         "uav.vision_nodes.PayloadAprilTagNode"
       ],
@@ -1384,6 +1388,7 @@
         "title": "PayloadRetreatModeParams",
         "type": "object"
       },
+      "peer_vehicle_names": [],
       "required_vision_nodes": [
         "uav.vision_nodes.PayloadAprilTagNode"
       ],
@@ -1462,6 +1467,7 @@
         "title": "PayloadScanForTagModeParams",
         "type": "object"
       },
+      "peer_vehicle_names": [],
       "required_vision_nodes": [
         "uav.vision_nodes.PayloadAprilTagNode"
       ],
@@ -1585,6 +1591,7 @@
         "title": "PayloadWaitForDriveOutModeParams",
         "type": "object"
       },
+      "peer_vehicle_names": [],
       "required_vision_nodes": [],
       "requires_camera": true,
       "transition_labels": [
@@ -1605,6 +1612,7 @@
         "title": "LandingModeParams",
         "type": "object"
       },
+      "peer_vehicle_names": [],
       "required_vision_nodes": [],
       "requires_camera": false,
       "transition_labels": []
@@ -1719,6 +1727,7 @@
         "title": "NavGPSModeParams",
         "type": "object"
       },
+      "peer_vehicle_names": [],
       "required_vision_nodes": [],
       "requires_camera": false,
       "transition_labels": [
@@ -1803,6 +1812,7 @@
         "title": "PayloadDropoffModeParams",
         "type": "object"
       },
+      "peer_vehicle_names": [],
       "required_vision_nodes": [
         "uav.vision_nodes.PayloadTrackingNode"
       ],
@@ -1841,6 +1851,7 @@
         "title": "PayloadPickupModeParams",
         "type": "object"
       },
+      "peer_vehicle_names": [],
       "required_vision_nodes": [
         "uav.vision_nodes.PayloadTrackingNode"
       ],
@@ -1989,6 +2000,7 @@
         "title": "ServoDropoffModeParams",
         "type": "object"
       },
+      "peer_vehicle_names": [],
       "required_vision_nodes": [],
       "requires_camera": false,
       "transition_labels": [
@@ -2098,6 +2110,7 @@
         "title": "TakeoffModeParams",
         "type": "object"
       },
+      "peer_vehicle_names": [],
       "required_vision_nodes": [],
       "requires_camera": false,
       "transition_labels": [
@@ -2144,6 +2157,7 @@
         "title": "TransitionModeParams",
         "type": "object"
       },
+      "peer_vehicle_names": [],
       "required_vision_nodes": [],
       "requires_camera": false,
       "transition_labels": [
@@ -2263,10 +2277,11 @@
         "title": "WaypointMissionParams",
         "type": "object"
       },
+      "peer_vehicle_names": [],
       "required_vision_nodes": [],
       "requires_camera": false,
       "transition_labels": []
     }
   },
-  "schema_version": 2
+  "schema_version": 3
 }

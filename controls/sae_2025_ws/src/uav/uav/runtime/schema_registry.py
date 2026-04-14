@@ -11,7 +11,7 @@ from typing_extensions import NotRequired, Required, TypedDict
 
 
 REGISTRY_FILENAME = "mode_registry.json"
-SCHEMA_REGISTRY_VERSION = 2
+SCHEMA_REGISTRY_VERSION = 3
 
 
 class ModeParamFieldSpec(BaseModel):
@@ -34,6 +34,7 @@ class ModeRegistryEntry(BaseModel):
     description: str
     mission_target: str
     required_vision_nodes: tuple[str, ...]
+    peer_vehicle_names: tuple[str, ...] = ()
     requires_camera: bool = False
     transition_labels: tuple[str, ...]
     params_schema: dict[str, Any]

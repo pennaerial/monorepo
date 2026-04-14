@@ -19,6 +19,8 @@ class UAVMissionBootstrap(Node):
         self.declare_parameter("vehicle_name", "uav")
         self.declare_parameter("vehicle_class", AirframeClass.MULTICOPTER.name)
         self.declare_parameter("camera_mount_offsets", [0.0, 0.0, 0.0])
+        self.declare_parameter("peer_heartbeat_hz", 10.0)
+        self.declare_parameter("peer_stale_timeout_s", 0.5)
 
     def _string_parameter(self, name: str, default: str = "") -> str:
         try:
@@ -34,6 +36,14 @@ class UAVMissionBootstrap(Node):
                 f"uav_mission requires boolean parameter '{name}', received {value!r}."
             )
         return value
+
+    def _float_parameter(self, name: str) -> float:
+        value = self.get_parameter(name).value
+        if not isinstance(value, (int, float)) or isinstance(value, bool):
+            raise ValueError(
+                f"uav_mission requires numeric parameter '{name}', received {value!r}."
+            )
+        return float(value)
 
     def manager_kwargs(self) -> dict:
         mission_path = str(self.get_parameter("mode_map").value)
@@ -57,6 +67,8 @@ class UAVMissionBootstrap(Node):
                 self.get_parameter("vehicle_class").value
             ),
             "camera_offsets": list(self.get_parameter("camera_mount_offsets").value),
+            "peer_heartbeat_hz": self._float_parameter("peer_heartbeat_hz"),
+            "peer_stale_timeout_s": self._float_parameter("peer_stale_timeout_s"),
             "node_name": "mission",
         }
 

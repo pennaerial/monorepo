@@ -18,6 +18,7 @@ class Mode(ABC):
 
     mission_target: ClassVar[str | None] = None
     required_vision_nodes: ClassVar[tuple[object, ...]] = ()
+    peer_vehicle_names: ClassVar[tuple[str, ...]] = ()
     requires_camera: ClassVar[bool] = False
     transition_labels: ClassVar[tuple[str, ...]] = ()
 
@@ -94,6 +95,18 @@ class Mode(ABC):
         """
         pass
 
+    def on_disconnect(
+        self, time_delta: float, disconnected_peers: tuple[str, ...]
+    ) -> None:
+        """
+        Periodic logic executed while one or more required peers are disconnected.
+
+        Args:
+            time_delta (float): Time in seconds since the last update.
+            disconnected_peers (tuple[str, ...]): Required peers currently disconnected.
+        """
+        pass
+
     @abstractmethod
     def check_status(self) -> str:
         """
@@ -127,6 +140,19 @@ class Mode(ABC):
         """
         if self.active:
             self.on_update(time_delta)
+
+    def disconnect(
+        self, time_delta: float, disconnected_peers: tuple[str, ...]
+    ) -> None:
+        """
+        Update the mode's disconnected behavior if it is active.
+
+        Args:
+            time_delta (float): Time in seconds since the last update.
+            disconnected_peers (tuple[str, ...]): Required peers currently disconnected.
+        """
+        if self.active:
+            self.on_disconnect(time_delta, disconnected_peers)
 
     def log(self, message: str) -> None:
         """

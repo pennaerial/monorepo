@@ -81,6 +81,7 @@ class MissionSpec:
     target: str
     modes: dict[str, ModeSpec]
     vision_nodes: tuple[str, ...] = ()
+    peer_vehicle_names: tuple[str, ...] = ()
     requires_camera: bool = False
     path: Path | None = None
 
@@ -134,6 +135,7 @@ def load_mission_spec(path: str | Path | dict[str, Any]) -> MissionSpec:
     modes: dict[str, ModeSpec] = {}
     mode_targets: set[str] = set()
     vision_nodes: set[str] = set()
+    peer_vehicle_names: set[str] = set()
     requires_camera = False
 
     for mode_name, mode_info in raw_modes.items():
@@ -183,6 +185,11 @@ def load_mission_spec(path: str | Path | dict[str, Any]) -> MissionSpec:
             )
         mode_targets.add(mission_target)
         vision_nodes.update(mode_entry.required_vision_nodes)
+        peer_vehicle_names.update(
+            str(peer_name).strip()
+            for peer_name in getattr(mode_entry, "peer_vehicle_names", ())
+            if str(peer_name).strip()
+        )
         requires_camera = requires_camera or bool(mode_entry.required_vision_nodes)
         requires_camera = requires_camera or bool(
             getattr(mode_entry, "requires_camera", False)
@@ -231,6 +238,7 @@ def load_mission_spec(path: str | Path | dict[str, Any]) -> MissionSpec:
         target=next(iter(mode_targets)),
         modes=modes,
         vision_nodes=tuple(sorted(vision_nodes)),
+        peer_vehicle_names=tuple(sorted(peer_vehicle_names)),
         requires_camera=requires_camera,
         path=mission_path,
     )

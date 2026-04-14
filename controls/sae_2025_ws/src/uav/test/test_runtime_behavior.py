@@ -80,6 +80,13 @@ def _install_ros_test_doubles() -> None:
         std_srvs.srv = std_srvs_srv
         sys.modules.update({"std_srvs": std_srvs, "std_srvs.srv": std_srvs_srv})
 
+    if "std_msgs" not in sys.modules:
+        std_msgs = types.ModuleType("std_msgs")
+        std_msgs_msg = types.ModuleType("std_msgs.msg")
+        std_msgs_msg.Empty = _placeholder("Empty")
+        std_msgs.msg = std_msgs_msg
+        sys.modules.update({"std_msgs": std_msgs, "std_msgs.msg": std_msgs_msg})
+
     if "px4_msgs" not in sys.modules:
         px4_msgs = types.ModuleType("px4_msgs")
         px4_msgs_msg = types.ModuleType("px4_msgs.msg")
@@ -215,6 +222,17 @@ def _make_mode_manager(*, vehicle=None, auto_launch: bool = False) -> ModeManage
     manager.timer = None
     manager.auto_launch = auto_launch
     manager._auto_launch_timer = None
+    manager._runtime_vehicle_name = ""
+    manager.peer_heartbeat_hz = 10.0
+    manager.peer_stale_timeout_s = 0.5
+    manager._managed_entity_context = None
+    manager._managed_entities = {}
+    manager._peer_heartbeat_publisher = None
+    manager._peer_timer = None
+    manager._peer_heartbeat_subscriptions = {}
+    manager._peer_connected = {}
+    manager._peer_last_seen = {}
+    manager._mission_peer_names = ()
     manager._logger = _FakeLogger()
     manager.destroyed = False
     manager.stopped = False
@@ -227,7 +245,15 @@ def _make_mode_manager(*, vehicle=None, auto_launch: bool = False) -> ModeManage
     return manager
 
 
-def _stub_mode_manager_init(self, node_name: str, *, auto_launch: bool = True) -> None:
+def _stub_mode_manager_init(
+    self,
+    node_name: str,
+    *,
+    vehicle_name: str = "",
+    auto_launch: bool = True,
+    peer_heartbeat_hz: float = 10.0,
+    peer_stale_timeout_s: float = 0.5,
+) -> None:
     self.vehicle = None
     self.modes = {}
     self.transitions = {}
@@ -236,10 +262,24 @@ def _stub_mode_manager_init(self, node_name: str, *, auto_launch: bool = True) -
     self._vision_clients = {}
     self.timer = None
     self.auto_launch = bool(auto_launch)
+    self._runtime_vehicle_name = str(vehicle_name).strip().strip("/")
+    self.peer_heartbeat_hz = float(peer_heartbeat_hz)
+    self.peer_stale_timeout_s = float(peer_stale_timeout_s)
+    self._managed_entity_context = None
+    self._managed_entities = {}
+    self._peer_heartbeat_publisher = None
+    self._peer_timer = None
+    self._peer_heartbeat_subscriptions = {}
+    self._peer_connected = {}
+    self._peer_last_seen = {}
+    self._mission_peer_names = ()
     self._auto_launch_timer = None
     self._logger = _FakeLogger()
     self.create_timer = lambda period, callback: _FakeTimer(callback)
     self.create_service = lambda *args, **kwargs: object()
+    self.configure_peer_vehicle_names = (
+        lambda peer_names: setattr(self, "_mission_peer_names", tuple(peer_names))
+    )
     self.get_logger = lambda: self._logger
     self.destroy_node = lambda: None
 
@@ -418,11 +458,18 @@ def test_setup_vision_deduplicates_clients(monkeypatch):
         lambda _path: FakeVisionNode,
     )
     monkeypatch.setattr(
-        manager,
+        mode_manager_module.Node,
         "create_client",
-        lambda service, service_name: (
+        lambda _self, service, service_name, *_args, **_kwargs: (
             created_clients.append((service, service_name)) or client
         ),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        mode_manager_module.Node,
+        "destroy_client",
+        lambda *_args, **_kwargs: True,
+        raising=False,
     )
 
     ModeManager.setup_vision(manager, [canonical_name, canonical_name])
@@ -615,6 +662,8 @@ def test_uav_bootstrap_bool_parameter_and_manager_validation(monkeypatch):
             "vehicle_name": "uav_5",
             "vehicle_class": "MULTICOPTER",
             "camera_mount_offsets": [0.0, 0.0, 0.0],
+            "peer_heartbeat_hz": 10.0,
+            "peer_stale_timeout_s": 0.5,
         },
     )
 
@@ -650,6 +699,8 @@ def test_payload_bootstrap_bool_parameter_and_manager_validation(monkeypatch):
             "mode_map": "mission.yaml",
             "auto_launch": True,
             "vehicle_name": "payload_0",
+            "peer_heartbeat_hz": 10.0,
+            "peer_stale_timeout_s": 0.5,
         },
     )
 
