@@ -1394,7 +1394,7 @@
           },
           "default": false,
           "default_kind": "value",
-          "name": "compressed",
+          "name": "compressed_image",
           "required": false
         }
       ],
@@ -1426,9 +1426,9 @@
             "title": "Color Min Detect Pixels",
             "type": "integer"
           },
-          "compressed": {
+          "compressed_image": {
             "default": false,
-            "title": "Compressed",
+            "title": "Compressed Image",
             "type": "boolean"
           },
           "lost_timeout_s": {

@@ -91,7 +91,7 @@ class PayloadDualApproachMode(Mode):
         stop_height_px: int = 100,
         lost_timeout_s: float = 3.0,
         # --- Common ---
-        compressed: bool = False,
+        compressed_image: bool = False,
     ):
         super().__init__(node, vehicle)
         self.vehicle: Payload = vehicle
@@ -120,22 +120,24 @@ class PayloadDualApproachMode(Mode):
 
         # Internals
         self._bridge = CvBridge()
+        self._compressed_image = bool(compressed_image)
         self._detector_cache = AprilTagDetectorCache()
         self._detector = self._detector_cache.get(self.tag_family)
 
         self._latest_image: Optional[Image | CompressedImage] = None
         self._latest_camera_info: Optional[CameraInfo] = None
 
-        if bool(compressed):
+        cam_topic = vehicle.namespaced_path("camera")
+        if self._compressed_image:
             self.node.create_subscription(
                 CompressedImage,
-                f"{vehicle.image_topic}/compressed",
+                f"{cam_topic}/compressed",
                 self._on_image,
                 1,
             )
         else:
             self.node.create_subscription(
-                Image, vehicle.image_topic, self._on_image, 1
+                Image, cam_topic, self._on_image, 1
             )
 
         self.node.create_subscription(
@@ -143,7 +145,9 @@ class PayloadDualApproachMode(Mode):
         )
 
         self._debug_pub = self.node.create_publisher(
-            Image, f"{vehicle.camera_namespace}/dual_approach_debug", 1
+            CompressedImage,
+            vehicle.namespaced_path("dual_approach_debug/compressed"),
+            1,
         )
 
         self._done = False
@@ -164,8 +168,9 @@ class PayloadDualApproachMode(Mode):
         msg = self._latest_image
         if msg is None:
             return None
-        if isinstance(msg, CompressedImage):
-            return self._bridge.compressed_imgmsg_to_cv2(msg, desired_encoding="bgr8")
+        if self._compressed_image:
+            buf = np.frombuffer(msg.data, dtype=np.uint8)
+            return cv2.imdecode(buf, cv2.IMREAD_COLOR)
         return self._bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
 
     def _now(self) -> float:
@@ -234,7 +239,9 @@ class PayloadDualApproachMode(Mode):
         cv2.putText(
             debug, source, (5, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2
         )
-        self._debug_pub.publish(self._bridge.cv2_to_imgmsg(debug, encoding="bgr8"))
+        msg = self._bridge.cv2_to_compressed_imgmsg(debug, dst_format="jpeg")
+        msg.header.stamp = self.node.get_clock().now().to_msg()
+        self._debug_pub.publish(msg)
 
     # ---- apriltag detection ----
 

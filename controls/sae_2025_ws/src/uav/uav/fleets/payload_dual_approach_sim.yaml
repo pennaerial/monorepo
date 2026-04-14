@@ -18,4 +18,4 @@ defaults:
 vehicles:
   - name: payload
     controllable: payload_0
-    mission: payload_dual_approach
+    mission: payload_dual_approach_sim
