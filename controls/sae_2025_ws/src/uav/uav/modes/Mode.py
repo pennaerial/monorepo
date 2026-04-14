@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, ClassVar
 from rclpy.node import Node
 
 from uav.vehicles.Vehicle import Vehicle
+from uav.runtime.vision_loader import canonical_vision_node_path
 
 if TYPE_CHECKING:
     from uav.vision_nodes import VisionNode
@@ -34,14 +35,10 @@ class Mode(ABC):
         self.pending_requests = {}
 
     @classmethod
-    def required_vision_node_names(cls) -> tuple[str, ...]:
-        names: list[str] = []
-        for node in cls.required_vision_nodes:
-            if isinstance(node, str):
-                names.append(node)
-            else:
-                names.append(node.__name__)
-        return tuple(names)
+    def required_vision_node_paths(cls) -> tuple[str, ...]:
+        return tuple(
+            canonical_vision_node_path(node) for node in cls.required_vision_nodes
+        )
 
     @classmethod
     def declared_transition_labels(cls) -> tuple[str, ...]:

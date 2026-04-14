@@ -17,6 +17,7 @@ from uav.runtime.schema import (
     mode_registry_entries,
     schema_registry_document,
 )
+from uav.runtime.schema_registry import ModeRegistryEntry
 
 
 def _write_yaml(tmp_path: Path, name: str, contents: str) -> Path:
@@ -41,6 +42,23 @@ def test_mode_registry_entry_marks_camera_only_modes():
     assert entry.mission_target == "payload"
     assert entry.required_vision_nodes == ()
     assert entry.requires_camera is True
+
+
+def test_mode_registry_entry_preserves_canonical_vision_node_paths():
+    entry = ModeRegistryEntry(
+        class_path="uav.modes.payload.PayloadScanForTagMode",
+        module_path="uav.modes.payload.PayloadScanForTagMode",
+        class_name="PayloadScanForTagMode",
+        display_name="PayloadScanForTagMode",
+        description="Spin in place looking for a specific AprilTag.",
+        mission_target="payload",
+        required_vision_nodes=("uav.vision_nodes.PayloadAprilTagNode",),
+        requires_camera=False,
+        transition_labels=("found", "not_found"),
+        params_schema={"type": "object"},
+    )
+
+    assert entry.required_vision_nodes == ("uav.vision_nodes.PayloadAprilTagNode",)
 
 
 def test_mode_registry_entries_include_payload_modes():

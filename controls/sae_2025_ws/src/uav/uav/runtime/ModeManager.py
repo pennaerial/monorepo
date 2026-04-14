@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import inspect
-import importlib
 from time import time
 from typing import Any, get_type_hints
 
@@ -10,8 +9,7 @@ from std_srvs.srv import Trigger
 from uav.vehicles.Vehicle import Vehicle
 from uav.modes.Mode import Mode
 from .mission_spec import MissionSpec, load_mode_class
-
-VISION_NODE_PATH = "uav.vision_nodes"
+from .vision_loader import canonical_vision_node_path, load_vision_class
 
 
 class ModeManager(Node):
@@ -44,10 +42,9 @@ class ModeManager(Node):
         if self.vehicle is None or not getattr(self.vehicle, "has_camera", False):
             raise ValueError("Vision nodes require an active vehicle camera contract.")
 
-        module = importlib.import_module(VISION_NODE_PATH)
         for vision_node in nodes_to_setup:
-            vision_class = getattr(module, vision_node)
-            key = vision_class.__name__
+            vision_class = load_vision_class(vision_node)
+            key = canonical_vision_node_path(vision_class)
             if key in self._vision_clients:
                 continue
             client, service_name = self._connect_vision_client(vision_class)
@@ -72,7 +69,7 @@ class ModeManager(Node):
             )
 
     def get_vision_client(self, vision_node):
-        key = vision_node.__name__
+        key = canonical_vision_node_path(vision_node)
         if key not in self._vision_clients:
             raise KeyError(f"Vision client '{key}' is not registered.")
         return self._vision_clients[key]

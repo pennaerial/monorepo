@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import textwrap
+from types import SimpleNamespace
 
 import pytest
 
@@ -80,7 +81,7 @@ def test_load_uav_mission_spec(tmp_path):
     }
 
 
-def test_load_payload_mission_spec(tmp_path):
+def test_load_payload_mission_spec(tmp_path, monkeypatch):
     mission_path = _write_mission(
         tmp_path,
         """
@@ -100,12 +101,38 @@ def test_load_payload_mission_spec(tmp_path):
         """,
     )
 
+    fake_entries = {
+        "uav.modes.payload.PayloadScanForTagMode": SimpleNamespace(
+            mission_target="payload",
+            required_vision_nodes=("uav.vision_nodes.PayloadAprilTagNode",),
+            requires_camera=False,
+            transition_labels=("found", "not_found"),
+        ),
+        "uav.modes.payload.PayloadAprilTagApproachMode": SimpleNamespace(
+            mission_target="payload",
+            required_vision_nodes=(),
+            requires_camera=True,
+            transition_labels=("done",),
+        ),
+    }
+
+    monkeypatch.setattr(
+        schema_module,
+        "mode_entry_for_class_path",
+        lambda class_path: fake_entries[class_path],
+    )
+    monkeypatch.setattr(
+        schema_module,
+        "validate_mode_params",
+        lambda _class_path, params: params,
+    )
+
     mission_spec = load_mission_spec(mission_path)
 
     assert mission_spec.target == "payload"
     assert mission_spec.is_payload is True
     assert mission_spec.is_uav is False
-    assert mission_spec.vision_nodes == ("PayloadAprilTagNode",)
+    assert mission_spec.vision_nodes == ("uav.vision_nodes.PayloadAprilTagNode",)
     assert mission_spec.requires_camera is True
     assert mission_spec.modes["start"].class_path == (
         "uav.modes.payload.PayloadScanForTagMode"

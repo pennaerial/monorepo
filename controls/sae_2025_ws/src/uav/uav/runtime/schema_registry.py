@@ -11,7 +11,7 @@ from typing_extensions import NotRequired, Required, TypedDict
 
 
 REGISTRY_FILENAME = "mode_registry.json"
-SCHEMA_REGISTRY_VERSION = 1
+SCHEMA_REGISTRY_VERSION = 2
 
 
 class ModeParamFieldSpec(BaseModel):

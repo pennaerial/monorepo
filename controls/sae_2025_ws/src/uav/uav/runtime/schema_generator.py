@@ -32,7 +32,6 @@ def _canonical_mode_path(mode_class: type[Mode]) -> str:
         return module_path
     return f"{module_path}.{mode_class.__name__}"
 
-
 def _doc_summary(obj: object) -> str:
     doc = inspect.getdoc(obj) or ""
     return doc.strip().split("\n", 1)[0] if doc.strip() else ""
@@ -292,7 +291,7 @@ def build_mode_registry_entry(mode_class: type[Mode]) -> ModeRegistryEntry:
         display_name=mode_class.__name__,
         description=_doc_summary(mode_class),
         mission_target=mission_target,
-        required_vision_nodes=mode_class.required_vision_node_names(),
+        required_vision_nodes=mode_class.required_vision_node_paths(),
         requires_camera=bool(getattr(mode_class, "requires_camera", False)),
         transition_labels=mode_class.declared_transition_labels(),
         params_schema=_sanitize_json_schema(

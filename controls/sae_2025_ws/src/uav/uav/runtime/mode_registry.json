@@ -901,7 +901,7 @@
         "type": "object"
       },
       "required_vision_nodes": [],
-      "requires_camera": false,
+      "requires_camera": true,
       "transition_labels": [
         "complete"
       ]
@@ -1207,7 +1207,7 @@
         "type": "object"
       },
       "required_vision_nodes": [
-        "PayloadAprilTagNode"
+        "uav.vision_nodes.PayloadAprilTagNode"
       ],
       "requires_camera": false,
       "transition_labels": [
@@ -1385,7 +1385,7 @@
         "type": "object"
       },
       "required_vision_nodes": [
-        "PayloadAprilTagNode"
+        "uav.vision_nodes.PayloadAprilTagNode"
       ],
       "requires_camera": false,
       "transition_labels": []
@@ -1463,7 +1463,7 @@
         "type": "object"
       },
       "required_vision_nodes": [
-        "PayloadAprilTagNode"
+        "uav.vision_nodes.PayloadAprilTagNode"
       ],
       "requires_camera": false,
       "transition_labels": [
@@ -1804,7 +1804,7 @@
         "type": "object"
       },
       "required_vision_nodes": [
-        "PayloadTrackingNode"
+        "uav.vision_nodes.PayloadTrackingNode"
       ],
       "requires_camera": false,
       "transition_labels": [
@@ -1842,7 +1842,7 @@
         "type": "object"
       },
       "required_vision_nodes": [
-        "PayloadTrackingNode"
+        "uav.vision_nodes.PayloadTrackingNode"
       ],
       "requires_camera": false,
       "transition_labels": [
@@ -2268,5 +2268,5 @@
       "transition_labels": []
     }
   },
-  "schema_version": 1
+  "schema_version": 2
 }

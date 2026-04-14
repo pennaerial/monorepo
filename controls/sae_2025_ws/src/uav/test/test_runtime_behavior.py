@@ -393,10 +393,16 @@ def test_initialize_mode_rejects_vehicle_type_mismatch(monkeypatch):
 def test_setup_vision_deduplicates_clients(monkeypatch):
     _require_runtime_support()
 
-    class FakeVisionNode:
-        srv = SimpleNamespace(Response=type("Response", (), {}))
+    canonical_name = "uav.vision_nodes.FakeVisionNode"
+    FakeVisionNode = type(
+        "FakeVisionNode",
+        (),
+        {
+            "__module__": canonical_name,
+            "srv": SimpleNamespace(Response=type("Response", (), {})),
+        },
+    )
 
-    vision_module = SimpleNamespace(FakeVisionNode=FakeVisionNode)
     client = SimpleNamespace(wait_for_service=lambda timeout_sec: True)
     manager = _make_mode_manager(
         vehicle=SimpleNamespace(
@@ -407,9 +413,9 @@ def test_setup_vision_deduplicates_clients(monkeypatch):
     created_clients: list[tuple[object, str]] = []
 
     monkeypatch.setattr(
-        mode_manager_module.importlib,
-        "import_module",
-        lambda _path: vision_module,
+        mode_manager_module,
+        "load_vision_class",
+        lambda _path: FakeVisionNode,
     )
     monkeypatch.setattr(
         manager,
@@ -419,9 +425,10 @@ def test_setup_vision_deduplicates_clients(monkeypatch):
         ),
     )
 
-    ModeManager.setup_vision(manager, ["FakeVisionNode", "FakeVisionNode"])
+    ModeManager.setup_vision(manager, [canonical_name, canonical_name])
 
-    assert list(manager.vision_clients) == ["FakeVisionNode"]
+    assert list(manager.vision_clients) == [canonical_name]
+    assert ModeManager.get_vision_client(manager, FakeVisionNode) is client
     assert created_clients == [(FakeVisionNode.srv, "/vision/FakeVisionNode")]
 
 
@@ -433,7 +440,7 @@ def test_setup_vision_rejects_vehicle_without_camera():
     with pytest.raises(
         ValueError, match="Vision nodes require an active vehicle camera contract"
     ):
-        ModeManager.setup_vision(manager, ["FakeVisionNode"])
+        ModeManager.setup_vision(manager, ["uav.vision_nodes.FakeVisionNode"])
 
 
 def test_switch_mode_deactivates_previous_mode_and_activates_new_mode():
