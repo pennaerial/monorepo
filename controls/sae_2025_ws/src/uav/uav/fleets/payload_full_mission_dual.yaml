@@ -16,10 +16,10 @@ defaults:
 vehicles:
   - name: payload_0
     controllable: payload_0
-    mission: payload_full_mission
+    mission: payload_full_run
     camera_mount_offsets: [0.2, 0.0, 0.0]
 
   - name: payload_1
     controllable: payload_1
-    mission: payload_full_mission
+    mission: payload_full_run
     camera_mount_offsets: [0.2, 0.0, 0.0]

@@ -77,7 +77,7 @@ class PayloadWaitForDriveOutMode(Mode):
         if self.debug:
             self.debug_pub = self.node.create_publisher(
                 CompressedImage,
-                f"{vehicle.camera_namespace}/vision/payload_wait_drive_out/debug/compressed",
+                vehicle.namespaced_path("vision/payload_wait_drive_out/debug/compressed"),
                 1,
             )
 

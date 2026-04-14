@@ -14,8 +14,6 @@ auto_launch: true
 # PX4 / airframe settings for UAV missions.
 airframe: standard_vtol
 custom_airframe_model: ""
-# Optional PX4 uXRCE-DDS transport namespace. Leave blank to keep the legacy /fmu/... transport shape.
-px4_namespace: ""
 # Optional explicit PX4 instance index. Multi-vehicle simulation assigns this automatically.
 px4_instance: 0
 

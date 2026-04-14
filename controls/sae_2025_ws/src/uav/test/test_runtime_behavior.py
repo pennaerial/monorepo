@@ -407,7 +407,7 @@ def test_setup_vision_deduplicates_clients(monkeypatch):
     manager = _make_mode_manager(
         vehicle=SimpleNamespace(
             has_camera=True,
-            vision_service_name=lambda vision_class: f"/vision/{vision_class.__name__}",
+            vision_service_name=lambda vision_class: f"vision/{vision_class.__name__}",
         )
     )
     created_clients: list[tuple[object, str]] = []
@@ -429,7 +429,7 @@ def test_setup_vision_deduplicates_clients(monkeypatch):
 
     assert list(manager.vision_clients) == [canonical_name]
     assert ModeManager.get_vision_client(manager, FakeVisionNode) is client
-    assert created_clients == [(FakeVisionNode.srv, "/vision/FakeVisionNode")]
+    assert created_clients == [(FakeVisionNode.srv, "vision/FakeVisionNode")]
 
 
 def test_setup_vision_rejects_vehicle_without_camera():

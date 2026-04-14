@@ -17,7 +17,6 @@ class UAVMissionBootstrap(Node):
         self.declare_parameter("debug", False)
         self.declare_parameter("servo_only", False)
         self.declare_parameter("vehicle_name", "uav")
-        self.declare_parameter("px4_namespace", "")
         self.declare_parameter("vehicle_class", AirframeClass.MULTICOPTER.name)
         self.declare_parameter("camera_mount_offsets", [0.0, 0.0, 0.0])
 
@@ -54,7 +53,6 @@ class UAVMissionBootstrap(Node):
             "servo_only": bool(self.get_parameter("servo_only").value),
             "vehicle_name": str(self.get_parameter("vehicle_name").value).strip()
             or "uav",
-            "px4_namespace": self._string_parameter("px4_namespace"),
             "vehicle_class": AirframeClass.parse(
                 self.get_parameter("vehicle_class").value
             ),

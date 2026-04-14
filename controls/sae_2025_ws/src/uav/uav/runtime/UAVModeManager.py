@@ -21,7 +21,6 @@ class UAVModeManager(ModeManager):
         debug: bool = False,
         servo_only: bool = False,
         vehicle_name: str = "uav",
-        px4_namespace: str = "",
         vehicle_class: AirframeClass = AirframeClass.MULTICOPTER,
         camera_offsets=None,
         auto_launch: bool = True,
@@ -51,9 +50,6 @@ class UAVModeManager(ModeManager):
             "camera_offsets": camera_offsets,
             "vehicle_name": vehicle_name,
         }
-        normalized_px4_namespace = str(px4_namespace).strip()
-        if normalized_px4_namespace:
-            vehicle_kwargs["px4_namespace"] = normalized_px4_namespace
 
         if vehicle_class == AirframeClass.VTOL:
             self.vehicle = VTOL(self, **vehicle_kwargs)

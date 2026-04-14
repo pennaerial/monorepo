@@ -9,7 +9,7 @@ regions are ignored.  Set ``use_global_hsv_centroid`` to use the full mask
 as before.
 
 Set ``debug`` to true to publish a JPEG on
-``{camera_namespace}/vision/color_string_approach/debug/compressed`` with
+``vision/color_string_approach/debug/compressed`` with
 HSV mask contours drawn (green = tracked blob, orange = fails h/w, gray =
 too small, yellow = other qualified candidates).
 
@@ -118,7 +118,7 @@ class PayloadColorStringApproachMode(Mode):
         if self.debug:
             self._debug_pub = self.node.create_publisher(
                 CompressedImage,
-                f"{vehicle.camera_namespace}/vision/color_string_approach/debug/compressed",
+                vehicle.namespaced_path("vision/color_string_approach/debug/compressed"),
                 1,
             )
 
@@ -262,7 +262,9 @@ class PayloadColorStringApproachMode(Mode):
         if self.debug:
             self.log(
                 "PayloadColorStringApproachMode: debug → "
-                f"{self.vehicle.camera_namespace}/vision/color_string_approach/debug/compressed"
+                + self.vehicle.namespaced_path(
+                    "vision/color_string_approach/debug/compressed"
+                )
             )
 
     def on_update(self, time_delta: float) -> None:
