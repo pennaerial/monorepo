@@ -949,6 +949,15 @@
           "annotation": {
             "kind": "float"
           },
+          "default": 0.3,
+          "default_kind": "value",
+          "name": "corner_angular_speed",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
           "default": 0.1,
           "default_kind": "value",
           "name": "line_follow_speed_mps",
@@ -1117,6 +1126,11 @@
             "default": false,
             "title": "Compressed Image",
             "type": "boolean"
+          },
+          "corner_angular_speed": {
+            "default": 0.3,
+            "title": "Corner Angular Speed",
+            "type": "number"
           },
           "detect_frames": {
             "default": 5,

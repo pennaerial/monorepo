@@ -24,6 +24,12 @@ _QUARTER_TURN = math.pi / 2.0  # 90 degrees
 _EIGHTH_TURN = math.pi / 4.0  # 45 degrees
 _ANGLE_TOL = 0.05  # radians, stop slightly early to avoid overshoot
 
+# Corner-turn vision thresholds (mirrors PayloadCornerNavigateMode defaults)
+_CORNER_CENTER_TOL_PX = 30.0  # lateral error tolerance (px)
+_CORNER_CENTER_MIN_PX = 150  # minimum target-colour pixels to trust centering
+_CORNER_STABLE_FRAMES = 1  # consecutive centred frames before locking
+_CORNER_MAX_RAD = 2.0 * math.pi  # safety timeout (radians)
+
 _VALID_START_PHASES = ("wait_for_plane", "scan_tags", "line_follow")
 
 # ---------------------------------------------------------------------------
@@ -167,6 +173,7 @@ class PayloadDLZNavigateMode(Mode):
         direction: Literal["cw", "ccw"] = "ccw",
         target_transitions: int = 1,
         turn_angular_speed: float = 0.5,
+        corner_angular_speed: float = 0.3,
         line_follow_speed_mps: float = 0.10,
         k_lat: float = 0.003,
         k_ang: float = 0.4,
@@ -197,6 +204,7 @@ class PayloadDLZNavigateMode(Mode):
         self._default_target_transitions = int(target_transitions)
 
         self.turn_angular_speed = float(turn_angular_speed)
+        self.corner_angular_speed = float(corner_angular_speed)
         self.line_follow_speed_mps = float(line_follow_speed_mps)
         self.k_lat = float(k_lat)
         self.k_ang = float(k_ang)
@@ -341,6 +349,8 @@ class PayloadDLZNavigateMode(Mode):
         self._transitions = 0
         self._lf_phase = "following"  # "following" | "corner_turn"
         self._corner_turned = 0.0
+        self._corner_stable = 0
+        self._corner_target_color: str = "none"
         self._done = False
         self._image = None
 
@@ -560,6 +570,8 @@ class PayloadDLZNavigateMode(Mode):
             if is_corner:
                 self._lf_phase = "corner_turn"
                 self._corner_turned = 0.0
+                self._corner_stable = 0
+                self._corner_target_color = self._prev_color
                 self._annotate_line_follow(
                     bgr,
                     strip_start,
@@ -603,19 +615,149 @@ class PayloadDLZNavigateMode(Mode):
         )
         self.vehicle.drive(self.line_follow_speed_mps, angular)
 
+    def _corner_single_color_metrics(
+        self, bgr: np.ndarray, color: str
+    ) -> Tuple[int, float, np.ndarray, int]:
+        """Return ``(pixel_count, lateral_error_px, mask, row_start)`` for a
+        single colour in the bottom 40 % of the frame (full width).
+        ``mask`` and ``row_start`` are returned for debug annotation.
+        Returns ``(0, 0.0, empty_mask, row_start)`` if no pixels found."""
+        h, w = bgr.shape[:2]
+        row_start = int(h * 0.5)
+        crop = bgr[row_start:]
+        hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
+        if color == "A":
+            mask = _red_mask(hsv)
+        else:
+            mask = cv2.inRange(hsv, _LOWER_B, _UPPER_B)
+        count = int(np.count_nonzero(mask))
+        if count == 0:
+            return 0, 0.0, mask, row_start
+        _ys, xs = np.nonzero(mask)
+        centroid_x = float(xs.mean())
+        crop_center_x = mask.shape[1] / 2.0
+        return count, centroid_x - crop_center_x, mask, row_start
+
     def _do_corner_turn(self, time_delta: float) -> None:
         # Corner turns are opposite to the initial alignment turn:
         #   CCW travel → turn left (+), CW travel → turn right (-)
-        angular = -self._turn_angular()
+        speed = self.corner_angular_speed
+        angular = speed if self.direction == "ccw" else -speed
         self._corner_turned += abs(angular) * time_delta
 
-        if self._corner_turned >= _EIGHTH_TURN - _ANGLE_TOL:
-            self._lf_phase = "following"
+        bgr = self._decode_image()
+        if bgr is not None:
+            total, lateral_error_px, mask, row_start = (
+                self._corner_single_color_metrics(bgr, self._corner_target_color)
+            )
+            if (
+                total >= _CORNER_CENTER_MIN_PX
+                and abs(lateral_error_px) < _CORNER_CENTER_TOL_PX
+            ):
+                self._corner_stable += 1
+                if self._corner_stable >= _CORNER_STABLE_FRAMES:
+                    self._annotate_corner_turn(
+                        bgr, mask, row_start, total, lateral_error_px
+                    )
+                    self.vehicle.drive(0.0, 0.0)
+                    self._lf_phase = "following"
+                    self.log(
+                        f"PayloadDLZNavigateMode: corner turn centred on "
+                        f"{self._corner_target_color} "
+                        f"(lat={lateral_error_px:.1f}px, total={total}) "
+                        f"→ FOLLOWING"
+                    )
+                    return
+            else:
+                self._corner_stable = 0
+
+            self._annotate_corner_turn(
+                bgr, mask, row_start, total, lateral_error_px
+            )
+
+        # Safety timeout
+        if self._corner_turned >= _CORNER_MAX_RAD:
             self.vehicle.drive(0.0, 0.0)
-            self.log("PayloadDLZNavigateMode: corner turn complete → FOLLOWING")
+            self._lf_phase = "following"
+            self.log(
+                f"PayloadDLZNavigateMode: corner turn TIMEOUT "
+                f"({math.degrees(self._corner_turned):.1f}°) → FOLLOWING"
+            )
             return
 
         self.vehicle.drive(0.0, angular)
+
+    def _annotate_corner_turn(
+        self,
+        bgr: np.ndarray,
+        mask: np.ndarray,
+        row_start: int,
+        total: int,
+        lateral_error_px: float,
+    ) -> None:
+        if self._annotated_pub is None or bgr is None:
+            return
+        debug = bgr.copy()
+        h, w = bgr.shape[:2]
+
+        # Draw contours of the target colour mask
+        contours, _ = cv2.findContours(
+            mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+        )
+        shifted = [c + np.array([[[0, row_start]]]) for c in contours]
+        cv2.drawContours(debug, shifted, -1, (255, 255, 255), 2)
+
+        # Crop boundary line
+        cv2.line(debug, (0, row_start), (w, row_start), (80, 80, 80), 1)
+
+        # Frame centre reference (white)
+        frame_cx = w // 2
+        cv2.line(debug, (frame_cx, row_start), (frame_cx, h), (255, 255, 255), 1)
+
+        # Tolerance band (green)
+        tol_left = int(frame_cx - _CORNER_CENTER_TOL_PX)
+        tol_right = int(frame_cx + _CORNER_CENTER_TOL_PX)
+        cv2.line(debug, (tol_left, row_start), (tol_left, h), (0, 255, 0), 1)
+        cv2.line(debug, (tol_right, row_start), (tol_right, h), (0, 255, 0), 1)
+
+        # Centroid line (green if in tolerance, orange otherwise)
+        if total >= _CORNER_CENTER_MIN_PX:
+            centroid_x = int(frame_cx + lateral_error_px)
+            in_tol = abs(lateral_error_px) < _CORNER_CENTER_TOL_PX
+            color = (0, 255, 0) if in_tol else (0, 140, 255)
+            cv2.line(debug, (centroid_x, row_start), (centroid_x, h), color, 2)
+
+        # Text overlay
+        cv2.putText(
+            debug,
+            f"CORNER_TURN dir={self.direction} target={self._corner_target_color}",
+            (8, 22),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.6,
+            (0, 255, 255),
+            2,
+        )
+        cv2.putText(
+            debug,
+            f"total={total}px lat={lateral_error_px:+.1f}px "
+            f"tol=+/-{_CORNER_CENTER_TOL_PX:.0f}",
+            (8, 44),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            (200, 200, 200),
+            1,
+        )
+        cv2.putText(
+            debug,
+            f"stable={self._corner_stable}/{_CORNER_STABLE_FRAMES} "
+            f"turned={math.degrees(self._corner_turned):.1f}deg",
+            (8, 62),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            (200, 200, 200),
+            1,
+        )
+        self._publish_annotated(debug)
 
     # ------------------------------------------------------------------
     # Annotated debug image
