@@ -211,7 +211,9 @@ class ModeManager(Node):
             self._peer_connected[peer_name] = False
             self._handle_peer_connection_change(peer_name, connected=False)
 
-    def _handle_peer_connection_change(self, peer_name: str, *, connected: bool) -> None:
+    def _handle_peer_connection_change(
+        self, peer_name: str, *, connected: bool
+    ) -> None:
         for wrapper in list(self._managed_entities.values()):
             if wrapper.destroyed or peer_name not in wrapper.spec.peers:
                 continue

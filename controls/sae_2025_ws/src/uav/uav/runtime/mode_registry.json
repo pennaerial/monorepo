@@ -1218,6 +1218,72 @@
         "done"
       ]
     },
+    "uav.modes.payload.PayloadPeerFleetTestMode": {
+      "class_name": "PayloadPeerFleetTestMode",
+      "class_path": "uav.modes.payload.PayloadPeerFleetTestMode",
+      "description": "Passive multi-payload communication demo for fleet bring-up.",
+      "display_name": "PayloadPeerFleetTestMode",
+      "mission_target": "payload",
+      "module_path": "uav.modes.payload.PayloadPeerFleetTestMode",
+      "param_fields": [
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 1.0,
+          "default_kind": "value",
+          "name": "publish_period_s",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "str"
+          },
+          "default": "peer_test/state",
+          "default_kind": "value",
+          "name": "local_topic",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "str"
+          },
+          "default": "/shared/peer_test/broadcast",
+          "default_kind": "value",
+          "name": "shared_topic",
+          "required": false
+        }
+      ],
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "local_topic": {
+            "default": "peer_test/state",
+            "title": "Local Topic",
+            "type": "string"
+          },
+          "publish_period_s": {
+            "default": 1.0,
+            "title": "Publish Period S",
+            "type": "number"
+          },
+          "shared_topic": {
+            "default": "/shared/peer_test/broadcast",
+            "title": "Shared Topic",
+            "type": "string"
+          }
+        },
+        "title": "PayloadPeerFleetTestModeParams",
+        "type": "object"
+      },
+      "peer_vehicle_names": [
+        "payload_0",
+        "payload_1"
+      ],
+      "required_vision_nodes": [],
+      "requires_camera": false,
+      "transition_labels": []
+    },
     "uav.modes.payload.PayloadRetreatMode": {
       "class_name": "PayloadRetreatMode",
       "class_path": "uav.modes.payload.PayloadRetreatMode",

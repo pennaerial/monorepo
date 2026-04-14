@@ -69,6 +69,14 @@ def test_mode_registry_entries_include_payload_modes():
     assert "uav.modes.payload.PayloadAprilTagApproachMode" in class_paths
 
 
+def test_mode_registry_entry_exposes_peer_vehicle_names():
+    entry = mode_entry_for_class_path("uav.modes.payload.PayloadPeerFleetTestMode")
+
+    assert entry.mission_target == "payload"
+    assert entry.peer_vehicle_names == ("payload_0", "payload_1")
+    assert entry.requires_camera is False
+
+
 def test_schema_registry_document_exposes_mode_entries_and_document_schemas():
     document = schema_registry_document()
 

@@ -32,6 +32,7 @@ def _canonical_mode_path(mode_class: type[Mode]) -> str:
         return module_path
     return f"{module_path}.{mode_class.__name__}"
 
+
 def _doc_summary(obj: object) -> str:
     doc = inspect.getdoc(obj) or ""
     return doc.strip().split("\n", 1)[0] if doc.strip() else ""

@@ -108,24 +108,46 @@ def _xfail_if_missing_peer_features(*features: str) -> None:
     manager_fields = getattr(ModeManager, "__dict__", {})
 
     for feature in features:
-        if feature == "mode_peer_vehicle_names" and "peer_vehicle_names" not in mode_fields:
+        if (
+            feature == "mode_peer_vehicle_names"
+            and "peer_vehicle_names" not in mode_fields
+        ):
             missing.append("Mode.peer_vehicle_names")
         elif feature == "mode_on_disconnect" and "on_disconnect" not in mode_fields:
             missing.append("Mode.on_disconnect")
-        elif feature == "mission_peer_vehicle_names" and "peer_vehicle_names" not in dataclass_fields:
+        elif (
+            feature == "mission_peer_vehicle_names"
+            and "peer_vehicle_names" not in dataclass_fields
+        ):
             missing.append("MissionSpec.peer_vehicle_names")
-        elif feature == "registry_peer_vehicle_names" and "peer_vehicle_names" not in registry_fields:
+        elif (
+            feature == "registry_peer_vehicle_names"
+            and "peer_vehicle_names" not in registry_fields
+        ):
             missing.append("ModeRegistryEntry.peer_vehicle_names")
-        elif feature == "manager_create_subscription" and "create_subscription" not in manager_fields:
+        elif (
+            feature == "manager_create_subscription"
+            and "create_subscription" not in manager_fields
+        ):
             missing.append("ModeManager.create_subscription")
-        elif feature == "manager_create_publisher" and "create_publisher" not in manager_fields:
+        elif (
+            feature == "manager_create_publisher"
+            and "create_publisher" not in manager_fields
+        ):
             missing.append("ModeManager.create_publisher")
-        elif feature == "manager_create_client" and "create_client" not in manager_fields:
+        elif (
+            feature == "manager_create_client" and "create_client" not in manager_fields
+        ):
             missing.append("ModeManager.create_client")
-        elif feature == "manager_create_service" and "create_service" not in manager_fields:
+        elif (
+            feature == "manager_create_service"
+            and "create_service" not in manager_fields
+        ):
             missing.append("ModeManager.create_service")
         elif feature == "manager_disconnect_runtime":
-            runtime_names = set(getattr(ModeManager._run_active_mode, "__code__").co_names)
+            runtime_names = set(
+                getattr(ModeManager._run_active_mode, "__code__").co_names
+            )
             if "disconnect" not in runtime_names:
                 missing.append("ModeManager._run_active_mode peer disconnect logic")
 
@@ -238,7 +260,9 @@ def _configure_manager_for_mode(manager: ModeManager, mode: Mode) -> None:
     )
 
 
-def _set_peer_connection_state(manager: ModeManager, peer_status: dict[str, bool]) -> None:
+def _set_peer_connection_state(
+    manager: ModeManager, peer_status: dict[str, bool]
+) -> None:
     manager._peer_connected = dict(peer_status)
     manager._mission_peer_names = tuple(sorted(peer_status))
 
@@ -581,10 +605,8 @@ def test_peer_timer_publishes_heartbeat_and_marks_stale_connections():
     manager.get_clock = lambda: SimpleNamespace(
         now=lambda: SimpleNamespace(nanoseconds=1_000_000_000)
     )
-    manager._handle_peer_connection_change = (
-        lambda peer_name, *, connected: connection_events.append(
-            (peer_name, connected)
-        )
+    manager._handle_peer_connection_change = lambda peer_name, *, connected: (
+        connection_events.append((peer_name, connected))
     )
 
     ModeManager._peer_timer_callback(manager)

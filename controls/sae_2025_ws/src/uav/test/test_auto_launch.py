@@ -18,8 +18,8 @@ if "std_msgs" not in sys.modules:
 if "ament_index_python" not in sys.modules:
     ament_index_python = types.ModuleType("ament_index_python")
     ament_index_packages = types.ModuleType("ament_index_python.packages")
-    ament_index_packages.get_package_share_directory = (
-        lambda _name: str(Path(__file__).resolve().parents[1])
+    ament_index_packages.get_package_share_directory = lambda _name: str(
+        Path(__file__).resolve().parents[1]
     )
     ament_index_python.packages = ament_index_packages
     sys.modules.update(
@@ -121,7 +121,7 @@ if "rclpy" not in sys.modules:
         }
     )
 
-from uav.runtime.ModeManager import ModeManager
+from uav.runtime.ModeManager import ModeManager  # noqa: E402
 
 try:
     import uav.runtime.uav_mission as uav_mission_module
@@ -233,8 +233,8 @@ def _stub_mode_manager_init(
     self._logger = _FakeLogger()
     self.create_timer = lambda period, callback: _FakeTimer(callback)
     self.create_service = lambda *args, **kwargs: object()
-    self.configure_peer_vehicle_names = (
-        lambda peer_names: setattr(self, "_mission_peer_names", tuple(peer_names))
+    self.configure_peer_vehicle_names = lambda peer_names: setattr(
+        self, "_mission_peer_names", tuple(peer_names)
     )
     self.get_logger = lambda: self._logger
     self.start_mission_service = object()

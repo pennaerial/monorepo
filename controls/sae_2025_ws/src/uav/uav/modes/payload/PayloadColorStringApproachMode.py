@@ -64,7 +64,7 @@ def _vertical_blob_centroid_area(
 
         top_cutoff = by + max(1, int(bh * top_frac))
         top_mask = np.zeros_like(mask)
-        top_mask[by:top_cutoff, bx:bx + bw] = mask[by:top_cutoff, bx:bx + bw]
+        top_mask[by:top_cutoff, bx : bx + bw] = mask[by:top_cutoff, bx : bx + bw]
         M_top = cv2.moments(top_mask)
         if M_top["m00"] <= 0:
             M_full = cv2.moments(cnt)
@@ -140,9 +140,7 @@ class PayloadColorStringApproachMode(Mode):
                 1,
             )
         else:
-            self.node.create_subscription(
-                Image, vehicle.image_topic, self._on_image, 1
-            )
+            self.node.create_subscription(Image, vehicle.image_topic, self._on_image, 1)
 
         self._debug_pub = self.node.create_publisher(
             Image, f"{vehicle.camera_namespace}/color_string_debug", 1
@@ -183,7 +181,11 @@ class PayloadColorStringApproachMode(Mode):
         cv2.drawContours(debug, contours, -1, (0, 255, 0), 1)
         if cx is not None and cy is not None:
             cv2.circle(debug, (int(cx), int(cy)), 5, (0, 0, 255), -1)
-        center_x = int(self._image_width / 2.0) if self._image_width > 0 else debug.shape[1] // 2
+        center_x = (
+            int(self._image_width / 2.0)
+            if self._image_width > 0
+            else debug.shape[1] // 2
+        )
         cv2.line(debug, (center_x, 0), (center_x, debug.shape[0]), (255, 0, 0), 1)
         self._debug_pub.publish(self._bridge.cv2_to_imgmsg(debug, encoding="bgr8"))
 
@@ -247,7 +249,10 @@ class PayloadColorStringApproachMode(Mode):
         self._publish_debug(bgr, mask, cx, cy)
 
         if cx is None or area < self.min_detect_pixels:
-            if self._last_seen_time is not None and (now - self._last_seen_time) > self.lost_timeout_s:
+            if (
+                self._last_seen_time is not None
+                and (now - self._last_seen_time) > self.lost_timeout_s
+            ):
                 self.vehicle.stop()
                 self._last_seen_time = None
                 if now - self._last_log_time >= 2.0:
@@ -259,7 +264,9 @@ class PayloadColorStringApproachMode(Mode):
 
         if area >= self.stop_area:
             self._stopping = True
-            self.log(f"PayloadColorStringApproachMode: stop_area hit (area={area}), driving one more frame")
+            self.log(
+                f"PayloadColorStringApproachMode: stop_area hit (area={area}), driving one more frame"
+            )
 
         image_center = self._image_width / 2.0
         lateral_error = cx - image_center

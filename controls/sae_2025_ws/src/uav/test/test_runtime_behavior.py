@@ -277,8 +277,8 @@ def _stub_mode_manager_init(
     self._logger = _FakeLogger()
     self.create_timer = lambda period, callback: _FakeTimer(callback)
     self.create_service = lambda *args, **kwargs: object()
-    self.configure_peer_vehicle_names = (
-        lambda peer_names: setattr(self, "_mission_peer_names", tuple(peer_names))
+    self.configure_peer_vehicle_names = lambda peer_names: setattr(
+        self, "_mission_peer_names", tuple(peer_names)
     )
     self.get_logger = lambda: self._logger
     self.destroy_node = lambda: None

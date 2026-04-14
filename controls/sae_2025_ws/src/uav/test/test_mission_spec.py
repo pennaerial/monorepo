@@ -8,6 +8,18 @@ import types
 
 import pytest
 
+if "rclpy" not in sys.modules:
+    rclpy = types.ModuleType("rclpy")
+    node_mod = types.ModuleType("rclpy.node")
+
+    class Node:
+        def __init__(self, *_args, **_kwargs) -> None:
+            pass
+
+    node_mod.Node = Node
+    rclpy.node = node_mod
+    sys.modules.update({"rclpy": rclpy, "rclpy.node": node_mod})
+
 from uav.modes.Mode import Mode
 import uav.runtime.mission_spec as mission_spec_module
 import uav.runtime.schema as schema_module
@@ -357,6 +369,21 @@ def test_load_mode_class_accepts_module_path(monkeypatch):
 
     assert mode_class.__name__ == "PayloadAprilTagApproachMode"
     assert mode_class.mission_target == "payload"
+
+
+def test_checked_in_peer_fleet_test_mission_loads_with_peer_union():
+    mission_path = (
+        Path(__file__).resolve().parent.parent
+        / "uav"
+        / "missions"
+        / "payload_peer_fleet_test.yaml"
+    )
+
+    mission_spec = load_mission_spec(mission_path)
+
+    assert mission_spec.target == "payload"
+    assert mission_spec.peer_vehicle_names == ("payload_0", "payload_1")
+    assert mission_spec.requires_camera is False
 
 
 def test_load_mode_class_falls_back_from_class_path(tmp_path, monkeypatch):

@@ -204,9 +204,7 @@ def _sim_camera_bridge_actions(
 ) -> list:
     gz_image_topic = f"/world/{world_name}/model/{sim_entity_name}/link/camera_link/sensor/camera/image"
     gz_camera_info_topic = f"/world/{world_name}/model/{sim_entity_name}/link/camera_link/sensor/camera/camera_info"
-    image_target = (
-        "camera_source" if mission_target == "payload" else "camera"
-    )
+    image_target = "camera_source" if mission_target == "payload" else "camera"
     camera_info_target = (
         "camera_info_source" if mission_target == "payload" else "camera_info"
     )
