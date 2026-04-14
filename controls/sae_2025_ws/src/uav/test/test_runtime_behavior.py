@@ -12,61 +12,102 @@ def _placeholder(name: str):
 
 
 def _install_ros_test_doubles() -> None:
-    if "rclpy" not in sys.modules:
+    ament_index_python = sys.modules.get("ament_index_python")
+    if ament_index_python is None:
+        ament_index_python = types.ModuleType("ament_index_python")
+        sys.modules["ament_index_python"] = ament_index_python
+
+    ament_index_packages = sys.modules.get("ament_index_python.packages")
+    if ament_index_packages is None:
+        ament_index_packages = types.ModuleType("ament_index_python.packages")
+        sys.modules["ament_index_python.packages"] = ament_index_packages
+    if not hasattr(ament_index_packages, "PackageNotFoundError"):
+
+        class PackageNotFoundError(Exception):
+            pass
+
+        ament_index_packages.PackageNotFoundError = PackageNotFoundError
+    if not hasattr(ament_index_packages, "get_package_share_directory"):
+        ament_index_packages.get_package_share_directory = lambda _name: ""
+    ament_index_python.packages = ament_index_packages
+
+    rclpy = sys.modules.get("rclpy")
+    if rclpy is None:
         rclpy = types.ModuleType("rclpy")
+        sys.modules["rclpy"] = rclpy
+    if not hasattr(rclpy, "ok"):
         rclpy.ok = lambda: True
 
+    node_mod = sys.modules.get("rclpy.node")
+    if node_mod is None:
         node_mod = types.ModuleType("rclpy.node")
+        sys.modules["rclpy.node"] = node_mod
+    if not hasattr(node_mod, "Node"):
 
         class Node:
             pass
 
         node_mod.Node = Node
 
+    executors_mod = sys.modules.get("rclpy.executors")
+    if executors_mod is None:
         executors_mod = types.ModuleType("rclpy.executors")
+        sys.modules["rclpy.executors"] = executors_mod
+    if not hasattr(executors_mod, "ExternalShutdownException"):
 
         class ExternalShutdownException(Exception):
             pass
 
         executors_mod.ExternalShutdownException = ExternalShutdownException
 
+    clock_mod = sys.modules.get("rclpy.clock")
+    if clock_mod is None:
         clock_mod = types.ModuleType("rclpy.clock")
+        sys.modules["rclpy.clock"] = clock_mod
+    if not hasattr(clock_mod, "Clock"):
         clock_mod.Clock = _placeholder("Clock")
 
+    parameter_mod = sys.modules.get("rclpy.parameter")
+    if parameter_mod is None:
         parameter_mod = types.ModuleType("rclpy.parameter")
+        sys.modules["rclpy.parameter"] = parameter_mod
+    if not hasattr(parameter_mod, "Parameter"):
         parameter_mod.Parameter = _placeholder("Parameter")
 
+    validate_namespace_mod = sys.modules.get("rclpy.validate_namespace")
+    if validate_namespace_mod is None:
         validate_namespace_mod = types.ModuleType("rclpy.validate_namespace")
+        sys.modules["rclpy.validate_namespace"] = validate_namespace_mod
+    if not hasattr(validate_namespace_mod, "validate_namespace"):
         validate_namespace_mod.validate_namespace = lambda namespace: None
 
+    validate_node_name_mod = sys.modules.get("rclpy.validate_node_name")
+    if validate_node_name_mod is None:
         validate_node_name_mod = types.ModuleType("rclpy.validate_node_name")
+        sys.modules["rclpy.validate_node_name"] = validate_node_name_mod
+    if not hasattr(validate_node_name_mod, "validate_node_name"):
         validate_node_name_mod.validate_node_name = lambda node_name: None
 
+    qos_mod = sys.modules.get("rclpy.qos")
+    if qos_mod is None:
         qos_mod = types.ModuleType("rclpy.qos")
+        sys.modules["rclpy.qos"] = qos_mod
+    if not hasattr(qos_mod, "QoSProfile"):
         qos_mod.QoSProfile = _placeholder("QoSProfile")
+    if not hasattr(qos_mod, "QoSReliabilityPolicy"):
         qos_mod.QoSReliabilityPolicy = _placeholder("QoSReliabilityPolicy")
+    if not hasattr(qos_mod, "QoSHistoryPolicy"):
         qos_mod.QoSHistoryPolicy = _placeholder("QoSHistoryPolicy")
+    if not hasattr(qos_mod, "QoSDurabilityPolicy"):
         qos_mod.QoSDurabilityPolicy = _placeholder("QoSDurabilityPolicy")
 
-        rclpy.node = node_mod
-        rclpy.executors = executors_mod
-        rclpy.clock = clock_mod
-        rclpy.parameter = parameter_mod
-        rclpy.validate_namespace = validate_namespace_mod
-        rclpy.validate_node_name = validate_node_name_mod
-        rclpy.qos = qos_mod
-        sys.modules.update(
-            {
-                "rclpy": rclpy,
-                "rclpy.node": node_mod,
-                "rclpy.executors": executors_mod,
-                "rclpy.clock": clock_mod,
-                "rclpy.parameter": parameter_mod,
-                "rclpy.validate_namespace": validate_namespace_mod,
-                "rclpy.validate_node_name": validate_node_name_mod,
-                "rclpy.qos": qos_mod,
-            }
-        )
+    rclpy.node = node_mod
+    rclpy.executors = executors_mod
+    rclpy.clock = clock_mod
+    rclpy.parameter = parameter_mod
+    rclpy.validate_namespace = validate_namespace_mod
+    rclpy.validate_node_name = validate_node_name_mod
+    rclpy.qos = qos_mod
 
     if "std_srvs" not in sys.modules:
         std_srvs = types.ModuleType("std_srvs")
