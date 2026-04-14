@@ -35,4 +35,7 @@ def test_find_package_resource_accepts_package_relative_paths():
         base_file=base_file,
     )
 
-    assert result == (package_root / "sim" / "world_gen" / "worlds" / "template.sdf").resolve()
+    assert (
+        result
+        == (package_root / "sim" / "world_gen" / "worlds" / "template.sdf").resolve()
+    )

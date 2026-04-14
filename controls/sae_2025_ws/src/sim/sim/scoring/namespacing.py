@@ -33,9 +33,11 @@ def uav_controllable_names(world_params: dict[str, Any]) -> list[str]:
 def resolve_scoring_vehicle_name(
     scoring_params: dict[str, Any], world_params: dict[str, Any]
 ) -> str:
-    explicit_vehicle_name = normalize_vehicle_name(
-        scoring_params.get("vehicle_name")
-    ) if "vehicle_name" in scoring_params else ""
+    explicit_vehicle_name = (
+        normalize_vehicle_name(scoring_params.get("vehicle_name"))
+        if "vehicle_name" in scoring_params
+        else ""
+    )
     uav_names = uav_controllable_names(world_params)
 
     if explicit_vehicle_name:

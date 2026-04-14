@@ -29,7 +29,9 @@ def _install_ros_test_doubles() -> None:
 
     ament_index_packages = sys.modules.get("ament_index_python.packages")
     if ament_index_packages is None:
-        ament_index_packages = _import_module_if_available("ament_index_python.packages")
+        ament_index_packages = _import_module_if_available(
+            "ament_index_python.packages"
+        )
     if ament_index_packages is None:
         ament_index_packages = types.ModuleType("ament_index_python.packages")
         sys.modules["ament_index_python.packages"] = ament_index_packages
@@ -98,9 +100,7 @@ def _install_ros_test_doubles() -> None:
 
     validate_namespace_mod = sys.modules.get("rclpy.validate_namespace")
     if validate_namespace_mod is None:
-        validate_namespace_mod = _import_module_if_available(
-            "rclpy.validate_namespace"
-        )
+        validate_namespace_mod = _import_module_if_available("rclpy.validate_namespace")
     if validate_namespace_mod is None:
         validate_namespace_mod = types.ModuleType("rclpy.validate_namespace")
         sys.modules["rclpy.validate_namespace"] = validate_namespace_mod
