@@ -434,6 +434,11 @@ def test_initialize_mode_happy_path(monkeypatch):
         "load_mode_class",
         lambda _path: FakeMode,
     )
+    monkeypatch.setattr(
+        mode_manager_module,
+        "mode_entry_for_mode_id",
+        lambda _mode_id: SimpleNamespace(class_path="fake.module.FakeMode"),
+    )
 
     mode = ModeManager.initialize_mode(
         manager, "fake.module.FakeMode", {"required": 7, "optional": "value"}
@@ -468,6 +473,11 @@ def test_initialize_mode_missing_required_parameter(monkeypatch):
         "load_mode_class",
         lambda _path: FakeMode,
     )
+    monkeypatch.setattr(
+        mode_manager_module,
+        "mode_entry_for_mode_id",
+        lambda _mode_id: SimpleNamespace(class_path="fake.module.FakeMode"),
+    )
 
     with pytest.raises(ValueError, match="Missing required parameter 'required'"):
         ModeManager.initialize_mode(manager, "fake.module.FakeMode", {})
@@ -494,6 +504,11 @@ def test_initialize_mode_rejects_unexpected_parameter(monkeypatch):
         mode_manager_module,
         "load_mode_class",
         lambda _path: FakeMode,
+    )
+    monkeypatch.setattr(
+        mode_manager_module,
+        "mode_entry_for_mode_id",
+        lambda _mode_id: SimpleNamespace(class_path="fake.module.FakeMode"),
     )
 
     with pytest.raises(ValueError, match="unexpected parameter"):
@@ -523,6 +538,11 @@ def test_initialize_mode_rejects_vehicle_type_mismatch(monkeypatch):
         mode_manager_module,
         "load_mode_class",
         lambda _path: FakeMode,
+    )
+    monkeypatch.setattr(
+        mode_manager_module,
+        "mode_entry_for_mode_id",
+        lambda _mode_id: SimpleNamespace(class_path="fake.module.FakeMode"),
     )
 
     with pytest.raises(TypeError, match="expects vehicle type"):
