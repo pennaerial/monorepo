@@ -285,7 +285,8 @@ class PayloadDualApproachMode(Mode):
         self._image_width = 0.0
         self._last_seen_time = None
         self._last_log_time = 0.0
-        self.log("PayloadDualApproachMode: started")
+        self.vehicle.set_servo(120.0)
+        self.log("PayloadDualApproachMode: started, servo set to 160")
 
     def on_update(self, time_delta: float) -> None:
         if self._done:
@@ -307,11 +308,12 @@ class PayloadDualApproachMode(Mode):
 
         # Check stop condition on colour blob height
         if color_height >= self.stop_height_px:
+            self.vehicle.set_servo(0.0)
             self.vehicle.stop()
             self._done = True
             self.log(
                 f"PayloadDualApproachMode: stop_height hit "
-                f"(height={color_height}px) — done"
+                f"(height={color_height}px) — servo set to 0, done"
             )
             self._publish_debug(
                 bgr, mask, "STOP", None, color_cx, color_cy, color_height

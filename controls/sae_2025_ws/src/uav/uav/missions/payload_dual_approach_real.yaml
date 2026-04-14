@@ -12,10 +12,10 @@ modes:
       lower_hsv: [10, 80, 120]
       upper_hsv: [25, 255, 255]
       color_forward_speed: 0.2
-      color_angular_gain: 0.004
+      color_angular_gain: 0.0045
       color_centering_threshold_px: 15
       color_drive_angular_scale: 0.3
       color_min_detect_pixels: 50
-      stop_height_px: 350
+      stop_height_px: 400
       lost_timeout_s: 0.0
       compressed_image: true

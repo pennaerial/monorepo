@@ -17,5 +17,5 @@ modes:
       color_drive_angular_scale: 0.3
       color_min_detect_pixels: 50
       stop_height_px: 155
-      lost_timeout_s: 3.0
+      lost_timeout_s: 0.0
       compressed_image: false
