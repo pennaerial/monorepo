@@ -315,11 +315,11 @@
         },
         {
           "annotation": {
-            "kind": "bool"
+            "kind": "float"
           },
-          "default": false,
+          "default": 0.3,
           "default_kind": "value",
-          "name": "use_global_hsv_centroid",
+          "name": "top_centroid_frac",
           "required": false
         },
         {
@@ -328,7 +328,7 @@
           },
           "default": false,
           "default_kind": "value",
-          "name": "debug",
+          "name": "use_global_hsv_centroid",
           "required": false
         }
       ],
@@ -348,11 +348,6 @@
           "compressed": {
             "default": false,
             "title": "Compressed",
-            "type": "boolean"
-          },
-          "debug": {
-            "default": false,
-            "title": "Debug",
             "type": "boolean"
           },
           "drive_angular_scale": {
@@ -391,6 +386,11 @@
             "default": 5000,
             "title": "Stop Area",
             "type": "integer"
+          },
+          "top_centroid_frac": {
+            "default": 0.3,
+            "title": "Top Centroid Frac",
+            "type": "number"
           },
           "upper_hsv": {
             "default": [
@@ -901,7 +901,7 @@
         "type": "object"
       },
       "required_vision_nodes": [],
-      "requires_camera": false,
+      "requires_camera": true,
       "transition_labels": [
         "complete"
       ]
