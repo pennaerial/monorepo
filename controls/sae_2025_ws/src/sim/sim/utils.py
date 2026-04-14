@@ -210,6 +210,7 @@ def find_package_resource(
         FileNotFoundError: If resource cannot be found
     """
     relative_path = Path(relative_path)
+
     if base_file is None:
         # Default to utils.py location if not provided (fallback)
         base_file = Path(__file__)
@@ -240,8 +241,7 @@ def find_package_resource(
         from ament_index_python.packages import get_package_share_directory
 
         package_share = Path(get_package_share_directory(package_name))
-        installed_path = package_share / relative_path
-        installed_path = installed_path.resolve()
+        installed_path = (package_share / relative_path).resolve()
 
         if (
             resource_type == "file"
@@ -272,6 +272,22 @@ def find_package_resource(
         f"{resource_type.capitalize()} '{resource_name}' not found. "
         f"Checked source paths: {source_paths} and installed location."
     )
+
+
+def template_world_reference_candidates(
+    template_world_path: Union[str, Path],
+) -> list[Path]:
+    template_path = Path(template_world_path).expanduser()
+    if template_path.is_absolute():
+        return [template_path]
+
+    if len(template_path.parts) != 1:
+        raise ValueError(
+            "template_world must be a bare filename like 'template.sdf' "
+            "or an absolute path."
+        )
+
+    return [Path("worlds") / template_path.name]
 
 
 def copy_models_to_gazebo(src_models_dir: Path, dst_models_dir: Path) -> None:

@@ -14,7 +14,12 @@ from abc import ABC, abstractmethod
 from rclpy.impl.rcutils_logger import RcutilsLogger
 from rclpy.node import Node
 from sim.orchestration import normalize_named_records
-from sim.utils import camel_to_snake, find_package_resource, copy_models_to_gazebo
+from sim.utils import (
+    camel_to_snake,
+    copy_models_to_gazebo,
+    find_package_resource,
+    template_world_reference_candidates,
+)
 import xml.etree.ElementTree as ET
 import random
 from std_srvs.srv import Trigger
@@ -116,15 +121,21 @@ class WorldNode(Node, ABC):
         if template_path.is_absolute():
             in_path = template_path.resolve()
         else:
-            try:
-                in_path = find_package_resource(
-                    relative_path=str(template_path),
-                    package_name="sim",
-                    resource_type="file",
-                    logger=self.get_logger(),
-                    base_file=Path(__file__),
-                ).resolve()
-            except FileNotFoundError:
+            in_path = None
+            candidate_paths = template_world_reference_candidates(template_path)
+            for candidate in candidate_paths:
+                try:
+                    in_path = find_package_resource(
+                        relative_path=str(candidate),
+                        package_name="sim",
+                        resource_type="file",
+                        logger=self.get_logger(),
+                        base_file=Path(__file__),
+                    ).resolve()
+                    break
+                except FileNotFoundError:
+                    continue
+            if in_path is None:
                 in_path = template_path.resolve()
         out_path = Path(self.output_path).expanduser().resolve()
 

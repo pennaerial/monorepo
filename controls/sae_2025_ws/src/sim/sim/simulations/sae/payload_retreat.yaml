@@ -1,7 +1,7 @@
 world:
   name: SAEWorldNode
   params:
-    template_world: "src/sim/sim/world_gen/worlds/template.sdf"
+    template_world: "template.sdf"
     physics:
       friction: 0.6
     entities:
