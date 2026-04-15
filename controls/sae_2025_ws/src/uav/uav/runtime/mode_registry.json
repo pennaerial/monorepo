@@ -1343,7 +1343,7 @@
       "required_vision_nodes": [
         "uav.vision_nodes.PayloadAprilTagNode"
       ],
-      "requires_camera": false,
+      "requires_camera": true,
       "transition_labels": [
         "done"
       ]

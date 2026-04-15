@@ -29,7 +29,7 @@ modes:
         "0|4|5":   {transitions: 0, direction: ccw}  # front only (already at dock)
         "1|6|7,2": {transitions: 3, direction: ccw}  # back + left
         "1|6|7,3": {transitions: 3, direction: cw}   # back + right
-        "1|6|7":   {transitions: 4, direction: ccw}  # back only
+        "1|6|7":   {transitions: 4, direction: cw}  # back only
         "2":       {transitions: 2, direction: ccw}  # left only
         "3":       {transitions: 2, direction: cw}   # right only
       tag_size_m: 0.0508
