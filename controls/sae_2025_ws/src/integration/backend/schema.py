@@ -12,15 +12,10 @@ from uav.runtime.fleet_spec import (
 )
 from uav.runtime.mission_spec import (
     MissionDocumentModel,
-    MissionSpec,
     mission_path_for_name,
     mission_root,
 )
-from uav.runtime.schema import (
-    mode_entry_for_class_path,
-    mode_registry_entries,
-    repo_fleet_paths,
-)
+from uav.runtime.schema import repo_fleet_paths
 
 from .models import (
     FleetSchemaResponse,
@@ -32,6 +27,13 @@ from .models import (
     MissionSchemaResponse,
     SchemaFieldResponse,
     SchemaIndexResponse,
+)
+from .mission_compat import (
+    load_mission_spec_compat,
+    internal_mode_path,
+    mode_entry_for_class_path,
+    mode_registry_entries,
+    public_mode_id,
 )
 
 _FLEET_BACKEND_KINDS = ["sim", "hardware", "real"]
@@ -46,6 +48,30 @@ _FLEET_EXCLUDED_KEYS = [
 
 def _required_names(schema: dict[str, Any]) -> set[str]:
     return set(schema.get("required", []))
+
+
+def _mode_reference(entry: Any) -> str:
+    return public_mode_id(
+        getattr(entry, "mode", None) or getattr(entry, "class_path", None)
+    )
+
+
+def _lookup_mode_entry(mode_ref: str) -> Any:
+    candidates = []
+    for candidate in (internal_mode_path(mode_ref), public_mode_id(mode_ref)):
+        if candidate and candidate not in candidates:
+            candidates.append(candidate)
+
+    last_error: Exception | None = None
+    for candidate in candidates:
+        try:
+            return mode_entry_for_class_path(candidate)
+        except Exception as exc:  # pragma: no cover - runtime compatibility shim
+            last_error = exc
+
+    if last_error is not None:
+        raise last_error
+    raise ValueError(f"Unable to resolve mode entry for {mode_ref!r}")
 
 
 def _schema_field(
@@ -155,11 +181,14 @@ def _fields_from_model(
     ]
 
 
-def _mode_metadata_response(class_path: str) -> ModeMetadataResponse:
-    entry = mode_entry_for_class_path(class_path)
+def _mode_metadata_response(mode_ref: str | Any) -> ModeMetadataResponse:
+    if isinstance(mode_ref, str):
+        entry = _lookup_mode_entry(mode_ref)
+    else:
+        entry = mode_ref
     return ModeMetadataResponse(
         name=entry.display_name,
-        class_path=entry.class_path,
+        mode=_mode_reference(entry),
         module=entry.module_path,
         mission_target=entry.mission_target,
         description=entry.description or None,
@@ -175,7 +204,7 @@ def mode_registry(target: str | None = None) -> ModeRegistryResponse:
     grouped: dict[str, list[ModeMetadataResponse]] = {}
     for entry in entries:
         grouped.setdefault(entry.mission_target, []).append(
-            _mode_metadata_response(entry.class_path)
+            _mode_metadata_response(entry)
         )
     return ModeRegistryResponse(targets=grouped)
 
@@ -190,17 +219,20 @@ def _available_fleet_names() -> list[str]:
 
 def mission_schema_for_path(path: str | Path) -> MissionSchemaResponse:
     mission_path = Path(path)
-    mission_spec = MissionSpec.load(mission_path)
+    mission_spec = load_mission_spec_compat(mission_path)
     modes: list[MissionModeResponse] = []
 
     for mode_name, mode_spec in mission_spec.modes.items():
+        mode_ref = public_mode_id(
+            getattr(mode_spec, "mode", None) or getattr(mode_spec, "class_path", None)
+        )
         modes.append(
             MissionModeResponse(
                 name=mode_name,
-                class_path=mode_spec.class_path,
+                mode=mode_ref,
                 params=dict(mode_spec.params),
                 transitions=dict(mode_spec.transitions),
-                metadata=_mode_metadata_response(mode_spec.class_path),
+                metadata=_mode_metadata_response(mode_ref),
             )
         )
 

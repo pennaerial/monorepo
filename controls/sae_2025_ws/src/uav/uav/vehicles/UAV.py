@@ -49,17 +49,15 @@ class UAV(Vehicle):
         DEBUG=False,
         camera_offsets=[0, 0, 0],
         vehicle_name: str = "uav",
-        px4_namespace: str = "",
     ):
         super().__init__(
             node,
             str(vehicle_name),
             has_camera=True,
             camera_namespace=f"/{vehicle_name}",
-            px4_namespace=px4_namespace,
-            image_topic=f"/{vehicle_name}/camera",
-            camera_info_topic=f"/{vehicle_name}/camera_info",
-            camera_service_name=f"/{vehicle_name}/camera_data",
+            image_topic="camera",
+            camera_info_topic="camera_info",
+            camera_service_name="camera_data",
         )
         self.node = node
         self.DEBUG = DEBUG

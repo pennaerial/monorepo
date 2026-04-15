@@ -58,22 +58,16 @@ class Camera(Node):
             explicit=image_topic,
             param_name="image_topic",
             default_suffix="camera",
-            namespace=resolved_namespace,
-            legacy_default="/camera",
         )
         resolved_info_topic = self._resolve_transport_path(
             explicit=info_topic,
             param_name="camera_info_topic",
             default_suffix="camera_info",
-            namespace=resolved_namespace,
-            legacy_default="/camera_info",
         )
         resolved_service_name = self._resolve_transport_path(
             explicit=service_name,
             param_name="camera_service_name",
             default_suffix="camera_data",
-            namespace=resolved_namespace,
-            legacy_default="/camera_data",
         )
         self.input_transport = self._resolve_transport_mode(
             str(self.get_parameter("input_transport").value).strip()
@@ -96,22 +90,16 @@ class Camera(Node):
             explicit=None,
             param_name="input_raw_topic",
             default_suffix="camera",
-            namespace=resolved_namespace,
-            legacy_default=resolved_image_topic,
         )
         self.input_compressed_topic = self._resolve_transport_path(
             explicit=None,
             param_name="input_compressed_topic",
             default_suffix="camera/compressed",
-            namespace=resolved_namespace,
-            legacy_default=self._compressed_topic_for(resolved_image_topic),
         )
         self.input_camera_info_topic = self._resolve_transport_path(
             explicit=None,
             param_name="input_camera_info_topic",
             default_suffix="camera_info",
-            namespace=resolved_namespace,
-            legacy_default=resolved_info_topic,
         )
 
         self._raw_passthrough = (
@@ -254,13 +242,6 @@ class Camera(Node):
         return f"/{normalized}"
 
     @staticmethod
-    def _join_namespace(namespace: str | None, suffix: str) -> str:
-        clean_suffix = suffix.lstrip("/")
-        if not namespace:
-            return f"/{clean_suffix}"
-        return f"{namespace.rstrip('/')}/{clean_suffix}"
-
-    @staticmethod
     def _compressed_topic_for(raw_topic: str) -> str:
         return f"{raw_topic.rstrip('/')}/compressed"
 
@@ -279,17 +260,22 @@ class Camera(Node):
         explicit: str | None,
         param_name: str,
         default_suffix: str,
-        namespace: str | None,
-        legacy_default: str,
     ) -> str:
         if explicit:
-            return explicit
+            return self._require_relative_transport_path(explicit, label=param_name)
         configured = str(self.get_parameter(param_name).value).strip()
         if configured:
-            return configured
-        if namespace:
-            return self._join_namespace(namespace, default_suffix)
-        return legacy_default
+            return self._require_relative_transport_path(configured, label=param_name)
+        return default_suffix
+
+    @staticmethod
+    def _require_relative_transport_path(path: str, *, label: str) -> str:
+        cleaned = str(path).strip()
+        if cleaned.startswith("/"):
+            raise ValueError(
+                f"{label} must be relative to the vehicle namespace, received absolute path {cleaned!r}."
+            )
+        return cleaned.lstrip("/")
 
     def _load_preprocess_hook(
         self, hook_path: str

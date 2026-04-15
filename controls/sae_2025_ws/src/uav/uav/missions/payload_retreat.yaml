@@ -3,7 +3,7 @@
 # PayloadRetreatMode signals "terminate" when the turn finishes.
 modes:
   start:
-    class: uav.modes.payload.PayloadRetreatMode
+    mode: payload.PayloadRetreatMode
     params:
       forward_speed_mps: 0.12
       edge_threshold: 0.30

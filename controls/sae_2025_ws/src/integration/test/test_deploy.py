@@ -328,10 +328,10 @@ def _make_context(
     )
 
 
-def _write_mission(root: Path, name: str, mission_class: str) -> Path:
+def _write_mission(root: Path, name: str, mission_mode: str) -> Path:
     path = root / f"{name}.yaml"
     path.write_text(
-        f"modes:\n  start:\n    class: {mission_class}\n",
+        f"modes:\n  start:\n    mode: {mission_mode}\n",
         encoding="utf-8",
     )
     return path
@@ -483,7 +483,7 @@ def _write_deploy_lib(tmp_path: Path) -> Path:
 def test_render_runtime_fleet_for_uav(tmp_path, monkeypatch):
     missions_root = tmp_path / "src" / "uav" / "uav" / "missions"
     missions_root.mkdir(parents=True, exist_ok=True)
-    _write_mission(missions_root, "hover", "uav.modes.uav.TakeoffMode")
+    _write_mission(missions_root, "hover", "uav.vtol.TakeoffMode")
 
     fleet_file = _write_fleet(
         tmp_path,
@@ -573,9 +573,7 @@ def test_render_runtime_fleet_for_uav(tmp_path, monkeypatch):
 def test_render_runtime_fleet_for_payload_defaults(tmp_path, monkeypatch):
     missions_root = tmp_path / "src" / "uav" / "uav" / "missions"
     missions_root.mkdir(parents=True, exist_ok=True)
-    _write_mission(
-        missions_root, "payload_retreat", "uav.modes.payload.PayloadRetreatMode"
-    )
+    _write_mission(missions_root, "payload_retreat", "payload.PayloadRetreatMode")
 
     fleet_file = _write_fleet(
         tmp_path,
@@ -647,7 +645,7 @@ def test_render_runtime_fleet_for_payload_defaults(tmp_path, monkeypatch):
 def test_validate_overlay_preview_rejects_unsupported_fields(tmp_path, monkeypatch):
     missions_root = tmp_path / "src" / "uav" / "uav" / "missions"
     missions_root.mkdir(parents=True, exist_ok=True)
-    _write_mission(missions_root, "hover", "uav.modes.uav.TakeoffMode")
+    _write_mission(missions_root, "hover", "uav.vtol.TakeoffMode")
     fleet_file = _write_fleet(
         tmp_path,
         {"vehicles": [{"name": "uav_0", "mission": "hover"}]},
@@ -754,7 +752,7 @@ def test_build_local_source_bundle_scopes_packages_for_target(tmp_path, monkeypa
     _write_mission(
         missions_root,
         "payload_retreat",
-        "uav.modes.payload.PayloadRetreatMode",
+        "payload.PayloadRetreatMode",
     )
 
     fleet_file = _write_fleet(

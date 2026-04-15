@@ -1,20 +1,27 @@
 #!/usr/bin/env python3
 
+import json
+import sys
+import math
+import time
+from typing import List, Optional, Tuple
+
 import rclpy
 from px4_msgs.msg import VehicleLocalPosition
 from rclpy.executors import ExternalShutdownException
 from rclpy.qos import (
+    QoSDurabilityPolicy,
+    QoSHistoryPolicy,
     QoSProfile,
     QoSReliabilityPolicy,
-    QoSHistoryPolicy,
-    QoSDurabilityPolicy,
 )
 from std_msgs.msg import Float32MultiArray
-from typing import List, Tuple, Optional
-import math
-import time
 from sim_interfaces.srv import HoopList
 from sim.scoring import ScoringNode
+from sim.scoring.namespacing import (
+    normalize_vehicle_name,
+    vehicle_px4_local_position_topic,
+)
 
 
 class HoopScoringNode(ScoringNode):
@@ -25,6 +32,7 @@ class HoopScoringNode(ScoringNode):
 
     def __init__(
         self,
+        vehicle_name: Optional[str] = None,
         hoop_tolerance: float = 1.5,
         landing_bonus: float = 5.0,
         landing_tolerance: float = 2.0,
@@ -34,12 +42,16 @@ class HoopScoringNode(ScoringNode):
         Initialize the hoop scoring node.
 
         Args:
+            vehicle_name: ROS identity for the UAV being scored. The PX4
+                local-position subscription resolves under /<vehicle_name>/fmu/...
             hoop_tolerance: Distance tolerance for hoop passage (meters)
             landing_bonus: Points awarded for landing bonus
             landing_tolerance: Distance tolerance for landing (meters)
             landing_altitude_max: Maximum altitude to be considered "landed" (meters)
         """
         super().__init__(competition_name="in_house")
+
+        self.vehicle_name = normalize_vehicle_name(vehicle_name)
 
         # Store parameters
         self.hoop_tolerance = hoop_tolerance
@@ -79,7 +91,7 @@ class HoopScoringNode(ScoringNode):
         )
         self.position_subscription = self.create_subscription(
             VehicleLocalPosition,
-            "/fmu/out/vehicle_local_position",
+            vehicle_px4_local_position_topic(self.vehicle_name),
             self.position_callback,
             qos,
         )
@@ -357,14 +369,23 @@ def main(args=None):
     """Main function for scoring node. (SAME AS BEFORE)"""
     rclpy.init(args=args)
 
-    scoring_node = HoopScoringNode()
-
+    scoring_node = None
     try:
+        scoring_params = {}
+        if len(sys.argv) > 1 and str(sys.argv[1]).strip():
+            scoring_params = json.loads(sys.argv[1])
+            if not isinstance(scoring_params, dict):
+                raise ValueError("HoopScore expects a JSON object in argv[1].")
+
+        scoring_node = HoopScoringNode(**scoring_params)
         rclpy.spin(scoring_node)
     except (KeyboardInterrupt, ExternalShutdownException):
         pass
+    except Exception as e:
+        print(e)
     finally:
-        scoring_node.destroy_node()
+        if scoring_node is not None:
+            scoring_node.destroy_node()
         if rclpy.ok():
             rclpy.shutdown()
 

@@ -14,6 +14,8 @@ class PayloadMissionBootstrap(Node):
         self.declare_parameter("mode_map", mission_path_for_name("basic"))
         self.declare_parameter("auto_launch", True)
         self.declare_parameter("vehicle_name", "")
+        self.declare_parameter("peer_heartbeat_hz", 10.0)
+        self.declare_parameter("peer_stale_timeout_s", 0.5)
 
     def _bool_parameter(self, name: str) -> bool:
         value = self.get_parameter(name).value
@@ -22,6 +24,14 @@ class PayloadMissionBootstrap(Node):
                 f"payload_mission requires boolean parameter '{name}', received {value!r}."
             )
         return value
+
+    def _float_parameter(self, name: str) -> float:
+        value = self.get_parameter(name).value
+        if not isinstance(value, (int, float)) or isinstance(value, bool):
+            raise ValueError(
+                f"payload_mission requires numeric parameter '{name}', received {value!r}."
+            )
+        return float(value)
 
     def manager_kwargs(self) -> dict:
         mission_path = str(self.get_parameter("mode_map").value)
@@ -42,6 +52,8 @@ class PayloadMissionBootstrap(Node):
             "mission_spec": mission_spec,
             "auto_launch": self._bool_parameter("auto_launch"),
             "vehicle_name": vehicle_name,
+            "peer_heartbeat_hz": self._float_parameter("peer_heartbeat_hz"),
+            "peer_stale_timeout_s": self._float_parameter("peer_stale_timeout_s"),
             "node_name": "mission",
         }
 

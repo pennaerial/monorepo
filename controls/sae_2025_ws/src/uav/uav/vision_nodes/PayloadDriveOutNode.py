@@ -37,7 +37,7 @@ class PayloadDriveOutNode(VisionNode):
         )
         self._debug_pub = None
         if self.debug:
-            debug_topic = f"{self.camera_namespace}/vision/payload_drive_out_node/debug/compressed"
+            debug_topic = "vision/payload_drive_out_node/debug/compressed"
             self._debug_pub = self.create_publisher(CompressedImage, debug_topic, 1)
             self.get_logger().info(f"Debug stream publishing to {debug_topic}")
 

@@ -1,7 +1,7 @@
 world:
   name: SAEWorldNode
   params:
-    template_world: "src/sim/sim/world_gen/worlds/template.sdf"
+    template_world: "template.sdf"
     vehicle_pose: [0.3, 0.0, 0.1, 0.0, 0.0, 0.0]
 
     physics:

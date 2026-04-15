@@ -26,7 +26,6 @@ class VTOL(UAV):
         DEBUG=False,
         camera_offsets=[0, 0, 0],
         vehicle_name: str = "uav",
-        px4_namespace: str = "",
     ):
         # Initialize VTOL-specific attributes before calling super().__init__
         self.vehicle_type = None  # 'MC' or 'FW' from VtolVehicleStatus
@@ -40,7 +39,6 @@ class VTOL(UAV):
             DEBUG,
             camera_offsets,
             vehicle_name=vehicle_name,
-            px4_namespace=px4_namespace,
         )
 
     @property

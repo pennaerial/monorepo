@@ -10,9 +10,9 @@ from pathlib import Path
 
 from fastapi import WebSocket, WebSocketDisconnect
 import yaml
-from uav.runtime.mission_spec import MissionSpec
 
 from ..context import AppContext, TargetContext
+from ..mission_compat import load_mission_spec_compat
 from ..models import TerminalChunkMessage, TerminalInfoMessage
 from . import deploy as deploy_service
 
@@ -706,7 +706,7 @@ async def set_mission_file(
         parsed = yaml.safe_load(content) or {}
         if not isinstance(parsed, dict):
             raise ValueError("Mission YAML must define a mapping at the top level.")
-        MissionSpec.from_dict(parsed)
+        load_mission_spec_compat(parsed)
 
         missions_dir = target_ctx.target.mission_paths()["missions_dir"]
         mkdir_result = await target_ctx.ssh.run(

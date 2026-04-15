@@ -5,7 +5,7 @@
 # "terminate" if the drive-out times out without finding the tape.
 modes:
   start:
-    class: uav.modes.payload.PayloadCornerNavigateMode
+    mode: payload.PayloadCornerNavigateMode
     params:
       direction: ccw
       # Target colours in standard HSV: blue=(240°,100%,100%), red=(0°,100%,100%).
@@ -41,4 +41,3 @@ modes:
       tape_align_center_tol_px: 20.0
       tape_align_min_pixels: 100
       tape_align_stable_frames: 3
-

@@ -100,7 +100,7 @@ def test_normalized_stage_name_defaults_to_base():
 def test_normalize_stage_world_params_keeps_standard_spawnables_separated():
     params = normalize_stage_world_params(
         {
-            "template_world": "worlds/template.sdf",
+            "template_world": "template.sdf",
             "entities": {
                 "dlz": {"path_to_sdf": "dlz.sdf"},
                 "marker": {"path_to_sdf": "marker.sdf"},
@@ -119,7 +119,7 @@ def test_normalize_stage_world_params_keeps_standard_spawnables_separated():
         }
     )
 
-    assert params["template_world"] == "worlds/template.sdf"
+    assert params["template_world"] == "template.sdf"
     assert params["entities"]["dlz"]["path_to_sdf"] == "dlz.sdf"
     assert params["entities"]["marker"]["path_to_sdf"] == "marker.sdf"
     assert params["controllables"]["uav_0"]["px4_airframe_id"] == 4010
@@ -131,7 +131,7 @@ def test_normalize_stage_world_params_rejects_legacy_top_level_spawnables(legacy
     try:
         normalize_stage_world_params(
             {
-                "template_world": "worlds/template.sdf",
+                "template_world": "template.sdf",
                 legacy_key: {"path_to_sdf": f"{legacy_key}.sdf"},
             }
         )
@@ -160,7 +160,7 @@ def test_resolve_stage_world_exposes_standard_stage_spawnables(monkeypatch):
                 "world": {
                     "name": "SAEWorldNode",
                     "params": {
-                        "template_world": "worlds/template.sdf",
+                        "template_world": "template.sdf",
                         "entities": {
                             "dlz": {
                                 "path_to_sdf": "~/.simulation-gazebo/models/dlz_white/model.sdf",
@@ -226,7 +226,7 @@ def test_resolve_stage_world_defaults_to_base_stage(monkeypatch):
                 "world": {
                     "name": "SAEWorldNode",
                     "params": {
-                        "template_world": "worlds/template.sdf",
+                        "template_world": "template.sdf",
                         "entities": {
                             "dlz": {
                                 "path_to_sdf": "~/.simulation-gazebo/models/dlz/model.sdf"
@@ -281,7 +281,7 @@ def test_resolve_stage_world_loads_specific_stage_and_merges_world_overrides(
                 "world": {
                     "name": "SAEWorldNode",
                     "params": {
-                        "template_world": "worlds/template.sdf",
+                        "template_world": "template.sdf",
                         "entities": {
                             "dlz": {
                                 "path_to_sdf": "~/.simulation-gazebo/models/dlz_white/model.sdf",
