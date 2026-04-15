@@ -1099,6 +1099,70 @@
           "default_kind": "value",
           "name": "compressed_image",
           "required": false
+        },
+        {
+          "annotation": {
+            "item": {
+              "kind": "int"
+            },
+            "kind": "list"
+          },
+          "default": [
+            0,
+            80,
+            80
+          ],
+          "default_kind": "value",
+          "name": "ccw_lower_hsv",
+          "required": false
+        },
+        {
+          "annotation": {
+            "item": {
+              "kind": "int"
+            },
+            "kind": "list"
+          },
+          "default": [
+            10,
+            255,
+            255
+          ],
+          "default_kind": "value",
+          "name": "ccw_upper_hsv",
+          "required": false
+        },
+        {
+          "annotation": {
+            "item": {
+              "kind": "int"
+            },
+            "kind": "list"
+          },
+          "default": [
+            85,
+            120,
+            60
+          ],
+          "default_kind": "value",
+          "name": "cw_lower_hsv",
+          "required": false
+        },
+        {
+          "annotation": {
+            "item": {
+              "kind": "int"
+            },
+            "kind": "list"
+          },
+          "default": [
+            140,
+            255,
+            255
+          ],
+          "default_kind": "value",
+          "name": "cw_upper_hsv",
+          "required": false
         }
       ],
       "params_schema": {
@@ -1129,6 +1193,30 @@
         },
         "additionalProperties": false,
         "properties": {
+          "ccw_lower_hsv": {
+            "default": [
+              0,
+              80,
+              80
+            ],
+            "items": {
+              "type": "integer"
+            },
+            "title": "Ccw Lower Hsv",
+            "type": "array"
+          },
+          "ccw_upper_hsv": {
+            "default": [
+              10,
+              255,
+              255
+            ],
+            "items": {
+              "type": "integer"
+            },
+            "title": "Ccw Upper Hsv",
+            "type": "array"
+          },
           "compressed_image": {
             "default": false,
             "title": "Compressed Image",
@@ -1138,6 +1226,30 @@
             "default": 0.3,
             "title": "Corner Angular Speed",
             "type": "number"
+          },
+          "cw_lower_hsv": {
+            "default": [
+              85,
+              120,
+              60
+            ],
+            "items": {
+              "type": "integer"
+            },
+            "title": "Cw Lower Hsv",
+            "type": "array"
+          },
+          "cw_upper_hsv": {
+            "default": [
+              140,
+              255,
+              255
+            ],
+            "items": {
+              "type": "integer"
+            },
+            "title": "Cw Upper Hsv",
+            "type": "array"
           },
           "detect_frames": {
             "default": 5,

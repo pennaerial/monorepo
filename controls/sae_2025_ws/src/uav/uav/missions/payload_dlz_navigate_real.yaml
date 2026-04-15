@@ -38,6 +38,14 @@ modes:
       k_lat: 0.01
       k_ang: 0.4
       max_angular: 0.5
+      # HSV bounds — copy of payload_corner_navigate_real.yaml so the same
+      # tape calibration is used. ccw_hsv = colour at the start of a CCW-
+      # travel side (blue). cw_hsv = colour at the start of a CW-travel
+      # side (pink in the real arena).
+      ccw_lower_hsv: [100, 100, 100] # blue
+      ccw_upper_hsv: [130, 255, 255]
+      cw_lower_hsv: [160, 102, 216]  # pink
+      cw_upper_hsv: [170, 153, 255]
   #   transitions:
   #     done: scan
 

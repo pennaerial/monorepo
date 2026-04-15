@@ -11,7 +11,6 @@ from cv_bridge import CvBridge
 from rclpy.node import Node
 from sensor_msgs.msg import CompressedImage, Image
 
-from uav.utils import blue, red
 from uav.vehicles.Payload import Payload
 from uav.vision_nodes import PayloadAprilTagNode
 from uav.vision_nodes.payload_perception_common import DEFAULT_TAG_FAMILY
@@ -39,17 +38,17 @@ _TURN_MAX_RAD = 2.0 * math.pi  # safety timeout (radians)
 _VALID_START_PHASES = ("wait_for_plane", "scan_tags", "line_follow")
 
 # ---------------------------------------------------------------------------
-# Inline colour detection (mirrors PayloadColorSquareNode exactly)
+# Inline colour detection. HSV bounds are now constructor parameters (see
+# ccw_*_hsv / cw_*_hsv) so the same pink/red/blue calibrations as
+# PayloadCornerNavigateMode can be reused.
 # ---------------------------------------------------------------------------
-
-# Color A = red, Color B = blue (matches dlz_alternating_border model)
-# Red wraps around the HSV hue wheel so two ranges are required.
-_LOWER_A1 = np.array(red[0][0], dtype=np.uint8)
-_UPPER_A1 = np.array(red[0][1], dtype=np.uint8)
-_LOWER_A2 = np.array(red[1][0], dtype=np.uint8)
-_UPPER_A2 = np.array(red[1][1], dtype=np.uint8)
-_LOWER_B = np.array(blue[0], dtype=np.uint8)
-_UPPER_B = np.array(blue[1], dtype=np.uint8)
+# Internal A/B labelling:
+#   A = "cw-start colour" (the colour you'd land on when travelling CW)
+#   B = "ccw-start colour" (the colour you'd land on when travelling CCW)
+# So cw_*_hsv configures A and ccw_*_hsv configures B. This is the opposite
+# of PayloadCornerNavigateMode's internal mapping, because DLZNavigate's
+# corner transition is A→B for ccw while Corner's is B→A — the yaml-level
+# ccw/cw colour still refers to the same physical tape in both modes.
 
 # Fraction of the full frame height where the processing strip starts (bottom 4/9)
 _STRIP_START_FRAC = 6 / 9
@@ -59,14 +58,6 @@ _MIN_COLOR_PIXELS = 20
 _COLOR_RATIO = 1.5
 # Minimum tape pixels (A+B combined) per row to include in boundary estimate
 _MIN_ROW_PIXELS = 3
-
-
-def _red_mask(hsv: np.ndarray) -> np.ndarray:
-    """OR the two hue ranges required to detect red in OpenCV HSV."""
-    return cv2.bitwise_or(
-        cv2.inRange(hsv, _LOWER_A1, _UPPER_A1),
-        cv2.inRange(hsv, _LOWER_A2, _UPPER_A2),
-    )
 
 
 def _get_strip(bgr: np.ndarray) -> Tuple[np.ndarray, int]:
@@ -172,6 +163,7 @@ class PayloadDLZNavigateMode(Mode):
     mission_target = "payload"
     required_vision_nodes = (PayloadAprilTagNode,)
     transition_labels = ("done",)
+    requires_camera = True
 
     def __init__(
         self,
@@ -195,6 +187,12 @@ class PayloadDLZNavigateMode(Mode):
         tag_size_m: float = 0.0508,
         tag_family: str = DEFAULT_TAG_FAMILY,
         compressed_image: bool = False,
+        # HSV bounds — same semantics as PayloadCornerNavigateMode. Defaults
+        # match that mode (ccw=red, cw=blue) so calibrations can be shared.
+        ccw_lower_hsv: list[int] = (0, 80, 80),
+        ccw_upper_hsv: list[int] = (10, 255, 255),
+        cw_lower_hsv: list[int] = (85, 120, 60),
+        cw_upper_hsv: list[int] = (140, 255, 255),
     ):
         super().__init__(node, vehicle)
         direction = str(direction).lower().strip()
@@ -224,6 +222,12 @@ class PayloadDLZNavigateMode(Mode):
         self.tag_size_m = float(tag_size_m)
         self.tag_family = str(tag_family) if tag_family else DEFAULT_TAG_FAMILY
         self.compressed_image = bool(compressed_image)
+
+        # A = cw-start colour, B = ccw-start colour (see module docstring).
+        self._lower_a = np.array(cw_lower_hsv, dtype=np.uint8)
+        self._upper_a = np.array(cw_upper_hsv, dtype=np.uint8)
+        self._lower_b = np.array(ccw_lower_hsv, dtype=np.uint8)
+        self._upper_b = np.array(ccw_upper_hsv, dtype=np.uint8)
 
         self._bridge = CvBridge()
         self._image_sub = None
@@ -288,8 +292,8 @@ class PayloadDLZNavigateMode(Mode):
         """
         strip, strip_start = _get_strip(bgr)
         hsv = cv2.cvtColor(strip, cv2.COLOR_BGR2HSV)
-        orange_mask = _red_mask(hsv)
-        blue_mask = cv2.inRange(hsv, _LOWER_B, _UPPER_B)
+        orange_mask = cv2.inRange(hsv, self._lower_a, self._upper_a)
+        blue_mask = cv2.inRange(hsv, self._lower_b, self._upper_b)
         current_color = _detect_current_color(orange_mask, blue_mask)
         detected, lateral_error_px, boundary_angle = _detect_tape_following(
             orange_mask, blue_mask
@@ -396,6 +400,7 @@ class PayloadDLZNavigateMode(Mode):
         elif self._phase == "turn_onto_tape":
             self._update_turn_onto_tape(time_delta)
         elif self._phase == "line_follow":
+            self.log("LINE SEEN")
             self._update_line_follow(time_delta)
 
     def check_status(self) -> str:
@@ -519,9 +524,9 @@ class PayloadDLZNavigateMode(Mode):
         crop = bgr[row_start:, col_start:col_end]
         hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
         if color == "A":
-            mask = _red_mask(hsv)
+            mask = cv2.inRange(hsv, self._lower_a, self._upper_a)
         else:
-            mask = cv2.inRange(hsv, _LOWER_B, _UPPER_B)
+            mask = cv2.inRange(hsv, self._lower_b, self._upper_b)
         count = int(np.count_nonzero(mask))
         if count == 0:
             return 0, 0.0, mask, row_start, col_start
@@ -803,9 +808,9 @@ class PayloadDLZNavigateMode(Mode):
         crop = bgr[row_start:]
         hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
         if color == "A":
-            mask = _red_mask(hsv)
+            mask = cv2.inRange(hsv, self._lower_a, self._upper_a)
         else:
-            mask = cv2.inRange(hsv, _LOWER_B, _UPPER_B)
+            mask = cv2.inRange(hsv, self._lower_b, self._upper_b)
         count = int(np.count_nonzero(mask))
         if count == 0:
             return 0, 0.0, mask, row_start
