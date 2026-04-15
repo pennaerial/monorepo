@@ -34,51 +34,51 @@ modes:
         "3":       {transitions: 2, direction: cw}   # right only
       tag_size_m: 0.0508
       turn_angular_speed: 0.5
-      line_follow_speed_mps: 0.3
+      line_follow_speed_mps: 0.1
       k_lat: 0.01
       k_ang: 0.4
       max_angular: 0.5
-    transitions:
-      done: scan
+  #   transitions:
+  #     done: scan
 
-  scan:
-    mode: payload.PayloadScanForTagMode
-    params:
-      tag_id: 0
-      tag_size_m: 0.0508
-      spin_angular_speed: 0.4
-    transitions:
-      found: apriltag_approach
-      not_found: retry
+  # scan:
+  #   mode: payload.PayloadScanForTagMode
+  #   params:
+  #     tag_id: 0
+  #     tag_size_m: 0.0508
+  #     spin_angular_speed: 0.4
+  #   transitions:
+  #     found: apriltag_approach
+  #     not_found: retry
 
-  retry:
-    mode: payload.PayloadDLZNavigateMode
-    params:
-      start_phase: "scan_tags"   # already on tape; re-scan then line-follow more transitions
-      scan_duration_s: 1.0
-      tag_transition_table:
-        "0|4|5,2": {transitions: 2, direction: ccw}
-        "0|4|5,3": {transitions: 6, direction: cw}
-        "0|4|5":   {transitions: 0, direction: ccw}
-        "1|6|7,2": {transitions: 4, direction: ccw}
-        "1|6|7,3": {transitions: 4, direction: cw}
-        "1|6|7":   {transitions: 4, direction: ccw}
-      tag_size_m: 0.0508
-      turn_angular_speed: 0.5
-      line_follow_speed_mps: 0.3
-      k_lat: 0.01
-      k_ang: 0.4
-      max_angular: 0.5
-    transitions:
-      done: scan
+  # retry:
+  #   mode: payload.PayloadDLZNavigateMode
+  #   params:
+  #     start_phase: "scan_tags"   # already on tape; re-scan then line-follow more transitions
+  #     scan_duration_s: 1.0
+  #     tag_transition_table:
+  #       "0|4|5,2": {transitions: 2, direction: ccw}
+  #       "0|4|5,3": {transitions: 6, direction: cw}
+  #       "0|4|5":   {transitions: 0, direction: ccw}
+  #       "1|6|7,2": {transitions: 4, direction: ccw}
+  #       "1|6|7,3": {transitions: 4, direction: cw}
+  #       "1|6|7":   {transitions: 4, direction: ccw}
+  #     tag_size_m: 0.0508
+  #     turn_angular_speed: 0.5
+  #     line_follow_speed_mps: 0.1
+  #     k_lat: 0.01
+  #     k_ang: 0.4
+  #     max_angular: 0.5
+  #   transitions:
+  #     done: scan
 
-  apriltag_approach:
-    mode: payload.PayloadAprilTagApproachMode
-    params:
-      tag_id: 0
-      tag_size_m: 0.0508
-      max_forward_speed: 0.2
-      forward_gain: 0.5
-      angular_gain: 0.003
-      yaw_gain: 0.65
-      stop_distance_m: 0.08
+  # apriltag_approach:
+  #   mode: payload.PayloadAprilTagApproachMode
+  #   params:
+  #     tag_id: 0
+  #     tag_size_m: 0.0508
+  #     max_forward_speed: 0.2
+  #     forward_gain: 0.5
+  #     angular_gain: 0.003
+  #     yaw_gain: 0.65
+  #     stop_distance_m: 0.08

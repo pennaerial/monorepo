@@ -1,0 +1,84 @@
+# Payload DLZ navigation: wait for plane → scan tags → line-follow to dock side → approach.
+#
+# tag_transition_table key format:
+#   comma-separated AND-groups, pipe-separated OR within a group.
+#   "0|4|5,2" = (tag 0 OR 4 OR 5 visible) AND (tag 2 visible)
+#   More-specific keys should come first (tested in order).
+#
+# Flow:
+#   start ──done──► scan ──found──► apriltag_approach
+#                    │
+#                 not_found
+#                    │
+#                  retry (start_phase=scan_tags; re-scans, advances more transitions)
+#                    │
+#                  done──► scan  (loops)
+modes:
+  start:
+    mode: payload.PayloadDLZNavigateMode
+    params:
+      start_phase: "wait_for_plane"
+      detect_frames: 5
+      scan_duration_s: 2.0
+      tag_transition_table:
+        # Fill in with your actual mappings.
+        # Key: visible tag combo (OR groups with |, AND groups with ,)
+        # Value: transitions to travel and direction to travel
+        "0|4|5,2": {transitions: 1, direction: ccw}  # front + left
+        "0|4|5,3": {transitions: 1, direction: cw}   # front + right
+        "0|4|5":   {transitions: 0, direction: ccw}  # front only (already at dock)
+        "1|6|7,2": {transitions: 3, direction: ccw}  # back + left
+        "1|6|7,3": {transitions: 3, direction: cw}   # back + right
+        "1|6|7":   {transitions: 4, direction: ccw}  # back only
+        "2":       {transitions: 2, direction: ccw}  # left only
+        "3":       {transitions: 2, direction: cw}   # right only
+      tag_size_m: 0.0508
+      turn_angular_speed: 0.5
+      line_follow_speed_mps: 0.3
+      k_lat: 0.01
+      k_ang: 0.4
+      max_angular: 0.5
+  #   transitions:
+  #     done: scan
+
+  # scan:
+  #   mode: payload.PayloadScanForTagMode
+  #   params:
+  #     tag_id: 0
+  #     tag_size_m: 0.0508
+  #     spin_angular_speed: 0.4
+  #   transitions:
+  #     found: apriltag_approach
+  #     not_found: retry
+
+  # retry:
+  #   mode: payload.PayloadDLZNavigateMode
+  #   params:
+  #     start_phase: "scan_tags"   # already on tape; re-scan then line-follow more transitions
+  #     scan_duration_s: 1.0
+  #     tag_transition_table:
+  #       "0|4|5,2": {transitions: 2, direction: ccw}
+  #       "0|4|5,3": {transitions: 6, direction: cw}
+  #       "0|4|5":   {transitions: 0, direction: ccw}
+  #       "1|6|7,2": {transitions: 4, direction: ccw}
+  #       "1|6|7,3": {transitions: 4, direction: cw}
+  #       "1|6|7":   {transitions: 4, direction: ccw}
+  #     tag_size_m: 0.0508
+  #     turn_angular_speed: 0.5
+  #     line_follow_speed_mps: 0.3
+  #     k_lat: 0.01
+  #     k_ang: 0.4
+  #     max_angular: 0.5
+  #   transitions:
+  #     done: scan
+
+  # apriltag_approach:
+  #   mode: payload.PayloadAprilTagApproachMode
+  #   params:
+  #     tag_id: 0
+  #     tag_size_m: 0.0508
+  #     max_forward_speed: 0.2
+  #     forward_gain: 0.5
+  #     angular_gain: 0.003
+  #     yaw_gain: 0.65
+  #     stop_distance_m: 0.08

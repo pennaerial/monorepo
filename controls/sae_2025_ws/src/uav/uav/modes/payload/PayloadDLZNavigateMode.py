@@ -30,6 +30,12 @@ _CORNER_CENTER_MIN_PX = 150  # minimum target-colour pixels to trust centering
 _CORNER_STABLE_FRAMES = 1  # consecutive centred frames before locking
 _CORNER_MAX_RAD = 2.0 * math.pi  # safety timeout (radians)
 
+# TURN_ONTO_TAPE vision thresholds
+_TURN_CENTER_TOL_PX = 30.0  # lateral error tolerance (px)
+_TURN_CENTER_MIN_PX = 150  # minimum tape pixels to trust centering
+_TURN_STABLE_FRAMES = 1  # consecutive centred frames before locking
+_TURN_MAX_RAD = 2.0 * math.pi  # safety timeout (radians)
+
 _VALID_START_PHASES = ("wait_for_plane", "scan_tags", "line_follow")
 
 # ---------------------------------------------------------------------------
@@ -145,7 +151,8 @@ class PayloadDLZNavigateMode(Mode):
         If target_transitions == 0 → done immediately (already at the dock side).
 
     TURN_ONTO_TAPE
-        Fixed 45° turn to align with the tape:
+        Rotate in place until the combined red/blue tape is centred in the
+        detection strip (vision-based; safety timeout at 2π rad):
           direction="cw"  → turn left  (positive angular)
           direction="ccw" → turn right (negative angular)
 
@@ -343,6 +350,7 @@ class PayloadDLZNavigateMode(Mode):
 
         # TURN_ONTO_TAPE state
         self._angle_turned = 0.0
+        self._turn_stable = 0
 
         # LINE_FOLLOW state
         self._prev_color = "A" if self.direction == "cw" else "B"
@@ -494,20 +502,188 @@ class PayloadDLZNavigateMode(Mode):
     # Phase: TURN_ONTO_TAPE
     # ------------------------------------------------------------------
 
+    def _middle_third_single_color_metrics(
+        self, bgr: np.ndarray, color: str
+    ) -> Tuple[int, float, np.ndarray, int, int]:
+        """Middle-third × bottom-40% crop, masked on a single expected colour.
+
+        Returns ``(pixel_count, lateral_error_px, mask, row_start, col_start)``.
+        ``lateral_error_px`` is the mask centroid x minus crop center x
+        (positive = right). Only the expected colour is computed — the
+        opposite-side tape cannot bias the centroid.
+        """
+        h, w = bgr.shape[:2]
+        row_start = int(h * 0.6)
+        col_start = w // 3
+        col_end = w - (w // 3)
+        crop = bgr[row_start:, col_start:col_end]
+        hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
+        if color == "A":
+            mask = _red_mask(hsv)
+        else:
+            mask = cv2.inRange(hsv, _LOWER_B, _UPPER_B)
+        count = int(np.count_nonzero(mask))
+        if count == 0:
+            return 0, 0.0, mask, row_start, col_start
+        _ys, xs = np.nonzero(mask)
+        centroid_x = float(xs.mean())
+        crop_center_x = mask.shape[1] / 2.0
+        return count, centroid_x - crop_center_x, mask, row_start, col_start
+
     def _update_turn_onto_tape(self, time_delta: float) -> None:
+        # Rotate in place until the expected-colour tape is centred in the
+        # middle-third of the frame. Only the colour we're about to follow is
+        # masked — the opposite-side tape cannot pull the centroid.
+        #   direction="cw"  → turn left  (+), expect colour A (red)
+        #   direction="ccw" → turn right (-), expect colour B (blue)
         angular = self._turn_angular()
         self._angle_turned += abs(angular) * time_delta
+        expected_color = "A" if self.direction == "cw" else "B"
 
-        if self._angle_turned >= _EIGHTH_TURN - _ANGLE_TOL:
+        bgr = self._decode_image()
+        count = 0
+        lateral_error_px = 0.0
+        if bgr is not None:
+            (
+                count,
+                lateral_error_px,
+                mask,
+                row_start,
+                col_start,
+            ) = self._middle_third_single_color_metrics(bgr, expected_color)
+
+            centred = (
+                count >= _TURN_CENTER_MIN_PX
+                and abs(lateral_error_px) < _TURN_CENTER_TOL_PX
+            )
+            if centred:
+                self._turn_stable += 1
+                if self._turn_stable >= _TURN_STABLE_FRAMES:
+                    self.vehicle.stop()
+                    # LINE_FOLLOW's first transition is off the expected colour.
+                    self._prev_color = expected_color
+                    self._annotate_turn_onto_tape(
+                        bgr,
+                        row_start,
+                        col_start,
+                        mask,
+                        expected_color,
+                        count,
+                        lateral_error_px,
+                        angular,
+                    )
+                    self._phase = "line_follow"
+                    self.log(
+                        f"PayloadDLZNavigateMode: TURN_ONTO_TAPE centred on "
+                        f"{expected_color} (lat={lateral_error_px:.1f}px, "
+                        f"count={count}px, "
+                        f"turned={math.degrees(self._angle_turned):.1f}°) "
+                        f"→ LINE_FOLLOW"
+                    )
+                    return
+            else:
+                self._turn_stable = 0
+
+            self._annotate_turn_onto_tape(
+                bgr,
+                row_start,
+                col_start,
+                mask,
+                expected_color,
+                count,
+                lateral_error_px,
+                angular,
+            )
+
+        if self._angle_turned >= _TURN_MAX_RAD:
             self.vehicle.stop()
             self._phase = "line_follow"
             self.log(
-                f"PayloadDLZNavigateMode: TURN_ONTO_TAPE complete "
+                f"PayloadDLZNavigateMode: TURN_ONTO_TAPE TIMEOUT "
                 f"({math.degrees(self._angle_turned):.1f}°) → LINE_FOLLOW"
             )
             return
 
         self.vehicle.drive(0.0, angular)
+
+    def _annotate_turn_onto_tape(
+        self,
+        bgr: np.ndarray,
+        row_start: int,
+        col_start: int,
+        mask: np.ndarray,
+        expected_color: str,
+        count: int,
+        lateral_error_px: float,
+        angular: float,
+    ) -> None:
+        if self._annotated_pub is None or bgr is None:
+            return
+        debug = bgr.copy()
+        h, w = bgr.shape[:2]
+
+        # Contours of the single expected-colour mask — exactly what the
+        # detector thresholded on for the centroid.
+        shift = np.array([[[col_start, row_start]]])
+        contours, _ = cv2.findContours(
+            mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+        )
+        cv2.drawContours(
+            debug, [c + shift for c in contours], -1, (255, 255, 255), 2
+        )
+
+        # Crop boundary (top row, left+right columns) — middle-third bottom-40%.
+        col_end = w - col_start
+        cv2.line(debug, (0, row_start), (w, row_start), (80, 80, 80), 1)
+        cv2.line(debug, (col_start, row_start), (col_start, h - 1), (80, 80, 80), 1)
+        cv2.line(debug, (col_end, row_start), (col_end, h - 1), (80, 80, 80), 1)
+
+        # Crop centre (white) and tolerance band (green) — matches the check.
+        crop_cx = col_start + (col_end - col_start) // 2
+        cv2.line(debug, (crop_cx, row_start), (crop_cx, h - 1), (255, 255, 255), 1)
+        tol_left = int(crop_cx - _TURN_CENTER_TOL_PX)
+        tol_right = int(crop_cx + _TURN_CENTER_TOL_PX)
+        cv2.line(debug, (tol_left, row_start), (tol_left, h - 1), (0, 255, 0), 1)
+        cv2.line(debug, (tol_right, row_start), (tol_right, h - 1), (0, 255, 0), 1)
+
+        # Single-colour centroid — reconstruct the exact lateral_error_px used.
+        if count >= _TURN_CENTER_MIN_PX:
+            centroid_x = int(crop_cx + lateral_error_px)
+            in_tol = abs(lateral_error_px) < _TURN_CENTER_TOL_PX
+            color = (0, 255, 0) if in_tol else (0, 140, 255)
+            cv2.line(debug, (centroid_x, row_start), (centroid_x, h - 1), color, 2)
+
+        cv2.putText(
+            debug,
+            f"TURN_ONTO_TAPE dir={self.direction} expect={expected_color}",
+            (8, 22),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.6,
+            (0, 255, 255),
+            2,
+        )
+        cv2.putText(
+            debug,
+            f"{expected_color}={count}px lat={lateral_error_px:+.1f}px "
+            f"tol=+/-{_TURN_CENTER_TOL_PX:.0f}",
+            (8, 44),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            (200, 200, 200),
+            1,
+        )
+        cv2.putText(
+            debug,
+            f"stable={self._turn_stable}/{_TURN_STABLE_FRAMES} "
+            f"turned={math.degrees(self._angle_turned):.1f}deg "
+            f"cmd={angular:+.2f}rad/s",
+            (8, 62),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            (200, 200, 200),
+            1,
+        )
+        self._publish_annotated(debug)
 
     # ------------------------------------------------------------------
     # Phase: LINE_FOLLOW
