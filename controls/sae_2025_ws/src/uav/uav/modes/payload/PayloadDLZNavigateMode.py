@@ -184,7 +184,7 @@ class PayloadDLZNavigateMode(Mode):
         tag_family: str = DEFAULT_TAG_FAMILY,
         compressed_image: bool = False,
         # TURN_ONTO_TAPE vision-based centering
-        center_tol_px: float = 30.0,
+        center_tol_px: float = 100.0,
         center_min_pixels: int = 150,
         center_stable_frames: int = 3,
         max_turn_to_center_rad: float = 2.0 * math.pi,
@@ -541,17 +541,6 @@ class PayloadDLZNavigateMode(Mode):
             self._annotate_turn_onto_tape(
                 bgr, total, lateral_error_px, locked=False
             )
-
-        if self._angle_turned >= self.max_turn_to_center_rad:
-            self.vehicle.stop()
-            self._phase = "line_follow"
-            self.log(
-                f"PayloadDLZNavigateMode: TURN_ONTO_TAPE fallback — "
-                f"max rotation {math.degrees(self._angle_turned):.1f}° "
-                f"reached without centering → LINE_FOLLOW"
-            )
-            return
-
         self.vehicle.drive(0.0, angular)
 
     # ------------------------------------------------------------------

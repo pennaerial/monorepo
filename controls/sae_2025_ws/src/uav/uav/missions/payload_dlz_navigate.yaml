@@ -33,8 +33,8 @@ modes:
         "2":       {transitions: 2, direction: ccw}  # left only
         "3":       {transitions: 2, direction: cw}   # right only
       tag_size_m: 0.0508
-      turn_angular_speed: 0.5
-      line_follow_speed_mps: 0.3
+      turn_angular_speed: 0.05
+      line_follow_speed_mps: 0.1
       k_lat: 0.01
       k_ang: 0.4
       max_angular: 0.5
