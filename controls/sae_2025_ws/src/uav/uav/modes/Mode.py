@@ -3,7 +3,6 @@ from typing import TYPE_CHECKING, ClassVar, Mapping
 
 from rclpy.node import Node
 
-from uav.runtime.mode_paths import canonical_mode_path
 from uav.vehicles.Vehicle import Vehicle
 from uav.runtime.vision_loader import canonical_vision_node_path
 
@@ -115,21 +114,12 @@ class Mode(ABC):
         """
         Return whether the mode has enough peer connectivity to run `on_update()`.
 
-        The default implementation treats every declared remote peer as required.
-        Modes may override this to express looser readiness rules.
+        `connection_status` contains only this mode's relevant remote peers.
+        The default implementation treats every provided peer as required.
         """
-        vehicle_name = str(getattr(self.vehicle, "name", "") or "").strip().strip("/")
-        required_peers = tuple(
-            peer_name
-            for peer_name in self.peer_vehicle_names
-            if peer_name and peer_name != vehicle_name
-        )
-        if not required_peers:
+        if not connection_status:
             return True
-        return all(
-            bool(connection_status.get(peer_name, False))
-            for peer_name in required_peers
-        )
+        return all(bool(is_connected) for is_connected in connection_status.values())
 
     @abstractmethod
     def check_status(self) -> str:
@@ -182,7 +172,7 @@ class Mode(ABC):
         """
         Return persistent ModeManager-owned state for this mode class.
         """
-        return self.node.shared_state_for(canonical_mode_path(self))
+        return self.node.shared_state_for(self)
 
     def log(self, message: str) -> None:
         """

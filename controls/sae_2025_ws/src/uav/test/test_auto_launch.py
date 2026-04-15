@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from contextlib import nullcontext
 import importlib
 import importlib.util
 from pathlib import Path
@@ -290,23 +289,32 @@ def _make_mode_manager(*, ready: bool) -> ModeManager:
     manager.create_timer = lambda period, callback: _FakeTimer(callback)
     manager.get_logger = lambda: manager._logger
     manager._shared_mode_state = {}
-    manager._managed_comms = SimpleNamespace(
-        scope=lambda **_kwargs: nullcontext(),
+    manager._current_comm_builder = None
+    manager._runtime_closed = False
+    manager._managed_registry = SimpleNamespace(
         destroy_for_owner=lambda *_args, **_kwargs: None,
-        bind_owner=lambda *_args, **_kwargs: None,
+        destroy_publisher=lambda _publisher: True,
+        destroy_subscription=lambda _subscription: True,
+        destroy_client=lambda _client: True,
+        close=lambda: None,
+        debug_descriptors=lambda: (),
+    )
+    manager._raw_node_api = SimpleNamespace(
         create_publisher=lambda *_args, **_kwargs: None,
         create_subscription=lambda *_args, **_kwargs: None,
         create_client=lambda *_args, **_kwargs: None,
         create_service=lambda *_args, **_kwargs: object(),
+        create_timer=lambda period, callback: _FakeTimer(callback),
         destroy_publisher=lambda _publisher: True,
         destroy_subscription=lambda _subscription: True,
         destroy_client=lambda _client: True,
-        descriptors=(),
+        destroy_timer=lambda _timer: True,
     )
     manager._peer_connections = SimpleNamespace(
         configure=lambda _peer_names: None,
         status=lambda: {},
         peer_names=(),
+        close=lambda: None,
     )
     return manager
 
@@ -350,18 +358,26 @@ def _stub_mode_manager_init(
     self.create_timer = lambda period, callback: _FakeTimer(callback)
     self.get_logger = lambda: self._logger
     self._shared_mode_state = {}
-    self._managed_comms = SimpleNamespace(
-        scope=lambda **_kwargs: nullcontext(),
+    self._current_comm_builder = None
+    self._runtime_closed = False
+    self._managed_registry = SimpleNamespace(
         destroy_for_owner=lambda *_args, **_kwargs: None,
-        bind_owner=lambda *_args, **_kwargs: None,
+        destroy_publisher=lambda _publisher: True,
+        destroy_subscription=lambda _subscription: True,
+        destroy_client=lambda _client: True,
+        close=lambda: None,
+        debug_descriptors=lambda: (),
+    )
+    self._raw_node_api = SimpleNamespace(
         create_publisher=lambda *_args, **_kwargs: None,
         create_subscription=lambda *_args, **_kwargs: None,
         create_client=lambda *_args, **_kwargs: None,
         create_service=lambda *_args, **_kwargs: object(),
+        create_timer=lambda period, callback: _FakeTimer(callback),
         destroy_publisher=lambda _publisher: True,
         destroy_subscription=lambda _subscription: True,
         destroy_client=lambda _client: True,
-        descriptors=(),
+        destroy_timer=lambda _timer: True,
     )
     self._peer_connections = SimpleNamespace(
         configure=lambda peer_names: setattr(
@@ -369,6 +385,7 @@ def _stub_mode_manager_init(
         ),
         status=lambda: {},
         peer_names=(),
+        close=lambda: None,
     )
     self.start_mission_service = object()
     self._auto_launch_timer = None

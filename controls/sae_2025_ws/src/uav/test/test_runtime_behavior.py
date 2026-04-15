@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from contextlib import nullcontext
 import importlib
 import sys
 import types
@@ -314,23 +313,32 @@ def _make_mode_manager(*, vehicle=None, auto_launch: bool = False) -> ModeManage
     manager.destroy_client = lambda client: None
     manager.destroy_node = lambda: setattr(manager, "destroyed", True)
     manager._stop_vehicle = lambda: setattr(manager, "stopped", True)
-    manager._managed_comms = SimpleNamespace(
-        scope=lambda **_kwargs: nullcontext(),
+    manager._current_comm_builder = None
+    manager._runtime_closed = False
+    manager._managed_registry = SimpleNamespace(
         destroy_for_owner=lambda *_args, **_kwargs: None,
-        bind_owner=lambda *_args, **_kwargs: None,
+        destroy_publisher=lambda _publisher: True,
+        destroy_subscription=lambda _subscription: True,
+        destroy_client=lambda _client: True,
+        close=lambda: None,
+        debug_descriptors=lambda: (),
+    )
+    manager._raw_node_api = SimpleNamespace(
         create_publisher=lambda *_args, **_kwargs: None,
         create_subscription=lambda *_args, **_kwargs: None,
         create_client=lambda *_args, **_kwargs: None,
         create_service=lambda *_args, **_kwargs: object(),
+        create_timer=lambda period, callback: _FakeTimer(callback),
         destroy_publisher=lambda _publisher: True,
         destroy_subscription=lambda _subscription: True,
         destroy_client=lambda _client: True,
-        descriptors=(),
+        destroy_timer=lambda _timer: True,
     )
     manager._peer_connections = SimpleNamespace(
         configure=lambda _peer_names: None,
         status=lambda: {},
         peer_names=(),
+        close=lambda: None,
     )
     return manager
 
@@ -361,18 +369,26 @@ def _stub_mode_manager_init(
     self.create_timer = lambda period, callback: _FakeTimer(callback)
     self.get_logger = lambda: self._logger
     self.destroy_node = lambda: None
-    self._managed_comms = SimpleNamespace(
-        scope=lambda **_kwargs: nullcontext(),
+    self._current_comm_builder = None
+    self._runtime_closed = False
+    self._managed_registry = SimpleNamespace(
         destroy_for_owner=lambda *_args, **_kwargs: None,
-        bind_owner=lambda *_args, **_kwargs: None,
+        destroy_publisher=lambda _publisher: True,
+        destroy_subscription=lambda _subscription: True,
+        destroy_client=lambda _client: True,
+        close=lambda: None,
+        debug_descriptors=lambda: (),
+    )
+    self._raw_node_api = SimpleNamespace(
         create_publisher=lambda *_args, **_kwargs: None,
         create_subscription=lambda *_args, **_kwargs: None,
         create_client=lambda *_args, **_kwargs: None,
         create_service=lambda *_args, **_kwargs: object(),
+        create_timer=lambda period, callback: _FakeTimer(callback),
         destroy_publisher=lambda _publisher: True,
         destroy_subscription=lambda _subscription: True,
         destroy_client=lambda _client: True,
-        descriptors=(),
+        destroy_timer=lambda _timer: True,
     )
     self._peer_connections = SimpleNamespace(
         configure=lambda peer_names: setattr(
@@ -380,6 +396,7 @@ def _stub_mode_manager_init(
         ),
         status=lambda: {},
         peer_names=(),
+        close=lambda: None,
     )
 
 
@@ -701,6 +718,29 @@ def test_handle_mode_state_requires_exact_transition_label():
     with pytest.raises(KeyError):
         ModeManager.handle_mode_state(manager, "Complete")
     assert manager.active_mode == "start"
+
+
+def test_create_entity_falls_back_to_raw_node_during_node_init(monkeypatch):
+    _require_runtime_support()
+
+    created = []
+    marker = object()
+
+    monkeypatch.setattr(
+        mode_manager_module.Node,
+        "create_publisher",
+        lambda _self, msg_type, topic, *args, **kwargs: (
+            created.append((msg_type, topic, args, kwargs)) or marker
+        ),
+        raising=False,
+    )
+
+    manager = object.__new__(ModeManager)
+
+    publisher = ModeManager.create_publisher(manager, object, "/parameter_events", 10)
+
+    assert publisher is marker
+    assert created == [(object, "/parameter_events", (10,), {})]
 
 
 def test_start_mission_callback_reports_already_started():

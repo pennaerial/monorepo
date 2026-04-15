@@ -58,6 +58,3 @@ class ManagedClient(ManagedEntity):
         if not self.wait_for_service(timeout_sec=0.0):
             return None
         return entity.call_async(request)
-
-
-ManagedSubscription = ManagedEntity

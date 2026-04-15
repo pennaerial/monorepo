@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Iterable
+from typing import Callable, Mapping
 
 from std_msgs.msg import Empty
 
@@ -25,6 +26,36 @@ def normalize_peer_vehicle_names(
     )
 
 
+def declared_remote_peer_names(
+    peer_vehicle_names: object,
+    runtime_vehicle_name: str,
+) -> tuple[str, ...]:
+    if hasattr(peer_vehicle_names, "peer_vehicle_names"):
+        raw_peer_names = getattr(peer_vehicle_names, "peer_vehicle_names", ())
+    else:
+        raw_peer_names = (
+            peer_vehicle_names
+            if isinstance(peer_vehicle_names, (tuple, list, set))
+            else ()
+        )
+    return tuple(
+        peer_name
+        for peer_name in normalize_peer_vehicle_names(raw_peer_names)
+        if peer_name != normalize_vehicle_name(runtime_vehicle_name)
+    )
+
+
+def relevant_connection_status(
+    connection_status: Mapping[str, bool],
+    *,
+    peer_vehicle_names: Iterable[str],
+) -> dict[str, bool]:
+    return {
+        peer_name: bool(connection_status.get(peer_name, False))
+        for peer_name in tuple(peer_vehicle_names)
+    }
+
+
 class PeerConnectionTracker:
     def __init__(
         self,
@@ -36,8 +67,10 @@ class PeerConnectionTracker:
         on_connection_change: Callable[[str], None] | Callable[..., None],
         raw_create_publisher: Callable[..., object],
         raw_create_subscription: Callable[..., object],
+        raw_destroy_publisher: Callable[[object], bool | None],
         raw_destroy_subscription: Callable[[object], bool | None],
         raw_create_timer: Callable[..., object],
+        raw_destroy_timer: Callable[[object], bool | None] | None = None,
     ) -> None:
         self._runtime_vehicle_name = normalize_vehicle_name(runtime_vehicle_name)
         self.peer_heartbeat_hz = float(peer_heartbeat_hz)
@@ -46,8 +79,10 @@ class PeerConnectionTracker:
         self._on_connection_change = on_connection_change
         self._raw_create_publisher = raw_create_publisher
         self._raw_create_subscription = raw_create_subscription
+        self._raw_destroy_publisher = raw_destroy_publisher
         self._raw_destroy_subscription = raw_destroy_subscription
         self._raw_create_timer = raw_create_timer
+        self._raw_destroy_timer = raw_destroy_timer
 
         self._heartbeat_publisher = None
         self._heartbeat_timer = None
@@ -133,3 +168,18 @@ class PeerConnectionTracker:
                 continue
             self._connected[peer_name] = False
             self._on_connection_change(peer_name, connected=False)
+
+    def close(self) -> None:
+        for peer_name, subscription in list(self._heartbeat_subscriptions.items()):
+            self._heartbeat_subscriptions.pop(peer_name, None)
+            self._raw_destroy_subscription(subscription)
+        if self._heartbeat_timer is not None:
+            cancel = getattr(self._heartbeat_timer, "cancel", None)
+            if callable(cancel):
+                cancel()
+            if callable(self._raw_destroy_timer):
+                self._raw_destroy_timer(self._heartbeat_timer)
+            self._heartbeat_timer = None
+        if self._heartbeat_publisher is not None:
+            self._raw_destroy_publisher(self._heartbeat_publisher)
+            self._heartbeat_publisher = None

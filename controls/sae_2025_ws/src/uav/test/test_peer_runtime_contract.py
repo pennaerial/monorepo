@@ -90,16 +90,18 @@ from uav.modes.Mode import Mode  # noqa: E402
 from uav.runtime.ModeManager import ModeManager  # noqa: E402
 import uav.runtime.ModeManager as mode_manager_module  # noqa: E402
 from uav.runtime.managed_comms import (  # noqa: E402
-    ManagedCommContext,
     ManagedCommRegistry,
 )
 from uav.runtime.managed_entities import (  # noqa: E402
     ManagedClient,
+    ManagedEntity,
     ManagedPublisher,
-    ManagedSubscription,
 )
 from uav.runtime.mode_paths import canonical_mode_path  # noqa: E402
-from uav.runtime.peer_connections import PeerConnectionTracker  # noqa: E402
+from uav.runtime.peer_connections import (  # noqa: E402
+    PeerConnectionTracker,
+    declared_remote_peer_names,
+)
 from uav.runtime.mission_spec import MissionSpec, load_mission_spec  # noqa: E402
 import uav.runtime.schema as schema_module  # noqa: E402
 from uav.runtime.schema_generator import build_mode_registry_entry  # noqa: E402
@@ -248,6 +250,8 @@ def _make_mode_manager() -> ModeManager:
     manager.peer_heartbeat_hz = 10.0
     manager.peer_stale_timeout_s = 0.5
     manager._shared_mode_state = {}
+    manager._current_comm_builder = None
+    manager._runtime_closed = False
     manager.get_logger = lambda: _FakeLogger()
     manager.get_clock = lambda: SimpleNamespace(
         now=lambda: SimpleNamespace(nanoseconds=0)
@@ -310,13 +314,22 @@ def _make_mode_manager() -> ModeManager:
             return True
         return bool(destroy_client(manager, client))
 
-    manager._managed_comms = ManagedCommRegistry(
-        runtime_vehicle_name=manager._runtime_vehicle_name,
+    manager._raw_node_api = SimpleNamespace(
+        create_publisher=raw_create_publisher,
+        create_subscription=raw_create_subscription,
+        create_client=raw_create_client,
+        create_service=raw_create_service,
+        create_timer=lambda _period, _callback: SimpleNamespace(cancel=lambda: None),
+        destroy_publisher=raw_destroy_publisher,
+        destroy_subscription=raw_destroy_subscription,
+        destroy_client=raw_destroy_client,
+        destroy_timer=lambda _timer: True,
+    )
+    manager._managed_registry = ManagedCommRegistry(
         connection_status=lambda: manager._peer_connections.status(),
         raw_create_publisher=raw_create_publisher,
         raw_create_subscription=raw_create_subscription,
         raw_create_client=raw_create_client,
-        raw_create_service=raw_create_service,
         raw_destroy_publisher=raw_destroy_publisher,
         raw_destroy_subscription=raw_destroy_subscription,
         raw_destroy_client=raw_destroy_client,
@@ -326,13 +339,15 @@ def _make_mode_manager() -> ModeManager:
         peer_heartbeat_hz=manager.peer_heartbeat_hz,
         peer_stale_timeout_s=manager.peer_stale_timeout_s,
         now_seconds=manager._now_seconds,
-        on_connection_change=manager._managed_comms.on_peer_connection_change,
+        on_connection_change=manager._managed_registry.on_peer_connection_change,
         raw_create_publisher=raw_create_publisher,
         raw_create_subscription=raw_create_subscription,
+        raw_destroy_publisher=raw_destroy_publisher,
         raw_destroy_subscription=raw_destroy_subscription,
         raw_create_timer=lambda _period, _callback: SimpleNamespace(
             cancel=lambda: None
         ),
+        raw_destroy_timer=lambda _timer: True,
     )
     return manager
 
@@ -341,14 +356,8 @@ def _configure_manager_for_mode(manager: ModeManager, mode: Mode) -> None:
     manager.modes = {"start": mode}
     manager.active_mode = "start"
     manager.get_active_mode = lambda: mode
-    peer_vehicle_names = manager._mode_peer_vehicle_names(mode)
+    peer_vehicle_names = declared_remote_peer_names(mode, manager._runtime_vehicle_name)
     manager._peer_connections.configure(peer_vehicle_names)
-    manager._managed_comms._context = ManagedCommContext(
-        owner=mode,
-        owner_label=type(mode).__name__,
-        phase="active",
-        peer_vehicle_names=peer_vehicle_names,
-    )
 
 
 def _set_peer_connection_state(
@@ -564,15 +573,27 @@ def test_mode_manager_validates_peer_and_shared_entity_namespaces(monkeypatch):
     mode = ModeManager.initialize_mode(manager, "fake.module.PeerAwareMode", {})
     _configure_manager_for_mode(manager, mode)
 
-    peer_sub = ModeManager.create_subscription(
-        manager, object, "/uav_1/status", lambda _msg: None, 1
-    )
-    peer_client = ModeManager.create_client(manager, object, "/uav_1/camera")
+    with manager._use_comm_builder(
+        manager._make_comm_builder(
+            owner=mode,
+            owner_label=type(mode).__name__,
+            lifetime="active",
+            peer_vehicle_names=declared_remote_peer_names(
+                mode, manager._runtime_vehicle_name
+            ),
+        )
+    ):
+        peer_sub = ModeManager.create_subscription(
+            manager, object, "/uav_1/status", lambda _msg: None, 1
+        )
+        peer_client = ModeManager.create_client(manager, object, "/uav_1/camera")
 
-    assert isinstance(peer_sub, ManagedSubscription)
+    assert isinstance(peer_sub, ManagedEntity)
+    assert peer_sub.spec.kind == "subscription"
     assert isinstance(peer_client, ManagedClient)
     assert isinstance(mode.shared_pub, ManagedPublisher)
-    assert isinstance(mode.peer_sub, ManagedSubscription)
+    assert isinstance(mode.peer_sub, ManagedEntity)
+    assert mode.peer_sub.spec.kind == "subscription"
 
     with pytest.raises(ValueError):
         ModeManager.create_subscription(
@@ -772,19 +793,29 @@ def test_peer_client_wrapper_rebinds_on_connection_changes(monkeypatch):
     mode = PeerAwareMode(manager, manager.vehicle)
     _configure_manager_for_mode(manager, mode)
 
-    client = ModeManager.create_client(manager, object, "/uav_1/camera")
+    with manager._use_comm_builder(
+        manager._make_comm_builder(
+            owner=mode,
+            owner_label=type(mode).__name__,
+            lifetime="active",
+            peer_vehicle_names=declared_remote_peer_names(
+                mode, manager._runtime_vehicle_name
+            ),
+        )
+    ):
+        client = ModeManager.create_client(manager, object, "/uav_1/camera")
 
     assert isinstance(client, ManagedClient)
     assert client.get_underlying() is None
 
     manager._peer_connections._connected["uav_1"] = True
-    manager._managed_comms.on_peer_connection_change("uav_1", connected=True)
+    manager._managed_registry.on_peer_connection_change("uav_1", connected=True)
 
     assert create_calls == ["/uav_1/camera"]
     assert client.get_underlying() is not None
 
     manager._peer_connections._connected["uav_1"] = False
-    manager._managed_comms.on_peer_connection_change("uav_1", connected=False)
+    manager._managed_registry.on_peer_connection_change("uav_1", connected=False)
 
     assert client.get_underlying() is None
     assert len(destroy_calls) == 1
@@ -876,8 +907,11 @@ def test_managed_entity_descriptors_use_persistent_and_active_phases(monkeypatch
 
     ModeManager.switch_mode(manager, "start")
 
-    phases = {descriptor.phase for descriptor in manager.managed_entity_descriptors}
-    assert phases == {"active", "persistent"}
+    lifetimes = {
+        descriptor.lifetime
+        for descriptor in ModeManager._comm_debug_snapshot(manager)["descriptors"]
+    }
+    assert lifetimes == {"active", "persistent"}
 
 
 def test_shared_state_for_is_keyed_by_canonical_mode_path():

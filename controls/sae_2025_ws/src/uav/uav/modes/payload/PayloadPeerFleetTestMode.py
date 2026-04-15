@@ -200,8 +200,8 @@ class PayloadPeerFleetTestMode(Mode):
         now = self._now()
         disconnected_peers = tuple(
             peer_name
-            for peer_name in self._peer_names
-            if not bool(connection_status.get(peer_name, False))
+            for peer_name, is_connected in sorted(connection_status.items())
+            if not bool(is_connected)
         )
         disconnect_signature = tuple(sorted(disconnected_peers))
         if disconnect_signature != self._last_disconnect_signature:
