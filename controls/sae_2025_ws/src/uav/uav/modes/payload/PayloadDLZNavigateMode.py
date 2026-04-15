@@ -139,9 +139,11 @@ class PayloadDLZNavigateMode(Mode):
         If target_transitions == 0 → done immediately (already at the dock side).
 
     TURN_ONTO_TAPE
-        Fixed 45° turn to align with the tape:
-          direction="cw"  → turn left  (positive angular)
-          direction="ccw" → turn right (negative angular)
+        Vision-based alignment: rotate in the travel direction until the
+        combined red/blue tape centroid is centred in the detection strip
+        for ``center_stable_frames`` consecutive frames.  Falls back to a
+        fixed 45° open-loop turn if ``max_turn_to_center_rad`` is exceeded
+        before lock is achieved.
 
     LINE_FOLLOW
         Follow the combined red/blue tape strip. Detect colour transitions (A↔B)
@@ -181,6 +183,11 @@ class PayloadDLZNavigateMode(Mode):
         tag_size_m: float = 0.0508,
         tag_family: str = DEFAULT_TAG_FAMILY,
         compressed_image: bool = False,
+        # TURN_ONTO_TAPE vision-based centering
+        center_tol_px: float = 30.0,
+        center_min_pixels: int = 150,
+        center_stable_frames: int = 3,
+        max_turn_to_center_rad: float = 2.0 * math.pi,
     ):
         super().__init__(node, vehicle)
         direction = str(direction).lower().strip()
@@ -209,6 +216,11 @@ class PayloadDLZNavigateMode(Mode):
         self.tag_size_m = float(tag_size_m)
         self.tag_family = str(tag_family) if tag_family else DEFAULT_TAG_FAMILY
         self.compressed_image = bool(compressed_image)
+
+        self.center_tol_px = float(center_tol_px)
+        self.center_min_pixels = int(center_min_pixels)
+        self.center_stable_frames = int(center_stable_frames)
+        self.max_turn_to_center_rad = float(max_turn_to_center_rad)
 
         self._bridge = CvBridge()
         self._image_sub = None
@@ -335,6 +347,7 @@ class PayloadDLZNavigateMode(Mode):
 
         # TURN_ONTO_TAPE state
         self._angle_turned = 0.0
+        self._center_stable = 0
 
         # LINE_FOLLOW state
         self._prev_color = "A" if self.direction == "cw" else "B"
@@ -488,12 +501,54 @@ class PayloadDLZNavigateMode(Mode):
         angular = self._turn_angular()
         self._angle_turned += abs(angular) * time_delta
 
-        if self._angle_turned >= _EIGHTH_TURN - _ANGLE_TOL:
+        bgr = self._decode_image()
+        if bgr is not None:
+            (
+                _curr,
+                boundary_detected,
+                lateral_error_px,
+                _boundary_angle,
+                orange_mask,
+                blue_mask,
+                _strip,
+                _strip_start,
+            ) = self._detect_color(bgr)
+            total = int(np.count_nonzero(orange_mask)) + int(
+                np.count_nonzero(blue_mask)
+            )
+            if (
+                total >= self.center_min_pixels
+                and boundary_detected
+                and abs(lateral_error_px) < self.center_tol_px
+            ):
+                self._center_stable += 1
+                if self._center_stable >= self.center_stable_frames:
+                    self.vehicle.stop()
+                    self._annotate_turn_onto_tape(
+                        bgr, total, lateral_error_px, locked=True
+                    )
+                    self._phase = "line_follow"
+                    self.log(
+                        f"PayloadDLZNavigateMode: TURN_ONTO_TAPE centered "
+                        f"(lat={lateral_error_px:.1f}px, total={total}px, "
+                        f"turned={math.degrees(self._angle_turned):.1f}°) "
+                        f"→ LINE_FOLLOW"
+                    )
+                    return
+            else:
+                self._center_stable = 0
+
+            self._annotate_turn_onto_tape(
+                bgr, total, lateral_error_px, locked=False
+            )
+
+        if self._angle_turned >= self.max_turn_to_center_rad:
             self.vehicle.stop()
             self._phase = "line_follow"
             self.log(
-                f"PayloadDLZNavigateMode: TURN_ONTO_TAPE complete "
-                f"({math.degrees(self._angle_turned):.1f}°) → LINE_FOLLOW"
+                f"PayloadDLZNavigateMode: TURN_ONTO_TAPE fallback — "
+                f"max rotation {math.degrees(self._angle_turned):.1f}° "
+                f"reached without centering → LINE_FOLLOW"
             )
             return
 
@@ -620,6 +675,66 @@ class PayloadDLZNavigateMode(Mode):
     # ------------------------------------------------------------------
     # Annotated debug image
     # ------------------------------------------------------------------
+
+    def _annotate_turn_onto_tape(
+        self,
+        bgr: np.ndarray,
+        total: int,
+        lateral_error_px: float,
+        locked: bool,
+    ) -> None:
+        if self._annotated_pub is None or bgr is None:
+            return
+        debug = bgr.copy()
+        h, w = bgr.shape[:2]
+        strip_start = int(h * _STRIP_START_FRAC)
+
+        cv2.line(debug, (0, strip_start), (w, strip_start), (80, 80, 80), 1)
+
+        frame_cx = w // 2
+        cv2.line(debug, (frame_cx, strip_start), (frame_cx, h), (255, 255, 255), 1)
+
+        tol_left = int(frame_cx - self.center_tol_px)
+        tol_right = int(frame_cx + self.center_tol_px)
+        cv2.line(debug, (tol_left, strip_start), (tol_left, h), (80, 160, 80), 1)
+        cv2.line(debug, (tol_right, strip_start), (tol_right, h), (80, 160, 80), 1)
+
+        if total >= self.center_min_pixels:
+            centroid_x = int(frame_cx + lateral_error_px)
+            color = (0, 255, 0) if locked else (0, 128, 255)
+            cv2.line(debug, (centroid_x, strip_start), (centroid_x, h), color, 2)
+
+        status = "LOCKED" if locked else "turning"
+        cv2.putText(
+            debug,
+            f"TURN_ONTO_TAPE [{status}] dir={self.direction}",
+            (8, 22),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.6,
+            (0, 255, 255),
+            2,
+        )
+        cv2.putText(
+            debug,
+            f"total={total}px lat={lateral_error_px:+.1f}px "
+            f"tol=+/-{self.center_tol_px:.0f} min={self.center_min_pixels}",
+            (8, 44),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            (200, 200, 200),
+            1,
+        )
+        cv2.putText(
+            debug,
+            f"stable={self._center_stable}/{self.center_stable_frames} "
+            f"turned={math.degrees(self._angle_turned):.1f}deg",
+            (8, 62),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            (200, 200, 200),
+            1,
+        )
+        self._publish_annotated(debug)
 
     def _annotate_line_follow(
         self,
