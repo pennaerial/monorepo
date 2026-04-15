@@ -228,7 +228,6 @@ def test_vehicle_stack_configs_defaults_namespaces_and_instances(
     assert backend["mission_stage"] == "payload_retreat"
     assert vehicles[0]["vehicle_name"] == "uav_alpha"
     assert vehicles[0]["sim_entity_name"] == "uav_model_0"
-    assert vehicles[0]["px4_namespace"] == "uav_alpha"
     assert vehicles[0]["px4_instance"] == 0
     assert vehicles[0]["px4_airframe_id"] == 4010
     assert vehicles[0]["launch_middleware"] is False
@@ -334,7 +333,6 @@ def test_vehicle_stack_configs_support_hardware_uav(
                 "mission_path": "/tmp/hover.yaml",
                 "kind": "uav",
                 "px4_airframe_id": 4004,
-                "px4_namespace": "uav_alpha",
                 "auto_launch": False,
             }
         ],
@@ -347,7 +345,6 @@ def test_vehicle_stack_configs_support_hardware_uav(
     assert vehicles[0]["launch_px4_sitl"] is False
     assert vehicles[0]["launch_middleware"] is True
     assert vehicles[0]["px4_airframe_id"] == 4004
-    assert vehicles[0]["px4_namespace"] == "uav_alpha"
     assert vehicles[0]["auto_launch"] is False
 
 
@@ -362,7 +359,6 @@ def test_vehicle_stack_configs_support_real_uav_alias(
                 "mission_path": "/tmp/hover.yaml",
                 "kind": "uav",
                 "px4_airframe_id": 4004,
-                "px4_namespace": "uav_alpha",
                 "auto_launch": False,
             }
         ],
@@ -375,7 +371,6 @@ def test_vehicle_stack_configs_support_real_uav_alias(
     assert vehicles[0]["launch_px4_sitl"] is False
     assert vehicles[0]["launch_middleware"] is True
     assert vehicles[0]["px4_airframe_id"] == 4004
-    assert vehicles[0]["px4_namespace"] == "uav_alpha"
     assert vehicles[0]["auto_launch"] is False
 
 

@@ -23,6 +23,7 @@ from sim.constants import (
     DEFAULT_USE_SCORING,
     Competition,
 )
+from sim.scoring.namespacing import resolve_scoring_vehicle_name
 from sim.orchestration import parse_json_config, resolve_stage_world
 from sim.utils import (
     build_node_arguments,
@@ -232,10 +233,14 @@ def launch_setup(context, *args, **kwargs):
 
     scoring = None
     if use_scoring and "scoring" in sim_stage_params:
+        scoring_params = dict(sim_stage_params["scoring"].get("params") or {})
+        vehicle_name = resolve_scoring_vehicle_name(scoring_params, world_params)
+        scoring_params["vehicle_name"] = vehicle_name
+        logger.info(f"Scoring vehicle: {vehicle_name}")
         scoring = Node(
             package="sim",
             executable=camel_to_snake(sim_stage_params["scoring"]["name"]),
-            arguments=[sim_stage_params["scoring"]["params"]],
+            arguments=[json.dumps(scoring_params)],
             output="screen",
             name=sim_stage_params["scoring"]["name"],
             cwd=cwd,

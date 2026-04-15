@@ -10,28 +10,27 @@ class Payload(Vehicle):
     """Mission-side adapter for one payload node namespace."""
 
     def __init__(self, node: Node, vehicle_name: str):
-        namespace = f"/{vehicle_name}"
         super().__init__(
             node,
             vehicle_name,
             has_camera=True,
-            camera_namespace=namespace,
-            image_topic=f"{namespace}/camera",
-            camera_info_topic=f"{namespace}/camera_info",
-            camera_service_name=f"{namespace}/camera_data",
+            camera_namespace=f"/{vehicle_name}",
+            image_topic="camera",
+            camera_info_topic="camera_info",
+            camera_service_name="camera_data",
         )
 
         self.drive_publisher = self.node.create_publisher(
-            DriveCommand, self.namespaced_path("cmd_drive", namespace=namespace), 10
+            DriveCommand, self.namespaced_path("cmd_drive"), 10
         )
         self.servo_publisher = self.node.create_publisher(
-            ServoCommand, self.namespaced_path("servo", namespace=namespace), 10
+            ServoCommand, self.namespaced_path("servo"), 10
         )
         self.timed_drive_client = self.node.create_client(
-            TimedDrive, self.namespaced_path("timed_drive", namespace=namespace)
+            TimedDrive, self.namespaced_path("timed_drive")
         )
         self.dead_reckon_client = self.node.create_client(
-            DeadReckon, self.namespaced_path("dead_reckon", namespace=namespace)
+            DeadReckon, self.namespaced_path("dead_reckon")
         )
 
     def drive(self, linear: float, angular: float) -> None:

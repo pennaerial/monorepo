@@ -1,7 +1,7 @@
 # Standalone test for PayloadColorStringApproachMode (dark gray target).
 modes:
   start:
-    class: uav.modes.payload.PayloadColorStringApproachMode
+    mode: payload.PayloadColorStringApproachMode
     params:
       lower_hsv: [20, 100, 100]
       upper_hsv: [35, 255, 255]

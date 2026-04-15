@@ -2,8 +2,23 @@ from __future__ import annotations
 
 from pathlib import Path
 import textwrap
+from types import SimpleNamespace
+import sys
+import types
 
 import pytest
+
+if "rclpy" not in sys.modules:
+    rclpy = types.ModuleType("rclpy")
+    node_mod = types.ModuleType("rclpy.node")
+
+    class Node:
+        def __init__(self, *_args, **_kwargs) -> None:
+            pass
+
+    node_mod.Node = Node
+    rclpy.node = node_mod
+    sys.modules.update({"rclpy": rclpy, "rclpy.node": node_mod})
 
 from uav.modes.Mode import Mode
 import uav.runtime.mission_spec as mission_spec_module
@@ -45,13 +60,11 @@ def test_load_uav_mission_spec(tmp_path):
         """
         modes:
           start:
-            class: uav.modes.uav.TakeoffMode
-            params:
-              altitude: 3.0
+            mode: uav.vtol.TakeoffMode
             transitions:
               complete: cruise
           cruise:
-            class: uav.modes.uav.NavGPSMode
+            mode: uav.NavGPSMode
             params:
               coordinates:
                 - [[1.0, 2.0, 3.0], 0.0, LOCAL]
@@ -59,7 +72,7 @@ def test_load_uav_mission_spec(tmp_path):
             transitions:
               complete: land
           land:
-            class: uav.modes.uav.LandingMode
+            mode: uav.LandingMode
         """,
     )
 
@@ -71,8 +84,8 @@ def test_load_uav_mission_spec(tmp_path):
     assert mission_spec.vision_nodes == ()
     assert mission_spec.requires_camera is False
     assert mission_spec.path == mission_path
-    assert mission_spec.modes["start"].class_path == "uav.modes.uav.TakeoffMode"
-    assert mission_spec.modes["start"].params == {"altitude": 3.0}
+    assert mission_spec.modes["start"].mode_id == "uav.vtol.TakeoffMode"
+    assert mission_spec.modes["start"].params == {}
     assert mission_spec.modes["start"].transitions == {"complete": "cruise"}
     assert mission_spec.modes["cruise"].params == {
         "coordinates": [((1.0, 2.0, 3.0), 0.0, "LOCAL")],
@@ -80,24 +93,50 @@ def test_load_uav_mission_spec(tmp_path):
     }
 
 
-def test_load_payload_mission_spec(tmp_path):
+def test_load_payload_mission_spec(tmp_path, monkeypatch):
     mission_path = _write_mission(
         tmp_path,
         """
         modes:
           start:
-            class: uav.modes.payload.PayloadScanForTagMode
+            mode: payload.PayloadScanForTagMode
             params:
               tag_id: 1
             transitions:
               found: approach
               not_found: approach
           approach:
-            class: uav.modes.payload.PayloadAprilTagApproachMode
+            mode: payload.PayloadAprilTagApproachMode
             params:
               tag_id: 1
               stop_distance_m: 0.07
         """,
+    )
+
+    fake_entries = {
+        "payload.PayloadScanForTagMode": SimpleNamespace(
+            mission_target="payload",
+            required_vision_nodes=("uav.vision_nodes.PayloadAprilTagNode",),
+            requires_camera=False,
+            transition_labels=("found", "not_found"),
+        ),
+        "payload.PayloadAprilTagApproachMode": SimpleNamespace(
+            mission_target="payload",
+            required_vision_nodes=(),
+            requires_camera=True,
+            transition_labels=("done",),
+        ),
+    }
+
+    monkeypatch.setattr(
+        schema_module,
+        "mode_entry_for_mode_id",
+        lambda mode_id: fake_entries[mode_id],
+    )
+    monkeypatch.setattr(
+        schema_module,
+        "validate_mode_params",
+        lambda _mode_id, params: params,
     )
 
     mission_spec = load_mission_spec(mission_path)
@@ -105,14 +144,12 @@ def test_load_payload_mission_spec(tmp_path):
     assert mission_spec.target == "payload"
     assert mission_spec.is_payload is True
     assert mission_spec.is_uav is False
-    assert mission_spec.vision_nodes == ("PayloadAprilTagNode",)
+    assert mission_spec.vision_nodes == ("uav.vision_nodes.PayloadAprilTagNode",)
     assert mission_spec.requires_camera is True
-    assert mission_spec.modes["start"].class_path == (
-        "uav.modes.payload.PayloadScanForTagMode"
-    )
+    assert mission_spec.modes["start"].class_path == ("payload.PayloadScanForTagMode")
     assert mission_spec.modes["start"].params["tag_id"] == 1
     assert mission_spec.modes["approach"].class_path == (
-        "uav.modes.payload.PayloadAprilTagApproachMode"
+        "payload.PayloadAprilTagApproachMode"
     )
 
 
@@ -121,7 +158,7 @@ def test_mission_spec_from_dict():
         {
             "modes": {
                 "start": {
-                    "class": "uav.modes.payload.PayloadAprilTagApproachMode",
+                    "mode": "payload.PayloadAprilTagApproachMode",
                     "params": {"tag_id": 0, "stop_distance_m": 0.05},
                 }
             }
@@ -140,7 +177,7 @@ def test_mission_spec_marks_camera_only_mode_as_camera_required():
         {
             "modes": {
                 "start": {
-                    "class": "uav.modes.payload.PayloadWaitForDriveOutMode.PayloadWaitForDriveOutMode",
+                    "mode": "payload.PayloadWaitForDriveOutMode",
                 }
             }
         }
@@ -161,7 +198,7 @@ def test_mission_spec_marks_camera_only_mode_as_camera_required():
             """
             modes:
               cruise:
-                class: uav.modes.uav.NavGPSMode
+                mode: uav.NavGPSMode
             """,
             "must define a start mode",
         ),
@@ -170,7 +207,7 @@ def test_mission_spec_marks_camera_only_mode_as_camera_required():
             target: uav
             modes:
               start:
-                class: uav.modes.uav.TakeoffMode
+                mode: uav.vtol.TakeoffMode
             """,
             "unsupported top-level keys",
         ),
@@ -185,9 +222,9 @@ def test_mission_spec_marks_camera_only_mode_as_camera_required():
             """
             modes:
               start:
-                class: uav.modes.uav.TakeoffMode
+                mode: uav.vtol.TakeoffMode
               "":
-                class: uav.modes.uav.TakeoffMode
+                mode: uav.vtol.TakeoffMode
             """,
             "contains an invalid mode name",
         ),
@@ -195,7 +232,7 @@ def test_mission_spec_marks_camera_only_mode_as_camera_required():
             """
             modes:
               start:
-                class: uav.modes.uav.TakeoffMode
+                mode: uav.vtol.TakeoffMode
                 extra: true
             """,
             "contains unsupported keys",
@@ -204,15 +241,15 @@ def test_mission_spec_marks_camera_only_mode_as_camera_required():
             """
             modes:
               start:
-                class: 3
+                mode: 3
             """,
-            "must define a non-empty class path",
+            "must define a non-empty mode identifier",
         ),
         (
             """
             modes:
               start:
-                class: uav.modes.uav.TakeoffMode
+                mode: uav.vtol.TakeoffMode
                 params: []
             """,
             "must define params as a mapping",
@@ -221,7 +258,7 @@ def test_mission_spec_marks_camera_only_mode_as_camera_required():
             """
             modes:
               start:
-                class: uav.modes.uav.TakeoffMode
+                mode: uav.vtol.TakeoffMode
                 transitions: []
             """,
             "must define transitions as a string-to-string mapping",
@@ -230,7 +267,7 @@ def test_mission_spec_marks_camera_only_mode_as_camera_required():
             """
             modes:
               start:
-                class: uav.modes.uav.TakeoffMode
+                mode: uav.vtol.TakeoffMode
                 transitions:
                   complete: 1
             """,
@@ -251,11 +288,11 @@ def test_mode_derived_metadata_rejects_mixed_targets(tmp_path):
         """
         modes:
           start:
-            class: uav.modes.uav.TakeoffMode
+            mode: uav.vtol.TakeoffMode
             transitions:
               complete: payload
           payload:
-            class: uav.modes.payload.PayloadRetreatMode
+            mode: payload.PayloadRetreatMode
         """,
     )
 
@@ -269,7 +306,7 @@ def test_undefined_transition_target_is_rejected(tmp_path):
         """
         modes:
           start:
-            class: uav.modes.uav.TakeoffMode
+            mode: uav.vtol.TakeoffMode
             transitions:
               complete: missing
         """,
@@ -283,7 +320,7 @@ def test_undefined_transition_target_is_rejected(tmp_path):
 def test_invalid_mode_target_is_rejected(monkeypatch, mission_target):
     monkeypatch.setattr(
         schema_module,
-        "mode_entry_for_class_path",
+        "mode_entry_for_mode_id",
         lambda _path: type(
             "FakeEntry",
             (),
@@ -297,18 +334,52 @@ def test_invalid_mode_target_is_rejected(monkeypatch, mission_target):
     monkeypatch.setattr(
         schema_module,
         "validate_mode_params",
-        lambda _path, params: params,
+        lambda _mode_id, params: params,
     )
 
     with pytest.raises(ValueError, match="must declare mission_target"):
-        load_mission_spec({"modes": {"start": {"class": "fake.module.FakeMode"}}})
+        load_mission_spec({"modes": {"start": {"mode": "fake.module.FakeMode"}}})
 
 
-def test_load_mode_class_accepts_module_path():
+def test_load_mode_class_accepts_module_path(monkeypatch):
+    module_name = "uav.modes.payload.PayloadAprilTagApproachMode"
+    fake_module = types.ModuleType(module_name)
+
+    class PayloadAprilTagApproachMode(Mode):
+        mission_target = "payload"
+
+        def __init__(self, node, vehicle) -> None:
+            super().__init__(node, vehicle)
+
+        def on_update(self, time_delta: float) -> None:
+            pass
+
+        def check_status(self) -> str:
+            return "continue"
+
+    PayloadAprilTagApproachMode.__module__ = module_name
+    fake_module.PayloadAprilTagApproachMode = PayloadAprilTagApproachMode
+    monkeypatch.setitem(sys.modules, module_name, fake_module)
+
     mode_class = load_mode_class("uav.modes.payload.PayloadAprilTagApproachMode")
 
     assert mode_class.__name__ == "PayloadAprilTagApproachMode"
     assert mode_class.mission_target == "payload"
+
+
+def test_checked_in_peer_fleet_test_mission_loads_with_peer_union():
+    mission_path = (
+        Path(__file__).resolve().parent.parent
+        / "uav"
+        / "missions"
+        / "payload_peer_fleet_test.yaml"
+    )
+
+    mission_spec = load_mission_spec(mission_path)
+
+    assert mission_spec.target == "payload"
+    assert mission_spec.peer_vehicle_names == ("payload_0", "payload_1")
+    assert mission_spec.requires_camera is False
 
 
 def test_load_mode_class_falls_back_from_class_path(tmp_path, monkeypatch):
