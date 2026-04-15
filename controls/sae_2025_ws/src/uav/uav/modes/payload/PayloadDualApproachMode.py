@@ -136,9 +136,7 @@ class PayloadDualApproachMode(Mode):
                 1,
             )
         else:
-            self.node.create_subscription(
-                Image, cam_topic, self._on_image, 1
-            )
+            self.node.create_subscription(Image, cam_topic, self._on_image, 1)
 
         self.node.create_subscription(
             CameraInfo, vehicle.camera_info_topic, self._on_camera_info, 1
@@ -193,9 +191,7 @@ class PayloadDualApproachMode(Mode):
         debug = bgr.copy()
 
         # Draw HSV colour contours (green) and centroid (red)
-        contours, _ = cv2.findContours(
-            mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
-        )
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         cv2.drawContours(debug, contours, -1, (0, 255, 0), 1)
         if color_cx is not None and color_cy is not None:
             cv2.circle(debug, (int(color_cx), int(color_cy)), 5, (0, 0, 255), -1)
@@ -214,9 +210,7 @@ class PayloadDualApproachMode(Mode):
             tx, ty = int(tag.center_x), int(tag.center_y)
             r = max(5, int(tag.area**0.5 / 4))
             cv2.circle(debug, (tx, ty), r, (255, 255, 0), 2)
-            cv2.drawMarker(
-                debug, (tx, ty), (255, 255, 0), cv2.MARKER_CROSS, r * 2, 1
-            )
+            cv2.drawMarker(debug, (tx, ty), (255, 255, 0), cv2.MARKER_CROSS, r * 2, 1)
             cv2.putText(
                 debug,
                 f"id{tag.tag_id} {tag.tvec_z:.2f}m",
@@ -327,16 +321,12 @@ class PayloadDualApproachMode(Mode):
             self._last_seen_time = now
             distance = float(tag.tvec_z)
             lateral_error_px = float(tag.center_x - image_center)
-            linear = min(
-                self.tag_forward_gain * distance, self.tag_max_forward_speed
-            )
+            linear = min(self.tag_forward_gain * distance, self.tag_max_forward_speed)
             angular = (-self.tag_angular_gain * lateral_error_px) - (
                 self.tag_yaw_gain * tag.yaw_error
             )
             self.vehicle.drive(linear, angular)
-            self._publish_debug(
-                bgr, mask, "TAG", tag, color_cx, color_cy, color_height
-            )
+            self._publish_debug(bgr, mask, "TAG", tag, color_cx, color_cy, color_height)
             if now - self._last_log_time >= 1.0:
                 self._last_log_time = now
                 self.log(
