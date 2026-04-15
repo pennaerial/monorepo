@@ -24,16 +24,16 @@ _EIGHTH_TURN = math.pi / 4.0  # 45 degrees
 _ANGLE_TOL = 0.05  # radians, stop slightly early to avoid overshoot
 
 # Corner-turn vision thresholds (mirrors PayloadCornerNavigateMode defaults)
-_CORNER_CENTER_TOL_PX = 30.0  # lateral error tolerance (px)
-_CORNER_CENTER_MIN_PX = 100  # minimum target-colour pixels to trust centering
-_CORNER_STABLE_FRAMES = 1  # consecutive centred frames before locking
+_CORNER_CENTER_TOL_PX = 100.0  # lateral error tolerance (px)
+_CORNER_CENTER_MIN_PX = 400  # minimum target-colour pixels to trust centering
+_CORNER_STABLE_FRAMES = 2  # consecutive centred frames before locking
 _CORNER_MAX_RAD = 2.0 * math.pi  # safety timeout (radians)
 # Pause held after detecting a corner transition before starting to rotate,
 # so the vehicle fully stops and the camera de-blurs before vision centering.
 _CORNER_PRE_TURN_WAIT_S = 0.5
 
 # TURN_ONTO_TAPE vision thresholds
-_TURN_CENTER_TOL_PX = 30.0  # lateral error tolerance (px)
+_TURN_CENTER_TOL_PX = 50.0  # lateral error tolerance (px)
 _TURN_CENTER_MIN_PX = 150  # minimum tape pixels to trust centering
 _TURN_STABLE_FRAMES = 1  # consecutive centred frames before locking
 _TURN_MAX_RAD = 2.0 * math.pi  # safety timeout (radians)
@@ -846,10 +846,18 @@ class PayloadDLZNavigateMode(Mode):
             total, lateral_error_px, mask, row_start, col_start = (
                 self._corner_single_color_metrics(bgr, self._corner_target_color)
             )
-            if (
-                total >= _CORNER_CENTER_MIN_PX
-                and abs(lateral_error_px) < _CORNER_CENTER_TOL_PX
-            ):
+            # Stop condition depends on travel direction:
+            #   cw  → centroid should end up on the LEFT side of the crop
+            #         (lateral_error_px < -_CORNER_CENTER_TOL_PX)
+            #   ccw → centroid should end up on the RIGHT side of the crop
+            #         (lateral_error_px >  _CORNER_CENTER_TOL_PX)
+            # i.e. the target colour has swept past the crop centre by at
+            # least tol pixels in the expected direction.
+            if self.direction == "cw":
+                side_ok = lateral_error_px < -_CORNER_CENTER_TOL_PX
+            else:
+                side_ok = lateral_error_px > _CORNER_CENTER_TOL_PX
+            if total >= _CORNER_CENTER_MIN_PX and side_ok:
                 self._corner_stable += 1
                 if self._corner_stable >= _CORNER_STABLE_FRAMES:
                     self._annotate_corner_turn(
