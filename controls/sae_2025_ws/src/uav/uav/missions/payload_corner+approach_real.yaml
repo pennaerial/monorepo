@@ -48,7 +48,7 @@ modes:
       complete: dlz_navigate
 
   dlz_navigate:
-    class: uav.modes.payload.PayloadDualApproachMode
+    mode: payload.PayloadDualApproachMode
     params:
       tag_id: 0
       tag_size_m: 0.0508
