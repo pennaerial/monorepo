@@ -69,11 +69,29 @@ def _prevalidate_raw_fleet_keys(fleet: dict) -> None:
         )
 
 
+def _resolve_fleet_path(fleet_path: str) -> Path:
+    direct = Path(os.path.expanduser(fleet_path))
+    if direct.is_absolute() or os.sep in fleet_path or "/" in fleet_path:
+        return direct.resolve()
+    if direct.exists():
+        return direct.resolve()
+    fleets_dir = Path(get_package_share_directory("uav")) / "fleets"
+    candidate = fleets_dir / fleet_path
+    if not candidate.suffix:
+        candidate = candidate.with_suffix(".yaml")
+    if candidate.exists():
+        return candidate.resolve()
+    raise FileNotFoundError(
+        f"Could not find fleet file '{fleet_path}'. Tried cwd-relative "
+        f"'{direct}' and fleets dir '{candidate}'."
+    )
+
+
 def _load_fleet_file(context) -> dict:
     fleet_path = LaunchConfiguration("fleet_file").perform(context).strip()
     if not fleet_path:
         raise ValueError("fleet.launch.py requires fleet_file:=...")
-    resolved_path = Path(os.path.expanduser(fleet_path)).resolve()
+    resolved_path = _resolve_fleet_path(fleet_path)
     with resolved_path.open("r", encoding="utf-8") as fleet_file:
         raw_fleet = yaml.safe_load(fleet_file) or {}
     _prevalidate_raw_fleet_keys(raw_fleet)
