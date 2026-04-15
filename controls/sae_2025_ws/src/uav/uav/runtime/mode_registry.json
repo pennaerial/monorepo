@@ -1222,12 +1222,13 @@
         "done"
       ]
     },
-    "uav.modes.payload.PayloadDualApproachMode": {
+    "payload.PayloadDualApproachMode": {
       "class_name": "PayloadDualApproachMode",
       "class_path": "uav.modes.payload.PayloadDualApproachMode",
       "description": "Approach using AprilTag when visible, HSV colour fallback otherwise.",
       "display_name": "PayloadDualApproachMode",
       "mission_target": "payload",
+      "mode_id": "payload.PayloadDualApproachMode",
       "module_path": "uav.modes.payload.PayloadDualApproachMode",
       "param_fields": [
         {
@@ -1519,11 +1520,79 @@
         "title": "PayloadDualApproachModeParams",
         "type": "object"
       },
+      "peer_vehicle_names": [],
       "required_vision_nodes": [],
       "requires_camera": true,
       "transition_labels": []
     },
-    "uav.modes.payload.PayloadRetreatMode": {
+    "payload.PayloadPeerFleetTestMode": {
+      "class_name": "PayloadPeerFleetTestMode",
+      "class_path": "uav.modes.payload.PayloadPeerFleetTestMode",
+      "description": "Passive multi-payload communication demo for fleet bring-up.",
+      "display_name": "PayloadPeerFleetTestMode",
+      "mission_target": "payload",
+      "mode_id": "payload.PayloadPeerFleetTestMode",
+      "module_path": "uav.modes.payload.PayloadPeerFleetTestMode",
+      "param_fields": [
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 1.0,
+          "default_kind": "value",
+          "name": "publish_period_s",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "str"
+          },
+          "default": "peer_test/state",
+          "default_kind": "value",
+          "name": "local_topic",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "str"
+          },
+          "default": "/shared/peer_test/broadcast",
+          "default_kind": "value",
+          "name": "shared_topic",
+          "required": false
+        }
+      ],
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "local_topic": {
+            "default": "peer_test/state",
+            "title": "Local Topic",
+            "type": "string"
+          },
+          "publish_period_s": {
+            "default": 1.0,
+            "title": "Publish Period S",
+            "type": "number"
+          },
+          "shared_topic": {
+            "default": "/shared/peer_test/broadcast",
+            "title": "Shared Topic",
+            "type": "string"
+          }
+        },
+        "title": "PayloadPeerFleetTestModeParams",
+        "type": "object"
+      },
+      "peer_vehicle_names": [
+        "payload_0",
+        "payload_1"
+      ],
+      "required_vision_nodes": [],
+      "requires_camera": false,
+      "transition_labels": []
+    },
+    "payload.PayloadRetreatMode": {
       "class_name": "PayloadRetreatMode",
       "class_path": "uav.modes.payload.PayloadRetreatMode",
       "description": "Drive the payload to the edge of the DLZ, then turn 180\u00b0 to face the center.",
@@ -1745,11 +1814,25 @@
           "default_kind": "value",
           "name": "spin_angular_speed",
           "required": false
+        },
+        {
+          "annotation": {
+            "kind": "bool"
+          },
+          "default": false,
+          "default_kind": "value",
+          "name": "loop",
+          "required": false
         }
       ],
       "params_schema": {
         "additionalProperties": false,
         "properties": {
+          "loop": {
+            "default": false,
+            "title": "Loop",
+            "type": "boolean"
+          },
           "spin_angular_speed": {
             "default": 0.4,
             "title": "Spin Angular Speed",

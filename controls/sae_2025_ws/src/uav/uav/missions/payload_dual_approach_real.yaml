@@ -1,7 +1,7 @@
 # Dual approach: AprilTag tracking with HSV colour fallback for string obstacle.
 modes:
   start:
-    class: uav.modes.payload.PayloadDualApproachMode
+    mode: payload.PayloadDualApproachMode
     params:
       tag_id: 0
       tag_size_m: 0.0508
