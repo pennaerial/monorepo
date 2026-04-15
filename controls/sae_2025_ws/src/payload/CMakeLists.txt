@@ -219,6 +219,23 @@ if(BUILD_TESTING)
     )
     target_link_libraries(test_payload_shutdown payload_parameters)
   endif()
+
+  if(build_payload_gpio_controller)
+    ament_add_gtest(test_gpio_controller_shutdown
+      test/test_gpio_controller_shutdown.cpp
+    )
+    if(TARGET test_gpio_controller_shutdown)
+      target_include_directories(test_gpio_controller_shutdown PRIVATE include)
+      ament_target_dependencies(test_gpio_controller_shutdown
+        rclcpp
+        payload_interfaces
+        pluginlib
+      )
+      target_link_libraries(test_gpio_controller_shutdown
+        payload_gpio_controller
+      )
+    endif()
+  endif()
 endif()
 
 ament_package()

@@ -15,7 +15,6 @@ backend:
   px4_path: ~/PX4-Autopilot
   world_name: sae
   mission_stage: base
-  middleware_port: 8888
 
 defaults:
   auto_launch: true

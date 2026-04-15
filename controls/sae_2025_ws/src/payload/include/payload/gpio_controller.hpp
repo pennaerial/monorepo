@@ -25,6 +25,7 @@ class GPIOController : public Controller
 {
 public:
   GPIOController();
+  GPIOController(std::unique_ptr<Motor> left_motor, std::unique_ptr<Motor> right_motor);
   ~GPIOController() override;
 
   void initialize(rclcpp::Node * node) override;
@@ -49,8 +50,8 @@ private:
 
   std::shared_ptr<payload::ParamListener> param_listener_;
 
-  std::unique_ptr<SNMotor> left_motor_;
-  std::unique_ptr<SNMotor> right_motor_;
+  std::unique_ptr<Motor> left_motor_;
+  std::unique_ptr<Motor> right_motor_;
 
   std::atomic<double> cmd_linear_ {0.0};
   std::atomic<double> cmd_angular_ {0.0};
