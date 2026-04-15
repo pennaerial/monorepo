@@ -854,9 +854,9 @@ class PayloadDLZNavigateMode(Mode):
             # i.e. the target colour has swept past the crop centre by at
             # least tol pixels in the expected direction.
             if self.direction == "cw":
-                side_ok = lateral_error_px < -_CORNER_CENTER_TOL_PX
+                side_ok = lateral_error_px < _CORNER_CENTER_TOL_PX
             else:
-                side_ok = lateral_error_px > _CORNER_CENTER_TOL_PX
+                side_ok = lateral_error_px > -_CORNER_CENTER_TOL_PX
             if total >= _CORNER_CENTER_MIN_PX and side_ok:
                 self._corner_stable += 1
                 if self._corner_stable >= _CORNER_STABLE_FRAMES:

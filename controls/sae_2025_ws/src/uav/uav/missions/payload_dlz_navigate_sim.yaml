@@ -46,15 +46,15 @@ modes:
       ccw_upper_hsv: [140, 255, 255]
       cw_lower_hsv: [0, 100, 100]    # red
       cw_upper_hsv: [10, 255, 255]
-  #   transitions:
-  #     done: scan
+    transitions:
+      done: scan
 
-  # scan:
-  #   mode: payload.PayloadScanForTagMode
-  #   params:
-  #     tag_id: 0
-  #     tag_size_m: 0.0508
-  #     spin_angular_speed: 0.4
+  scan:
+    mode: payload.PayloadScanForTagMode
+    params:
+      tag_id: 0
+      tag_size_m: 0.0508
+      spin_angular_speed: 0.4
   #   transitions:
   #     found: apriltag_approach
   #     not_found: retry
