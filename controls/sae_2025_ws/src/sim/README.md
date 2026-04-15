@@ -57,3 +57,5 @@ Notes:
 - legacy embedded `backend.world` input is intentionally no longer supported
 - legacy top-level spawnable records are no longer supported; use `world.params.entities`
 - legacy single-UAV spawning remains available for older launch paths that still pass `spawn_uav_model:=true`
+- scoring nodes use explicit `scoring.params.vehicle_name` to bind PX4 state under `/<vehicle_name>/fmu/...`
+- if a scoring stage has multiple UAV controllables and no explicit `vehicle_name`, launch fails instead of guessing

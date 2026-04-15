@@ -17,6 +17,7 @@ from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 from uav.runtime.mission_spec import MissionSpec, mission_path_for_name
+from uav.runtime.vision_loader import load_vision_class
 from uav.utils import (
     camel_to_snake,
     find_folder_with_heuristic,
@@ -40,7 +41,7 @@ def _vehicle_namespace_for(vehicle_name: str) -> str:
     clean_name = str(vehicle_name).strip().strip("/")
     if not clean_name:
         raise ValueError("Vehicle stack requires a non-empty vehicle_name.")
-    return f"/{clean_name}"
+    return clean_name
 
 
 def _runtime_executable_for(mission_spec: MissionSpec) -> str:
@@ -165,17 +166,16 @@ def _camera_contract_for(
     preprocess_hook: str | None = None,
     camera_info_url: str | None = None,
 ) -> dict[str, object]:
-    namespace = _vehicle_namespace_for(vehicle_name)
     return {
         "vehicle_name": vehicle_name,
-        "camera_namespace": namespace,
-        "image_topic": f"{namespace}/camera",
-        "camera_info_topic": f"{namespace}/camera_info",
-        "camera_service_name": f"{namespace}/camera_data",
+        "camera_namespace": _vehicle_namespace_for(vehicle_name),
+        "image_topic": "camera",
+        "camera_info_topic": "camera_info",
+        "camera_service_name": "camera_data",
         "input_transport": input_transport or "",
-        "input_raw_topic": f"{namespace}/camera_source",
-        "input_compressed_topic": f"{namespace}/camera_source/compressed",
-        "input_camera_info_topic": f"{namespace}/camera_info_source",
+        "input_raw_topic": "camera_source",
+        "input_compressed_topic": "camera_source/compressed",
+        "input_camera_info_topic": "camera_info_source",
         "rotate_degrees": 0.0 if rotate_degrees is None else rotate_degrees,
         "preprocess_hook": "" if preprocess_hook is None else preprocess_hook,
         "camera_info_url": "" if camera_info_url is None else camera_info_url,
@@ -204,16 +204,9 @@ def _sim_camera_bridge_actions(
 ) -> list:
     gz_image_topic = f"/world/{world_name}/model/{sim_entity_name}/link/camera_link/sensor/camera/image"
     gz_camera_info_topic = f"/world/{world_name}/model/{sim_entity_name}/link/camera_link/sensor/camera/camera_info"
-    namespace = _vehicle_namespace_for(vehicle_name)
-    image_target = (
-        f"{namespace}/camera_source"
-        if mission_target == "payload"
-        else f"{namespace}/camera"
-    )
+    image_target = "camera_source" if mission_target == "payload" else "camera"
     camera_info_target = (
-        f"{namespace}/camera_info_source"
-        if mission_target == "payload"
-        else f"{namespace}/camera_info"
+        "camera_info_source" if mission_target == "payload" else "camera_info"
     )
     return [
         Node(
@@ -223,6 +216,7 @@ def _sim_camera_bridge_actions(
             remappings=[(gz_image_topic, image_target)],
             output="screen",
             name=f"{vehicle_name}_camera_bridge",
+            namespace=_vehicle_namespace_for(vehicle_name),
         ),
         Node(
             package="ros_gz_bridge",
@@ -233,6 +227,7 @@ def _sim_camera_bridge_actions(
             remappings=[(gz_camera_info_topic, camera_info_target)],
             output="screen",
             name=f"{vehicle_name}_camera_info_bridge",
+            namespace=_vehicle_namespace_for(vehicle_name),
         ),
     ]
 
@@ -241,7 +236,6 @@ def _build_camera_actions(
     *,
     mission_spec: MissionSpec,
     camera_contract: dict[str, object],
-    vehicle_namespace: str,
     vision_nodes: list[str],
     sim: bool,
     sim_world_name: str,
@@ -268,6 +262,8 @@ def _build_camera_actions(
             "v4l2_camera",
             "v4l2_camera_node",
             "--ros-args",
+            "-r",
+            f"__ns:=/{camera_contract['vehicle_name']}",
             "-p",
             "image_size:=[640,480]",
             "-p",
@@ -281,21 +277,21 @@ def _build_camera_actions(
             [
                 "--remap",
                 (
-                    f"/image_raw:={camera_contract['input_raw_topic']}"
+                    f"image_raw:={camera_contract['input_raw_topic']}"
                     if mission_spec.is_payload
-                    else f"/image_raw:={camera_contract['image_topic']}"
+                    else f"image_raw:={camera_contract['image_topic']}"
                 ),
                 "--remap",
                 (
-                    f"/image_raw/compressed:={camera_contract['input_compressed_topic']}"
+                    f"image_raw/compressed:={camera_contract['input_compressed_topic']}"
                     if mission_spec.is_payload
-                    else f"/image_raw/compressed:={camera_contract['image_topic']}/compressed"
+                    else f"image_raw/compressed:={camera_contract['image_topic']}/compressed"
                 ),
                 "--remap",
                 (
-                    f"/camera_info:={camera_contract['input_camera_info_topic']}"
+                    f"camera_info:={camera_contract['input_camera_info_topic']}"
                     if mission_spec.is_payload
-                    else f"/camera_info:={camera_contract['camera_info_topic']}"
+                    else f"camera_info:={camera_contract['camera_info_topic']}"
                 ),
             ]
         )
@@ -309,7 +305,6 @@ def _build_camera_actions(
 
     camera_parameters = {
         "vehicle_name": camera_contract["vehicle_name"],
-        "vehicle_namespace": vehicle_namespace,
         "image_topic": "",
         "camera_info_topic": "",
         "camera_service_name": "",
@@ -348,19 +343,21 @@ def _build_camera_actions(
     )
 
     for vision_node in vision_nodes:
+        vision_class = load_vision_class(vision_node)
+        executable = camel_to_snake(vision_class.__name__)
         actions.append(
             Node(
                 package="uav",
-                executable=camel_to_snake(vision_node),
+                executable=executable,
                 namespace=camera_contract["vehicle_name"],
-                name=f"{camera_contract['vehicle_name']}_{camel_to_snake(vision_node)}",
+                name=f"{camera_contract['vehicle_name']}_{executable}",
                 output="screen",
                 parameters=[
                     {
                         "vehicle_name": camera_contract["vehicle_name"],
-                        "vehicle_namespace": vehicle_namespace,
                         "camera_service_name": "",
-                        "use_camera_service": vision_node != "PayloadAprilTagNode",
+                        "use_camera_service": vision_class.__name__
+                        != "PayloadAprilTagNode",
                         "preferred_image_transport": preferred_image_transport,
                         "debug": vision_debug,
                         "sim": sim,
@@ -382,7 +379,6 @@ def _build_runtime_parameters(
     mission_path: str,
     mission_spec: MissionSpec,
     vehicle_name: str,
-    px4_namespace: str,
     auto_launch: bool,
     debug: bool,
     servo_only: bool,
@@ -410,8 +406,6 @@ def _build_runtime_parameters(
             "camera_mount_offsets": list(camera_mount_offsets),
         }
     )
-    if str(px4_namespace).strip():
-        parameters["px4_namespace"] = str(px4_namespace).strip()
     return parameters
 
 
@@ -459,7 +453,6 @@ def _px4_sitl_action(
     sim_entity_name: str,
     autostart: int,
     px4_instance: int,
-    px4_namespace: str,
     vehicle_name: str,
 ):
     env_exports = [
@@ -467,10 +460,8 @@ def _px4_sitl_action(
         f"PX4_GZ_WORLD={world_name}",
         "PX4_GZ_STANDALONE=1",
         f"PX4_SYS_AUTOSTART={autostart}",
+        f"PX4_UXRCE_DDS_NS={_vehicle_namespace_for(vehicle_name)}",
     ]
-    normalized_px4_namespace = str(px4_namespace).strip().strip("/")
-    if normalized_px4_namespace:
-        env_exports.append(f"PX4_UXRCE_DDS_NS={normalized_px4_namespace}")
 
     cmd = [
         "bash",
@@ -527,8 +518,6 @@ def launch_setup(context, *args, **kwargs):
         config, "launch_payload_backend", mission_spec.is_payload
     )
 
-    vehicle_namespace = _vehicle_namespace_for(vehicle_name)
-    px4_namespace = str(config.get("px4_namespace", "")).strip()
     sim_entity_name = str(config.get("sim_entity_name", "")).strip() or vehicle_name
     sim_world_name = str(config.get("sim_world_name", "")).strip()
     save_vision_milliseconds = int(config.get("save_vision_milliseconds", 0))
@@ -604,7 +593,6 @@ def launch_setup(context, *args, **kwargs):
         _build_camera_actions(
             mission_spec=mission_spec,
             camera_contract=camera_contract,
-            vehicle_namespace=vehicle_namespace,
             vision_nodes=list(mission_spec.vision_nodes),
             sim=sim,
             sim_world_name=sim_world_name,
@@ -626,7 +614,6 @@ def launch_setup(context, *args, **kwargs):
                 mission_path=mission_path,
                 mission_spec=mission_spec,
                 vehicle_name=vehicle_name,
-                px4_namespace=px4_namespace,
                 auto_launch=auto_launch,
                 debug=debug,
                 servo_only=servo_only,
@@ -664,7 +651,6 @@ def launch_setup(context, *args, **kwargs):
                 sim_entity_name=sim_entity_name,
                 autostart=autostart,
                 px4_instance=int(config.get("px4_instance", 0)),
-                px4_namespace=px4_namespace,
                 vehicle_name=vehicle_name,
             )
         )

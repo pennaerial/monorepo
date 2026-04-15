@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 import sys
 import types
 from types import SimpleNamespace
@@ -11,62 +12,132 @@ def _placeholder(name: str):
     return type(name, (), {})
 
 
+def _import_module_if_available(name: str):
+    try:
+        return importlib.import_module(name)
+    except ModuleNotFoundError:
+        return None
+
+
 def _install_ros_test_doubles() -> None:
-    if "rclpy" not in sys.modules:
+    ament_index_python = sys.modules.get("ament_index_python")
+    if ament_index_python is None:
+        ament_index_python = _import_module_if_available("ament_index_python")
+    if ament_index_python is None:
+        ament_index_python = types.ModuleType("ament_index_python")
+        sys.modules["ament_index_python"] = ament_index_python
+
+    ament_index_packages = sys.modules.get("ament_index_python.packages")
+    if ament_index_packages is None:
+        ament_index_packages = _import_module_if_available(
+            "ament_index_python.packages"
+        )
+    if ament_index_packages is None:
+        ament_index_packages = types.ModuleType("ament_index_python.packages")
+        sys.modules["ament_index_python.packages"] = ament_index_packages
+    if not hasattr(ament_index_packages, "PackageNotFoundError"):
+
+        class PackageNotFoundError(Exception):
+            pass
+
+        ament_index_packages.PackageNotFoundError = PackageNotFoundError
+    if not hasattr(ament_index_packages, "get_package_share_directory"):
+        ament_index_packages.get_package_share_directory = lambda _name: ""
+    ament_index_python.packages = ament_index_packages
+
+    rclpy = sys.modules.get("rclpy")
+    if rclpy is None:
+        rclpy = _import_module_if_available("rclpy")
+    if rclpy is None:
         rclpy = types.ModuleType("rclpy")
+        sys.modules["rclpy"] = rclpy
+    if not hasattr(rclpy, "ok"):
         rclpy.ok = lambda: True
 
+    node_mod = sys.modules.get("rclpy.node")
+    if node_mod is None:
+        node_mod = _import_module_if_available("rclpy.node")
+    if node_mod is None:
         node_mod = types.ModuleType("rclpy.node")
+        sys.modules["rclpy.node"] = node_mod
+    if not hasattr(node_mod, "Node"):
 
         class Node:
             pass
 
         node_mod.Node = Node
 
+    executors_mod = sys.modules.get("rclpy.executors")
+    if executors_mod is None:
+        executors_mod = _import_module_if_available("rclpy.executors")
+    if executors_mod is None:
         executors_mod = types.ModuleType("rclpy.executors")
+        sys.modules["rclpy.executors"] = executors_mod
+    if not hasattr(executors_mod, "ExternalShutdownException"):
 
         class ExternalShutdownException(Exception):
             pass
 
         executors_mod.ExternalShutdownException = ExternalShutdownException
 
+    clock_mod = sys.modules.get("rclpy.clock")
+    if clock_mod is None:
+        clock_mod = _import_module_if_available("rclpy.clock")
+    if clock_mod is None:
         clock_mod = types.ModuleType("rclpy.clock")
+        sys.modules["rclpy.clock"] = clock_mod
+    if not hasattr(clock_mod, "Clock"):
         clock_mod.Clock = _placeholder("Clock")
 
+    parameter_mod = sys.modules.get("rclpy.parameter")
+    if parameter_mod is None:
+        parameter_mod = _import_module_if_available("rclpy.parameter")
+    if parameter_mod is None:
         parameter_mod = types.ModuleType("rclpy.parameter")
+        sys.modules["rclpy.parameter"] = parameter_mod
+    if not hasattr(parameter_mod, "Parameter"):
         parameter_mod.Parameter = _placeholder("Parameter")
 
+    validate_namespace_mod = sys.modules.get("rclpy.validate_namespace")
+    if validate_namespace_mod is None:
+        validate_namespace_mod = _import_module_if_available("rclpy.validate_namespace")
+    if validate_namespace_mod is None:
         validate_namespace_mod = types.ModuleType("rclpy.validate_namespace")
+        sys.modules["rclpy.validate_namespace"] = validate_namespace_mod
+    if not hasattr(validate_namespace_mod, "validate_namespace"):
         validate_namespace_mod.validate_namespace = lambda namespace: None
 
+    validate_node_name_mod = sys.modules.get("rclpy.validate_node_name")
+    if validate_node_name_mod is None:
+        validate_node_name_mod = _import_module_if_available("rclpy.validate_node_name")
+    if validate_node_name_mod is None:
         validate_node_name_mod = types.ModuleType("rclpy.validate_node_name")
+        sys.modules["rclpy.validate_node_name"] = validate_node_name_mod
+    if not hasattr(validate_node_name_mod, "validate_node_name"):
         validate_node_name_mod.validate_node_name = lambda node_name: None
 
+    qos_mod = sys.modules.get("rclpy.qos")
+    if qos_mod is None:
+        qos_mod = _import_module_if_available("rclpy.qos")
+    if qos_mod is None:
         qos_mod = types.ModuleType("rclpy.qos")
+        sys.modules["rclpy.qos"] = qos_mod
+    if not hasattr(qos_mod, "QoSProfile"):
         qos_mod.QoSProfile = _placeholder("QoSProfile")
+    if not hasattr(qos_mod, "QoSReliabilityPolicy"):
         qos_mod.QoSReliabilityPolicy = _placeholder("QoSReliabilityPolicy")
+    if not hasattr(qos_mod, "QoSHistoryPolicy"):
         qos_mod.QoSHistoryPolicy = _placeholder("QoSHistoryPolicy")
+    if not hasattr(qos_mod, "QoSDurabilityPolicy"):
         qos_mod.QoSDurabilityPolicy = _placeholder("QoSDurabilityPolicy")
 
-        rclpy.node = node_mod
-        rclpy.executors = executors_mod
-        rclpy.clock = clock_mod
-        rclpy.parameter = parameter_mod
-        rclpy.validate_namespace = validate_namespace_mod
-        rclpy.validate_node_name = validate_node_name_mod
-        rclpy.qos = qos_mod
-        sys.modules.update(
-            {
-                "rclpy": rclpy,
-                "rclpy.node": node_mod,
-                "rclpy.executors": executors_mod,
-                "rclpy.clock": clock_mod,
-                "rclpy.parameter": parameter_mod,
-                "rclpy.validate_namespace": validate_namespace_mod,
-                "rclpy.validate_node_name": validate_node_name_mod,
-                "rclpy.qos": qos_mod,
-            }
-        )
+    rclpy.node = node_mod
+    rclpy.executors = executors_mod
+    rclpy.clock = clock_mod
+    rclpy.parameter = parameter_mod
+    rclpy.validate_namespace = validate_namespace_mod
+    rclpy.validate_node_name = validate_node_name_mod
+    rclpy.qos = qos_mod
 
     if "std_srvs" not in sys.modules:
         std_srvs = types.ModuleType("std_srvs")
@@ -79,6 +150,13 @@ def _install_ros_test_doubles() -> None:
         std_srvs_srv.Trigger = Trigger
         std_srvs.srv = std_srvs_srv
         sys.modules.update({"std_srvs": std_srvs, "std_srvs.srv": std_srvs_srv})
+
+    if "std_msgs" not in sys.modules:
+        std_msgs = types.ModuleType("std_msgs")
+        std_msgs_msg = types.ModuleType("std_msgs.msg")
+        std_msgs_msg.Empty = _placeholder("Empty")
+        std_msgs.msg = std_msgs_msg
+        sys.modules.update({"std_msgs": std_msgs, "std_msgs.msg": std_msgs_msg})
 
     if "px4_msgs" not in sys.modules:
         px4_msgs = types.ModuleType("px4_msgs")
@@ -188,6 +266,7 @@ class _TrackingMode:
         self.activated = 0
         self.deactivated = 0
         self.updates: list[float] = []
+        self.disconnects: list[tuple[float, dict[str, bool]]] = []
 
     def activate(self) -> None:
         self.activated += 1
@@ -195,10 +274,16 @@ class _TrackingMode:
     def deactivate(self) -> None:
         self.deactivated += 1
 
+    def connection_ready(self, _connection_status: dict[str, bool]) -> bool:
+        return True
+
     def update(self, time_delta: float) -> None:
         self.updates.append(time_delta)
         if self.raises is not None:
             raise self.raises
+
+    def disconnect(self, time_delta: float, connection_status: dict[str, bool]) -> None:
+        self.disconnects.append((time_delta, dict(connection_status)))
 
     def check_status(self) -> str:
         return self.status
@@ -215,6 +300,10 @@ def _make_mode_manager(*, vehicle=None, auto_launch: bool = False) -> ModeManage
     manager.timer = None
     manager.auto_launch = auto_launch
     manager._auto_launch_timer = None
+    manager._runtime_vehicle_name = ""
+    manager.peer_heartbeat_hz = 10.0
+    manager.peer_stale_timeout_s = 0.5
+    manager._shared_mode_state = {}
     manager._logger = _FakeLogger()
     manager.destroyed = False
     manager.stopped = False
@@ -224,10 +313,45 @@ def _make_mode_manager(*, vehicle=None, auto_launch: bool = False) -> ModeManage
     manager.destroy_client = lambda client: None
     manager.destroy_node = lambda: setattr(manager, "destroyed", True)
     manager._stop_vehicle = lambda: setattr(manager, "stopped", True)
+    manager._current_comm_builder = None
+    manager._runtime_closed = False
+    manager._managed_registry = SimpleNamespace(
+        destroy_for_owner=lambda *_args, **_kwargs: None,
+        destroy_publisher=lambda _publisher: True,
+        destroy_subscription=lambda _subscription: True,
+        destroy_client=lambda _client: True,
+        close=lambda: None,
+        debug_descriptors=lambda: (),
+    )
+    manager._raw_node_api = SimpleNamespace(
+        create_publisher=lambda *_args, **_kwargs: None,
+        create_subscription=lambda *_args, **_kwargs: None,
+        create_client=lambda *_args, **_kwargs: None,
+        create_service=lambda *_args, **_kwargs: object(),
+        create_timer=lambda period, callback: _FakeTimer(callback),
+        destroy_publisher=lambda _publisher: True,
+        destroy_subscription=lambda _subscription: True,
+        destroy_client=lambda _client: True,
+        destroy_timer=lambda _timer: True,
+    )
+    manager._peer_connections = SimpleNamespace(
+        configure=lambda _peer_names: None,
+        status=lambda: {},
+        peer_names=(),
+        close=lambda: None,
+    )
     return manager
 
 
-def _stub_mode_manager_init(self, node_name: str, *, auto_launch: bool = True) -> None:
+def _stub_mode_manager_init(
+    self,
+    node_name: str,
+    *,
+    vehicle_name: str = "",
+    auto_launch: bool = True,
+    peer_heartbeat_hz: float = 10.0,
+    peer_stale_timeout_s: float = 0.5,
+) -> None:
     self.vehicle = None
     self.modes = {}
     self.transitions = {}
@@ -236,12 +360,44 @@ def _stub_mode_manager_init(self, node_name: str, *, auto_launch: bool = True) -
     self._vision_clients = {}
     self.timer = None
     self.auto_launch = bool(auto_launch)
+    self._runtime_vehicle_name = str(vehicle_name).strip().strip("/")
+    self.peer_heartbeat_hz = float(peer_heartbeat_hz)
+    self.peer_stale_timeout_s = float(peer_stale_timeout_s)
+    self._shared_mode_state = {}
     self._auto_launch_timer = None
     self._logger = _FakeLogger()
     self.create_timer = lambda period, callback: _FakeTimer(callback)
-    self.create_service = lambda *args, **kwargs: object()
     self.get_logger = lambda: self._logger
     self.destroy_node = lambda: None
+    self._current_comm_builder = None
+    self._runtime_closed = False
+    self._managed_registry = SimpleNamespace(
+        destroy_for_owner=lambda *_args, **_kwargs: None,
+        destroy_publisher=lambda _publisher: True,
+        destroy_subscription=lambda _subscription: True,
+        destroy_client=lambda _client: True,
+        close=lambda: None,
+        debug_descriptors=lambda: (),
+    )
+    self._raw_node_api = SimpleNamespace(
+        create_publisher=lambda *_args, **_kwargs: None,
+        create_subscription=lambda *_args, **_kwargs: None,
+        create_client=lambda *_args, **_kwargs: None,
+        create_service=lambda *_args, **_kwargs: object(),
+        create_timer=lambda period, callback: _FakeTimer(callback),
+        destroy_publisher=lambda _publisher: True,
+        destroy_subscription=lambda _subscription: True,
+        destroy_client=lambda _client: True,
+        destroy_timer=lambda _timer: True,
+    )
+    self._peer_connections = SimpleNamespace(
+        configure=lambda peer_names: setattr(
+            self, "_configured_peers", tuple(peer_names)
+        ),
+        status=lambda: {},
+        peer_names=(),
+        close=lambda: None,
+    )
 
 
 def _make_bootstrap(module_cls, params: dict[str, object]):
@@ -295,6 +451,11 @@ def test_initialize_mode_happy_path(monkeypatch):
         "load_mode_class",
         lambda _path: FakeMode,
     )
+    monkeypatch.setattr(
+        mode_manager_module,
+        "mode_entry_for_mode_id",
+        lambda _mode_id: SimpleNamespace(class_path="fake.module.FakeMode"),
+    )
 
     mode = ModeManager.initialize_mode(
         manager, "fake.module.FakeMode", {"required": 7, "optional": "value"}
@@ -329,6 +490,11 @@ def test_initialize_mode_missing_required_parameter(monkeypatch):
         "load_mode_class",
         lambda _path: FakeMode,
     )
+    monkeypatch.setattr(
+        mode_manager_module,
+        "mode_entry_for_mode_id",
+        lambda _mode_id: SimpleNamespace(class_path="fake.module.FakeMode"),
+    )
 
     with pytest.raises(ValueError, match="Missing required parameter 'required'"):
         ModeManager.initialize_mode(manager, "fake.module.FakeMode", {})
@@ -355,6 +521,11 @@ def test_initialize_mode_rejects_unexpected_parameter(monkeypatch):
         mode_manager_module,
         "load_mode_class",
         lambda _path: FakeMode,
+    )
+    monkeypatch.setattr(
+        mode_manager_module,
+        "mode_entry_for_mode_id",
+        lambda _mode_id: SimpleNamespace(class_path="fake.module.FakeMode"),
     )
 
     with pytest.raises(ValueError, match="unexpected parameter"):
@@ -385,6 +556,11 @@ def test_initialize_mode_rejects_vehicle_type_mismatch(monkeypatch):
         "load_mode_class",
         lambda _path: FakeMode,
     )
+    monkeypatch.setattr(
+        mode_manager_module,
+        "mode_entry_for_mode_id",
+        lambda _mode_id: SimpleNamespace(class_path="fake.module.FakeMode"),
+    )
 
     with pytest.raises(TypeError, match="expects vehicle type"):
         ModeManager.initialize_mode(manager, "fake.module.FakeMode", {"required": 7})
@@ -393,36 +569,50 @@ def test_initialize_mode_rejects_vehicle_type_mismatch(monkeypatch):
 def test_setup_vision_deduplicates_clients(monkeypatch):
     _require_runtime_support()
 
-    class FakeVisionNode:
-        srv = SimpleNamespace(Response=type("Response", (), {}))
+    canonical_name = "uav.vision_nodes.FakeVisionNode"
+    FakeVisionNode = type(
+        "FakeVisionNode",
+        (),
+        {
+            "__module__": canonical_name,
+            "srv": SimpleNamespace(Response=type("Response", (), {})),
+        },
+    )
 
-    vision_module = SimpleNamespace(FakeVisionNode=FakeVisionNode)
     client = SimpleNamespace(wait_for_service=lambda timeout_sec: True)
     manager = _make_mode_manager(
         vehicle=SimpleNamespace(
             has_camera=True,
-            vision_service_name=lambda vision_class: f"/vision/{vision_class.__name__}",
+            vision_service_name=lambda vision_class: f"vision/{vision_class.__name__}",
         )
     )
     created_clients: list[tuple[object, str]] = []
 
     monkeypatch.setattr(
-        mode_manager_module.importlib,
-        "import_module",
-        lambda _path: vision_module,
+        mode_manager_module,
+        "load_vision_class",
+        lambda _path: FakeVisionNode,
     )
     monkeypatch.setattr(
-        manager,
+        mode_manager_module.Node,
         "create_client",
-        lambda service, service_name: (
+        lambda _self, service, service_name, *_args, **_kwargs: (
             created_clients.append((service, service_name)) or client
         ),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        mode_manager_module.Node,
+        "destroy_client",
+        lambda *_args, **_kwargs: True,
+        raising=False,
     )
 
-    ModeManager.setup_vision(manager, ["FakeVisionNode", "FakeVisionNode"])
+    ModeManager.setup_vision(manager, [canonical_name, canonical_name])
 
-    assert list(manager.vision_clients) == ["FakeVisionNode"]
-    assert created_clients == [(FakeVisionNode.srv, "/vision/FakeVisionNode")]
+    assert list(manager.vision_clients) == [canonical_name]
+    assert ModeManager.get_vision_client(manager, FakeVisionNode) is client
+    assert created_clients == [(FakeVisionNode.srv, "vision/FakeVisionNode")]
 
 
 def test_setup_vision_rejects_vehicle_without_camera():
@@ -433,7 +623,7 @@ def test_setup_vision_rejects_vehicle_without_camera():
     with pytest.raises(
         ValueError, match="Vision nodes require an active vehicle camera contract"
     ):
-        ModeManager.setup_vision(manager, ["FakeVisionNode"])
+        ModeManager.setup_vision(manager, ["uav.vision_nodes.FakeVisionNode"])
 
 
 def test_switch_mode_deactivates_previous_mode_and_activates_new_mode():
@@ -530,6 +720,29 @@ def test_handle_mode_state_requires_exact_transition_label():
     assert manager.active_mode == "start"
 
 
+def test_create_entity_falls_back_to_raw_node_during_node_init(monkeypatch):
+    _require_runtime_support()
+
+    created = []
+    marker = object()
+
+    monkeypatch.setattr(
+        mode_manager_module.Node,
+        "create_publisher",
+        lambda _self, msg_type, topic, *args, **kwargs: (
+            created.append((msg_type, topic, args, kwargs)) or marker
+        ),
+        raising=False,
+    )
+
+    manager = object.__new__(ModeManager)
+
+    publisher = ModeManager.create_publisher(manager, object, "/parameter_events", 10)
+
+    assert publisher is marker
+    assert created == [(object, "/parameter_events", (10,), {})]
+
+
 def test_start_mission_callback_reports_already_started():
     _require_runtime_support()
 
@@ -608,6 +821,8 @@ def test_uav_bootstrap_bool_parameter_and_manager_validation(monkeypatch):
             "vehicle_name": "uav_5",
             "vehicle_class": "MULTICOPTER",
             "camera_mount_offsets": [0.0, 0.0, 0.0],
+            "peer_heartbeat_hz": 10.0,
+            "peer_stale_timeout_s": 0.5,
         },
     )
 
@@ -643,6 +858,8 @@ def test_payload_bootstrap_bool_parameter_and_manager_validation(monkeypatch):
             "mode_map": "mission.yaml",
             "auto_launch": True,
             "vehicle_name": "payload_0",
+            "peer_heartbeat_hz": 10.0,
+            "peer_stale_timeout_s": 0.5,
         },
     )
 

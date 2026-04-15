@@ -6,6 +6,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from .mode_paths import mode_id_from_class_path, normalize_public_mode_id
 from .fleet_spec import FleetDocumentModel
 from .mission_spec import MissionDocumentModel
 from .schema_registry import (
@@ -36,30 +37,49 @@ def mode_registry_entries(
     entries = list(mode_registry().values())
     if mission_target:
         entries = [entry for entry in entries if entry.mission_target == mission_target]
-    return sorted(entries, key=lambda entry: (entry.mission_target, entry.class_path))
+    return sorted(entries, key=lambda entry: (entry.mission_target, entry.mode_id))
 
 
-def mode_entry_for_class_path(class_path: str) -> ModeRegistryEntry:
-    entry = mode_registry().get(class_path)
-    if entry is None and "." in class_path:
-        module_path, _, class_name = class_path.rpartition(".")
-        fallback = mode_registry().get(module_path)
-        if fallback is not None and fallback.class_name == class_name:
-            entry = fallback
+def mode_entry_for_mode_id(mode_id: str) -> ModeRegistryEntry:
+    normalized = normalize_public_mode_id(mode_id)
+    entry = mode_registry().get(normalized)
     if entry is None:
         raise ValueError(
-            f"Mode '{class_path}' is not present in the committed schema registry."
+            f"Mode '{normalized}' is not present in the committed schema registry."
         )
     return entry
 
 
-def mode_params_model(class_path: str) -> type[BaseModel]:
-    entry = mode_entry_for_class_path(class_path)
-    return params_model_for_entry(entry.class_path)
+def mode_entry_for_class_path(class_path: str) -> ModeRegistryEntry:
+    normalized = str(class_path).strip()
+    if not normalized:
+        raise ValueError("Mode path cannot be empty.")
+
+    entry = mode_registry().get(normalized)
+    if entry is not None:
+        return entry
+
+    public_mode_id = mode_id_from_class_path(normalized)
+    entry = mode_registry().get(public_mode_id)
+    if entry is not None:
+        return entry
+
+    for candidate in mode_registry().values():
+        if candidate.class_path == normalized:
+            return candidate
+
+    raise ValueError(
+        f"Mode '{normalized}' is not present in the committed schema registry."
+    )
 
 
-def validate_mode_params(class_path: str, params: dict[str, Any]) -> dict[str, Any]:
-    validated = mode_params_model(class_path).model_validate(params or {})
+def mode_params_model(mode_id: str) -> type[BaseModel]:
+    entry = mode_entry_for_class_path(mode_id)
+    return params_model_for_entry(entry.mode_id)
+
+
+def validate_mode_params(mode_id: str, params: dict[str, Any]) -> dict[str, Any]:
+    validated = mode_params_model(mode_id).model_validate(params or {})
     dumped = validated.model_dump(mode="python")
     return {key: dumped[key] for key in (params or {}) if key in dumped}
 

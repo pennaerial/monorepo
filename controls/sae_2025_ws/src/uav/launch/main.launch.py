@@ -258,7 +258,6 @@ def _single_vehicle_config(context, params: dict) -> tuple[dict, dict | None]:
         "airframe": params.get("airframe", "quadcopter"),
         "model": model,
         "px4_path": px4_path,
-        "px4_namespace": str(params.get("px4_namespace", "")).strip(),
         "px4_instance": int(params.get("px4_instance", 0)),
         "force_camera": _resolve_force_camera(params, logger=logger),
         "launch_middleware": mission_spec.is_uav,

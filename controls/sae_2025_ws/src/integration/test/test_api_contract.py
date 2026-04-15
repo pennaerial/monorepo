@@ -441,7 +441,10 @@ def test_fleet_board_keeps_last_seen_device_when_discovery_returns_empty(
         (
             "post",
             "/api/mission/mission-file",
-            {"name": "hover", "content": "modes: {}\n"},
+            {
+                "name": "hover",
+                "content": "modes:\n  hover:\n    mode: uav.HoverMode\n",
+            },
         ),
         ("get", "/api/builds/current", None),
         ("post", "/api/builds/deploy-selected", {}),

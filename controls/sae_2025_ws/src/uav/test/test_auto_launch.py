@@ -1,12 +1,231 @@
 from __future__ import annotations
 
+import importlib
 import importlib.util
 from pathlib import Path
+import sys
 from types import SimpleNamespace
+import types
 
 import pytest
 
-from uav.runtime.ModeManager import ModeManager
+
+def _import_module_if_available(name: str):
+    try:
+        return importlib.import_module(name)
+    except ModuleNotFoundError:
+        return None
+
+
+if "std_msgs" not in sys.modules:
+    std_msgs = _import_module_if_available("std_msgs")
+else:
+    std_msgs = sys.modules["std_msgs"]
+if std_msgs is None:
+    std_msgs = types.ModuleType("std_msgs")
+    std_msgs_msg = types.ModuleType("std_msgs.msg")
+    std_msgs_msg.Empty = type("Empty", (), {})
+    std_msgs.msg = std_msgs_msg
+    sys.modules.update({"std_msgs": std_msgs, "std_msgs.msg": std_msgs_msg})
+
+ament_index_python = sys.modules.get("ament_index_python")
+if ament_index_python is None:
+    ament_index_python = _import_module_if_available("ament_index_python")
+if ament_index_python is None:
+    ament_index_python = types.ModuleType("ament_index_python")
+    sys.modules["ament_index_python"] = ament_index_python
+
+ament_index_packages = sys.modules.get("ament_index_python.packages")
+if ament_index_packages is None:
+    ament_index_packages = _import_module_if_available("ament_index_python.packages")
+if ament_index_packages is None:
+    ament_index_packages = types.ModuleType("ament_index_python.packages")
+    sys.modules["ament_index_python.packages"] = ament_index_packages
+if not hasattr(ament_index_packages, "PackageNotFoundError"):
+
+    class PackageNotFoundError(Exception):
+        pass
+
+    ament_index_packages.PackageNotFoundError = PackageNotFoundError
+if not hasattr(ament_index_packages, "get_package_share_directory"):
+    ament_index_packages.get_package_share_directory = lambda _name: str(
+        Path(__file__).resolve().parents[1]
+    )
+sys.modules["ament_index_python"].packages = ament_index_packages
+
+if "std_srvs" not in sys.modules:
+    std_srvs = _import_module_if_available("std_srvs")
+else:
+    std_srvs = sys.modules["std_srvs"]
+if std_srvs is None:
+    std_srvs = types.ModuleType("std_srvs")
+    std_srvs_srv = types.ModuleType("std_srvs.srv")
+
+    class Trigger:
+        Request = type("Request", (), {})
+        Response = type("Response", (), {})
+
+    std_srvs_srv.Trigger = Trigger
+    std_srvs.srv = std_srvs_srv
+    sys.modules.update({"std_srvs": std_srvs, "std_srvs.srv": std_srvs_srv})
+
+launch_module = sys.modules.get("launch")
+if launch_module is None:
+    launch_module = _import_module_if_available("launch")
+if launch_module is None:
+    launch_module = types.ModuleType("launch")
+    sys.modules["launch"] = launch_module
+if not hasattr(launch_module, "LaunchDescription"):
+    launch_module.LaunchDescription = type("LaunchDescription", (), {})
+
+launch_actions = sys.modules.get("launch.actions")
+if launch_actions is None:
+    launch_actions = _import_module_if_available("launch.actions")
+if launch_actions is None:
+    launch_actions = types.ModuleType("launch.actions")
+    sys.modules["launch.actions"] = launch_actions
+for name in (
+    "DeclareLaunchArgument",
+    "ExecuteProcess",
+    "IncludeLaunchDescription",
+    "OpaqueFunction",
+):
+    if not hasattr(launch_actions, name):
+        setattr(launch_actions, name, type(name, (), {}))
+
+launch_sources = sys.modules.get("launch.launch_description_sources")
+if launch_sources is None:
+    launch_sources = _import_module_if_available("launch.launch_description_sources")
+if launch_sources is None:
+    launch_sources = types.ModuleType("launch.launch_description_sources")
+    sys.modules["launch.launch_description_sources"] = launch_sources
+if not hasattr(launch_sources, "PythonLaunchDescriptionSource"):
+    launch_sources.PythonLaunchDescriptionSource = type(
+        "PythonLaunchDescriptionSource", (), {}
+    )
+
+launch_logging = sys.modules.get("launch.logging")
+if launch_logging is None:
+    launch_logging = _import_module_if_available("launch.logging")
+if launch_logging is None:
+    launch_logging = types.ModuleType("launch.logging")
+    sys.modules["launch.logging"] = launch_logging
+if not hasattr(launch_logging, "get_logger"):
+    launch_logging.get_logger = lambda *_args, **_kwargs: SimpleNamespace(
+        warning=lambda *_a, **_k: None,
+        warn=lambda *_a, **_k: None,
+        info=lambda *_a, **_k: None,
+    )
+
+launch_substitutions = sys.modules.get("launch.substitutions")
+if launch_substitutions is None:
+    launch_substitutions = _import_module_if_available("launch.substitutions")
+if launch_substitutions is None:
+    launch_substitutions = types.ModuleType("launch.substitutions")
+    sys.modules["launch.substitutions"] = launch_substitutions
+if not hasattr(launch_substitutions, "LaunchConfiguration"):
+    launch_substitutions.LaunchConfiguration = type("LaunchConfiguration", (), {})
+
+rclpy = sys.modules.get("rclpy")
+if rclpy is None:
+    rclpy = _import_module_if_available("rclpy")
+if rclpy is None:
+    rclpy = types.ModuleType("rclpy")
+    sys.modules["rclpy"] = rclpy
+if not hasattr(rclpy, "init"):
+    rclpy.init = lambda *args, **kwargs: None
+if not hasattr(rclpy, "shutdown"):
+    rclpy.shutdown = lambda: None
+if not hasattr(rclpy, "ok"):
+    rclpy.ok = lambda: True
+
+node_mod = sys.modules.get("rclpy.node")
+if node_mod is None:
+    node_mod = _import_module_if_available("rclpy.node")
+if node_mod is None:
+    node_mod = types.ModuleType("rclpy.node")
+    sys.modules["rclpy.node"] = node_mod
+if not hasattr(node_mod, "Node"):
+
+    class Node:
+        def __init__(self, *_args, **_kwargs) -> None:
+            pass
+
+    node_mod.Node = Node
+
+executors_mod = sys.modules.get("rclpy.executors")
+if executors_mod is None:
+    executors_mod = _import_module_if_available("rclpy.executors")
+if executors_mod is None:
+    executors_mod = types.ModuleType("rclpy.executors")
+    sys.modules["rclpy.executors"] = executors_mod
+if not hasattr(executors_mod, "ExternalShutdownException"):
+
+    class ExternalShutdownException(Exception):
+        pass
+
+    executors_mod.ExternalShutdownException = ExternalShutdownException
+
+clock_mod = sys.modules.get("rclpy.clock")
+if clock_mod is None:
+    clock_mod = _import_module_if_available("rclpy.clock")
+if clock_mod is None:
+    clock_mod = types.ModuleType("rclpy.clock")
+    sys.modules["rclpy.clock"] = clock_mod
+if not hasattr(clock_mod, "Clock"):
+    clock_mod.Clock = type("Clock", (), {})
+
+parameter_mod = sys.modules.get("rclpy.parameter")
+if parameter_mod is None:
+    parameter_mod = _import_module_if_available("rclpy.parameter")
+if parameter_mod is None:
+    parameter_mod = types.ModuleType("rclpy.parameter")
+    sys.modules["rclpy.parameter"] = parameter_mod
+if not hasattr(parameter_mod, "Parameter"):
+    parameter_mod.Parameter = type("Parameter", (), {})
+
+validate_namespace_mod = sys.modules.get("rclpy.validate_namespace")
+if validate_namespace_mod is None:
+    validate_namespace_mod = _import_module_if_available("rclpy.validate_namespace")
+if validate_namespace_mod is None:
+    validate_namespace_mod = types.ModuleType("rclpy.validate_namespace")
+    sys.modules["rclpy.validate_namespace"] = validate_namespace_mod
+if not hasattr(validate_namespace_mod, "validate_namespace"):
+    validate_namespace_mod.validate_namespace = lambda namespace: None
+
+validate_node_name_mod = sys.modules.get("rclpy.validate_node_name")
+if validate_node_name_mod is None:
+    validate_node_name_mod = _import_module_if_available("rclpy.validate_node_name")
+if validate_node_name_mod is None:
+    validate_node_name_mod = types.ModuleType("rclpy.validate_node_name")
+    sys.modules["rclpy.validate_node_name"] = validate_node_name_mod
+if not hasattr(validate_node_name_mod, "validate_node_name"):
+    validate_node_name_mod.validate_node_name = lambda node_name: None
+
+qos_mod = sys.modules.get("rclpy.qos")
+if qos_mod is None:
+    qos_mod = _import_module_if_available("rclpy.qos")
+if qos_mod is None:
+    qos_mod = types.ModuleType("rclpy.qos")
+    sys.modules["rclpy.qos"] = qos_mod
+if not hasattr(qos_mod, "QoSProfile"):
+    qos_mod.QoSProfile = type("QoSProfile", (), {})
+if not hasattr(qos_mod, "QoSReliabilityPolicy"):
+    qos_mod.QoSReliabilityPolicy = type("QoSReliabilityPolicy", (), {})
+if not hasattr(qos_mod, "QoSHistoryPolicy"):
+    qos_mod.QoSHistoryPolicy = type("QoSHistoryPolicy", (), {})
+if not hasattr(qos_mod, "QoSDurabilityPolicy"):
+    qos_mod.QoSDurabilityPolicy = type("QoSDurabilityPolicy", (), {})
+
+rclpy.node = node_mod
+rclpy.executors = executors_mod
+rclpy.clock = clock_mod
+rclpy.parameter = parameter_mod
+rclpy.validate_namespace = validate_namespace_mod
+rclpy.validate_node_name = validate_node_name_mod
+rclpy.qos = qos_mod
+
+from uav.runtime.ModeManager import ModeManager  # noqa: E402
 
 try:
     import uav.runtime.uav_mission as uav_mission_module
@@ -69,6 +288,34 @@ def _make_mode_manager(*, ready: bool) -> ModeManager:
     manager._auto_launch_ready = lambda: manager._ready
     manager.create_timer = lambda period, callback: _FakeTimer(callback)
     manager.get_logger = lambda: manager._logger
+    manager._shared_mode_state = {}
+    manager._current_comm_builder = None
+    manager._runtime_closed = False
+    manager._managed_registry = SimpleNamespace(
+        destroy_for_owner=lambda *_args, **_kwargs: None,
+        destroy_publisher=lambda _publisher: True,
+        destroy_subscription=lambda _subscription: True,
+        destroy_client=lambda _client: True,
+        close=lambda: None,
+        debug_descriptors=lambda: (),
+    )
+    manager._raw_node_api = SimpleNamespace(
+        create_publisher=lambda *_args, **_kwargs: None,
+        create_subscription=lambda *_args, **_kwargs: None,
+        create_client=lambda *_args, **_kwargs: None,
+        create_service=lambda *_args, **_kwargs: object(),
+        create_timer=lambda period, callback: _FakeTimer(callback),
+        destroy_publisher=lambda _publisher: True,
+        destroy_subscription=lambda _subscription: True,
+        destroy_client=lambda _client: True,
+        destroy_timer=lambda _timer: True,
+    )
+    manager._peer_connections = SimpleNamespace(
+        configure=lambda _peer_names: None,
+        status=lambda: {},
+        peer_names=(),
+        close=lambda: None,
+    )
     return manager
 
 
@@ -87,7 +334,15 @@ class _FakeServiceClient:
         return self.ready
 
 
-def _stub_mode_manager_init(self, node_name: str, *, auto_launch: bool = True) -> None:
+def _stub_mode_manager_init(
+    self,
+    node_name: str,
+    *,
+    vehicle_name: str = "",
+    auto_launch: bool = True,
+    peer_heartbeat_hz: float = 10.0,
+    peer_stale_timeout_s: float = 0.5,
+) -> None:
     self.vehicle = None
     self.modes = {}
     self.transitions = {}
@@ -96,10 +351,42 @@ def _stub_mode_manager_init(self, node_name: str, *, auto_launch: bool = True) -
     self._vision_clients = {}
     self.timer = None
     self.auto_launch = bool(auto_launch)
+    self._runtime_vehicle_name = str(vehicle_name).strip().strip("/")
+    self.peer_heartbeat_hz = float(peer_heartbeat_hz)
+    self.peer_stale_timeout_s = float(peer_stale_timeout_s)
     self._logger = _FakeLogger()
     self.create_timer = lambda period, callback: _FakeTimer(callback)
-    self.create_service = lambda *args, **kwargs: object()
     self.get_logger = lambda: self._logger
+    self._shared_mode_state = {}
+    self._current_comm_builder = None
+    self._runtime_closed = False
+    self._managed_registry = SimpleNamespace(
+        destroy_for_owner=lambda *_args, **_kwargs: None,
+        destroy_publisher=lambda _publisher: True,
+        destroy_subscription=lambda _subscription: True,
+        destroy_client=lambda _client: True,
+        close=lambda: None,
+        debug_descriptors=lambda: (),
+    )
+    self._raw_node_api = SimpleNamespace(
+        create_publisher=lambda *_args, **_kwargs: None,
+        create_subscription=lambda *_args, **_kwargs: None,
+        create_client=lambda *_args, **_kwargs: None,
+        create_service=lambda *_args, **_kwargs: object(),
+        create_timer=lambda period, callback: _FakeTimer(callback),
+        destroy_publisher=lambda _publisher: True,
+        destroy_subscription=lambda _subscription: True,
+        destroy_client=lambda _client: True,
+        destroy_timer=lambda _timer: True,
+    )
+    self._peer_connections = SimpleNamespace(
+        configure=lambda peer_names: setattr(
+            self, "_configured_peers", tuple(peer_names)
+        ),
+        status=lambda: {},
+        peer_names=(),
+        close=lambda: None,
+    )
     self.start_mission_service = object()
     self._auto_launch_timer = None
     if self.auto_launch:
@@ -382,6 +669,8 @@ def test_uav_bootstrap_forwards_auto_launch(monkeypatch, auto_launch):
         "vehicle_name": "uav_2",
         "vehicle_class": "MULTICOPTER",
         "camera_mount_offsets": [0.0, 0.0, 0.0],
+        "peer_heartbeat_hz": 8.0,
+        "peer_stale_timeout_s": 1.25,
     }
     bootstrap.get_parameter = lambda name: _FakeParameter(parameters[name])
 
@@ -392,6 +681,8 @@ def test_uav_bootstrap_forwards_auto_launch(monkeypatch, auto_launch):
 
     assert manager_kwargs["auto_launch"] is auto_launch
     assert manager_kwargs["vehicle_name"] == "uav_2"
+    assert manager_kwargs["peer_heartbeat_hz"] == 8.0
+    assert manager_kwargs["peer_stale_timeout_s"] == 1.25
 
 
 @pytest.mark.parametrize("auto_launch", [True, False])
@@ -407,6 +698,8 @@ def test_payload_bootstrap_forwards_auto_launch(monkeypatch, auto_launch):
         "mode_map": "/tmp/test_payload_mission.yaml",
         "auto_launch": auto_launch,
         "vehicle_name": "payload_0",
+        "peer_heartbeat_hz": 12.0,
+        "peer_stale_timeout_s": 0.75,
     }
     bootstrap.get_parameter = lambda name: _FakeParameter(parameters[name])
 
@@ -415,6 +708,8 @@ def test_payload_bootstrap_forwards_auto_launch(monkeypatch, auto_launch):
     manager_kwargs = bootstrap.manager_kwargs()
 
     assert manager_kwargs["auto_launch"] is auto_launch
+    assert manager_kwargs["peer_heartbeat_hz"] == 12.0
+    assert manager_kwargs["peer_stale_timeout_s"] == 0.75
 
 
 def test_launch_auto_launch_yaml_requires_bool():

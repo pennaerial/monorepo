@@ -302,7 +302,6 @@ def _vehicle_stack_configs(fleet: dict) -> tuple[dict, list[dict]]:
             "launch_middleware": backend_kind != "sim" and kind == "uav",
             "launch_px4_sitl": backend_kind == "sim" and kind == "uav",
             "launch_payload_backend": kind == "payload",
-            "px4_namespace": str(vehicle.get("px4_namespace", name)).strip() or name,
             "model": str(controllable.get("model", "")).strip(),
         }
 

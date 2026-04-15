@@ -174,6 +174,7 @@ def test_vehicle_stack_force_camera_accepts_legacy_alias(stack_launch_module):
 def test_launch_setup_starts_camera_actions_for_camera_only_mission(
     monkeypatch, stack_launch_module
 ):
+    monkeypatch.setenv("ROS_LOG_DIR", "/tmp/ros_logs")
     mission_spec = SimpleNamespace(
         is_uav=False,
         is_payload=True,
@@ -260,6 +261,7 @@ def test_launch_setup_starts_camera_actions_for_camera_only_mission(
 def test_launch_setup_validates_uav_camera_sensor_for_camera_only_mission(
     monkeypatch, stack_launch_module
 ):
+    monkeypatch.setenv("ROS_LOG_DIR", "/tmp/ros_logs")
     mission_spec = SimpleNamespace(
         is_uav=True,
         is_payload=False,
@@ -329,14 +331,14 @@ def test_camera_contract_for_uav_and_payload(stack_launch_module):
     )
     assert uav_contract == {
         "vehicle_name": "uav_7",
-        "camera_namespace": "/uav_7",
-        "image_topic": "/uav_7/camera",
-        "camera_info_topic": "/uav_7/camera_info",
-        "camera_service_name": "/uav_7/camera_data",
+        "camera_namespace": "uav_7",
+        "image_topic": "camera",
+        "camera_info_topic": "camera_info",
+        "camera_service_name": "camera_data",
         "input_transport": "",
-        "input_raw_topic": "/uav_7/camera_source",
-        "input_compressed_topic": "/uav_7/camera_source/compressed",
-        "input_camera_info_topic": "/uav_7/camera_info_source",
+        "input_raw_topic": "camera_source",
+        "input_compressed_topic": "camera_source/compressed",
+        "input_camera_info_topic": "camera_info_source",
         "rotate_degrees": 0.0,
         "preprocess_hook": "",
         "camera_info_url": "",
@@ -353,14 +355,14 @@ def test_camera_contract_for_uav_and_payload(stack_launch_module):
     )
     assert payload_contract == {
         "vehicle_name": "payload_2",
-        "camera_namespace": "/payload_2",
-        "image_topic": "/payload_2/camera",
-        "camera_info_topic": "/payload_2/camera_info",
-        "camera_service_name": "/payload_2/camera_data",
+        "camera_namespace": "payload_2",
+        "image_topic": "camera",
+        "camera_info_topic": "camera_info",
+        "camera_service_name": "camera_data",
         "input_transport": "compressed",
-        "input_raw_topic": "/payload_2/camera_source",
-        "input_compressed_topic": "/payload_2/camera_source/compressed",
-        "input_camera_info_topic": "/payload_2/camera_info_source",
+        "input_raw_topic": "camera_source",
+        "input_compressed_topic": "camera_source/compressed",
+        "input_camera_info_topic": "camera_info_source",
         "rotate_degrees": 180.0,
         "preprocess_hook": "rotate_then_crop",
         "camera_info_url": "file:///tmp/payload.yaml",
@@ -458,7 +460,6 @@ def test_build_runtime_parameters_for_uav(stack_launch_module):
         mission_path="/tmp/mission.yaml",
         mission_spec=SimpleNamespace(is_payload=False, is_uav=True),
         vehicle_name="uav_3",
-        px4_namespace="px4_uav_3",
         auto_launch=True,
         debug=1,
         servo_only=0,
@@ -474,7 +475,6 @@ def test_build_runtime_parameters_for_uav(stack_launch_module):
         "servo_only": False,
         "vehicle_class": "MULTICOPTER",
         "camera_mount_offsets": [0.1, 0.2, 0.3],
-        "px4_namespace": "px4_uav_3",
     }
 
 
@@ -483,7 +483,6 @@ def test_build_runtime_parameters_for_payload(stack_launch_module):
         mission_path="/tmp/payload.yaml",
         mission_spec=SimpleNamespace(is_payload=True, is_uav=False),
         vehicle_name="payload_0",
-        px4_namespace="",
         auto_launch=False,
         debug=True,
         servo_only=True,
@@ -504,7 +503,6 @@ def test_build_runtime_parameters_rejects_missing_vehicle_class(stack_launch_mod
             mission_path="/tmp/mission.yaml",
             mission_spec=SimpleNamespace(is_payload=False, is_uav=True),
             vehicle_name="uav",
-            px4_namespace="",
             auto_launch=True,
             debug=False,
             servo_only=False,
@@ -521,7 +519,6 @@ def test_build_runtime_parameters_rejects_bad_camera_offsets(stack_launch_module
             mission_path="/tmp/mission.yaml",
             mission_spec=SimpleNamespace(is_payload=False, is_uav=True),
             vehicle_name="uav",
-            px4_namespace="",
             auto_launch=True,
             debug=False,
             servo_only=False,
@@ -609,6 +606,7 @@ def test_sim_camera_bridge_actions_use_entity_name_for_payload(
         def __init__(self, **kwargs):
             self.arguments = kwargs.get("arguments", [])
             self.remappings = kwargs.get("remappings", [])
+            self.namespace = kwargs.get("namespace", "")
 
     monkeypatch.setattr(stack_launch_module, "Node", FakeNode)
 
@@ -627,15 +625,17 @@ def test_sim_camera_bridge_actions_use_entity_name_for_payload(
     assert image_bridge.remappings == [
         (
             "/world/sae/model/payload_model_7/link/camera_link/sensor/camera/image",
-            "/payload_ns/camera_source",
+            "camera_source",
         )
     ]
+    assert image_bridge.namespace == "payload_ns"
     assert info_bridge.remappings == [
         (
             "/world/sae/model/payload_model_7/link/camera_link/sensor/camera/camera_info",
-            "/payload_ns/camera_info_source",
+            "camera_info_source",
         )
     ]
+    assert info_bridge.namespace == "payload_ns"
 
 
 def test_legacy_backend_override_returns_stage_based_backend_for_uav(

@@ -1,23 +1,56 @@
 #!/usr/bin/env python3
+from contextlib import contextmanager
+from dataclasses import dataclass
 import inspect
-import importlib
 from time import time
-from typing import Any, get_type_hints
+from typing import Any, Callable, Iterator, get_type_hints
 
 from rclpy.node import Node
 from std_srvs.srv import Trigger
 
 from uav.vehicles.Vehicle import Vehicle
 from uav.modes.Mode import Mode
+from .comm_naming import ManagedCommKind, resolve_managed_target
+from .comm_policy import ManagedCommLifetime, managed_creation_phase_error
+from .managed_comms import ModeCommBuilder
+from .managed_registry import ManagedCommRegistry
+from .mode_paths import canonical_mode_path
 from .mission_spec import MissionSpec, load_mode_class
+from .schema import mode_entry_for_mode_id
+from .peer_connections import (
+    PeerConnectionTracker,
+    declared_remote_peer_names,
+    relevant_connection_status,
+    normalize_vehicle_name,
+)
+from .vision_loader import canonical_vision_node_path, load_vision_class
 
-VISION_NODE_PATH = "uav.vision_nodes"
+
+@dataclass(frozen=True)
+class _RawNodeApi:
+    create_publisher: Callable[..., object]
+    create_subscription: Callable[..., object]
+    create_client: Callable[..., object]
+    create_service: Callable[..., object]
+    create_timer: Callable[..., object]
+    destroy_publisher: Callable[[object], bool | None]
+    destroy_subscription: Callable[[object], bool | None]
+    destroy_client: Callable[[object], bool | None]
+    destroy_timer: Callable[[object], bool | None] | None
 
 
 class ModeManager(Node):
     """Shared mission manager plumbing for a single bound vehicle."""
 
-    def __init__(self, node_name: str, *, auto_launch: bool = True) -> None:
+    def __init__(
+        self,
+        node_name: str,
+        *,
+        vehicle_name: str = "",
+        auto_launch: bool = True,
+        peer_heartbeat_hz: float = 10.0,
+        peer_stale_timeout_s: float = 0.5,
+    ) -> None:
         super().__init__(node_name)
         self.vehicle = None
         self.modes = {}
@@ -28,6 +61,22 @@ class ModeManager(Node):
         self.timer = None
         self.auto_launch = bool(auto_launch)
         self._auto_launch_timer = None
+        self._runtime_vehicle_name = normalize_vehicle_name(vehicle_name)
+        self.peer_heartbeat_hz = float(peer_heartbeat_hz)
+        self.peer_stale_timeout_s = float(peer_stale_timeout_s)
+        if self.peer_heartbeat_hz <= 0.0:
+            raise ValueError(
+                f"peer_heartbeat_hz must be positive, got {self.peer_heartbeat_hz!r}."
+            )
+        if self.peer_stale_timeout_s <= 0.0:
+            raise ValueError(
+                "peer_stale_timeout_s must be positive, "
+                f"got {self.peer_stale_timeout_s!r}."
+            )
+        self._shared_mode_state = {}
+        self._current_comm_builder = None
+        self._runtime_closed = False
+        self._initialize_comms_runtime(vehicle_name=vehicle_name)
         self.start_mission_service = self.create_service(
             Trigger, "mode_manager/start_mission", self._start_mission_callback
         )
@@ -37,6 +86,62 @@ class ModeManager(Node):
     def get_active_mode(self) -> Mode:
         return self.modes[self.active_mode]
 
+    def _now_seconds(self) -> float:
+        return self.get_clock().now().nanoseconds * 1e-9
+
+    def shared_state_for(self, mode_or_class: object) -> dict[str, Any]:
+        key = canonical_mode_path(mode_or_class)
+        return self._shared_mode_state.setdefault(key, {})
+
+    def _comm_debug_snapshot(self) -> dict[str, Any]:
+        return {
+            "peer_vehicle_names": tuple(self._peer_connections.peer_names),
+            "connection_status": self._peer_connections.status(),
+            "descriptors": self._managed_registry.debug_descriptors(),
+        }
+
+    def _initialize_comms_runtime(self, *, vehicle_name: str) -> None:
+        self._runtime_vehicle_name = normalize_vehicle_name(vehicle_name)
+        raw_node = super(ModeManager, self)
+        self._raw_node_api = _RawNodeApi(
+            create_publisher=raw_node.create_publisher,
+            create_subscription=raw_node.create_subscription,
+            create_client=raw_node.create_client,
+            create_service=raw_node.create_service,
+            create_timer=raw_node.create_timer,
+            destroy_publisher=raw_node.destroy_publisher,
+            destroy_subscription=raw_node.destroy_subscription,
+            destroy_client=raw_node.destroy_client,
+            destroy_timer=getattr(raw_node, "destroy_timer", None),
+        )
+        self._managed_registry = ManagedCommRegistry(
+            connection_status=lambda: self._peer_connections.status(),
+            raw_create_publisher=self._raw_node_api.create_publisher,
+            raw_create_subscription=self._raw_node_api.create_subscription,
+            raw_create_client=self._raw_node_api.create_client,
+            raw_destroy_publisher=self._raw_node_api.destroy_publisher,
+            raw_destroy_subscription=self._raw_node_api.destroy_subscription,
+            raw_destroy_client=self._raw_node_api.destroy_client,
+        )
+        self._peer_connections = PeerConnectionTracker(
+            runtime_vehicle_name=self._runtime_vehicle_name,
+            peer_heartbeat_hz=self.peer_heartbeat_hz,
+            peer_stale_timeout_s=self.peer_stale_timeout_s,
+            now_seconds=self._now_seconds,
+            on_connection_change=self._managed_registry.on_peer_connection_change,
+            raw_create_publisher=self._raw_node_api.create_publisher,
+            raw_create_subscription=self._raw_node_api.create_subscription,
+            raw_destroy_publisher=self._raw_node_api.destroy_publisher,
+            raw_destroy_subscription=self._raw_node_api.destroy_subscription,
+            raw_create_timer=self._raw_node_api.create_timer,
+            raw_destroy_timer=self._raw_node_api.destroy_timer,
+        )
+
+    def configure_peer_vehicle_names(
+        self, peer_vehicle_names: tuple[str, ...] | list[str] | set[str]
+    ) -> None:
+        self._peer_connections.configure(peer_vehicle_names)
+
     def setup_vision(self, vision_nodes: list[str]) -> None:
         nodes_to_setup = [node for node in vision_nodes if node]
         if not nodes_to_setup:
@@ -44,10 +149,9 @@ class ModeManager(Node):
         if self.vehicle is None or not getattr(self.vehicle, "has_camera", False):
             raise ValueError("Vision nodes require an active vehicle camera contract.")
 
-        module = importlib.import_module(VISION_NODE_PATH)
         for vision_node in nodes_to_setup:
-            vision_class = getattr(module, vision_node)
-            key = vision_class.__name__
+            vision_class = load_vision_class(vision_node)
+            key = canonical_vision_node_path(vision_class)
             if key in self._vision_clients:
                 continue
             client, service_name = self._connect_vision_client(vision_class)
@@ -63,22 +167,141 @@ class ModeManager(Node):
     def _connect_vision_client(self, vision_class):
         service_name = self.vehicle.vision_service_name(vision_class)
         while True:
-            client = self.create_client(vision_class.srv, service_name)
+            client = super().create_client(vision_class.srv, service_name)
             if client.wait_for_service(timeout_sec=1.0):
                 return client, service_name
-            self.destroy_client(client)
+            super().destroy_client(client)
             self.get_logger().info(
                 f"Service {service_name} not available yet, waiting again..."
             )
 
     def get_vision_client(self, vision_node):
-        key = vision_node.__name__
+        key = canonical_vision_node_path(vision_node)
         if key not in self._vision_clients:
             raise KeyError(f"Vision client '{key}' is not registered.")
         return self._vision_clients[key]
 
-    def initialize_mode(self, mode_path: str, params: dict) -> Mode:
-        mode_class = load_mode_class(mode_path)
+    def _mode_peer_names(self, mode_or_class: object) -> tuple[str, ...]:
+        return declared_remote_peer_names(mode_or_class, self._runtime_vehicle_name)
+
+    def _mode_connection_status(self, mode: Mode) -> dict[str, bool]:
+        return relevant_connection_status(
+            self._peer_connections.status(),
+            peer_vehicle_names=self._mode_peer_names(mode),
+        )
+
+    def _make_comm_builder(
+        self,
+        *,
+        owner: object,
+        owner_label: str,
+        lifetime: ManagedCommLifetime,
+        peer_vehicle_names: tuple[str, ...],
+    ) -> ModeCommBuilder:
+        return ModeCommBuilder(
+            owner=owner,
+            owner_label=owner_label,
+            lifetime=lifetime,
+            allowed_peer_names=peer_vehicle_names,
+            registry=self._managed_registry,
+        )
+
+    @contextmanager
+    def _use_comm_builder(self, builder: ModeCommBuilder) -> Iterator[None]:
+        previous_builder = self._current_comm_builder
+        self._current_comm_builder = builder
+        try:
+            yield
+        finally:
+            self._current_comm_builder = previous_builder
+
+    def _raw_method(self, name: str):
+        raw_node_api = getattr(self, "_raw_node_api", None)
+        if raw_node_api is not None:
+            return getattr(raw_node_api, name)
+        raw_method = getattr(super(ModeManager, self), name, None)
+        if raw_method is not None:
+            return raw_method
+        return getattr(Node, name)
+
+    def _instantiate_mode(
+        self,
+        *,
+        mode_class: type[Mode],
+        args: dict[str, Any],
+        mode_id: str,
+        peer_vehicle_names: tuple[str, ...],
+    ) -> Mode:
+        mode_instance = mode_class.__new__(mode_class)
+        if not isinstance(mode_instance, mode_class):
+            raise TypeError(
+                f"Mode '{mode_id}' returned unexpected instance from __new__()."
+            )
+        builder = self._make_comm_builder(
+            owner=mode_instance,
+            owner_label=mode_id,
+            lifetime="persistent",
+            peer_vehicle_names=peer_vehicle_names,
+        )
+        try:
+            with self._use_comm_builder(builder):
+                mode_class.__init__(mode_instance, **args)
+        except Exception:
+            self._managed_registry.destroy_for_owner(
+                mode_instance, lifetime="persistent"
+            )
+            raise
+        return mode_instance
+
+    def _create_entity(
+        self,
+        *,
+        kind: ManagedCommKind,
+        interface_type: object,
+        name: str,
+        args: tuple[Any, ...],
+        kwargs: dict[str, Any],
+    ):
+        if not hasattr(self, "_runtime_vehicle_name"):
+            return self._raw_method(f"create_{kind}")(
+                interface_type,
+                name,
+                *args,
+                **kwargs,
+            )
+        target = resolve_managed_target(
+            name=name,
+            runtime_vehicle_name=self._runtime_vehicle_name,
+        )
+        if target is None:
+            return self._raw_method(f"create_{kind}")(
+                interface_type,
+                name,
+                *args,
+                **kwargs,
+            )
+        builder = self._current_comm_builder
+        if builder is None:
+            raise managed_creation_phase_error(kind, name)
+        return builder.create(
+            kind=kind,
+            interface_type=interface_type,
+            name=name,
+            target=target,
+            args=args,
+            kwargs=kwargs,
+        )
+
+    def _destroy_entity(self, *, kind: str, entity) -> bool:
+        registry = getattr(self, "_managed_registry", None)
+        if registry is None:
+            return bool(self._raw_method(f"destroy_{kind}")(entity))
+        return getattr(registry, f"destroy_{kind}")(entity)
+
+    def initialize_mode(self, mode_id: str, params: dict) -> Mode:
+        mode_entry = mode_entry_for_mode_id(mode_id)
+        mode_class = load_mode_class(mode_entry.class_path)
+        peer_vehicle_names = self._mode_peer_names(mode_class)
         signature = inspect.signature(mode_class.__init__)
         type_hints = get_type_hints(mode_class.__init__)
         args = {}
@@ -91,7 +314,7 @@ class ModeManager(Node):
                 args[name] = self
                 continue
             if name == "vehicle":
-                self._validate_vehicle_annotation(mode_path, type_hints.get(name))
+                self._validate_vehicle_annotation(mode_id, type_hints.get(name))
                 args[name] = self.vehicle
                 continue
             if name in params:
@@ -102,16 +325,21 @@ class ModeManager(Node):
                 args[name] = param.default
                 continue
             raise ValueError(
-                f"Missing required parameter '{name}' for mode '{mode_path}'"
+                f"Missing required parameter '{name}' for mode '{mode_id}'"
             )
 
         unexpected_params = sorted(set(params) - consumed_params)
         if unexpected_params:
             raise ValueError(
-                f"Mode '{mode_path}' received unexpected parameter(s): {', '.join(unexpected_params)}"
+                f"Mode '{mode_id}' received unexpected parameter(s): {', '.join(unexpected_params)}"
             )
 
-        return mode_class(**args)
+        return self._instantiate_mode(
+            mode_class=mode_class,
+            args=args,
+            mode_id=mode_id,
+            peer_vehicle_names=peer_vehicle_names,
+        )
 
     def _validate_vehicle_annotation(self, mode_path: str, annotation) -> None:
         if annotation in (None, inspect.Parameter.empty, Vehicle, Any):
@@ -126,7 +354,7 @@ class ModeManager(Node):
 
     def setup_modes(self, mission_spec: MissionSpec) -> None:
         for mode_name, mode_info in mission_spec.modes.items():
-            mode = self.initialize_mode(mode_info.class_path, mode_info.params)
+            mode = self.initialize_mode(mode_info.mode_id, mode_info.params)
             self.add_mode(mode_name, mode)
             self.transitions[mode_name] = mode_info.transitions
 
@@ -142,11 +370,25 @@ class ModeManager(Node):
 
     def switch_mode(self, mode_name: str) -> None:
         if self.active_mode:
-            self.get_active_mode().deactivate()
+            previous_mode = self.get_active_mode()
+            previous_mode.deactivate()
+            self._managed_registry.destroy_for_owner(previous_mode, lifetime="active")
 
         if mode_name in self.modes:
             self.active_mode = mode_name
-            self.get_active_mode().activate()
+            mode = self.get_active_mode()
+            builder = self._make_comm_builder(
+                owner=mode,
+                owner_label=type(mode).__name__,
+                lifetime="active",
+                peer_vehicle_names=self._mode_peer_names(mode),
+            )
+            try:
+                with self._use_comm_builder(builder):
+                    mode.activate()
+            except Exception:
+                self._managed_registry.destroy_for_owner(mode, lifetime="active")
+                raise
         else:
             self.get_logger().error(f"Mode {mode_name} not found.")
 
@@ -156,14 +398,19 @@ class ModeManager(Node):
 
         time_delta = current_time - self.last_update_time
         self.last_update_time = current_time
+        mode = self.get_active_mode()
+        connection_status = self._mode_connection_status(mode)
         try:
-            self.get_active_mode().update(time_delta)
+            if mode.connection_ready(connection_status):
+                mode.update(time_delta)
+            else:
+                mode.disconnect(time_delta, connection_status)
         except Exception as exc:
             self.get_logger().error(f"Error in mode {self.active_mode}: {exc}")
             self.handle_mode_state("error")
             return
 
-        state = self.get_active_mode().check_status()
+        state = mode.check_status()
         self.handle_mode_state(state)
 
     def _deactivate_active_mode(self) -> None:
@@ -178,6 +425,7 @@ class ModeManager(Node):
 
         try:
             mode.deactivate()
+            self._managed_registry.destroy_for_owner(mode, lifetime="active")
         except Exception as exc:
             self.get_logger().warn(
                 f"Failed to deactivate mode {mode_name} during shutdown: {exc}"
@@ -245,3 +493,66 @@ class ModeManager(Node):
             self.destroy_node()
         elif state != "continue":
             self.switch_mode(self.transition(state))
+
+    def create_publisher(self, msg_type, topic: str, *args, **kwargs):
+        return self._create_entity(
+            kind="publisher",
+            interface_type=msg_type,
+            name=topic,
+            args=args,
+            kwargs=kwargs,
+        )
+
+    def create_subscription(self, msg_type, topic: str, *args, **kwargs):
+        return self._create_entity(
+            kind="subscription",
+            interface_type=msg_type,
+            name=topic,
+            args=args,
+            kwargs=kwargs,
+        )
+
+    def create_client(self, srv_type, srv_name: str, *args, **kwargs):
+        return self._create_entity(
+            kind="client",
+            interface_type=srv_type,
+            name=srv_name,
+            args=args,
+            kwargs=kwargs,
+        )
+
+    def create_service(self, srv_type, srv_name: str, *args, **kwargs):
+        return self._create_entity(
+            kind="service",
+            interface_type=srv_type,
+            name=srv_name,
+            args=args,
+            kwargs=kwargs,
+        )
+
+    def destroy_publisher(self, publisher) -> bool:
+        return self._destroy_entity(kind="publisher", entity=publisher)
+
+    def destroy_subscription(self, subscription) -> bool:
+        return self._destroy_entity(kind="subscription", entity=subscription)
+
+    def destroy_client(self, client) -> bool:
+        return self._destroy_entity(kind="client", entity=client)
+
+    def _close_runtime_helpers(self) -> None:
+        if getattr(self, "_runtime_closed", False):
+            return
+        self._runtime_closed = True
+        managed_registry = getattr(self, "_managed_registry", None)
+        if managed_registry is not None:
+            managed_registry.close()
+        peer_connections = getattr(self, "_peer_connections", None)
+        if peer_connections is not None:
+            peer_connections.close()
+
+    def destroy_node(self) -> bool:
+        if getattr(self, "active_mode", None):
+            self._deactivate_active_mode()
+        self._stop_vehicle()
+        self._close_runtime_helpers()
+        return bool(super().destroy_node())

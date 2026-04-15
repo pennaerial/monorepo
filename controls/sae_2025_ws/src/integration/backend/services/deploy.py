@@ -17,6 +17,7 @@ from pathlib import Path
 import yaml
 
 from ..context import AppContext, TargetContext
+from ..mission_compat import load_mission_spec_compat
 from uav.runtime.mission_spec import MissionSpec
 
 _ARTIFACT_NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
@@ -903,7 +904,7 @@ def _mission_source_for(
     if mission_path:
         local_path = _resolve_local_path(ctx, mission_path)
         mission_name = Path(local_path).stem
-        return mission_name, local_path, MissionSpec.load(local_path)
+        return mission_name, local_path, load_mission_spec_compat(local_path)
 
     mission_name = str(vehicle.get("mission", "")).strip()
     if not mission_name:
@@ -911,7 +912,7 @@ def _mission_source_for(
     local_path = (_missions_root(ctx) / f"{mission_name}.yaml").resolve()
     if not local_path.exists():
         raise ValueError(f"Mission '{mission_name}' was not found at '{local_path}'.")
-    return mission_name, local_path, MissionSpec.load(local_path)
+    return mission_name, local_path, load_mission_spec_compat(local_path)
 
 
 def _normalized_camera_offsets(value: object) -> list[float]:

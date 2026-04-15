@@ -438,7 +438,7 @@ class SchemaFieldResponse(BaseModel):
 
 class ModeMetadataResponse(BaseModel):
     name: str
-    class_path: str
+    mode: str
     module: str
     mission_target: str
     description: str | None = None
@@ -450,7 +450,7 @@ class ModeMetadataResponse(BaseModel):
 
 class MissionModeResponse(BaseModel):
     name: str
-    class_path: str
+    mode: str
     params: dict[str, Any] = Field(default_factory=dict)
     transitions: dict[str, str] = Field(default_factory=dict)
     metadata: ModeMetadataResponse

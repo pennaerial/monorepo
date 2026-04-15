@@ -4,7 +4,7 @@
 # PayloadAprilTagApproachMode returns "done" → mission ends
 modes:
   start:
-    class: uav.modes.payload.PayloadWaitForDriveOutMode.PayloadWaitForDriveOutMode
+    mode: payload.PayloadWaitForDriveOutMode
     params:
       turn_angular: 3.14
       turn_speed: 1.5
@@ -12,7 +12,7 @@ modes:
       complete: corner_nav
 
   corner_nav:
-    class: uav.modes.payload.PayloadCornerNavigateMode
+    mode: payload.PayloadCornerNavigateMode
     params:
       direction: ccw
       ccw_lower_hsv: [100, 100, 100]
@@ -38,7 +38,7 @@ modes:
       complete: approach
 
   approach:
-    class: uav.modes.payload.PayloadAprilTagApproachMode
+    mode: payload.PayloadAprilTagApproachMode
     params:
       tag_id: 0
       tag_size_m: 0.0508
