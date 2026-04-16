@@ -26,6 +26,7 @@ class FleetDefaultsModel(BaseModel):
     camera_mount_offsets: tuple[float, float, float] | None = None
     camera_input_transport: str | None = None
     camera_rotate_degrees: float | None = None
+    camera_calibration_file: str | None = None
     camera_preprocess_hook: str | None = None
 
 

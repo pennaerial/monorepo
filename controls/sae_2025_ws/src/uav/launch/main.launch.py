@@ -251,6 +251,9 @@ def _single_vehicle_config(context, params: dict) -> tuple[dict, dict | None]:
         "camera_rotate_degrees": float(
             params.get("camera_rotate_degrees", 0.0 if sim else 180.0)
         ),
+        "camera_calibration_file": str(
+            params.get("camera_calibration_file", "")
+        ).strip(),
         "camera_preprocess_hook": str(params.get("camera_preprocess_hook", "")).strip(),
         "camera_mount_offsets": list(
             params.get("camera_mount_offsets", [0.0, 0.0, 0.0])

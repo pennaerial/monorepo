@@ -14,6 +14,7 @@ defaults:
   # auto computed based on sim vs real:
   # camera_input_transport: raw
   # camera_rotate_degrees: 0.0
+  camera_calibration_file: payload_0_camera_info.yaml
   camera_preprocess_hook: ""
 
 vehicles:

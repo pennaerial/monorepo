@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, File, Form, UploadFile
 
 from ..context import AppContext
-from ..models import BuildSourceResponse, FleetCatalogResponse
+from ..models import BuildSourceResponse, FleetCatalogResponse, FleetFileResponse
 
 
 def build_router(ctx: AppContext) -> APIRouter:
@@ -25,6 +25,14 @@ def build_router(ctx: AppContext) -> APIRouter:
 
         return FleetCatalogResponse.model_validate(
             await deploy_service.get_fleet_catalog(ctx)
+        )
+
+    @router.get("/fleet-file", response_model=FleetFileResponse)
+    async def get_selected_fleet_file() -> FleetFileResponse:
+        from ..services import deploy as deploy_service
+
+        return FleetFileResponse.model_validate(
+            await deploy_service.get_selected_fleet_file(ctx)
         )
 
     @router.post("/github", response_model=BuildSourceResponse)
@@ -101,6 +109,16 @@ def build_router(ctx: AppContext) -> APIRouter:
                 ctx,
                 fleet_file=fleet_file,
             )
+        )
+
+    @router.post("/fleet-file", response_model=FleetFileResponse)
+    async def set_selected_fleet_file(
+        content: Annotated[str, Form(...)],
+    ) -> FleetFileResponse:
+        from ..services import deploy as deploy_service
+
+        return FleetFileResponse.model_validate(
+            await deploy_service.set_selected_fleet_file(ctx, content=content)
         )
 
     @router.post("/clear", response_model=BuildSourceResponse)
