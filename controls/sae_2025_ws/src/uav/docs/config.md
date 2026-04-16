@@ -21,6 +21,7 @@ Key fields:
 - `camera_mount_offsets`
 - `camera_input_transport`
 - `camera_rotate_degrees`
+- `camera_calibration_file`
 - `camera_preprocess_hook`
 - `servo_only`
 - `payload_controller`
@@ -35,9 +36,11 @@ Same shape as the sim file, but with hardware-oriented defaults such as:
 - `force_camera: false`
 - `camera_input_transport: compressed`
 - `camera_rotate_degrees: 180.0`
+- `camera_calibration_file: payload_0_camera_info.yaml`
 - `payload_controller: GPIOController`
 
 `use_camera` is still accepted on the legacy single-vehicle path as a deprecated alias for `force_camera`.
+`camera_calibration_file` expects a packaged filename from `uav/config/camera_calibrations`, not a path or URL. When left blank, payload hardware launch falls back to `<vehicle_name>_camera_info.yaml` and then `payload_0_camera_info.yaml`.
 
 ## Fleet YAML Shape
 
@@ -72,6 +75,7 @@ defaults:
   camera_mount_offsets: [0.0, 0.0, 0.0]
   camera_input_transport: raw
   camera_rotate_degrees: 0.0
+  camera_calibration_file: payload_0_camera_info.yaml
   camera_preprocess_hook: ""
 
 vehicles:
@@ -93,7 +97,7 @@ Runtime-owned:
 - auto-start behavior
 - debug and vision flags
 - manual camera override
-- camera transport/rotation/preprocess settings
+- camera transport/rotation/calibration/preprocess settings
 - namespace and PX4 instance in the single-vehicle compatibility path
 
 The backend should define spawnable props under `world.params.entities` and UAV/payload vehicles under `world.params.controllables`. UAV controllables should include `px4_airframe_id`. The fleet layer attaches to those controllables; it should not redefine their PX4 identity. For real hardware fleets, `backend.kind` may be either `hardware` or `real`; both map to the same runtime path.

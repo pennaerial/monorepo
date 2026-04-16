@@ -183,11 +183,30 @@ def _camera_contract_for(
     }
 
 
-def _payload_camera_info_url_for(vehicle_name: str) -> str:
-    payload_share = Path(get_package_share_directory("payload"))
+def _payload_camera_info_url_for(
+    vehicle_name: str, *, camera_calibration_file: str = ""
+) -> str:
+    calibration_dir = (
+        Path(get_package_share_directory("uav")) / "config" / "camera_calibrations"
+    )
+    requested_file = str(camera_calibration_file).strip()
+    if requested_file:
+        if Path(requested_file).name != requested_file:
+            raise ValueError(
+                "camera_calibration_file must be a filename inside the packaged "
+                "uav camera_calibrations directory."
+            )
+        candidate = calibration_dir / requested_file
+        if candidate.exists():
+            return f"file://{candidate}"
+        raise ValueError(
+            f"Vehicle '{vehicle_name}' requested camera calibration file "
+            f"'{requested_file}', but no packaged calibration exists at '{candidate}'."
+        )
+
     candidates = [
-        payload_share / "config" / f"{vehicle_name}_camera_info.yaml",
-        payload_share / "config" / "payload_0_camera_info.yaml",
+        calibration_dir / f"{vehicle_name}_camera_info.yaml",
+        calibration_dir / "payload_0_camera_info.yaml",
     ]
     for candidate in candidates:
         if candidate.exists():
@@ -524,6 +543,7 @@ def launch_setup(context, *args, **kwargs):
     camera_rotate_degrees = float(
         config.get("camera_rotate_degrees", 0.0 if sim else 180.0)
     )
+    camera_calibration_file = str(config.get("camera_calibration_file", "")).strip()
     camera_preprocess_hook = str(config.get("camera_preprocess_hook", "")).strip()
     camera_input_transport = _resolve_camera_input_transport(
         mission_spec=mission_spec,
@@ -570,7 +590,10 @@ def launch_setup(context, *args, **kwargs):
             rotate_degrees=camera_rotate_degrees,
             preprocess_hook=camera_preprocess_hook,
             camera_info_url=(
-                _payload_camera_info_url_for(vehicle_name)
+                _payload_camera_info_url_for(
+                    vehicle_name,
+                    camera_calibration_file=camera_calibration_file,
+                )
                 if mission_spec.is_payload and not sim
                 else ""
             ),

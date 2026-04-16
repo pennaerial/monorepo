@@ -497,6 +497,7 @@ def test_render_runtime_fleet_for_uav(tmp_path, monkeypatch):
                 "camera_mount_offsets": [0.0, 0.0, 0.0],
                 "camera_input_transport": "raw",
                 "camera_rotate_degrees": 0.0,
+                "camera_calibration_file": "",
                 "camera_preprocess_hook": "",
             },
             "vehicles": [
@@ -522,6 +523,7 @@ def test_render_runtime_fleet_for_uav(tmp_path, monkeypatch):
             "camera_mount_offsets: [1.0, 2.0, 3.0]\n"
             "camera_input_transport: compressed\n"
             "camera_rotate_degrees: 15\n"
+            "camera_calibration_file: warehouse_cam.yaml\n"
             "camera_preprocess_hook: rotate_then_crop\n"
             "px4_airframe_id: 4004\n"
         ),
@@ -563,6 +565,7 @@ def test_render_runtime_fleet_for_uav(tmp_path, monkeypatch):
             "camera_mount_offsets": [1.0, 2.0, 3.0],
             "camera_input_transport": "compressed",
             "camera_rotate_degrees": 15.0,
+            "camera_calibration_file": "warehouse_cam.yaml",
             "camera_preprocess_hook": "rotate_then_crop",
             "px4_airframe_id": 4004,
             "px4_namespace": "uav_0",
@@ -586,6 +589,7 @@ def test_render_runtime_fleet_for_payload_defaults(tmp_path, monkeypatch):
                 "servo_only": False,
                 "camera_mount_offsets": [0.0, 0.0, 0.0],
                 "camera_input_transport": "compressed",
+                "camera_calibration_file": "",
                 "camera_preprocess_hook": "",
             },
             "vehicles": [
@@ -636,6 +640,7 @@ def test_render_runtime_fleet_for_payload_defaults(tmp_path, monkeypatch):
             "camera_mount_offsets": [0.0, 0.0, 0.0],
             "camera_input_transport": "compressed",
             "camera_rotate_degrees": 180.0,
+            "camera_calibration_file": "",
             "camera_preprocess_hook": "",
             "payload_controller": "SimController",
         }

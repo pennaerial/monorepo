@@ -43,6 +43,7 @@ _SHARED_OVERLAY_KEYS = {
     "camera_input_transport",
     "camera_rotate_degrees",
     "camera_preprocess_hook",
+    "camera_calibration_file",
 }
 _UAV_OVERLAY_KEYS = _SHARED_OVERLAY_KEYS | {"px4_airframe_id", "px4_namespace"}
 _PAYLOAD_OVERLAY_KEYS = _SHARED_OVERLAY_KEYS | {"payload_controller"}
@@ -791,6 +792,9 @@ def _runtime_vehicle_from_config(
         ).strip(),
     }
 
+        "camera_calibration_file": str(
+            merged_vehicle.get("camera_calibration_file", "")
+        ).strip(),
     if mission_target == "uav":
         px4_airframe_id = merged_vehicle.get("px4_airframe_id")
         runtime_vehicle["px4_airframe_id"] = (
@@ -874,6 +878,9 @@ def _fleet_preview(ctx: AppContext, fleet_file: str) -> dict[str, object]:
                     ),
                     "px4_airframe_id": runtime_vehicle.get("px4_airframe_id"),
                     "px4_namespace": runtime_vehicle.get("px4_namespace"),
+                    "camera_calibration_file": runtime_vehicle.get(
+                        "camera_calibration_file"
+                    ),
                     "payload_controller": runtime_vehicle.get("payload_controller"),
                 }
             )

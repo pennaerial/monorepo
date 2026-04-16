@@ -31,6 +31,7 @@ _SHARED_DEFAULT_KEYS = {
     "camera_mount_offsets",
     "camera_input_transport",
     "camera_rotate_degrees",
+    "camera_calibration_file",
     "camera_preprocess_hook",
 }
 
@@ -305,6 +306,9 @@ def _vehicle_stack_configs(fleet: dict) -> tuple[dict, list[dict]]:
                 vehicle.get(
                     "camera_rotate_degrees", 0.0 if backend_kind == "sim" else 180.0
                 )
+            "camera_calibration_file": str(
+                vehicle.get("camera_calibration_file", "")
+            ).strip(),
             ),
             "camera_preprocess_hook": str(
                 vehicle.get("camera_preprocess_hook", "")

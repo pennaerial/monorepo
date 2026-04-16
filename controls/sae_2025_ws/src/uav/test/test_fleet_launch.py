@@ -74,6 +74,7 @@ def _example_fleet():
             "camera_mount_offsets": [0.0, 0.0, 0.0],
             "camera_input_transport": "raw",
             "camera_rotate_degrees": 0.0,
+            "camera_calibration_file": "payload_0_camera_info.yaml",
             "camera_preprocess_hook": "",
         },
         "vehicles": [
@@ -89,6 +90,7 @@ def _example_fleet():
                 "mission": "payload_retreat",
                 "vision_debug": True,
                 "force_camera": True,
+                "camera_calibration_file": "payload_alpha_camera_info.yaml",
             },
         ],
     }
@@ -244,6 +246,7 @@ def test_vehicle_stack_configs_defaults_namespaces_and_instances(
     assert vehicles[0]["camera_mount_offsets"] == [0.2, 0.0, 0.0]
     assert vehicles[0]["camera_input_transport"] == "raw"
     assert vehicles[0]["camera_rotate_degrees"] == 0.0
+    assert vehicles[0]["camera_calibration_file"] == "payload_0_camera_info.yaml"
     assert vehicles[0]["camera_preprocess_hook"] == ""
     assert vehicles[1]["auto_launch"] is True
     assert vehicles[1]["debug"] is False
@@ -254,6 +257,7 @@ def test_vehicle_stack_configs_defaults_namespaces_and_instances(
     assert vehicles[1]["camera_mount_offsets"] == [0.0, 0.0, 0.0]
     assert vehicles[1]["camera_input_transport"] == "raw"
     assert vehicles[1]["camera_rotate_degrees"] == 0.0
+    assert vehicles[1]["camera_calibration_file"] == "payload_alpha_camera_info.yaml"
     assert vehicles[1]["camera_preprocess_hook"] == ""
 
 
@@ -394,3 +398,4 @@ def test_vehicle_stack_configs_support_hardware_payload(
     assert vehicles[0]["sim"] is False
     assert vehicles[0]["launch_payload_backend"] is True
     assert vehicles[0]["payload_controller"] == "GPIOController"
+    assert vehicles[0]["camera_calibration_file"] == ""

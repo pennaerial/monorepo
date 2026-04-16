@@ -65,6 +65,9 @@ defaults:
   # Rotate incoming camera images clockwise by this many degrees before vision.
   camera_rotate_degrees: 0.0
 
+  # Packaged payload camera calibration filename from uav/config/camera_calibrations.
+  camera_calibration_file: payload_0_camera_info.yaml
+
   # Optional Python hook to preprocess images before they reach vision nodes.
   # Leave blank to disable. This must resolve inside the runtime environment.
   camera_preprocess_hook: ""
@@ -93,4 +96,5 @@ vehicles:
     vision_debug: true
     camera_input_transport: compressed
     camera_rotate_degrees: 180.0
+    # camera_calibration_file: payload_front_camera_info.yaml
     # camera_preprocess_hook: my_package.my_module:preprocess

@@ -26,6 +26,7 @@ defaults:
   camera_mount_offsets: [0.0, 0.0, 0.0]
   camera_input_transport: raw
   camera_rotate_degrees: 0.0
+  camera_calibration_file: payload_0_camera_info.yaml
   camera_preprocess_hook: ""
 
 vehicles:

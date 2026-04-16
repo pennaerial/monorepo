@@ -113,6 +113,50 @@ def test_main_launch_force_camera_accepts_legacy_alias(main_launch_module):
     assert main_launch_module._resolve_force_camera({"use_camera": True}) is True
 
 
+def test_single_vehicle_config_carries_camera_calibration_file(
+    monkeypatch, main_launch_module
+):
+    monkeypatch.setattr(
+        main_launch_module, "mission_path_for_name", lambda name: f"/tmp/{name}.yaml"
+    )
+    monkeypatch.setattr(
+        main_launch_module.MissionSpec,
+        "load",
+        staticmethod(
+            lambda _path: SimpleNamespace(is_uav=False, is_payload=True, target="payload")
+        ),
+    )
+    monkeypatch.setattr(
+        main_launch_module,
+        "find_folder_with_heuristic",
+        lambda *_args, **_kwargs: "/tmp/PX4-Autopilot",
+    )
+
+    class FakeLaunchConfiguration:
+        def __init__(self, name: str):
+            self.name = name
+
+        def perform(self, _context):
+            return {"px4_path": "~/PX4-Autopilot"}.get(self.name, "")
+
+    monkeypatch.setattr(
+        main_launch_module, "LaunchConfiguration", FakeLaunchConfiguration
+    )
+
+    vehicle_config, backend = main_launch_module._single_vehicle_config(
+        SimpleNamespace(),
+        {
+            "mission_name": "payload_retreat",
+            "vehicle_name": "payload_7",
+            "sim": False,
+            "camera_calibration_file": "payload_7_camera_info.yaml",
+        },
+    )
+
+    assert backend is None
+    assert vehicle_config["camera_calibration_file"] == "payload_7_camera_info.yaml"
+
+
 @pytest.mark.parametrize(
     ("mission_spec", "expected"),
     [
@@ -420,39 +464,84 @@ def test_resolve_camera_input_transport_prefers_raw_for_payload_preprocessing(
 def test_payload_camera_info_url_for_prefers_named_file(
     monkeypatch, tmp_path, stack_launch_module
 ):
-    payload_share = tmp_path / "payload_share"
-    (payload_share / "config").mkdir(parents=True)
-    preferred = payload_share / "config" / "payload_2_camera_info.yaml"
-    fallback = payload_share / "config" / "payload_0_camera_info.yaml"
+    uav_share = tmp_path / "uav_share"
+    calibration_dir = uav_share / "config" / "camera_calibrations"
+    calibration_dir.mkdir(parents=True)
+    preferred = calibration_dir / "payload_2_camera_info.yaml"
+    fallback = calibration_dir / "payload_0_camera_info.yaml"
     fallback.write_text("fallback", encoding="utf-8")
     preferred.write_text("preferred", encoding="utf-8")
 
     monkeypatch.setattr(
         stack_launch_module,
         "get_package_share_directory",
-        lambda package_name: str(payload_share),
+        lambda package_name: str(uav_share),
     )
 
     expected = f"file://{preferred}"
     assert stack_launch_module._payload_camera_info_url_for("payload_2") == expected
 
+def test_payload_camera_info_url_for_uses_explicit_filename(
+    monkeypatch, tmp_path, stack_launch_module
+):
+    uav_share = tmp_path / "uav_share"
+    calibration_dir = uav_share / "config" / "camera_calibrations"
+    calibration_dir.mkdir(parents=True)
+    requested = calibration_dir / "warehouse_cam.yaml"
+    requested.write_text("warehouse", encoding="utf-8")
+
+    monkeypatch.setattr(
+        stack_launch_module,
+        "get_package_share_directory",
+        lambda package_name: str(uav_share),
+    )
+
+    expected = f"file://{requested}"
+    assert (
+        stack_launch_module._payload_camera_info_url_for(
+            "payload_2", camera_calibration_file="warehouse_cam.yaml"
+        )
+        == expected
+    )
+
+
 
 def test_payload_camera_info_url_for_falls_back_to_payload_0(
     monkeypatch, tmp_path, stack_launch_module
 ):
-    payload_share = tmp_path / "payload_share"
-    (payload_share / "config").mkdir(parents=True)
-    fallback = payload_share / "config" / "payload_0_camera_info.yaml"
+    uav_share = tmp_path / "uav_share"
+    calibration_dir = uav_share / "config" / "camera_calibrations"
+    calibration_dir.mkdir(parents=True)
+    fallback = calibration_dir / "payload_0_camera_info.yaml"
     fallback.write_text("fallback", encoding="utf-8")
 
     monkeypatch.setattr(
         stack_launch_module,
         "get_package_share_directory",
-        lambda package_name: str(payload_share),
+        lambda package_name: str(uav_share),
     )
 
     expected = f"file://{fallback}"
     assert stack_launch_module._payload_camera_info_url_for("payload_2") == expected
+
+
+def test_payload_camera_info_url_for_rejects_missing_explicit_file(
+    monkeypatch, tmp_path, stack_launch_module
+):
+    uav_share = tmp_path / "uav_share"
+    calibration_dir = uav_share / "config" / "camera_calibrations"
+    calibration_dir.mkdir(parents=True)
+
+    monkeypatch.setattr(
+        stack_launch_module,
+        "get_package_share_directory",
+        lambda package_name: str(uav_share),
+    )
+
+    with pytest.raises(ValueError, match="requested camera calibration file"):
+        stack_launch_module._payload_camera_info_url_for(
+            "payload_2", camera_calibration_file="missing.yaml"
+        )
 
 
 def test_build_runtime_parameters_for_uav(stack_launch_module):

@@ -85,6 +85,12 @@ const LAUNCH_PARAM_FIELDS = [
   },
   {
     key: 'camera_preprocess_hook',
+  {
+    key: 'camera_calibration_file',
+    label: 'Camera calibration file',
+    type: 'string',
+    help: 'Packaged calibration filename from uav/config/camera_calibrations. Leave blank to use the launch fallback.',
+  },
     label: 'Camera preprocess hook',
     type: 'string',
     help: 'Optional Python hook for image preprocessing.',
@@ -106,6 +112,7 @@ const LAUNCH_PARAM_CORE_FIELDS = [
   'camera_rotate_degrees',
   'camera_preprocess_hook',
 ].map(key => LAUNCH_PARAM_FIELD_MAP[key]).filter(Boolean)
+  'camera_calibration_file',
 
 const LAUNCH_PARAM_TOGGLE_FIELDS = [
   'debug',

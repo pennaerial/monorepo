@@ -816,6 +816,7 @@ def test_build_source_routes_round_trip(client, tmp_path):
     assert response.status_code == 200
     payload = response.json()
     assert payload["success"] is True
+            "camera_calibration_file": None,
     assert payload["source"]["kind"] == "none"
 
 
