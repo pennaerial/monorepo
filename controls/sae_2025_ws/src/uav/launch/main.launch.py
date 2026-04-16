@@ -275,6 +275,7 @@ def _single_vehicle_config(context, params: dict) -> tuple[dict, dict | None]:
             or ["heartbeat:payload_interfaces/msg/PayloadHeartbeat"]
         ),
         "udp_broadcast_ip": str(params.get("udp_broadcast_ip") or "10.42.0.255").strip(),
+        "udp_peer_ttl": float(params.get("udp_peer_ttl") or 3.0),
     }
     if vehicle_class_name is not None:
         vehicle_config["vehicle_class"] = vehicle_class_name

@@ -340,6 +340,9 @@ def _vehicle_stack_configs(fleet: dict) -> tuple[dict, list[dict]]:
             stack_config["udp_broadcast_ip"] = str(
                 vehicle.get("udp_broadcast_ip") or "10.42.0.255"
             ).strip()
+            stack_config["udp_peer_ttl"] = float(
+                vehicle.get("udp_peer_ttl") or 3.0
+            )
 
         if kind == "uav":
             px4_airframe_id = (

@@ -52,6 +52,7 @@ class FleetVehicleModel(FleetDefaultsModel):
     udp_all_ports: list[int] | None = None
     udp_topics: list[str] | None = None
     udp_broadcast_ip: str | None = None
+    udp_peer_ttl: float | None = None
 
     @model_validator(mode="after")
     def _require_name(self) -> "FleetVehicleModel":

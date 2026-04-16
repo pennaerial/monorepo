@@ -454,6 +454,7 @@ def _udp_bridge_action(
     udp_all_ports: list,
     udp_topics: list,
     udp_broadcast_ip: str,
+    udp_peer_ttl: float,
 ) -> Node:
     return Node(
         package="udp_bridge",
@@ -466,6 +467,7 @@ def _udp_bridge_action(
                 "all_ports": udp_all_ports,
                 "broadcast_ip": udp_broadcast_ip,
                 "topics": udp_topics,
+                "peer_ttl": udp_peer_ttl,
             }
         ],
         output="screen",
@@ -687,6 +689,7 @@ def launch_setup(context, *args, **kwargs):
         or ["heartbeat:payload_interfaces/msg/PayloadHeartbeat"]
     )
     udp_broadcast_ip = str(config.get("udp_broadcast_ip") or "10.42.0.255").strip()
+    udp_peer_ttl = float(config.get("udp_peer_ttl") or 3.0)
 
     actions = []
     if mission_spec.is_payload and launch_payload_backend:
@@ -713,6 +716,7 @@ def launch_setup(context, *args, **kwargs):
                 udp_all_ports=udp_all_ports,
                 udp_topics=udp_topics,
                 udp_broadcast_ip=udp_broadcast_ip,
+                udp_peer_ttl=udp_peer_ttl,
             )
         )
 

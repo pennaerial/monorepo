@@ -33,6 +33,14 @@ def generate_launch_description():
                     "Example: \"['test:uav_interfaces/msg/UdpTest']\""
                 ),
             ),
+            DeclareLaunchArgument(
+                "peer_ttl",
+                default_value="3.0",
+                description=(
+                    "Seconds without a heartbeat before a peer is considered dead. "
+                    "Default is 3× the 1s heartbeat interval."
+                ),
+            ),
             Node(
                 package="udp_bridge",
                 executable="bridge_node",
@@ -44,6 +52,7 @@ def generate_launch_description():
                         "all_ports": LaunchConfiguration("all_ports"),
                         "broadcast_ip": LaunchConfiguration("broadcast_ip"),
                         "topics": LaunchConfiguration("topics"),
+                        "peer_ttl": LaunchConfiguration("peer_ttl"),
                     }
                 ],
                 output="screen",
