@@ -44,8 +44,8 @@ modes:
       # TAPE_ALIGN — rotate until diagonal black-tape centroid is centered
       # tape_align_lower_hsv: [0, 0, 0] # black
       # tape_align_upper_hsv: [180, 255, 60]
-      tape_align_lower_hsv: [20, 100, 100]
-      tape_align_upper_hsv: [35, 255, 255] # yellow (tested outdoors)
+      # tape_align_lower_hsv: [20, 100, 100]
+      # tape_align_upper_hsv: [35, 255, 255] # yellow (tested outdoors)
 
       tape_align_lower_hsv: [15, 80, 120]
       tape_align_upper_hsv: [25, 255, 255] # yellow (M81)
