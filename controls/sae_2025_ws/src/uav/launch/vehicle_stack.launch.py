@@ -381,6 +381,7 @@ def _build_runtime_parameters(
     vehicle_name: str,
     auto_launch: bool,
     debug: bool,
+    vision_debug: bool,
     servo_only: bool,
     vehicle_class_name: str | None,
     camera_mount_offsets: list[float],
@@ -388,6 +389,7 @@ def _build_runtime_parameters(
     parameters = {"mode_map": mission_path, "auto_launch": bool(auto_launch)}
     if mission_spec.is_payload:
         parameters["vehicle_name"] = vehicle_name
+        parameters["vision_debug"] = bool(vision_debug)
         return parameters
 
     if vehicle_class_name is None:
@@ -616,6 +618,7 @@ def launch_setup(context, *args, **kwargs):
                 vehicle_name=vehicle_name,
                 auto_launch=auto_launch,
                 debug=debug,
+                vision_debug=vision_debug,
                 servo_only=servo_only,
                 vehicle_class_name=(
                     vehicle_class.name if vehicle_class is not None else None

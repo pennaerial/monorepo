@@ -383,15 +383,16 @@ class PayloadDLZNavigateMode(Mode):
                 Image, cam_topic, self._image_cb, 1
             )
 
-        annotated_topic = self.vehicle.namespaced_path("annotated_image/compressed")
-        self._annotated_pub = self.node.create_publisher(
-            CompressedImage, annotated_topic, 1
-        )
+        if getattr(self.node, "vision_debug", False):
+            annotated_topic = self.vehicle.namespaced_path("annotated_image/compressed")
+            self._annotated_pub = self.node.create_publisher(
+                CompressedImage, annotated_topic, 1
+            )
 
         self.log(
             f"PayloadDLZNavigateMode: enter  start_phase={self.start_phase}  "
             f"direction={self.direction}  target_transitions={self.target_transitions}  "
-            f"camera={cam_topic} annotated={annotated_topic}"
+            f"camera={cam_topic} vision_debug={getattr(self.node, 'vision_debug', False)}"
         )
 
     def on_update(self, time_delta: float) -> None:

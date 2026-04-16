@@ -983,6 +983,15 @@
           "annotation": {
             "kind": "float"
           },
+          "default": 0.002,
+          "default_kind": "value",
+          "name": "k_d_lat",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
           "default": 0.4,
           "default_kind": "value",
           "name": "k_ang",
@@ -1163,6 +1172,38 @@
           "default_kind": "value",
           "name": "cw_upper_hsv",
           "required": false
+        },
+        {
+          "annotation": {
+            "item": {
+              "kind": "int"
+            },
+            "kind": "list"
+          },
+          "default": [
+            255,
+            255,
+            255
+          ],
+          "default_kind": "value",
+          "name": "cw_lower_hsv2",
+          "required": false
+        },
+        {
+          "annotation": {
+            "item": {
+              "kind": "int"
+            },
+            "kind": "list"
+          },
+          "default": [
+            255,
+            255,
+            255
+          ],
+          "default_kind": "value",
+          "name": "cw_upper_hsv2",
+          "required": false
         }
       ],
       "params_schema": {
@@ -1239,6 +1280,18 @@
             "title": "Cw Lower Hsv",
             "type": "array"
           },
+          "cw_lower_hsv2": {
+            "default": [
+              255,
+              255,
+              255
+            ],
+            "items": {
+              "type": "integer"
+            },
+            "title": "Cw Lower Hsv2",
+            "type": "array"
+          },
           "cw_upper_hsv": {
             "default": [
               140,
@@ -1249,6 +1302,18 @@
               "type": "integer"
             },
             "title": "Cw Upper Hsv",
+            "type": "array"
+          },
+          "cw_upper_hsv2": {
+            "default": [
+              255,
+              255,
+              255
+            ],
+            "items": {
+              "type": "integer"
+            },
+            "title": "Cw Upper Hsv2",
             "type": "array"
           },
           "detect_frames": {
@@ -1268,6 +1333,11 @@
           "k_ang": {
             "default": 0.4,
             "title": "K Ang",
+            "type": "number"
+          },
+          "k_d_lat": {
+            "default": 0.002,
+            "title": "K D Lat",
             "type": "number"
           },
           "k_lat": {
@@ -1949,11 +2019,25 @@
           "default_kind": "value",
           "name": "loop",
           "required": false
+        },
+        {
+          "annotation": {
+            "kind": "bool"
+          },
+          "default": false,
+          "default_kind": "value",
+          "name": "compressed_image",
+          "required": false
         }
       ],
       "params_schema": {
         "additionalProperties": false,
         "properties": {
+          "compressed_image": {
+            "default": false,
+            "title": "Compressed Image",
+            "type": "boolean"
+          },
           "loop": {
             "default": false,
             "title": "Loop",
@@ -1987,7 +2071,7 @@
       "required_vision_nodes": [
         "uav.vision_nodes.PayloadAprilTagNode"
       ],
-      "requires_camera": false,
+      "requires_camera": true,
       "transition_labels": [
         "found",
         "not_found"

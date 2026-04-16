@@ -142,11 +142,13 @@ class PayloadDualApproachMode(Mode):
             CameraInfo, vehicle.camera_info_topic, self._on_camera_info, 1
         )
 
-        self._debug_pub = self.node.create_publisher(
-            CompressedImage,
-            vehicle.namespaced_path("dual_approach_debug/compressed"),
-            1,
-        )
+        self._debug_pub = None
+        if getattr(self.node, "vision_debug", False):
+            self._debug_pub = self.node.create_publisher(
+                CompressedImage,
+                vehicle.namespaced_path("annotated_image/compressed"),
+                1,
+            )
 
         self._done = False
         self._image_width = 0.0
@@ -186,7 +188,7 @@ class PayloadDualApproachMode(Mode):
         color_cy: Optional[float],
         color_height_px: int,
     ) -> None:
-        if self._debug_pub.get_subscription_count() == 0:
+        if self._debug_pub is None or self._debug_pub.get_subscription_count() == 0:
             return
         debug = bgr.copy()
 

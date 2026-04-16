@@ -209,16 +209,17 @@ class PayloadCornerNavigateMode(Mode):
                 Image, cam_topic, self._image_cb, 1
             )
 
-        annotated_topic = self.vehicle.namespaced_path("annotated_image/compressed")
-        self._annotated_pub = self.node.create_publisher(
-            CompressedImage, annotated_topic, 1
-        )
+        if getattr(self.node, "vision_debug", False):
+            annotated_topic = self.vehicle.namespaced_path("annotated_image/compressed")
+            self._annotated_pub = self.node.create_publisher(
+                CompressedImage, annotated_topic, 1
+            )
 
         self.log(
             f"PayloadCornerNavigateMode: enter direction={self.direction} "
             f"drive_out_speed={self.drive_out_speed_mps:.2f}m/s "
             f"strip_frac={self.drive_out_strip_frac:.2f} "
-            f"camera={cam_topic} annotated={annotated_topic}"
+            f"camera={cam_topic} vision_debug={getattr(self.node, 'vision_debug', False)}"
         )
 
     def on_update(self, time_delta: float) -> None:
