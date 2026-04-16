@@ -95,7 +95,7 @@ modes:
       color_forward_speed: 0.2
       color_angular_gain: 0.0045
       color_centering_threshold_px: 15
-      color_drive_angular_scale: 0.2
+      color_drive_angular_scale: 0.1
       color_min_detect_pixels: 50
       stop_height_px: 360
       lost_timeout_s: 0.0
