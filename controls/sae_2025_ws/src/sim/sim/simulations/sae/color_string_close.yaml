@@ -1,7 +1,7 @@
 world:
   name: SAEWorldNode
   params:
-    template_world: "src/sim/sim/world_gen/worlds/template.sdf"
+    template_world: "template.sdf"
     vehicle_pose: [0.3, 0.0, 0.1, 0.0, 0.0, 0.0]
 
     physics:
@@ -12,7 +12,7 @@ world:
         position: [0.0, 0.0, -0.1]
         rpy: [0.0, 0.0, 0.0]
       string_obstacle:
-        path_to_sdf: "package://sim/world_gen/models/string_obstacle/model.sdf"
+        path_to_sdf: "~/.simulation-gazebo/models/string_obstacle/model.sdf"
         position: [0.20, 0.0, 0.0]
         rpy: [0.0, 0.0, 0.0]
     controllables:

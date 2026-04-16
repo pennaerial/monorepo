@@ -5,7 +5,7 @@
 # "terminate" if the drive-out times out without finding the tape.
 modes:
   start:
-    class: uav.modes.payload.PayloadCornerNavigateMode
+    mode: payload.PayloadCornerNavigateMode
     params:
       direction: ccw
       # Target colours in standard HSV: blue=(240°,100%,100%), red=(0°,100%,100%).
@@ -42,7 +42,7 @@ modes:
       complete: dlz_navigate
 
   dlz_navigate:
-    class: uav.modes.payload.PayloadDLZNavigateMode
+    mode: payload.PayloadDLZNavigateMode
     params:
       start_phase: "wait_for_plane"
       detect_frames: 5
@@ -69,7 +69,7 @@ modes:
       done: scan
 
   scan:
-    class: uav.modes.payload.PayloadScanForTagMode
+    mode: payload.PayloadScanForTagMode
     params:
       tag_id: 0
       tag_size_m: 0.0508
@@ -79,7 +79,7 @@ modes:
       not_found: retry
 
   retry:
-    class: uav.modes.payload.PayloadDLZNavigateMode
+    mode: payload.PayloadDLZNavigateMode
     params:
       start_phase: "scan_tags"   # already on tape; re-scan then line-follow more transitions
       scan_duration_s: 1.0
@@ -100,7 +100,7 @@ modes:
       done: scan
 
   apriltag_approach:
-    class: uav.modes.payload.PayloadAprilTagApproachMode
+    mode: payload.PayloadAprilTagApproachMode
     params:
       tag_id: 0
       tag_size_m: 0.0508

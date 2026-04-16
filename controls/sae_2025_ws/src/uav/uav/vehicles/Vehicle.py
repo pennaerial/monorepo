@@ -13,7 +13,6 @@ class Vehicle(ABC):
         *,
         has_camera: bool = False,
         camera_namespace: str | None = None,
-        px4_namespace: str | None = "",
         image_topic: str | None = None,
         camera_info_topic: str | None = None,
         camera_service_name: str | None = None,
@@ -22,7 +21,6 @@ class Vehicle(ABC):
         self.name = name
         self.has_camera = bool(has_camera)
         self.camera_namespace = self._normalize_namespace(camera_namespace)
-        self.px4_namespace = self._normalize_px4_prefix(px4_namespace)
         self.image_topic = None
         self.camera_info_topic = None
         self.camera_service_name = None
@@ -45,15 +43,6 @@ class Vehicle(ABC):
         return f"/{normalized}"
 
     @staticmethod
-    def _normalize_px4_prefix(namespace: str | None) -> str | None:
-        if namespace is None:
-            return None
-        normalized = str(namespace).strip().strip("/")
-        if not normalized:
-            return None
-        return normalized
-
-    @staticmethod
     def _vision_node_name(vision_node: object) -> str:
         if hasattr(vision_node, "node_name"):
             return vision_node.node_name()
@@ -62,37 +51,36 @@ class Vehicle(ABC):
         return str(vision_node)
 
     def _default_camera_path(self, suffix: str) -> str | None:
-        if not self.has_camera or not self.camera_namespace:
+        if not self.has_camera:
             return None
         return self.namespaced_path(suffix)
 
-    def px4_transport_path(self, suffix: str, *, namespace: str | None = None) -> str:
-        resolved_namespace = self._normalize_px4_prefix(namespace) or self.px4_namespace
+    def px4_transport_path(self, suffix: str) -> str:
         clean_suffix = suffix.lstrip("/")
-        if not resolved_namespace:
-            return f"/fmu/{clean_suffix}"
-        return f"/{resolved_namespace}/fmu/{clean_suffix}"
+        return f"fmu/{clean_suffix}"
 
     @property
     def logger(self):
         return self.node.get_logger()
 
     def namespaced_path(self, suffix: str, *, namespace: str | None = None) -> str:
-        resolved_namespace = (
-            self._normalize_namespace(namespace) or self.camera_namespace
-        )
         clean_suffix = suffix.lstrip("/")
+        if namespace is None:
+            return clean_suffix
+        resolved_namespace = str(namespace).strip()
         if not resolved_namespace:
-            return f"/{clean_suffix}"
-        return f"{resolved_namespace}/{clean_suffix}"
+            return clean_suffix
+        if resolved_namespace.startswith("/"):
+            return f"{resolved_namespace.rstrip('/')}/{clean_suffix}"
+        return f"{resolved_namespace.strip('/')}/{clean_suffix}"
 
     def vision_service_name(self, vision_node: object) -> str:
-        if not self.has_camera or not self.camera_namespace:
+        if not self.has_camera:
             raise RuntimeError(
                 f"Vehicle '{self.name}' does not expose a namespaced camera contract."
             )
         if hasattr(vision_node, "service_name"):
-            return vision_node.service_name(self.camera_namespace)
+            return vision_node.service_name()
         return self.namespaced_path(f"vision/{self._vision_node_name(vision_node)}")
 
     @abstractmethod

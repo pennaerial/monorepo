@@ -3,7 +3,7 @@
 # PayloadColorStringApproachMode returns "terminate" → mission ends
 modes:
   start:
-    class: uav.modes.payload.PayloadAprilTagApproachMode
+    mode: payload.PayloadAprilTagApproachMode
     params:
       tag_id: 0
       tag_size_m: 0.0508
@@ -18,7 +18,7 @@ modes:
       tag_lost: color_approach
 
   color_approach:
-    class: uav.modes.payload.PayloadColorStringApproachMode
+    mode: payload.PayloadColorStringApproachMode
     params:
       lower_hsv: [20, 100, 100]
       upper_hsv: [35, 255, 255]

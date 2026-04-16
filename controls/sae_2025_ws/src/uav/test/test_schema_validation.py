@@ -71,11 +71,18 @@ def _make_mode_manager():
     return manager
 
 
-def test_checked_in_fleet_specs_load_against_mission_schema():
+def test_checked_in_fleet_specs_load_against_mission_schema(monkeypatch):
     fleet_launch_module = _load_fleet_module()
     fleets_dir = Path(__file__).resolve().parent.parent / "uav" / "fleets"
+    missions_dir = Path(__file__).resolve().parent.parent / "uav" / "missions"
     fleet_paths = sorted(fleets_dir.glob("*.yaml"))
     assert fleet_paths, "Expected checked-in fleet specs under src/uav/uav/fleets"
+
+    monkeypatch.setattr(
+        fleet_launch_module,
+        "mission_path_for_name",
+        lambda mission_name: str((missions_dir / f"{mission_name}.yaml").resolve()),
+    )
 
     for fleet_path in fleet_paths:
         fleet = yaml.safe_load(fleet_path.read_text(encoding="utf-8")) or {}
@@ -90,7 +97,6 @@ def test_checked_in_fleet_specs_load_against_mission_schema():
             assert Path(vehicle["mission_path"]).suffix == ".yaml"
             if vehicle["kind"] == "uav":
                 assert isinstance(vehicle["px4_airframe_id"], int)
-                assert vehicle["px4_namespace"]
             else:
                 assert vehicle["payload_controller"]
 

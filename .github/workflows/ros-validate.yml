@@ -11,7 +11,11 @@ on:
     branches: [main, master]
     paths:
       - ".github/workflows/ros-validate.yml"
+      - ".github/workflows/ci-image.yml"
+      - ".github/ci/**"
       - "controls/sae_2025_ws/**"
+      - "controls/sae_2025_ws/scripts/ci/common.sh"
+      - "controls/sae_2025_ws/scripts/ci/install_ros_ci_deps.sh"
       - "!controls/sae_2025_ws/src/integration/**"
   workflow_dispatch:
 
@@ -39,5 +43,56 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Detect CI bootstrap changes
+        if: github.event_name == 'pull_request'
+        id: bootstrap_changes
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const bootstrapPrefixes = [".github/ci/"];
+            const bootstrapFiles = new Set([
+              ".github/workflows/ci-image.yml",
+              "controls/sae_2025_ws/scripts/ci/common.sh",
+              "controls/sae_2025_ws/scripts/ci/install_ros_ci_deps.sh",
+            ]);
+
+            const files = await github.paginate(
+              github.rest.pulls.listFiles,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.payload.pull_request.number,
+                per_page: 100,
+              },
+            );
+
+            const changed = files.some(({ filename }) =>
+              bootstrapFiles.has(filename)
+              || bootstrapPrefixes.some((prefix) => filename.startsWith(prefix)),
+            );
+
+            core.setOutput("changed", changed ? "1" : "0");
+
+            if (changed) {
+              core.notice(
+                "PR changes ROS CI image/bootstrap inputs; reinstalling CI dependencies during validation.",
+              );
+            }
+
+      - name: Select dependency bootstrap mode
+        id: bootstrap_mode
+        env:
+          PR_BOOTSTRAP_CHANGED: ${{ steps.bootstrap_changes.outputs.changed || '0' }}
+        run: |
+          install_deps=0
+
+          if [[ "$GITHUB_EVENT_NAME" == "pull_request" && "$PR_BOOTSTRAP_CHANGED" == "1" ]]; then
+            install_deps=1
+          fi
+
+          echo "install_deps=$install_deps" >> "$GITHUB_OUTPUT"
+
       - name: Build and validate ROS workspace
+        env:
+          INSTALL_DEPS: ${{ steps.bootstrap_mode.outputs.install_deps }}
         run: bash controls/sae_2025_ws/scripts/ci/validate_ros_workspace.sh

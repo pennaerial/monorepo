@@ -15,7 +15,6 @@ Key fields:
 - `auto_launch`
 - `airframe`
 - `custom_airframe_model`
-- `px4_namespace`
 - `px4_instance`
 - `force_camera`
 - `save_vision_milliseconds`

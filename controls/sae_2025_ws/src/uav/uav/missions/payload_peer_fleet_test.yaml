@@ -1,0 +1,5 @@
+modes:
+  start:
+    mode: payload.PayloadPeerFleetTestMode
+    params:
+      publish_period_s: 1.0

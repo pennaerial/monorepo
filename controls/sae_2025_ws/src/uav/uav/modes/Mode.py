@@ -1,9 +1,10 @@
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, ClassVar, Mapping
 
 from rclpy.node import Node
 
 from uav.vehicles.Vehicle import Vehicle
+from uav.runtime.vision_loader import canonical_vision_node_path
 
 if TYPE_CHECKING:
     from uav.vision_nodes import VisionNode
@@ -17,6 +18,7 @@ class Mode(ABC):
 
     mission_target: ClassVar[str | None] = None
     required_vision_nodes: ClassVar[tuple[object, ...]] = ()
+    peer_vehicle_names: ClassVar[tuple[str, ...]] = ()
     requires_camera: ClassVar[bool] = False
     transition_labels: ClassVar[tuple[str, ...]] = ()
 
@@ -34,14 +36,10 @@ class Mode(ABC):
         self.pending_requests = {}
 
     @classmethod
-    def required_vision_node_names(cls) -> tuple[str, ...]:
-        names: list[str] = []
-        for node in cls.required_vision_nodes:
-            if isinstance(node, str):
-                names.append(node)
-            else:
-                names.append(node.__name__)
-        return tuple(names)
+    def required_vision_node_paths(cls) -> tuple[str, ...]:
+        return tuple(
+            canonical_vision_node_path(node) for node in cls.required_vision_nodes
+        )
 
     @classmethod
     def declared_transition_labels(cls) -> tuple[str, ...]:
@@ -66,7 +64,10 @@ class Mode(ABC):
         future = self.pending_requests.get(service_name)
         if future is None:
             client = self.node.get_vision_client(vision_node)
-            self.pending_requests[service_name] = client.call_async(request)
+            future = client.call_async(request)
+            if future is None:
+                return None
+            self.pending_requests[service_name] = future
             return None
 
         if not future.done():
@@ -96,6 +97,29 @@ class Mode(ABC):
             time_delta (float): Time in seconds since the last update.
         """
         pass
+
+    def on_disconnect(
+        self, time_delta: float, connection_status: Mapping[str, bool]
+    ) -> None:
+        """
+        Periodic logic executed while one or more required peers are disconnected.
+
+        Args:
+            time_delta (float): Time in seconds since the last update.
+            connection_status (Mapping[str, bool]): Current mission peer connection map.
+        """
+        pass
+
+    def connection_ready(self, connection_status: Mapping[str, bool]) -> bool:
+        """
+        Return whether the mode has enough peer connectivity to run `on_update()`.
+
+        `connection_status` contains only this mode's relevant remote peers.
+        The default implementation treats every provided peer as required.
+        """
+        if not connection_status:
+            return True
+        return all(bool(is_connected) for is_connected in connection_status.values())
 
     @abstractmethod
     def check_status(self) -> str:
@@ -130,6 +154,25 @@ class Mode(ABC):
         """
         if self.active:
             self.on_update(time_delta)
+
+    def disconnect(
+        self, time_delta: float, connection_status: Mapping[str, bool]
+    ) -> None:
+        """
+        Update the mode's disconnected behavior if it is active.
+
+        Args:
+            time_delta (float): Time in seconds since the last update.
+            connection_status (Mapping[str, bool]): Current mission peer connection map.
+        """
+        if self.active:
+            self.on_disconnect(time_delta, connection_status)
+
+    def shared_state(self) -> dict:
+        """
+        Return persistent ModeManager-owned state for this mode class.
+        """
+        return self.node.shared_state_for(self)
 
     def log(self, message: str) -> None:
         """

@@ -6,7 +6,6 @@ __all__ = [
     "PayloadDropoffMode",
     "PayloadPickupMode",
     "ServoDropoffMode",
-    "TakeoffMode",
     "TransitionMode",
     "WaypointMission",
 ]

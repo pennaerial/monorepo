@@ -26,10 +26,8 @@ class VisionNode(Node):
 
     @classmethod
     def service_name(cls, camera_namespace: str | None = None):
-        normalized_namespace = cls._normalize_namespace(camera_namespace)
-        if not normalized_namespace:
-            return f"vision/{cls.node_name()}"
-        return f"{normalized_namespace}/vision/{cls.node_name()}"
+        del camera_namespace
+        return f"vision/{cls.node_name()}"
 
     @classmethod
     def __str__(cls):
@@ -82,20 +80,17 @@ class VisionNode(Node):
             explicit=camera_service_name,
             param_name="camera_service_name",
             default_suffix="camera_data",
-            legacy_default="/camera_data",
         )
         self.image_topic = self._resolve_transport_path(
             explicit=image_topic,
             param_name="camera_image_topic",
             default_suffix="camera",
-            legacy_default="/camera",
         )
         self.compressed_image_topic = self._compressed_topic_for(self.image_topic)
         self.camera_info_topic = self._resolve_transport_path(
             explicit=camera_info_topic,
             param_name="camera_info_topic",
             default_suffix="camera_info",
-            legacy_default="/camera_info",
         )
         self.preferred_image_transport = self._resolve_preferred_image_transport(
             str(self.get_parameter("preferred_image_transport").value).strip()
@@ -178,24 +173,34 @@ class VisionNode(Node):
         explicit: str | None,
         param_name: str,
         default_suffix: str,
-        legacy_default: str,
     ) -> str:
         if explicit:
-            return explicit
+            return self._require_relative_transport_path(explicit, label=param_name)
         configured = str(self.get_parameter(param_name).value).strip()
         if configured:
-            return configured
-        if self.vehicle_namespace:
-            return f"{self.vehicle_namespace}/{default_suffix}"
-        return legacy_default
+            return self._require_relative_transport_path(configured, label=param_name)
+        return default_suffix
 
     def _resolve_vision_service_name(self, explicit: str | None) -> str:
         if explicit:
-            return explicit
+            return self._require_relative_transport_path(
+                explicit, label="vision_service_name"
+            )
         configured = str(self.get_parameter("vision_service_name").value).strip()
         if configured:
-            return configured
-        return self.service_name(self.vehicle_namespace)
+            return self._require_relative_transport_path(
+                configured, label="vision_service_name"
+            )
+        return self.service_name()
+
+    @staticmethod
+    def _require_relative_transport_path(path: str, *, label: str) -> str:
+        cleaned = str(path).strip()
+        if cleaned.startswith("/"):
+            raise ValueError(
+                f"{label} must be relative to the vehicle namespace, received absolute path {cleaned!r}."
+            )
+        return cleaned.lstrip("/")
 
     @staticmethod
     def _compressed_topic_for(raw_topic: str) -> str:

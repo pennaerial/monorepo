@@ -348,10 +348,23 @@ function parseTransitionEntries(rawText) {
     .filter(entry => entry.key)
 }
 
-function inferMissionTarget(classPath) {
-  if (typeof classPath !== 'string') return ''
-  if (classPath.includes('.payload.')) return 'payload'
-  if (classPath.includes('.uav.')) return 'uav'
+function publicModeId(modeRef) {
+  if (typeof modeRef !== 'string') return ''
+  const trimmed = modeRef.trim()
+  const withoutPrefix = trimmed.startsWith('uav.modes.')
+    ? trimmed.slice('uav.modes.'.length)
+    : trimmed
+  const parts = withoutPrefix.split('.')
+  if (parts.length > 1 && parts.at(-1) === parts.at(-2)) {
+    return parts.slice(0, -1).join('.')
+  }
+  return withoutPrefix
+}
+
+function inferMissionTarget(modeId) {
+  if (typeof modeId !== 'string') return ''
+  if (modeId.startsWith('payload.') || modeId.includes('.payload.')) return 'payload'
+  if (modeId.startsWith('uav.') || modeId.includes('.uav.')) return 'uav'
   return ''
 }
 
@@ -391,18 +404,18 @@ function parseMissionDocument(text) {
     const nextLine = modeStarts[index + 1]?.line ?? lines.length
     const blockLines = lines.slice(modeStart.line, nextLine)
 
-    let classPath = ''
+    let mode = ''
     let paramsRaw = ''
     let transitionsRaw = ''
-    let classLine = -1
+    let modeLine = -1
     let paramsLine = -1
     let transitionsLine = -1
 
     for (let i = 0; i < blockLines.length; i += 1) {
       const line = blockLines[i]
-      if (classLine < 0 && /^\s{4}class:\s*/.test(line)) {
-        classLine = i
-        classPath = stripYamlComment(parseInlineYamlValue(line))
+      if (modeLine < 0 && /^\s{4}(?:mode|class):\s*/.test(line)) {
+        modeLine = i
+        mode = publicModeId(stripYamlComment(parseInlineYamlValue(line)))
         continue
       }
       if (paramsLine < 0 && /^\s{4}params:\s*/.test(line)) {
@@ -433,11 +446,11 @@ function parseMissionDocument(text) {
     }
 
     const transitions = parseTransitionEntries(transitionsRaw)
-    const target = inferMissionTarget(classPath)
+    const target = inferMissionTarget(mode)
 
     return {
       name: modeStart.name,
-      classPath,
+      mode,
       paramsRaw,
       transitionsRaw,
       transitions,
@@ -465,7 +478,7 @@ function renderMissionDocument(doc) {
   const lines = ['modes:']
   doc.modes.forEach((mode, index) => {
     lines.push(`  ${mode.name}:`)
-    lines.push(`    class: ${mode.classPath || ''}`)
+    lines.push(`    mode: ${mode.mode || ''}`)
 
     if (mode.paramsRaw && `${mode.paramsRaw}`.trim()) {
       lines.push('    params:')
@@ -623,10 +636,12 @@ function normalizeModeRegistry(modeRegistry) {
   const flat = {}
   Object.values(modeRegistry || {}).forEach(entries => {
     ;(entries || []).forEach(entry => {
-      flat[entry.class_path] = entry
-      const parts = `${entry.class_path}`.split('.')
-      if (parts.length > 1 && parts.at(-1) === parts.at(-2)) {
-        flat[parts.slice(0, -1).join('.')] = entry
+      const modeRef = publicModeId(entry.mode || entry.class_path || '')
+      if (modeRef) {
+        flat[modeRef] = entry
+      }
+      if (entry.class_path) {
+        flat[entry.class_path] = entry
       }
     })
   })
@@ -1204,7 +1219,7 @@ function MissionGraphEditor({
   missionDocumentSchema,
 }) {
   const [selectedModeName, setSelectedModeName] = useState('')
-  const registryByClass = useMemo(() => normalizeModeRegistry(modeRegistry), [modeRegistry])
+  const registryByMode = useMemo(() => normalizeModeRegistry(modeRegistry), [modeRegistry])
   const selectedVehicle = useMemo(
     () => fleetVehicleByName(buildSource, selectedTarget?.vehicle_name || ''),
     [buildSource, selectedTarget?.vehicle_name]
@@ -1221,7 +1236,7 @@ function MissionGraphEditor({
   }, [parsedMission.modes, selectedModeName])
 
   const selectedMode = parsedMission.modes.find(mode => mode.name === selectedModeName) || null
-  const selectedModeMetadata = selectedMode ? registryByClass[selectedMode.classPath] || null : null
+  const selectedModeMetadata = selectedMode ? registryByMode[selectedMode.mode] || null : null
   const availableModes = useMemo(() => {
     const target = selectedMode?.target || parsedMission.selectedTarget
     if (target && Array.isArray(modeRegistry?.[target])) {
@@ -1250,7 +1265,7 @@ function MissionGraphEditor({
       const nextName = uniqueModeName(doc)
       const nextMode = {
         name: nextName,
-        classPath: fallbackMode?.class_path || '',
+        mode: publicModeId(fallbackMode?.mode || fallbackMode?.class_path || ''),
         paramsRaw: defaultParamsRawForMode(fallbackMode),
         transitionsRaw: '',
         transitions: [],
@@ -1466,24 +1481,24 @@ function MissionGraphEditor({
             </button>
           </div>
           {parsedMission.modes.map(mode => (
-            <button
-              key={mode.name}
-              type="button"
-              className={`mission-node ${selectedModeName === mode.name ? 'mission-node-active' : ''}`}
-              onClick={() => setSelectedModeName(mode.name)}
-            >
-              <span className="mission-node-name">{mode.name}</span>
-              <span className="mission-node-class">{mode.classPath}</span>
-              <span className="mission-node-meta">
-                {mode.target || 'unknown'} · {mode.transitions.length} edge{mode.transitions.length === 1 ? '' : 's'}
-              </span>
-            </button>
-          ))}
+          <button
+            key={mode.name}
+            type="button"
+            className={`mission-node ${selectedModeName === mode.name ? 'mission-node-active' : ''}`}
+            onClick={() => setSelectedModeName(mode.name)}
+          >
+            <span className="mission-node-name">{mode.name}</span>
+            <span className="mission-node-class">{mode.mode}</span>
+            <span className="mission-node-meta">
+              {mode.target || 'unknown'} · {mode.transitions.length} edge{mode.transitions.length === 1 ? '' : 's'}
+            </span>
+          </button>
+        ))}
         </div>
 
         <div className="mission-node-editor">
           {!selectedMode ? (
-            <p className="subtext left-note">Select a mode to edit its class, params, and outgoing transitions.</p>
+            <p className="subtext left-note">Select a mode to edit its public alias, params, and outgoing transitions.</p>
           ) : (
             <>
               <div className="mission-node-editor-head">
@@ -1520,12 +1535,12 @@ function MissionGraphEditor({
                 disabled={!connected || busy}
               />
 
-              <label>Class path</label>
+              <label>Mode alias</label>
               <select
-                value={selectedMode.classPath}
+                value={selectedMode.mode}
                 onChange={e => updateSelectedMode(mode => {
-                  const metadata = registryByClass[e.target.value] || null
-                  mode.classPath = e.target.value
+                  const metadata = registryByMode[e.target.value] || null
+                  mode.mode = e.target.value
                   mode.target = metadata?.mission_target || inferMissionTarget(e.target.value)
                   mode.paramsRaw = defaultParamsRawForMode(metadata)
                   mode.transitions = []
@@ -1536,12 +1551,12 @@ function MissionGraphEditor({
                 disabled={!connected || busy || availableModes.length === 0}
               >
                 {availableModes.map(mode => (
-                  <option key={mode.class_path} value={mode.class_path}>
-                    {mode.class_path}
+                  <option key={mode.mode || mode.class_path} value={mode.mode || mode.class_path}>
+                    {mode.mode || mode.class_path}
                   </option>
                 ))}
                 {!availableModes.length && (
-                  <option value={selectedMode.classPath}>{selectedMode.classPath || 'No registered modes'}</option>
+                  <option value={selectedMode.mode}>{selectedMode.mode || 'No registered modes'}</option>
                 )}
               </select>
 

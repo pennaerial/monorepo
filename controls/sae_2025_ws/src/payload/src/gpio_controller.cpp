@@ -14,6 +14,12 @@
 
 GPIOController::GPIOController() {}
 
+GPIOController::GPIOController(
+  std::unique_ptr<Motor> left_motor,
+  std::unique_ptr<Motor> right_motor)
+: left_motor_(std::move(left_motor)),
+  right_motor_(std::move(right_motor)) {}
+
 GPIOController::~GPIOController()
 {
   if (node_ != nullptr) {
@@ -106,9 +112,8 @@ void GPIOController::initialize(rclcpp::Node * node)
   left_pid_state_ = payload::control_math::PidState{};
   right_pid_state_ = payload::control_math::PidState{};
 
-  const std::string node_name = node_->get_name();
-  const std::string state_topic = "/" + node_name + "/motor_state";
-  const std::string zn_service_name = "/" + node_name + "/compute_pid_zn";
+  const std::string state_topic = "motor_state";
+  const std::string zn_service_name = "compute_pid_zn";
 
   motor_state_pub_ =
     node_->create_publisher<payload_interfaces::msg::MotorState>(state_topic, 10);
@@ -123,7 +128,7 @@ void GPIOController::initialize(rclcpp::Node * node)
 
   dead_reckon_cbg_ = node_->create_callback_group(
     rclcpp::CallbackGroupType::MutuallyExclusive);
-  const std::string dr_service_name = "/" + node_name + "/dead_reckon";
+  const std::string dr_service_name = "dead_reckon";
   dead_reckon_srv_ = node_->create_service<payload_interfaces::srv::DeadReckon>(
     dr_service_name,
     std::bind(
@@ -184,11 +189,11 @@ void GPIOController::safe_shutdown()
   }
 
   if (left_motor_) {
-    left_motor_->coast();
+    left_motor_->hard_brake();
   }
 
   if (right_motor_) {
-    right_motor_->coast();
+    right_motor_->hard_brake();
   }
 
   if (servo_) {
