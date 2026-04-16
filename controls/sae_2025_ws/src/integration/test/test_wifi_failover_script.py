@@ -114,6 +114,7 @@ def _run_failover(
     runtime_policy_active: bool,
     runtime_allowed_ap_hosts: list[str] | None = None,
     visible_networks: list[tuple[str, int]] | None = None,
+    switching_disabled: bool = False,
 ) -> subprocess.CompletedProcess[str]:
     bin_dir, nmcli_log, runtime_policy_path = _make_fake_tools(
         tmp_path,
@@ -124,12 +125,17 @@ def _run_failover(
 
     policy_path = tmp_path / "default-policy.yaml"
     policy_path.write_text(default_policy, encoding="utf-8")
+    switching_disable_marker = tmp_path / "runtime" / "disable-switching"
+    if switching_disabled:
+        switching_disable_marker.parent.mkdir(parents=True, exist_ok=True)
+        switching_disable_marker.write_text("disabled\n", encoding="utf-8")
 
     env = os.environ.copy()
     env.update(
         {
             "PATH": f"{bin_dir}{os.pathsep}{env.get('PATH', '')}",
             "PENNAIR_NETWORK_DEFAULT_POLICY": str(policy_path),
+            "PENNAIR_WIFI_SWITCHING_DISABLE_MARKER": str(switching_disable_marker),
             "DEFAULT_DEPLOY_ROOT": str(tmp_path / "deploy"),
             "DEFAULT_HOSTNAME": "air-02",
             "DEFAULT_FALLBACK_PSK": "shared-psk",
@@ -259,4 +265,33 @@ def test_explicit_allowed_ap_hosts_still_restricts_selection(tmp_path: Path) -> 
     ]
     assert connect_lines == [
         "CONNECT device wifi connect pennair-ap-air-03 password shared-psk name pennair-fallback-client-air-03 ifname wlan0"
+    ]
+
+
+def test_switching_disabled_marker_prevents_automatic_wifi_changes(
+    tmp_path: Path,
+) -> None:
+    result = _run_failover(
+        tmp_path,
+        default_policy="""\
+        hostname: air-02
+        fallback_ap_prefix: pennair-ap
+        fallback_psk: shared-psk
+        network_role: client
+        ap_selection: strongest
+        allowed_ap_hosts: []
+        """,
+        runtime_policy_active=False,
+        visible_networks=[
+            ("pennair-ap-air-01", 90),
+        ],
+        switching_disabled=True,
+    )
+
+    assert result.returncode == 0, result.stderr or result.stdout
+    assert "Wi-Fi switching is disabled" in result.stdout
+    assert _nmcli_log_lines(tmp_path) == [
+        "nmcli -t -f DEVICE,TYPE device status",
+        "nmcli -t -f NAME,TYPE connection show --active",
+        "nmcli -t -f ACTIVE,SSID device wifi list ifname wlan0 --rescan no",
     ]

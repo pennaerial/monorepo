@@ -92,6 +92,7 @@ async def wifi_status(
             "runtime_active": policy_status.get("runtime_active"),
             "mission_started": policy_status.get("mission_started"),
             "travel_router_locked": policy_status.get("travel_router_locked"),
+            "switching_disabled": policy_status.get("switching_disabled"),
             "local_ap_profile": policy_status.get("local_ap_profile"),
             "travel_router_profile": policy_status.get("travel_router_profile"),
             "allowed_ap_hosts": policy_status.get("allowed_ap_hosts") or [],

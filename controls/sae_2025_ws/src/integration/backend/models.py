@@ -118,6 +118,7 @@ class WifiStatusResponse(BaseModel):
     runtime_active: bool | None = None
     mission_started: bool | None = None
     travel_router_locked: bool | None = None
+    switching_disabled: bool | None = None
     local_ap_profile: str | None = None
     travel_router_profile: str | None = None
     allowed_ap_hosts: list[str] = Field(default_factory=list)

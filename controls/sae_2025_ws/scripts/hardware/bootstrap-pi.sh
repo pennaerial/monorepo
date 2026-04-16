@@ -283,11 +283,15 @@ write_network_default_policy() {
 
 install_wifi_failover_helper() {
     local helper_path="/usr/local/bin/pennair-wifi-failover"
+    local disable_path="/usr/local/bin/pennair-disable-wifi-switching"
+    local enable_path="/usr/local/bin/pennair-enable-wifi-switching"
     local service_path="/etc/systemd/system/pennair-wifi-failover.service"
     local timer_path="/etc/systemd/system/pennair-wifi-failover.timer"
 
     deploy_info "Installing Wi-Fi failover helper"
     run_root install -m 0755 "$SCRIPT_DIR/wifi-failover.sh" "$helper_path"
+    run_root install -m 0755 "$SCRIPT_DIR/disable-wifi-switching.sh" "$disable_path"
+    run_root install -m 0755 "$SCRIPT_DIR/enable-wifi-switching.sh" "$enable_path"
 
     run_root tee "$service_path" >/dev/null <<EOF_SERVICE
 [Unit]

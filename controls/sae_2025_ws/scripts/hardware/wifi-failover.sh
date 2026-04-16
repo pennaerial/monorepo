@@ -3,6 +3,7 @@
 set -euo pipefail
 
 DEFAULT_POLICY_PATH="${PENNAIR_NETWORK_DEFAULT_POLICY:-/etc/pennair/network-default.yaml}"
+SWITCHING_DISABLE_MARKER="${PENNAIR_WIFI_SWITCHING_DISABLE_MARKER:-/run/pennair/network/disable-switching}"
 STATUS_ONLY=0
 
 if [[ "${1:-}" == "--status" ]]; then
@@ -286,6 +287,22 @@ else
     CURRENT_MODE="other"
 fi
 
+SWITCHING_DISABLED=0
+if [[ -f "$SWITCHING_DISABLE_MARKER" ]]; then
+    SWITCHING_DISABLED=1
+fi
+
+ACTIVE_WIFI_SSID="$(active_wifi_ssid "$WIFI_DEVICE")"
+
+if [[ "$STATUS_ONLY" == "1" ]]; then
+    export PENNAIR_WIFI_STATUS_SWITCHING_DISABLED="$([[ "$SWITCHING_DISABLED" == "1" ]] && printf 'true' || printf 'false')"
+fi
+
+if [[ "$SWITCHING_DISABLED" == "1" && "$STATUS_ONLY" != "1" ]]; then
+    log "Wi-Fi switching is disabled by ${SWITCHING_DISABLE_MARKER}"
+    exit 0
+fi
+
 while IFS=: read -r ssid signal; do
     [[ -n "$ssid" ]] || continue
     signal="${signal:-0}"
@@ -298,8 +315,6 @@ TRAVEL_ROUTER_ALLOWED=1
 if [[ "$MISSION_STARTED" == "1" ]]; then
     TRAVEL_ROUTER_ALLOWED=0
 fi
-
-ACTIVE_WIFI_SSID="$(active_wifi_ssid "$WIFI_DEVICE")"
 
 if [[ "$STATUS_ONLY" == "1" ]]; then
     export PENNAIR_WIFI_STATUS_CURRENT_CONNECTION="${CURRENT_CONNECTION:-}"
@@ -331,6 +346,7 @@ payload = {
     "runtime_active": os.environ.get("PENNAIR_WIFI_STATUS_RUNTIME_ACTIVE", "false") == "true",
     "mission_started": os.environ.get("PENNAIR_WIFI_STATUS_MISSION_STARTED", "false") == "true",
     "travel_router_locked": os.environ.get("PENNAIR_WIFI_STATUS_TRAVEL_ROUTER_LOCKED", "false") == "true",
+    "switching_disabled": os.environ.get("PENNAIR_WIFI_STATUS_SWITCHING_DISABLED", "false") == "true",
     "local_ap_profile": os.environ.get("PENNAIR_WIFI_STATUS_LOCAL_AP_PROFILE", "") or None,
     "travel_router_profile": os.environ.get("PENNAIR_WIFI_STATUS_TRAVEL_ROUTER_PROFILE", "") or None,
     "allowed_ap_hosts": allowed,
