@@ -114,10 +114,7 @@ class ModeManager(Node):
     def _write_mission_started_marker(self) -> None:
         marker_path = self._mission_started_marker_path()
         vehicle_name = str(getattr(self, "_runtime_vehicle_name", "") or "").strip()
-        marker_text = (
-            f"started_at={time():.6f}\n"
-            f"vehicle_name={vehicle_name}\n"
-        )
+        marker_text = f"started_at={time():.6f}\nvehicle_name={vehicle_name}\n"
         try:
             marker_path.parent.mkdir(parents=True, exist_ok=True)
             marker_path.write_text(marker_text, encoding="utf-8")

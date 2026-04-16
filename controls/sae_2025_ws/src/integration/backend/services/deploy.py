@@ -84,11 +84,7 @@ def _render_runtime_network_policy(
     network_policy_override: RuntimeNetworkPolicyOverride | None,
 ) -> str:
     normalized = _normalized_network_policy_override(network_policy_override)
-    payload = (
-        {}
-        if normalized is None
-        else normalized.model_dump(exclude_none=True)
-    )
+    payload = {} if normalized is None else normalized.model_dump(exclude_none=True)
     return yaml.safe_dump(payload, sort_keys=False)
 
 
@@ -260,7 +256,9 @@ def _resolve_fleet_allowed_ap_hosts(
     if not candidate_vehicles:
         return None
 
-    unknown = [candidate for candidate in candidate_vehicles if candidate not in policy_lookup]
+    unknown = [
+        candidate for candidate in candidate_vehicles if candidate not in policy_lookup
+    ]
     if unknown:
         raise ValueError(
             f"{error_prefix} for "
@@ -308,8 +306,7 @@ def _resolve_fleet_allowed_ap_hosts(
 
     if not resolved_hosts:
         raise ValueError(
-            f"{error_prefix} for "
-            f"'{vehicle_name}' {empty_resolution_message}."
+            f"{error_prefix} for '{vehicle_name}' {empty_resolution_message}."
         )
 
     return resolved_hosts or None

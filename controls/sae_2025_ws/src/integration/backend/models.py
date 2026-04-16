@@ -229,9 +229,7 @@ class RuntimeNetworkPolicyOverride(BaseModel):
 
     @field_validator("allowed_ap_hosts", mode="before")
     @classmethod
-    def _normalize_allowed_ap_hosts(
-        cls, value: object
-    ) -> list[str] | None:
+    def _normalize_allowed_ap_hosts(cls, value: object) -> list[str] | None:
         return _normalize_name_list(value, lower=True)
 
     def is_empty(self) -> bool:
@@ -400,9 +398,7 @@ class FleetDeviceSelection(BaseModel):
 
     @field_validator("allowed_ap_hosts", mode="before")
     @classmethod
-    def _normalize_selection_allowed_ap_hosts(
-        cls, value: object
-    ) -> list[str] | None:
+    def _normalize_selection_allowed_ap_hosts(cls, value: object) -> list[str] | None:
         return _normalize_name_list(value, lower=True)
 
     @field_validator("allowed_ap_vehicles", mode="before")
@@ -430,9 +426,7 @@ class FleetBatchRequest(BaseModel):
 
     @field_validator("session_assignments", mode="before")
     @classmethod
-    def _normalize_session_assignments(
-        cls, value: object
-    ) -> dict[str, str]:
+    def _normalize_session_assignments(cls, value: object) -> dict[str, str]:
         if value is None:
             return {}
         if not isinstance(value, dict):

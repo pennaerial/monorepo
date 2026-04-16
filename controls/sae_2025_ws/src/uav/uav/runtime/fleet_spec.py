@@ -33,9 +33,7 @@ class FleetDefaultsModel(BaseModel):
 
     @field_validator("allowed_ap_vehicles", mode="before")
     @classmethod
-    def _normalize_allowed_ap_vehicles(
-        cls, value: object
-    ) -> list[str] | None:
+    def _normalize_allowed_ap_vehicles(cls, value: object) -> list[str] | None:
         if value is None:
             return None
 

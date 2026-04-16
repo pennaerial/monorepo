@@ -1964,9 +1964,7 @@ def test_runner_script_disables_nounset_only_around_ros_setup(tmp_path):
     ) < script.index("set -u\nexec ros2 launch")
 
 
-def test_deploy_artifact_path_writes_runtime_network_policy_yaml(
-    tmp_path, monkeypatch
-):
+def test_deploy_artifact_path_writes_runtime_network_policy_yaml(tmp_path, monkeypatch):
     from backend.models import RuntimeNetworkPolicyOverride
 
     target = _make_target(
@@ -2197,9 +2195,7 @@ def test_perform_action_refreshes_failed_deploy_rows_with_rollback_metadata(
     assert result["current_build"]["release_id"] == "release-old"
 
 
-def test_perform_action_threads_operator_ap_vehicles_to_deploy(
-    tmp_path, monkeypatch
-):
+def test_perform_action_threads_operator_ap_vehicles_to_deploy(tmp_path, monkeypatch):
     from backend.models import FleetDeviceSelection
     from backend.services import fleet as fleet_service
 

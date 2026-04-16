@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 import subprocess
-import sys
 import textwrap
 from pathlib import Path
 
@@ -28,49 +27,46 @@ def _make_fake_tools(
     nmcli_log = tmp_path / "nmcli.log"
     runtime_policy_path = tmp_path / "deploy" / "config" / "network-policy.yaml"
 
-    visible_lines = "\n".join(f"{ssid}:{signal}" for ssid, signal in (visible_networks or []))
-    runtime_hosts = "\n".join(runtime_allowed_ap_hosts or [])
-
     _write_executable(
         bin_dir / "nmcli",
-        f"""\
+        """\
         #!/usr/bin/env bash
         set -euo pipefail
 
-        log_file="${{NMCLI_LOG:?}}"
+        log_file="${NMCLI_LOG:?}"
         printf 'nmcli %s\\n' "$*" >> "$log_file"
 
-        if [[ "${{1:-}}" == "-t" && "${{2:-}}" == "-f" && "${{3:-}}" == "DEVICE,TYPE" && "${{4:-}}" == "device" && "${{5:-}}" == "status" ]]; then
+        if [[ "${1:-}" == "-t" && "${2:-}" == "-f" && "${3:-}" == "DEVICE,TYPE" && "${4:-}" == "device" && "${5:-}" == "status" ]]; then
             printf 'wlan0:wifi\\n'
             exit 0
         fi
 
-        if [[ "${{1:-}}" == "-t" && "${{2:-}}" == "-f" && "${{3:-}}" == "NAME" && "${{4:-}}" == "connection" && "${{5:-}}" == "show" && "${{6:-}}" == "--active" ]]; then
+        if [[ "${1:-}" == "-t" && "${2:-}" == "-f" && "${3:-}" == "NAME" && "${4:-}" == "connection" && "${5:-}" == "show" && "${6:-}" == "--active" ]]; then
             exit 0
         fi
 
-        if [[ "${{1:-}}" == "-t" && "${{2:-}}" == "-f" && "${{3:-}}" == "NAME" && "${{4:-}}" == "connection" && "${{5:-}}" == "show" ]]; then
+        if [[ "${1:-}" == "-t" && "${2:-}" == "-f" && "${3:-}" == "NAME" && "${4:-}" == "connection" && "${5:-}" == "show" ]]; then
             exit 0
         fi
 
-        if [[ "${{1:-}}" == "-t" && "${{2:-}}" == "-f" && "${{3:-}}" == "ACTIVE,SSID" && "${{4:-}}" == "device" && "${{5:-}}" == "wifi" && "${{6:-}}" == "list" && "${{7:-}}" == "ifname" && "${{9:-}}" == "--rescan" && "${{10:-}}" == "no" ]]; then
+        if [[ "${1:-}" == "-t" && "${2:-}" == "-f" && "${3:-}" == "ACTIVE,SSID" && "${4:-}" == "device" && "${5:-}" == "wifi" && "${6:-}" == "list" && "${7:-}" == "ifname" && "${9:-}" == "--rescan" && "${10:-}" == "no" ]]; then
             exit 0
         fi
 
-        if [[ "${{1:-}}" == "-t" && "${{2:-}}" == "-f" && "${{3:-}}" == "SSID,SIGNAL" && "${{4:-}}" == "device" && "${{5:-}}" == "wifi" && "${{6:-}}" == "list" && "${{7:-}}" == "ifname" && "${{9:-}}" == "--rescan" && "${{10:-}}" == "auto" ]]; then
+        if [[ "${1:-}" == "-t" && "${2:-}" == "-f" && "${3:-}" == "SSID,SIGNAL" && "${4:-}" == "device" && "${5:-}" == "wifi" && "${6:-}" == "list" && "${7:-}" == "ifname" && "${9:-}" == "--rescan" && "${10:-}" == "auto" ]]; then
             while IFS= read -r line; do
                 [[ -n "$line" ]] || continue
                 printf '%s\\n' "$line"
-            done <<<"${{FAKE_VISIBLE_NETWORKS:-}}"
+            done <<<"${FAKE_VISIBLE_NETWORKS:-}"
             exit 0
         fi
 
-        if [[ "${{1:-}}" == "device" && "${{2:-}}" == "wifi" && "${{3:-}}" == "connect" ]]; then
+        if [[ "${1:-}" == "device" && "${2:-}" == "wifi" && "${3:-}" == "connect" ]]; then
             printf 'CONNECT %s\\n' "$*" >> "$log_file"
             exit 0
         fi
 
-        if [[ "${{1:-}}" == "connection" && "${{2:-}}" == "modify" ]]; then
+        if [[ "${1:-}" == "connection" && "${2:-}" == "modify" ]]; then
             printf 'MODIFY %s\\n' "$*" >> "$log_file"
             exit 0
         fi
@@ -81,23 +77,23 @@ def _make_fake_tools(
 
     _write_executable(
         bin_dir / "systemctl",
-        f"""\
+        """\
         #!/usr/bin/env bash
         set -euo pipefail
 
-        if [[ "${{1:-}}" == "is-active" && "${{2:-}}" == "--quiet" && "${{3:-}}" == "pennair-autonomy.service" ]]; then
-            if [[ "${{FAKE_SYSTEMCTL_ACTIVE:-0}}" == "1" ]]; then
+        if [[ "${1:-}" == "is-active" && "${2:-}" == "--quiet" && "${3:-}" == "pennair-autonomy.service" ]]; then
+            if [[ "${FAKE_SYSTEMCTL_ACTIVE:-0}" == "1" ]]; then
                 mkdir -p "$(dirname "$RUNTIME_POLICY_PATH")"
-                {{
+                {
                     printf 'fallback_ap_prefix: pennair-ap\\n'
                     printf 'network_role: client\\n'
-                    printf 'ap_selection: %s\\n' "${{FAKE_RUNTIME_AP_SELECTION:-ordered_then_strongest}}"
+                    printf 'ap_selection: %s\\n' "${FAKE_RUNTIME_AP_SELECTION:-ordered_then_strongest}"
                     printf 'allowed_ap_hosts:\\n'
                     while IFS= read -r host; do
                         [[ -n "$host" ]] || continue
                         printf '  - %s\\n' "$host"
-                    done <<<"${{FAKE_RUNTIME_ALLOWED_AP_HOSTS:-}}"
-                }} > "$RUNTIME_POLICY_PATH"
+                    done <<<"${FAKE_RUNTIME_ALLOWED_AP_HOSTS:-}"
+                } > "$RUNTIME_POLICY_PATH"
                 exit 0
             fi
             rm -f "$RUNTIME_POLICY_PATH" 2>/dev/null || true
@@ -164,7 +160,11 @@ def _nmcli_log_lines(tmp_path: Path) -> list[str]:
     log_path = tmp_path / "nmcli.log"
     if not log_path.exists():
         return []
-    return [line.strip() for line in log_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    return [
+        line.strip()
+        for line in log_path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
 
 
 def test_empty_default_allowed_ap_hosts_uses_visible_pennair_ap_candidates_and_skips_self(
@@ -190,13 +190,17 @@ def test_empty_default_allowed_ap_hosts_uses_visible_pennair_ap_candidates_and_s
 
     assert result.returncode == 0, result.stderr or result.stdout
 
-    connect_lines = [line for line in _nmcli_log_lines(tmp_path) if line.startswith("CONNECT ")]
+    connect_lines = [
+        line for line in _nmcli_log_lines(tmp_path) if line.startswith("CONNECT ")
+    ]
     assert connect_lines == [
         "CONNECT device wifi connect pennair-ap-air-01 password shared-psk name pennair-fallback-client-air-01 ifname wlan0"
     ]
 
 
-def test_empty_runtime_allowed_ap_hosts_override_replaces_bootstrap_allowlist(tmp_path: Path) -> None:
+def test_empty_runtime_allowed_ap_hosts_override_replaces_bootstrap_allowlist(
+    tmp_path: Path,
+) -> None:
     result = _run_failover(
         tmp_path,
         default_policy="""\
@@ -219,7 +223,9 @@ def test_empty_runtime_allowed_ap_hosts_override_replaces_bootstrap_allowlist(tm
 
     assert result.returncode == 0, result.stderr or result.stdout
 
-    connect_lines = [line for line in _nmcli_log_lines(tmp_path) if line.startswith("CONNECT ")]
+    connect_lines = [
+        line for line in _nmcli_log_lines(tmp_path) if line.startswith("CONNECT ")
+    ]
     assert connect_lines == [
         "CONNECT device wifi connect pennair-ap-air-01 password shared-psk name pennair-fallback-client-air-01 ifname wlan0"
     ]
@@ -248,7 +254,9 @@ def test_explicit_allowed_ap_hosts_still_restricts_selection(tmp_path: Path) -> 
 
     assert result.returncode == 0, result.stderr or result.stdout
 
-    connect_lines = [line for line in _nmcli_log_lines(tmp_path) if line.startswith("CONNECT ")]
+    connect_lines = [
+        line for line in _nmcli_log_lines(tmp_path) if line.startswith("CONNECT ")
+    ]
     assert connect_lines == [
         "CONNECT device wifi connect pennair-ap-air-03 password shared-psk name pennair-fallback-client-air-03 ifname wlan0"
     ]
