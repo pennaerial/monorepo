@@ -835,7 +835,7 @@ class PayloadDLZNavigateMode(Mode):
         h, w = bgr.shape[:2]
         # Bottom third: top at 2h/3, bottom at h.
         row_start = int(h * 2 / 3)
-        row_end = h
+        row_end = h * 9 // 10
         col_start = 0
         col_end = w
         crop = bgr[row_start:row_end, col_start:col_end]
@@ -860,7 +860,7 @@ class PayloadDLZNavigateMode(Mode):
             self.vehicle.drive(0.0, 0.0)
             return
 
-        # Corner turns are opposite to the initial alignment turn:
+        # Corner turns:
         #   CCW travel → turn left (+), CW travel → turn right (-)
         speed = self.corner_angular_speed
         angular = speed if self.direction == "ccw" else -speed
@@ -872,14 +872,14 @@ class PayloadDLZNavigateMode(Mode):
                 self._corner_single_color_metrics(bgr, self._corner_target_color)
             )
             # Stop condition depends on travel direction (lenient):
-            #   cw  → accept when centroid on the RIGHT side of the crop
-            #         (lateral_error_px > -_CORNER_CENTER_TOL_PX)
-            #   ccw → accept when centroid on the LEFT side of the crop
+            #   cw  → accept when centroid on the LEFT side of the crop
             #         (lateral_error_px <  _CORNER_CENTER_TOL_PX)
+            #   ccw → accept when centroid on the RIGHT side of the crop
+            #         (lateral_error_px > -_CORNER_CENTER_TOL_PX)
             if self.direction == "cw":
-                side_ok = lateral_error_px > -_CORNER_CENTER_TOL_PX
-            else:
                 side_ok = lateral_error_px < _CORNER_CENTER_TOL_PX
+            else:
+                side_ok = lateral_error_px > -_CORNER_CENTER_TOL_PX
             if total >= _CORNER_CENTER_MIN_PX and side_ok:
                 self._corner_stable += 1
                 if self._corner_stable >= _CORNER_STABLE_FRAMES:
@@ -927,7 +927,7 @@ class PayloadDLZNavigateMode(Mode):
             return
         debug = bgr.copy()
         h, w = bgr.shape[:2]
-        row_end = h
+        row_end = h * 9 // 10
         col_end = w - col_start
 
         # Darken the rows OUTSIDE the crop band so the active region is
@@ -953,14 +953,14 @@ class PayloadDLZNavigateMode(Mode):
         cv2.line(debug, (crop_cx, row_start), (crop_cx, row_end), (255, 255, 255), 1)
 
         # Accept region (direction-dependent, lenient):
-        #   cw  → accept side = right; boundary line at crop_cx - tol
-        #   ccw → accept side = left; boundary line at crop_cx + tol
+        #   cw  → accept side = left; boundary line at crop_cx + tol
+        #   ccw → accept side = right; boundary line at crop_cx - tol
         if self.direction == "cw":
-            accept_boundary_x = int(crop_cx - _CORNER_CENTER_TOL_PX)
-            accept_x0, accept_x1 = accept_boundary_x, w
-        else:
             accept_boundary_x = int(crop_cx + _CORNER_CENTER_TOL_PX)
             accept_x0, accept_x1 = 0, accept_boundary_x
+        else:
+            accept_boundary_x = int(crop_cx - _CORNER_CENTER_TOL_PX)
+            accept_x0, accept_x1 = accept_boundary_x, w
         overlay = debug.copy()
         cv2.rectangle(
             overlay,
@@ -982,9 +982,9 @@ class PayloadDLZNavigateMode(Mode):
         if total >= _CORNER_CENTER_MIN_PX:
             centroid_x = int(crop_cx + lateral_error_px)
             if self.direction == "cw":
-                in_accept = lateral_error_px > -_CORNER_CENTER_TOL_PX
-            else:
                 in_accept = lateral_error_px < _CORNER_CENTER_TOL_PX
+            else:
+                in_accept = lateral_error_px > -_CORNER_CENTER_TOL_PX
             color = (0, 255, 0) if in_accept else (0, 140, 255)
             cv2.line(debug, (centroid_x, row_start), (centroid_x, row_end), color, 2)
 
