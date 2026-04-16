@@ -14,6 +14,14 @@ function withSshPasswordHint(error) {
 export function withQueryParams(url, params = {}) {
   const parsed = new URL(url, window.location.origin)
   Object.entries(params).forEach(([key, value]) => {
+    if (Array.isArray(value)) {
+      parsed.searchParams.delete(key)
+      value
+        .map(item => `${item ?? ''}`.trim())
+        .filter(Boolean)
+        .forEach(item => parsed.searchParams.append(key, item))
+      return
+    }
     if (value === undefined || value === null || `${value}` === '') return
     parsed.searchParams.set(key, `${value}`)
   })
@@ -24,11 +32,37 @@ export function withTargetId(url, targetId) {
   return withQueryParams(url, { target_id: targetId })
 }
 
-export function withDeviceScope(url, { hostname = '', vehicleName = '' } = {}) {
+export function withDeviceScope(
+  url,
+  {
+    targetId = '',
+    hostname = '',
+    vehicleName = '',
+    networkRole = '',
+    allowedApHosts = [],
+    apSelection = '',
+  } = {},
+) {
   return withQueryParams(url, {
+    target_id: targetId,
     hostname,
     vehicle_name: vehicleName,
+    network_role: networkRole,
+    allowed_ap_hosts: allowedApHosts,
+    ap_selection: apSelection,
   })
+}
+
+export function withJsonBody(payload, opts = {}) {
+  const headers = new Headers(opts.headers || {})
+  if (!headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json')
+  }
+  return {
+    ...opts,
+    headers,
+    body: JSON.stringify(payload ?? {}),
+  }
 }
 
 export function withTargetFormData(formData, targetId) {

@@ -69,6 +69,13 @@ defaults:
   # Leave blank to disable. This must resolve inside the runtime environment.
   camera_preprocess_hook: ""
 
+  # Optional hardware fallback Wi-Fi role. Use `default` to defer to the Pi's
+  # bootstrap policy, `ap` to host a fallback AP, or `client` to join one.
+  network_role: default
+
+  # For client-role hardware vehicles, choose a preferred AP selection strategy.
+  ap_selection: ordered_then_strongest
+
 vehicles:
   # Fleet vehicle entries bind one managed stack to one backend controllable.
   - name: uav_0
@@ -84,6 +91,8 @@ vehicles:
     # Any shared knob from `defaults` can be overridden per vehicle.
     debug: true
     camera_mount_offsets: [0.2, 0.0, 0.0]
+    network_role: client
+    allowed_ap_vehicles: [payload_0]
 
   - name: payload_0
     controllable: payload_0
@@ -93,4 +102,5 @@ vehicles:
     vision_debug: true
     camera_input_transport: compressed
     camera_rotate_degrees: 180.0
+    network_role: ap
     # camera_preprocess_hook: my_package.my_module:preprocess

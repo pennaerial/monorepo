@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class ErrorResponse(BaseModel):
@@ -112,6 +112,15 @@ class WifiStatusResponse(BaseModel):
     success: bool
     is_hotspot: bool | None = None
     current_wifi: str | None = None
+    current_mode: str | None = None
+    effective_role: str | None = None
+    policy_source: str | None = None
+    runtime_active: bool | None = None
+    mission_started: bool | None = None
+    travel_router_locked: bool | None = None
+    local_ap_profile: str | None = None
+    travel_router_profile: str | None = None
+    allowed_ap_hosts: list[str] = Field(default_factory=list)
     connections: list[WifiConnection] = Field(default_factory=list)
     error: str | None = None
 
@@ -167,6 +176,72 @@ class BuildListResponse(BaseModel):
     error: str | None = None
 
 
+NetworkRole = Literal["default", "ap", "client"]
+ApSelection = Literal["ordered_then_strongest", "strongest"]
+
+
+def _normalize_host_alias(value: object) -> str:
+    candidate = str(value or "").strip().rstrip(".").lower()
+    if candidate.endswith(".local"):
+        candidate = candidate[:-6]
+    return candidate
+
+
+def _normalize_name_list(
+    value: object,
+    *,
+    lower: bool = False,
+) -> list[str] | None:
+    if value is None:
+        return None
+
+    raw_values: list[object]
+    if isinstance(value, str):
+        raw_values = [value]
+    elif isinstance(value, (list, tuple, set)):
+        raw_values = list(value)
+    else:
+        raw_values = [value]
+
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for raw in raw_values:
+        parts = (
+            [segment for segment in raw.split(",")]
+            if isinstance(raw, str)
+            else [str(raw)]
+        )
+        for part in parts:
+            candidate = part.strip().rstrip(".")
+            if lower:
+                candidate = candidate.lower()
+            if not candidate or candidate in seen:
+                continue
+            seen.add(candidate)
+            normalized.append(candidate)
+    return normalized
+
+
+class RuntimeNetworkPolicyOverride(BaseModel):
+    network_role: NetworkRole | None = None
+    allowed_ap_hosts: list[str] | None = None
+    ap_selection: ApSelection | None = None
+
+    @field_validator("allowed_ap_hosts", mode="before")
+    @classmethod
+    def _normalize_allowed_ap_hosts(
+        cls, value: object
+    ) -> list[str] | None:
+        return _normalize_name_list(value, lower=True)
+
+    def is_empty(self) -> bool:
+        return (
+            self.network_role is None
+            and self.allowed_ap_hosts is None
+            and self.ap_selection is None
+        )
+
+
 class FleetVehiclePreview(BaseModel):
     name: str
     kind: str | None = None
@@ -184,6 +259,9 @@ class FleetVehiclePreview(BaseModel):
     px4_airframe_id: int | None = None
     px4_namespace: str | None = None
     payload_controller: str | None = None
+    network_role: NetworkRole | None = None
+    allowed_ap_vehicles: list[str] = Field(default_factory=list)
+    ap_selection: ApSelection | None = None
 
 
 class BuildSourcePayload(BaseModel):
@@ -315,10 +393,59 @@ class FleetDeviceSelection(BaseModel):
     service_unit: str | None = None
     ssh_key: str | None = None
     ssh_pass: str | None = None
+    network_role: NetworkRole | None = None
+    allowed_ap_hosts: list[str] | None = None
+    allowed_ap_vehicles: list[str] | None = None
+    ap_selection: ApSelection | None = None
+
+    @field_validator("allowed_ap_hosts", mode="before")
+    @classmethod
+    def _normalize_selection_allowed_ap_hosts(
+        cls, value: object
+    ) -> list[str] | None:
+        return _normalize_name_list(value, lower=True)
+
+    @field_validator("allowed_ap_vehicles", mode="before")
+    @classmethod
+    def _normalize_selection_allowed_ap_vehicles(
+        cls, value: object
+    ) -> list[str] | None:
+        return _normalize_name_list(value)
+
+    def network_policy_override(self) -> RuntimeNetworkPolicyOverride | None:
+        override = RuntimeNetworkPolicyOverride(
+            network_role=self.network_role,
+            allowed_ap_hosts=self.allowed_ap_hosts,
+            ap_selection=self.ap_selection,
+        )
+        return None if override.is_empty() else override
+
+    def allowed_ap_vehicles_override(self) -> list[str] | None:
+        return list(self.allowed_ap_vehicles or []) or None
 
 
 class FleetBatchRequest(BaseModel):
     devices: list[FleetDeviceSelection] = Field(default_factory=list)
+    session_assignments: dict[str, str] = Field(default_factory=dict)
+
+    @field_validator("session_assignments", mode="before")
+    @classmethod
+    def _normalize_session_assignments(
+        cls, value: object
+    ) -> dict[str, str]:
+        if value is None:
+            return {}
+        if not isinstance(value, dict):
+            raise TypeError("session_assignments must be a mapping.")
+
+        normalized: dict[str, str] = {}
+        for raw_host, raw_vehicle in value.items():
+            host = _normalize_host_alias(raw_host)
+            vehicle = str(raw_vehicle or "").strip()
+            if not host or not vehicle:
+                continue
+            normalized[host] = vehicle
+        return normalized
 
 
 class FleetActionDeviceResponse(FleetBoardDeviceResponse):

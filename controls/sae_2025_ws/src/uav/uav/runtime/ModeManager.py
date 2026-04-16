@@ -2,6 +2,8 @@
 from contextlib import contextmanager
 from dataclasses import dataclass
 import inspect
+import os
+from pathlib import Path
 from time import time
 from typing import Any, Callable, Iterator, get_type_hints
 
@@ -37,6 +39,9 @@ class _RawNodeApi:
     destroy_subscription: Callable[[object], bool | None]
     destroy_client: Callable[[object], bool | None]
     destroy_timer: Callable[[object], bool | None] | None
+
+
+MISSION_STARTED_MARKER_ENV = "PENNAIR_MISSION_STARTED_MARKER_PATH"
 
 
 class ModeManager(Node):
@@ -80,6 +85,7 @@ class ModeManager(Node):
         self.start_mission_service = self.create_service(
             Trigger, "mode_manager/start_mission", self._start_mission_callback
         )
+        self._clear_mission_started_marker()
         if self.auto_launch:
             self._auto_launch_timer = self.create_timer(0.1, self._maybe_auto_launch)
 
@@ -88,6 +94,46 @@ class ModeManager(Node):
 
     def _now_seconds(self) -> float:
         return self.get_clock().now().nanoseconds * 1e-9
+
+    def _mission_started_marker_path(self) -> Path:
+        explicit_path = os.environ.get(MISSION_STARTED_MARKER_ENV, "").strip()
+        if explicit_path:
+            return Path(explicit_path)
+
+        deploy_root = os.environ.get("DEPLOY_ROOT", "").strip()
+        if deploy_root:
+            return Path(deploy_root) / "state" / "mission-started"
+
+        runtime_vehicle_name = str(
+            getattr(self, "_runtime_vehicle_name", "") or ""
+        ).strip()
+        if runtime_vehicle_name:
+            return Path("/tmp/pennair") / runtime_vehicle_name / "mission-started"
+        return Path("/tmp/pennair/mission-started")
+
+    def _write_mission_started_marker(self) -> None:
+        marker_path = self._mission_started_marker_path()
+        vehicle_name = str(getattr(self, "_runtime_vehicle_name", "") or "").strip()
+        marker_text = (
+            f"started_at={time():.6f}\n"
+            f"vehicle_name={vehicle_name}\n"
+        )
+        try:
+            marker_path.parent.mkdir(parents=True, exist_ok=True)
+            marker_path.write_text(marker_text, encoding="utf-8")
+        except OSError as exc:
+            self.get_logger().warn(
+                f"Failed to write mission-start marker {marker_path}: {exc}"
+            )
+
+    def _clear_mission_started_marker(self) -> None:
+        marker_path = self._mission_started_marker_path()
+        try:
+            marker_path.unlink(missing_ok=True)
+        except OSError as exc:
+            self.get_logger().warn(
+                f"Failed to clear mission-start marker {marker_path}: {exc}"
+            )
 
     def shared_state_for(self, mode_or_class: object) -> dict[str, Any]:
         key = canonical_mode_path(mode_or_class)
@@ -456,6 +502,7 @@ class ModeManager(Node):
         self.last_update_time = time()
         self.get_logger().info("MODE MANAGER | Starting Mission!")
         self.timer = self.create_timer(0.1, self.spin_once)
+        self._write_mission_started_marker()
         return True
 
     def _cancel_auto_launch_timer(self) -> None:
@@ -483,11 +530,13 @@ class ModeManager(Node):
             self.get_logger().error(
                 f"Error in mode {self.active_mode}. Switching to safe stop behavior."
             )
+            self._clear_mission_started_marker()
             self._deactivate_active_mode()
             self._stop_vehicle()
             self.destroy_node()
         elif state == "terminate":
             self.get_logger().info("Mission has completed.")
+            self._clear_mission_started_marker()
             self._deactivate_active_mode()
             self._stop_vehicle()
             self.destroy_node()
@@ -551,6 +600,7 @@ class ModeManager(Node):
             peer_connections.close()
 
     def destroy_node(self) -> bool:
+        self._clear_mission_started_marker()
         if getattr(self, "active_mode", None):
             self._deactivate_active_mode()
         self._stop_vehicle()

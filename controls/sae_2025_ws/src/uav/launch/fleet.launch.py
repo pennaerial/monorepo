@@ -32,6 +32,9 @@ _SHARED_DEFAULT_KEYS = {
     "camera_input_transport",
     "camera_rotate_degrees",
     "camera_preprocess_hook",
+    "network_role",
+    "allowed_ap_vehicles",
+    "ap_selection",
 }
 
 _EXCLUDED_FLEET_KEYS = {

@@ -242,6 +242,7 @@ def _make_context(
     target: TargetRecord,
     *,
     fleet_file: Path | None = None,
+    extra_targets: list[TargetRecord] | None = None,
 ) -> SimpleNamespace:
     base_dir = tmp_path / "src" / "integration"
     base_dir.mkdir(parents=True, exist_ok=True)
@@ -262,6 +263,8 @@ def _make_context(
             **inventory_kwargs,
         )
         inventory.upsert_target(target.to_store_dict())
+    for extra_target in extra_targets or []:
+        inventory.upsert_target(extra_target.to_store_dict())
     build_source_path, cache_dir = build_source_store_paths(operator.inventory_path)
     build_source_store = BuildSourceStore(
         build_source_path,
@@ -325,6 +328,7 @@ def _make_context(
             ssh=_FakeSSH(result=_FakeSSHResult()),
         ),
         resolve_live_target=resolve_live_target,
+        list_targets=inventory.list_targets,
     )
 
 
@@ -639,6 +643,303 @@ def test_render_runtime_fleet_for_payload_defaults(tmp_path, monkeypatch):
             "camera_preprocess_hook": "",
             "payload_controller": "SimController",
         }
+    ]
+
+
+def test_runtime_network_policy_override_normalizes_hosts_and_renders_yaml():
+    from backend.models import RuntimeNetworkPolicyOverride
+
+    override = RuntimeNetworkPolicyOverride.model_validate(
+        {
+            "network_role": "client",
+            "allowed_ap_hosts": ["AP-1.local", "ap-2.local.", "ap-1.local"],
+            "ap_selection": "ordered_then_strongest",
+        }
+    )
+
+    assert override.allowed_ap_hosts == ["ap-1.local", "ap-2.local"]
+    assert yaml.safe_load(deploy_service._render_runtime_network_policy(override)) == {
+        "network_role": "client",
+        "allowed_ap_hosts": ["ap-1.local", "ap-2.local"],
+        "ap_selection": "ordered_then_strongest",
+    }
+    assert yaml.safe_load(deploy_service._render_runtime_network_policy(None)) == {}
+
+
+def test_effective_runtime_network_policy_override_resolves_fleet_policy(
+    tmp_path,
+):
+    fleet_file = _write_fleet(
+        tmp_path,
+        {
+            "defaults": {
+                "network_role": "client",
+                "ap_selection": "ordered_then_strongest",
+            },
+            "vehicles": [
+                {
+                    "name": "uav_0",
+                    "mission": "hover",
+                },
+                {
+                    "name": "payload_0",
+                    "mission": "payload_retreat",
+                    "network_role": "ap",
+                },
+            ],
+        },
+    )
+    target = _make_target(
+        target_id="pi-client",
+        vehicle_name="uav_0",
+        overlay_yaml="mission: hover\npx4_airframe_id: 4004\n",
+        pi_host="pi-client.local",
+    )
+    ctx = _make_context(tmp_path, target, fleet_file=fleet_file)
+
+    override = deploy_service._effective_runtime_network_policy_override(
+        ctx,
+        target_ctx=ctx.resolve_target("pi-client"),
+        session_assignments={"pi-client": "uav_0", "pi-ap-1": "payload_0"},
+    )
+
+    assert override is not None
+    assert override.model_dump() == {
+        "network_role": "client",
+        "allowed_ap_hosts": ["pi-ap-1"],
+        "ap_selection": "ordered_then_strongest",
+    }
+
+
+def test_effective_runtime_network_policy_override_merges_operator_fields(
+    tmp_path,
+):
+    from backend.models import RuntimeNetworkPolicyOverride
+
+    fleet_file = _write_fleet(
+        tmp_path,
+        {
+            "defaults": {
+                "network_role": "client",
+                "ap_selection": "ordered_then_strongest",
+            },
+            "vehicles": [
+                {
+                    "name": "uav_0",
+                    "mission": "hover",
+                },
+                {
+                    "name": "payload_0",
+                    "mission": "payload_retreat",
+                    "network_role": "ap",
+                },
+            ],
+        },
+    )
+    target = _make_target(
+        target_id="pi-client-override",
+        vehicle_name="uav_0",
+        overlay_yaml="mission: hover\npx4_airframe_id: 4004\n",
+        pi_host="pi-client-override.local",
+    )
+    ctx = _make_context(tmp_path, target, fleet_file=fleet_file)
+
+    override = deploy_service._effective_runtime_network_policy_override(
+        ctx,
+        target_ctx=ctx.resolve_target("pi-client-override"),
+        network_policy_override=RuntimeNetworkPolicyOverride(
+            network_role="default",
+            allowed_ap_hosts=["manual-ap"],
+            ap_selection="strongest",
+        ),
+        session_assignments={
+            "pi-client-override": "uav_0",
+            "pi-ap-1": "payload_0",
+        },
+    )
+
+    assert override is not None
+    assert override.model_dump() == {
+        "network_role": "default",
+        "allowed_ap_hosts": ["manual-ap"],
+        "ap_selection": "strongest",
+    }
+
+
+def test_effective_runtime_network_policy_override_resolves_operator_ap_vehicles(
+    tmp_path,
+):
+    from backend.models import RuntimeNetworkPolicyOverride
+
+    fleet_file = _write_fleet(
+        tmp_path,
+        {
+            "defaults": {
+                "network_role": "client",
+                "ap_selection": "ordered_then_strongest",
+            },
+            "vehicles": [
+                {
+                    "name": "uav_0",
+                    "mission": "hover",
+                    "allowed_ap_vehicles": ["payload_0"],
+                },
+                {
+                    "name": "payload_0",
+                    "mission": "payload_retreat",
+                    "network_role": "ap",
+                },
+                {
+                    "name": "payload_1",
+                    "mission": "payload_retreat",
+                    "network_role": "ap",
+                },
+            ],
+        },
+    )
+    target = _make_target(
+        target_id="pi-client-operator-vehicles",
+        vehicle_name="uav_0",
+        overlay_yaml="mission: hover\npx4_airframe_id: 4004\n",
+        pi_host="pi-client-operator-vehicles.local",
+    )
+    ctx = _make_context(tmp_path, target, fleet_file=fleet_file)
+
+    override = deploy_service._effective_runtime_network_policy_override(
+        ctx,
+        target_ctx=ctx.resolve_target("pi-client-operator-vehicles"),
+        network_policy_override=RuntimeNetworkPolicyOverride(
+            network_role="client",
+            ap_selection="strongest",
+        ),
+        operator_allowed_ap_vehicles=["payload_1"],
+        session_assignments={
+            "pi-client-operator-vehicles": "uav_0",
+            "pi-ap-1": "payload_0",
+            "pi-ap-2": "payload_1",
+        },
+    )
+
+    assert override is not None
+    assert override.model_dump() == {
+        "network_role": "client",
+        "allowed_ap_hosts": ["pi-ap-2"],
+        "ap_selection": "strongest",
+    }
+
+
+def test_effective_runtime_network_policy_override_requires_resolved_ap_vehicle(
+    tmp_path,
+):
+    fleet_file = _write_fleet(
+        tmp_path,
+        {
+            "vehicles": [
+                {
+                    "name": "uav_0",
+                    "mission": "hover",
+                    "network_role": "client",
+                    "allowed_ap_vehicles": ["payload_0"],
+                },
+                {
+                    "name": "payload_0",
+                    "mission": "payload_retreat",
+                    "network_role": "ap",
+                },
+            ]
+        },
+    )
+    target = _make_target(
+        target_id="pi-unresolved",
+        vehicle_name="uav_0",
+        overlay_yaml="mission: hover\npx4_airframe_id: 4004\n",
+        pi_host="pi-unresolved.local",
+    )
+    ctx = _make_context(tmp_path, target, fleet_file=fleet_file)
+
+    with pytest.raises(ValueError, match="payload_0"):
+        deploy_service._effective_runtime_network_policy_override(
+            ctx,
+            target_ctx=ctx.resolve_target("pi-unresolved"),
+            session_assignments={"pi-unresolved": "uav_0"},
+        )
+
+
+def test_fleet_preview_includes_effective_wifi_policy_fields(tmp_path):
+    fleet_file = _write_fleet(
+        tmp_path,
+        {
+            "defaults": {
+                "network_role": "client",
+                "ap_selection": "ordered_then_strongest",
+            },
+            "vehicles": [
+                {
+                    "name": "uav_0",
+                    "mission": "hover",
+                },
+                {
+                    "name": "payload_0",
+                    "mission": "payload_retreat",
+                    "network_role": "ap",
+                },
+            ],
+        },
+    )
+    target = _make_target(
+        target_id="pi-preview",
+        vehicle_name="uav_0",
+        overlay_yaml="mission: hover\npx4_airframe_id: 4004\n",
+        pi_host="pi-preview.local",
+    )
+    ctx = _make_context(tmp_path, target, fleet_file=fleet_file)
+
+    preview = deploy_service._fleet_preview(ctx, fleet_file.name)
+
+    assert preview["fleet_exists"] is True
+    assert preview["fleet_vehicles"] == [
+        {
+            "name": "uav_0",
+            "kind": None,
+            "mission": "hover",
+            "mission_path": None,
+            "auto_launch": None,
+            "debug": None,
+            "vision_debug": None,
+            "save_vision_milliseconds": None,
+            "servo_only": None,
+            "camera_mount_offsets": [],
+            "camera_input_transport": None,
+            "camera_rotate_degrees": None,
+            "camera_preprocess_hook": None,
+            "px4_airframe_id": None,
+            "px4_namespace": None,
+            "payload_controller": None,
+            "network_role": "client",
+            "allowed_ap_vehicles": ["payload_0"],
+            "ap_selection": "ordered_then_strongest",
+        },
+        {
+            "name": "payload_0",
+            "kind": None,
+            "mission": "payload_retreat",
+            "mission_path": None,
+            "auto_launch": None,
+            "debug": None,
+            "vision_debug": None,
+            "save_vision_milliseconds": None,
+            "servo_only": None,
+            "camera_mount_offsets": [],
+            "camera_input_transport": None,
+            "camera_rotate_degrees": None,
+            "camera_preprocess_hook": None,
+            "px4_airframe_id": None,
+            "px4_namespace": None,
+            "payload_controller": None,
+            "network_role": "ap",
+            "allowed_ap_vehicles": [],
+            "ap_selection": "ordered_then_strongest",
+        },
     ]
 
 
@@ -1397,12 +1698,23 @@ def test_build_source_round_trip_and_local_artifact_cache(tmp_path):
 def test_deploy_selected_source_dispatches_to_persisted_selection(
     tmp_path, monkeypatch
 ):
+    from backend.models import RuntimeNetworkPolicyOverride
+
+    fleet_file = _write_fleet(
+        tmp_path,
+        {"vehicles": [{"name": "uav_0", "mission": "hover"}]},
+    )
     target = _make_target(
         target_id="pi-dispatch",
         vehicle_name="uav_0",
         overlay_yaml="mission: hover\npx4_airframe_id: 4004\n",
     )
-    ctx = _make_context(tmp_path, target, fleet_file=tmp_path / "fleet.yaml")
+    ctx = _make_context(tmp_path, target, fleet_file=fleet_file)
+    override = RuntimeNetworkPolicyOverride(
+        network_role="ap",
+        allowed_ap_hosts=["pi-ap-1.local"],
+        ap_selection="strongest",
+    )
 
     calls: list[tuple[str, dict[str, object]]] = []
 
@@ -1425,6 +1737,11 @@ def test_deploy_selected_source_dispatches_to_persisted_selection(
     monkeypatch.setattr(
         deploy_service, "deploy_local_codebase", fake_deploy_local_codebase
     )
+    monkeypatch.setattr(
+        deploy_service,
+        "_effective_runtime_network_policy_override",
+        lambda *args, **kwargs: override,
+    )
 
     asyncio.run(
         deploy_service.set_github_build_source(
@@ -1436,7 +1753,11 @@ def test_deploy_selected_source_dispatches_to_persisted_selection(
         )
     )
     result = asyncio.run(
-        deploy_service.deploy_selected_source(ctx, target_id="pi-dispatch")
+        deploy_service.deploy_selected_source(
+            ctx,
+            target_id="pi-dispatch",
+            network_policy_override=override,
+        )
     )
     assert result["success"] is True
     kind, kwargs = calls[-1]
@@ -1445,6 +1766,7 @@ def test_deploy_selected_source_dispatches_to_persisted_selection(
     assert kwargs["tag"] == ""
     assert kwargs["source"] == "actions"
     assert kwargs["artifact_id"] == "42"
+    assert kwargs["network_policy_override"].model_dump() == override.model_dump()
 
     asyncio.run(
         deploy_service.set_local_artifact_build_source(
@@ -1454,20 +1776,30 @@ def test_deploy_selected_source_dispatches_to_persisted_selection(
         )
     )
     result = asyncio.run(
-        deploy_service.deploy_selected_source(ctx, target_id="pi-dispatch")
+        deploy_service.deploy_selected_source(
+            ctx,
+            target_id="pi-dispatch",
+            network_policy_override=override,
+        )
     )
     assert result["success"] is True
     assert calls[-1][0] == "local_artifact"
     assert calls[-1][1]["target_ctx"].target.target_id == "pi-dispatch"
     assert calls[-1][1]["artifact_name"] == "artifact.tar.gz"
+    assert calls[-1][1]["network_policy_override"].model_dump() == override.model_dump()
 
     asyncio.run(deploy_service.set_local_codebase_build_source(ctx))
     result = asyncio.run(
-        deploy_service.deploy_selected_source(ctx, target_id="pi-dispatch")
+        deploy_service.deploy_selected_source(
+            ctx,
+            target_id="pi-dispatch",
+            network_policy_override=override,
+        )
     )
     assert result["success"] is True
     assert calls[-1][0] == "local_codebase"
     assert calls[-1][1]["target_ctx"].target.target_id == "pi-dispatch"
+    assert calls[-1][1]["network_policy_override"].model_dump() == override.model_dump()
 
 
 def test_deploy_selected_source_requires_global_fleet_selection(tmp_path):
@@ -1632,6 +1964,84 @@ def test_runner_script_disables_nounset_only_around_ros_setup(tmp_path):
     ) < script.index("set -u\nexec ros2 launch")
 
 
+def test_deploy_artifact_path_writes_runtime_network_policy_yaml(
+    tmp_path, monkeypatch
+):
+    from backend.models import RuntimeNetworkPolicyOverride
+
+    target = _make_target(
+        target_id="pi-network-policy",
+        vehicle_name="uav_0",
+        overlay_yaml="mission: hover\npx4_airframe_id: 4004\n",
+    )
+    ctx = _make_context(tmp_path, target, fleet_file=tmp_path / "fleet.yaml")
+    target_ctx = ctx.resolve_target("pi-network-policy")
+    writes: list[tuple[str, str]] = []
+
+    async def fake_copy_text_to_pi(
+        inner_target_ctx, *, remote_path, content, suffix=".yaml"
+    ):
+        writes.append((remote_path, content))
+
+    async def fake_noop(*args, **kwargs):
+        return None
+
+    async def fake_extract_release_on_pi(inner_target_ctx, artifact_name):
+        return {
+            "release_id": "release-1",
+            "release_dir": "/home/penn/pennair-deploy/releases/release-1",
+            "previous_target": "",
+        }
+
+    monkeypatch.setattr(
+        deploy_service,
+        "_render_runtime_fleet",
+        lambda inner_ctx, inner_target_ctx: (
+            "backend:\n  kind: hardware\n",
+            "vehicles: []\n",
+            "/tmp/hover.yaml",
+        ),
+    )
+    monkeypatch.setattr(deploy_service, "_copy_text_to_pi", fake_copy_text_to_pi)
+    monkeypatch.setattr(deploy_service, "_ensure_remote_layout", fake_noop)
+    monkeypatch.setattr(deploy_service, "_seed_repo_missions", fake_noop)
+    monkeypatch.setattr(
+        deploy_service, "_extract_release_on_pi", fake_extract_release_on_pi
+    )
+    monkeypatch.setattr(deploy_service, "_write_release_metadata", fake_noop)
+    monkeypatch.setattr(deploy_service, "_ensure_runtime_service", fake_noop)
+    monkeypatch.setattr(deploy_service, "_ensure_runtime_prereqs", fake_noop)
+    monkeypatch.setattr(deploy_service, "_activate_release", fake_noop)
+
+    result = asyncio.run(
+        deploy_service._deploy_artifact_path(
+            ctx,
+            target_ctx=target_ctx,
+            local_path="/tmp/artifact.tar.gz",
+            artifact_name="artifact.tar.gz",
+            source_type="local-artifact",
+            source_label="artifact.tar.gz",
+            network_policy_override=RuntimeNetworkPolicyOverride(
+                network_role="client",
+                allowed_ap_hosts=["pi-ap-1.local", "pi-ap-2.local"],
+                ap_selection="ordered_then_strongest",
+            ),
+        )
+    )
+
+    assert result["success"] is True
+    network_policy_write = next(
+        content
+        for remote_path, content in writes
+        if remote_path.endswith("/config/network-policy.yaml")
+    )
+    assert yaml.safe_load(network_policy_write) == {
+        "network_role": "client",
+        "allowed_ap_hosts": ["pi-ap-1.local", "pi-ap-2.local"],
+        "ap_selection": "ordered_then_strongest",
+    }
+
+
 def test_activate_release_polls_stability_and_rolls_back_on_instability(tmp_path):
     target = _make_target(
         target_id="pi-activate-stability",
@@ -1706,7 +2116,14 @@ def test_perform_action_refreshes_failed_deploy_rows_with_rollback_metadata(
         {"hostname": "pi-row-refresh.local", "vehicle_name": "uav_0"}
     )
 
-    async def fake_deploy_selected_source(inner_ctx, target_ctx=None, target_id=None):
+    async def fake_deploy_selected_source(
+        inner_ctx,
+        target_ctx=None,
+        target_id=None,
+        network_policy_override=None,
+        operator_allowed_ap_vehicles=None,
+        session_assignments=None,
+    ):
         return {
             "success": False,
             "error": "Restart runtime service failed: __ERR__:unstable",
@@ -1780,6 +2197,115 @@ def test_perform_action_refreshes_failed_deploy_rows_with_rollback_metadata(
     assert result["current_build"]["release_id"] == "release-old"
 
 
+def test_perform_action_threads_operator_ap_vehicles_to_deploy(
+    tmp_path, monkeypatch
+):
+    from backend.models import FleetDeviceSelection
+    from backend.services import fleet as fleet_service
+
+    target = _make_target(
+        target_id="pi-network-fleet",
+        vehicle_name="uav_0",
+        overlay_yaml="mission: hover\npx4_airframe_id: 4004\n",
+        pi_host="pi-network-fleet.local",
+    )
+    ctx = _make_context(tmp_path, target)
+    selection = FleetDeviceSelection.model_validate(
+        {
+            "hostname": "pi-network-fleet.local",
+            "vehicle_name": "uav_0",
+            "network_role": "client",
+            "allowed_ap_vehicles": ["payload_0", "payload_1"],
+            "ap_selection": "strongest",
+        }
+    )
+    captured: dict[str, object] = {}
+
+    async def fake_deploy_selected_source(
+        inner_ctx,
+        target_ctx=None,
+        target_id=None,
+        network_policy_override=None,
+        operator_allowed_ap_vehicles=None,
+        session_assignments=None,
+    ):
+        captured["network_policy_override"] = network_policy_override
+        captured["operator_allowed_ap_vehicles"] = operator_allowed_ap_vehicles
+        captured["session_assignments"] = session_assignments
+        return {
+            "success": True,
+            "output": "deployed",
+            "attempted_release_id": "release-new",
+            "active_release_id": "release-new",
+        }
+
+    async def fake_summarize_device(inner_ctx, device, fleet_vehicle_lookup):
+        return {
+            "hardware_id": "pi-network-fleet.local",
+            "hostname": "pi-network-fleet.local",
+            "addresses": [],
+            "service_name": None,
+            "service_type": None,
+            "last_seen_at": "2026-04-15T00:00:00Z",
+            "discovery_stale": False,
+            "target_id": "pi-network-fleet.local",
+            "vehicle_name": "uav_0",
+            "fleet_vehicle": None,
+            "connection": {
+                "success": True,
+                "connected": True,
+                "target": "pi-network-fleet.local",
+                "info": "ok",
+                "error": None,
+            },
+            "current_build": {
+                "success": True,
+                "installed": True,
+                "info": "ok",
+                "release_id": "release-new",
+            },
+            "runtime": {
+                "success": True,
+                "running": False,
+                "state": "stopped",
+                "pid": None,
+                "error": None,
+            },
+            "readiness": {
+                "connected": True,
+                "build_installed": True,
+                "runtime_ready": True,
+                "vehicle_assigned": True,
+                "ready": True,
+                "notes": [],
+            },
+        }
+
+    monkeypatch.setattr(
+        fleet_service.deploy_service,
+        "deploy_selected_source",
+        fake_deploy_selected_source,
+    )
+    monkeypatch.setattr(fleet_service, "_summarize_device", fake_summarize_device)
+
+    result = asyncio.run(
+        fleet_service._perform_action(
+            ctx,
+            action="deploy",
+            selection=selection,
+            snapshot={"vehicle_lookup": {}},
+        )
+    )
+
+    assert result["success"] is True
+    assert captured["network_policy_override"].model_dump(exclude_none=True) == {
+        "network_role": "client",
+        "ap_selection": "strongest",
+    }
+    assert captured["operator_allowed_ap_vehicles"] == ["payload_0", "payload_1"]
+    assert captured["session_assignments"] is None
+
+
 def test_batch_action_marks_top_level_failure_when_any_row_fails(tmp_path, monkeypatch):
     from backend.models import FleetDeviceSelection
     from backend.services import fleet as fleet_service
@@ -1802,7 +2328,14 @@ def test_batch_action_marks_top_level_failure_when_any_row_fails(tmp_path, monke
             ),
         ]
 
-    async def fake_perform_action(inner_ctx, *, action, selection, snapshot):
+    async def fake_perform_action(
+        inner_ctx,
+        *,
+        action,
+        selection,
+        snapshot,
+        session_assignments=None,
+    ):
         if selection.hostname == "pi-1.local":
             return {
                 "hardware_id": "pi-1.local",

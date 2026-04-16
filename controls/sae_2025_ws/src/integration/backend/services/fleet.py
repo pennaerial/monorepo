@@ -417,6 +417,7 @@ async def _perform_action(
     action: str,
     selection: FleetDeviceSelection,
     snapshot: dict[str, Any],
+    session_assignments: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     target_ctx = ctx.resolve_live_target(
         hostname=selection.hostname or selection.target_id,
@@ -432,7 +433,15 @@ async def _perform_action(
     try:
         if action == "deploy":
             result = await deploy_service.deploy_selected_source(
-                ctx, target_ctx=target_ctx
+                ctx,
+                target_ctx=target_ctx,
+                network_policy_override=selection.network_policy_override(),
+                operator_allowed_ap_vehicles=(
+                    None
+                    if selection.allowed_ap_hosts is not None
+                    else selection.allowed_ap_vehicles_override()
+                ),
+                session_assignments=session_assignments,
             )
         elif action == "prepare":
             result = await mission_service.prepare_mission(ctx, target_ctx=target_ctx)
@@ -500,6 +509,7 @@ async def batch_action(
     *,
     action: str,
     devices: list[FleetDeviceSelection] | None = None,
+    session_assignments: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     snapshot = await _build_snapshot(ctx)
     selected_devices = await _resolve_action_devices(ctx, devices)
@@ -517,7 +527,13 @@ async def batch_action(
 
     results = await asyncio.gather(
         *[
-            _perform_action(ctx, action=action, selection=selection, snapshot=snapshot)
+            _perform_action(
+                ctx,
+                action=action,
+                selection=selection,
+                snapshot=snapshot,
+                session_assignments=session_assignments,
+            )
             for selection in selected_devices
         ],
         return_exceptions=True,

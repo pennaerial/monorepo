@@ -18,6 +18,7 @@ import yaml
 
 from ..context import AppContext, TargetContext
 from ..mission_compat import load_mission_spec_compat
+from ..models import RuntimeNetworkPolicyOverride
 from uav.runtime.mission_spec import MissionSpec
 
 _ARTIFACT_NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
@@ -69,6 +70,336 @@ def _target_context(
 
 def _selected_fleet_file(ctx: AppContext) -> str:
     return str(ctx.build_source_store.current().fleet_file or "").strip()
+
+
+def _normalized_network_policy_override(
+    network_policy_override: RuntimeNetworkPolicyOverride | None,
+) -> RuntimeNetworkPolicyOverride | None:
+    if network_policy_override is None:
+        return None
+    return None if network_policy_override.is_empty() else network_policy_override
+
+
+def _render_runtime_network_policy(
+    network_policy_override: RuntimeNetworkPolicyOverride | None,
+) -> str:
+    normalized = _normalized_network_policy_override(network_policy_override)
+    payload = (
+        {}
+        if normalized is None
+        else normalized.model_dump(exclude_none=True)
+    )
+    return yaml.safe_dump(payload, sort_keys=False)
+
+
+def _runtime_network_policy_path(target_ctx: TargetContext) -> str:
+    return f"{target_ctx.target.deploy_paths()['config_dir']}/network-policy.yaml"
+
+
+def _normalize_host_alias(value: object) -> str:
+    candidate = str(value or "").strip().rstrip(".").lower()
+    if candidate.endswith(".local"):
+        candidate = candidate[:-6]
+    return candidate
+
+
+def _normalize_vehicle_name(value: object) -> str:
+    return str(value or "").strip()
+
+
+def _normalize_network_role(value: object) -> str | None:
+    candidate = str(value or "").strip().lower()
+    return candidate if candidate in {"default", "ap", "client"} else None
+
+
+def _normalize_ap_selection(value: object) -> str | None:
+    candidate = str(value or "").strip().lower()
+    return candidate if candidate in {"ordered_then_strongest", "strongest"} else None
+
+
+def _normalize_vehicle_name_list(value: object) -> list[str]:
+    if value is None:
+        return []
+
+    raw_values: list[object]
+    if isinstance(value, str):
+        raw_values = [value]
+    elif isinstance(value, (list, tuple, set)):
+        raw_values = list(value)
+    else:
+        raw_values = [value]
+
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for raw in raw_values:
+        parts = (
+            [segment for segment in raw.split(",")]
+            if isinstance(raw, str)
+            else [str(raw)]
+        )
+        for part in parts:
+            candidate = _normalize_vehicle_name(part)
+            if not candidate or candidate in seen:
+                continue
+            seen.add(candidate)
+            normalized.append(candidate)
+    return normalized
+
+
+def _fleet_vehicle_names(shared_fleet: dict[str, object]) -> list[str]:
+    names: list[str] = []
+    for vehicle in shared_fleet.get("vehicles", []) or []:
+        if not isinstance(vehicle, dict):
+            continue
+        name = _normalize_vehicle_name(vehicle.get("name"))
+        if name:
+            names.append(name)
+    return names
+
+
+def _fleet_network_policy_from_merged_vehicle(
+    merged_vehicle: dict[str, object],
+) -> dict[str, object]:
+    return {
+        "network_role": _normalize_network_role(merged_vehicle.get("network_role")),
+        "allowed_ap_vehicles": _normalize_vehicle_name_list(
+            merged_vehicle.get("allowed_ap_vehicles")
+        ),
+        "ap_selection": _normalize_ap_selection(merged_vehicle.get("ap_selection")),
+    }
+
+
+def _fleet_network_policy_lookup(
+    shared_fleet: dict[str, object],
+    fleet_defaults: dict[str, object],
+) -> dict[str, dict[str, object]]:
+    policies: dict[str, dict[str, object]] = {}
+    for vehicle in shared_fleet.get("vehicles", []) or []:
+        if not isinstance(vehicle, dict):
+            continue
+        name = _normalize_vehicle_name(vehicle.get("name"))
+        if not name:
+            continue
+        merged = deepcopy(fleet_defaults)
+        merged.update(vehicle)
+        policies[name] = _fleet_network_policy_from_merged_vehicle(merged)
+    return policies
+
+
+def _fleet_allowed_ap_vehicle_names(
+    *,
+    shared_fleet: dict[str, object],
+    vehicle_name: str,
+    vehicle_policy: dict[str, object],
+    policy_lookup: dict[str, dict[str, object]],
+) -> list[str]:
+    explicit = [
+        candidate
+        for candidate in vehicle_policy.get("allowed_ap_vehicles", []) or []
+        if _normalize_vehicle_name(candidate) and candidate != vehicle_name
+    ]
+    if explicit:
+        return explicit
+
+    if vehicle_policy.get("network_role") != "client":
+        return []
+
+    return [
+        candidate
+        for candidate in _fleet_vehicle_names(shared_fleet)
+        if candidate != vehicle_name
+        and (policy_lookup.get(candidate) or {}).get("network_role") == "ap"
+    ]
+
+
+def _assignment_vehicle_host_lookup(
+    ctx: AppContext,
+    *,
+    session_assignments: dict[str, str] | None = None,
+) -> tuple[dict[str, str], dict[str, list[str]]]:
+    resolved: dict[str, str] = {}
+    ambiguous: dict[str, set[str]] = {}
+
+    def _record(host_value: object, vehicle_value: object) -> None:
+        host = _normalize_host_alias(host_value)
+        vehicle = _normalize_vehicle_name(vehicle_value)
+        if not host or not vehicle:
+            return
+
+        existing = resolved.get(vehicle)
+        if existing is not None and existing != host:
+            ambiguous.setdefault(vehicle, {existing}).add(host)
+            return
+        resolved[vehicle] = host
+
+    for host, vehicle in (session_assignments or {}).items():
+        _record(host, vehicle)
+
+    for target in ctx.list_targets():
+        vehicle = _normalize_vehicle_name(target.vehicle_name)
+        if not vehicle or vehicle in resolved:
+            continue
+        _record(target.pi_host, vehicle)
+
+    return resolved, {
+        vehicle: sorted(hosts) for vehicle, hosts in ambiguous.items() if hosts
+    }
+
+
+def _resolve_fleet_allowed_ap_hosts(
+    ctx: AppContext,
+    *,
+    target_ctx: TargetContext,
+    vehicle_name: str,
+    policy_lookup: dict[str, dict[str, object]],
+    candidate_vehicles: list[str],
+    error_prefix: str,
+    empty_resolution_message: str,
+    session_assignments: dict[str, str] | None = None,
+) -> list[str] | None:
+    if not candidate_vehicles:
+        return None
+
+    unknown = [candidate for candidate in candidate_vehicles if candidate not in policy_lookup]
+    if unknown:
+        raise ValueError(
+            f"{error_prefix} for "
+            f"'{vehicle_name}' references unknown AP vehicles: {', '.join(unknown)}."
+        )
+
+    vehicle_host_lookup, ambiguous = _assignment_vehicle_host_lookup(
+        ctx,
+        session_assignments=session_assignments,
+    )
+    current_host = _normalize_host_alias(target_ctx.target.pi_host)
+    resolved_hosts: list[str] = []
+    unresolved: list[str] = []
+    ambiguous_hits: dict[str, list[str]] = {}
+
+    for candidate_vehicle in candidate_vehicles:
+        if candidate_vehicle in ambiguous:
+            ambiguous_hits[candidate_vehicle] = ambiguous[candidate_vehicle]
+            continue
+        host = vehicle_host_lookup.get(candidate_vehicle)
+        if not host:
+            unresolved.append(candidate_vehicle)
+            continue
+        if host == current_host:
+            continue
+        if host not in resolved_hosts:
+            resolved_hosts.append(host)
+
+    if ambiguous_hits:
+        details = ", ".join(
+            f"{vehicle} -> {', '.join(hosts)}"
+            for vehicle, hosts in sorted(ambiguous_hits.items())
+        )
+        raise ValueError(
+            f"{error_prefix} for "
+            f"'{vehicle_name}' is ambiguous across multiple assigned hosts: {details}."
+        )
+
+    if unresolved:
+        raise ValueError(
+            f"{error_prefix} for "
+            f"'{vehicle_name}' could not resolve AP vehicles to assigned hosts: "
+            f"{', '.join(unresolved)}."
+        )
+
+    if not resolved_hosts:
+        raise ValueError(
+            f"{error_prefix} for "
+            f"'{vehicle_name}' {empty_resolution_message}."
+        )
+
+    return resolved_hosts or None
+
+
+def _effective_runtime_network_policy_override(
+    ctx: AppContext,
+    *,
+    target_ctx: TargetContext,
+    network_policy_override: RuntimeNetworkPolicyOverride | None = None,
+    operator_allowed_ap_vehicles: list[str] | None = None,
+    session_assignments: dict[str, str] | None = None,
+) -> RuntimeNetworkPolicyOverride | None:
+    target = target_ctx.target
+    vehicle_name = _normalize_vehicle_name(target.vehicle_name)
+    if not vehicle_name:
+        return _normalized_network_policy_override(network_policy_override)
+
+    _fleet_file, _fleet_path, shared_fleet, fleet_defaults = _load_selected_fleet(ctx)
+    selected_vehicle = _vehicle_from_fleet(shared_fleet, vehicle_name)
+    merged_vehicle = deepcopy(fleet_defaults)
+    merged_vehicle.update(selected_vehicle)
+    fleet_vehicle_policy = _fleet_network_policy_from_merged_vehicle(merged_vehicle)
+    policy_lookup = _fleet_network_policy_lookup(shared_fleet, fleet_defaults)
+
+    final_network_role = (
+        network_policy_override.network_role
+        if network_policy_override is not None
+        and network_policy_override.network_role is not None
+        else fleet_vehicle_policy.get("network_role")
+    )
+    final_ap_selection = (
+        network_policy_override.ap_selection
+        if network_policy_override is not None
+        and network_policy_override.ap_selection is not None
+        else fleet_vehicle_policy.get("ap_selection")
+    )
+    operator_allowed_ap_vehicles = _normalize_vehicle_name_list(
+        operator_allowed_ap_vehicles
+    )
+
+    if final_network_role == "ap":
+        final_allowed_ap_hosts = None
+    elif (
+        network_policy_override is not None
+        and network_policy_override.allowed_ap_hosts is not None
+    ):
+        final_allowed_ap_hosts = network_policy_override.allowed_ap_hosts
+    elif operator_allowed_ap_vehicles:
+        final_allowed_ap_hosts = _resolve_fleet_allowed_ap_hosts(
+            ctx,
+            target_ctx=target_ctx,
+            vehicle_name=vehicle_name,
+            policy_lookup=policy_lookup,
+            candidate_vehicles=operator_allowed_ap_vehicles,
+            error_prefix="Operator Wi-Fi override",
+            empty_resolution_message=(
+                "does not leave any fallback AP hosts after self-exclusion"
+            ),
+            session_assignments=session_assignments,
+        )
+    else:
+        candidate_vehicles = _fleet_allowed_ap_vehicle_names(
+            shared_fleet=shared_fleet,
+            vehicle_name=vehicle_name,
+            vehicle_policy=fleet_vehicle_policy,
+            policy_lookup=policy_lookup,
+        )
+        explicit_vehicles = fleet_vehicle_policy.get("allowed_ap_vehicles", []) or []
+        final_allowed_ap_hosts = _resolve_fleet_allowed_ap_hosts(
+            ctx,
+            target_ctx=target_ctx,
+            vehicle_name=vehicle_name,
+            policy_lookup=policy_lookup,
+            candidate_vehicles=candidate_vehicles,
+            error_prefix="Fleet Wi-Fi policy",
+            empty_resolution_message=(
+                "does not leave any fallback AP hosts after self-exclusion"
+                if explicit_vehicles
+                else "did not resolve any AP-role vehicles to fallback hosts"
+            ),
+            session_assignments=session_assignments,
+        )
+
+    final_override = RuntimeNetworkPolicyOverride(
+        network_role=final_network_role,
+        allowed_ap_hosts=final_allowed_ap_hosts,
+        ap_selection=final_ap_selection,
+    )
+    return None if final_override.is_empty() else final_override
 
 
 def _source_catalog_key(current) -> str:
@@ -825,21 +1156,24 @@ def _fleet_preview(ctx: AppContext, fleet_file: str) -> dict[str, object]:
         _, _, shared_fleet, defaults = _load_selected_fleet(ctx)
         vehicles = shared_fleet.get("vehicles", [])
         preview["fleet_exists"] = True
+        policy_lookup = _fleet_network_policy_lookup(shared_fleet, defaults)
         fleet_vehicles: list[dict[str, object]] = []
         for vehicle in vehicles:
             if not isinstance(vehicle, dict):
                 continue
             merged = deepcopy(defaults)
             merged.update(vehicle)
+            vehicle_name = str(vehicle.get("name", "")).strip()
+            fleet_policy = policy_lookup.get(vehicle_name, {})
             try:
                 runtime_vehicle, local_mission_path, _ = _runtime_vehicle_from_config(
                     ctx,
                     merged_vehicle=merged,
-                    vehicle_name=str(vehicle.get("name", "")).strip(),
+                    vehicle_name=vehicle_name,
                 )
             except Exception:
                 runtime_vehicle = {
-                    "name": str(vehicle.get("name", "")).strip(),
+                    "name": vehicle_name,
                     "kind": str(merged.get("kind", "")).strip() or None,
                     "mission": str(merged.get("mission", "")).strip() or None,
                     "mission_path": str(merged.get("mission_path", "")).strip() or None,
@@ -875,6 +1209,14 @@ def _fleet_preview(ctx: AppContext, fleet_file: str) -> dict[str, object]:
                     "px4_airframe_id": runtime_vehicle.get("px4_airframe_id"),
                     "px4_namespace": runtime_vehicle.get("px4_namespace"),
                     "payload_controller": runtime_vehicle.get("payload_controller"),
+                    "network_role": fleet_policy.get("network_role"),
+                    "allowed_ap_vehicles": _fleet_allowed_ap_vehicle_names(
+                        shared_fleet=shared_fleet,
+                        vehicle_name=vehicle_name,
+                        vehicle_policy=fleet_policy,
+                        policy_lookup=policy_lookup,
+                    ),
+                    "ap_selection": fleet_policy.get("ap_selection"),
                 }
             )
         preview["fleet_vehicles"] = fleet_vehicles
@@ -1843,6 +2185,7 @@ async def _deploy_artifact_path(
     artifact_name: str,
     source_type: str,
     source_label: str,
+    network_policy_override: RuntimeNetworkPolicyOverride | None = None,
 ) -> dict:
     await _ensure_remote_layout(target_ctx)
     await _copy_artifact_to_pi(target_ctx, local_path, artifact_name)
@@ -1865,6 +2208,11 @@ async def _deploy_artifact_path(
         target_ctx,
         remote_path=paths["runtime_fleet"],
         content=runtime_fleet_yaml,
+    )
+    await _copy_text_to_pi(
+        target_ctx,
+        remote_path=_runtime_network_policy_path(target_ctx),
+        content=_render_runtime_network_policy(network_policy_override),
     )
     await _seed_repo_missions(ctx, target_ctx)
 
@@ -1931,6 +2279,7 @@ async def _deploy_source_bundle_path(
     package_names: list[str],
     source_type: str,
     source_label: str,
+    network_policy_override: RuntimeNetworkPolicyOverride | None = None,
 ) -> dict:
     await _ensure_remote_layout(target_ctx)
     await _ensure_source_build_prereqs(ctx, target_ctx)
@@ -1956,6 +2305,11 @@ async def _deploy_source_bundle_path(
         target_ctx,
         remote_path=paths["runtime_fleet"],
         content=runtime_fleet_yaml,
+    )
+    await _copy_text_to_pi(
+        target_ctx,
+        remote_path=_runtime_network_policy_path(target_ctx),
+        content=_render_runtime_network_policy(network_policy_override),
     )
     await _seed_repo_missions(ctx, target_ctx)
 
@@ -2034,6 +2388,7 @@ async def upload_source_bundle(
     target_id: str | None = None,
     filename: str,
     file_bytes: bytes,
+    network_policy_override: RuntimeNetworkPolicyOverride | None = None,
 ) -> dict:
     upload_path = ""
     normalized_bundle = ""
@@ -2061,6 +2416,7 @@ async def upload_source_bundle(
             package_names=package_names,
             source_type="source-build",
             source_label=sanitized_name,
+            network_policy_override=network_policy_override,
         )
     except RuntimeError as exc:
         return {"success": False, "error": str(exc)}
@@ -2079,6 +2435,7 @@ async def deploy_local_codebase(
     *,
     target_ctx: TargetContext | None = None,
     target_id: str | None = None,
+    network_policy_override: RuntimeNetworkPolicyOverride | None = None,
 ) -> dict:
     local_bundle = ""
     try:
@@ -2094,6 +2451,7 @@ async def deploy_local_codebase(
             package_names=package_names,
             source_type="local-codebase",
             source_label=bundle_name,
+            network_policy_override=network_policy_override,
         )
     except RuntimeError as exc:
         return {"success": False, "error": str(exc)}
@@ -2317,11 +2675,24 @@ async def deploy_selected_source(
     *,
     target_ctx: TargetContext | None = None,
     target_id: str | None = None,
+    network_policy_override: RuntimeNetworkPolicyOverride | None = None,
+    operator_allowed_ap_vehicles: list[str] | None = None,
+    session_assignments: dict[str, str] | None = None,
 ) -> dict:
     current = ctx.build_source_store.current()
     if current.kind == "none":
         return {"success": False, "error": "No build source selected"}
     target_ctx = _target_context(ctx, target_ctx=target_ctx, target_id=target_id)
+    try:
+        effective_network_policy_override = _effective_runtime_network_policy_override(
+            ctx,
+            target_ctx=target_ctx,
+            network_policy_override=network_policy_override,
+            operator_allowed_ap_vehicles=operator_allowed_ap_vehicles,
+            session_assignments=session_assignments,
+        )
+    except Exception as exc:
+        return {"success": False, "error": str(exc)}
 
     if current.kind == "github":
         return await download_build(
@@ -2330,6 +2701,7 @@ async def deploy_selected_source(
             tag=current.tag,
             source=current.github_source,
             artifact_id=current.artifact_id,
+            network_policy_override=effective_network_policy_override,
         )
 
     if current.kind == "local_artifact":
@@ -2349,10 +2721,15 @@ async def deploy_selected_source(
             artifact_name=current.artifact_name,
             source_type="local-artifact",
             source_label=current.artifact_name,
+            network_policy_override=effective_network_policy_override,
         )
 
     if current.kind == "local_codebase":
-        return await deploy_local_codebase(ctx, target_ctx=target_ctx)
+        return await deploy_local_codebase(
+            ctx,
+            target_ctx=target_ctx,
+            network_policy_override=effective_network_policy_override,
+        )
 
     return {
         "success": False,
@@ -2959,6 +3336,7 @@ async def download_build(
     tag: str = "",
     source: str = "release",
     artifact_id: str = "",
+    network_policy_override: RuntimeNetworkPolicyOverride | None = None,
 ) -> dict:
     if not ctx.operator_config.github_repo:
         return {"success": False, "error": "GITHUB_REPO not configured"}
@@ -3007,6 +3385,7 @@ async def download_build(
                     artifact_name=artifact_name,
                     source_type="actions",
                     source_label=f"actions-artifact-{artifact_id}",
+                    network_policy_override=network_policy_override,
                 )
                 return result
 
@@ -3037,6 +3416,7 @@ async def download_build(
             artifact_name=artifact_name,
             source_type="release",
             source_label=tag or artifact_name,
+            network_policy_override=network_policy_override,
         )
     except RuntimeError as exc:
         return {"success": False, "error": str(exc)}

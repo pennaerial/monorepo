@@ -259,8 +259,16 @@ def _make_mode_manager() -> ModeManager:
     manager.destroy_node = lambda: None
     manager.handle_mode_state = lambda state: state
 
+    def _test_double_node_method(name: str):
+        method = getattr(mode_manager_module.Node, name, None)
+        if method is None:
+            return None
+        if getattr(method, "__module__", "").startswith("rclpy"):
+            return None
+        return method
+
     def raw_create_publisher(msg_type, topic, *args, **kwargs):
-        create_publisher = getattr(mode_manager_module.Node, "create_publisher", None)
+        create_publisher = _test_double_node_method("create_publisher")
         if create_publisher is None:
             return SimpleNamespace(
                 kind="publisher",
@@ -270,15 +278,13 @@ def _make_mode_manager() -> ModeManager:
         return create_publisher(manager, msg_type, topic, *args, **kwargs)
 
     def raw_create_subscription(msg_type, topic, *args, **kwargs):
-        create_subscription = getattr(
-            mode_manager_module.Node, "create_subscription", None
-        )
+        create_subscription = _test_double_node_method("create_subscription")
         if create_subscription is None:
             return SimpleNamespace(kind="subscription", name=topic)
         return create_subscription(manager, msg_type, topic, *args, **kwargs)
 
     def raw_create_client(srv_type, service_name, *args, **kwargs):
-        create_client = getattr(mode_manager_module.Node, "create_client", None)
+        create_client = _test_double_node_method("create_client")
         if create_client is None:
             return SimpleNamespace(
                 kind="client",
@@ -289,27 +295,25 @@ def _make_mode_manager() -> ModeManager:
         return create_client(manager, srv_type, service_name, *args, **kwargs)
 
     def raw_create_service(srv_type, service_name, *args, **kwargs):
-        create_service = getattr(mode_manager_module.Node, "create_service", None)
+        create_service = _test_double_node_method("create_service")
         if create_service is None:
             return SimpleNamespace(kind="service", name=service_name)
         return create_service(manager, srv_type, service_name, *args, **kwargs)
 
     def raw_destroy_publisher(publisher) -> bool:
-        destroy_publisher = getattr(mode_manager_module.Node, "destroy_publisher", None)
+        destroy_publisher = _test_double_node_method("destroy_publisher")
         if destroy_publisher is None:
             return True
         return bool(destroy_publisher(manager, publisher))
 
     def raw_destroy_subscription(subscription) -> bool:
-        destroy_subscription = getattr(
-            mode_manager_module.Node, "destroy_subscription", None
-        )
+        destroy_subscription = _test_double_node_method("destroy_subscription")
         if destroy_subscription is None:
             return True
         return bool(destroy_subscription(manager, subscription))
 
     def raw_destroy_client(client) -> bool:
-        destroy_client = getattr(mode_manager_module.Node, "destroy_client", None)
+        destroy_client = _test_double_node_method("destroy_client")
         if destroy_client is None:
             return True
         return bool(destroy_client(manager, client))

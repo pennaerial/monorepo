@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import re
 import subprocess
 
@@ -18,6 +19,28 @@ def _target_context(
     return ctx.resolve_target(target_id)
 
 
+async def _policy_status(session) -> dict:
+    try:
+        result = await session.ssh.run(
+            (
+                "if command -v pennair-wifi-failover >/dev/null 2>&1; then "
+                "sudo -n pennair-wifi-failover --status 2>/dev/null || "
+                "pennair-wifi-failover --status 2>/dev/null; "
+                "fi"
+            ),
+            timeout=15,
+        )
+        if result.returncode != 0:
+            return {}
+        raw = (result.stdout or "").strip()
+        if not raw:
+            return {}
+        parsed = json.loads(raw)
+        return parsed if isinstance(parsed, dict) else {}
+    except Exception:
+        return {}
+
+
 async def wifi_status(
     ctx: AppContext,
     *,
@@ -26,6 +49,7 @@ async def wifi_status(
 ) -> dict:
     session = _target_context(ctx, target_ctx=target_ctx, target_id=target_id)
     try:
+        policy_status = await _policy_status(session)
         result = await session.ssh.run(
             "nmcli -f NAME,TYPE,DEVICE,STATE con show --active | tail -n +2",
             timeout=15,
@@ -51,7 +75,7 @@ async def wifi_status(
                     }
                 )
 
-        is_hotspot = any(
+        legacy_hotspot = any(
             c["name"] == ctx.operator_config.hotspot_name for c in connections
         )
         wifi_con = next(
@@ -59,8 +83,18 @@ async def wifi_status(
         )
         return {
             "success": True,
-            "is_hotspot": is_hotspot,
-            "current_wifi": wifi_con["name"] if wifi_con else None,
+            "is_hotspot": policy_status.get("is_hotspot", legacy_hotspot),
+            "current_wifi": policy_status.get("current_wifi")
+            or (wifi_con["name"] if wifi_con else None),
+            "current_mode": policy_status.get("current_mode"),
+            "effective_role": policy_status.get("effective_role"),
+            "policy_source": policy_status.get("policy_source"),
+            "runtime_active": policy_status.get("runtime_active"),
+            "mission_started": policy_status.get("mission_started"),
+            "travel_router_locked": policy_status.get("travel_router_locked"),
+            "local_ap_profile": policy_status.get("local_ap_profile"),
+            "travel_router_profile": policy_status.get("travel_router_profile"),
+            "allowed_ap_hosts": policy_status.get("allowed_ap_hosts") or [],
             "connections": connections,
         }
     except subprocess.TimeoutExpired:
@@ -133,7 +167,10 @@ async def wifi_connect(
     password: str,
 ) -> dict:
     session = _target_context(ctx, target_ctx=target_ctx, target_id=target_id)
-    hotspot_name = session.ssh.q(ctx.operator_config.hotspot_name)
+    policy_status = await _policy_status(session)
+    hotspot_name = session.ssh.q(
+        str(policy_status.get("local_ap_profile") or ctx.operator_config.hotspot_name)
+    )
     try:
         await session.ssh.run(
             f"nmcli con down {hotspot_name} 2>/dev/null; sleep 2", timeout=15
@@ -164,12 +201,16 @@ async def wifi_hotspot(
     target_id: str | None = None,
 ) -> dict:
     session = _target_context(ctx, target_ctx=target_ctx, target_id=target_id)
+    policy_status = await _policy_status(session)
+    hotspot_name = str(
+        policy_status.get("local_ap_profile") or ctx.operator_config.hotspot_name
+    )
     try:
         await session.ssh.run(
             "nmcli dev disconnect wlan0 2>/dev/null; sleep 1", timeout=15
         )
         result = await session.ssh.run(
-            f"nmcli con up {session.ssh.q(ctx.operator_config.hotspot_name)}",
+            f"nmcli con up {session.ssh.q(hotspot_name)}",
             timeout=15,
         )
         if result.returncode != 0:
