@@ -677,7 +677,9 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
-    raw_udp_port = config.get("udp_port")  # None = auto-compute, 0 = disabled, >0 = explicit
+    raw_udp_port = config.get(
+        "udp_port"
+    )  # None = auto-compute, 0 = disabled, >0 = explicit
     if raw_udp_port is None:
         m = re.search(r"_(\d+)$", vehicle_name)
         udp_port = (5000 + int(m.group(1))) if m else 0

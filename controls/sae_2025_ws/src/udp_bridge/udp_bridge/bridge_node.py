@@ -44,8 +44,8 @@ from std_msgs.msg import String
 
 _TYPE_DATA = 0x01
 _TYPE_PING = 0x02
-_DATA_HEADER = struct.Struct("!BHB")   # msg_type, sender_port, topic_id
-_PING_HEADER = struct.Struct("!BHI")   # msg_type, sender_port, seq
+_DATA_HEADER = struct.Struct("!BHB")  # msg_type, sender_port, topic_id
+_PING_HEADER = struct.Struct("!BHI")  # msg_type, sender_port, seq
 _RECV_TIMEOUT_S = 1.0
 _PING_INTERVAL_S = 1.0
 _DEFAULT_PEER_TTL_S = 3.0  # 3× ping interval — tolerates 2 dropped pings
@@ -76,8 +76,8 @@ class BridgeNode(Node):
         # --- topic registry ---
         # _topic_types[i] = (topic_name, msg_class)
         self._topic_types: list[tuple[str, type]] = []
-        self._in_publishers: list = []   # indexed by topic_id
-        self._out_subscribers: list = [] # keep refs so they aren't GC'd
+        self._in_publishers: list = []  # indexed by topic_id
+        self._out_subscribers: list = []  # keep refs so they aren't GC'd
 
         _topics_raw = self.get_parameter("topics").value
         topics_param: list[str] = list(_topics_raw) if _topics_raw is not None else []
@@ -208,7 +208,7 @@ class BridgeNode(Node):
         if len(data) < _DATA_HEADER.size:
             return
         msg_type, sender_port, topic_id = _DATA_HEADER.unpack_from(data, 0)
-        ros_bytes = data[_DATA_HEADER.size:]
+        ros_bytes = data[_DATA_HEADER.size :]
 
         self._debug(
             f"IN data {len(data)}B from {addr[0]}:{sender_port} "
@@ -238,7 +238,9 @@ class BridgeNode(Node):
             return
         _, sender_port, seq = _PING_HEADER.unpack_from(data, 0)
         self._record_heartbeat(sender_port)
-        self._debug(f"IN ping from {addr[0]}:{sender_port} seq={seq} active={self._active_peers()}")
+        self._debug(
+            f"IN ping from {addr[0]}:{sender_port} seq={seq} active={self._active_peers()}"
+        )
 
     # ------------------------------------------------------------------
     # Ping sender — always broadcasts to all ports (enables discovery)

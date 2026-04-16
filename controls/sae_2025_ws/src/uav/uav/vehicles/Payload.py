@@ -1,6 +1,11 @@
 from rclpy.node import Node
 
-from payload_interfaces.msg import DriveCommand, MotorState, PayloadHeartbeat, ServoCommand
+from payload_interfaces.msg import (
+    DriveCommand,
+    MotorState,
+    PayloadHeartbeat,
+    ServoCommand,
+)
 from payload_interfaces.srv import DeadReckon, TimedDrive
 
 from .Vehicle import Vehicle
@@ -11,7 +16,12 @@ _DEFAULT_UDP_HEARTBEAT_HZ = 10.0
 class Payload(Vehicle):
     """Mission-side adapter for one payload node namespace."""
 
-    def __init__(self, node: Node, vehicle_name: str, udp_heartbeat_hz: float = _DEFAULT_UDP_HEARTBEAT_HZ):
+    def __init__(
+        self,
+        node: Node,
+        vehicle_name: str,
+        udp_heartbeat_hz: float = _DEFAULT_UDP_HEARTBEAT_HZ,
+    ):
         super().__init__(
             node,
             vehicle_name,

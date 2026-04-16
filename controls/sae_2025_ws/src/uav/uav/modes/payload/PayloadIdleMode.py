@@ -30,7 +30,9 @@ class PayloadIdleMode(Mode):
     def on_enter(self) -> None:
         self._elapsed = 0.0
         if self._wait_seconds > 0:
-            self.log(f"idle for {self._wait_seconds}s — UDP bridge and heartbeat running")
+            self.log(
+                f"idle for {self._wait_seconds}s — UDP bridge and heartbeat running"
+            )
         else:
             self.log("idle indefinitely — UDP bridge and heartbeat running")
 
