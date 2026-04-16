@@ -447,6 +447,31 @@ def _payload_launch_action(*, vehicle_name: str, controller: str, sim_entity_nam
     )
 
 
+def _udp_bridge_action(
+    *,
+    vehicle_name: str,
+    udp_port: int,
+    udp_all_ports: list,
+    udp_topics: list,
+    udp_broadcast_ip: str,
+) -> Node:
+    return Node(
+        package="udp_bridge",
+        executable="bridge_node",
+        name="udp_bridge",
+        namespace=vehicle_name,
+        parameters=[
+            {
+                "my_port": udp_port,
+                "all_ports": udp_all_ports,
+                "broadcast_ip": udp_broadcast_ip,
+                "topics": udp_topics,
+            }
+        ],
+        output="screen",
+    )
+
+
 def _middleware_action(*, sim: bool, config: dict):
     if sim:
         port = int(config.get("middleware_port", 8888))
@@ -650,6 +675,19 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
+    raw_udp_port = config.get("udp_port")  # None = auto-compute, 0 = disabled, >0 = explicit
+    if raw_udp_port is None:
+        m = re.search(r"_(\d+)$", vehicle_name)
+        udp_port = (5000 + int(m.group(1))) if m else 0
+    else:
+        udp_port = int(raw_udp_port)
+    udp_all_ports = list(config.get("udp_all_ports") or [5000, 5001, 5002, 5003])
+    udp_topics = list(
+        config.get("udp_topics")
+        or ["heartbeat:payload_interfaces/msg/PayloadHeartbeat"]
+    )
+    udp_broadcast_ip = str(config.get("udp_broadcast_ip") or "10.42.0.255").strip()
+
     actions = []
     if mission_spec.is_payload and launch_payload_backend:
         payload_controller = "SimController" if sim else "GPIOController"
@@ -662,6 +700,21 @@ def launch_setup(context, *args, **kwargs):
         )
 
     actions.extend(camera_actions)
+
+    if mission_spec.is_payload and not sim and udp_port:
+        logger.info(
+            f"Launching UDP bridge for '{vehicle_name}' on port {udp_port} "
+            f"(peers: {[p for p in udp_all_ports if p != udp_port]})."
+        )
+        actions.append(
+            _udp_bridge_action(
+                vehicle_name=vehicle_name,
+                udp_port=udp_port,
+                udp_all_ports=udp_all_ports,
+                udp_topics=udp_topics,
+                udp_broadcast_ip=udp_broadcast_ip,
+            )
+        )
 
     if mission_spec.is_uav and launch_middleware:
         actions.append(_middleware_action(sim=sim, config=config))

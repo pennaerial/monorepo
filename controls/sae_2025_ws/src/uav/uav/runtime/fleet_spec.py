@@ -47,6 +47,12 @@ class FleetVehicleModel(FleetDefaultsModel):
     model: str | None = None
     sim: bool | None = None
 
+    # UDP bridge (payload hardware only). None = auto-assign port from vehicle name.
+    udp_port: int | None = None
+    udp_all_ports: list[int] | None = None
+    udp_topics: list[str] | None = None
+    udp_broadcast_ip: str | None = None
+
     @model_validator(mode="after")
     def _require_name(self) -> "FleetVehicleModel":
         if not self.name.strip():

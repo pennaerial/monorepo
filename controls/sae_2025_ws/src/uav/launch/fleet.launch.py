@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import json
 import os
+import re
 from copy import deepcopy
 from pathlib import Path
 
@@ -325,6 +326,20 @@ def _vehicle_stack_configs(fleet: dict) -> tuple[dict, list[dict]]:
             "launch_payload_backend": kind == "payload",
             "model": str(controllable.get("model", "")).strip(),
         }
+
+        if kind == "payload":
+            # udp_port: None = auto-compute (payload_N → 5000+N), 0 = disabled
+            stack_config["udp_port"] = vehicle.get("udp_port")
+            stack_config["udp_all_ports"] = list(
+                vehicle.get("udp_all_ports") or [5000, 5001, 5002, 5003]
+            )
+            stack_config["udp_topics"] = list(
+                vehicle.get("udp_topics")
+                or ["heartbeat:payload_interfaces/msg/PayloadHeartbeat"]
+            )
+            stack_config["udp_broadcast_ip"] = str(
+                vehicle.get("udp_broadcast_ip") or "10.42.0.255"
+            ).strip()
 
         if kind == "uav":
             px4_airframe_id = (
