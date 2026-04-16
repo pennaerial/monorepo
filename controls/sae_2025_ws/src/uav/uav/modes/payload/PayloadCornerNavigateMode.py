@@ -503,7 +503,12 @@ class PayloadCornerNavigateMode(Mode):
                         self._latest_dominant or dominant or self._first_color or "A"
                     )
                     self._annotate_turn_to_center(
-                        bgr, mask_a, mask_b, row_start, total, lateral_error_px,
+                        bgr,
+                        mask_a,
+                        mask_b,
+                        row_start,
+                        total,
+                        lateral_error_px,
                         dominant,
                     )
                     self._phase = "line_follow"
@@ -520,7 +525,12 @@ class PayloadCornerNavigateMode(Mode):
                     self._latest_dominant = dominant
 
             self._annotate_turn_to_center(
-                bgr, mask_a, mask_b, row_start, total, lateral_error_px,
+                bgr,
+                mask_a,
+                mask_b,
+                row_start,
+                total,
+                lateral_error_px,
                 dominant,
             )
 
