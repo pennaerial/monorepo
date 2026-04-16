@@ -768,6 +768,10 @@ def _runtime_vehicle_from_config(
         ctx, merged_vehicle
     )
     mission_target = mission_spec.target
+    camera_calibration_file = str(
+        merged_vehicle.get("camera_calibration_file", "")
+    ).strip()
+
     runtime_vehicle = {
         "name": vehicle_name,
         "kind": mission_target,
@@ -792,13 +796,14 @@ def _runtime_vehicle_from_config(
             )
             or 0.0
         ),
-        "camera_calibration_file": str(
-            merged_vehicle.get("camera_calibration_file", "")
-        ).strip(),
         "camera_preprocess_hook": str(
             merged_vehicle.get("camera_preprocess_hook", "")
         ).strip(),
     }
+    if camera_calibration_file:
+        # Older deployed releases reject unknown keys in runtime_fleet.yaml, so
+        # keep this optional field out of the rendered config unless it is set.
+        runtime_vehicle["camera_calibration_file"] = camera_calibration_file
 
     if mission_target == "uav":
         px4_airframe_id = merged_vehicle.get("px4_airframe_id")
