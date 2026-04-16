@@ -17,6 +17,14 @@ def _import_module_if_available(name: str):
         return None
 
 
+def _purge_fake_rclpy_modules() -> None:
+    fake_rclpy = sys.modules.get("rclpy")
+    if fake_rclpy is not None and not hasattr(fake_rclpy, "__path__"):
+        for module_name in list(sys.modules):
+            if module_name == "rclpy" or module_name.startswith("rclpy."):
+                del sys.modules[module_name]
+
+
 def _ensure_launch_import_stubs() -> None:
     ament_index_python = sys.modules.get("ament_index_python")
     if ament_index_python is None:
@@ -117,6 +125,9 @@ def _ensure_launch_import_stubs() -> None:
 
 
 def _load_launch_module(filename: str, module_name: str):
+    # Runtime-behavior tests install lightweight rclpy doubles into sys.modules.
+    # launch_ros must see the real ROS Python packages if they are available.
+    _purge_fake_rclpy_modules()
     _ensure_launch_import_stubs()
     package_root = Path(__file__).resolve().parents[1]
     if str(package_root) not in sys.path:
@@ -124,13 +135,6 @@ def _load_launch_module(filename: str, module_name: str):
     sim_package_root = Path(__file__).resolve().parents[2] / "sim"
     if str(sim_package_root) not in sys.path:
         sys.path.insert(0, str(sim_package_root))
-    # test_runtime_behavior installs lightweight rclpy stubs into sys.modules.
-    # launch_ros needs the real ROS Python packages here.
-    fake_rclpy = sys.modules.get("rclpy")
-    if fake_rclpy is not None and not hasattr(fake_rclpy, "__path__"):
-        for module_name_key in list(sys.modules):
-            if module_name_key == "rclpy" or module_name_key.startswith("rclpy."):
-                del sys.modules[module_name_key]
     launch_path = package_root / "launch" / filename
     spec = importlib.util.spec_from_file_location(module_name, launch_path)
     module = importlib.util.module_from_spec(spec)
