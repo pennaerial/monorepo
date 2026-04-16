@@ -694,6 +694,47 @@ def test_run_active_mode_handles_update_error():
     assert handled == ["error"]
 
 
+def test_run_active_mode_logs_connectivity_transition_once():
+    _require_runtime_support()
+
+    start_mode = _TrackingMode("start")
+    start_mode.peer_vehicle_names = ("payload_1",)
+    start_mode.connection_ready = lambda _connection_status: False
+    manager = _make_mode_manager()
+    manager.modes = {"start": start_mode}
+    manager.active_mode = "start"
+    manager._peer_connections = SimpleNamespace(
+        status=lambda: {"payload_1": False},
+        peer_names=("payload_1",),
+        debug_snapshot=lambda: {
+            "local_heartbeat_topic": "/payload_0/mode_manager/heartbeat",
+            "remote_heartbeat_topics": {
+                "payload_1": "/payload_1/mode_manager/heartbeat"
+            },
+            "peer_vehicle_names": ("payload_1",),
+            "connection_status": {"payload_1": False},
+            "last_seen_age_s": {"payload_1": None},
+        },
+        close=lambda: None,
+    )
+    manager.count_publishers = lambda _topic: 0
+    manager.count_subscribers = lambda _topic: 1
+
+    ModeManager._run_active_mode(manager, 1.0)
+    ModeManager._run_active_mode(manager, 2.0)
+
+    diag_messages = [
+        msg
+        for level, msg in manager._logger.messages
+        if level == "info"
+        and "COMMS DIAG | MODE | runtime comm snapshot" in msg
+        and "reason=mode_connectivity_transition" in msg
+    ]
+    assert len(diag_messages) == 1
+    assert "connection_ready=false" in diag_messages[0]
+    assert start_mode.disconnects == [(1.0, {"payload_1": False}), (1.0, {"payload_1": False})]
+
+
 def test_handle_mode_state_requires_exact_transition_label():
     _require_runtime_support()
 

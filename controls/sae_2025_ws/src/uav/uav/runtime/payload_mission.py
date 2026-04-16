@@ -4,6 +4,7 @@ import rclpy
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 
+from .comms_diagnostics import log_bootstrap_diagnostics
 from .PayloadModeManager import PayloadModeManager
 from .mission_spec import MissionSpec, mission_path_for_name
 
@@ -65,6 +66,19 @@ def main(args=None) -> None:
 
     try:
         manager_kwargs = bootstrap.manager_kwargs()
+        mission_spec = manager_kwargs["mission_spec"]
+        log_bootstrap_diagnostics(
+            bootstrap.get_logger(),
+            runtime_kind="payload_mission",
+            vehicle_name=manager_kwargs["vehicle_name"],
+            mission_path=str(bootstrap.get_parameter("mode_map").value),
+            mission_target=mission_spec.target,
+            auto_launch=bool(manager_kwargs["auto_launch"]),
+            peer_heartbeat_hz=float(manager_kwargs["peer_heartbeat_hz"]),
+            peer_stale_timeout_s=float(manager_kwargs["peer_stale_timeout_s"]),
+            peer_vehicle_names=getattr(mission_spec, "peer_vehicle_names", ()),
+            vision_nodes=getattr(mission_spec, "vision_nodes", ()),
+        )
         bootstrap.destroy_node()
         bootstrap = None
         mission_node = PayloadModeManager(**manager_kwargs)

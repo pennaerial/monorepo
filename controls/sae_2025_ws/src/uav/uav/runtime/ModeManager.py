@@ -10,6 +10,7 @@ from std_srvs.srv import Trigger
 
 from uav.vehicles.Vehicle import Vehicle
 from uav.modes.Mode import Mode
+from .comms_diagnostics import log_comms_diag, topic_graph_counts
 from .comm_naming import ManagedCommKind, resolve_managed_target
 from .comm_policy import ManagedCommLifetime, managed_creation_phase_error
 from .managed_comms import ModeCommBuilder
@@ -76,6 +77,7 @@ class ModeManager(Node):
         self._shared_mode_state = {}
         self._current_comm_builder = None
         self._runtime_closed = False
+        self._last_connectivity_diag_signature = None
         self._initialize_comms_runtime(vehicle_name=vehicle_name)
         self.start_mission_service = self.create_service(
             Trigger, "mode_manager/start_mission", self._start_mission_callback
@@ -94,11 +96,70 @@ class ModeManager(Node):
         return self._shared_mode_state.setdefault(key, {})
 
     def _comm_debug_snapshot(self) -> dict[str, Any]:
+        peer_snapshot = None
+        if hasattr(self._peer_connections, "debug_snapshot"):
+            peer_snapshot = self._peer_connections.debug_snapshot()
         return {
             "peer_vehicle_names": tuple(self._peer_connections.peer_names),
             "connection_status": self._peer_connections.status(),
             "descriptors": self._managed_registry.debug_descriptors(),
+            "peer_snapshot": peer_snapshot,
         }
+
+    def _diag_log(self, category: str, message: str | None = None, **fields) -> None:
+        log_comms_diag(self.get_logger(), category, message=message, **fields)
+
+    def _heartbeat_graph_snapshot(self) -> dict[str, dict[str, object]]:
+        peer_snapshot = getattr(self._peer_connections, "debug_snapshot", lambda: {})()
+        topics: dict[str, str] = {}
+        local_topic = peer_snapshot.get("local_heartbeat_topic")
+        if local_topic:
+            topics["local"] = str(local_topic)
+        for peer_name, topic in sorted(
+            dict(peer_snapshot.get("remote_heartbeat_topics", {})).items()
+        ):
+            topics[peer_name] = str(topic)
+        return {
+            label: {"topic": topic, **topic_graph_counts(self, topic)}
+            for label, topic in topics.items()
+        }
+
+    def _log_comm_snapshot(
+        self,
+        *,
+        reason: str,
+        include_descriptors: bool = False,
+        **fields,
+    ) -> None:
+        snapshot = self._comm_debug_snapshot()
+        descriptor_payload = None
+        if include_descriptors:
+            descriptor_payload = [
+                vars(descriptor).copy() for descriptor in snapshot["descriptors"]
+            ]
+        payload = {
+            "reason": reason,
+            "peer_vehicle_names": snapshot["peer_vehicle_names"],
+            "connection_status": snapshot["connection_status"],
+            "peer_snapshot": snapshot["peer_snapshot"],
+            "heartbeat_graph": self._heartbeat_graph_snapshot(),
+            "descriptor_count": len(snapshot["descriptors"]),
+            "bound_descriptor_count": sum(
+                1 for descriptor in snapshot["descriptors"] if descriptor.bound
+            ),
+            "descriptors": descriptor_payload,
+        }
+        payload.update(fields)
+        self._diag_log("MODE", "runtime comm snapshot", **payload)
+
+    def _handle_peer_connection_change(self, peer_name: str, *, connected: bool) -> None:
+        self._managed_registry.on_peer_connection_change(peer_name, connected=connected)
+        self._log_comm_snapshot(
+            reason="peer_connection_change",
+            peer_name=peer_name,
+            connected=connected,
+            active_mode=self.active_mode,
+        )
 
     def _initialize_comms_runtime(self, *, vehicle_name: str) -> None:
         self._runtime_vehicle_name = normalize_vehicle_name(vehicle_name)
@@ -122,13 +183,15 @@ class ModeManager(Node):
             raw_destroy_publisher=self._raw_node_api.destroy_publisher,
             raw_destroy_subscription=self._raw_node_api.destroy_subscription,
             raw_destroy_client=self._raw_node_api.destroy_client,
+            diagnostic_logger=self._diag_log,
         )
         self._peer_connections = PeerConnectionTracker(
             runtime_vehicle_name=self._runtime_vehicle_name,
             peer_heartbeat_hz=self.peer_heartbeat_hz,
             peer_stale_timeout_s=self.peer_stale_timeout_s,
             now_seconds=self._now_seconds,
-            on_connection_change=self._managed_registry.on_peer_connection_change,
+            on_connection_change=self._handle_peer_connection_change,
+            diagnostic_logger=self._diag_log,
             raw_create_publisher=self._raw_node_api.create_publisher,
             raw_create_subscription=self._raw_node_api.create_subscription,
             raw_destroy_publisher=self._raw_node_api.destroy_publisher,
@@ -141,6 +204,7 @@ class ModeManager(Node):
         self, peer_vehicle_names: tuple[str, ...] | list[str] | set[str]
     ) -> None:
         self._peer_connections.configure(peer_vehicle_names)
+        self._log_comm_snapshot(reason="after_peer_config", include_descriptors=True)
 
     def setup_vision(self, vision_nodes: list[str]) -> None:
         nodes_to_setup = [node for node in vision_nodes if node]
@@ -376,6 +440,7 @@ class ModeManager(Node):
 
         if mode_name in self.modes:
             self.active_mode = mode_name
+            self._last_connectivity_diag_signature = None
             mode = self.get_active_mode()
             builder = self._make_comm_builder(
                 owner=mode,
@@ -389,6 +454,11 @@ class ModeManager(Node):
             except Exception:
                 self._managed_registry.destroy_for_owner(mode, lifetime="active")
                 raise
+            self._log_comm_snapshot(
+                reason="mode_activated",
+                include_descriptors=True,
+                active_mode=mode_name,
+            )
         else:
             self.get_logger().error(f"Mode {mode_name} not found.")
 
@@ -400,8 +470,25 @@ class ModeManager(Node):
         self.last_update_time = current_time
         mode = self.get_active_mode()
         connection_status = self._mode_connection_status(mode)
+        connection_ready = mode.connection_ready(connection_status)
+        connectivity_signature = (
+            self.active_mode,
+            bool(connection_ready),
+            tuple(sorted(connection_status.items())),
+        )
+        last_connectivity_diag_signature = getattr(
+            self, "_last_connectivity_diag_signature", None
+        )
+        if connectivity_signature != last_connectivity_diag_signature:
+            self._last_connectivity_diag_signature = connectivity_signature
+            self._log_comm_snapshot(
+                reason="mode_connectivity_transition",
+                active_mode=self.active_mode,
+                connection_ready=connection_ready,
+                connection_status=connection_status,
+            )
         try:
-            if mode.connection_ready(connection_status):
+            if connection_ready:
                 mode.update(time_delta)
             else:
                 mode.disconnect(time_delta, connection_status)
@@ -420,6 +507,7 @@ class ModeManager(Node):
         mode_name = self.active_mode
         mode = self.modes.get(mode_name)
         self.active_mode = None
+        self._last_connectivity_diag_signature = None
         if mode is None or not getattr(mode, "active", False):
             return
 

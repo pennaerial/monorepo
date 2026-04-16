@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import Callable, Mapping
+from typing import Any, Callable, Mapping
 
 from std_msgs.msg import Empty
 
@@ -65,6 +65,7 @@ class PeerConnectionTracker:
         peer_stale_timeout_s: float = 0.5,
         now_seconds: Callable[[], float],
         on_connection_change: Callable[[str], None] | Callable[..., None],
+        diagnostic_logger: Callable[..., None] | None = None,
         raw_create_publisher: Callable[..., object],
         raw_create_subscription: Callable[..., object],
         raw_destroy_publisher: Callable[[object], bool | None],
@@ -77,6 +78,7 @@ class PeerConnectionTracker:
         self.peer_stale_timeout_s = float(peer_stale_timeout_s)
         self._now_seconds = now_seconds
         self._on_connection_change = on_connection_change
+        self._diagnostic_logger = diagnostic_logger
         self._raw_create_publisher = raw_create_publisher
         self._raw_create_subscription = raw_create_subscription
         self._raw_destroy_publisher = raw_destroy_publisher
@@ -101,6 +103,13 @@ class PeerConnectionTracker:
                 1.0 / self.peer_heartbeat_hz,
                 self._peer_timer_callback,
             )
+            self._log_diag(
+                "HEARTBEAT",
+                "initialized local heartbeat publisher",
+                local_topic=self.local_heartbeat_topic(),
+                peer_heartbeat_hz=self.peer_heartbeat_hz,
+                peer_stale_timeout_s=self.peer_stale_timeout_s,
+            )
 
     @property
     def peer_names(self) -> tuple[str, ...]:
@@ -109,8 +118,40 @@ class PeerConnectionTracker:
     def status(self) -> dict[str, bool]:
         return dict(self._connected)
 
+    def local_heartbeat_topic(self) -> str | None:
+        if not self._runtime_vehicle_name:
+            return None
+        return self._heartbeat_topic_for(self._runtime_vehicle_name)
+
     def _heartbeat_topic_for(self, vehicle_name: str) -> str:
         return f"/{vehicle_name}/{HEARTBEAT_TOPIC_SUFFIX}"
+
+    def remote_heartbeat_topics(self) -> dict[str, str]:
+        return {
+            peer_name: self._heartbeat_topic_for(peer_name) for peer_name in self._peer_names
+        }
+
+    def debug_snapshot(self) -> dict[str, Any]:
+        current_time = self._now_seconds()
+        return {
+            "local_heartbeat_topic": self.local_heartbeat_topic(),
+            "remote_heartbeat_topics": self.remote_heartbeat_topics(),
+            "peer_vehicle_names": self.peer_names,
+            "connection_status": self.status(),
+            "last_seen_age_s": {
+                peer_name: (
+                    None
+                    if last_seen is None
+                    else max(0.0, current_time - float(last_seen))
+                )
+                for peer_name, last_seen in sorted(self._last_seen.items())
+            },
+        }
+
+    def _log_diag(self, category: str, message: str, **fields) -> None:
+        if self._diagnostic_logger is None:
+            return
+        self._diagnostic_logger(category, message=message, **fields)
 
     def configure(
         self, peer_vehicle_names: tuple[str, ...] | list[str] | set[str]
@@ -145,12 +186,26 @@ class PeerConnectionTracker:
             )
 
         self._peer_names = tuple(sorted(next_peer_names))
+        self._log_diag(
+            "HEARTBEAT",
+            "configured peer heartbeat subscriptions",
+            local_topic=self.local_heartbeat_topic(),
+            peer_vehicle_names=self._peer_names,
+            remote_heartbeat_topics=self.remote_heartbeat_topics(),
+            removed_peer_vehicle_names=tuple(sorted(current_peer_names - next_peer_names)),
+        )
 
     def _peer_heartbeat_callback(self, peer_name: str) -> None:
         self._last_seen[peer_name] = self._now_seconds()
         if self._connected.get(peer_name, False):
             return
         self._connected[peer_name] = True
+        self._log_diag(
+            "HEARTBEAT",
+            "observed first heartbeat from peer",
+            peer_name=peer_name,
+            topic=self._heartbeat_topic_for(peer_name),
+        )
         self._on_connection_change(peer_name, connected=True)
 
     def _peer_timer_callback(self) -> None:
@@ -167,6 +222,14 @@ class PeerConnectionTracker:
             if not self._connected.get(peer_name, False):
                 continue
             self._connected[peer_name] = False
+            self._log_diag(
+                "HEARTBEAT",
+                "peer heartbeat went stale",
+                peer_name=peer_name,
+                topic=self._heartbeat_topic_for(peer_name),
+                seconds_since_last_seen=max(0.0, current_time - float(last_seen)),
+                peer_stale_timeout_s=self.peer_stale_timeout_s,
+            )
             self._on_connection_change(peer_name, connected=False)
 
     def close(self) -> None:

@@ -88,6 +88,13 @@ class PayloadPeerFleetTestMode(Mode):
             peer_name: 0 for peer_name in self._peer_names
         }
         self._last_disconnect_signature: tuple[str, ...] = ()
+        self._peer_state_topics = {
+            peer_name: vehicle.namespaced_path(local_topic, namespace=f"/{peer_name}")
+            for peer_name in self._peer_names
+        }
+        self._last_operating_state: str | None = None
+        self._logged_first_peer_receipt: set[str] = set()
+        self._logged_first_shared_receipt: set[str] = set()
 
     def _now(self) -> float:
         return self.node.get_clock().now().nanoseconds * 1e-9
@@ -108,6 +115,12 @@ class PayloadPeerFleetTestMode(Mode):
         self._peer_message_counts[peer_name] = (
             self._peer_message_counts.get(peer_name, 0) + 1
         )
+        if peer_name not in self._logged_first_peer_receipt:
+            self._logged_first_peer_receipt.add(peer_name)
+            self.log(
+                f"COMMS DIAG | PEER_TEST | first peer-local message received "
+                f"peer_name={peer_name} topic={self._peer_state_topics.get(peer_name, '')}"
+            )
 
     def _on_shared_message(self, message: String) -> None:
         self._shared_message_count += 1
@@ -119,6 +132,25 @@ class PayloadPeerFleetTestMode(Mode):
             self._shared_remote_message_counts[sender] = (
                 self._shared_remote_message_counts.get(sender, 0) + 1
             )
+            if sender not in self._logged_first_shared_receipt:
+                self._logged_first_shared_receipt.add(sender)
+                self.log(
+                    f"COMMS DIAG | PEER_TEST | first shared remote message received "
+                    f"peer_name={sender} topic={self._shared_topic}"
+                )
+
+    def _log_state_transition(
+        self, *, state: str, disconnected_peers: tuple[str, ...] = ()
+    ) -> None:
+        if state == self._last_operating_state:
+            return
+        self._last_operating_state = state
+        self.log(
+            "COMMS DIAG | PEER_TEST | state transition "
+            f"state={state} disconnected_peers={list(disconnected_peers)} "
+            f"peer_total={sum(self._peer_message_counts.values())} "
+            f"shared_remote_total={sum(self._shared_remote_message_counts.values())}"
+        )
 
     def _status_payload(
         self, *, state: str, disconnected_peers: tuple[str, ...]
@@ -183,13 +215,22 @@ class PayloadPeerFleetTestMode(Mode):
             self._peer_message_counts[peer_name] = 0
             self._shared_remote_message_counts[peer_name] = 0
         self._last_disconnect_signature = ()
+        self._last_operating_state = None
+        self._logged_first_peer_receipt.clear()
+        self._logged_first_shared_receipt.clear()
         self.log(
             f"starting peer fleet test for {self.vehicle.name}; expecting peers {self._peer_names}"
+        )
+        self.log(
+            "COMMS DIAG | PEER_TEST | topics "
+            f"local_topic={self._local_topic} shared_topic={self._shared_topic} "
+            f"peer_topics={self._peer_state_topics}"
         )
 
     def on_update(self, time_delta: float) -> None:
         del time_delta
         now = self._now()
+        self._log_state_transition(state="connected")
         self._publish_status(now=now, state="connected")
         self._log_status(now=now, state="connected")
 
@@ -207,6 +248,9 @@ class PayloadPeerFleetTestMode(Mode):
         if disconnect_signature != self._last_disconnect_signature:
             self.log("waiting for peers: " + ", ".join(disconnect_signature))
             self._last_disconnect_signature = disconnect_signature
+        self._log_state_transition(
+            state="waiting", disconnected_peers=disconnect_signature
+        )
         self._publish_status(
             now=now,
             state="waiting",
