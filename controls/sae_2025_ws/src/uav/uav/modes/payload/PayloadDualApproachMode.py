@@ -279,8 +279,8 @@ class PayloadDualApproachMode(Mode):
         self._image_width = 0.0
         self._last_seen_time = None
         self._last_log_time = 0.0
-        self.vehicle.set_servo(120.0)
-        self.log("PayloadDualApproachMode: started, servo set to 160")
+        self.vehicle.set_servo(180.0)
+        self.log("PayloadDualApproachMode: started, servo set to 180")
 
     def on_update(self, time_delta: float) -> None:
         if self._done:
