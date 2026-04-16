@@ -640,11 +640,11 @@ def test_render_runtime_fleet_for_payload_defaults(tmp_path, monkeypatch):
             "camera_mount_offsets": [0.0, 0.0, 0.0],
             "camera_input_transport": "compressed",
             "camera_rotate_degrees": 180.0,
-            "camera_calibration_file": "",
             "camera_preprocess_hook": "",
             "payload_controller": "SimController",
         }
     ]
+    assert "camera_calibration_file" not in runtime["vehicles"][0]
 
 
 def test_validate_overlay_preview_rejects_unsupported_fields(tmp_path, monkeypatch):
