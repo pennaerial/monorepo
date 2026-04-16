@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import builtins
+import importlib
 import importlib.util
 import sys
 from pathlib import Path
 from types import SimpleNamespace
+import types
 
 import pytest
 
@@ -20,7 +22,97 @@ _EXCLUDED_KEYS = {
 }
 
 
+def _import_module_if_available(name: str):
+    try:
+        return importlib.import_module(name)
+    except ModuleNotFoundError:
+        return None
+
+
+def _ensure_launch_import_stubs() -> None:
+    ament_index_python = sys.modules.get("ament_index_python")
+    if ament_index_python is None:
+        ament_index_python = _import_module_if_available("ament_index_python")
+    if ament_index_python is None:
+        ament_index_python = types.ModuleType("ament_index_python")
+        sys.modules["ament_index_python"] = ament_index_python
+
+    ament_index_packages = sys.modules.get("ament_index_python.packages")
+    if ament_index_packages is None:
+        ament_index_packages = _import_module_if_available(
+            "ament_index_python.packages"
+        )
+    if ament_index_packages is None:
+        ament_index_packages = types.ModuleType("ament_index_python.packages")
+        sys.modules["ament_index_python.packages"] = ament_index_packages
+    if not hasattr(ament_index_packages, "get_package_share_directory"):
+        ament_index_packages.get_package_share_directory = lambda _name: str(
+            Path(__file__).resolve().parents[1]
+        )
+    ament_index_python.packages = ament_index_packages
+
+    launch_module = sys.modules.get("launch")
+    if launch_module is None:
+        launch_module = _import_module_if_available("launch")
+    if launch_module is None:
+        launch_module = types.ModuleType("launch")
+        sys.modules["launch"] = launch_module
+    if not hasattr(launch_module, "LaunchDescription"):
+        launch_module.LaunchDescription = type("LaunchDescription", (), {})
+
+    launch_actions = sys.modules.get("launch.actions")
+    if launch_actions is None:
+        launch_actions = _import_module_if_available("launch.actions")
+    if launch_actions is None:
+        launch_actions = types.ModuleType("launch.actions")
+        sys.modules["launch.actions"] = launch_actions
+    for name in (
+        "DeclareLaunchArgument",
+        "ExecuteProcess",
+        "IncludeLaunchDescription",
+        "OpaqueFunction",
+    ):
+        if not hasattr(launch_actions, name):
+            setattr(launch_actions, name, type(name, (), {}))
+
+    launch_sources = sys.modules.get("launch.launch_description_sources")
+    if launch_sources is None:
+        launch_sources = _import_module_if_available(
+            "launch.launch_description_sources"
+        )
+    if launch_sources is None:
+        launch_sources = types.ModuleType("launch.launch_description_sources")
+        sys.modules["launch.launch_description_sources"] = launch_sources
+    if not hasattr(launch_sources, "PythonLaunchDescriptionSource"):
+        launch_sources.PythonLaunchDescriptionSource = type(
+            "PythonLaunchDescriptionSource", (), {}
+        )
+
+    launch_logging = sys.modules.get("launch.logging")
+    if launch_logging is None:
+        launch_logging = _import_module_if_available("launch.logging")
+    if launch_logging is None:
+        launch_logging = types.ModuleType("launch.logging")
+        sys.modules["launch.logging"] = launch_logging
+    if not hasattr(launch_logging, "get_logger"):
+        launch_logging.get_logger = lambda *_args, **_kwargs: SimpleNamespace(
+            warning=lambda *_a, **_k: None,
+            warn=lambda *_a, **_k: None,
+            info=lambda *_a, **_k: None,
+        )
+
+    launch_substitutions = sys.modules.get("launch.substitutions")
+    if launch_substitutions is None:
+        launch_substitutions = _import_module_if_available("launch.substitutions")
+    if launch_substitutions is None:
+        launch_substitutions = types.ModuleType("launch.substitutions")
+        sys.modules["launch.substitutions"] = launch_substitutions
+    if not hasattr(launch_substitutions, "LaunchConfiguration"):
+        launch_substitutions.LaunchConfiguration = type("LaunchConfiguration", (), {})
+
+
 def _load_fleet_module():
+    _ensure_launch_import_stubs()
     package_root = Path(__file__).resolve().parents[1]
     if str(package_root) not in sys.path:
         sys.path.insert(0, str(package_root))
@@ -155,6 +247,7 @@ def test_backend_config_accepts_real_backend(fleet_launch_module):
 
 
 def test_real_backend_does_not_import_sim(monkeypatch):
+    _ensure_launch_import_stubs()
     package_root = Path(__file__).resolve().parents[1]
     if str(package_root) not in sys.path:
         sys.path.insert(0, str(package_root))
@@ -237,6 +330,7 @@ def test_vehicle_stack_configs_defaults_namespaces_and_instances(
     assert vehicles[1]["vehicle_name"] == "payload_alpha"
     assert vehicles[1]["sim_entity_name"] == "payload_0"
     assert vehicles[1]["launch_payload_backend"] is True
+    assert vehicles[1]["payload_controller"] == "SimController"
     assert vehicles[0]["auto_launch"] is True
     assert vehicles[0]["debug"] is False
     assert vehicles[0]["vision_debug"] is False
@@ -388,7 +482,6 @@ def test_vehicle_stack_configs_support_hardware_payload(
                 "name": "payload_alpha",
                 "mission_path": "/tmp/payload_retreat.yaml",
                 "kind": "payload",
-                "payload_controller": "GPIOController",
             }
         ],
     }
@@ -399,3 +492,4 @@ def test_vehicle_stack_configs_support_hardware_payload(
     assert vehicles[0]["launch_payload_backend"] is True
     assert vehicles[0]["payload_controller"] == "GPIOController"
     assert vehicles[0]["camera_calibration_file"] == ""
+    assert vehicles[0]["auto_launch"] is False

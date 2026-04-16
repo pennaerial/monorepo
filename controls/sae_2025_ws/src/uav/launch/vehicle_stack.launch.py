@@ -525,7 +525,7 @@ def launch_setup(context, *args, **kwargs):
         )
 
     sim = _resolve_bool(config, "sim", False)
-    auto_launch = _resolve_bool(config, "auto_launch", True)
+    auto_launch = _resolve_bool(config, "auto_launch", sim)
     debug = _resolve_bool(config, "debug", False)
     vision_debug = _resolve_bool(config, "vision_debug", False)
     servo_only = _resolve_bool(config, "servo_only", False)
@@ -650,9 +650,7 @@ def launch_setup(context, *args, **kwargs):
 
     actions = []
     if mission_spec.is_payload and launch_payload_backend:
-        payload_controller = str(config.get("payload_controller", "")).strip()
-        if sim and not payload_controller:
-            payload_controller = "SimController"
+        payload_controller = "SimController" if sim else "GPIOController"
         actions.append(
             _payload_launch_action(
                 vehicle_name=vehicle_name,

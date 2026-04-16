@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback, useDeferredValue, useMemo, useRef } from 'react'
+import YAML from 'yaml'
 import '@xterm/xterm/css/xterm.css'
 import './App.css'
 import { useMissionControl } from './hooks/useMissionControl'
 import {
   api,
   normalizeFleetActionResult,
+  requestJson,
   withDeviceFormData,
   withDeviceScope,
   withQueryParams,
@@ -84,13 +86,14 @@ const LAUNCH_PARAM_FIELDS = [
     help: 'Rotate incoming camera frames before vision processing.',
   },
   {
-    key: 'camera_preprocess_hook',
-  {
     key: 'camera_calibration_file',
     label: 'Camera calibration file',
     type: 'string',
+    choices: [],
     help: 'Packaged calibration filename from uav/config/camera_calibrations. Leave blank to use the launch fallback.',
   },
+  {
+    key: 'camera_preprocess_hook',
     label: 'Camera preprocess hook',
     type: 'string',
     help: 'Optional Python hook for image preprocessing.',
@@ -110,9 +113,9 @@ const LAUNCH_PARAM_CORE_FIELDS = [
   'camera_mount_offsets',
   'camera_input_transport',
   'camera_rotate_degrees',
+  'camera_calibration_file',
   'camera_preprocess_hook',
 ].map(key => LAUNCH_PARAM_FIELD_MAP[key]).filter(Boolean)
-  'camera_calibration_file',
 
 const LAUNCH_PARAM_TOGGLE_FIELDS = [
   'debug',
@@ -168,6 +171,18 @@ function getTargetLabel(target) {
   const id = getTargetId(target)
   const label = `${target.label ?? target.name ?? target.hostname ?? target.pi_host ?? id}`.trim() || 'Unnamed target'
   return id && label !== id ? `${label} (${id})` : label
+}
+
+function calibrationChoicesFromFleetSchema(schema) {
+  const defaultsSection = Array.isArray(schema?.sections)
+    ? schema.sections.find(section => section?.name === 'defaults')
+    : null
+  const calibrationField = Array.isArray(defaultsSection?.fields)
+    ? defaultsSection.fields.find(field => field?.name === 'camera_calibration_file')
+    : null
+  return Array.isArray(calibrationField?.choices)
+    ? calibrationField.choices.map(choice => `${choice}`).filter(Boolean)
+    : []
 }
 
 function normalizeTargets(targets) {
@@ -602,6 +617,24 @@ function schemaFieldInputKind(field) {
   return 'text'
 }
 
+const LOW_SIGNAL_SCHEMA_ANNOTATIONS = new Set([
+  'str',
+  'int',
+  'float',
+  'bool',
+  'enum',
+  'list',
+  'dict',
+  'mapping',
+])
+
+function fieldHelpText(field) {
+  if (field?.description) return field.description
+  const annotation = `${field?.annotation || ''}`.trim().toLowerCase()
+  if (!annotation || LOW_SIGNAL_SCHEMA_ANNOTATIONS.has(annotation)) return ''
+  return field.annotation
+}
+
 function effectiveSchemaFieldValue(paramsRaw, field) {
   const blockValue = getYamlBlockValue(paramsRaw, field.name)
   if (!blockValue) {
@@ -687,6 +720,251 @@ function uniqueModeName(doc, baseName = 'mode') {
   return `${baseName}_${index}`
 }
 
+function cloneYamlValue(value) {
+  if (value === null || value === undefined) return value
+  return JSON.parse(JSON.stringify(value))
+}
+
+function normalizeFleetEditorDocument(raw) {
+  const doc = raw && typeof raw === 'object' && !Array.isArray(raw)
+    ? cloneYamlValue(raw)
+    : {}
+
+  if (!doc.backend || typeof doc.backend !== 'object' || Array.isArray(doc.backend)) {
+    doc.backend = {}
+  }
+  if (!doc.defaults || typeof doc.defaults !== 'object' || Array.isArray(doc.defaults)) {
+    doc.defaults = {}
+  }
+  if (!Array.isArray(doc.vehicles)) {
+    doc.vehicles = []
+  }
+  doc.vehicles = doc.vehicles
+    .filter(vehicle => vehicle && typeof vehicle === 'object' && !Array.isArray(vehicle))
+    .map(vehicle => ({ ...vehicle }))
+  return doc
+}
+
+function emptyFleetEditorDocument() {
+  return normalizeFleetEditorDocument({
+    backend: { kind: 'hardware' },
+    defaults: {},
+    vehicles: [],
+  })
+}
+
+function parseFleetEditorDocument(text) {
+  const rawText = `${text || ''}`
+  if (!rawText.trim()) {
+    return {
+      rawText,
+      doc: emptyFleetEditorDocument(),
+      error: '',
+    }
+  }
+
+  try {
+    const parsed = YAML.parse(rawText)
+    return {
+      rawText,
+      doc: normalizeFleetEditorDocument(parsed || {}),
+      error: '',
+    }
+  } catch (error) {
+    return {
+      rawText,
+      doc: null,
+      error: error?.message || 'Failed to parse fleet YAML.',
+    }
+  }
+}
+
+function renderFleetEditorDocument(doc) {
+  return YAML.stringify(normalizeFleetEditorDocument(doc), {
+    lineWidth: 0,
+  }).trimEnd()
+}
+
+function missionNameFromPathString(path) {
+  const normalized = `${path || ''}`.trim().replace(/\\/g, '/')
+  if (!normalized) return ''
+  const basename = normalized.split('/').pop() || ''
+  return basename.replace(/\.ya?ml$/i, '')
+}
+
+function normalizeIntegrationFleetDocument(doc, missionTargetByName = {}) {
+  const next = normalizeFleetEditorDocument(doc)
+  const backend = next.backend && typeof next.backend === 'object' && !Array.isArray(next.backend)
+    ? { ...next.backend }
+    : {}
+  next.backend = {
+    kind: 'hardware',
+    px4_path: `${backend.px4_path || '~/PX4-Autopilot'}`.trim() || '~/PX4-Autopilot',
+  }
+
+  const defaults = next.defaults && typeof next.defaults === 'object' && !Array.isArray(next.defaults)
+    ? { ...next.defaults }
+    : {}
+  delete defaults.auto_launch
+  next.defaults = defaults
+
+  next.vehicles = (next.vehicles || []).map(vehicle => {
+    const normalizedVehicle = { ...vehicle }
+    const missionName = `${normalizedVehicle.mission || missionNameFromPathString(normalizedVehicle.mission_path) || ''}`.trim()
+    const inferredKind = `${missionTargetByName[missionName] || normalizedVehicle.kind || ''}`.trim()
+
+    delete normalizedVehicle.controllable
+    delete normalizedVehicle.mission_path
+    delete normalizedVehicle.px4_instance
+    delete normalizedVehicle.payload_controller
+    delete normalizedVehicle.auto_launch
+
+    if (missionName) {
+      normalizedVehicle.mission = missionName
+    } else {
+      delete normalizedVehicle.mission
+    }
+
+    if (inferredKind) {
+      normalizedVehicle.kind = inferredKind
+    } else {
+      delete normalizedVehicle.kind
+    }
+
+    if (`${normalizedVehicle.kind || ''}`.trim() !== 'uav') {
+      delete normalizedVehicle.px4_airframe_id
+      delete normalizedVehicle.px4_namespace
+    }
+
+    return normalizedVehicle
+  })
+
+  return next
+}
+
+function getObjectPathValue(root, path) {
+  return path.reduce((current, key) => {
+    if (current === null || current === undefined) return undefined
+    if (typeof key === 'number') {
+      return Array.isArray(current) ? current[key] : undefined
+    }
+    return typeof current === 'object' ? current[key] : undefined
+  }, root)
+}
+
+function setObjectPathValue(root, path, value) {
+  if (!path.length) return
+  let current = root
+  for (let index = 0; index < path.length - 1; index += 1) {
+    const key = path[index]
+    const nextKey = path[index + 1]
+    const nextValue = typeof nextKey === 'number' ? [] : {}
+    if (typeof key === 'number') {
+      if (!Array.isArray(current)) return
+      current[key] = current[key] ?? nextValue
+      current = current[key]
+      continue
+    }
+    if (!current[key] || typeof current[key] !== 'object') {
+      current[key] = nextValue
+    }
+    current = current[key]
+  }
+  const finalKey = path[path.length - 1]
+  if (typeof finalKey === 'number') {
+    if (Array.isArray(current)) {
+      current[finalKey] = value
+    }
+    return
+  }
+  current[finalKey] = value
+}
+
+function deleteObjectPathValue(root, path) {
+  if (!path.length) return
+  let current = root
+  for (let index = 0; index < path.length - 1; index += 1) {
+    const key = path[index]
+    if (typeof key === 'number') {
+      if (!Array.isArray(current)) return
+      current = current[key]
+      continue
+    }
+    if (!current || typeof current !== 'object') return
+    current = current[key]
+  }
+  if (!current || typeof current !== 'object') return
+  const finalKey = path[path.length - 1]
+  if (typeof finalKey === 'number') {
+    if (Array.isArray(current)) {
+      current.splice(finalKey, 1)
+    }
+    return
+  }
+  delete current[finalKey]
+}
+
+function hasFleetFieldValue(value) {
+  if (value === false || value === 0) return true
+  if (Array.isArray(value)) {
+    return value.some(item => hasFleetFieldValue(item))
+  }
+  if (value && typeof value === 'object') {
+    return Object.keys(value).length > 0
+  }
+  return `${value ?? ''}`.trim() !== ''
+}
+
+function coerceFleetFieldValue(field, nextValue) {
+  const kind = schemaFieldInputKind(field)
+  if (kind === 'boolean') {
+    return Boolean(nextValue)
+  }
+  if (kind === 'number') {
+    const raw = `${nextValue ?? ''}`.trim()
+    if (!raw) return undefined
+    const parsed = Number(raw)
+    return Number.isFinite(parsed) ? parsed : undefined
+  }
+  if (kind === 'tuple') {
+    const arr = Array.isArray(nextValue) ? nextValue : []
+    const normalized = arr.map(value => Number(value))
+    return normalized.every(value => Number.isFinite(value)) ? normalized : undefined
+  }
+  if (kind === 'block') {
+    return nextValue
+  }
+  const text = `${nextValue ?? ''}`
+  return text.trim() ? text : undefined
+}
+
+function writeFleetFieldValue(doc, path, field, nextValue) {
+  const nextDoc = normalizeFleetEditorDocument(doc)
+  const normalized = coerceFleetFieldValue(field, nextValue)
+  if (!hasFleetFieldValue(normalized)) {
+    deleteObjectPathValue(nextDoc, path)
+    return normalizeFleetEditorDocument(nextDoc)
+  }
+  setObjectPathValue(nextDoc, path, normalized)
+  return normalizeFleetEditorDocument(nextDoc)
+}
+
+function renderFleetBlockValue(value) {
+  if (value === undefined || value === null) return ''
+  if (typeof value === 'string') return value
+  return YAML.stringify(value, { lineWidth: 0 }).trimEnd()
+}
+
+function uniqueFleetVehicleName(doc, baseName = 'vehicle') {
+  const existing = new Set((doc?.vehicles || []).map(vehicle => `${vehicle?.name || ''}`.trim()).filter(Boolean))
+  if (!existing.has(baseName)) return baseName
+  let index = 1
+  while (existing.has(`${baseName}_${index}`)) {
+    index += 1
+  }
+  return `${baseName}_${index}`
+}
+
 function WifiCard({ connected, wifiStatus, onRefresh, targetId, hostname = '', vehicleName = '' }) {
   const [networks, setNetworks] = useState([])
   const [scanning, setScanning] = useState(false)
@@ -762,8 +1040,11 @@ function WifiCard({ connected, wifiStatus, onRefresh, targetId, hostname = '', v
 
   return (
     <div className="card">
-      <h2 className="card-title">Target WiFi</h2>
+      <h2 className="card-title">WiFi Handoff</h2>
       <div className="card-content">
+        <p className="subtext left-note">
+          Scan runs on the Pi itself. Joining a network switches the Pi to that WiFi and then asks this laptop to follow it locally. Re-enabling the hotspot only changes the Pi back to hotspot mode.
+        </p>
         <button className="btn btn-secondary" onClick={scan} disabled={scanning || !connected}>
           {scanning ? 'Scanning...' : 'Scan networks'}
         </button>
@@ -791,14 +1072,14 @@ function WifiCard({ connected, wifiStatus, onRefresh, targetId, hostname = '', v
             />
 
             <button className="btn btn-primary" onClick={connect} disabled={loading || !connected}>
-              {loading ? 'Connecting...' : 'Connect both devices'}
+              {loading ? 'Joining...' : 'Join network on Pi + laptop'}
             </button>
           </>
         )}
 
         {!wifiStatus?.is_hotspot && (
           <button className="btn btn-secondary" onClick={hotspot} disabled={loading || !connected}>
-            {loading ? 'Switching...' : 'Restore hotspot'}
+            {loading ? 'Switching...' : 'Re-enable target hotspot'}
           </button>
         )}
 
@@ -822,6 +1103,7 @@ function MissionControl({
   const [missionViewMode, setMissionViewMode] = useState('graph')
   const [showAdvancedRaw, setShowAdvancedRaw] = useState(false)
   const [integerDrafts, setIntegerDrafts] = useState({})
+  const [cameraCalibrationChoices, setCameraCalibrationChoices] = useState([])
   const selectedVehicle = useMemo(
     () => fleetVehicleByName(buildSource, selectedTarget?.vehicle_name || vehicleName || ''),
     [buildSource, selectedTarget?.vehicle_name, vehicleName]
@@ -863,6 +1145,34 @@ function MissionControl({
   useEffect(() => {
     setIntegerDrafts({})
   }, [paramsText])
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const schema = await requestJson('/api/schema/fleet')
+        if (!cancelled) {
+          setCameraCalibrationChoices(calibrationChoicesFromFleetSchema(schema))
+        }
+      } catch {
+        if (!cancelled) {
+          setCameraCalibrationChoices([])
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const launchParamStructureFields = useMemo(
+    () => LAUNCH_PARAM_STRUCTURE_FIELDS.map(field => (
+      field.key === 'camera_calibration_file'
+        ? { ...field, choices: cameraCalibrationChoices }
+        : field
+    )),
+    [cameraCalibrationChoices]
+  )
 
   useEffect(() => {
     if (!connected || !selectedMissionName) return
@@ -912,13 +1222,37 @@ function MissionControl({
 
   const renderCommonOverrideField = (field) => {
     const value = getYamlFieldValue(paramsText, field.key, field.type)
+    const fieldId = `launch-param-${field.key}`
+
+    if (Array.isArray(field.choices) && field.choices.length > 0) {
+      return (
+        <div key={field.key} className="param-field">
+          <label htmlFor={fieldId}>{field.label}</label>
+          <select
+            id={fieldId}
+            value={`${value ?? ''}`}
+            onChange={e => updateField(field, e.target.value)}
+            disabled={!connected}
+          >
+            <option value="">Use launch fallback</option>
+            {field.choices.map(choice => (
+              <option key={`${field.key}-${choice}`} value={`${choice}`}>
+                {`${choice}`}
+              </option>
+            ))}
+          </select>
+          <p className="param-help">{field.help}</p>
+        </div>
+      )
+    }
 
     if (field.type === 'array3') {
       const textValue = Array.isArray(value) ? value.join(', ') : '0, 0, 0'
       return (
         <div key={field.key} className="param-field">
-          <label>{field.label}</label>
+          <label htmlFor={fieldId}>{field.label}</label>
           <input
+            id={fieldId}
             type="text"
             value={textValue}
             onChange={e => {
@@ -939,8 +1273,9 @@ function MissionControl({
       const displayValue = draftValue ?? `${Number.isFinite(value) ? value : 0}`
       return (
         <div key={field.key} className="param-field">
-          <label>{field.label}</label>
+          <label htmlFor={fieldId}>{field.label}</label>
           <input
+            id={fieldId}
             type="text"
             inputMode="numeric"
             pattern="[0-9]*"
@@ -960,8 +1295,9 @@ function MissionControl({
 
     return (
       <div key={field.key} className="param-field">
-        <label>{field.label}</label>
+        <label htmlFor={fieldId}>{field.label}</label>
         <input
+          id={fieldId}
           type="text"
           value={value}
           onChange={e => updateField(field, e.target.value)}
@@ -995,6 +1331,10 @@ function MissionControl({
       <div className="grid mission-grid">
         <div className="card">
           <h2 className="card-title">Current Runtime</h2>
+          <p className="subtext left-note">
+            This shows the active release on the Pi from release metadata and
+            `install/BUILD_INFO.txt`, not the selected source above.
+          </p>
           <div className="info-box">
             <pre>
               {connected
@@ -1037,6 +1377,20 @@ function MissionControl({
       </div>
 
       <div className="card card-full">
+        <h2 className="card-title">Runtime Output</h2>
+        <div className="card-content">
+          <button className="btn btn-secondary" onClick={() => refreshLaunchData(true)} disabled={!connected}>Refresh Logs Now</button>
+          <p className="subtext left-note">
+            {connected
+              ? 'Live SSH stream runs while runtime is running. Refresh re-syncs full log history.'
+              : 'Connect to the target WiFi to stream runtime output.'}
+          </p>
+          <div ref={terminalHostRef} className="terminal-output terminal-host" />
+          {connected && <Result data={logsResult} />}
+        </div>
+      </div>
+
+      <div className="card card-full">
         <h2 className="card-title">Runtime Overrides ({launchParamsDisplayPath})</h2>
         <div className="card-content">
           {!connected && (
@@ -1071,13 +1425,13 @@ function MissionControl({
           </div>
 
           <div className="params-layout">
-            <div className="params-section">
+            <div className="params-section params-section-spaced">
               <h3 className="params-section-title">Common Overrides</h3>
               <div className="params-stack">
-                {LAUNCH_PARAM_STRUCTURE_FIELDS.map(renderCommonOverrideField)}
+                {launchParamStructureFields.map(renderCommonOverrideField)}
               </div>
             </div>
-            <div className="params-section">
+            <div className="params-section params-section-spaced">
               <h3 className="params-section-title">Mission Toggles</h3>
               <div className="toggle-grid">
                 {LAUNCH_PARAM_TOGGLE_FIELDS.map(renderToggleField)}
@@ -1114,20 +1468,6 @@ function MissionControl({
           </div>
           <p className="subtext left-note">Reload discards unsaved local edits and re-reads the selected target file from the Pi.</p>
           {connected && <Result data={paramsResult} />}
-        </div>
-      </div>
-
-      <div className="card card-full">
-        <h2 className="card-title">Runtime Output</h2>
-        <div className="card-content">
-          <button className="btn btn-secondary" onClick={() => refreshLaunchData(true)} disabled={!connected}>Refresh Logs Now</button>
-          <p className="subtext left-note">
-            {connected
-              ? 'Live SSH stream runs while runtime is running. Refresh re-syncs full log history.'
-              : 'Connect to the target WiFi to stream runtime output.'}
-          </p>
-          <div ref={terminalHostRef} className="terminal-output terminal-host" />
-          {connected && <Result data={logsResult} />}
         </div>
       </div>
 
@@ -1226,6 +1566,7 @@ function MissionGraphEditor({
   missionDocumentSchema,
 }) {
   const [selectedModeName, setSelectedModeName] = useState('')
+  const [modeNameNotice, setModeNameNotice] = useState('')
   const registryByMode = useMemo(() => normalizeModeRegistry(modeRegistry), [modeRegistry])
   const selectedVehicle = useMemo(
     () => fleetVehicleByName(buildSource, selectedTarget?.vehicle_name || ''),
@@ -1241,6 +1582,10 @@ function MissionGraphEditor({
       setSelectedModeName(parsedMission.modes[0].name)
     }
   }, [parsedMission.modes, selectedModeName])
+
+  useEffect(() => {
+    setModeNameNotice('')
+  }, [selectedModeName])
 
   const selectedMode = parsedMission.modes.find(mode => mode.name === selectedModeName) || null
   const selectedModeMetadata = selectedMode ? registryByMode[selectedMode.mode] || null : null
@@ -1286,13 +1631,13 @@ function MissionGraphEditor({
     setSelectedModeName('')
   }
 
-  const removeSelectedMode = () => {
-    if (!selectedMode) return
+  const removeModeByName = (modeName) => {
+    if (!modeName) return
     applyMissionUpdate(doc => {
-      doc.modes = doc.modes.filter(mode => mode.name !== selectedMode.name)
+      doc.modes = doc.modes.filter(mode => mode.name !== modeName)
       doc.modes = doc.modes.map(mode => ({
         ...mode,
-        transitions: mode.transitions.filter(entry => entry.value !== selectedMode.name),
+        transitions: mode.transitions.filter(entry => entry.value !== modeName),
       }))
       return doc
     })
@@ -1408,7 +1753,7 @@ function MissionGraphEditor({
 
     if (kind === 'block') {
       return (
-        <div key={field.name} className="param-field">
+        <div key={field.name} className="param-field param-field-full">
           <label>{field.name}</label>
           <textarea
             className="yaml-editor mission-mode-editor"
@@ -1488,19 +1833,40 @@ function MissionGraphEditor({
             </button>
           </div>
           {parsedMission.modes.map(mode => (
-          <button
-            key={mode.name}
-            type="button"
-            className={`mission-node ${selectedModeName === mode.name ? 'mission-node-active' : ''}`}
-            onClick={() => setSelectedModeName(mode.name)}
-          >
-            <span className="mission-node-name">{mode.name}</span>
-            <span className="mission-node-class">{mode.mode}</span>
-            <span className="mission-node-meta">
-              {mode.target || 'unknown'} · {mode.transitions.length} edge{mode.transitions.length === 1 ? '' : 's'}
-            </span>
-          </button>
-        ))}
+            <div
+              key={mode.name}
+              className={`mission-node-shell ${selectedModeName === mode.name ? 'mission-node-shell-active' : ''}`}
+            >
+              <button
+                type="button"
+                className={`mission-node ${selectedModeName === mode.name ? 'mission-node-active' : ''}`}
+                onClick={() => setSelectedModeName(mode.name)}
+              >
+                <span className="mission-node-name">{mode.name}</span>
+                <span className="mission-node-class">{mode.mode}</span>
+                <span className="mission-node-meta">
+                  {mode.target || 'unknown'} · {mode.transitions.length} edge{mode.transitions.length === 1 ? '' : 's'}
+                </span>
+              </button>
+              <button
+                className="mission-node-delete"
+                type="button"
+                aria-label={`Remove ${mode.name}`}
+                onClick={event => {
+                  event.stopPropagation()
+                  removeModeByName(mode.name)
+                }}
+                disabled={!connected || busy || parsedMission.modes.length <= 1}
+              >
+                <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                  <path
+                    d="M6 2.75h4l.5 1H13a.75.75 0 1 1 0 1.5h-.47l-.58 7.01A1.75 1.75 0 0 1 10.2 14H5.8a1.75 1.75 0 0 1-1.75-1.74L3.47 5.25H3a.75.75 0 0 1 0-1.5h2.5l.5-1ZM5.85 5.25l.56 6.74a.25.25 0 0 0 .25.24h2.68a.25.25 0 0 0 .25-.24l.56-6.74H5.85ZM7.07 3.75h1.86l-.13-.25h-1.6l-.13.25Z"
+                    fill="currentColor"
+                  />
+                </svg>
+              </button>
+            </div>
+          ))}
         </div>
 
         <div className="mission-node-editor">
@@ -1513,7 +1879,9 @@ function MissionGraphEditor({
                   <div className="mission-schema-kicker">Selected mode</div>
                   <h3>{selectedMode.name}</h3>
                 </div>
-                <span className="launch-pill">{selectedMode.target || 'unknown target'}</span>
+                <div className="mission-node-head-actions">
+                  <span className="launch-pill">{selectedMode.target || 'unknown target'}</span>
+                </div>
               </div>
 
               <label>Mode name</label>
@@ -1521,8 +1889,24 @@ function MissionGraphEditor({
                 type="text"
                 value={selectedMode.name}
                 onChange={e => {
-                  const nextName = e.target.value
-                  if (!nextName) return
+                  const nextName = e.target.value.trim()
+                  if (!nextName) {
+                    setModeNameNotice('Mode name cannot be empty.')
+                    return
+                  }
+                  if (selectedMode.name === 'start') {
+                    setModeNameNotice('start is the mission entrypoint and should remain the only start mode.')
+                    return
+                  }
+                  if (nextName === 'start') {
+                    setModeNameNotice('Only one mode can be named start.')
+                    return
+                  }
+                  if (parsedMission.modes.some(mode => mode.name === nextName && mode.name !== selectedMode.name)) {
+                    setModeNameNotice('Mode names must be unique.')
+                    return
+                  }
+                  setModeNameNotice('')
                   applyMissionUpdate(doc => {
                     doc.modes = doc.modes.map(mode => {
                       if (mode.name === selectedMode.name) {
@@ -1539,8 +1923,13 @@ function MissionGraphEditor({
                   })
                   setSelectedModeName(nextName)
                 }}
-                disabled={!connected || busy}
+                disabled={!connected || busy || selectedMode.name === 'start'}
               />
+              <p className="param-help">
+                {selectedMode.name === 'start'
+                  ? 'start is the first mode run for this mission and stays reserved as the entrypoint.'
+                  : (modeNameNotice || 'Use unique mode names. Only one mode may be named start.')}
+              </p>
 
               <label>Mode alias</label>
               <select
@@ -1597,13 +1986,20 @@ function MissionGraphEditor({
                 <button className="btn btn-secondary btn-inline" type="button" onClick={addTransitionRow} disabled={!connected || busy}>
                   Add edge
                 </button>
-                <button className="btn btn-secondary btn-inline" type="button" onClick={removeSelectedMode} disabled={!connected || busy || parsedMission.modes.length <= 1}>
-                  Remove mode
-                </button>
               </div>
+              {!selectedModeMetadata?.transition_labels?.length && (
+                <p className="param-help">
+                  This mode does not publish predefined status labels. Add edges only when you know the raw status key the mode emits.
+                </p>
+              )}
 
               <div className="mission-edge-list">
-                {(selectedMode.transitions.length ? selectedMode.transitions : [{ key: '', value: '' }]).map((entry, index) => (
+                {selectedMode.transitions.length === 0 && (
+                  <p className="subtext left-note mission-edge-empty">
+                    No outgoing edges yet.
+                  </p>
+                )}
+                {selectedMode.transitions.map((entry, index) => (
                   <div key={`${selectedMode.name}-${index}`} className="mission-edge-row">
                     {selectedModeMetadata?.transition_labels?.length ? (
                       <select
@@ -1623,7 +2019,7 @@ function MissionGraphEditor({
                         type="text"
                         value={entry.key}
                         onChange={e => updateTransitionRow(index, 'key', e.target.value)}
-                        placeholder="state"
+                        placeholder="status / outcome"
                         disabled={!connected || busy}
                       />
                     )}
@@ -1864,6 +2260,10 @@ function selectedFleetVehicle(buildSource, selectedTarget) {
 function deviceReadinessSummary(device, buildSource, buildSourceLoaded = true, assignedVehicleName = '') {
   const sourceReady = describeBuildSource(buildSource, buildSourceLoaded).ready
   const assigned = Boolean(assignedVehicleName || device?.vehicle_name)
+  const rawNotes = Array.isArray(device?.readiness?.notes) ? device.readiness.notes.filter(Boolean) : []
+  const effectiveNotes = assigned
+    ? rawNotes.filter(note => !/no vehicle assigned/i.test(`${note}`))
+    : rawNotes
   const backendReadiness = device?.readiness && typeof device.readiness === 'object'
     ? {
       connected: Boolean(device.readiness.connected),
@@ -1871,7 +2271,7 @@ function deviceReadinessSummary(device, buildSource, buildSourceLoaded = true, a
       runtime_ready: Boolean(device.readiness.runtime_ready),
       vehicle_assigned: Boolean(device.readiness.vehicle_assigned) || assigned,
       ready: Boolean(device.readiness.ready),
-      notes: Array.isArray(device.readiness.notes) ? device.readiness.notes.filter(Boolean) : [],
+      notes: effectiveNotes,
     }
     : null
 
@@ -2075,51 +2475,41 @@ function describeBuildSource(buildSource, loaded = true) {
       ready: false,
     }
   }
+
+  let sourceTitle = 'Unknown build and fleet context'
+  let sourceDetail = 'Select a supported build source.'
+  if (buildSource.kind === 'github') {
+    const build = buildSource.build
+    sourceTitle = buildDisplayTitle(build)
+    sourceDetail = buildDisplayDetail(build)
+  } else if (buildSource.kind === 'local-artifact') {
+    sourceTitle = buildSource.sourceLabel || buildSource.fileName || 'Local artifact bundle'
+    sourceDetail = buildSource.cached
+      ? 'Cached by the backend and ready for deployment.'
+      : 'Uploaded from this laptop and cached by the backend.'
+  } else if (buildSource.kind === 'local-codebase') {
+    sourceTitle = buildSource.sourceLabel || 'Current local codebase'
+    sourceDetail = buildSource.packages?.length
+      ? `Packages the local workspace into a source bundle (${buildSource.packages.length} package(s)).`
+      : 'Packages the local workspace into a source bundle and builds it on the selected Pi.'
+  }
+
   if (!buildSource.fleetFile || buildSource.fleetExists === false) {
-    const fleetDetail = buildSource.fleetCatalogError && (!buildSource.fleetOptions || buildSource.fleetOptions.length === 0)
-      ? buildSource.fleetCatalogError
-      : buildSource.fleetError
     return {
-      title: buildSource.fleetFile ? 'Fleet selection needs attention' : 'Fleet file not selected',
-      detail: fleetDetail || 'Choose a valid fleet file before assigning and deploying devices.',
+      title: sourceTitle,
+      detail: buildSource.fleetExists === false
+        ? (buildSource.fleetError || 'Choose a valid fleet file before assigning and deploying devices.')
+        : sourceDetail,
       fleetDetail: buildSource.fleetFile || 'No fleet file selected.',
       ready: false,
     }
   }
-  if (buildSource.kind === 'github') {
-    const build = buildSource.build
-    return {
-      title: buildDisplayTitle(build),
-      detail: buildDisplayDetail(build),
-      fleetDetail: buildSource.fleetFile,
-      ready: true,
-    }
-  }
-  if (buildSource.kind === 'local-artifact') {
-    return {
-      title: buildSource.sourceLabel || buildSource.fileName || 'Local artifact bundle',
-      detail: buildSource.cached
-        ? 'Cached by the backend and ready for deployment.'
-        : 'Uploaded from this laptop and cached by the backend.',
-      fleetDetail: buildSource.fleetFile,
-      ready: true,
-    }
-  }
-  if (buildSource.kind === 'local-codebase') {
-    return {
-      title: buildSource.sourceLabel || 'Current local codebase',
-      detail: buildSource.packages?.length
-        ? `Packages the local workspace into a source bundle (${buildSource.packages.length} package(s)).`
-        : 'Packages the local workspace into a source bundle and builds it on the selected Pi.',
-      fleetDetail: buildSource.fleetFile,
-      ready: true,
-    }
-  }
+
   return {
-    title: 'Unknown build and fleet context',
-    detail: 'Select a supported build source.',
-    fleetDetail: buildSource?.fleetFile || 'No fleet file selected.',
-    ready: false,
+    title: sourceTitle,
+    detail: sourceDetail,
+    fleetDetail: buildSource.fleetFile,
+    ready: true,
   }
 }
 
@@ -2132,6 +2522,77 @@ function buildSourceBadge(buildSource, loaded = true) {
   if (buildSource.kind === 'local-artifact') return 'Local Artifact'
   if (buildSource.kind === 'local-codebase') return 'Local Codebase'
   return 'Custom Source'
+}
+
+function stripArchiveSuffix(value) {
+  return `${value || ''}`.trim().replace(/\.(tar\.gz|tgz|zip)$/i, '')
+}
+
+function deploymentMatchTokens(buildSource) {
+  if (!buildSource || buildSource.kind === 'none') return []
+  const rawTokens = buildSource.kind === 'github'
+    ? [
+      buildSource.build?.artifactName,
+      buildSource.build?.artifact_name,
+      buildSource.build?.tag,
+      buildSource.build?.name,
+      shortBuildSha(buildSource.build),
+    ]
+    : buildSource.kind === 'local-artifact'
+      ? [
+        buildSource.fileName,
+        buildSource.sourceLabel,
+      ]
+      : [
+        buildSource.sourceLabel,
+        ...(Array.isArray(buildSource.packages) ? buildSource.packages : []),
+      ]
+
+  return [...new Set(rawTokens
+    .map(token => stripArchiveSuffix(token).toLowerCase().trim())
+    .filter(token => token.length >= 4))]
+}
+
+function deploymentStatusSummary(buildSource, buildInfo) {
+  const currentRelease = `${buildInfo?.release_id || ''}`.trim()
+  if (!buildInfo?.installed) {
+    return {
+      title: 'No deployed build on this device',
+      detail: 'Deploy the selected build and fleet context to install a runtime release on this host.',
+      matched: false,
+    }
+  }
+
+  const haystack = `${currentRelease} ${buildInfo?.info || ''}`.toLowerCase()
+  const matchesSelectedSource = deploymentMatchTokens(buildSource).some(token => haystack.includes(token))
+
+  if (matchesSelectedSource) {
+    return {
+      title: 'Selected build already appears deployed',
+      detail: currentRelease
+        ? `Current release ${currentRelease} matches the selected source. Deploy again only if you want to refresh the runtime files.`
+        : 'The installed release metadata matches the selected source.',
+      matched: true,
+    }
+  }
+
+  if (buildSource?.kind === 'local-codebase') {
+    return {
+      title: 'A different source build is currently deployed',
+      detail: currentRelease
+        ? `Current release ${currentRelease} is installed. Local workspace builds get a fresh release id each deploy.`
+        : 'This device already has a deployed release.',
+      matched: false,
+    }
+  }
+
+  return {
+    title: 'A different build is currently deployed',
+    detail: currentRelease
+      ? `Current release ${currentRelease} is installed on this device. Deploying will replace it with the selected source.`
+      : 'This device already has a deployed release that does not match the selected source.',
+    matched: false,
+  }
 }
 
 function normalizeFleetOptions(rawOptions) {
@@ -2285,14 +2746,6 @@ function inventoryDraftFromSelection(target, liveDevice, operatorConfig) {
   }
 }
 
-function assignmentDraftFromTarget(target, vehicleName = '') {
-  return {
-    target_id: target?.target_id || '',
-    vehicle_name: vehicleName || target?.vehicle_name || '',
-    overlay_yaml: target?.overlay_yaml || '',
-  }
-}
-
 function fleetVehicleByName(buildSource, vehicleName) {
   return (buildSource?.fleetVehicles || []).find(vehicle => vehicle.name === vehicleName) || null
 }
@@ -2351,28 +2804,33 @@ function AppHeader({
           <span className="header-stat-label">Build/Fleet</span>
           <strong>{sourceBadge}</strong>
         </div>
+      </div>
+      <div className="header-controls nav-tabs">
+        <div className="page-tabs">
+          <button className={`tab-btn ${page === 'setup' ? 'tab-active' : ''}`} onClick={() => onPageChange('setup')} disabled={buildSourceWorking}>
+            Setup
+          </button>
+          <button className={`tab-btn ${page === 'readiness' ? 'tab-active' : ''}`} onClick={() => onPageChange('readiness')} disabled={buildSourceWorking}>
+            Readiness
+          </button>
+          <button className={`tab-btn ${page === 'launch-monitor' ? 'tab-active' : ''}`} onClick={() => onPageChange('launch-monitor')} disabled={buildSourceWorking}>
+            Launch &amp; Monitor
+          </button>
+        </div>
         <button className="theme-toggle-btn" type="button" onClick={onToggleTheme}>
           {theme === THEME_DARK ? 'Light Mode' : 'Dark Mode'}
-        </button>
-      </div>
-      <div className="page-tabs nav-tabs">
-        <button className={`tab-btn ${page === 'setup' ? 'tab-active' : ''}`} onClick={() => onPageChange('setup')} disabled={buildSourceWorking}>
-          Setup
-        </button>
-        <button className={`tab-btn ${page === 'readiness' ? 'tab-active' : ''}`} onClick={() => onPageChange('readiness')} disabled={buildSourceWorking}>
-          Readiness
-        </button>
-        <button className={`tab-btn ${page === 'launch-monitor' ? 'tab-active' : ''}`} onClick={() => onPageChange('launch-monitor')} disabled={buildSourceWorking}>
-          Launch &amp; Monitor
         </button>
       </div>
       <div className="build-source-banner">
         <span className={`launch-pill ${buildSourceWorking ? 'pill-not-prepared' : sourceSummary.ready ? 'pill-running' : 'pill-not-prepared'}`}>
           {sourceBadge}
         </span>
-        <div>
+        <div className="build-source-banner-copy">
           <strong>{sourceSummary.title}</strong>
           <p>{sourceSummary.detail}</p>
+          <p className={`build-source-fleet-line ${sourceSummary.ready ? 'build-source-fleet-line-ready' : ''}`}>
+            Fleet: {sourceSummary.fleetDetail || 'No fleet file selected.'}
+          </p>
         </div>
       </div>
     </header>
@@ -2458,22 +2916,48 @@ function SetupField({ label, value, onChange, placeholder, type = 'text' }) {
   )
 }
 
-function AssignmentCard({ draft, buildSource, buildSourceWorking, onChange, onSave, saving, saveResult, hostname = '' }) {
+function AssignmentCard({
+  assignedVehicleName = '',
+  buildSource,
+  buildSourceLoaded = true,
+  buildSourceWorking = false,
+  buildInfo,
+  deploying = false,
+  deployResult,
+  assignmentResult,
+  hostname = '',
+  onChange,
+  onDeploy,
+}) {
   const fleetVehicles = Array.isArray(buildSource?.fleetVehicles) ? buildSource.fleetVehicles : []
-  const selectedVehicle = fleetVehicleByName(buildSource, draft?.vehicle_name || '')
-  const canSave = Boolean(hostname && buildSource?.fleetExists && !buildSourceWorking)
+  const selectedVehicle = fleetVehicleByName(buildSource, assignedVehicleName || '')
+  const sourceSummary = describeBuildSource(buildSource, buildSourceLoaded)
+  const deploymentStatus = deploymentStatusSummary(buildSource, buildInfo)
+  const canDeploy = Boolean(hostname && assignedVehicleName && buildSourceLoaded && sourceSummary.ready && !buildSourceWorking)
+  const deployButtonLabel = deploymentStatus.matched ? 'Deploy Fleet Context Again' : 'Deploy Fleet Context'
 
   return (
-    <div className="card">
+    <div className="card assignment-card">
       <h2 className="card-title">Launch Prep</h2>
-      <div className="card-content settings-grid">
-        <div className="info-box compact-info settings-field settings-field-full">
+      <div className="card-content settings-grid assignment-grid">
+        <div className="info-box compact-info settings-field settings-field-full assignment-context-card">
           <strong>Fleet context</strong>
           <p>{buildSource?.fleetFile || 'No fleet file selected.'}</p>
+          {selectedVehicle ? (
+            <div className="assignment-entry-summary">
+              <strong className="assignment-entry-name">{selectedVehicle.name}</strong>
+              <p>
+                {selectedVehicle.kind || 'unknown'}
+                {selectedVehicle.mission ? ` · mission ${selectedVehicle.mission}` : ''}
+              </p>
+            </div>
+          ) : (
+            <p>Select a controllable to unlock deploy and Mission Control for this hardware.</p>
+          )}
         </div>
-        <div className="settings-field">
+        <div className="settings-field settings-field-full assignment-select-field">
           <label>Controllable</label>
-          <select value={draft?.vehicle_name || ''} onChange={e => onChange('vehicle_name', e.target.value)} disabled={buildSourceWorking}>
+          <select className="assignment-select" value={assignedVehicleName || ''} onChange={e => onChange(e.target.value)} disabled={buildSourceWorking}>
             <option value="">Select controllable</option>
             {fleetVehicles.map(vehicle => (
               <option key={vehicle.name} value={vehicle.name}>
@@ -2485,100 +2969,42 @@ function AssignmentCard({ draft, buildSource, buildSourceWorking, onChange, onSa
           </select>
         </div>
         <div className="settings-field settings-field-full">
-          <label>Selected fleet entry</label>
-          <div className="info-box compact-info">
-            {selectedVehicle ? (
-              <>
-                <strong>{selectedVehicle.name}</strong>
-                <p>
-                  {selectedVehicle.kind || 'unknown kind'}
-                  {selectedVehicle.mission ? ` · mission ${selectedVehicle.mission}` : ''}
-                  {selectedVehicle.missionPath ? ` · ${selectedVehicle.missionPath}` : ''}
-                </p>
-              </>
-            ) : (
-              <p>Select a controllable from the current fleet before deploying this Pi.</p>
-            )}
+          <div className="info-box compact-info assignment-detail-card">
+            <strong>{deploymentStatus.title}</strong>
+            <p>{deploymentStatus.detail}</p>
+            <p>
+              {selectedVehicle
+                ? `Selected controllable: ${selectedVehicle.name}`
+                : 'Select a controllable to enable deploy and Mission Control for this hardware.'}
+            </p>
           </div>
-        </div>
-        <div className="settings-field settings-field-full">
-          <div className="info-box compact-info">
-            <strong>Derived mission scope</strong>
-            <p>The selected fleet entry supplies the base mission and launch config. Runtime overrides live in Mission Control once the host is selected.</p>
-          </div>
-        </div>
-        <div className="settings-field settings-save">
-          <button className="btn btn-primary" type="button" onClick={onSave} disabled={saving || !canSave}>
-            {saving ? 'Saving...' : 'Save Session Assignment'}
-          </button>
-        </div>
-        <Result data={saveResult} />
-      </div>
-    </div>
-  )
-}
-
-function DeployActionCard({
-  buildSource,
-  buildSourceLoaded = true,
-  buildSourceWorking = false,
-  connected,
-  targetId,
-  hostname = '',
-  assignedVehicleName,
-  buildInfo,
-  deploying,
-  deployResult,
-  onDeploy,
-  onRollback,
-}) {
-  const sourceSummary = describeBuildSource(buildSource, buildSourceLoaded)
-  const canDeploy = Boolean(assignedVehicleName) && Boolean(targetId || hostname) && buildSourceLoaded && sourceSummary.ready && !buildSourceWorking
-
-  return (
-    <div className="card">
-      <h2 className="card-title">Fleet Deploy</h2>
-      <div className="card-content">
-        <div className="info-box compact-info">
-          <strong>{sourceSummary.title}</strong>
-          <p>{sourceSummary.detail}</p>
         </div>
         {buildSourceWorking && (
-          <div className="busy-banner" aria-live="polite">
+          <div className="busy-banner settings-field-full" aria-live="polite">
             Build and fleet context is updating. Deploy actions are locked.
           </div>
         )}
-        {!targetId && !hostname && (
-          <p className="subtext left-note">
-            Open a device drilldown to deploy or stop that host.
-          </p>
-        )}
-        {(targetId || hostname) && !sourceSummary.ready && !buildSourceLoaded && (
-          <p className="subtext left-note">
+        {!sourceSummary.ready && !buildSourceLoaded && (
+          <p className="subtext left-note settings-field-full">
             Loading build and fleet context...
           </p>
         )}
-        {(targetId || hostname) && !sourceSummary.ready && buildSourceLoaded && (
-          <p className="subtext left-note">
-            Choose a build and fleet in global setup before deploying to this host.
+        {!sourceSummary.ready && buildSourceLoaded && (
+          <p className="subtext left-note settings-field-full">
+            Choose a valid build and fleet in global setup before deploying to this host.
           </p>
         )}
-        {(targetId || hostname) && sourceSummary.ready && !assignedVehicleName && (
-          <p className="subtext left-note">
-            Choose a controllable assignment before deploying to this host.
+        {sourceSummary.ready && !assignedVehicleName && (
+          <p className="subtext left-note settings-field-full">
+            Select a controllable to enable deploy and Mission Control for this hardware.
           </p>
         )}
-        <button className="btn btn-primary" type="button" onClick={onDeploy} disabled={!canDeploy || deploying}>
-          {deploying ? 'Deploying...' : 'Deploy Fleet Context'}
-        </button>
-        <button
-          className="btn btn-secondary"
-          type="button"
-          onClick={onRollback}
-          disabled={(!targetId && !hostname) || !connected || !buildInfo?.installed || deploying}
-        >
-          Stop Fleet
-        </button>
+        <div className="settings-field settings-save">
+          <button className="btn btn-primary" type="button" onClick={onDeploy} disabled={!canDeploy || deploying}>
+            {deploying ? 'Deploying...' : deployButtonLabel}
+          </button>
+        </div>
+        <Result data={assignmentResult} />
         <Result data={deployResult} />
       </div>
     </div>
@@ -2635,6 +3061,11 @@ function RuntimeOverviewCard({ liveDevice, selectedTarget, connected, buildInfo,
         )}
         {buildInfo?.info && (
           <div className="info-box compact-info">
+            <p className="subtext left-note">
+              This reads the active release on the Pi from release metadata and
+              `install/BUILD_INFO.txt`. It can differ from the selected source
+              until deploy succeeds and stays active.
+            </p>
             <pre>{buildInfo.info}</pre>
           </div>
         )}
@@ -2650,7 +3081,6 @@ function HardwareDetailPage({
   hostname,
   vehicleName,
   connected,
-  wifiStatus,
   buildInfo,
   sshCommand,
   workspacePaths,
@@ -2658,10 +3088,8 @@ function HardwareDetailPage({
   buildSource,
   buildSourceLoaded = true,
   buildSourceWorking = false,
-  assignmentDraft,
+  assignedVehicleName = '',
   onAssignmentChange,
-  onSaveAssignment,
-  savingAssignment,
   assignmentResult,
   onRefresh,
   onBack,
@@ -2670,11 +3098,9 @@ function HardwareDetailPage({
   onDeploy,
   deploying,
   deployResult,
-  onRollback,
 }) {
-  const sourceSummary = describeBuildSource(buildSource, buildSourceLoaded)
   const selectedTargetId = selectedTarget?.target_id || hostname || ''
-  const missionReady = Boolean(hostname || selectedTargetId)
+  const missionReady = Boolean(hostname || selectedTargetId) && Boolean(assignedVehicleName)
   const liveStateLabel = liveDevice ? (liveDevice.discovery_stale ? 'Offline' : 'Live') : 'Offline'
   const liveStateClass = liveDevice && !liveDevice.discovery_stale ? 'pill-running' : 'pill-offline'
 
@@ -2687,11 +3113,10 @@ function HardwareDetailPage({
         <div className="detail-header-copy">
           <div className="section-kicker">Launch & monitor</div>
           <h2>{liveDevice?.hostname || hostname || 'Device'}</h2>
-          <p>{selectedTarget?.vehicle_name ? `${selectedTarget.vehicle_name} · ${liveDevice?.hostname || hostname || 'live only'}` : `${liveDevice?.hostname || hostname || 'Unknown host'} · live only`}</p>
+          <p>{assignedVehicleName ? `${assignedVehicleName} · ${liveDevice?.hostname || hostname || 'live only'}` : `${liveDevice?.hostname || hostname || 'Unknown host'} · assignment required`}</p>
         </div>
         <div className="detail-header-pills">
           <span className={`launch-pill ${liveStateClass}`}>{liveStateLabel}</span>
-          <span className={`launch-pill ${sourceSummary.ready ? 'pill-running' : 'pill-not-prepared'}`}>{buildSourceBadge(buildSource, buildSourceLoaded)}</span>
         </div>
       </div>
 
@@ -2704,66 +3129,41 @@ function HardwareDetailPage({
           type="button"
           onClick={() => onDetailTabChange('mission')}
           disabled={!missionReady}
+          title={missionReady ? 'Mission Control' : 'Select a controllable first'}
         >
           Mission Control
         </button>
       </div>
+      {!missionReady && (
+        <p className="subtext left-note detail-tab-note">
+          Mission Control unlocks after a controllable is selected for this hardware.
+        </p>
+      )}
 
       {detailTab === 'setup' ? (
-        <>
-          <div className="grid">
-            <AssignmentCard
-              draft={assignmentDraft}
-              buildSource={buildSource}
-              buildSourceWorking={buildSourceWorking}
-              onChange={onAssignmentChange}
-              onSave={onSaveAssignment}
-              saving={savingAssignment}
-              saveResult={assignmentResult}
-              hostname={hostname || liveDevice?.hostname || selectedTarget?.pi_host || ''}
-            />
-            <RuntimeOverviewCard
-              liveDevice={liveDevice}
-              selectedTarget={selectedTarget}
-              connected={connected}
-              buildInfo={buildInfo}
-              sshCommand={sshCommand}
-              pollError={pollError}
-            />
-          </div>
-
-          <div className="grid">
-              <DeployActionCard
-                buildSource={buildSource}
-                buildSourceLoaded={buildSourceLoaded}
-                buildSourceWorking={buildSourceWorking}
-                connected={connected}
-                targetId={selectedTargetId}
-                hostname={hostname || liveDevice?.hostname || selectedTarget?.pi_host || ''}
-                assignedVehicleName={assignmentDraft?.vehicle_name || selectedTarget?.vehicle_name || ''}
-                buildInfo={buildInfo}
-                deploying={deploying}
-                deployResult={deployResult}
-                onDeploy={onDeploy}
-                onRollback={onRollback}
-              />
-            {(selectedTargetId || hostname || liveDevice?.hostname || selectedTarget?.pi_host) ? (
-              <WifiCard
-                connected={connected}
-                wifiStatus={wifiStatus}
-                onRefresh={onRefresh}
-                targetId={selectedTargetId}
-                hostname={hostname || liveDevice?.hostname || selectedTarget?.pi_host || ''}
-                vehicleName={vehicleName || selectedTarget?.vehicle_name || ''}
-              />
-            ) : (
-              <div className="card">
-                <h2 className="card-title">Target WiFi</h2>
-                <p className="subtext left-note">Select a live host before using SSH-driven WiFi management.</p>
-              </div>
-            )}
-          </div>
-        </>
+        <div className="grid">
+          <AssignmentCard
+            assignedVehicleName={assignedVehicleName}
+            buildSource={buildSource}
+            buildSourceLoaded={buildSourceLoaded}
+            buildSourceWorking={buildSourceWorking}
+            buildInfo={buildInfo}
+            deploying={deploying}
+            deployResult={deployResult}
+            assignmentResult={assignmentResult}
+            onChange={onAssignmentChange}
+            onDeploy={onDeploy}
+            hostname={hostname || liveDevice?.hostname || selectedTarget?.pi_host || ''}
+          />
+          <RuntimeOverviewCard
+            liveDevice={liveDevice}
+            selectedTarget={selectedTarget}
+            connected={connected}
+            buildInfo={buildInfo}
+            sshCommand={sshCommand}
+            pollError={pollError}
+          />
+        </div>
       ) : (
             <MissionControl
               connected={connected}
@@ -2773,7 +3173,7 @@ function HardwareDetailPage({
               buildSource={buildSource}
               targetId={selectedTargetId}
               hostname={hostname || liveDevice?.hostname || selectedTarget?.pi_host || ''}
-              vehicleName={vehicleName || selectedTarget?.vehicle_name || ''}
+              vehicleName={assignedVehicleName}
               selectedTarget={selectedTarget}
             />
         )}
@@ -2796,12 +3196,12 @@ function BuildSourcePage({
   onSelectLocalArtifact,
   onSelectLocalCodebase,
   onSelectFleetFile,
-  onClearBuildSource,
+  onRefreshContext,
 }) {
   const [selectedBuildKey, setSelectedBuildKey] = useState('')
   const [buildSearch, setBuildSearch] = useState('')
   const [fleetDraft, setFleetDraft] = useState(fleetSelectionId(buildSource?.fleetFile || ''))
-  const sourceSummary = describeBuildSource(buildSource, buildSourceLoaded)
+  const [fleetDraftDirty, setFleetDraftDirty] = useState(false)
   const fleetOptions = Array.isArray(buildSource?.fleetOptions) ? buildSource.fleetOptions : []
 
   useEffect(() => {
@@ -2812,12 +3212,18 @@ function BuildSourcePage({
 
   useEffect(() => {
     const nextDraft = fleetSelectionId(buildSource?.fleetFile || '')
+    const draftStillValid = fleetOptions.some(option => option.value === fleetDraft)
+    if (fleetDraftDirty && draftStillValid && nextDraft !== fleetDraft) {
+      return
+    }
     if (!nextDraft) {
       setFleetDraft('')
+      setFleetDraftDirty(false)
       return
     }
     setFleetDraft(fleetOptions.some(option => option.value === nextDraft) ? nextDraft : '')
-  }, [buildSource?.fleetFile, fleetOptions])
+    setFleetDraftDirty(false)
+  }, [buildSource?.fleetFile, fleetDraft, fleetDraftDirty, fleetOptions])
   const allBuilds = useMemo(() => mergeBuildLists(releases, artifacts), [releases, artifacts])
   const deferredSearch = useDeferredValue(buildSearch.trim().toLowerCase())
   const fleetCatalogWarning = buildSource?.fleetCatalogStale
@@ -2885,38 +3291,30 @@ function BuildSourcePage({
         </div>
       </div>
 
-      <div className="card card-full">
-        <h2 className="card-title">Active build and fleet</h2>
-        <div className="info-box compact-info">
-          <strong>{sourceSummary.title}</strong>
-          <p>{sourceSummary.detail}</p>
-          <p>{sourceSummary.fleetDetail || 'No fleet file selected.'}</p>
-          {fleetCatalogWarning && (
-            <p className="param-help param-help-warn">{fleetCatalogWarning}</p>
+      {(buildSourceWorking || buildSourceResult) && (
+        <div className="setup-feedback-stack">
+          {buildSourceWorking && (
+            <div className="busy-banner" aria-live="polite">
+              Updating build and fleet context. Controls are locked until the backend finishes.
+            </div>
           )}
+          <Result data={buildSourceResult} />
         </div>
-        {buildSourceWorking && (
-          <div className="busy-banner" aria-live="polite">
-            Updating build and fleet context. Controls are locked until the backend finishes.
-          </div>
-        )}
-        <div className="settings-actions">
-          <button className="btn btn-secondary" type="button" onClick={onClearBuildSource} disabled={buildSourceWorking || !buildSourceLoaded || buildSource?.kind === 'none'}>
-            {buildSourceWorking ? 'Working...' : 'Clear Selection'}
-          </button>
-        </div>
-        <Result data={buildSourceResult} />
-      </div>
+      )}
 
-      <div className="grid">
-        <div className="card">
+      <div className="setup-grid">
+        <div className="setup-sidebar">
+          <div className="card">
           <h2 className="card-title">Fleet catalog</h2>
           <div className="card-content">
             <p className="subtext left-note">One fleet is active at a time. Device drilldowns only choose the controllable inside this fleet.</p>
             <label>Fleet</label>
             <select
               value={fleetDraft}
-              onChange={e => setFleetDraft(e.target.value)}
+              onChange={e => {
+                setFleetDraft(e.target.value)
+                setFleetDraftDirty(true)
+              }}
               disabled={buildSourceWorking || loadingBuilds || fleetOptions.length === 0}
             >
               <option value="">{fleetOptions.length > 0 ? 'Select fleet' : 'No fleet choices available'}</option>
@@ -2938,7 +3336,50 @@ function BuildSourcePage({
           </div>
         </div>
 
-        <div className="card card-full">
+          <div className="card setup-source-card">
+            <h2 className="card-title">Source options</h2>
+            <div className="card-content setup-source-actions">
+              <p className="subtext left-note">
+                Switch sources without leaving setup. The active fleet stays selected when it still exists in the new source.
+              </p>
+              <div className="setup-source-row">
+                <div className="setup-source-copy">
+                  <strong>Upload artifact bundle</strong>
+                  <p>Use a local `.tar.gz` bundle from this laptop and cache it on the operator machine.</p>
+                </div>
+                <div className="file-upload setup-source-upload">
+                  <input
+                    type="file"
+                    accept=".tar.gz,.tgz,.tar,.gz,application/gzip,application/x-gzip,application/x-tar,application/octet-stream"
+                    onChange={async e => {
+                      const file = e.target.files?.[0] || null
+                      if (file) {
+                        await onSelectLocalArtifact(file)
+                      }
+                      e.target.value = ''
+                    }}
+                    id="global-artifact-file"
+                    disabled={buildSourceWorking}
+                  />
+                  <label htmlFor="global-artifact-file" className="file-label">
+                    {buildSourceWorking ? 'Uploading...' : 'Upload artifact bundle'}
+                  </label>
+                </div>
+              </div>
+              <div className="setup-source-row">
+                <div className="setup-source-copy">
+                  <strong>Use current workspace</strong>
+                  <p>Package the checked-out workspace into a source bundle and build it on the selected Pi.</p>
+                </div>
+                <button className="btn btn-primary btn-inline setup-source-button" type="button" onClick={onSelectLocalCodebase} disabled={buildSourceWorking}>
+                  Use current workspace
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="card card-full setup-build-card">
           <h2 className="card-title">Build catalog</h2>
           <div className="card-content">
             <div className="build-source-toolbar">
@@ -2964,11 +3405,13 @@ function BuildSourcePage({
                 () => setSelectedBuildKey(buildSelectionKey(build)),
                 () => onSelectGitHubBuild(build)
               )) : (
-                <p className="subtext left-note">
-                  {allBuilds.length > 0
-                    ? 'No builds match this search.'
-                    : 'No builds loaded yet. Refresh to fetch releases and artifacts.'}
-                </p>
+                <div className="build-list-empty">
+                  <p className="subtext left-note">
+                    {allBuilds.length > 0
+                      ? 'No builds match this search.'
+                      : 'No builds loaded yet. Refresh to fetch releases and artifacts.'}
+                  </p>
+                </div>
               )}
             </div>
             {canLoadMoreArtifacts && (
@@ -2979,35 +3422,703 @@ function BuildSourcePage({
             <Result data={buildListResult} />
           </div>
         </div>
+      </div>
 
-        <div className="card card-full">
-          <h2 className="card-title">Source options</h2>
-          <div className="card-content local-source-actions">
-            <div className="file-upload">
+      {buildSource?.fleetFile && (
+        <FleetFileEditor
+          buildSource={buildSource}
+          busy={buildSourceWorking}
+          onRefreshContext={onRefreshContext}
+        />
+      )}
+    </>
+  )
+}
+
+function FleetFileEditor({ buildSource, busy = false, onRefreshContext }) {
+  const selectedFleetFile = `${buildSource?.fleetFile || ''}`.trim()
+  const [viewMode, setViewMode] = useState('form')
+  const [fleetSchema, setFleetSchema] = useState(null)
+  const [schemaLoading, setSchemaLoading] = useState(false)
+  const [schemaError, setSchemaError] = useState('')
+  const [fleetFileText, setFleetFileText] = useState('')
+  const [fleetFilePath, setFleetFilePath] = useState('')
+  const [fleetFileLoading, setFleetFileLoading] = useState(false)
+  const [fleetFileSaving, setFleetFileSaving] = useState(false)
+  const [fleetFileResult, setFleetFileResult] = useState(null)
+  const [fieldDrafts, setFieldDrafts] = useState({})
+  const [fieldErrors, setFieldErrors] = useState({})
+  const [missionCatalog, setMissionCatalog] = useState([])
+  const [missionCatalogLoading, setMissionCatalogLoading] = useState(false)
+  const [missionCatalogError, setMissionCatalogError] = useState('')
+
+  const schemaRequestRef = useRef(0)
+  const fileRequestRef = useRef(0)
+  const missionRequestRef = useRef(0)
+  const missionTargetByNameRef = useRef({})
+
+  const loadMissionCatalog = useCallback(async () => {
+    if (!selectedFleetFile) return null
+    const requestId = ++missionRequestRef.current
+    setMissionCatalogLoading(true)
+    const data = await requestJson('/api/schema/missions')
+    if (requestId !== missionRequestRef.current) return data
+
+    if (Array.isArray(data?.missions)) {
+      setMissionCatalog(
+        data.missions
+          .map(mission => ({
+            name: `${mission?.name || ''}`.trim(),
+            target: `${mission?.target || ''}`.trim(),
+          }))
+          .filter(mission => mission.name)
+      )
+      setMissionCatalogError('')
+    } else {
+      setMissionCatalog([])
+      setMissionCatalogError(data?.error || 'Failed to load mission catalog.')
+    }
+    setMissionCatalogLoading(false)
+    return data
+  }, [selectedFleetFile])
+
+  const loadFleetSchema = useCallback(async () => {
+    if (!selectedFleetFile) return null
+    const requestId = ++schemaRequestRef.current
+    setSchemaLoading(true)
+    const data = await requestJson('/api/schema/fleet')
+    if (requestId !== schemaRequestRef.current) return data
+
+    if (Array.isArray(data?.sections)) {
+      setFleetSchema(data)
+      setSchemaError('')
+    } else {
+      setFleetSchema(null)
+      setSchemaError(data?.error || 'Failed to load fleet schema metadata.')
+    }
+    setSchemaLoading(false)
+    return data
+  }, [selectedFleetFile])
+
+  const missionTargetByName = useMemo(
+    () => Object.fromEntries(missionCatalog.map(mission => [mission.name, mission.target])),
+    [missionCatalog]
+  )
+
+  useEffect(() => {
+    missionTargetByNameRef.current = missionTargetByName
+  }, [missionTargetByName])
+
+  const loadFleetFile = useCallback(async ({ preserveResult = false } = {}) => {
+    if (!selectedFleetFile) {
+      setFleetFileText('')
+      setFleetFilePath('')
+      setFleetFileLoading(false)
+      if (!preserveResult) {
+        setFleetFileResult(null)
+      }
+      return null
+    }
+    const requestId = ++fileRequestRef.current
+    setFleetFileLoading(true)
+    if (!preserveResult) {
+      setFleetFileResult(null)
+    }
+    const data = await api('/api/build-source/fleet-file')
+    if (requestId !== fileRequestRef.current) return data
+
+    if (data.success) {
+      try {
+        const parsed = YAML.parse(data.content || '') || {}
+        setFleetFileText(
+          renderFleetEditorDocument(
+            normalizeIntegrationFleetDocument(parsed, missionTargetByNameRef.current)
+          )
+        )
+      } catch {
+        setFleetFileText(data.content || '')
+      }
+      setFleetFilePath(data.path || '')
+      setFieldDrafts({})
+      setFieldErrors({})
+      if (!preserveResult) {
+        setFleetFileResult(null)
+      }
+    } else if (!preserveResult) {
+      setFleetFileResult(data)
+    }
+    setFleetFileLoading(false)
+    return data
+  }, [selectedFleetFile])
+
+  useEffect(() => {
+    if (!selectedFleetFile) {
+      setFleetSchema(null)
+      setSchemaError('')
+      setMissionCatalog([])
+      setMissionCatalogError('')
+      setFleetFileText('')
+      setFleetFilePath('')
+      setFleetFileResult(null)
+      setFieldDrafts({})
+      setFieldErrors({})
+      return
+    }
+    setViewMode('form')
+    ;(async () => {
+      await Promise.allSettled([loadMissionCatalog(), loadFleetSchema()])
+      await loadFleetFile()
+    })()
+  }, [buildSource?.kind, loadFleetFile, loadFleetSchema, loadMissionCatalog, selectedFleetFile])
+
+  const parsedFleet = useMemo(
+    () => parseFleetEditorDocument(fleetFileText),
+    [fleetFileText]
+  )
+  const fleetDoc = parsedFleet.doc || emptyFleetEditorDocument()
+  const backendKinds = Array.isArray(fleetSchema?.backend_kinds)
+    ? fleetSchema.backend_kinds
+    : ['sim', 'hardware', 'real']
+  const sectionsByName = useMemo(
+    () => Object.fromEntries((fleetSchema?.sections || []).map(section => [section.name, section])),
+    [fleetSchema]
+  )
+  const editorBusy = busy || fleetFileLoading || fleetFileSaving
+  const fleetSummary = buildSource?.fleetVehicles || []
+  const backendFields = useMemo(
+    () => (sectionsByName.backend?.fields || []).filter(field => field.name === 'px4_path'),
+    [sectionsByName]
+  )
+  const defaultFields = useMemo(
+    () => (sectionsByName.defaults?.fields || []).filter(field => field.name !== 'auto_launch'),
+    [sectionsByName]
+  )
+  const vehicleCommonFields = useMemo(
+    () => (sectionsByName['vehicle.common']?.fields || []).filter(field => field.name !== 'mission_path'),
+    [sectionsByName]
+  )
+  const vehicleHardwareFields = useMemo(
+    () => (sectionsByName['vehicle.hardware']?.fields || []).filter(field => field.name !== 'payload_controller'),
+    [sectionsByName]
+  )
+
+  const updateFleetDoc = useCallback((updater) => {
+    setFleetFileText(prev => {
+      const current = parseFleetEditorDocument(prev).doc || emptyFleetEditorDocument()
+      const next = updater(normalizeFleetEditorDocument(current))
+      return renderFleetEditorDocument(next)
+    })
+  }, [])
+
+  const updateField = useCallback((path, field, nextValue) => {
+    const fieldKey = path.join('.')
+    setFieldDrafts(prev => {
+      if (!(fieldKey in prev)) return prev
+      const next = { ...prev }
+      delete next[fieldKey]
+      return next
+    })
+    setFieldErrors(prev => {
+      if (!(fieldKey in prev)) return prev
+      const next = { ...prev }
+      delete next[fieldKey]
+      return next
+    })
+    updateFleetDoc(doc => writeFleetFieldValue(doc, path, field, nextValue))
+  }, [updateFleetDoc])
+
+  const commitBlockField = useCallback((path, field, rawValue) => {
+    const fieldKey = path.join('.')
+    const trimmed = `${rawValue || ''}`.trim()
+    if (!trimmed) {
+      updateField(path, field, undefined)
+      return
+    }
+    try {
+      const parsed = YAML.parse(trimmed)
+      setFieldErrors(prev => {
+        if (!(fieldKey in prev)) return prev
+        const next = { ...prev }
+        delete next[fieldKey]
+        return next
+      })
+      updateField(path, field, parsed)
+    } catch (error) {
+      setFieldErrors(prev => ({
+        ...prev,
+        [fieldKey]: error?.message || 'Invalid YAML fragment.',
+      }))
+    }
+  }, [updateField])
+
+  const handleAddVehicle = () => {
+    const defaultMission = missionCatalog[0] || null
+    updateFleetDoc(doc => {
+      doc.vehicles = Array.isArray(doc.vehicles) ? [...doc.vehicles] : []
+      doc.vehicles.push({
+        name: uniqueFleetVehicleName(doc),
+        mission: defaultMission?.name || '',
+        kind: defaultMission?.target || 'payload',
+      })
+      return doc
+    })
+  }
+
+  const handleRemoveVehicle = (vehicleIndex) => {
+    updateFleetDoc(doc => {
+      doc.vehicles = Array.isArray(doc.vehicles) ? [...doc.vehicles] : []
+      doc.vehicles.splice(vehicleIndex, 1)
+      return doc
+    })
+  }
+
+  const handleSave = async () => {
+    setFleetFileSaving(true)
+    let contentToSave = fleetFileText
+    try {
+      contentToSave = renderFleetEditorDocument(
+        normalizeIntegrationFleetDocument(
+          YAML.parse(fleetFileText || '') || {},
+          missionTargetByName
+        )
+      )
+      setFleetFileText(contentToSave)
+    } catch {
+      contentToSave = fleetFileText
+    }
+    const fd = new FormData()
+    fd.append('content', contentToSave)
+    const data = await api('/api/build-source/fleet-file', {
+      method: 'POST',
+      body: fd,
+    })
+    setFleetFileResult(data)
+    if (data.success) {
+      await Promise.allSettled([
+        loadFleetFile({ preserveResult: true }),
+        onRefreshContext ? onRefreshContext() : Promise.resolve(),
+      ])
+    }
+    setFleetFileSaving(false)
+  }
+
+  const renderField = (field, path, { sectionName = '', fieldPrefix = '' } = {}) => {
+    const kind = schemaFieldInputKind(field)
+    const fieldKey = path.join('.')
+    const fieldId = [fieldPrefix || sectionName || 'fleet', ...path].join('-').replace(/[^A-Za-z0-9_-]+/g, '-')
+    const rawValue = getObjectPathValue(fleetDoc, path)
+    const value = rawValue ?? field.default
+    const helpText = fieldHelpText(field)
+    const isVehicleField = path[0] === 'vehicles' && typeof path[1] === 'number'
+    const vehicleBasePath = isVehicleField ? ['vehicles', path[1]] : []
+    const currentVehicleKind = isVehicleField
+      ? `${getObjectPathValue(fleetDoc, [...vehicleBasePath, 'kind']) || missionTargetByName[`${getObjectPathValue(fleetDoc, [...vehicleBasePath, 'mission']) || ''}`] || ''}`.trim()
+      : ''
+    const missionChoices = missionCatalog.filter(mission => (
+      !currentVehicleKind
+      || mission.target === currentVehicleKind
+      || mission.name === `${value ?? ''}`.trim()
+    ))
+    const choiceValues = field.name === 'kind' && sectionName === 'backend'
+      ? backendKinds
+      : field.name === 'mission' && isVehicleField
+        ? missionChoices.map(mission => mission.name)
+        : field.name === 'kind' && isVehicleField
+          ? ['uav', 'payload']
+          : (field.choices || [])
+
+    if (kind === 'boolean') {
+      return (
+        <label key={fieldKey} className="toggle-card">
+          <input
+            type="checkbox"
+            checked={Boolean(value)}
+            onChange={event => updateField(path, field, event.target.checked)}
+            disabled={editorBusy}
+          />
+          <div>
+            <span className="toggle-card-title">{field.name}{field.required ? ' *' : ''}</span>
+            {helpText && <p className="param-help">{helpText}</p>}
+          </div>
+        </label>
+      )
+    }
+
+    if (kind === 'tuple') {
+      const tupleValue = Array.isArray(value) && value.length > 0
+        ? value
+        : Array.isArray(field.default)
+          ? field.default
+          : [0, 0, 0]
+      return (
+        <div key={fieldKey} className="param-field">
+          <label htmlFor={fieldId}>{field.name}{field.required ? ' *' : ''}</label>
+          <div className="fleet-tuple-grid" id={fieldId}>
+            {tupleValue.map((entry, index) => (
               <input
-                type="file"
-                accept=".tar.gz,.tgz,.tar,.gz,application/gzip,application/x-gzip,application/x-tar,application/octet-stream"
-                onChange={async e => {
-                  const file = e.target.files?.[0] || null
-                  if (file) {
-                    await onSelectLocalArtifact(file)
-                  }
-                  e.target.value = ''
+                key={`${fieldKey}-${index}`}
+                type="number"
+                value={`${tupleValue[index] ?? entry ?? 0}`}
+                onChange={event => {
+                  const nextTuple = [...tupleValue]
+                  nextTuple[index] = event.target.value
+                  updateField(path, field, nextTuple)
                 }}
-                id="global-artifact-file"
-                disabled={buildSourceWorking}
+                disabled={editorBusy}
               />
-              <label htmlFor="global-artifact-file" className="file-label">
-                {buildSourceWorking ? 'Uploading...' : 'Upload artifact bundle'}
-              </label>
-            </div>
-            <button className="btn btn-primary" type="button" onClick={onSelectLocalCodebase} disabled={buildSourceWorking}>
-              Use current workspace
-            </button>
+            ))}
+          </div>
+          {helpText && <p className="param-help">{helpText}</p>}
+        </div>
+      )
+    }
+
+    if (field.name === 'mission' && isVehicleField) {
+      return (
+        <div key={fieldKey} className="param-field">
+          <label htmlFor={fieldId}>{field.name}{field.required ? ' *' : ''}</label>
+          <select
+            id={fieldId}
+            value={`${value ?? ''}`}
+            onChange={event => {
+              const missionName = event.target.value
+              const nextKind = missionTargetByName[missionName] || currentVehicleKind
+              updateFleetDoc(doc => {
+                setObjectPathValue(doc, path, missionName)
+                if (nextKind) {
+                  setObjectPathValue(doc, [...vehicleBasePath, 'kind'], nextKind)
+                  if (nextKind !== 'uav') {
+                    deleteObjectPathValue(doc, [...vehicleBasePath, 'px4_airframe_id'])
+                    deleteObjectPathValue(doc, [...vehicleBasePath, 'px4_namespace'])
+                  }
+                }
+                deleteObjectPathValue(doc, [...vehicleBasePath, 'mission_path'])
+                deleteObjectPathValue(doc, [...vehicleBasePath, 'payload_controller'])
+                return normalizeIntegrationFleetDocument(doc, missionTargetByName)
+              })
+            }}
+            disabled={editorBusy || missionCatalogLoading}
+          >
+            <option value="">Select mission</option>
+            {choiceValues.map(choice => (
+              <option key={`${fieldKey}-${choice}`} value={`${choice}`}>
+                {`${choice}`}
+              </option>
+            ))}
+          </select>
+          {helpText && <p className="param-help">{helpText}</p>}
+        </div>
+      )
+    }
+
+    if (field.name === 'kind' && isVehicleField) {
+      return (
+        <div key={fieldKey} className="param-field">
+          <label htmlFor={fieldId}>{field.name}{field.required ? ' *' : ''}</label>
+          <select
+            id={fieldId}
+            value={`${(value ?? currentVehicleKind) || 'payload'}`}
+            onChange={event => {
+              const nextKind = event.target.value
+              updateFleetDoc(doc => {
+                setObjectPathValue(doc, path, nextKind)
+                const currentMission = `${getObjectPathValue(doc, [...vehicleBasePath, 'mission']) || ''}`.trim()
+                if (currentMission && missionTargetByName[currentMission] && missionTargetByName[currentMission] !== nextKind) {
+                  deleteObjectPathValue(doc, [...vehicleBasePath, 'mission'])
+                }
+                if (nextKind !== 'uav') {
+                  deleteObjectPathValue(doc, [...vehicleBasePath, 'px4_airframe_id'])
+                  deleteObjectPathValue(doc, [...vehicleBasePath, 'px4_namespace'])
+                }
+                return normalizeIntegrationFleetDocument(doc, missionTargetByName)
+              })
+            }}
+            disabled={editorBusy}
+          >
+            {choiceValues.map(choice => (
+              <option key={`${fieldKey}-${choice}`} value={`${choice}`}>
+                {`${choice}`}
+              </option>
+            ))}
+          </select>
+          {helpText && <p className="param-help">{helpText}</p>}
+        </div>
+      )
+    }
+
+    if (kind === 'block') {
+      const draftValue = Object.prototype.hasOwnProperty.call(fieldDrafts, fieldKey)
+        ? fieldDrafts[fieldKey]
+        : renderFleetBlockValue(value)
+      return (
+        <div key={fieldKey} className="param-field fleet-block-field">
+          <label htmlFor={fieldId}>{field.name}{field.required ? ' *' : ''}</label>
+          <textarea
+            id={fieldId}
+            className="yaml-editor fleet-block-editor"
+            value={draftValue}
+            onChange={event => {
+              const nextRaw = event.target.value
+              setFieldDrafts(prev => ({ ...prev, [fieldKey]: nextRaw }))
+              setFieldErrors(prev => {
+                if (!(fieldKey in prev)) return prev
+                const next = { ...prev }
+                delete next[fieldKey]
+                return next
+              })
+            }}
+            onBlur={event => commitBlockField(path, field, event.target.value)}
+            spellCheck={false}
+            disabled={editorBusy}
+          />
+          {fieldErrors[fieldKey] && (
+            <p className="param-help param-help-warn">{fieldErrors[fieldKey]}</p>
+          )}
+          {helpText && <p className="param-help">{helpText}</p>}
+        </div>
+      )
+    }
+
+    if (choiceValues.length > 0) {
+      return (
+        <div key={fieldKey} className="param-field">
+          <label htmlFor={fieldId}>{field.name}{field.required ? ' *' : ''}</label>
+          <select
+            id={fieldId}
+            value={`${value ?? ''}`}
+            onChange={event => updateField(path, field, event.target.value)}
+            disabled={editorBusy}
+          >
+            {field.name !== 'kind' || sectionName !== 'backend' ? (
+              <option value="">Use default</option>
+            ) : null}
+            {choiceValues.map(choice => (
+              <option key={`${fieldKey}-${choice}`} value={`${choice}`}>
+                {`${choice}`}
+              </option>
+            ))}
+          </select>
+          {helpText && <p className="param-help">{helpText}</p>}
+        </div>
+      )
+    }
+
+    return (
+      <div key={fieldKey} className="param-field">
+        <label htmlFor={fieldId}>{field.name}{field.required ? ' *' : ''}</label>
+        <input
+          id={fieldId}
+          type={kind === 'number' ? 'number' : 'text'}
+          inputMode={kind === 'number' ? 'decimal' : undefined}
+          value={`${value ?? ''}`}
+          onChange={event => updateField(path, field, event.target.value)}
+          placeholder={field.default_kind === 'value' && field.default !== null && field.default !== undefined ? `${field.default}` : ''}
+          disabled={editorBusy}
+        />
+        {helpText && <p className="param-help">{helpText}</p>}
+      </div>
+    )
+  }
+
+  const renderSection = (section, basePath, options = {}) => {
+    if (!section) return null
+    const fields = Array.isArray(options.fields) ? options.fields : (Array.isArray(section.fields) ? section.fields : [])
+    if (!fields.length) return null
+    const sectionTitle = options.title || section.name
+    const sectionDescription = options.description !== undefined ? options.description : section.description
+    const sectionConstraints = Array.isArray(options.constraints)
+      ? options.constraints
+      : (Array.isArray(section.constraints) ? section.constraints : [])
+    return (
+      <div className="fleet-editor-section">
+        <div className="fleet-editor-section-head">
+          <div>
+            <h3>{sectionTitle}</h3>
+            {sectionDescription && <p className="subtext left-note">{sectionDescription}</p>}
           </div>
         </div>
+        {sectionConstraints.length > 0 && (
+          <div className="fleet-constraints">
+            {sectionConstraints.map(constraint => (
+              <p key={`${sectionTitle}-${constraint}`} className="param-help">
+                {constraint}
+              </p>
+            ))}
+          </div>
+        )}
+        <div className="fleet-form-grid">
+          {fields.map(field => renderField(field, [...basePath, field.name], options))}
+        </div>
       </div>
-    </>
+    )
+  }
+
+  return (
+    <div className="card card-full">
+      <h2 className="card-title">Fleet YAML</h2>
+      <div className="card-content fleet-editor">
+        <div className="fleet-editor-summary">
+          <div>
+            <div className="mission-schema-kicker">Selected fleet file</div>
+            <div className="mission-schema-line">
+              `{fleetFilePath || selectedFleetFile}`
+            </div>
+            <p className="subtext left-note">
+              Edit the selected fleet source directly here. Form view covers the structured fields; raw view preserves direct YAML control for anything else.
+            </p>
+          </div>
+          <div className="fleet-editor-badges">
+            <span className="fleet-editor-stat">
+              {fleetDoc.vehicles.length} vehicle{fleetDoc.vehicles.length === 1 ? '' : 's'}
+            </span>
+            {fleetSummary.length > 0 && (
+              <span className={`fleet-editor-stat ${buildSource?.fleetExists === false ? 'fleet-editor-stat-muted' : 'fleet-editor-stat-ready'}`}>
+                {fleetSummary.length} preview vehicle{fleetSummary.length === 1 ? '' : 's'}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="mini-tabs">
+          <button
+            className={`mini-tab ${viewMode === 'form' ? 'mini-tab-active' : ''}`}
+            type="button"
+            onClick={() => setViewMode('form')}
+          >
+            Form View
+          </button>
+          <button
+            className={`mini-tab ${viewMode === 'raw' ? 'mini-tab-active' : ''}`}
+            type="button"
+            onClick={() => setViewMode('raw')}
+          >
+            Raw YAML
+          </button>
+        </div>
+
+        {schemaLoading && (
+          <div className="busy-banner" aria-live="polite">
+            Loading fleet schema metadata...
+          </div>
+        )}
+        {schemaError && (
+          <Result data={{ success: false, error: schemaError }} />
+        )}
+        {missionCatalogError && (
+          <Result data={{ success: false, error: missionCatalogError }} />
+        )}
+        {fleetFileLoading && (
+          <div className="busy-banner" aria-live="polite">
+            Loading the selected fleet file...
+          </div>
+        )}
+
+        {viewMode === 'form' ? (
+          parsedFleet.error ? (
+            <Result data={{ success: false, error: parsedFleet.error }} />
+          ) : (
+            <div className="fleet-editor-grid">
+              <div className="fleet-editor-stack">
+                {renderSection(sectionsByName.backend, ['backend'], {
+                  sectionName: 'backend',
+                  fields: backendFields,
+                  title: 'Hardware backend',
+                  description: 'Deployment settings shared by every vehicle in this fleet.',
+                  constraints: [],
+                })}
+                {renderSection(sectionsByName.defaults, ['defaults'], {
+                  sectionName: 'defaults',
+                  fields: defaultFields,
+                  title: 'Defaults',
+                  description: 'Shared runtime defaults applied to each vehicle entry.',
+                  constraints: [],
+                })}
+              </div>
+              <div className="fleet-editor-stack">
+                <div className="fleet-editor-section">
+                  <div className="fleet-editor-section-head">
+                    <div>
+                      <h3>vehicles</h3>
+                      <p className="subtext left-note">Each fleet entry maps one controllable configuration. These cards stay in sync with the raw YAML below.</p>
+                    </div>
+                    <button className="btn btn-secondary btn-inline" type="button" onClick={handleAddVehicle} disabled={editorBusy}>
+                      Add vehicle
+                    </button>
+                  </div>
+                  <div className="fleet-vehicle-list">
+                    {fleetDoc.vehicles.length === 0 && (
+                      <div className="info-box compact-info">
+                        <strong>No vehicles yet</strong>
+                        <p>Add at least one vehicle before saving this fleet file.</p>
+                      </div>
+                    )}
+                    {fleetDoc.vehicles.map((vehicle, index) => {
+                      const vehicleName = `${vehicle?.name || ''}`.trim() || `Vehicle ${index + 1}`
+                      const vehicleKind = `${vehicle?.kind || missionTargetByName[`${vehicle?.mission || ''}`] || ''}`.trim()
+                      return (
+                        <div key={`${vehicleName}-${index}`} className="fleet-vehicle-card">
+                          <div className="fleet-vehicle-head">
+                            <div>
+                              <strong>{vehicleName}</strong>
+                              <p>{vehicle?.kind ? `${vehicle.kind} vehicle` : 'Vehicle-specific runtime mapping'}</p>
+                            </div>
+                            <button
+                              className="btn btn-secondary btn-inline"
+                              type="button"
+                              onClick={() => handleRemoveVehicle(index)}
+                              disabled={editorBusy}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                          {renderSection(sectionsByName['vehicle.common'], ['vehicles', index], {
+                            sectionName: 'vehicle.common',
+                            fieldPrefix: `vehicle-${index}`,
+                            fields: vehicleCommonFields,
+                            title: 'Vehicle mapping',
+                            description: 'Choose the fleet vehicle name, mission, and target type for this entry.',
+                            constraints: [],
+                          })}
+                          {vehicleKind === 'uav' && renderSection(sectionsByName['vehicle.hardware'], ['vehicles', index], {
+                            sectionName: 'vehicle.hardware',
+                            fieldPrefix: `vehicle-${index}`,
+                            fields: vehicleHardwareFields,
+                            title: 'PX4',
+                            description: 'Hardware-only PX4 settings for UAV entries.',
+                            constraints: [],
+                          })}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )
+        ) : (
+          <textarea
+            className="yaml-editor fleet-raw-editor"
+            value={fleetFileText}
+            onChange={event => setFleetFileText(event.target.value)}
+            spellCheck={false}
+            disabled={editorBusy}
+          />
+        )}
+
+        <div className="row-actions">
+          <button className="btn btn-secondary" type="button" onClick={() => loadFleetFile()} disabled={editorBusy || !selectedFleetFile}>
+            {fleetFileLoading ? 'Loading...' : 'Reload Fleet YAML'}
+          </button>
+          <button className="btn btn-primary" type="button" onClick={handleSave} disabled={editorBusy || !selectedFleetFile}>
+            {fleetFileSaving ? 'Saving...' : 'Save Fleet YAML'}
+          </button>
+        </div>
+        <p className="subtext left-note">
+          Saving writes back to the selected source file for `{selectedFleetFile}` and then refreshes the setup context so readiness previews stay in sync.
+        </p>
+        <Result data={fleetFileResult} />
+      </div>
+    </div>
   )
 }
 
@@ -3220,9 +4331,6 @@ function App() {
   const [inventoryResult, setInventoryResult] = useState(null)
   const [discoveryResult, setDiscoveryResult] = useState(null)
   const [pollError, setPollError] = useState(null)
-  const [assignmentDraft, setAssignmentDraft] = useState(null)
-  const [assignmentDirty, setAssignmentDirty] = useState(false)
-  const [assignmentSaving, setAssignmentSaving] = useState(false)
   const [assignmentResult, setAssignmentResult] = useState(null)
   const [sessionAssignments, setSessionAssignments] = useState({})
   const [inventoryDraft, setInventoryDraft] = useState(null)
@@ -3264,8 +4372,7 @@ function App() {
   )
   const selectedDeviceHostKey = normalizeHostname(selectedLiveDevice?.hostname || selectedHardwareId)
   const selectedDeviceHostname = selectedLiveDevice?.hostname || ''
-  const selectedVehicleName = assignmentDraft?.vehicle_name
-    || sessionAssignments[selectedDeviceHostKey]
+  const selectedVehicleName = sessionAssignments[selectedDeviceHostKey]
     || `${selectedLiveDevice?.vehicle_name || ''}`.trim()
     || ''
   const selectedTarget = useMemo(() => {
@@ -3507,15 +4614,6 @@ function App() {
   }, [operatorConfig, operatorDirty])
 
   useEffect(() => {
-    if (assignmentDirty) return
-    const sessionVehicleName = sessionAssignments[selectedDeviceHostKey] || ''
-    if (selectedTarget) {
-      setAssignmentDraft(assignmentDraftFromTarget(selectedTarget, sessionVehicleName))
-    } else if (selectedLiveDevice) {
-      setAssignmentDraft(assignmentDraftFromTarget(selectedTarget, sessionVehicleName))
-    } else {
-      setAssignmentDraft(null)
-    }
     const scopeKey = [
       selectedDeviceHostKey,
       selectedTarget?.target_id || '',
@@ -3533,12 +4631,9 @@ function App() {
   }, [
     selectedLiveDevice?.hardware_id,
     selectedLiveDevice?.hostname,
-    selectedTarget?.overlay_yaml,
     selectedTarget?.target_id,
     selectedTarget?.vehicle_name,
-    assignmentDirty,
     selectedDeviceHostKey,
-    sessionAssignments,
   ])
 
   useEffect(() => {
@@ -3557,6 +4652,13 @@ function App() {
     setDetailTab('setup')
     setDeployResult(null)
   }, [page, selectedHardwareId])
+
+  useEffect(() => {
+    if (page !== 'launch-monitor') return
+    if (detailTab !== 'mission') return
+    if (selectedVehicleName) return
+    setDetailTab('setup')
+  }, [detailTab, page, selectedVehicleName])
 
   useEffect(() => {
     if (inventoryMode === 'new') {
@@ -3616,7 +4718,7 @@ function App() {
       }
       setTargets(prev => uniqueTargets([...prev.filter(target => target.target_id !== savedTarget.target_id), savedTarget]))
       if (scope === 'assignment') {
-        setAssignmentDirty(false)
+        setAssignmentResult(null)
       }
       if (scope === 'inventory') {
         setInventoryDirty(false)
@@ -3825,22 +4927,6 @@ function App() {
     }
   }
 
-  const clearBuildSource = async () => {
-    buildSourceRefreshRequestRef.current += 1
-    setBuildSourceWorking(true)
-    try {
-      const data = await api('/api/build-source/clear', { method: 'POST', body: new FormData() })
-      setBuildSourceResult(data)
-      if (data.success) {
-        setBuildSource(normalizeBackendBuildSource(data))
-        setBuildSourceLoaded(true)
-        await refreshBuildSource({ preserveResult: true })
-      }
-    } finally {
-      setBuildSourceWorking(false)
-    }
-  }
-
   const handleDeploySelectedSource = async () => {
     if (!buildSourceLoaded || !buildSource || buildSource.kind === 'none') return
     if (!selectedTargetId && !selectedDeviceHostname) return
@@ -3860,22 +4946,6 @@ function App() {
     }
   }
 
-  const handleStopFleet = async () => {
-    if (!selectedTargetId && !selectedDeviceHostname) return
-    setDeploying(true)
-    try {
-      const data = normalizeFleetActionResult(await api(withDeviceScope('/api/fleet/stop', {
-        targetId: selectedTargetId,
-        hostname: selectedDeviceHostname,
-        vehicleName: selectedVehicleName,
-      }), { method: 'POST' }))
-      setDeployResult(data)
-    } finally {
-      await refreshSelectedDeviceState()
-      setDeploying(false)
-    }
-  }
-
   const openHardware = hardwareId => {
     if (!buildSourceSummary.ready) {
       setBuildSourceResult({
@@ -3885,22 +4955,18 @@ function App() {
       setPage('setup')
       return
     }
-    setAssignmentDirty(false)
     setSelectedHardwareId(hardwareId)
     setDetailTab('setup')
     setPage('launch-monitor')
   }
 
-  const handleSaveSessionAssignment = async () => {
+  const handleAssignmentSelection = vehicleNameRaw => {
     const hostname = `${selectedDeviceHostname || ''}`.trim()
     if (!hostname) return
-
-    setAssignmentSaving(true)
-    setAssignmentResult(null)
     setDeployResult(null)
 
     const hostKey = normalizeHostname(hostname)
-    const vehicleName = `${assignmentDraft?.vehicle_name || ''}`.trim()
+    const vehicleName = `${vehicleNameRaw || ''}`.trim()
     const conflictingHost = Object.entries(sessionAssignments).find(
       ([candidateHost, assignedVehicle]) => candidateHost !== hostKey && assignedVehicle === vehicleName
     )?.[0]
@@ -3908,9 +4974,8 @@ function App() {
     if (vehicleName && conflictingHost) {
       setAssignmentResult({
         success: false,
-        error: `${vehicleName} is already assigned to ${conflictingHost}. Clear that session assignment first.`,
+          error: `${vehicleName} is already assigned to ${conflictingHost}. Clear that session assignment first.`,
       })
-      setAssignmentSaving(false)
       return
     }
 
@@ -3922,14 +4987,7 @@ function App() {
       }
       return next
     })
-    setAssignmentDirty(false)
-    setAssignmentResult({
-      success: true,
-      output: vehicleName
-        ? `Assigned ${vehicleName} to ${hostname} for this session.`
-        : `Cleared the session assignment for ${hostname}.`,
-    })
-    setAssignmentSaving(false)
+    setAssignmentResult(null)
   }
 
   return (
@@ -3963,7 +5021,7 @@ function App() {
           onSelectLocalArtifact={selectLocalArtifactSource}
           onSelectLocalCodebase={selectLocalCodebaseSource}
           onSelectFleetFile={saveGlobalFleetFile}
-          onClearBuildSource={clearBuildSource}
+          onRefreshContext={() => refreshBuildSource({ preserveResult: true })}
         />
       )}
 
@@ -4001,7 +5059,6 @@ function App() {
           hostname={selectedDeviceHostname}
           vehicleName={selectedVehicleName}
           connected={connected}
-          wifiStatus={wifiStatus}
           buildInfo={buildInfo}
           sshCommand={sshCommand}
           workspacePaths={workspacePaths}
@@ -4009,13 +5066,8 @@ function App() {
           buildSource={buildSource}
           buildSourceLoaded={buildSourceLoaded}
           buildSourceWorking={buildSourceWorking}
-          assignmentDraft={assignmentDraft || assignmentDraftFromTarget(selectedTarget, selectedVehicleName)}
-          onAssignmentChange={(field, value) => {
-            setAssignmentDirty(true)
-            setAssignmentDraft(prev => ({ ...(prev || {}), [field]: value }))
-          }}
-          onSaveAssignment={handleSaveSessionAssignment}
-          savingAssignment={assignmentSaving}
+          assignedVehicleName={selectedVehicleName}
+          onAssignmentChange={handleAssignmentSelection}
           assignmentResult={assignmentResult}
           onRefresh={() => {
             refreshGlobal()
@@ -4026,8 +5078,8 @@ function App() {
             })
           }}
           onBack={() => {
-            setAssignmentDirty(false)
             setSelectedHardwareId('')
+            setDetailTab('setup')
             setPage('readiness')
           }}
           detailTab={detailTab}
@@ -4035,7 +5087,6 @@ function App() {
           onDeploy={handleDeploySelectedSource}
           deploying={deploying}
           deployResult={deployResult}
-          onRollback={handleStopFleet}
         />
       )}
     </div>

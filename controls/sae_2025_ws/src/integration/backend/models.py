@@ -244,6 +244,15 @@ class FleetCatalogResponse(BaseModel):
     error: str | None = None
 
 
+class FleetFileResponse(BaseModel):
+    success: bool
+    fleet_file: str | None = None
+    path: str | None = None
+    content: str | None = None
+    output: str | None = None
+    error: str | None = None
+
+
 class FleetConnectionSummary(BaseModel):
     success: bool
     connected: bool
