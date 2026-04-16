@@ -25,7 +25,7 @@ Packet wire format
     Byte  3    : topic_id (uint8, index into configured topics list)
     Bytes 4+   : rclpy-serialized ROS message bytes
 
-  Heartbeat packet
+  Ping packet (liveness probe — not a ROS message)
     Byte 0     : 0x02
     Bytes 1-2  : sender port (big-endian uint16)
     Bytes 3-6  : sequence number (big-endian uint32)
@@ -43,12 +43,12 @@ from rosidl_runtime_py.utilities import get_message
 from std_msgs.msg import String
 
 _TYPE_DATA = 0x01
-_TYPE_HEARTBEAT = 0x02
+_TYPE_PING = 0x02
 _DATA_HEADER = struct.Struct("!BHB")   # msg_type, sender_port, topic_id
-_HB_HEADER = struct.Struct("!BHI")    # msg_type, sender_port, seq
+_PING_HEADER = struct.Struct("!BHI")   # msg_type, sender_port, seq
 _RECV_TIMEOUT_S = 1.0
-_HEARTBEAT_INTERVAL_S = 1.0
-_DEFAULT_PEER_TTL_S = 3.0  # 3× heartbeat interval — tolerates 2 dropped packets
+_PING_INTERVAL_S = 1.0
+_DEFAULT_PEER_TTL_S = 3.0  # 3× ping interval — tolerates 2 dropped pings
 
 
 class BridgeNode(Node):
@@ -66,7 +66,7 @@ class BridgeNode(Node):
         self._broadcast_ip: str = self.get_parameter("broadcast_ip").value
         self._peer_ports: list[int] = [p for p in all_ports if p != self._my_port]
         self._peer_ttl: float = float(self.get_parameter("peer_ttl").value)
-        self._heartbeat_seq = 0
+        self._ping_seq = 0
         self._stop = threading.Event()
 
         # peer liveness: port → monotonic timestamp of last received heartbeat
@@ -120,11 +120,11 @@ class BridgeNode(Node):
         self._recv_thread = threading.Thread(
             target=self._recv_loop, daemon=True, name="udp_recv"
         )
-        self._heartbeat_thread = threading.Thread(
-            target=self._heartbeat_loop, daemon=True, name="udp_heartbeat"
+        self._ping_thread = threading.Thread(
+            target=self._ping_loop, daemon=True, name="udp_ping"
         )
         self._recv_thread.start()
-        self._heartbeat_thread.start()
+        self._ping_thread.start()
 
     def _debug(self, text: str) -> None:
         ns = self.get_namespace().strip("/")
@@ -199,8 +199,8 @@ class BridgeNode(Node):
 
             if msg_type == _TYPE_DATA:
                 self._handle_data(data, addr)
-            elif msg_type == _TYPE_HEARTBEAT:
-                self._handle_heartbeat(data, addr)
+            elif msg_type == _TYPE_PING:
+                self._handle_ping(data, addr)
             else:
                 self._debug(f"IN unknown type 0x{msg_type:02x} from {addr} — dropping")
 
@@ -233,38 +233,36 @@ class BridgeNode(Node):
         self._in_publishers[topic_id].publish(msg)
         self._debug(f"IN data published → udp_bridge/in/{topic_name}")
 
-    def _handle_heartbeat(self, data: bytes, addr) -> None:
-        if len(data) < _HB_HEADER.size:
+    def _handle_ping(self, data: bytes, addr) -> None:
+        if len(data) < _PING_HEADER.size:
             return
-        _, sender_port, seq = _HB_HEADER.unpack_from(data, 0)
+        _, sender_port, seq = _PING_HEADER.unpack_from(data, 0)
         self._record_heartbeat(sender_port)
-        self._debug(f"IN heartbeat from {addr[0]}:{sender_port} seq={seq} active={self._active_peers()}")
+        self._debug(f"IN ping from {addr[0]}:{sender_port} seq={seq} active={self._active_peers()}")
 
     # ------------------------------------------------------------------
-    # Heartbeat sender — always broadcasts to all ports (enables discovery)
+    # Ping sender — always broadcasts to all ports (enables discovery)
     # ------------------------------------------------------------------
 
-    def _heartbeat_loop(self) -> None:
+    def _ping_loop(self) -> None:
         while not self._stop.is_set():
-            packet = _HB_HEADER.pack(
-                _TYPE_HEARTBEAT, self._my_port, self._heartbeat_seq
-            )
-            # Heartbeats go to all configured ports regardless of liveness,
+            packet = _PING_HEADER.pack(_TYPE_PING, self._my_port, self._ping_seq)
+            # Pings go to all configured ports regardless of liveness,
             # so peers can discover this node even after a reconnect.
             self._send_to_peers(
                 packet,
-                f"heartbeat seq={self._heartbeat_seq}",
+                f"ping seq={self._ping_seq}",
                 ports=self._peer_ports,
             )
-            self._heartbeat_seq += 1
-            time.sleep(_HEARTBEAT_INTERVAL_S)
+            self._ping_seq += 1
+            time.sleep(_PING_INTERVAL_S)
 
     # ------------------------------------------------------------------
 
     def destroy_node(self) -> None:
         self._stop.set()
         self._recv_thread.join(timeout=2.0)
-        self._heartbeat_thread.join(timeout=2.0)
+        self._ping_thread.join(timeout=2.0)
         self._sock.close()
         super().destroy_node()
 
