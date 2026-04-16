@@ -37,6 +37,7 @@ modes:
       line_follow_speed_mps: 0.1
       k_lat: 0.01
       k_ang: 0.4
+      k_d_lat: 0.002
       max_angular: 0.5
       # HSV bounds — copy of payload_corner_navigate_sim.yaml so the same
       # tape calibration is used. ccw_hsv = colour at the start of a CCW-
@@ -76,6 +77,7 @@ modes:
       line_follow_speed_mps: 0.1
       k_lat: 0.01
       k_ang: 0.4
+      k_d_lat: 0.002
       max_angular: 0.5
     transitions:
       done: scan

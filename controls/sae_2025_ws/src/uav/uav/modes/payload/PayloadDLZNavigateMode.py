@@ -173,6 +173,7 @@ class PayloadDLZNavigateMode(Mode):
         corner_angular_speed: float = 0.3,
         line_follow_speed_mps: float = 0.10,
         k_lat: float = 0.003,
+        k_d_lat: float = 0.002,
         k_ang: float = 0.4,
         max_angular: float = 0.5,
         # Scan / lookup params
@@ -210,6 +211,7 @@ class PayloadDLZNavigateMode(Mode):
         self.corner_angular_speed = float(corner_angular_speed)
         self.line_follow_speed_mps = float(line_follow_speed_mps)
         self.k_lat = float(k_lat)
+        self.k_d_lat = float(k_d_lat)
         self.k_ang = float(k_ang)
         self.max_angular = float(max_angular)
 
@@ -356,6 +358,7 @@ class PayloadDLZNavigateMode(Mode):
 
         # LINE_FOLLOW state
         self._prev_color = "A" if self.direction == "cw" else "B"
+        self._prev_lateral_error: Optional[float] = None
         self._transitions = 0
         self._lf_phase = "following"  # "following" | "corner_turn"
         self._corner_wait_elapsed = 0.0
@@ -782,6 +785,7 @@ class PayloadDLZNavigateMode(Mode):
                 self._corner_turned = 0.0
                 self._corner_stable = 0
                 self._corner_target_color = self._prev_color
+                self._prev_lateral_error = None
                 self._annotate_line_follow(
                     bgr,
                     strip_start,
@@ -798,16 +802,30 @@ class PayloadDLZNavigateMode(Mode):
                 self.vehicle.drive(0.0, 0.0)
                 return
 
-        # Boundary following
+        # PD boundary following
         if boundary_detected:
+            # D term: rate of change of lateral error. When the error is
+            # shrinking (tape returning to centre), d_lateral opposes P and
+            # brakes the correction before it overshoots — this is what
+            # damps the oscillation cycle.
+            if self._prev_lateral_error is not None and time_delta > 0:
+                d_lateral = (lateral_error_px - self._prev_lateral_error) / time_delta
+            else:
+                d_lateral = 0.0
+            self._prev_lateral_error = lateral_error_px
+
             angular = float(
                 np.clip(
-                    -self.k_lat * lateral_error_px + self.k_ang * boundary_angle,
+                    -self.k_lat * lateral_error_px
+                    - self.k_d_lat * d_lateral
+                    + self.k_ang * boundary_angle,
                     -self.max_angular,
                     self.max_angular,
                 )
             )
         else:
+            # No boundary — reset so stale derivative can't kick in next frame
+            self._prev_lateral_error = None
             angular = 0.0
 
         self._annotate_line_follow(

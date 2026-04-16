@@ -37,6 +37,7 @@ modes:
       line_follow_speed_mps: 0.1
       k_lat: 0.01
       k_ang: 0.4
+      k_d_lat: 0.002
       max_angular: 0.5
       corner_angular_speed: 0.5
       # HSV bounds — copy of payload_corner_navigate_real.yaml so the same
@@ -77,6 +78,7 @@ modes:
       line_follow_speed_mps: 0.1
       k_lat: 0.01
       k_ang: 0.4
+      k_d_lat: 0.002
       max_angular: 0.5
       corner_angular_speed: 0.5
       # HSV bounds — copy of payload_corner_navigate_real.yaml so the same
@@ -89,7 +91,7 @@ modes:
       cw_upper_hsv: [170, 153, 255]
     transitions:
       done: scan
-    
+
   dual_approach:
     mode: payload.PayloadDualApproachMode
     params:
