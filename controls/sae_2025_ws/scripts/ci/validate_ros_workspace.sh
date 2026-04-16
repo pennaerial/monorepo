@@ -27,7 +27,7 @@ ci_refresh_apt_lists
 rosdep update --rosdistro "$ROS_DISTRO"
 rosdep install -r -i -y --rosdistro "$ROS_DISTRO" \
     --from-paths src/uav src/uav_interfaces src/px4_msgs src/actuator_msgs \
-    src/payload src/payload_interfaces src/tools
+    src/payload src/payload_interfaces src/tools src/udp_bridge
 
 ci_log "Building shared hardware dependencies"
 colcon build \
@@ -38,6 +38,10 @@ ci_source_workspace "$WORKSPACE_ROOT"
 colcon build \
     --packages-select payload \
     --cmake-args -DBUILD_SIM=OFF
+
+ci_log "Building udp_bridge package"
+ci_source_workspace "$WORKSPACE_ROOT"
+colcon build --packages-select udp_bridge
 
 ci_log "Building uav package"
 ci_source_workspace "$WORKSPACE_ROOT"
