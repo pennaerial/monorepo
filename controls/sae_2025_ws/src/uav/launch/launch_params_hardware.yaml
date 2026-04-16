@@ -33,4 +33,26 @@ camera_preprocess_hook: ""
 servo_only: false
 payload_controller: GPIOController
 
+# UDP bridge settings for inter-Pi communication (payload hardware missions only).
+# All four params are optional — sane defaults are applied automatically.
+#
+# udp_port: omit (or comment out) to auto-assign from the vehicle name:
+#   payload_0 → 5000, payload_1 → 5001, payload_2 → 5002, etc.
+#   Set to 0 to disable the UDP bridge entirely.
+# udp_port: 5000
+#
+# udp_all_ports: all peer ports in the fleet (including this node's own port).
+#   Peers are derived by excluding udp_port from this list.
+#   Default: [5000, 5001, 5002, 5003]
+# udp_all_ports: [5000, 5001, 5002, 5003]
+#
+# udp_topics: topics to bridge, as "topic_name:pkg/msg/MsgType" pairs.
+#   Default: PayloadHeartbeat on topic "heartbeat"
+# udp_topics:
+#   - "heartbeat:payload_interfaces/msg/PayloadHeartbeat"
+#
+# udp_broadcast_ip: subnet broadcast address for the AP hotspot network.
+#   Default: 10.42.0.255 (NetworkManager hotspot default)
+# udp_broadcast_ip: "10.42.0.255"
+
 sim: false

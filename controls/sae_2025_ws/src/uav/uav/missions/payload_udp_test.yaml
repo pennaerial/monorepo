@@ -1,0 +1,5 @@
+modes:
+  start:
+    mode: payload.PayloadIdleMode
+    params:
+      wait_seconds: 300.0

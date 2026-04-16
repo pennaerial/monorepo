@@ -1222,6 +1222,44 @@
         "done"
       ]
     },
+    "payload.PayloadIdleMode": {
+      "class_name": "PayloadIdleMode",
+      "class_path": "uav.modes.payload.PayloadIdleMode",
+      "description": "Base class for UAV operational modes within a ROS 2 node.",
+      "display_name": "PayloadIdleMode",
+      "mission_target": "payload",
+      "mode_id": "payload.PayloadIdleMode",
+      "module_path": "uav.modes.payload.PayloadIdleMode",
+      "param_fields": [
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.0,
+          "default_kind": "value",
+          "name": "wait_seconds",
+          "required": false
+        }
+      ],
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "wait_seconds": {
+            "default": 0.0,
+            "title": "Wait Seconds",
+            "type": "number"
+          }
+        },
+        "title": "PayloadIdleModeParams",
+        "type": "object"
+      },
+      "peer_vehicle_names": [],
+      "required_vision_nodes": [],
+      "requires_camera": false,
+      "transition_labels": [
+        "complete"
+      ]
+    },
     "payload.PayloadPeerFleetTestMode": {
       "class_name": "PayloadPeerFleetTestMode",
       "class_path": "uav.modes.payload.PayloadPeerFleetTestMode",
