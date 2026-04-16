@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import json
 import os
+import re
 from pathlib import Path
 
 from ament_index_python.packages import get_package_share_directory
@@ -204,10 +205,11 @@ def _payload_camera_info_url_for(
             f"'{requested_file}', but no packaged calibration exists at '{candidate}'."
         )
 
-    candidates = [
-        calibration_dir / f"{vehicle_name}_camera_info.yaml",
-        calibration_dir / "payload_0_camera_info.yaml",
-    ]
+    m = re.search(r"_(\d+)$", vehicle_name)
+    candidates = []
+    if m:
+        candidates.append(calibration_dir / f"camera_info_{m.group(1)}.yaml")
+    candidates.append(calibration_dir / "payload_0_camera_info.yaml")
     for candidate in candidates:
         if candidate.exists():
             return f"file://{candidate}"

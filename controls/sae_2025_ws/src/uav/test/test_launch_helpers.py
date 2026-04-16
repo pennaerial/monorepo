@@ -576,16 +576,14 @@ def test_resolve_camera_input_transport_prefers_raw_for_payload_preprocessing(
     )
 
 
-def test_payload_camera_info_url_for_prefers_named_file(
+def test_payload_camera_info_url_for_uses_numbered_file(
     monkeypatch, tmp_path, stack_launch_module
 ):
     uav_share = tmp_path / "uav_share"
     calibration_dir = uav_share / "config" / "camera_calibrations"
     calibration_dir.mkdir(parents=True)
-    preferred = calibration_dir / "payload_2_camera_info.yaml"
-    fallback = calibration_dir / "payload_0_camera_info.yaml"
-    fallback.write_text("fallback", encoding="utf-8")
-    preferred.write_text("preferred", encoding="utf-8")
+    calibration = calibration_dir / "camera_info_2.yaml"
+    calibration.write_text("calibration", encoding="utf-8")
 
     monkeypatch.setattr(
         stack_launch_module,
@@ -593,7 +591,7 @@ def test_payload_camera_info_url_for_prefers_named_file(
         lambda package_name: str(uav_share),
     )
 
-    expected = f"file://{preferred}"
+    expected = f"file://{calibration}"
     assert stack_launch_module._payload_camera_info_url_for("payload_2") == expected
 
 
