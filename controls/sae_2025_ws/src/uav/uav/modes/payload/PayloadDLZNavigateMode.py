@@ -19,13 +19,13 @@ from uav_interfaces.srv import PayloadAprilTagState
 from ..Mode import Mode
 
 # Corner-turn vision thresholds (mirrors PayloadCornerNavigateMode defaults)
-_CORNER_CENTER_TOL_PX = 50.0  # lateral error tolerance (px)
+_CORNER_CENTER_TOL_PX = 75.0  # lateral error tolerance (px)
 _CORNER_CENTER_MIN_PX = 400  # minimum target-colour pixels to trust centering
 _CORNER_STABLE_FRAMES = 2  # consecutive centred frames before locking
 _CORNER_MAX_RAD = 2.0 * math.pi  # safety timeout (radians)
 # Pause held after detecting a corner transition before starting to rotate,
 # so the vehicle fully stops and the camera de-blurs before vision centering.
-_CORNER_PRE_TURN_WAIT_S = 0.2
+_CORNER_PRE_TURN_WAIT_S = 0.0
 
 # TURN_ONTO_TAPE vision thresholds
 _TURN_CENTER_TOL_PX = 50.0  # lateral error tolerance (px)
@@ -192,6 +192,8 @@ class PayloadDLZNavigateMode(Mode):
         ccw_upper_hsv: list[int] = (10, 255, 255),
         cw_lower_hsv: list[int] = (85, 120, 60),
         cw_upper_hsv: list[int] = (140, 255, 255),
+        cw_lower_hsv2: list[int] = (255, 255, 255),
+        cw_upper_hsv2: list[int] = (255, 255, 255),
     ):
         super().__init__(node, vehicle)
         direction = str(direction).lower().strip()
@@ -226,6 +228,8 @@ class PayloadDLZNavigateMode(Mode):
         # A = cw-start colour, B = ccw-start colour (see module docstring).
         self._lower_a = np.array(cw_lower_hsv, dtype=np.uint8)
         self._upper_a = np.array(cw_upper_hsv, dtype=np.uint8)
+        self._lower_a2 = np.array(cw_lower_hsv2, dtype=np.uint8)
+        self._upper_a2 = np.array(cw_upper_hsv2, dtype=np.uint8)
         self._lower_b = np.array(ccw_lower_hsv, dtype=np.uint8)
         self._upper_b = np.array(ccw_upper_hsv, dtype=np.uint8)
 
@@ -292,7 +296,7 @@ class PayloadDLZNavigateMode(Mode):
         """
         strip, strip_start = _get_strip(bgr)
         hsv = cv2.cvtColor(strip, cv2.COLOR_BGR2HSV)
-        orange_mask = cv2.inRange(hsv, self._lower_a, self._upper_a)
+        orange_mask = cv2.inRange(hsv, self._lower_a, self._upper_a) | cv2.inRange(hsv, self._lower_a2, self._upper_a2)
         blue_mask = cv2.inRange(hsv, self._lower_b, self._upper_b)
         current_color = _detect_current_color(orange_mask, blue_mask)
         detected, lateral_error_px, boundary_angle = _detect_tape_following(
@@ -527,7 +531,7 @@ class PayloadDLZNavigateMode(Mode):
         crop = bgr[row_start:, col_start:col_end]
         hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
         if color == "A":
-            mask = cv2.inRange(hsv, self._lower_a, self._upper_a)
+            mask = cv2.inRange(hsv, self._lower_a, self._upper_a) | cv2.inRange(hsv, self._lower_a2, self._upper_a2)
         else:
             mask = cv2.inRange(hsv, self._lower_b, self._upper_b)
         count = int(np.count_nonzero(mask))
@@ -859,7 +863,7 @@ class PayloadDLZNavigateMode(Mode):
         crop = bgr[row_start:row_end, col_start:col_end]
         hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
         if color == "A":
-            mask = cv2.inRange(hsv, self._lower_a, self._upper_a)
+            mask = cv2.inRange(hsv, self._lower_a, self._upper_a) | cv2.inRange(hsv, self._lower_a2, self._upper_a2)
         else:
             mask = cv2.inRange(hsv, self._lower_b, self._upper_b)
         count = int(np.count_nonzero(mask))

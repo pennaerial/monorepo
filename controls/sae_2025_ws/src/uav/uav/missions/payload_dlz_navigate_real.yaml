@@ -24,13 +24,22 @@ modes:
         # Fill in with your actual mappings.
         # Key: visible tag combo (OR groups with |, AND groups with ,)
         # Value: transitions to travel and direction to travel
-        "0|4|5,2": {transitions: 1, direction: ccw}  # front + left
+        # "0|4|5,2": {transitions: 1, direction: ccw}  # front + left
+        # "0|4|5,3": {transitions: 1, direction: cw}   # front + right
+        # "0|4|5":   {transitions: 0, direction: ccw}  # front only (already at dock)
+        # "1|6|7,2": {transitions: 3, direction: ccw}  # back + left
+        # "1|6|7,3": {transitions: 3, direction: cw}   # back + right
+        # "1|6|7":   {transitions: 4, direction: cw}  # back only
+        # "2":       {transitions: 2, direction: ccw}  # left only
+        # "3":       {transitions: 2, direction: cw}   # right only
+
+        "0|4|5,2": {transitions: 7, direction: cw}  # front + left
         "0|4|5,3": {transitions: 1, direction: cw}   # front + right
-        "0|4|5":   {transitions: 0, direction: ccw}  # front only (already at dock)
-        "1|6|7,2": {transitions: 3, direction: ccw}  # back + left
+        "0|4|5":   {transitions: 0, direction: cw}  # front only (already at dock)
+        "1|6|7,2": {transitions: 5, direction: cw}  # back + left
         "1|6|7,3": {transitions: 3, direction: cw}   # back + right
         "1|6|7":   {transitions: 4, direction: cw}  # back only
-        "2":       {transitions: 2, direction: ccw}  # left only
+        "2":       {transitions: 6, direction: cw}  # left only
         "3":       {transitions: 2, direction: cw}   # right only
       tag_size_m: 0.0508
       turn_angular_speed: 0.5
@@ -48,6 +57,8 @@ modes:
       ccw_upper_hsv: [130, 255, 255]
       cw_lower_hsv: [160, 65, 196]  # pink
       cw_upper_hsv: [170, 153, 255]
+      cw_lower_hsv2: [165, 85, 100] # red/pink alt range
+      cw_upper_hsv2: [180, 252, 255]
     transitions:
       done: scan
 
@@ -56,7 +67,7 @@ modes:
     params:
       tag_id: 0
       tag_size_m: 0.0508
-      spin_angular_speed: 0.4
+      spin_angular_speed: 1.0
     transitions:
       found: dual_approach
       not_found: retry
@@ -89,6 +100,8 @@ modes:
       ccw_upper_hsv: [130, 255, 255]
       cw_lower_hsv: [160, 65, 196]  # pink
       cw_upper_hsv: [170, 153, 255]
+      cw_lower_hsv2: [165, 85, 100] # red/pink alt range
+      cw_upper_hsv2: [180, 252, 255]
     transitions:
       done: scan
 
