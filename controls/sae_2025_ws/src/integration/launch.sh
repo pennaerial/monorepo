@@ -132,18 +132,21 @@ if ! command -v npm >/dev/null 2>&1; then
   exit 1
 fi
 
-if [ ! -d "$FRONTEND_DIR/node_modules" ]; then
-  echo "Frontend dependencies missing. Installing..."
-  cd "$FRONTEND_DIR"
-  npm install
-  cd "$SCRIPT_DIR"
-fi
+ensure_frontend_deps() {
+  if [ ! -d "$FRONTEND_DIR/node_modules" ]; then
+    echo "Frontend dependencies missing. Installing..."
+    npm --prefix "$FRONTEND_DIR" install
+    return
+  fi
 
-# Ensure required frontend deps are present even if node_modules already exists.
-if ! npm --prefix "$FRONTEND_DIR" ls --depth=0 @xterm/xterm >/dev/null 2>&1; then
-  echo "Frontend dependencies out of date. Running npm install..."
-  npm --prefix "$FRONTEND_DIR" install
-fi
+  # Validate the full declared dependency tree so newly added packages are installed.
+  if ! npm --prefix "$FRONTEND_DIR" ls --depth=0 >/dev/null 2>&1; then
+    echo "Frontend dependencies out of date. Running npm install..."
+    npm --prefix "$FRONTEND_DIR" install
+  fi
+}
+
+ensure_frontend_deps
 
 if [ -n "${CONDA_PREFIX:-}" ]; then
   ensure_python_backend_deps python
