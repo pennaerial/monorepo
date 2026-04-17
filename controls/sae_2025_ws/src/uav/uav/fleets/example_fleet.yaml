@@ -47,6 +47,9 @@ defaults:
   # Extra logging/visualization from the vision stack.
   vision_debug: false
 
+  # Enable debug mode on mission vision nodes (enables debug image publishers).
+  debug_vision_node: false
+
   # Force the camera stack on even when the mission does not declare it.
   force_camera: false
 

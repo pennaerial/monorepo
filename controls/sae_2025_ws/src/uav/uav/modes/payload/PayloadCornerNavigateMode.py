@@ -96,6 +96,7 @@ class PayloadCornerNavigateMode(Mode):
         line_follow_strip_frac: float = 0.40,
         line_follow_min_pixels: int = 50,
         k_lat: float = 0.003,
+        k_d: float = 0.001,
         max_angular: float = 0.5,
         # TAPE_ALIGN — rotate until diagonal black-tape centroid is centered
         tape_align_lower_hsv: list[int] = (0, 0, 0),
@@ -141,6 +142,7 @@ class PayloadCornerNavigateMode(Mode):
             )
         self.line_follow_min_pixels = int(line_follow_min_pixels)
         self.k_lat = float(k_lat)
+        self.k_d = float(k_d)
         self.max_angular = float(max_angular)
 
         self._lower_black = np.array(tape_align_lower_hsv, dtype=np.uint8)
@@ -190,6 +192,7 @@ class PayloadCornerNavigateMode(Mode):
         # LINE_FOLLOW state
         self._prev_color: Optional[str] = None
         self._corner_color_seen: bool = False
+        self._prev_lateral_px: float = 0.0
 
         # TAPE_ALIGN state
         self._tape_align_stable: int = 0
@@ -276,6 +279,17 @@ class PayloadCornerNavigateMode(Mode):
             )
             return None
 
+    def _largest_contour_mask(self, mask: np.ndarray) -> np.ndarray:
+        """Return a new mask containing only the largest contour, or an empty
+        mask if none found. Used by processing paths to ignore small noise blobs."""
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if not contours:
+            return np.zeros_like(mask)
+        largest = max(contours, key=cv2.contourArea)
+        out = np.zeros_like(mask)
+        cv2.drawContours(out, [largest], -1, 255, cv2.FILLED)
+        return out
+
     def _lower_strip_color_counts(self, bgr: np.ndarray) -> Tuple[int, int]:
         """Return (color_a_pixels, color_b_pixels) in the bottom drive_out_strip_frac
         of the frame, cropped horizontally to the middle third so tape that
@@ -286,8 +300,8 @@ class PayloadCornerNavigateMode(Mode):
         col_end = w - (w // 3)
         strip = bgr[strip_start:, col_start:col_end]
         hsv = cv2.cvtColor(strip, cv2.COLOR_BGR2HSV)
-        mask_a = cv2.inRange(hsv, self._lower_a, self._upper_a)
-        mask_b = cv2.inRange(hsv, self._lower_b, self._upper_b)
+        mask_a = self._largest_contour_mask(cv2.inRange(hsv, self._lower_a, self._upper_a))
+        mask_b = self._largest_contour_mask(cv2.inRange(hsv, self._lower_b, self._upper_b))
         return int(np.count_nonzero(mask_a)), int(np.count_nonzero(mask_b))
 
     def _middle_third_color_metrics(
@@ -344,9 +358,9 @@ class PayloadCornerNavigateMode(Mode):
         strip = bgr[strip_start:, :]
         hsv = cv2.cvtColor(strip, cv2.COLOR_BGR2HSV)
         if color == "A":
-            mask = cv2.inRange(hsv, self._lower_a, self._upper_a)
+            mask = self._largest_contour_mask(cv2.inRange(hsv, self._lower_a, self._upper_a))
         elif color == "B":
-            mask = cv2.inRange(hsv, self._lower_b, self._upper_b)
+            mask = self._largest_contour_mask(cv2.inRange(hsv, self._lower_b, self._upper_b))
         else:
             return 0, 0.0
         count = int(np.count_nonzero(mask))
@@ -450,8 +464,8 @@ class PayloadCornerNavigateMode(Mode):
         row_end = h * 9 // 10
         crop = bgr[row_start:row_end, :]
         hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
-        mask_a = cv2.inRange(hsv, self._lower_a, self._upper_a)
-        mask_b = cv2.inRange(hsv, self._lower_b, self._upper_b)
+        mask_a = self._largest_contour_mask(cv2.inRange(hsv, self._lower_a, self._upper_a))
+        mask_b = self._largest_contour_mask(cv2.inRange(hsv, self._lower_b, self._upper_b))
         count_a = int(np.count_nonzero(mask_a))
         count_b = int(np.count_nonzero(mask_b))
         total = count_a + count_b
@@ -634,14 +648,17 @@ class PayloadCornerNavigateMode(Mode):
         # Steer purely on the current colour's centroid so the other colour
         # cannot pull the centroid off the side we're following.
         if cur_count >= self.line_follow_min_pixels:
+            d_term = self.k_d * (cur_lateral_px - self._prev_lateral_px) / max(time_delta, 1e-3)
             angular = float(
                 np.clip(
-                    -self.k_lat * cur_lateral_px,
+                    -(self.k_lat * cur_lateral_px + d_term),
                     -self.max_angular,
                     self.max_angular,
                 )
             )
+            self._prev_lateral_px = cur_lateral_px
         else:
+            self._prev_lateral_px = 0.0
             angular = 0.0
 
         self._annotate_line_follow(

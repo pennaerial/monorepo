@@ -6,6 +6,7 @@ defaults:
   auto_launch: true
   debug: false
   vision_debug: true
+  debug_vision_node: false
   save_vision_milliseconds: 0
   servo_only: false
   camera_mount_offsets: [0.0, 0.0, 0.0]

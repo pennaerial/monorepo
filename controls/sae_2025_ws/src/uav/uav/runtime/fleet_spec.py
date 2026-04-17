@@ -20,6 +20,7 @@ class FleetDefaultsModel(BaseModel):
     auto_launch: bool | None = None
     debug: bool | None = None
     vision_debug: bool | None = None
+    debug_vision_node: bool | None = None
     force_camera: bool | None = None
     save_vision_milliseconds: int | None = None
     servo_only: bool | None = None

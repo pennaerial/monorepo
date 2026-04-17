@@ -23,6 +23,7 @@ defaults:
   auto_launch: true
   debug: true
   vision_debug: false
+  debug_vision_node: false
   force_camera: false
   save_vision_milliseconds: 0
   servo_only: false

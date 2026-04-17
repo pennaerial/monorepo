@@ -262,6 +262,7 @@ def _build_camera_actions(
     sim_world_name: str,
     sim_entity_name: str,
     vision_debug: bool,
+    debug_vision_node: bool,
     save_vision_milliseconds: int,
 ) -> list:
     save_vision = save_vision_milliseconds > 0
@@ -380,7 +381,7 @@ def _build_camera_actions(
                         "use_camera_service": vision_class.__name__
                         != "PayloadAprilTagNode",
                         "preferred_image_transport": preferred_image_transport,
-                        "debug": vision_debug,
+                        "debug": debug_vision_node,
                         "sim": sim,
                         "save_vision": save_vision,
                         "enable_failsafe_service": mission_spec.is_uav,
@@ -559,6 +560,7 @@ def launch_setup(context, *args, **kwargs):
     auto_launch = _resolve_bool(config, "auto_launch", sim)
     debug = _resolve_bool(config, "debug", False)
     vision_debug = _resolve_bool(config, "vision_debug", False)
+    debug_vision_node = _resolve_bool(config, "debug_vision_node", False)
     servo_only = _resolve_bool(config, "servo_only", False)
     launch_middleware = _resolve_bool(config, "launch_middleware", mission_spec.is_uav)
     launch_px4_sitl = _resolve_bool(
@@ -652,6 +654,7 @@ def launch_setup(context, *args, **kwargs):
             sim_world_name=sim_world_name,
             sim_entity_name=sim_entity_name,
             vision_debug=vision_debug,
+            debug_vision_node=debug_vision_node,
             save_vision_milliseconds=save_vision_milliseconds,
         )
         if requires_camera
