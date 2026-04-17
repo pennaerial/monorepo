@@ -9,9 +9,8 @@ defaults:
   save_vision_milliseconds: 0
   servo_only: false
   camera_mount_offsets: [0.0, 0.0, 0.0]
-  camera_input_transport: compressed
-  camera_rotate_degrees: 0.0
-  camera_calibration_file: payload_0_camera_info.yaml
+  # camera_input_transport: compressed
+  # camera_rotate_degrees: 0.0
   camera_preprocess_hook: ""
 
 vehicles:

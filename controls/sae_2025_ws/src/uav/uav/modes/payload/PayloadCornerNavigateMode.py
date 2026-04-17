@@ -209,16 +209,17 @@ class PayloadCornerNavigateMode(Mode):
                 Image, cam_topic, self._image_cb, 1
             )
 
-        annotated_topic = self.vehicle.namespaced_path("annotated_image/compressed")
-        self._annotated_pub = self.node.create_publisher(
-            CompressedImage, annotated_topic, 1
-        )
+        if getattr(self.node, "vision_debug", False):
+            annotated_topic = self.vehicle.namespaced_path("annotated_image/compressed")
+            self._annotated_pub = self.node.create_publisher(
+                CompressedImage, annotated_topic, 1
+            )
 
         self.log(
             f"PayloadCornerNavigateMode: enter direction={self.direction} "
             f"drive_out_speed={self.drive_out_speed_mps:.2f}m/s "
             f"strip_frac={self.drive_out_strip_frac:.2f} "
-            f"camera={cam_topic} annotated={annotated_topic}"
+            f"camera={cam_topic} vision_debug={getattr(self.node, 'vision_debug', False)}"
         )
 
     def on_update(self, time_delta: float) -> None:
@@ -435,9 +436,44 @@ class PayloadCornerNavigateMode(Mode):
     # Phase: TURN_TO_CENTER
     # ------------------------------------------------------------------
 
+    def _turn_both_color_metrics(
+        self, bgr: np.ndarray
+    ) -> Tuple[int, float, Optional[str], np.ndarray, np.ndarray, int]:
+        """Both-colour metrics in the bottom-third crop (2h/3 to 9h/10, full width).
+
+        Same crop region as DLZNavigateMode's corner logic, but masks both
+        colours (matching the old TURN_TO_CENTER behaviour).
+        Returns ``(total, lateral_error_px, dominant, mask_a, mask_b, row_start)``.
+        """
+        h, w = bgr.shape[:2]
+        row_start = int(h * 2 / 3)
+        row_end = h * 9 // 10
+        crop = bgr[row_start:row_end, :]
+        hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
+        mask_a = cv2.inRange(hsv, self._lower_a, self._upper_a)
+        mask_b = cv2.inRange(hsv, self._lower_b, self._upper_b)
+        count_a = int(np.count_nonzero(mask_a))
+        count_b = int(np.count_nonzero(mask_b))
+        total = count_a + count_b
+        if total == 0:
+            return 0, 0.0, None, mask_a, mask_b, row_start
+        combined = cv2.bitwise_or(mask_a, mask_b)
+        _ys, xs = np.nonzero(combined)
+        centroid_x = float(xs.mean())
+        crop_center_x = combined.shape[1] / 2.0
+        dominant: Optional[str]
+        if count_a > count_b:
+            dominant = "A"
+        elif count_b > count_a:
+            dominant = "B"
+        else:
+            dominant = None
+        return total, centroid_x - crop_center_x, dominant, mask_a, mask_b, row_start
+
     def _update_turn_to_center(self, time_delta: float) -> None:
-        # Always turn CCW (positive angular = left turn) for this phase.
-        angular = self.align_angular_speed
+        # CCW travel → turn left (+), CW travel → turn right (-)
+        speed = self.align_angular_speed
+        angular = speed if self.direction == "ccw" else -speed
         self._turn_to_center_rad += abs(angular) * time_delta
 
         bgr = self._decode_image()
@@ -445,14 +481,19 @@ class PayloadCornerNavigateMode(Mode):
         lateral_error_px = 0.0
         dominant: Optional[str] = None
         if bgr is not None:
-            total, lateral_error_px, dominant = self._middle_third_color_metrics(bgr)
-            if (
-                total >= self.center_min_pixels
-                and abs(lateral_error_px) < self.center_tol_px
-            ):
-                # Track the latest dominant colour while we hold the centered
-                # condition so the line-follow seed reflects whatever the
-                # camera was actually looking at when we locked.
+            total, lateral_error_px, dominant, mask_a, mask_b, row_start = (
+                self._turn_both_color_metrics(bgr)
+            )
+            # Accept condition matches DLZ corner logic (lenient one-sided):
+            #   ccw → accept when centroid on the RIGHT side
+            #         (lateral_error_px > -center_tol_px)
+            #   cw  → accept when centroid on the LEFT side
+            #         (lateral_error_px < center_tol_px)
+            if self.direction == "ccw":
+                side_ok = lateral_error_px > -self.center_tol_px
+            else:
+                side_ok = lateral_error_px < self.center_tol_px
+            if total >= self.center_min_pixels and side_ok:
                 if dominant is not None:
                     self._latest_dominant = dominant
                 self._center_stable += 1
@@ -462,7 +503,13 @@ class PayloadCornerNavigateMode(Mode):
                         self._latest_dominant or dominant or self._first_color or "A"
                     )
                     self._annotate_turn_to_center(
-                        bgr, total, lateral_error_px, dominant
+                        bgr,
+                        mask_a,
+                        mask_b,
+                        row_start,
+                        total,
+                        lateral_error_px,
+                        dominant,
                     )
                     self._phase = "line_follow"
                     self.log(
@@ -477,6 +524,16 @@ class PayloadCornerNavigateMode(Mode):
                 if dominant is not None:
                     self._latest_dominant = dominant
 
+            self._annotate_turn_to_center(
+                bgr,
+                mask_a,
+                mask_b,
+                row_start,
+                total,
+                lateral_error_px,
+                dominant,
+            )
+
         if self._turn_to_center_rad >= self.max_turn_to_center_rad:
             self.vehicle.stop()
             self._terminate = True
@@ -487,8 +544,6 @@ class PayloadCornerNavigateMode(Mode):
             )
             return
 
-        if bgr is not None:
-            self._annotate_turn_to_center(bgr, total, lateral_error_px, dominant)
         self.vehicle.drive(0.0, angular)
 
     # ------------------------------------------------------------------
@@ -768,6 +823,9 @@ class PayloadCornerNavigateMode(Mode):
     def _annotate_turn_to_center(
         self,
         bgr: np.ndarray,
+        mask_a: np.ndarray,
+        mask_b: np.ndarray,
+        row_start: int,
         total: int,
         lateral_error_px: float,
         dominant: Optional[str],
@@ -776,36 +834,62 @@ class PayloadCornerNavigateMode(Mode):
             return
         debug = bgr.copy()
         h, w = bgr.shape[:2]
-        y0 = int(h * 0.6)
-        x0 = w // 3
-        x1 = w - (w // 3)
-        crop = bgr[y0:, x0:x1]
-        hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
-        mask_a = cv2.inRange(hsv, self._lower_a, self._upper_a)
-        mask_b = cv2.inRange(hsv, self._lower_b, self._upper_b)
-        cv2.rectangle(debug, (x0, y0), (x1 - 1, h - 1), self._DBG_CROP, 1)
-        self._draw_shifted_contours(debug, mask_a, x0, y0, self._DBG_COLOR_A, 2)
-        self._draw_shifted_contours(debug, mask_b, x0, y0, self._DBG_COLOR_B, 2)
-        crop_center_x = x0 + (x1 - x0) // 2
-        # Tolerance band (green vertical lines).
-        tol_left = int(crop_center_x - self.center_tol_px)
-        tol_right = int(crop_center_x + self.center_tol_px)
-        cv2.line(debug, (tol_left, y0), (tol_left, h - 1), self._DBG_TOL, 1)
-        cv2.line(debug, (tol_right, y0), (tol_right, h - 1), self._DBG_TOL, 1)
-        # Crop-center reference (white).
+        row_end = h * 9 // 10
+
+        # Darken rows outside the crop band.
+        if row_start > 0:
+            debug[:row_start] = (debug[:row_start] * 0.4).astype(np.uint8)
+        if row_end < h:
+            debug[row_end:] = (debug[row_end:] * 0.4).astype(np.uint8)
+
+        # Draw contours of both colours.
+        self._draw_shifted_contours(debug, mask_a, 0, row_start, self._DBG_COLOR_A, 2)
+        self._draw_shifted_contours(debug, mask_b, 0, row_start, self._DBG_COLOR_B, 2)
+
+        # Crop boundary lines.
+        cv2.line(debug, (0, row_start), (w, row_start), (80, 80, 80), 1)
+        cv2.line(debug, (0, row_end), (w, row_end), (80, 80, 80), 1)
+
+        # Crop centre reference (white).
+        crop_cx = w // 2
+        cv2.line(debug, (crop_cx, row_start), (crop_cx, row_end), (255, 255, 255), 1)
+
+        # Accept region (direction-dependent, lenient):
+        #   ccw → accept side = right; boundary at crop_cx - tol
+        #   cw  → accept side = left;  boundary at crop_cx + tol
+        if self.direction == "cw":
+            accept_boundary_x = int(crop_cx + self.center_tol_px)
+            accept_x0, accept_x1 = 0, accept_boundary_x
+        else:
+            accept_boundary_x = int(crop_cx - self.center_tol_px)
+            accept_x0, accept_x1 = accept_boundary_x, w
+        overlay = debug.copy()
+        cv2.rectangle(
+            overlay,
+            (accept_x0, row_start),
+            (accept_x1, row_end),
+            (0, 255, 0),
+            thickness=-1,
+        )
+        cv2.addWeighted(overlay, 0.18, debug, 0.82, 0, dst=debug)
         cv2.line(
             debug,
-            (crop_center_x, y0),
-            (crop_center_x, h - 1),
-            self._DBG_CENTER,
-            1,
+            (accept_boundary_x, row_start),
+            (accept_boundary_x, row_end),
+            (0, 255, 0),
+            2,
         )
-        # Combined centroid (green if in tolerance, orange otherwise).
+
+        # Combined centroid line (green if in accept, orange otherwise).
         if total >= self.center_min_pixels:
-            centroid_x = int(crop_center_x + lateral_error_px)
-            in_tol = abs(lateral_error_px) < self.center_tol_px
-            color = self._DBG_OK if in_tol else self._DBG_WARN
-            cv2.line(debug, (centroid_x, y0), (centroid_x, h - 1), color, 2)
+            centroid_x = int(crop_cx + lateral_error_px)
+            if self.direction == "ccw":
+                in_accept = lateral_error_px > -self.center_tol_px
+            else:
+                in_accept = lateral_error_px < self.center_tol_px
+            color = (0, 255, 0) if in_accept else (0, 140, 255)
+            cv2.line(debug, (centroid_x, row_start), (centroid_x, row_end), color, 2)
+
         self._put_label(
             debug,
             f"TURN_TO_CENTER dir={self.direction}",

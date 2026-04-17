@@ -3,12 +3,27 @@
   <model name="string_obstacle">
     <static>true</static>
     <link name="link">
-      <pose>0 0 0.15 0 0 0</pose>
-      <visual name="visual">
+      <!-- Black bottom: 0.0 to 0.05m -->
+      <visual name="visual_bottom">
+        <pose>0 0 0.025 0 0 0</pose>
         <geometry>
           <cylinder>
             <radius>0.002</radius>
-            <length>0.30</length>
+            <length>0.05</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <ambient>0 0 0 1</ambient>
+          <diffuse>0 0 0 1</diffuse>
+        </material>
+      </visual>
+      <!-- Yellow strip: 0.05 to 0.08m, 0.05m wide (diameter) -->
+      <visual name="visual_yellow">
+        <pose>0 0 0.065 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.025</radius>
+            <length>0.03</length>
           </cylinder>
         </geometry>
         <material>
@@ -17,10 +32,11 @@
         </material>
       </visual>
       <collision name="collision">
+        <pose>0 0 0.04 0 0 0</pose>
         <geometry>
           <cylinder>
-            <radius>0.002</radius>
-            <length>0.30</length>
+            <radius>0.025</radius>
+            <length>0.08</length>
           </cylinder>
         </geometry>
       </collision>

@@ -2,22 +2,22 @@ backend:
   kind: sim
   px4_path: ~/PX4-Autopilot
   world_name: sae
-  mission_stage: dlz_navigate_corner
+  mission_stage: payload_retreat
 
 defaults:
   auto_launch: true
   debug: false
-  vision_debug: false
+  vision_debug: true
   save_vision_milliseconds: 0
   servo_only: false
   camera_mount_offsets: [0.0, 0.0, 0.0]
-  camera_input_transport: raw
-  camera_rotate_degrees: 0.0
-  camera_calibration_file: payload_0_camera_info.yaml
+  # auto computed based on sim vs real:
+  # camera_input_transport: raw
+  # camera_rotate_degrees: 0.0
   camera_preprocess_hook: ""
 
 vehicles:
   - name: payload_0
     controllable: payload_0
-    mission: payload_dlz_navigate
-    camera_mount_offsets: [0.2, 0.0, 0.0]
+    mission: payload_corner_navigate_sim
+    # camera_mount_offsets: [0.2, 0.0, 0.0]

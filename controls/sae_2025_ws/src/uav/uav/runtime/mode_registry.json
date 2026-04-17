@@ -956,6 +956,15 @@
           "annotation": {
             "kind": "float"
           },
+          "default": 0.3,
+          "default_kind": "value",
+          "name": "corner_angular_speed",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
           "default": 0.1,
           "default_kind": "value",
           "name": "line_follow_speed_mps",
@@ -968,6 +977,15 @@
           "default": 0.003,
           "default_kind": "value",
           "name": "k_lat",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.002,
+          "default_kind": "value",
+          "name": "k_d_lat",
           "required": false
         },
         {
@@ -1090,6 +1108,102 @@
           "default_kind": "value",
           "name": "compressed_image",
           "required": false
+        },
+        {
+          "annotation": {
+            "item": {
+              "kind": "int"
+            },
+            "kind": "list"
+          },
+          "default": [
+            0,
+            80,
+            80
+          ],
+          "default_kind": "value",
+          "name": "ccw_lower_hsv",
+          "required": false
+        },
+        {
+          "annotation": {
+            "item": {
+              "kind": "int"
+            },
+            "kind": "list"
+          },
+          "default": [
+            10,
+            255,
+            255
+          ],
+          "default_kind": "value",
+          "name": "ccw_upper_hsv",
+          "required": false
+        },
+        {
+          "annotation": {
+            "item": {
+              "kind": "int"
+            },
+            "kind": "list"
+          },
+          "default": [
+            85,
+            120,
+            60
+          ],
+          "default_kind": "value",
+          "name": "cw_lower_hsv",
+          "required": false
+        },
+        {
+          "annotation": {
+            "item": {
+              "kind": "int"
+            },
+            "kind": "list"
+          },
+          "default": [
+            140,
+            255,
+            255
+          ],
+          "default_kind": "value",
+          "name": "cw_upper_hsv",
+          "required": false
+        },
+        {
+          "annotation": {
+            "item": {
+              "kind": "int"
+            },
+            "kind": "list"
+          },
+          "default": [
+            255,
+            255,
+            255
+          ],
+          "default_kind": "value",
+          "name": "cw_lower_hsv2",
+          "required": false
+        },
+        {
+          "annotation": {
+            "item": {
+              "kind": "int"
+            },
+            "kind": "list"
+          },
+          "default": [
+            255,
+            255,
+            255
+          ],
+          "default_kind": "value",
+          "name": "cw_upper_hsv2",
+          "required": false
         }
       ],
       "params_schema": {
@@ -1120,10 +1234,87 @@
         },
         "additionalProperties": false,
         "properties": {
+          "ccw_lower_hsv": {
+            "default": [
+              0,
+              80,
+              80
+            ],
+            "items": {
+              "type": "integer"
+            },
+            "title": "Ccw Lower Hsv",
+            "type": "array"
+          },
+          "ccw_upper_hsv": {
+            "default": [
+              10,
+              255,
+              255
+            ],
+            "items": {
+              "type": "integer"
+            },
+            "title": "Ccw Upper Hsv",
+            "type": "array"
+          },
           "compressed_image": {
             "default": false,
             "title": "Compressed Image",
             "type": "boolean"
+          },
+          "corner_angular_speed": {
+            "default": 0.3,
+            "title": "Corner Angular Speed",
+            "type": "number"
+          },
+          "cw_lower_hsv": {
+            "default": [
+              85,
+              120,
+              60
+            ],
+            "items": {
+              "type": "integer"
+            },
+            "title": "Cw Lower Hsv",
+            "type": "array"
+          },
+          "cw_lower_hsv2": {
+            "default": [
+              255,
+              255,
+              255
+            ],
+            "items": {
+              "type": "integer"
+            },
+            "title": "Cw Lower Hsv2",
+            "type": "array"
+          },
+          "cw_upper_hsv": {
+            "default": [
+              140,
+              255,
+              255
+            ],
+            "items": {
+              "type": "integer"
+            },
+            "title": "Cw Upper Hsv",
+            "type": "array"
+          },
+          "cw_upper_hsv2": {
+            "default": [
+              255,
+              255,
+              255
+            ],
+            "items": {
+              "type": "integer"
+            },
+            "title": "Cw Upper Hsv2",
+            "type": "array"
           },
           "detect_frames": {
             "default": 5,
@@ -1142,6 +1333,11 @@
           "k_ang": {
             "default": 0.4,
             "title": "K Ang",
+            "type": "number"
+          },
+          "k_d_lat": {
+            "default": 0.002,
+            "title": "K D Lat",
             "type": "number"
           },
           "k_lat": {
@@ -1217,10 +1413,313 @@
       "required_vision_nodes": [
         "uav.vision_nodes.PayloadAprilTagNode"
       ],
-      "requires_camera": false,
+      "requires_camera": true,
       "transition_labels": [
         "done"
       ]
+    },
+    "payload.PayloadDualApproachMode": {
+      "class_name": "PayloadDualApproachMode",
+      "class_path": "uav.modes.payload.PayloadDualApproachMode",
+      "description": "Approach using AprilTag when visible, HSV colour fallback otherwise.",
+      "display_name": "PayloadDualApproachMode",
+      "mission_target": "payload",
+      "mode_id": "payload.PayloadDualApproachMode",
+      "module_path": "uav.modes.payload.PayloadDualApproachMode",
+      "param_fields": [
+        {
+          "annotation": {
+            "kind": "union",
+            "options": [
+              {
+                "kind": "int"
+              },
+              {
+                "kind": "none"
+              }
+            ]
+          },
+          "default": 0,
+          "default_kind": "value",
+          "name": "tag_id",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.0508,
+          "default_kind": "value",
+          "name": "tag_size_m",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "str"
+          },
+          "default": "tag36h11",
+          "default_kind": "value",
+          "name": "tag_family",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.5,
+          "default_kind": "value",
+          "name": "tag_forward_gain",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.2,
+          "default_kind": "value",
+          "name": "tag_max_forward_speed",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.003,
+          "default_kind": "value",
+          "name": "tag_angular_gain",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.6,
+          "default_kind": "value",
+          "name": "tag_yaw_gain",
+          "required": false
+        },
+        {
+          "annotation": {
+            "item": {
+              "kind": "int"
+            },
+            "kind": "list"
+          },
+          "default": [
+            20,
+            100,
+            100
+          ],
+          "default_kind": "value",
+          "name": "lower_hsv",
+          "required": false
+        },
+        {
+          "annotation": {
+            "item": {
+              "kind": "int"
+            },
+            "kind": "list"
+          },
+          "default": [
+            35,
+            255,
+            255
+          ],
+          "default_kind": "value",
+          "name": "upper_hsv",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.015,
+          "default_kind": "value",
+          "name": "color_forward_speed",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.003,
+          "default_kind": "value",
+          "name": "color_angular_gain",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "int"
+          },
+          "default": 15,
+          "default_kind": "value",
+          "name": "color_centering_threshold_px",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.3,
+          "default_kind": "value",
+          "name": "color_drive_angular_scale",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "int"
+          },
+          "default": 50,
+          "default_kind": "value",
+          "name": "color_min_detect_pixels",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "int"
+          },
+          "default": 100,
+          "default_kind": "value",
+          "name": "stop_height_px",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 3.0,
+          "default_kind": "value",
+          "name": "lost_timeout_s",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "bool"
+          },
+          "default": false,
+          "default_kind": "value",
+          "name": "compressed_image",
+          "required": false
+        }
+      ],
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "color_angular_gain": {
+            "default": 0.003,
+            "title": "Color Angular Gain",
+            "type": "number"
+          },
+          "color_centering_threshold_px": {
+            "default": 15,
+            "title": "Color Centering Threshold Px",
+            "type": "integer"
+          },
+          "color_drive_angular_scale": {
+            "default": 0.3,
+            "title": "Color Drive Angular Scale",
+            "type": "number"
+          },
+          "color_forward_speed": {
+            "default": 0.015,
+            "title": "Color Forward Speed",
+            "type": "number"
+          },
+          "color_min_detect_pixels": {
+            "default": 50,
+            "title": "Color Min Detect Pixels",
+            "type": "integer"
+          },
+          "compressed_image": {
+            "default": false,
+            "title": "Compressed Image",
+            "type": "boolean"
+          },
+          "lost_timeout_s": {
+            "default": 3.0,
+            "title": "Lost Timeout S",
+            "type": "number"
+          },
+          "lower_hsv": {
+            "default": [
+              20,
+              100,
+              100
+            ],
+            "items": {
+              "type": "integer"
+            },
+            "title": "Lower Hsv",
+            "type": "array"
+          },
+          "stop_height_px": {
+            "default": 100,
+            "title": "Stop Height Px",
+            "type": "integer"
+          },
+          "tag_angular_gain": {
+            "default": 0.003,
+            "title": "Tag Angular Gain",
+            "type": "number"
+          },
+          "tag_family": {
+            "default": "tag36h11",
+            "title": "Tag Family",
+            "type": "string"
+          },
+          "tag_forward_gain": {
+            "default": 0.5,
+            "title": "Tag Forward Gain",
+            "type": "number"
+          },
+          "tag_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": 0,
+            "title": "Tag Id"
+          },
+          "tag_max_forward_speed": {
+            "default": 0.2,
+            "title": "Tag Max Forward Speed",
+            "type": "number"
+          },
+          "tag_size_m": {
+            "default": 0.0508,
+            "title": "Tag Size M",
+            "type": "number"
+          },
+          "tag_yaw_gain": {
+            "default": 0.6,
+            "title": "Tag Yaw Gain",
+            "type": "number"
+          },
+          "upper_hsv": {
+            "default": [
+              35,
+              255,
+              255
+            ],
+            "items": {
+              "type": "integer"
+            },
+            "title": "Upper Hsv",
+            "type": "array"
+          }
+        },
+        "title": "PayloadDualApproachModeParams",
+        "type": "object"
+      },
+      "peer_vehicle_names": [],
+      "required_vision_nodes": [],
+      "requires_camera": true,
+      "transition_labels": []
     },
     "payload.PayloadIdleMode": {
       "class_name": "PayloadIdleMode",
@@ -1549,11 +2048,39 @@
           "default_kind": "value",
           "name": "spin_angular_speed",
           "required": false
+        },
+        {
+          "annotation": {
+            "kind": "bool"
+          },
+          "default": false,
+          "default_kind": "value",
+          "name": "loop",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "bool"
+          },
+          "default": false,
+          "default_kind": "value",
+          "name": "compressed_image",
+          "required": false
         }
       ],
       "params_schema": {
         "additionalProperties": false,
         "properties": {
+          "compressed_image": {
+            "default": false,
+            "title": "Compressed Image",
+            "type": "boolean"
+          },
+          "loop": {
+            "default": false,
+            "title": "Loop",
+            "type": "boolean"
+          },
           "spin_angular_speed": {
             "default": 0.4,
             "title": "Spin Angular Speed",
@@ -1582,7 +2109,7 @@
       "required_vision_nodes": [
         "uav.vision_nodes.PayloadAprilTagNode"
       ],
-      "requires_camera": false,
+      "requires_camera": true,
       "transition_labels": [
         "found",
         "not_found"

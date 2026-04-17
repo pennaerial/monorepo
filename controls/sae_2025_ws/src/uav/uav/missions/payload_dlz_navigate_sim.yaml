@@ -29,15 +29,24 @@ modes:
         "0|4|5":   {transitions: 0, direction: ccw}  # front only (already at dock)
         "1|6|7,2": {transitions: 3, direction: ccw}  # back + left
         "1|6|7,3": {transitions: 3, direction: cw}   # back + right
-        "1|6|7":   {transitions: 4, direction: ccw}  # back only
+        "1|6|7":   {transitions: 4, direction: cw}  # back only
         "2":       {transitions: 2, direction: ccw}  # left only
         "3":       {transitions: 2, direction: cw}   # right only
       tag_size_m: 0.0508
       turn_angular_speed: 0.5
-      line_follow_speed_mps: 0.3
+      line_follow_speed_mps: 0.1
       k_lat: 0.01
       k_ang: 0.4
+      k_d_lat: 0.002
       max_angular: 0.5
+      # HSV bounds — copy of payload_corner_navigate_sim.yaml so the same
+      # tape calibration is used. ccw_hsv = colour at the start of a CCW-
+      # travel side (blue). cw_hsv = colour at the start of a CW-travel
+      # side (red).
+      ccw_lower_hsv: [100, 100, 100] # blue
+      ccw_upper_hsv: [140, 255, 255]
+      cw_lower_hsv: [0, 100, 100]    # red
+      cw_upper_hsv: [10, 255, 255]
     transitions:
       done: scan
 
@@ -48,7 +57,7 @@ modes:
       tag_size_m: 0.0508
       spin_angular_speed: 0.4
     transitions:
-      found: apriltag_approach
+      found: dual_approach
       not_found: retry
 
   retry:
@@ -57,28 +66,41 @@ modes:
       start_phase: "scan_tags"   # already on tape; re-scan then line-follow more transitions
       scan_duration_s: 1.0
       tag_transition_table:
-        "0|4|5,2": {transitions: 2, direction: ccw}
-        "0|4|5,3": {transitions: 6, direction: cw}
-        "0|4|5":   {transitions: 0, direction: ccw}
-        "1|6|7,2": {transitions: 4, direction: ccw}
-        "1|6|7,3": {transitions: 4, direction: cw}
-        "1|6|7":   {transitions: 4, direction: ccw}
+        "0|4|5,2": {transitions: 1, direction: ccw}  # front + left
+        "0|4|5,3": {transitions: 1, direction: cw}   # front + right
+        "0|4|5":   {transitions: 0, direction: ccw}  # front only (already at dock)
+        "1|6|7,2": {transitions: 3, direction: ccw}  # back + left
+        "1|6|7,3": {transitions: 3, direction: cw}   # back + right
+        "1|6|7":   {transitions: 4, direction: cw}  # back only
+        "2":       {transitions: 2, direction: ccw}  # left only
+        "3":       {transitions: 2, direction: cw}   # right only
       tag_size_m: 0.0508
       turn_angular_speed: 0.5
-      line_follow_speed_mps: 0.3
+      line_follow_speed_mps: 0.1
       k_lat: 0.01
       k_ang: 0.4
+      k_d_lat: 0.002
       max_angular: 0.5
     transitions:
       done: scan
 
-  apriltag_approach:
-    mode: payload.PayloadAprilTagApproachMode
+  dual_approach:
+    mode: payload.PayloadDualApproachMode
     params:
       tag_id: 0
       tag_size_m: 0.0508
-      max_forward_speed: 0.2
-      forward_gain: 0.5
-      angular_gain: 0.003
-      yaw_gain: 0.65
-      stop_distance_m: 0.08
+      tag_forward_gain: 0.5
+      tag_max_forward_speed: 0.2
+      tag_angular_gain: 0.003
+      tag_yaw_gain: 0.6
+      lower_hsv: [20, 100, 100]
+      upper_hsv: [35, 255, 255]
+      color_forward_speed: 0.015
+      color_angular_gain: 0.003
+      color_centering_threshold_px: 15
+      color_drive_angular_scale: 0.3
+      color_min_detect_pixels: 50
+      stop_height_px: 155
+      lost_timeout_s: 0.0
+      compressed_image: false
+

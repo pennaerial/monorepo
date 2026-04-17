@@ -2,7 +2,7 @@ backend:
   kind: sim
   px4_path: ~/PX4-Autopilot
   world_name: sae
-  mission_stage: full_payload_test
+  mission_stage: color_string_close
 
 defaults:
   auto_launch: true
@@ -11,13 +11,11 @@ defaults:
   save_vision_milliseconds: 0
   servo_only: false
   camera_mount_offsets: [0.0, 0.0, 0.0]
-  camera_input_transport: raw
-  camera_rotate_degrees: 0.0
-  camera_calibration_file: payload_0_camera_info.yaml
+  # camera_input_transport: raw
+  # camera_rotate_degrees: 0.0
   camera_preprocess_hook: ""
 
 vehicles:
   - name: payload_0
     controllable: payload_0
-    mission: payload_full_run
-    camera_mount_offsets: [0.2, 0.0, 0.0]
+    mission: payload_dual_approach_sim

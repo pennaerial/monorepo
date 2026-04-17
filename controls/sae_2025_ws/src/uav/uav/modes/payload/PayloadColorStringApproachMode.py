@@ -142,9 +142,11 @@ class PayloadColorStringApproachMode(Mode):
         else:
             self.node.create_subscription(Image, vehicle.image_topic, self._on_image, 1)
 
-        self._debug_pub = self.node.create_publisher(
-            Image, f"{vehicle.camera_namespace}/color_string_debug", 1
-        )
+        self._debug_pub = None
+        if getattr(self.node, "vision_debug", False):
+            self._debug_pub = self.node.create_publisher(
+                Image, f"{vehicle.camera_namespace}/color_string_debug", 1
+            )
 
         self._done = False
         self._stopping = False
@@ -174,7 +176,7 @@ class PayloadColorStringApproachMode(Mode):
         cx: Optional[float],
         cy: Optional[float],
     ) -> None:
-        if self._debug_pub.get_subscription_count() == 0:
+        if self._debug_pub is None or self._debug_pub.get_subscription_count() == 0:
             return
         debug = bgr.copy()
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
