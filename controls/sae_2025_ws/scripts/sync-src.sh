@@ -27,12 +27,12 @@ DEPLOY_PACKAGES=(
 # rsync exclude patterns — mirrors .gitignore "noise" without skipping
 # anything source-meaningful (config files, YAMLs, launch files, etc.)
 RSYNC_EXCLUDES=(
-	--exclude='__pycache__/'
-	--exclude='*.pyc'
-	--exclude='*.pyo'
-	--exclude='*.egg-info/'
-	--exclude='.pytest_cache/'
-	--exclude='.ruff_cache/'
+	# --exclude='__pycache__/'
+	# --exclude='*.pyc'
+	# --exclude='*.pyo'
+	# --exclude='*.egg-info/'
+	# --exclude='.pytest_cache/'
+	# --exclude='.ruff_cache/'
 	--exclude='*.egg-link'
 	--exclude='.eggs/'
 	--exclude='dist/'
