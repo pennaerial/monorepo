@@ -53,6 +53,18 @@ from cv_bridge import CvBridge
 from rclpy.node import Node
 from sensor_msgs.msg import CompressedImage, Image
 
+from uav.cv.dlz_color_regions import (
+    DLZLineColorMaskConfig,
+    coerce_bgr_triplet,
+    detect_dlz_line_color_regions,
+)
+from uav.cv.dlz_masking import (
+    DLZOrangeBarrierMaskConfig,
+    DLZOrangeBarrierMaskResult,
+    HSVRangeConfig,
+    coerce_hsv_range_configs,
+    detect_dlz_orange_barrier_mask,
+)
 from uav.vehicles.Payload import Payload
 
 from ..Mode import Mode
@@ -78,6 +90,29 @@ class PayloadCornerNavigateMode(Mode):
         ccw_upper_hsv: list[int] = (10, 255, 255),
         cw_lower_hsv: list[int] = (85, 120, 60),
         cw_upper_hsv: list[int] = (140, 255, 255),
+        dlz_mask_enabled: bool = False,
+        dlz_mask_lower_hsv: list[int] = (5, 78, 158),
+        dlz_mask_upper_hsv: list[int] = (25, 189, 255),
+        dlz_mask_min_area_frac: float = 0.02,
+        dlz_mask_max_area_frac: float = 0.98,
+        dlz_mask_min_bbox_span_ratio: float = 0.45,
+        dlz_mask_min_orange_pixels: int = 400,
+        dlz_mask_min_component_pixels: int = 200,
+        dlz_mask_kernel_size: int = 5,
+        dlz_mask_dilate_iterations: int = 1,
+        dlz_mask_seed_patch_size_px: int = 48,
+        dlz_mask_seed_barrier_ratio_threshold: float = 0.08,
+        dlz_mask_seed_reject_ratio_threshold: float = 0.08,
+        dlz_mask_seed_reject_hsv_ranges: list[HSVRangeConfig] = (),
+        region_color_match_enabled: bool = False,
+        ccw_color_bgr: list[int] = (),
+        cw_color_bgr: list[int] = (),
+        reject_colors_bgr: list[list[int]] = (),
+        region_nonblack_min_value: int = 45,
+        region_nonblack_min_saturation: int = 35,
+        region_min_area_px: int = 20,
+        region_match_max_distance_lab: float = 38.0,
+        region_match_min_margin_lab: float = 8.0,
         # DRIVE_OUT
         drive_out_speed_mps: float = 0.12,
         detect_frames: int = 3,
@@ -116,6 +151,86 @@ class PayloadCornerNavigateMode(Mode):
         self._upper_a = np.array(ccw_upper_hsv, dtype=np.uint8)
         self._lower_b = np.array(cw_lower_hsv, dtype=np.uint8)
         self._upper_b = np.array(cw_upper_hsv, dtype=np.uint8)
+        self.dlz_mask_enabled = bool(dlz_mask_enabled)
+        self.dlz_mask_min_area_frac = float(dlz_mask_min_area_frac)
+        if not (0.0 <= self.dlz_mask_min_area_frac <= 1.0):
+            raise ValueError(
+                "dlz_mask_min_area_frac must be in [0, 1], "
+                f"got {dlz_mask_min_area_frac!r}"
+            )
+        self.dlz_mask_max_area_frac = float(dlz_mask_max_area_frac)
+        if not (0.0 <= self.dlz_mask_max_area_frac <= 1.0):
+            raise ValueError(
+                "dlz_mask_max_area_frac must be in [0, 1], "
+                f"got {dlz_mask_max_area_frac!r}"
+            )
+        if self.dlz_mask_max_area_frac < self.dlz_mask_min_area_frac:
+            raise ValueError(
+                "dlz_mask_max_area_frac must be >= dlz_mask_min_area_frac."
+            )
+        self.dlz_mask_min_bbox_span_ratio = float(dlz_mask_min_bbox_span_ratio)
+        if not (0.0 <= self.dlz_mask_min_bbox_span_ratio <= 1.0):
+            raise ValueError(
+                "dlz_mask_min_bbox_span_ratio must be in [0, 1], "
+                f"got {dlz_mask_min_bbox_span_ratio!r}"
+            )
+        kernel_size = max(1, int(dlz_mask_kernel_size))
+        if kernel_size % 2 == 0:
+            kernel_size += 1
+        self.dlz_mask_kernel_size = kernel_size
+        self.dlz_mask_dilate_iterations = max(0, int(dlz_mask_dilate_iterations))
+        dlz_mask_config_kwargs = dict(
+            orange_barrier_hsv=(
+                (
+                    tuple(int(value) for value in dlz_mask_lower_hsv),
+                    tuple(int(value) for value in dlz_mask_upper_hsv),
+                ),
+            ),
+            seed_reject_hsv=coerce_hsv_range_configs(dlz_mask_seed_reject_hsv_ranges),
+            seed_patch_size_px=max(1, int(dlz_mask_seed_patch_size_px)),
+            seed_barrier_ratio_threshold=float(
+                dlz_mask_seed_barrier_ratio_threshold
+            ),
+            seed_reject_ratio_threshold=float(
+                dlz_mask_seed_reject_ratio_threshold
+            ),
+            min_orange_pixels=max(0, int(dlz_mask_min_orange_pixels)),
+            min_mask_area_frac=self.dlz_mask_min_area_frac,
+            max_mask_area_frac=self.dlz_mask_max_area_frac,
+            min_bbox_span_ratio=self.dlz_mask_min_bbox_span_ratio,
+            morphology_kernel_size=self.dlz_mask_kernel_size,
+            dilate_iterations=self.dlz_mask_dilate_iterations,
+        )
+        if "min_component_pixels" in DLZOrangeBarrierMaskConfig.__dataclass_fields__:
+            dlz_mask_config_kwargs["min_component_pixels"] = max(
+                0, int(dlz_mask_min_component_pixels)
+            )
+        self._dlz_mask_config = DLZOrangeBarrierMaskConfig(**dlz_mask_config_kwargs)
+        self.region_color_match_enabled = bool(region_color_match_enabled)
+        self._region_color_mask_config: Optional[DLZLineColorMaskConfig] = None
+        if self.region_color_match_enabled:
+            self._region_color_mask_config = DLZLineColorMaskConfig(
+                color_a_bgr=coerce_bgr_triplet(
+                    ccw_color_bgr,
+                    label="ccw_color_bgr",
+                ),
+                color_b_bgr=coerce_bgr_triplet(
+                    cw_color_bgr,
+                    label="cw_color_bgr",
+                ),
+                reject_colors_bgr=tuple(
+                    coerce_bgr_triplet(
+                        color_bgr,
+                        label=f"reject_colors_bgr[{index}]",
+                    )
+                    for index, color_bgr in enumerate(reject_colors_bgr)
+                ),
+                nonblack_min_value=int(region_nonblack_min_value),
+                nonblack_min_saturation=int(region_nonblack_min_saturation),
+                min_region_area_px=int(region_min_area_px),
+                match_max_distance_lab=float(region_match_max_distance_lab),
+                match_min_margin_lab=float(region_match_min_margin_lab),
+            )
 
         self.drive_out_speed_mps = float(drive_out_speed_mps)
         self.detect_frames = int(detect_frames)
@@ -156,6 +271,7 @@ class PayloadCornerNavigateMode(Mode):
         self._image_sub = None
         self._image: Optional[object] = None
         self._annotated_pub = None
+        self._clear_dlz_mask_debug()
 
     # ------------------------------------------------------------------
     # helpers
@@ -183,6 +299,7 @@ class PayloadCornerNavigateMode(Mode):
         self._exit_streak = 0
         self._first_color: Optional[str] = None
         self._image = None
+        self._clear_dlz_mask_debug()
 
         # TURN_TO_CENTER state
         self._turn_to_center_rad = 0.0
@@ -279,6 +396,47 @@ class PayloadCornerNavigateMode(Mode):
             )
             return None
 
+    def _clear_dlz_mask_debug(self) -> None:
+        self._debug_dlz_mask_result: Optional[DLZOrangeBarrierMaskResult] = None
+        self._debug_dlz_mask_status = "off" if not self.dlz_mask_enabled else "idle"
+
+    def _mask_color_frame(self, bgr: np.ndarray) -> np.ndarray:
+        self._clear_dlz_mask_debug()
+        if not self.dlz_mask_enabled:
+            return bgr
+        result = detect_dlz_orange_barrier_mask(bgr, config=self._dlz_mask_config)
+        self._debug_dlz_mask_result = result
+        self._debug_dlz_mask_status = (
+            "masked" if not result.passthrough else f"passthrough:{result.reason}"
+        )
+        return result.frame
+
+    def _overlay_dlz_mask_debug(self, debug: np.ndarray) -> None:
+        if self._debug_dlz_mask_result is None:
+            return
+        applied_mask = self._debug_dlz_mask_result.applied_mask
+        if not np.any(applied_mask):
+            return
+        outside = applied_mask == 0
+        if np.any(outside):
+            debug[outside] = (debug[outside] * 0.35).astype(np.uint8)
+        contours, _ = cv2.findContours(
+            applied_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+        )
+        if contours:
+            cv2.drawContours(debug, contours, -1, (255, 0, 255), 2)
+        for seed_x, seed_y in self._debug_dlz_mask_result.seed_points:
+            cv2.circle(debug, (int(seed_x), int(seed_y)), 5, (0, 255, 0), -1)
+
+    def _dlz_mask_label(self) -> str:
+        if self._debug_dlz_mask_result is None:
+            return f"mask={self._debug_dlz_mask_status}"
+        return (
+            f"mask={self._debug_dlz_mask_status} "
+            f"area={self._debug_dlz_mask_result.mask_area_px}px "
+            f"seeds={len(self._debug_dlz_mask_result.seed_points)}"
+        )
+
     def _largest_contour_mask(self, mask: np.ndarray) -> np.ndarray:
         """Return a new mask containing only the largest contour, or an empty
         mask if none found. Used by processing paths to ignore small noise blobs."""
@@ -290,6 +448,35 @@ class PayloadCornerNavigateMode(Mode):
         cv2.drawContours(out, [largest], -1, 255, cv2.FILLED)
         return out
 
+    def _threshold_color_masks(self, bgr: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
+        return (
+            cv2.inRange(hsv, self._lower_a, self._upper_a),
+            cv2.inRange(hsv, self._lower_b, self._upper_b),
+        )
+
+    def _crop_color_masks(
+        self,
+        bgr: np.ndarray,
+        *,
+        keep_largest: bool = False,
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        if self.region_color_match_enabled:
+            if self._region_color_mask_config is None:
+                raise RuntimeError("region color matching enabled without a config")
+            result = detect_dlz_line_color_regions(
+                bgr,
+                config=self._region_color_mask_config,
+            )
+            mask_a = result.mask_a
+            mask_b = result.mask_b
+        else:
+            mask_a, mask_b = self._threshold_color_masks(bgr)
+        if keep_largest:
+            mask_a = self._largest_contour_mask(mask_a)
+            mask_b = self._largest_contour_mask(mask_b)
+        return mask_a, mask_b
+
     def _lower_strip_color_counts(self, bgr: np.ndarray) -> Tuple[int, int]:
         """Return (color_a_pixels, color_b_pixels) in the bottom drive_out_strip_frac
         of the frame, cropped horizontally to the middle third so tape that
@@ -299,9 +486,7 @@ class PayloadCornerNavigateMode(Mode):
         col_start = w // 3
         col_end = w - (w // 3)
         strip = bgr[strip_start:, col_start:col_end]
-        hsv = cv2.cvtColor(strip, cv2.COLOR_BGR2HSV)
-        mask_a = self._largest_contour_mask(cv2.inRange(hsv, self._lower_a, self._upper_a))
-        mask_b = self._largest_contour_mask(cv2.inRange(hsv, self._lower_b, self._upper_b))
+        mask_a, mask_b = self._crop_color_masks(strip, keep_largest=True)
         return int(np.count_nonzero(mask_a)), int(np.count_nonzero(mask_b))
 
     def _middle_third_color_metrics(
@@ -322,9 +507,7 @@ class PayloadCornerNavigateMode(Mode):
         col_start = w // 3
         col_end = w - (w // 3)
         crop = bgr[row_start:, col_start:col_end]
-        hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
-        mask_a = cv2.inRange(hsv, self._lower_a, self._upper_a)
-        mask_b = cv2.inRange(hsv, self._lower_b, self._upper_b)
+        mask_a, mask_b = self._crop_color_masks(crop)
         count_a = int(np.count_nonzero(mask_a))
         count_b = int(np.count_nonzero(mask_b))
         total = count_a + count_b
@@ -356,11 +539,11 @@ class PayloadCornerNavigateMode(Mode):
         h, w = bgr.shape[:2]
         strip_start = int(h * (1.0 - self.line_follow_strip_frac))
         strip = bgr[strip_start:, :]
-        hsv = cv2.cvtColor(strip, cv2.COLOR_BGR2HSV)
+        mask_a, mask_b = self._crop_color_masks(strip, keep_largest=True)
         if color == "A":
-            mask = self._largest_contour_mask(cv2.inRange(hsv, self._lower_a, self._upper_a))
+            mask = mask_a
         elif color == "B":
-            mask = self._largest_contour_mask(cv2.inRange(hsv, self._lower_b, self._upper_b))
+            mask = mask_b
         else:
             return 0, 0.0
         count = int(np.count_nonzero(mask))
@@ -392,7 +575,8 @@ class PayloadCornerNavigateMode(Mode):
             self.vehicle.drive(self.drive_out_speed_mps, 0.0)
             return
 
-        count_a, count_b = self._lower_strip_color_counts(bgr)
+        masked_bgr = self._mask_color_frame(bgr)
+        count_a, count_b = self._lower_strip_color_counts(masked_bgr)
         color_seen = (
             count_a >= self.drive_out_min_pixels or count_b >= self.drive_out_min_pixels
         )
@@ -416,7 +600,7 @@ class PayloadCornerNavigateMode(Mode):
             else:
                 self._enter_streak = 0
                 self._first_color = None
-            self._annotate_drive_out(bgr, count_a, count_b)
+            self._annotate_drive_out(masked_bgr, count_a, count_b)
             self.vehicle.drive(self.drive_out_speed_mps, 0.0)
             return
 
@@ -425,7 +609,7 @@ class PayloadCornerNavigateMode(Mode):
             self._exit_streak += 1
             if self._exit_streak >= self.detect_frames:
                 self.vehicle.stop()
-                self._annotate_drive_out(bgr, count_a, count_b)
+                self._annotate_drive_out(masked_bgr, count_a, count_b)
                 self._phase = "turn_to_center"
                 self._turn_to_center_rad = 0.0
                 self._center_stable = 0
@@ -443,7 +627,7 @@ class PayloadCornerNavigateMode(Mode):
             elif count_b > count_a:
                 self._first_color = "B"
 
-        self._annotate_drive_out(bgr, count_a, count_b)
+        self._annotate_drive_out(masked_bgr, count_a, count_b)
         self.vehicle.drive(self.drive_out_speed_mps, 0.0)
 
     # ------------------------------------------------------------------
@@ -463,9 +647,7 @@ class PayloadCornerNavigateMode(Mode):
         row_start = int(h * 2 / 3)
         row_end = h * 9 // 10
         crop = bgr[row_start:row_end, :]
-        hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
-        mask_a = self._largest_contour_mask(cv2.inRange(hsv, self._lower_a, self._upper_a))
-        mask_b = self._largest_contour_mask(cv2.inRange(hsv, self._lower_b, self._upper_b))
+        mask_a, mask_b = self._crop_color_masks(crop, keep_largest=True)
         count_a = int(np.count_nonzero(mask_a))
         count_b = int(np.count_nonzero(mask_b))
         total = count_a + count_b
@@ -495,8 +677,9 @@ class PayloadCornerNavigateMode(Mode):
         lateral_error_px = 0.0
         dominant: Optional[str] = None
         if bgr is not None:
+            masked_bgr = self._mask_color_frame(bgr)
             total, lateral_error_px, dominant, mask_a, mask_b, row_start = (
-                self._turn_both_color_metrics(bgr)
+                self._turn_both_color_metrics(masked_bgr)
             )
             # Accept condition matches DLZ corner logic (lenient one-sided):
             #   ccw → accept when centroid on the RIGHT side
@@ -517,7 +700,7 @@ class PayloadCornerNavigateMode(Mode):
                         self._latest_dominant or dominant or self._first_color or "A"
                     )
                     self._annotate_turn_to_center(
-                        bgr,
+                        masked_bgr,
                         mask_a,
                         mask_b,
                         row_start,
@@ -539,7 +722,7 @@ class PayloadCornerNavigateMode(Mode):
                     self._latest_dominant = dominant
 
             self._annotate_turn_to_center(
-                bgr,
+                masked_bgr,
                 mask_a,
                 mask_b,
                 row_start,
@@ -570,11 +753,14 @@ class PayloadCornerNavigateMode(Mode):
             self.vehicle.drive(0.0, 0.0)
             return
 
+        masked_bgr = self._mask_color_frame(bgr)
         current = self._prev_color or "A"
         other = "B" if current == "A" else "A"
 
-        cur_count, cur_lateral_px = self._single_color_strip_metrics(bgr, current)
-        other_count, other_lateral_px = self._single_color_strip_metrics(bgr, other)
+        cur_count, cur_lateral_px = self._single_color_strip_metrics(masked_bgr, current)
+        other_count, other_lateral_px = self._single_color_strip_metrics(
+            masked_bgr, other
+        )
         transitioned_this_tick = False
 
         # After a mid-side swap, the "other" colour (residual from the
@@ -618,7 +804,7 @@ class PayloadCornerNavigateMode(Mode):
                     current, other = other, current
                     cur_count, cur_lateral_px = other_count, other_lateral_px
                     other_count, other_lateral_px = self._single_color_strip_metrics(
-                        bgr, other
+                        masked_bgr, other
                     )
 
         # Stop condition: corner has been detected and the colour we are
@@ -627,7 +813,7 @@ class PayloadCornerNavigateMode(Mode):
         if self._corner_color_seen and cur_count < self.line_follow_min_pixels:
             self.vehicle.stop()
             self._annotate_line_follow(
-                bgr,
+                masked_bgr,
                 current,
                 cur_count,
                 cur_lateral_px,
@@ -662,7 +848,7 @@ class PayloadCornerNavigateMode(Mode):
             angular = 0.0
 
         self._annotate_line_follow(
-            bgr,
+            masked_bgr,
             current,
             cur_count,
             cur_lateral_px,
@@ -702,13 +888,14 @@ class PayloadCornerNavigateMode(Mode):
             self.vehicle.stop()
             return
 
-        count, lateral_px = self._black_centroid_metrics(bgr)
+        masked_bgr = self._mask_color_frame(bgr)
+        count, lateral_px = self._black_centroid_metrics(masked_bgr)
 
         if count < self.tape_align_min_pixels:
             # Tape not visible yet — rotate slowly to search
             self.vehicle.drive(0.0, self.tape_align_angular_speed)
             self._tape_align_stable = 0
-            self._annotate_tape_align(bgr, count, lateral_px, "searching")
+            self._annotate_tape_align(masked_bgr, count, lateral_px, "searching")
             self.log(
                 f"PayloadCornerNavigateMode: TAPE_ALIGN searching (black_px={count})"
             )
@@ -719,19 +906,19 @@ class PayloadCornerNavigateMode(Mode):
             self._tape_align_stable += 1
             self.vehicle.stop()
             if self._tape_align_stable >= self.tape_align_stable_frames:
-                self._annotate_tape_align(bgr, count, lateral_px, "LOCKED")
+                self._annotate_tape_align(masked_bgr, count, lateral_px, "LOCKED")
                 self.log(
                     f"PayloadCornerNavigateMode: TAPE_ALIGN centered "
                     f"(lat={lateral_px:.1f}px, px={count}) → done"
                 )
                 self._done = True
             else:
-                self._annotate_tape_align(bgr, count, lateral_px, "centering")
+                self._annotate_tape_align(masked_bgr, count, lateral_px, "centering")
         else:
             self._tape_align_stable = 0
             direction = -1.0 if lateral_px > 0 else 1.0
             self.vehicle.drive(0.0, direction * self.tape_align_angular_speed)
-            self._annotate_tape_align(bgr, count, lateral_px, "turning")
+            self._annotate_tape_align(masked_bgr, count, lateral_px, "turning")
             self.log(
                 f"PayloadCornerNavigateMode: TAPE_ALIGN turning "
                 f"lat={lateral_px:.1f}px black_px={count}"
@@ -802,6 +989,7 @@ class PayloadCornerNavigateMode(Mode):
         if self._annotated_pub is None or bgr is None:
             return
         debug = bgr.copy()
+        self._overlay_dlz_mask_debug(debug)
         h, w = bgr.shape[:2]
         y0 = int(h * (1.0 - self.drive_out_strip_frac))
         x0 = w // 3
@@ -809,9 +997,7 @@ class PayloadCornerNavigateMode(Mode):
         # Recompute the same masks the logic used so the contours exactly
         # match what DRIVE_OUT was thresholding on.
         strip = bgr[y0:, x0:x1]
-        hsv = cv2.cvtColor(strip, cv2.COLOR_BGR2HSV)
-        mask_a = cv2.inRange(hsv, self._lower_a, self._upper_a)
-        mask_b = cv2.inRange(hsv, self._lower_b, self._upper_b)
+        mask_a, mask_b = self._crop_color_masks(strip, keep_largest=True)
         cv2.rectangle(debug, (x0, y0), (x1 - 1, h - 1), self._DBG_CROP, 1)
         self._draw_shifted_contours(debug, mask_a, x0, y0, self._DBG_COLOR_A, 2)
         self._draw_shifted_contours(debug, mask_b, x0, y0, self._DBG_COLOR_B, 2)
@@ -832,7 +1018,8 @@ class PayloadCornerNavigateMode(Mode):
             debug,
             f"enter={self._enter_streak}/{self.detect_frames} "
             f"exit={self._exit_streak}/{self.detect_frames} "
-            f"first={self._first_color} t={self._drive_out_elapsed:.1f}s",
+            f"first={self._first_color} t={self._drive_out_elapsed:.1f}s "
+            f"{self._dlz_mask_label()}",
             62,
         )
         self._publish_annotated(debug)
@@ -850,6 +1037,7 @@ class PayloadCornerNavigateMode(Mode):
         if self._annotated_pub is None or bgr is None:
             return
         debug = bgr.copy()
+        self._overlay_dlz_mask_debug(debug)
         h, w = bgr.shape[:2]
         row_end = h * 9 // 10
 
@@ -924,7 +1112,8 @@ class PayloadCornerNavigateMode(Mode):
         self._put_label(
             debug,
             f"stable={self._center_stable}/{self.center_stable_frames} "
-            f"turned={math.degrees(self._turn_to_center_rad):.1f}deg",
+            f"turned={math.degrees(self._turn_to_center_rad):.1f}deg "
+            f"{self._dlz_mask_label()}",
             62,
         )
         self._publish_annotated(debug)
@@ -944,12 +1133,11 @@ class PayloadCornerNavigateMode(Mode):
         if self._annotated_pub is None or bgr is None:
             return
         debug = bgr.copy()
+        self._overlay_dlz_mask_debug(debug)
         h, w = bgr.shape[:2]
         y0 = int(h * (1.0 - self.line_follow_strip_frac))
         strip = bgr[y0:, :]
-        hsv = cv2.cvtColor(strip, cv2.COLOR_BGR2HSV)
-        mask_a = cv2.inRange(hsv, self._lower_a, self._upper_a)
-        mask_b = cv2.inRange(hsv, self._lower_b, self._upper_b)
+        mask_a, mask_b = self._crop_color_masks(strip, keep_largest=True)
         mask_current = mask_a if current == "A" else mask_b
         mask_other = mask_b if current == "A" else mask_a
         cv2.rectangle(debug, (0, y0), (w - 1, h - 1), self._DBG_CROP, 1)
@@ -1002,7 +1190,8 @@ class PayloadCornerNavigateMode(Mode):
         self._put_label(
             debug,
             f"min={self.line_follow_min_pixels} "
-            f"ang={angular:+.2f}rad/s v={self.line_follow_speed_mps:.2f}m/s",
+            f"ang={angular:+.2f}rad/s v={self.line_follow_speed_mps:.2f}m/s "
+            f"{self._dlz_mask_label()}",
             62,
         )
         self._publish_annotated(debug)
@@ -1017,6 +1206,7 @@ class PayloadCornerNavigateMode(Mode):
         if self._annotated_pub is None or bgr is None:
             return
         debug = bgr.copy()
+        self._overlay_dlz_mask_debug(debug)
         h, w = bgr.shape[:2]
         # Exactly match _black_centroid_metrics: bottom line_follow_strip_frac,
         # full width, same HSV thresholds, same center computation.
@@ -1067,7 +1257,8 @@ class PayloadCornerNavigateMode(Mode):
         )
         self._put_label(
             debug,
-            f"stable={self._tape_align_stable}/{self.tape_align_stable_frames}",
+            f"stable={self._tape_align_stable}/{self.tape_align_stable_frames} "
+            f"{self._dlz_mask_label()}",
             62,
         )
         self._publish_annotated(debug)

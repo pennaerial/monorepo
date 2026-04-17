@@ -11,6 +11,18 @@ from cv_bridge import CvBridge
 from rclpy.node import Node
 from sensor_msgs.msg import CompressedImage, Image
 
+from uav.cv.dlz_color_regions import (
+    DLZLineColorMaskConfig,
+    coerce_bgr_triplet,
+    detect_dlz_line_color_regions,
+)
+from uav.cv.dlz_masking import (
+    DLZOrangeBarrierMaskConfig,
+    DLZOrangeBarrierMaskResult,
+    HSVRangeConfig,
+    coerce_hsv_range_configs,
+    detect_dlz_orange_barrier_mask,
+)
 from uav.vehicles.Payload import Payload
 from uav.vision_nodes import PayloadAprilTagNode
 from uav.vision_nodes.payload_perception_common import DEFAULT_TAG_FAMILY
@@ -194,6 +206,29 @@ class PayloadDLZNavigateMode(Mode):
         cw_upper_hsv: list[int] = (140, 255, 255),
         cw_lower_hsv2: list[int] = (255, 255, 255),
         cw_upper_hsv2: list[int] = (255, 255, 255),
+        dlz_mask_enabled: bool = False,
+        dlz_mask_lower_hsv: list[int] = (5, 78, 158),
+        dlz_mask_upper_hsv: list[int] = (25, 189, 255),
+        dlz_mask_min_area_frac: float = 0.02,
+        dlz_mask_max_area_frac: float = 0.98,
+        dlz_mask_min_bbox_span_ratio: float = 0.45,
+        dlz_mask_min_orange_pixels: int = 400,
+        dlz_mask_min_component_pixels: int = 200,
+        dlz_mask_kernel_size: int = 5,
+        dlz_mask_dilate_iterations: int = 1,
+        dlz_mask_seed_patch_size_px: int = 48,
+        dlz_mask_seed_barrier_ratio_threshold: float = 0.08,
+        dlz_mask_seed_reject_ratio_threshold: float = 0.08,
+        dlz_mask_seed_reject_hsv_ranges: list[HSVRangeConfig] = (),
+        region_color_match_enabled: bool = False,
+        ccw_color_bgr: list[int] = (),
+        cw_color_bgr: list[int] = (),
+        reject_colors_bgr: list[list[int]] = (),
+        region_nonblack_min_value: int = 45,
+        region_nonblack_min_saturation: int = 35,
+        region_min_area_px: int = 20,
+        region_match_max_distance_lab: float = 38.0,
+        region_match_min_margin_lab: float = 8.0,
     ):
         super().__init__(node, vehicle)
         direction = str(direction).lower().strip()
@@ -232,11 +267,92 @@ class PayloadDLZNavigateMode(Mode):
         self._upper_a2 = np.array(cw_upper_hsv2, dtype=np.uint8)
         self._lower_b = np.array(ccw_lower_hsv, dtype=np.uint8)
         self._upper_b = np.array(ccw_upper_hsv, dtype=np.uint8)
+        self.dlz_mask_enabled = bool(dlz_mask_enabled)
+        self.dlz_mask_min_area_frac = float(dlz_mask_min_area_frac)
+        if not (0.0 <= self.dlz_mask_min_area_frac <= 1.0):
+            raise ValueError(
+                "dlz_mask_min_area_frac must be in [0, 1], "
+                f"got {dlz_mask_min_area_frac!r}"
+            )
+        self.dlz_mask_max_area_frac = float(dlz_mask_max_area_frac)
+        if not (0.0 <= self.dlz_mask_max_area_frac <= 1.0):
+            raise ValueError(
+                "dlz_mask_max_area_frac must be in [0, 1], "
+                f"got {dlz_mask_max_area_frac!r}"
+            )
+        if self.dlz_mask_max_area_frac < self.dlz_mask_min_area_frac:
+            raise ValueError(
+                "dlz_mask_max_area_frac must be >= dlz_mask_min_area_frac."
+            )
+        self.dlz_mask_min_bbox_span_ratio = float(dlz_mask_min_bbox_span_ratio)
+        if not (0.0 <= self.dlz_mask_min_bbox_span_ratio <= 1.0):
+            raise ValueError(
+                "dlz_mask_min_bbox_span_ratio must be in [0, 1], "
+                f"got {dlz_mask_min_bbox_span_ratio!r}"
+            )
+        kernel_size = max(1, int(dlz_mask_kernel_size))
+        if kernel_size % 2 == 0:
+            kernel_size += 1
+        self.dlz_mask_kernel_size = kernel_size
+        self.dlz_mask_dilate_iterations = max(0, int(dlz_mask_dilate_iterations))
+        dlz_mask_config_kwargs = dict(
+            orange_barrier_hsv=(
+                (
+                    tuple(int(value) for value in dlz_mask_lower_hsv),
+                    tuple(int(value) for value in dlz_mask_upper_hsv),
+                ),
+            ),
+            seed_reject_hsv=coerce_hsv_range_configs(dlz_mask_seed_reject_hsv_ranges),
+            seed_patch_size_px=max(1, int(dlz_mask_seed_patch_size_px)),
+            seed_barrier_ratio_threshold=float(
+                dlz_mask_seed_barrier_ratio_threshold
+            ),
+            seed_reject_ratio_threshold=float(
+                dlz_mask_seed_reject_ratio_threshold
+            ),
+            min_orange_pixels=max(0, int(dlz_mask_min_orange_pixels)),
+            min_mask_area_frac=self.dlz_mask_min_area_frac,
+            max_mask_area_frac=self.dlz_mask_max_area_frac,
+            min_bbox_span_ratio=self.dlz_mask_min_bbox_span_ratio,
+            morphology_kernel_size=self.dlz_mask_kernel_size,
+            dilate_iterations=self.dlz_mask_dilate_iterations,
+        )
+        if "min_component_pixels" in DLZOrangeBarrierMaskConfig.__dataclass_fields__:
+            dlz_mask_config_kwargs["min_component_pixels"] = max(
+                0, int(dlz_mask_min_component_pixels)
+            )
+        self._dlz_mask_config = DLZOrangeBarrierMaskConfig(**dlz_mask_config_kwargs)
+        self.region_color_match_enabled = bool(region_color_match_enabled)
+        self._region_color_mask_config: Optional[DLZLineColorMaskConfig] = None
+        if self.region_color_match_enabled:
+            self._region_color_mask_config = DLZLineColorMaskConfig(
+                color_a_bgr=coerce_bgr_triplet(
+                    cw_color_bgr,
+                    label="cw_color_bgr",
+                ),
+                color_b_bgr=coerce_bgr_triplet(
+                    ccw_color_bgr,
+                    label="ccw_color_bgr",
+                ),
+                reject_colors_bgr=tuple(
+                    coerce_bgr_triplet(
+                        color_bgr,
+                        label=f"reject_colors_bgr[{index}]",
+                    )
+                    for index, color_bgr in enumerate(reject_colors_bgr)
+                ),
+                nonblack_min_value=int(region_nonblack_min_value),
+                nonblack_min_saturation=int(region_nonblack_min_saturation),
+                min_region_area_px=int(region_min_area_px),
+                match_max_distance_lab=float(region_match_max_distance_lab),
+                match_min_margin_lab=float(region_match_min_margin_lab),
+            )
 
         self._bridge = CvBridge()
         self._image_sub = None
         self._image: Optional[object] = None
         self._annotated_pub = None
+        self._clear_dlz_mask_debug()
 
     # ------------------------------------------------------------------
     # helpers
@@ -286,21 +402,76 @@ class PayloadDLZNavigateMode(Mode):
             )
             return None
 
+    def _clear_dlz_mask_debug(self) -> None:
+        self._debug_dlz_mask_result: Optional[DLZOrangeBarrierMaskResult] = None
+        self._debug_dlz_mask_status = "off" if not self.dlz_mask_enabled else "idle"
+
+    def _mask_color_frame(self, bgr: np.ndarray) -> np.ndarray:
+        self._clear_dlz_mask_debug()
+        if not self.dlz_mask_enabled:
+            return bgr
+        result = detect_dlz_orange_barrier_mask(bgr, config=self._dlz_mask_config)
+        self._debug_dlz_mask_result = result
+        self._debug_dlz_mask_status = (
+            "masked" if not result.passthrough else f"passthrough:{result.reason}"
+        )
+        return result.frame
+
+    def _overlay_dlz_mask_debug(self, debug: np.ndarray) -> None:
+        if self._debug_dlz_mask_result is None:
+            return
+        applied_mask = self._debug_dlz_mask_result.applied_mask
+        if not np.any(applied_mask):
+            return
+        outside = applied_mask == 0
+        if np.any(outside):
+            debug[outside] = (debug[outside] * 0.35).astype(np.uint8)
+        contours, _ = cv2.findContours(
+            applied_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+        )
+        if contours:
+            cv2.drawContours(debug, contours, -1, (255, 0, 255), 2)
+        for seed_x, seed_y in self._debug_dlz_mask_result.seed_points:
+            cv2.circle(debug, (int(seed_x), int(seed_y)), 5, (0, 255, 0), -1)
+
+    def _dlz_mask_label(self) -> str:
+        if self._debug_dlz_mask_result is None:
+            return f"mask={self._debug_dlz_mask_status}"
+        return (
+            f"mask={self._debug_dlz_mask_status} "
+            f"area={self._debug_dlz_mask_result.mask_area_px}px "
+            f"seeds={len(self._debug_dlz_mask_result.seed_points)}"
+        )
+
+    def _threshold_color_masks(self, bgr: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
+        return (
+            cv2.inRange(hsv, self._lower_a, self._upper_a)
+            | cv2.inRange(hsv, self._lower_a2, self._upper_a2),
+            cv2.inRange(hsv, self._lower_b, self._upper_b),
+        )
+
+    def _crop_color_masks(self, bgr: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        if self.region_color_match_enabled:
+            if self._region_color_mask_config is None:
+                raise RuntimeError("region color matching enabled without a config")
+            result = detect_dlz_line_color_regions(
+                bgr,
+                config=self._region_color_mask_config,
+            )
+            return result.mask_a, result.mask_b
+        return self._threshold_color_masks(bgr)
+
     def _detect_color(
         self, bgr: np.ndarray
     ) -> Tuple[str, bool, float, float, np.ndarray, np.ndarray, np.ndarray, int]:
         """Run the full colour detection pipeline on a BGR frame.
 
         Returns (current_color, boundary_detected, lateral_error_px,
-                 boundary_angle, orange_mask, blue_mask, strip, strip_start).
+                 boundary_angle, mask_a, mask_b, strip, strip_start).
         """
         strip, strip_start = _get_strip(bgr)
-        hsv = cv2.cvtColor(strip, cv2.COLOR_BGR2HSV)
-        orange_mask = (
-            cv2.inRange(hsv, self._lower_a, self._upper_a)
-            | cv2.inRange(hsv, self._lower_a2, self._upper_a2)
-        )
-        blue_mask = cv2.inRange(hsv, self._lower_b, self._upper_b)
+        orange_mask, blue_mask = self._crop_color_masks(strip)
         current_color = _detect_current_color(orange_mask, blue_mask)
         detected, lateral_error_px, boundary_angle = _detect_tape_following(
             orange_mask, blue_mask
@@ -374,6 +545,7 @@ class PayloadDLZNavigateMode(Mode):
         self._corner_target_color: str = "none"
         self._done = False
         self._image = None
+        self._clear_dlz_mask_debug()
 
         # Camera subscription for inline colour detection
         cam_topic = self.vehicle.namespaced_path("camera")
@@ -533,14 +705,11 @@ class PayloadDLZNavigateMode(Mode):
         # col_end = w - (w // 3)
         col_end = w
         crop = bgr[row_start:, col_start:col_end]
-        hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
+        mask_a, mask_b = self._crop_color_masks(crop)
         if color == "A":
-            mask = (
-                cv2.inRange(hsv, self._lower_a, self._upper_a)
-                | cv2.inRange(hsv, self._lower_a2, self._upper_a2)
-            )
+            mask = mask_a
         else:
-            mask = cv2.inRange(hsv, self._lower_b, self._upper_b)
+            mask = mask_b
         count = int(np.count_nonzero(mask))
         if count == 0:
             return 0, 0.0, mask, row_start, col_start
@@ -563,13 +732,14 @@ class PayloadDLZNavigateMode(Mode):
         count = 0
         lateral_error_px = 0.0
         if bgr is not None:
+            masked_bgr = self._mask_color_frame(bgr)
             (
                 count,
                 lateral_error_px,
                 mask,
                 row_start,
                 col_start,
-            ) = self._middle_third_single_color_metrics(bgr, expected_color)
+            ) = self._middle_third_single_color_metrics(masked_bgr, expected_color)
 
             # Stop condition depends on travel direction (lenient variant —
             # mirrors the corner-turn termination):
@@ -589,7 +759,7 @@ class PayloadDLZNavigateMode(Mode):
                     # LINE_FOLLOW's first transition is off the expected colour.
                     self._prev_color = expected_color
                     self._annotate_turn_onto_tape(
-                        bgr,
+                        masked_bgr,
                         row_start,
                         col_start,
                         mask,
@@ -611,7 +781,7 @@ class PayloadDLZNavigateMode(Mode):
                 self._turn_stable = 0
 
             self._annotate_turn_onto_tape(
-                bgr,
+                masked_bgr,
                 row_start,
                 col_start,
                 mask,
@@ -646,6 +816,7 @@ class PayloadDLZNavigateMode(Mode):
         if self._annotated_pub is None or bgr is None:
             return
         debug = bgr.copy()
+        self._overlay_dlz_mask_debug(debug)
         h, w = bgr.shape[:2]
 
         # Contours of the single expected-colour mask — exactly what the
@@ -723,7 +894,7 @@ class PayloadDLZNavigateMode(Mode):
             debug,
             f"stable={self._turn_stable}/{_TURN_STABLE_FRAMES} "
             f"turned={math.degrees(self._angle_turned):.1f}deg "
-            f"cmd={angular:+.2f}rad/s",
+            f"cmd={angular:+.2f}rad/s {self._dlz_mask_label()}",
             (8, 62),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.5,
@@ -746,6 +917,7 @@ class PayloadDLZNavigateMode(Mode):
             self.vehicle.drive(0.0, 0.0)
             return
 
+        masked_bgr = self._mask_color_frame(bgr)
         # Inline colour detection
         (
             curr,
@@ -756,7 +928,7 @@ class PayloadDLZNavigateMode(Mode):
             blue_mask,
             strip,
             strip_start,
-        ) = self._detect_color(bgr)
+        ) = self._detect_color(masked_bgr)
 
         transitioned = False
         is_corner = False
@@ -774,7 +946,7 @@ class PayloadDLZNavigateMode(Mode):
             if self._transitions >= self.target_transitions:
                 self.vehicle.stop()
                 self._annotate_line_follow(
-                    bgr,
+                    masked_bgr,
                     strip_start,
                     orange_mask,
                     blue_mask,
@@ -798,7 +970,7 @@ class PayloadDLZNavigateMode(Mode):
                 self._corner_target_color = self._prev_color
                 self._prev_lateral_error = None
                 self._annotate_line_follow(
-                    bgr,
+                    masked_bgr,
                     strip_start,
                     orange_mask,
                     blue_mask,
@@ -840,7 +1012,7 @@ class PayloadDLZNavigateMode(Mode):
             angular = 0.0
 
         self._annotate_line_follow(
-            bgr,
+            masked_bgr,
             strip_start,
             orange_mask,
             blue_mask,
@@ -868,14 +1040,11 @@ class PayloadDLZNavigateMode(Mode):
         col_start = 0
         col_end = w
         crop = bgr[row_start:row_end, col_start:col_end]
-        hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
+        mask_a, mask_b = self._crop_color_masks(crop)
         if color == "A":
-            mask = (
-                cv2.inRange(hsv, self._lower_a, self._upper_a)
-                | cv2.inRange(hsv, self._lower_a2, self._upper_a2)
-            )
+            mask = mask_a
         else:
-            mask = cv2.inRange(hsv, self._lower_b, self._upper_b)
+            mask = mask_b
         count = int(np.count_nonzero(mask))
         if count == 0:
             return 0, 0.0, mask, row_start, col_start
@@ -900,8 +1069,9 @@ class PayloadDLZNavigateMode(Mode):
 
         bgr = self._decode_image()
         if bgr is not None:
+            masked_bgr = self._mask_color_frame(bgr)
             total, lateral_error_px, mask, row_start, col_start = (
-                self._corner_single_color_metrics(bgr, self._corner_target_color)
+                self._corner_single_color_metrics(masked_bgr, self._corner_target_color)
             )
             # Stop condition depends on travel direction (lenient):
             #   cw  → accept when centroid on the LEFT side of the crop
@@ -916,7 +1086,12 @@ class PayloadDLZNavigateMode(Mode):
                 self._corner_stable += 1
                 if self._corner_stable >= _CORNER_STABLE_FRAMES:
                     self._annotate_corner_turn(
-                        bgr, mask, row_start, col_start, total, lateral_error_px
+                        masked_bgr,
+                        mask,
+                        row_start,
+                        col_start,
+                        total,
+                        lateral_error_px,
                     )
                     self.vehicle.drive(0.0, 0.0)
                     self._lf_phase = "following"
@@ -931,7 +1106,12 @@ class PayloadDLZNavigateMode(Mode):
                 self._corner_stable = 0
 
             self._annotate_corner_turn(
-                bgr, mask, row_start, col_start, total, lateral_error_px
+                masked_bgr,
+                mask,
+                row_start,
+                col_start,
+                total,
+                lateral_error_px,
             )
 
         # Safety timeout
@@ -958,6 +1138,7 @@ class PayloadDLZNavigateMode(Mode):
         if self._annotated_pub is None or bgr is None:
             return
         debug = bgr.copy()
+        self._overlay_dlz_mask_debug(debug)
         h, w = bgr.shape[:2]
         row_end = h * 9 // 10
         col_end = w - col_start
@@ -1043,7 +1224,8 @@ class PayloadDLZNavigateMode(Mode):
         cv2.putText(
             debug,
             f"stable={self._corner_stable}/{_CORNER_STABLE_FRAMES} "
-            f"turned={math.degrees(self._corner_turned):.1f}deg",
+            f"turned={math.degrees(self._corner_turned):.1f}deg "
+            f"{self._dlz_mask_label()}",
             (8, 62),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.5,
@@ -1073,6 +1255,7 @@ class PayloadDLZNavigateMode(Mode):
         if self._annotated_pub is None or bgr is None:
             return
         debug = bgr.copy()
+        self._overlay_dlz_mask_debug(debug)
         h, w = bgr.shape[:2]
         strip_w = w
 
@@ -1131,10 +1314,11 @@ class PayloadDLZNavigateMode(Mode):
             err_label = (
                 f"lat={lateral_error_px:.1f}px  "
                 f"ang={math.degrees(boundary_angle):.1f}deg  "
-                f"cmd={angular:+.2f}rad/s  v={self.line_follow_speed_mps:.2f}m/s"
+                f"cmd={angular:+.2f}rad/s  v={self.line_follow_speed_mps:.2f}m/s  "
+                f"{self._dlz_mask_label()}"
             )
         else:
-            err_label = "boundary=none"
+            err_label = f"boundary=none  {self._dlz_mask_label()}"
         cv2.putText(
             debug,
             err_label,

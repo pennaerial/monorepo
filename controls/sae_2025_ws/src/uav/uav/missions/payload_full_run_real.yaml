@@ -31,6 +31,29 @@ modes:
       # cw_upper_hsv: [180, 255, 255]
       cw_lower_hsv: [140, 0, 85]  # purple
       cw_upper_hsv: [170, 255, 255]
+      dlz_mask_enabled: true
+      dlz_mask_lower_hsv: [5, 78, 158]
+      dlz_mask_upper_hsv: [25, 189, 255]
+      dlz_mask_min_area_frac: 0.03
+      dlz_mask_min_component_pixels: 200
+      dlz_mask_kernel_size: 5
+      dlz_mask_dilate_iterations: 1
+      dlz_mask_seed_reject_hsv_ranges:
+        - {lower: [100, 100, 100], upper: [130, 255, 255]} # blue
+        - {lower: [140, 0, 85], upper: [170, 255, 255]} # purple
+        - {lower: [141, 18, 122], upper: [180, 255, 255]} # pink/red
+        - {lower: [21, 100, 200], upper: [30, 255, 255]} # yellow
+      region_color_match_enabled: true
+      ccw_color_bgr: [177, 75, 54] # blue
+      cw_color_bgr: [156, 85, 170] # purple
+      reject_colors_bgr:
+        - [127, 62, 147] # pink pad
+        - [69, 201, 227] # yellow guide
+      region_nonblack_min_value: 45
+      region_nonblack_min_saturation: 35
+      region_min_area_px: 20
+      region_match_max_distance_lab: 38.0
+      region_match_min_margin_lab: 8.0
 
       drive_out_speed_mps: 0.1
       detect_frames: 2
@@ -109,6 +132,29 @@ modes:
       cw_upper_hsv: [180, 255, 255]
       cw_lower_hsv2: [165, 85, 100] # red/pink alt range
       cw_upper_hsv2: [180, 252, 255]
+      dlz_mask_enabled: true
+      dlz_mask_lower_hsv: [5, 78, 158]
+      dlz_mask_upper_hsv: [25, 189, 255]
+      dlz_mask_min_area_frac: 0.03
+      dlz_mask_min_component_pixels: 200
+      dlz_mask_kernel_size: 5
+      dlz_mask_dilate_iterations: 1
+      dlz_mask_seed_reject_hsv_ranges:
+        - {lower: [100, 100, 100], upper: [130, 255, 255]} # blue
+        - {lower: [140, 0, 85], upper: [170, 255, 255]} # purple
+        - {lower: [141, 18, 122], upper: [180, 255, 255]} # pink/red
+        - {lower: [21, 100, 200], upper: [30, 255, 255]} # yellow
+      region_color_match_enabled: true
+      ccw_color_bgr: [177, 75, 54] # blue
+      cw_color_bgr: [156, 85, 170] # purple
+      reject_colors_bgr:
+        - [127, 62, 147] # pink pad
+        - [69, 201, 227] # yellow guide
+      region_nonblack_min_value: 45
+      region_nonblack_min_saturation: 35
+      region_min_area_px: 20
+      region_match_max_distance_lab: 38.0
+      region_match_min_margin_lab: 8.0
     transitions:
       done: scan
 
@@ -155,6 +201,29 @@ modes:
       cw_upper_hsv: [180, 255, 255]
       cw_lower_hsv2: [165, 85, 100] # red/pink alt range
       cw_upper_hsv2: [180, 252, 255]
+      dlz_mask_enabled: true
+      dlz_mask_lower_hsv: [5, 78, 158]
+      dlz_mask_upper_hsv: [25, 189, 255]
+      dlz_mask_min_area_frac: 0.03
+      dlz_mask_min_component_pixels: 200
+      dlz_mask_kernel_size: 5
+      dlz_mask_dilate_iterations: 1
+      dlz_mask_seed_reject_hsv_ranges:
+        - {lower: [100, 100, 100], upper: [130, 255, 255]} # blue
+        - {lower: [140, 0, 85], upper: [170, 255, 255]} # purple
+        - {lower: [141, 18, 122], upper: [180, 255, 255]} # pink/red
+        - {lower: [21, 100, 200], upper: [30, 255, 255]} # yellow
+      region_color_match_enabled: true
+      ccw_color_bgr: [177, 75, 54] # blue
+      cw_color_bgr: [156, 85, 170] # purple
+      reject_colors_bgr:
+        - [127, 62, 147] # pink pad
+        - [69, 201, 227] # yellow guide
+      region_nonblack_min_value: 45
+      region_nonblack_min_saturation: 35
+      region_min_area_px: 20
+      region_match_max_distance_lab: 38.0
+      region_match_min_margin_lab: 8.0
     transitions:
       done: scan
 
