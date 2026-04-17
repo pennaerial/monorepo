@@ -1,27 +1,140 @@
 from __future__ import annotations
 
+import importlib
 import importlib.util
 import sys
 from pathlib import Path
 from types import SimpleNamespace
+import types
 
 import pytest
 
 
+def _import_module_if_available(name: str):
+    try:
+        return importlib.import_module(name)
+    except ModuleNotFoundError:
+        return None
+
+
+def _purge_fake_rclpy_modules() -> None:
+    fake_rclpy = sys.modules.get("rclpy")
+    if fake_rclpy is not None and not hasattr(fake_rclpy, "__path__"):
+        for module_name in list(sys.modules):
+            if module_name == "rclpy" or module_name.startswith("rclpy."):
+                del sys.modules[module_name]
+
+
+def _ensure_launch_import_stubs() -> None:
+    ament_index_python = sys.modules.get("ament_index_python")
+    if ament_index_python is None:
+        ament_index_python = _import_module_if_available("ament_index_python")
+    if ament_index_python is None:
+        ament_index_python = types.ModuleType("ament_index_python")
+        sys.modules["ament_index_python"] = ament_index_python
+
+    ament_index_packages = sys.modules.get("ament_index_python.packages")
+    if ament_index_packages is None:
+        ament_index_packages = _import_module_if_available(
+            "ament_index_python.packages"
+        )
+    if ament_index_packages is None:
+        ament_index_packages = types.ModuleType("ament_index_python.packages")
+        sys.modules["ament_index_python.packages"] = ament_index_packages
+    if not hasattr(ament_index_packages, "get_package_share_directory"):
+        ament_index_packages.get_package_share_directory = lambda _name: str(
+            Path(__file__).resolve().parents[1]
+        )
+    ament_index_python.packages = ament_index_packages
+
+    launch_module = sys.modules.get("launch")
+    if launch_module is None:
+        launch_module = _import_module_if_available("launch")
+    if launch_module is None:
+        launch_module = types.ModuleType("launch")
+        sys.modules["launch"] = launch_module
+    if not hasattr(launch_module, "LaunchDescription"):
+        launch_module.LaunchDescription = type("LaunchDescription", (), {})
+
+    launch_actions = sys.modules.get("launch.actions")
+    if launch_actions is None:
+        launch_actions = _import_module_if_available("launch.actions")
+    if launch_actions is None:
+        launch_actions = types.ModuleType("launch.actions")
+        sys.modules["launch.actions"] = launch_actions
+    for name in (
+        "DeclareLaunchArgument",
+        "ExecuteProcess",
+        "IncludeLaunchDescription",
+        "OpaqueFunction",
+    ):
+        if not hasattr(launch_actions, name):
+            setattr(launch_actions, name, type(name, (), {}))
+
+    launch_sources = sys.modules.get("launch.launch_description_sources")
+    if launch_sources is None:
+        launch_sources = _import_module_if_available(
+            "launch.launch_description_sources"
+        )
+    if launch_sources is None:
+        launch_sources = types.ModuleType("launch.launch_description_sources")
+        sys.modules["launch.launch_description_sources"] = launch_sources
+    if not hasattr(launch_sources, "PythonLaunchDescriptionSource"):
+        launch_sources.PythonLaunchDescriptionSource = type(
+            "PythonLaunchDescriptionSource", (), {}
+        )
+
+    launch_logging = sys.modules.get("launch.logging")
+    if launch_logging is None:
+        launch_logging = _import_module_if_available("launch.logging")
+    if launch_logging is None:
+        launch_logging = types.ModuleType("launch.logging")
+        sys.modules["launch.logging"] = launch_logging
+    if not hasattr(launch_logging, "get_logger"):
+        launch_logging.get_logger = lambda *_args, **_kwargs: SimpleNamespace(
+            warning=lambda *_a, **_k: None,
+            warn=lambda *_a, **_k: None,
+            info=lambda *_a, **_k: None,
+        )
+
+    launch_substitutions = sys.modules.get("launch.substitutions")
+    if launch_substitutions is None:
+        launch_substitutions = _import_module_if_available("launch.substitutions")
+    if launch_substitutions is None:
+        launch_substitutions = types.ModuleType("launch.substitutions")
+        sys.modules["launch.substitutions"] = launch_substitutions
+    if not hasattr(launch_substitutions, "LaunchConfiguration"):
+        launch_substitutions.LaunchConfiguration = type("LaunchConfiguration", (), {})
+
+    launch_ros = sys.modules.get("launch_ros")
+    if launch_ros is None:
+        launch_ros = _import_module_if_available("launch_ros")
+    if launch_ros is None:
+        launch_ros = types.ModuleType("launch_ros")
+        sys.modules["launch_ros"] = launch_ros
+
+    launch_ros_actions = sys.modules.get("launch_ros.actions")
+    if launch_ros_actions is None:
+        launch_ros_actions = _import_module_if_available("launch_ros.actions")
+    if launch_ros_actions is None:
+        launch_ros_actions = types.ModuleType("launch_ros.actions")
+        sys.modules["launch_ros.actions"] = launch_ros_actions
+    if not hasattr(launch_ros_actions, "Node"):
+        launch_ros_actions.Node = type("Node", (), {})
+    launch_ros.actions = launch_ros_actions
+
+
 def _load_launch_module(filename: str, module_name: str):
+    # Runtime-behavior tests install lightweight rclpy doubles into sys.modules.
+    # launch_ros must see the real ROS Python packages if they are available.
+    _purge_fake_rclpy_modules()
+    _ensure_launch_import_stubs()
     package_root = Path(__file__).resolve().parents[1]
     if str(package_root) not in sys.path:
         sys.path.insert(0, str(package_root))
     sim_package_root = Path(__file__).resolve().parents[2] / "sim"
     if str(sim_package_root) not in sys.path:
         sys.path.insert(0, str(sim_package_root))
-    # test_runtime_behavior installs lightweight rclpy stubs into sys.modules.
-    # launch_ros needs the real ROS Python packages here.
-    fake_rclpy = sys.modules.get("rclpy")
-    if fake_rclpy is not None and not hasattr(fake_rclpy, "__path__"):
-        for module_name_key in list(sys.modules):
-            if module_name_key == "rclpy" or module_name_key.startswith("rclpy."):
-                del sys.modules[module_name_key]
     launch_path = package_root / "launch" / filename
     spec = importlib.util.spec_from_file_location(module_name, launch_path)
     module = importlib.util.module_from_spec(spec)
@@ -111,6 +224,52 @@ def test_main_launch_force_camera_prefers_new_key(main_launch_module):
 
 def test_main_launch_force_camera_accepts_legacy_alias(main_launch_module):
     assert main_launch_module._resolve_force_camera({"use_camera": True}) is True
+
+
+def test_single_vehicle_config_carries_camera_calibration_file(
+    monkeypatch, main_launch_module
+):
+    monkeypatch.setattr(
+        main_launch_module, "mission_path_for_name", lambda name: f"/tmp/{name}.yaml"
+    )
+    monkeypatch.setattr(
+        main_launch_module.MissionSpec,
+        "load",
+        staticmethod(
+            lambda _path: SimpleNamespace(
+                is_uav=False, is_payload=True, target="payload"
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        main_launch_module,
+        "find_folder_with_heuristic",
+        lambda *_args, **_kwargs: "/tmp/PX4-Autopilot",
+    )
+
+    class FakeLaunchConfiguration:
+        def __init__(self, name: str):
+            self.name = name
+
+        def perform(self, _context):
+            return {"px4_path": "~/PX4-Autopilot"}.get(self.name, "")
+
+    monkeypatch.setattr(
+        main_launch_module, "LaunchConfiguration", FakeLaunchConfiguration
+    )
+
+    vehicle_config, backend = main_launch_module._single_vehicle_config(
+        SimpleNamespace(),
+        {
+            "mission_name": "payload_retreat",
+            "vehicle_name": "payload_7",
+            "sim": False,
+            "camera_calibration_file": "payload_7_camera_info.yaml",
+        },
+    )
+
+    assert backend is None
+    assert vehicle_config["camera_calibration_file"] == "payload_7_camera_info.yaml"
 
 
 @pytest.mark.parametrize(
@@ -417,42 +576,85 @@ def test_resolve_camera_input_transport_prefers_raw_for_payload_preprocessing(
     )
 
 
-def test_payload_camera_info_url_for_prefers_named_file(
+def test_payload_camera_info_url_for_uses_numbered_file(
     monkeypatch, tmp_path, stack_launch_module
 ):
-    payload_share = tmp_path / "payload_share"
-    (payload_share / "config").mkdir(parents=True)
-    preferred = payload_share / "config" / "payload_2_camera_info.yaml"
-    fallback = payload_share / "config" / "payload_0_camera_info.yaml"
-    fallback.write_text("fallback", encoding="utf-8")
-    preferred.write_text("preferred", encoding="utf-8")
+    uav_share = tmp_path / "uav_share"
+    calibration_dir = uav_share / "config" / "camera_calibrations"
+    calibration_dir.mkdir(parents=True)
+    calibration = calibration_dir / "camera_info_2.yaml"
+    calibration.write_text("calibration", encoding="utf-8")
 
     monkeypatch.setattr(
         stack_launch_module,
         "get_package_share_directory",
-        lambda package_name: str(payload_share),
+        lambda package_name: str(uav_share),
     )
 
-    expected = f"file://{preferred}"
+    expected = f"file://{calibration}"
     assert stack_launch_module._payload_camera_info_url_for("payload_2") == expected
+
+
+def test_payload_camera_info_url_for_uses_explicit_filename(
+    monkeypatch, tmp_path, stack_launch_module
+):
+    uav_share = tmp_path / "uav_share"
+    calibration_dir = uav_share / "config" / "camera_calibrations"
+    calibration_dir.mkdir(parents=True)
+    requested = calibration_dir / "warehouse_cam.yaml"
+    requested.write_text("warehouse", encoding="utf-8")
+
+    monkeypatch.setattr(
+        stack_launch_module,
+        "get_package_share_directory",
+        lambda package_name: str(uav_share),
+    )
+
+    expected = f"file://{requested}"
+    assert (
+        stack_launch_module._payload_camera_info_url_for(
+            "payload_2", camera_calibration_file="warehouse_cam.yaml"
+        )
+        == expected
+    )
 
 
 def test_payload_camera_info_url_for_falls_back_to_payload_0(
     monkeypatch, tmp_path, stack_launch_module
 ):
-    payload_share = tmp_path / "payload_share"
-    (payload_share / "config").mkdir(parents=True)
-    fallback = payload_share / "config" / "payload_0_camera_info.yaml"
+    uav_share = tmp_path / "uav_share"
+    calibration_dir = uav_share / "config" / "camera_calibrations"
+    calibration_dir.mkdir(parents=True)
+    fallback = calibration_dir / "payload_0_camera_info.yaml"
     fallback.write_text("fallback", encoding="utf-8")
 
     monkeypatch.setattr(
         stack_launch_module,
         "get_package_share_directory",
-        lambda package_name: str(payload_share),
+        lambda package_name: str(uav_share),
     )
 
     expected = f"file://{fallback}"
     assert stack_launch_module._payload_camera_info_url_for("payload_2") == expected
+
+
+def test_payload_camera_info_url_for_rejects_missing_explicit_file(
+    monkeypatch, tmp_path, stack_launch_module
+):
+    uav_share = tmp_path / "uav_share"
+    calibration_dir = uav_share / "config" / "camera_calibrations"
+    calibration_dir.mkdir(parents=True)
+
+    monkeypatch.setattr(
+        stack_launch_module,
+        "get_package_share_directory",
+        lambda package_name: str(uav_share),
+    )
+
+    with pytest.raises(ValueError, match="requested camera calibration file"):
+        stack_launch_module._payload_camera_info_url_for(
+            "payload_2", camera_calibration_file="missing.yaml"
+        )
 
 
 def test_build_runtime_parameters_for_uav(stack_launch_module):

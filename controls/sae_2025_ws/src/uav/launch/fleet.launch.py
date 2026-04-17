@@ -31,6 +31,7 @@ _SHARED_DEFAULT_KEYS = {
     "camera_mount_offsets",
     "camera_input_transport",
     "camera_rotate_degrees",
+    "camera_calibration_file",
     "camera_preprocess_hook",
     "network_role",
     "allowed_ap_vehicles",
@@ -180,8 +181,6 @@ def _defaults_config(fleet: dict) -> dict:
 
 
 def _validate_vehicle_keys(vehicle: dict, *, name_hint: str, backend_kind: str) -> None:
-    if backend_kind == "hardware":
-        return
     for key in _EXCLUDED_FLEET_KEYS:
         if key in vehicle:
             raise ValueError(
@@ -282,7 +281,9 @@ def _vehicle_stack_configs(fleet: dict) -> tuple[dict, list[dict]]:
             "mission_path": mission_path,
             "sim": backend_kind == "sim",
             "auto_launch": _resolve_bool(
-                vehicle.get("auto_launch", True), key="auto_launch", default=True
+                vehicle.get("auto_launch"),
+                key="auto_launch",
+                default=backend_kind == "sim",
             ),
             "debug": _resolve_bool(
                 vehicle.get("debug", False), key="debug", default=False
@@ -297,7 +298,6 @@ def _vehicle_stack_configs(fleet: dict) -> tuple[dict, list[dict]]:
             "servo_only": _resolve_bool(
                 vehicle.get("servo_only", False), key="servo_only", default=False
             ),
-            "payload_controller": str(vehicle.get("payload_controller", "")).strip(),
             "camera_input_transport": str(
                 vehicle.get(
                     "camera_input_transport",
@@ -309,6 +309,9 @@ def _vehicle_stack_configs(fleet: dict) -> tuple[dict, list[dict]]:
                     "camera_rotate_degrees", 0.0 if backend_kind == "sim" else 180.0
                 )
             ),
+            "camera_calibration_file": str(
+                vehicle.get("camera_calibration_file", "")
+            ).strip(),
             "camera_preprocess_hook": str(
                 vehicle.get("camera_preprocess_hook", "")
             ).strip(),
@@ -326,6 +329,21 @@ def _vehicle_stack_configs(fleet: dict) -> tuple[dict, list[dict]]:
             "model": str(controllable.get("model", "")).strip(),
         }
 
+        if kind == "payload":
+            # udp_port: None = auto-compute (payload_N → 5000+N), 0 = disabled
+            stack_config["udp_port"] = vehicle.get("udp_port")
+            stack_config["udp_all_ports"] = list(
+                vehicle.get("udp_all_ports") or [5000, 5001, 5002, 5003]
+            )
+            stack_config["udp_topics"] = list(
+                vehicle.get("udp_topics")
+                or ["heartbeat:payload_interfaces/msg/PayloadHeartbeat"]
+            )
+            stack_config["udp_broadcast_ip"] = str(
+                vehicle.get("udp_broadcast_ip") or "10.42.0.255"
+            ).strip()
+            stack_config["udp_peer_ttl"] = float(vehicle.get("udp_peer_ttl") or 3.0)
+
         if kind == "uav":
             px4_airframe_id = (
                 controllable.get("px4_airframe_id")
@@ -342,12 +360,9 @@ def _vehicle_stack_configs(fleet: dict) -> tuple[dict, list[dict]]:
             stack_config["px4_airframe_id"] = int(px4_airframe_id)
             next_px4_instance = max(next_px4_instance, int(px4_instance) + 1)
         else:
-            stack_config["payload_controller"] = str(
-                vehicle.get(
-                    "payload_controller",
-                    "SimController" if backend_kind == "sim" else "GPIOController",
-                )
-            ).strip()
+            stack_config["payload_controller"] = (
+                "SimController" if backend_kind == "sim" else "GPIOController"
+            )
 
         resolved.append(stack_config)
 

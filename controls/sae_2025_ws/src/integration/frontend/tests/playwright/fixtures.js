@@ -140,6 +140,33 @@ export function makeGithubBuildSource(build, overrides = {}) {
   }
 }
 
+export function makeLocalArtifactBuildSource(overrides = {}) {
+  return {
+    success: true,
+    kind: 'local_artifact',
+    source_kind: 'local_artifact',
+    file_name: 'ros2-build-35948f0.tar.gz',
+    source_label: 'ros2-build-35948f0.tar.gz',
+    fleet_file: '',
+    fleet_options: [],
+    ...overrides,
+  }
+}
+
+export function makeLocalCodebaseBuildSource(overrides = {}) {
+  return {
+    success: true,
+    kind: 'local_codebase',
+    source_kind: 'local_codebase',
+    source_label: 'Current local codebase',
+    codebase_root: '/workspace/sae_2025_ws',
+    packages: [],
+    fleet_file: '',
+    fleet_options: [],
+    ...overrides,
+  }
+}
+
 export function makeLiveDevice(overrides = {}) {
   return {
     hardware_id: 'air-02.local',
@@ -156,6 +183,193 @@ export function makeLiveDevice(overrides = {}) {
       ready: false,
       notes: ['SSH unavailable'],
     },
+    ...overrides,
+  }
+}
+
+export function makeFleetSchemaResponse(overrides = {}) {
+  return {
+    available_fleets: ['payload_corner_navigation'],
+    backend_kinds: ['sim', 'hardware', 'real'],
+    excluded_keys: [],
+    document_schema: {},
+    sections: [
+      {
+        name: 'backend',
+        description: 'Backend configuration shared by the fleet.',
+        applies_to: ['sim', 'hardware', 'real'],
+        constraints: ['kind must be sim, hardware, or real.'],
+        fields: [
+          {
+            name: 'kind',
+            schema_type: 'enum',
+            annotation: 'enum',
+            required: true,
+            default: 'hardware',
+            default_kind: 'value',
+            choices: ['sim', 'hardware', 'real'],
+          },
+          {
+            name: 'px4_path',
+            schema_type: 'str',
+            annotation: 'str',
+            required: false,
+            default: '~/PX4-Autopilot',
+            default_kind: 'value',
+            choices: [],
+          },
+          {
+            name: 'world_name',
+            schema_type: 'str',
+            annotation: 'str',
+            required: false,
+            default_kind: 'missing',
+            choices: [],
+          },
+          {
+            name: 'mission_stage',
+            schema_type: 'str',
+            annotation: 'str',
+            required: false,
+            default_kind: 'missing',
+            choices: [],
+          },
+        ],
+      },
+      {
+        name: 'defaults',
+        description: 'Shared per-vehicle runtime defaults.',
+        applies_to: ['sim', 'hardware', 'real'],
+        constraints: [],
+        fields: [
+          {
+            name: 'debug',
+            schema_type: 'bool',
+            annotation: 'bool',
+            required: false,
+            default: false,
+            default_kind: 'value',
+            choices: [],
+          },
+          {
+            name: 'save_vision_milliseconds',
+            schema_type: 'int',
+            annotation: 'int',
+            required: false,
+            default: 0,
+            default_kind: 'value',
+            choices: [],
+          },
+          {
+            name: 'camera_calibration_file',
+            schema_type: 'str',
+            annotation: 'str',
+            required: false,
+            default: 'payload_0_camera_info.yaml',
+            default_kind: 'value',
+            choices: ['payload_0_camera_info.yaml'],
+          },
+        ],
+      },
+      {
+        name: 'vehicle.common',
+        description: 'Per-vehicle common fields.',
+        applies_to: ['sim', 'hardware', 'real'],
+        constraints: [],
+        fields: [
+          {
+            name: 'name',
+            schema_type: 'str',
+            annotation: 'str',
+            required: true,
+            default_kind: 'missing',
+            choices: [],
+          },
+          {
+            name: 'mission',
+            schema_type: 'str',
+            annotation: 'str',
+            required: false,
+            default_kind: 'missing',
+            choices: [],
+          },
+          {
+            name: 'kind',
+            schema_type: 'str',
+            annotation: 'str',
+            required: false,
+            default_kind: 'missing',
+            choices: [],
+          },
+        ],
+      },
+      {
+        name: 'vehicle.hardware',
+        description: 'Hardware-only vehicle fields.',
+        applies_to: ['hardware', 'real'],
+        constraints: [],
+        fields: [
+          {
+            name: 'px4_airframe_id',
+            schema_type: 'int',
+            annotation: 'int',
+            required: false,
+            default_kind: 'missing',
+            choices: [],
+          },
+          {
+            name: 'px4_namespace',
+            schema_type: 'str',
+            annotation: 'str',
+            required: false,
+            default_kind: 'missing',
+            choices: [],
+          },
+        ],
+      },
+    ],
+    ...overrides,
+  }
+}
+
+export function makeMissionCatalogResponse(overrides = {}) {
+  return {
+    success: true,
+    available_missions: [
+      'hover',
+      'payload_corner_navigation',
+      'payload_retreat',
+    ],
+    missions: [
+      { name: 'hover', target: 'uav' },
+      { name: 'payload_corner_navigation', target: 'payload' },
+      { name: 'payload_retreat', target: 'payload' },
+    ],
+    ...overrides,
+  }
+}
+
+export function makeFleetFileResponse(overrides = {}) {
+  return {
+    success: true,
+    fleet_file: 'payload_corner_navigation.yaml',
+    path: '/tmp/payload_corner_navigation.yaml',
+    content: [
+      'backend:',
+      '  kind: sim',
+      '  world_name: sae',
+      '  mission_stage: payload_retreat',
+      'defaults:',
+      '  auto_launch: true',
+      '  debug: false',
+      'vehicles:',
+      '  - name: payload_0',
+      '    kind: payload',
+      '    mission: payload_corner_navigation',
+      '    controllable: payload_0',
+      '    payload_controller: GPIOController',
+      '',
+    ].join('\n'),
     ...overrides,
   }
 }

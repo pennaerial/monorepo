@@ -255,6 +255,30 @@ def _write_fleet(tmp_path: Path, *, name: str = "fleet.yaml") -> Path:
     return fleet_path
 
 
+def _write_valid_fleet(tmp_path: Path, *, name: str = "valid_fleet.yaml") -> Path:
+    fleets_dir = tmp_path / "src" / "uav" / "uav" / "fleets"
+    fleets_dir.mkdir(parents=True, exist_ok=True)
+    fleet_path = fleets_dir / name
+    fleet_path.write_text(
+        "\n".join(
+            [
+                "backend:",
+                "  kind: hardware",
+                "defaults:",
+                "  debug: false",
+                "vehicles:",
+                "  - name: payload_0",
+                "    kind: payload",
+                "    mission: payload_corner_navigate_real",
+                "    payload_controller: GPIOController",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    return fleet_path
+
+
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     ctx = _make_context(tmp_path)
@@ -1020,6 +1044,7 @@ def test_build_source_routes_round_trip(client, tmp_path):
             "camera_mount_offsets": [],
             "camera_input_transport": None,
             "camera_rotate_degrees": None,
+            "camera_calibration_file": None,
             "camera_preprocess_hook": None,
             "px4_airframe_id": None,
             "px4_namespace": None,
@@ -1091,3 +1116,72 @@ def test_build_source_catalog_endpoint_exposes_available_fleets(client, tmp_path
     assert payload["fleet_exists"] is True
     assert payload["fleet_error"] is None
     assert payload["fleet_vehicles"][0]["name"] == "uav_0"
+
+
+def test_selected_fleet_file_routes_round_trip(client, tmp_path):
+    fleet_path = _write_valid_fleet(tmp_path)
+
+    response = client.post("/api/build-source/local-codebase")
+    assert response.status_code == 200
+
+    response = client.post(
+        "/api/build-source/fleet",
+        data={"fleet_file": fleet_path.name},
+    )
+    assert response.status_code == 200
+    assert response.json()["success"] is True
+
+    response = client.get("/api/build-source/fleet-file")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["success"] is True
+    assert payload["fleet_file"] == fleet_path.name
+    assert payload["path"].endswith(f"/{fleet_path.name}")
+    assert "payload_0" in payload["content"]
+
+    updated_content = "\n".join(
+        [
+            "backend:",
+            "  kind: hardware",
+            "defaults:",
+            "  debug: true",
+            "vehicles:",
+            "  - name: payload_0",
+            "    kind: payload",
+            "    mission: payload_corner_navigate_real",
+            "    payload_controller: GPIOController",
+            "",
+        ]
+    )
+    response = client.post(
+        "/api/build-source/fleet-file",
+        data={"content": updated_content},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["success"] is True
+    assert payload["fleet_file"] == fleet_path.name
+    assert fleet_path.read_text(encoding="utf-8") == updated_content
+
+    response = client.get("/api/build-source/fleet-file")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["success"] is True
+    assert "debug: true" in payload["content"]
+
+
+def test_fleet_schema_exposes_camera_calibration_choices(client):
+    response = client.get("/api/schema/fleet")
+    assert response.status_code == 200
+    payload = response.json()
+
+    defaults_section = next(
+        section for section in payload["sections"] if section["name"] == "defaults"
+    )
+    calibration_field = next(
+        field
+        for field in defaults_section["fields"]
+        if field["name"] == "camera_calibration_file"
+    )
+
+    assert "payload_0_camera_info.yaml" in calibration_field["choices"]

@@ -12,6 +12,7 @@ enum class MotorType {
 
 class Motor {
     public:
+        virtual ~Motor() = default;
         virtual void set_speed(float speed) = 0;
         virtual void forward(float duty) = 0;
         virtual void reverse(float duty) = 0;

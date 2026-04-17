@@ -44,10 +44,25 @@ _FLEET_EXCLUDED_KEYS = [
     "sim",
     "px4_instance",
 ]
+_CAMERA_CALIBRATIONS_DIR = (
+    Path(__file__).resolve().parents[2] / "uav" / "config" / "camera_calibrations"
+)
 
 
 def _required_names(schema: dict[str, Any]) -> set[str]:
     return set(schema.get("required", []))
+
+
+def _available_camera_calibration_files() -> list[str]:
+    if not _CAMERA_CALIBRATIONS_DIR.is_dir():
+        return []
+    filenames = {
+        path.name
+        for pattern in ("*.yaml", "*.yml")
+        for path in _CAMERA_CALIBRATIONS_DIR.glob(pattern)
+        if path.is_file()
+    }
+    return sorted(filenames)
 
 
 def _mode_reference(entry: Any) -> str:
@@ -168,7 +183,7 @@ def _fields_from_model(
     properties = schema.get("properties", {})
     required = _required_names(schema)
     derived_fields = derived_fields or set()
-    return [
+    fields = [
         _schema_field(
             name,
             property_schema,
@@ -179,6 +194,15 @@ def _fields_from_model(
         )
         for name, property_schema in properties.items()
     ]
+    calibration_choices = _available_camera_calibration_files()
+    if calibration_choices:
+        fields = [
+            field.model_copy(update={"choices": calibration_choices})
+            if field.name == "camera_calibration_file"
+            else field
+            for field in fields
+        ]
+    return fields
 
 
 def _mode_metadata_response(mode_ref: str | Any) -> ModeMetadataResponse:

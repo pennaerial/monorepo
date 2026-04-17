@@ -501,6 +501,7 @@ def test_render_runtime_fleet_for_uav(tmp_path, monkeypatch):
                 "camera_mount_offsets": [0.0, 0.0, 0.0],
                 "camera_input_transport": "raw",
                 "camera_rotate_degrees": 0.0,
+                "camera_calibration_file": "",
                 "camera_preprocess_hook": "",
             },
             "vehicles": [
@@ -526,6 +527,7 @@ def test_render_runtime_fleet_for_uav(tmp_path, monkeypatch):
             "camera_mount_offsets: [1.0, 2.0, 3.0]\n"
             "camera_input_transport: compressed\n"
             "camera_rotate_degrees: 15\n"
+            "camera_calibration_file: warehouse_cam.yaml\n"
             "camera_preprocess_hook: rotate_then_crop\n"
             "px4_airframe_id: 4004\n"
         ),
@@ -567,6 +569,7 @@ def test_render_runtime_fleet_for_uav(tmp_path, monkeypatch):
             "camera_mount_offsets": [1.0, 2.0, 3.0],
             "camera_input_transport": "compressed",
             "camera_rotate_degrees": 15.0,
+            "camera_calibration_file": "warehouse_cam.yaml",
             "camera_preprocess_hook": "rotate_then_crop",
             "px4_airframe_id": 4004,
             "px4_namespace": "uav_0",
@@ -590,6 +593,7 @@ def test_render_runtime_fleet_for_payload_defaults(tmp_path, monkeypatch):
                 "servo_only": False,
                 "camera_mount_offsets": [0.0, 0.0, 0.0],
                 "camera_input_transport": "compressed",
+                "camera_calibration_file": "",
                 "camera_preprocess_hook": "",
             },
             "vehicles": [
@@ -644,6 +648,7 @@ def test_render_runtime_fleet_for_payload_defaults(tmp_path, monkeypatch):
             "payload_controller": "SimController",
         }
     ]
+    assert "camera_calibration_file" not in runtime["vehicles"][0]
 
 
 def test_runtime_network_policy_override_normalizes_hosts_and_renders_yaml():
@@ -911,6 +916,7 @@ def test_fleet_preview_includes_effective_wifi_policy_fields(tmp_path):
             "camera_mount_offsets": [],
             "camera_input_transport": None,
             "camera_rotate_degrees": None,
+            "camera_calibration_file": None,
             "camera_preprocess_hook": None,
             "px4_airframe_id": None,
             "px4_namespace": None,
@@ -932,6 +938,7 @@ def test_fleet_preview_includes_effective_wifi_policy_fields(tmp_path):
             "camera_mount_offsets": [],
             "camera_input_transport": None,
             "camera_rotate_degrees": None,
+            "camera_calibration_file": None,
             "camera_preprocess_hook": None,
             "px4_airframe_id": None,
             "px4_namespace": None,

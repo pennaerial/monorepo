@@ -14,6 +14,12 @@
 
 GPIOController::GPIOController() {}
 
+GPIOController::GPIOController(
+  std::unique_ptr<Motor> left_motor,
+  std::unique_ptr<Motor> right_motor)
+: left_motor_(std::move(left_motor)),
+  right_motor_(std::move(right_motor)) {}
+
 GPIOController::~GPIOController()
 {
   if (node_ != nullptr) {
@@ -183,11 +189,11 @@ void GPIOController::safe_shutdown()
   }
 
   if (left_motor_) {
-    left_motor_->coast();
+    left_motor_->hard_brake();
   }
 
   if (right_motor_) {
-    right_motor_->coast();
+    right_motor_->hard_brake();
   }
 
   if (servo_) {

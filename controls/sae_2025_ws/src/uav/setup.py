@@ -78,6 +78,10 @@ setup(
             glob(os.path.join("launch", "*.yaml")),
         ),
         (
+            os.path.join("share", package_name, "config", "camera_calibrations"),
+            glob(os.path.join("config", "camera_calibrations", "*.yaml")),
+        ),
+        (
             os.path.join("share", package_name, "missions"),
             glob(os.path.join(package_name, "missions", "*.yaml")),
         ),

@@ -254,6 +254,7 @@ class FleetVehiclePreview(BaseModel):
     camera_mount_offsets: list[float] = Field(default_factory=list)
     camera_input_transport: str | None = None
     camera_rotate_degrees: float | None = None
+    camera_calibration_file: str | None = None
     camera_preprocess_hook: str | None = None
     px4_airframe_id: int | None = None
     px4_namespace: str | None = None
@@ -317,6 +318,15 @@ class FleetCatalogResponse(BaseModel):
     fleet_exists: bool | None = None
     fleet_error: str | None = None
     fleet_vehicles: list[FleetVehiclePreview] = Field(default_factory=list)
+    error: str | None = None
+
+
+class FleetFileResponse(BaseModel):
+    success: bool
+    fleet_file: str | None = None
+    path: str | None = None
+    content: str | None = None
+    output: str | None = None
     error: str | None = None
 
 

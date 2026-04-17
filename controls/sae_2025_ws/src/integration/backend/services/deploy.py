@@ -19,6 +19,7 @@ import yaml
 from ..context import AppContext, TargetContext
 from ..mission_compat import load_mission_spec_compat
 from ..models import RuntimeNetworkPolicyOverride
+from uav.runtime.fleet_spec import load_fleet_document
 from uav.runtime.mission_spec import MissionSpec
 
 _ARTIFACT_NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
@@ -43,6 +44,7 @@ _SHARED_OVERLAY_KEYS = {
     "camera_mount_offsets",
     "camera_input_transport",
     "camera_rotate_degrees",
+    "camera_calibration_file",
     "camera_preprocess_hook",
 }
 _UAV_OVERLAY_KEYS = _SHARED_OVERLAY_KEYS | {"px4_airframe_id", "px4_namespace"}
@@ -755,6 +757,10 @@ def _resolve_catalog_fleet_path(ctx: AppContext, fleet_file: str) -> tuple[str, 
     return selected, fleet_path
 
 
+def _selected_catalog_fleet_path(ctx: AppContext) -> tuple[str, Path]:
+    return _resolve_catalog_fleet_path(ctx, _selected_fleet_file(ctx))
+
+
 def _reconcile_selected_fleet_with_current_source(
     ctx: AppContext, previous_fleet_file: str
 ) -> None:
@@ -1090,6 +1096,10 @@ def _runtime_vehicle_from_config(
         ctx, merged_vehicle
     )
     mission_target = mission_spec.target
+    camera_calibration_file = str(
+        merged_vehicle.get("camera_calibration_file", "")
+    ).strip()
+
     runtime_vehicle = {
         "name": vehicle_name,
         "kind": mission_target,
@@ -1118,6 +1128,10 @@ def _runtime_vehicle_from_config(
             merged_vehicle.get("camera_preprocess_hook", "")
         ).strip(),
     }
+    if camera_calibration_file:
+        # Older deployed releases reject unknown keys in runtime_fleet.yaml, so
+        # keep this optional field out of the rendered config unless it is set.
+        runtime_vehicle["camera_calibration_file"] = camera_calibration_file
 
     if mission_target == "uav":
         px4_airframe_id = merged_vehicle.get("px4_airframe_id")
@@ -1199,6 +1213,9 @@ def _fleet_preview(ctx: AppContext, fleet_file: str) -> dict[str, object]:
                     ),
                     "camera_rotate_degrees": runtime_vehicle.get(
                         "camera_rotate_degrees"
+                    ),
+                    "camera_calibration_file": runtime_vehicle.get(
+                        "camera_calibration_file"
                     ),
                     "camera_preprocess_hook": runtime_vehicle.get(
                         "camera_preprocess_hook"
@@ -2492,6 +2509,23 @@ async def get_fleet_catalog(ctx: AppContext) -> dict[str, object]:
     }
 
 
+async def get_selected_fleet_file(ctx: AppContext) -> dict[str, object]:
+    try:
+        fleet_file, fleet_path = _selected_catalog_fleet_path(ctx)
+        return {
+            "success": True,
+            "fleet_file": fleet_file,
+            "path": str(fleet_path),
+            "content": fleet_path.read_text(encoding="utf-8"),
+        }
+    except Exception as exc:
+        return {
+            "success": False,
+            "fleet_file": _selected_fleet_file(ctx) or None,
+            "error": str(exc),
+        }
+
+
 async def set_github_build_source(
     ctx: AppContext,
     *,
@@ -2649,6 +2683,30 @@ async def set_global_fleet_file(
             success=False,
             error=str(exc),
         )
+
+
+async def set_selected_fleet_file(
+    ctx: AppContext,
+    *,
+    content: str,
+) -> dict[str, object]:
+    try:
+        fleet_file, fleet_path = _selected_catalog_fleet_path(ctx)
+        parsed = yaml.safe_load(content) or {}
+        load_fleet_document(parsed)
+        fleet_path.write_text(content, encoding="utf-8")
+        return {
+            "success": True,
+            "fleet_file": fleet_file,
+            "path": str(fleet_path),
+            "output": f"Fleet YAML updated ({fleet_file})",
+        }
+    except Exception as exc:
+        return {
+            "success": False,
+            "fleet_file": _selected_fleet_file(ctx) or None,
+            "error": str(exc),
+        }
 
 
 async def clear_build_source(ctx: AppContext) -> dict[str, object]:

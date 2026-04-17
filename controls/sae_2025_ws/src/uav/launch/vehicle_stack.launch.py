@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import json
 import os
+import re
 from pathlib import Path
 
 from ament_index_python.packages import get_package_share_directory
@@ -183,12 +184,32 @@ def _camera_contract_for(
     }
 
 
-def _payload_camera_info_url_for(vehicle_name: str) -> str:
-    payload_share = Path(get_package_share_directory("payload"))
-    candidates = [
-        payload_share / "config" / f"{vehicle_name}_camera_info.yaml",
-        payload_share / "config" / "payload_0_camera_info.yaml",
-    ]
+def _payload_camera_info_url_for(
+    vehicle_name: str, *, camera_calibration_file: str = ""
+) -> str:
+    calibration_dir = (
+        Path(get_package_share_directory("uav")) / "config" / "camera_calibrations"
+    )
+    requested_file = str(camera_calibration_file).strip()
+    if requested_file:
+        if Path(requested_file).name != requested_file:
+            raise ValueError(
+                "camera_calibration_file must be a filename inside the packaged "
+                "uav camera_calibrations directory."
+            )
+        candidate = calibration_dir / requested_file
+        if candidate.exists():
+            return f"file://{candidate}"
+        raise ValueError(
+            f"Vehicle '{vehicle_name}' requested camera calibration file "
+            f"'{requested_file}', but no packaged calibration exists at '{candidate}'."
+        )
+
+    m = re.search(r"_(\d+)$", vehicle_name)
+    candidates = []
+    if m:
+        candidates.append(calibration_dir / f"camera_info_{m.group(1)}.yaml")
+    candidates.append(calibration_dir / "payload_0_camera_info.yaml")
     for candidate in candidates:
         if candidate.exists():
             return f"file://{candidate}"
@@ -426,6 +447,33 @@ def _payload_launch_action(*, vehicle_name: str, controller: str, sim_entity_nam
     )
 
 
+def _udp_bridge_action(
+    *,
+    vehicle_name: str,
+    udp_port: int,
+    udp_all_ports: list,
+    udp_topics: list,
+    udp_broadcast_ip: str,
+    udp_peer_ttl: float,
+) -> Node:
+    return Node(
+        package="udp_bridge",
+        executable="bridge_node",
+        name="udp_bridge",
+        namespace=vehicle_name,
+        parameters=[
+            {
+                "my_port": udp_port,
+                "all_ports": udp_all_ports,
+                "broadcast_ip": udp_broadcast_ip,
+                "topics": udp_topics,
+                "peer_ttl": udp_peer_ttl,
+            }
+        ],
+        output="screen",
+    )
+
+
 def _middleware_action(*, sim: bool, config: dict):
     if sim:
         port = int(config.get("middleware_port", 8888))
@@ -506,7 +554,7 @@ def launch_setup(context, *args, **kwargs):
         )
 
     sim = _resolve_bool(config, "sim", False)
-    auto_launch = _resolve_bool(config, "auto_launch", True)
+    auto_launch = _resolve_bool(config, "auto_launch", sim)
     debug = _resolve_bool(config, "debug", False)
     vision_debug = _resolve_bool(config, "vision_debug", False)
     servo_only = _resolve_bool(config, "servo_only", False)
@@ -524,6 +572,7 @@ def launch_setup(context, *args, **kwargs):
     camera_rotate_degrees = float(
         config.get("camera_rotate_degrees", 0.0 if sim else 180.0)
     )
+    camera_calibration_file = str(config.get("camera_calibration_file", "")).strip()
     camera_preprocess_hook = str(config.get("camera_preprocess_hook", "")).strip()
     camera_input_transport = _resolve_camera_input_transport(
         mission_spec=mission_spec,
@@ -570,7 +619,10 @@ def launch_setup(context, *args, **kwargs):
             rotate_degrees=camera_rotate_degrees,
             preprocess_hook=camera_preprocess_hook,
             camera_info_url=(
-                _payload_camera_info_url_for(vehicle_name)
+                _payload_camera_info_url_for(
+                    vehicle_name,
+                    camera_calibration_file=camera_calibration_file,
+                )
                 if mission_spec.is_payload and not sim
                 else ""
             ),
@@ -625,11 +677,25 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
+    raw_udp_port = config.get(
+        "udp_port"
+    )  # None = auto-compute, 0 = disabled, >0 = explicit
+    if raw_udp_port is None:
+        m = re.search(r"_(\d+)$", vehicle_name)
+        udp_port = (5000 + int(m.group(1))) if m else 0
+    else:
+        udp_port = int(raw_udp_port)
+    udp_all_ports = list(config.get("udp_all_ports") or [5000, 5001, 5002, 5003])
+    udp_topics = list(
+        config.get("udp_topics")
+        or ["heartbeat:payload_interfaces/msg/PayloadHeartbeat"]
+    )
+    udp_broadcast_ip = str(config.get("udp_broadcast_ip") or "10.42.0.255").strip()
+    udp_peer_ttl = float(config.get("udp_peer_ttl") or 3.0)
+
     actions = []
     if mission_spec.is_payload and launch_payload_backend:
-        payload_controller = str(config.get("payload_controller", "")).strip()
-        if sim and not payload_controller:
-            payload_controller = "SimController"
+        payload_controller = "SimController" if sim else "GPIOController"
         actions.append(
             _payload_launch_action(
                 vehicle_name=vehicle_name,
@@ -639,6 +705,22 @@ def launch_setup(context, *args, **kwargs):
         )
 
     actions.extend(camera_actions)
+
+    if mission_spec.is_payload and not sim and udp_port:
+        logger.info(
+            f"Launching UDP bridge for '{vehicle_name}' on port {udp_port} "
+            f"(peers: {[p for p in udp_all_ports if p != udp_port]})."
+        )
+        actions.append(
+            _udp_bridge_action(
+                vehicle_name=vehicle_name,
+                udp_port=udp_port,
+                udp_all_ports=udp_all_ports,
+                udp_topics=udp_topics,
+                udp_broadcast_ip=udp_broadcast_ip,
+                udp_peer_ttl=udp_peer_ttl,
+            )
+        )
 
     if mission_spec.is_uav and launch_middleware:
         actions.append(_middleware_action(sim=sim, config=config))

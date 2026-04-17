@@ -13,7 +13,7 @@ modes:
       # hue bands around each target, S/V ≥100 to tolerate real lighting.
       ccw_lower_hsv: [100, 100, 100] # blue  (was [100, 100, 100])
       ccw_upper_hsv: [130, 255, 255] #        (was [140, 255, 255])
-      cw_lower_hsv: [170, 140, 120]   # red   (was [0, 100, 100])
+      cw_lower_hsv: [160, 140, 120]   # red/pink   (was [0, 100, 100])
       cw_upper_hsv: [180, 255, 255]  #        (was [10, 255, 255])
       drive_out_speed_mps: 0.1
       detect_frames: 3

@@ -251,6 +251,9 @@ def _single_vehicle_config(context, params: dict) -> tuple[dict, dict | None]:
         "camera_rotate_degrees": float(
             params.get("camera_rotate_degrees", 0.0 if sim else 180.0)
         ),
+        "camera_calibration_file": str(
+            params.get("camera_calibration_file", "")
+        ).strip(),
         "camera_preprocess_hook": str(params.get("camera_preprocess_hook", "")).strip(),
         "camera_mount_offsets": list(
             params.get("camera_mount_offsets", [0.0, 0.0, 0.0])
@@ -264,6 +267,17 @@ def _single_vehicle_config(context, params: dict) -> tuple[dict, dict | None]:
         "launch_px4_sitl": bool(sim and mission_spec.is_uav),
         "launch_payload_backend": mission_spec.is_payload,
         "sim_entity_name": vehicle_name,
+        # udp_port: None = auto-compute (payload_N → 5000+N), 0 = disabled, >0 = explicit
+        "udp_port": params.get("udp_port"),
+        "udp_all_ports": list(params.get("udp_all_ports") or [5000, 5001, 5002, 5003]),
+        "udp_topics": list(
+            params.get("udp_topics")
+            or ["heartbeat:payload_interfaces/msg/PayloadHeartbeat"]
+        ),
+        "udp_broadcast_ip": str(
+            params.get("udp_broadcast_ip") or "10.42.0.255"
+        ).strip(),
+        "udp_peer_ttl": float(params.get("udp_peer_ttl") or 3.0),
     }
     if vehicle_class_name is not None:
         vehicle_config["vehicle_class"] = vehicle_class_name

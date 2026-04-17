@@ -65,6 +65,9 @@ defaults:
   # Rotate incoming camera images clockwise by this many degrees before vision.
   camera_rotate_degrees: 0.0
 
+  # Packaged payload camera calibration filename from uav/config/camera_calibrations.
+  camera_calibration_file: payload_0_camera_info.yaml
+
   # Optional Python hook to preprocess images before they reach vision nodes.
   # Leave blank to disable. This must resolve inside the runtime environment.
   camera_preprocess_hook: ""
@@ -102,5 +105,24 @@ vehicles:
     vision_debug: true
     camera_input_transport: compressed
     camera_rotate_degrees: 180.0
-    network_role: ap
+    # camera_calibration_file: payload_front_camera_info.yaml
     # camera_preprocess_hook: my_package.my_module:preprocess
+    network_role: ap
+
+    # UDP bridge (payload hardware only). All params are optional.
+    #
+    # udp_port: omit to auto-assign from vehicle name (payload_N → 5000+N).
+    #   Set to 0 to disable the UDP bridge for this vehicle.
+    # udp_port: 5000
+    #
+    # udp_all_ports: all peer ports in the fleet (including this vehicle's port).
+    #   Default: [5000, 5001, 5002, 5003]
+    # udp_all_ports: [5000, 5001, 5002, 5003]
+    #
+    # udp_topics: topics to bridge as "topic_name:pkg/msg/MsgType" pairs.
+    #   Default: PayloadHeartbeat on topic "heartbeat"
+    # udp_topics:
+    #   - "heartbeat:payload_interfaces/msg/PayloadHeartbeat"
+    #
+    # udp_broadcast_ip: subnet broadcast address. Default: 10.42.0.255
+    # udp_broadcast_ip: "10.42.0.255"

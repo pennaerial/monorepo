@@ -3,7 +3,12 @@ import {
   jsonResponse,
   makeConfigResponse,
   makeEmptyBuildSource,
+  makeFleetFileResponse,
+  makeMissionCatalogResponse,
+  makeFleetSchemaResponse,
   makeGithubBuildSource,
+  makeLocalArtifactBuildSource,
+  makeLocalCodebaseBuildSource,
 } from './fixtures.js'
 
 async function fulfill(route, body, status = 200) {
@@ -49,9 +54,13 @@ export async function installApiMocks(page, scenario = {}) {
     missionStateGetCount: 0,
     missionNamesGetCount: 0,
     schemaGetCount: 0,
+    fleetSchemaGetCount: 0,
+    missionCatalogGetCount: 0,
     missionFileGetCount: 0,
+    fleetFileGetCount: 0,
     launchLogsGetCount: 0,
     selectedBuildSource: scenario.initialBuildSource || makeEmptyBuildSource(),
+    fleetFileContent: scenario.initialFleetFileContent || makeFleetFileResponse().content,
   }
 
   await page.route('**/api/**', async route => {
@@ -158,6 +167,54 @@ export async function installApiMocks(page, scenario = {}) {
         { ...context, fallback: state.selectedBuildSource }
       )
       state.selectedBuildSource = response
+      return fulfill(route, response)
+    }
+
+    if (pathname === '/api/build-source/local-artifact' && method === 'POST') {
+      const response = await resolveValue(
+        scenario.buildSourcePostLocalArtifact || makeLocalArtifactBuildSource(),
+        { ...context, fallback: state.selectedBuildSource }
+      )
+      state.selectedBuildSource = response
+      return fulfill(route, response)
+    }
+
+    if (pathname === '/api/build-source/local-codebase' && method === 'POST') {
+      const response = await resolveValue(
+        scenario.buildSourcePostLocalCodebase || makeLocalCodebaseBuildSource(),
+        { ...context, fallback: state.selectedBuildSource }
+      )
+      state.selectedBuildSource = response
+      return fulfill(route, response)
+    }
+
+    if (pathname === '/api/build-source/fleet-file' && method === 'GET') {
+      const index = state.fleetFileGetCount++
+      const response = await resolveValue(
+        scenario.fleetFileGet || (({ state: mockState }) => makeFleetFileResponse({ content: mockState.fleetFileContent })),
+        { ...context, index, fallback: makeFleetFileResponse({ content: state.fleetFileContent }) }
+      )
+      return fulfill(route, response)
+    }
+
+    if (pathname === '/api/build-source/fleet-file' && method === 'POST') {
+      const postData = await request.postDataBuffer()
+      const rawText = postData ? postData.toString('utf-8') : ''
+      const urlEncodedMatch = rawText.match(/(?:^|&)content=([^&]*)/)
+      const multipartMatch = rawText.match(/name="content"\r\n\r\n([\s\S]*?)\r\n--/)
+      if (urlEncodedMatch) {
+        state.fleetFileContent = decodeURIComponent(urlEncodedMatch[1].replace(/\+/g, ' '))
+      } else if (multipartMatch) {
+        state.fleetFileContent = multipartMatch[1]
+      }
+      const response = await resolveValue(
+        scenario.fleetFilePost || {
+          success: true,
+          fleet_file: state.selectedBuildSource?.fleet_file || 'payload_corner_navigation.yaml',
+          output: 'Fleet YAML updated',
+        },
+        { ...context, fallback: { success: true, fleet_file: state.selectedBuildSource?.fleet_file || 'payload_corner_navigation.yaml', output: 'Fleet YAML updated' } }
+      )
       return fulfill(route, response)
     }
 
@@ -283,6 +340,24 @@ export async function installApiMocks(page, scenario = {}) {
             fleet_document_schema: {},
           },
         }
+      )
+      return fulfill(route, response)
+    }
+
+    if (pathname === '/api/schema/fleet' && method === 'GET') {
+      const index = state.fleetSchemaGetCount++
+      const response = await resolveValue(
+        scenario.fleetSchemaGet || makeFleetSchemaResponse(),
+        { ...context, index, fallback: makeFleetSchemaResponse() }
+      )
+      return fulfill(route, response)
+    }
+
+    if (pathname === '/api/schema/missions' && method === 'GET') {
+      const index = state.missionCatalogGetCount++
+      const response = await resolveValue(
+        scenario.missionCatalogGet || makeMissionCatalogResponse(),
+        { ...context, index, fallback: makeMissionCatalogResponse() }
       )
       return fulfill(route, response)
     }

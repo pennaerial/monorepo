@@ -26,6 +26,7 @@ class FleetDefaultsModel(BaseModel):
     camera_mount_offsets: tuple[float, float, float] | None = None
     camera_input_transport: str | None = None
     camera_rotate_degrees: float | None = None
+    camera_calibration_file: str | None = None
     camera_preprocess_hook: str | None = None
     network_role: Literal["default", "ap", "client"] | None = None
     allowed_ap_vehicles: list[str] | None = None
@@ -78,6 +79,13 @@ class FleetVehicleModel(FleetDefaultsModel):
     custom_airframe_model: str | None = None
     model: str | None = None
     sim: bool | None = None
+
+    # UDP bridge (payload hardware only). None = auto-assign port from vehicle name.
+    udp_port: int | None = None
+    udp_all_ports: list[int] | None = None
+    udp_topics: list[str] | None = None
+    udp_broadcast_ip: str | None = None
+    udp_peer_ttl: float | None = None
 
     @model_validator(mode="after")
     def _require_name(self) -> "FleetVehicleModel":
