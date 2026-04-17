@@ -142,14 +142,27 @@ def test_schema_index_exposes_missions_fleet_and_modes():
         for section in payload["fleet"]["sections"]
         if section["name"] == "vehicle.hardware"
     )
+    defaults_section = next(
+        section
+        for section in payload["fleet"]["sections"]
+        if section["name"] == "defaults"
+    )
     assert {field["name"] for field in vehicle_sim["fields"]} >= {
         "controllable",
         "px4_instance",
+    }
+    assert {field["name"] for field in defaults_section["fields"]} >= {
+        "network_role",
+        "allowed_ap_vehicles",
+        "ap_selection",
     }
     assert {field["name"] for field in vehicle_hardware["fields"]} >= {
         "px4_airframe_id",
         "px4_namespace",
         "payload_controller",
+        "network_role",
+        "allowed_ap_vehicles",
+        "ap_selection",
     }
 
 

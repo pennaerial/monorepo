@@ -603,10 +603,11 @@ def test_mission_state_accepts_hostname_scope(client, monkeypatch):
 def test_fleet_action_accepts_query_scoped_single_device(client, monkeypatch):
     from backend.services import fleet as fleet_service
 
-    async def fake_batch_action(ctx, *, action, devices=None):
+    async def fake_batch_action(ctx, *, action, devices=None, session_assignments=None):
         assert action == "prepare"
         assert devices is not None
         assert len(devices) == 1
+        assert session_assignments is None
         selection = devices[0]
         assert selection.hostname == "pi-1.local"
         assert selection.vehicle_name == "uav_0"
@@ -676,11 +677,238 @@ def test_fleet_action_accepts_query_scoped_single_device(client, monkeypatch):
     assert payload["results"][0]["vehicle_name"] == "uav_0"
 
 
+def test_build_deploy_route_accepts_network_policy_fields(client, monkeypatch):
+    from backend.services import deploy as deploy_service
+
+    captured: dict[str, object] = {}
+
+    async def fake_deploy_selected_source(
+        ctx,
+        *,
+        target_ctx=None,
+        target_id=None,
+        network_policy_override=None,
+        session_assignments=None,
+    ):
+        captured["target_ctx"] = target_ctx
+        captured["target_id"] = target_id
+        captured["network_policy_override"] = network_policy_override
+        captured["session_assignments"] = session_assignments
+        return {"success": True, "output": "deployed"}
+
+    monkeypatch.setattr(
+        deploy_service, "deploy_selected_source", fake_deploy_selected_source
+    )
+
+    response = client.post(
+        "/api/builds/deploy-selected",
+        data={
+            "hostname": "pi-1.local",
+            "vehicle_name": "uav_0",
+            "network_role": "client",
+            "allowed_ap_hosts": ["pi-ap-1.local", "pi-ap-2.local"],
+            "ap_selection": "ordered_then_strongest",
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["success"] is True
+    assert captured["target_ctx"].target.pi_host == "pi-1.local"
+    assert captured["network_policy_override"].model_dump() == {
+        "network_role": "client",
+        "allowed_ap_hosts": ["pi-ap-1.local", "pi-ap-2.local"],
+        "ap_selection": "ordered_then_strongest",
+    }
+    assert captured["session_assignments"] is None
+
+
+def test_fleet_deploy_route_accepts_query_scoped_network_policy_fields(
+    client, monkeypatch
+):
+    from backend.services import fleet as fleet_service
+
+    async def fake_batch_action(ctx, *, action, devices=None, session_assignments=None):
+        assert action == "deploy"
+        assert devices is not None
+        assert len(devices) == 1
+        assert session_assignments is None
+        selection = devices[0]
+        assert selection.hostname == "pi-1.local"
+        assert selection.vehicle_name == "uav_0"
+        assert selection.network_role == "ap"
+        assert selection.allowed_ap_vehicles == ["payload_0", "payload_1"]
+        assert selection.ap_selection == "strongest"
+        return {
+            "success": True,
+            "action": action,
+            "build_source": {
+                "success": True,
+                "source": {
+                    "kind": "none",
+                    "summary": "none",
+                },
+            },
+            "fleet_catalog": {
+                "success": True,
+                "source_kind": "none",
+                "fleet_vehicles": [],
+            },
+            "fleet_vehicles": [],
+            "results": [
+                {
+                    "hardware_id": "pi-1.local",
+                    "hostname": "pi-1.local",
+                    "addresses": [],
+                    "service_name": None,
+                    "service_type": None,
+                    "matched_target_id": None,
+                    "matched_label": None,
+                    "saved": False,
+                    "target_id": "pi-1.local",
+                    "vehicle_name": "uav_0",
+                    "fleet_vehicle": None,
+                    "connection": None,
+                    "current_build": None,
+                    "runtime": None,
+                    "readiness": {
+                        "connected": False,
+                        "build_installed": False,
+                        "runtime_ready": False,
+                        "vehicle_assigned": True,
+                        "ready": False,
+                        "notes": [],
+                    },
+                    "action": action,
+                    "success": True,
+                    "output": "deployed",
+                    "error": None,
+                }
+            ],
+            "summary": {
+                "requested_devices": 1,
+                "successful_devices": 1,
+                "failed_devices": 0,
+            },
+            "error": None,
+        }
+
+    monkeypatch.setattr(fleet_service, "batch_action", fake_batch_action)
+
+    response = client.post(
+        "/api/fleet/deploy",
+        params=[
+            ("hostname", "pi-1.local"),
+            ("vehicle_name", "uav_0"),
+            ("network_role", "ap"),
+            ("allowed_ap_vehicles", "payload_0"),
+            ("allowed_ap_vehicles", "payload_1"),
+            ("ap_selection", "strongest"),
+        ],
+    )
+    assert response.status_code == 200
+    assert response.json()["success"] is True
+
+
+def test_fleet_deploy_route_accepts_body_session_assignments(client, monkeypatch):
+    from backend.services import fleet as fleet_service
+
+    async def fake_batch_action(ctx, *, action, devices=None, session_assignments=None):
+        assert action == "deploy"
+        assert devices is not None
+        assert len(devices) == 1
+        assert session_assignments == {
+            "pi-1": "uav_0",
+            "pi-ap-1": "payload_0",
+        }
+        selection = devices[0]
+        assert selection.hostname == "pi-1.local"
+        assert selection.vehicle_name == "uav_0"
+        assert selection.network_role == "client"
+        assert selection.allowed_ap_vehicles == ["payload_0"]
+        assert selection.ap_selection == "ordered_then_strongest"
+        return {
+            "success": True,
+            "action": action,
+            "build_source": {
+                "success": True,
+                "source": {
+                    "kind": "none",
+                    "summary": "none",
+                },
+            },
+            "fleet_catalog": {
+                "success": True,
+                "source_kind": "none",
+                "fleet_vehicles": [],
+            },
+            "fleet_vehicles": [],
+            "results": [
+                {
+                    "hardware_id": "pi-1.local",
+                    "hostname": "pi-1.local",
+                    "addresses": [],
+                    "service_name": None,
+                    "service_type": None,
+                    "matched_target_id": None,
+                    "matched_label": None,
+                    "saved": False,
+                    "target_id": "pi-1.local",
+                    "vehicle_name": "uav_0",
+                    "fleet_vehicle": None,
+                    "connection": None,
+                    "current_build": None,
+                    "runtime": None,
+                    "readiness": {
+                        "connected": False,
+                        "build_installed": False,
+                        "runtime_ready": False,
+                        "vehicle_assigned": True,
+                        "ready": False,
+                        "notes": [],
+                    },
+                    "action": action,
+                    "success": True,
+                    "output": "deployed",
+                    "error": None,
+                }
+            ],
+            "summary": {
+                "requested_devices": 1,
+                "successful_devices": 1,
+                "failed_devices": 0,
+            },
+            "error": None,
+        }
+
+    monkeypatch.setattr(fleet_service, "batch_action", fake_batch_action)
+
+    response = client.post(
+        "/api/fleet/deploy",
+        json={
+            "devices": [
+                {
+                    "hostname": "pi-1.local",
+                    "vehicle_name": "uav_0",
+                    "network_role": "client",
+                    "allowed_ap_vehicles": ["payload_0"],
+                    "ap_selection": "ordered_then_strongest",
+                }
+            ],
+            "session_assignments": {
+                "pi-1.local": "uav_0",
+                "pi-ap-1.local": "payload_0",
+            },
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["success"] is True
+
+
 def test_fleet_action_failure_response_marks_top_level_failure(client, monkeypatch):
     from backend.services import fleet as fleet_service
 
-    async def fake_batch_action(ctx, *, action, devices=None):
+    async def fake_batch_action(ctx, *, action, devices=None, session_assignments=None):
         assert action == "deploy"
+        assert session_assignments is None
         return {
             "success": False,
             "action": action,
@@ -821,6 +1049,9 @@ def test_build_source_routes_round_trip(client, tmp_path):
             "px4_airframe_id": None,
             "px4_namespace": None,
             "payload_controller": None,
+            "network_role": None,
+            "allowed_ap_vehicles": [],
+            "ap_selection": None,
         }
     ]
 

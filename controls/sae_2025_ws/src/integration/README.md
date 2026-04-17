@@ -80,13 +80,38 @@ This creates a `dist/` folder with optimized static files you can serve with any
 
 ## Provisioning a Pi
 
-For first-time Pi setup, use (where `x` is a number):
+For first-time Pi setup, use one of these patterns (where `x` is a number):
 
 ```bash
+# Default client-mode Pi. Uses the default travel router profile:
+#   SSID: pennair_5G
+#   PSK:  pennair123!
+# Default fallback AP PSK: pennair123!
 cd /home/penn/monorepo/controls/sae_2025_ws
 scripts/hardware/provision-pi.sh \
   --hostname air-0x \
   --authorized-key-url https://raw.githubusercontent.com/pennaerial/monorepo/main/controls/sae_2025_ws/ops/keys/pennair_pi_ed25519.pub
+```
+
+```bash
+# AP-capable Pi. If pennair_5G is unavailable, this Pi will host
+# a fallback AP named pennair-ap-<hostname>.
+cd /home/penn/monorepo/controls/sae_2025_ws
+scripts/hardware/provision-pi.sh \
+  --hostname air-0x \
+  --authorized-key-url https://raw.githubusercontent.com/pennaerial/monorepo/main/controls/sae_2025_ws/ops/keys/pennair_pi_ed25519.pub \
+  --network-role ap
+```
+
+```bash
+# Optional: if you want bootstrap-time client fallback restricted to specific
+# AP Pis before any fleet deploy override exists, pin the allowed AP hostnames here.
+cd /home/penn/monorepo/controls/sae_2025_ws
+scripts/hardware/provision-pi.sh \
+  --hostname payload-01 \
+  --authorized-key-url https://raw.githubusercontent.com/pennaerial/monorepo/main/controls/sae_2025_ws/ops/keys/pennair_pi_ed25519.pub \
+  --network-role client \
+  --allowed-ap-hosts air-01,air-02
 ```
 
 That script configures:
@@ -96,7 +121,7 @@ That script configures:
 - the deploy user (default: `penn`)
 - SSH authorized keys
 - optional passwordless sudo for the deploy user
-- the existing hardware bootstrap path
+- the existing hardware bootstrap path, including default NetworkManager failover setup
 
 Recommended naming:
 - hostname: `air-0x.local`
@@ -107,6 +132,9 @@ Keep physical Pi identity in the hostname. Use inventory `vehicle_name` for the 
 Notes:
 - run the provisioning script on the Pi itself
 - ROS 2 Humble still needs to exist on the Pi at `/opt/ros/humble`
+- the default travel-router profile is `pennair_5G` / `pennair123!`, and the default fallback AP PSK is also `pennair123!`; override them with `--travel-router-ssid`, `--travel-router-psk`, and `--fallback-psk` if needed
+- bootstrap-time fallback targeting is still host-based via `--allowed-ap-hosts`, but that list is optional; if omitted, client-mode Pis discover any visible PennAiR fallback AP matching the configured prefix
+- the integration fleet deploy UI is vehicle-based and resolves vehicles to hostnames at deploy time
 - the script now attempts NTP time sync before any `apt` work and falls back to an HTTP `Date` header if NTP is unreachable, but broken third-party apt repos on the Pi can still block provisioning
 - if an existing Pi was provisioned before this change, rerun `provision-pi.sh` once so `/etc/avahi/services/ssh.service` is installed
 - `--no-bootstrap` skips the deploy-root/systemd install if you only want hostname/user/SSH setup

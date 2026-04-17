@@ -2388,12 +2388,20 @@ function normalizeBackendBuildSource(raw) {
   const kindHint = `${payload.kind || payload.source_kind || payload.source_type || payload.type || sourceString || ''}`.trim().toLowerCase()
   const normalizedKind = kindHint.replace(/_/g, '-')
   const fleetVehicles = Array.isArray(payload.fleet_vehicles)
-    ? payload.fleet_vehicles.map(vehicle => ({
-      name: `${vehicle?.name || ''}`.trim(),
-      kind: vehicle?.kind ? `${vehicle.kind}`.trim() : '',
-      mission: vehicle?.mission ? `${vehicle.mission}`.trim() : '',
-      missionPath: vehicle?.mission_path ? `${vehicle.mission_path}`.trim() : '',
-    })).filter(vehicle => vehicle.name)
+    ? payload.fleet_vehicles.map(vehicle => {
+      const rawVehicle = vehicle && typeof vehicle === 'object' ? vehicle : {}
+      return {
+        ...rawVehicle,
+        name: `${rawVehicle?.name || ''}`.trim(),
+        kind: rawVehicle?.kind ? `${rawVehicle.kind}`.trim() : '',
+        mission: rawVehicle?.mission ? `${rawVehicle.mission}`.trim() : '',
+        missionPath: rawVehicle?.mission_path
+          ? `${rawVehicle.mission_path}`.trim()
+          : rawVehicle?.missionPath
+            ? `${rawVehicle.missionPath}`.trim()
+            : '',
+      }
+    }).filter(vehicle => vehicle.name)
     : []
   const fleetOptions = normalizeFleetOptions(
     payload.available_fleets || payload.availableFleets || payload.fleet_options || payload.fleetOptions || payload.fleet_files || payload.fleetFiles || payload.fleet_catalog || payload.fleetCatalog
@@ -2926,6 +2934,11 @@ function AssignmentCard({
   deployResult,
   assignmentResult,
   hostname = '',
+  deployDeviceCount = 0,
+  networkPolicyDraft,
+  deployAssignments = {},
+  deployTargets = [],
+  onNetworkPolicyChange,
   onChange,
   onDeploy,
 }) {
@@ -2935,6 +2948,55 @@ function AssignmentCard({
   const deploymentStatus = deploymentStatusSummary(buildSource, buildInfo)
   const canDeploy = Boolean(hostname && assignedVehicleName && buildSourceLoaded && sourceSummary.ready && !buildSourceWorking)
   const deployButtonLabel = deploymentStatus.matched ? 'Deploy Fleet Context Again' : 'Deploy Fleet Context'
+  const fleetPolicySources = useMemo(() => fleetWifiPolicySources(selectedVehicle), [selectedVehicle])
+  const fleetWifiPolicy = useMemo(() => summarizeFleetWifiPolicy(selectedVehicle), [selectedVehicle])
+  const fleetAllowedApVehicles = useMemo(
+    () => firstFleetPolicyList(fleetPolicySources, ['allowed_ap_vehicles', 'allowedApVehicles']),
+    [fleetPolicySources]
+  )
+  const fleetNetworkRole = useMemo(
+    () => firstFleetPolicyText(fleetPolicySources, ['network_role', 'networkRole', 'runtime_network_role', 'runtimeNetworkRole']),
+    [fleetPolicySources]
+  )
+  const {
+    networkRole,
+    allowedApVehicles,
+    apSelection,
+  } = useMemo(() => normalizeDeployNetworkPolicyDraft(networkPolicyDraft), [networkPolicyDraft])
+  const effectiveNetworkRole = networkRole !== 'default' ? networkRole : fleetNetworkRole || 'default'
+  const availableApVehicles = useMemo(
+    () => fleetVehicles
+      .map(vehicle => ({
+        ...vehicle,
+        name: normalizeVehicleName(vehicle?.name),
+      }))
+      .filter(vehicle => vehicle.name && vehicle.name !== normalizeVehicleName(assignedVehicleName)),
+    [assignedVehicleName, fleetVehicles]
+  )
+  const availableApVehicleNameSet = useMemo(
+    () => new Set(availableApVehicles.map(vehicle => vehicle.name)),
+    [availableApVehicles]
+  )
+  const unavailableAllowedApVehicles = useMemo(
+    () => allowedApVehicles.filter(vehicle => !availableApVehicleNameSet.has(vehicle)),
+    [allowedApVehicles, availableApVehicleNameSet]
+  )
+  const previewApVehicles = allowedApVehicles.length > 0 ? allowedApVehicles : fleetAllowedApVehicles
+  const previewPolicySource = allowedApVehicles.length > 0 ? 'Operator override' : 'Fleet policy'
+  const resolvedApHostPreview = useMemo(() => {
+    if (effectiveNetworkRole === 'ap' || previewApVehicles.length === 0) return null
+    return resolveAllowedApVehicleHosts({
+      currentHostname: hostname,
+      allowedApVehicles: previewApVehicles,
+      sessionAssignments: deployAssignments,
+      targets: deployTargets,
+    })
+  }, [deployAssignments, deployTargets, effectiveNetworkRole, hostname, previewApVehicles])
+  const deployScopeDetail = deployDeviceCount > 1
+    ? `Deploy sends ${deployDeviceCount} assigned devices from the current session in one batch.`
+    : deployDeviceCount === 1
+      ? 'Deploy sends the current session assignment for this device.'
+      : 'Assign at least one device in this session before deploying.'
 
   return (
     <div className="card assignment-card">
@@ -2979,6 +3041,139 @@ function AssignmentCard({
             </p>
           </div>
         </div>
+        <div className="settings-field settings-field-full">
+          <div className="info-box compact-info assignment-detail-card">
+            <strong>Deploy scope</strong>
+            <p>{deployScopeDetail}</p>
+          </div>
+        </div>
+        {fleetWifiPolicy && (
+          <div className="info-box compact-info settings-field settings-field-full">
+            <strong>Fleet-authored Wi-Fi policy</strong>
+            <div className="overview-stack">
+              {fleetWifiPolicy.map(entry => (
+                <div key={entry.label} className="overview-row">
+                  <span>{entry.label}</span>
+                  <strong>{entry.value}</strong>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {hostname && (
+          <>
+            <div className="settings-field">
+              <label>Runtime Wi-Fi role</label>
+              <select
+                value={networkRole}
+                onChange={e => onNetworkPolicyChange?.({ networkRole: e.target.value })}
+                disabled={deploying}
+              >
+                <option value="default">Use bootstrap default</option>
+                <option value="ap">Force AP fallback</option>
+                <option value="client">Force client fallback</option>
+              </select>
+            </div>
+            <div className="settings-field">
+              <label>Fallback AP selection</label>
+              <select
+                value={apSelection}
+                onChange={e => onNetworkPolicyChange?.({ apSelection: e.target.value })}
+                disabled={deploying}
+              >
+                <option value="ordered_then_strongest">Ordered, then strongest</option>
+                <option value="strongest">Strongest visible AP</option>
+              </select>
+            </div>
+            <div className="settings-field settings-field-full">
+              <label>Allowed fallback AP vehicles</label>
+              {availableApVehicles.length > 0 ? (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.45rem' }}>
+                  {availableApVehicles.map(vehicle => {
+                    const vehicleRole = formatFleetPolicyValue(vehicle.network_role || vehicle.networkRole || '')
+                    const vehicleDetails = [
+                      vehicleRole ? `role ${vehicleRole}` : '',
+                      vehicle.mission ? `mission ${vehicle.mission}` : '',
+                    ].filter(Boolean).join(' · ') || 'Resolve this vehicle to its assigned host at deploy time.'
+
+                    return (
+                      <label key={vehicle.name} className="toggle-card">
+                        <input
+                          type="checkbox"
+                          checked={allowedApVehicles.includes(vehicle.name)}
+                          onChange={e => onNetworkPolicyChange?.({
+                            allowedApVehicles: e.target.checked
+                              ? normalizeVehicleNameList([...allowedApVehicles, vehicle.name])
+                              : allowedApVehicles.filter(candidate => candidate !== vehicle.name),
+                          })}
+                          disabled={deploying}
+                        />
+                        <div>
+                          <span className="toggle-card-title">{vehicle.name}</span>
+                          <p className="param-help">{vehicleDetails}</p>
+                        </div>
+                      </label>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div className="info-box compact-info">
+                  <p>No other fleet vehicles are available for AP fallback.</p>
+                </div>
+              )}
+              {unavailableAllowedApVehicles.length > 0 && (
+                <p className="subtext left-note">
+                  Current override references vehicles outside this fleet: {unavailableAllowedApVehicles.join(', ')}.
+                </p>
+              )}
+              <p className="subtext left-note">
+                {allowedApVehicles.length > 0
+                  ? `Deploy overrides the fleet AP vehicle policy with ${allowedApVehicles.join(', ')}.`
+                  : fleetAllowedApVehicles.length > 0
+                    ? `Leave all unchecked to use the fleet-authored vehicles: ${fleetAllowedApVehicles.join(', ')}.`
+                    : 'Leave all unchecked to keep the fleet-authored policy. Selected vehicles resolve to assigned hosts at deploy time.'}
+              </p>
+              {effectiveNetworkRole === 'ap' ? (
+                <p className="subtext left-note">
+                  AP host resolution is ignored while forcing AP fallback.
+                </p>
+              ) : resolvedApHostPreview && (
+                <div className="info-box compact-info" style={{ marginTop: '0.45rem' }}>
+                  <strong>Resolved fallback AP hosts</strong>
+                  <div className="overview-stack">
+                    <div className="overview-row">
+                      <span>Source</span>
+                      <strong>{previewPolicySource}</strong>
+                    </div>
+                    {resolvedApHostPreview.resolvedHosts.length > 0 && (
+                      <div className="overview-row">
+                        <span>Hosts</span>
+                        <strong>{resolvedApHostPreview.resolvedHosts.join(', ')}</strong>
+                      </div>
+                    )}
+                    {resolvedApHostPreview.unresolvedVehicles.length > 0 && (
+                      <div className="overview-row">
+                        <span>Waiting on assignment</span>
+                        <strong>{resolvedApHostPreview.unresolvedVehicles.join(', ')}</strong>
+                      </div>
+                    )}
+                    {resolvedApHostPreview.ambiguousVehicles.length > 0 && (
+                      <div className="overview-row">
+                        <span>Ambiguous vehicles</span>
+                        <strong>{resolvedApHostPreview.ambiguousVehicles.join(' · ')}</strong>
+                      </div>
+                    )}
+                  </div>
+                  {resolvedApHostPreview.resolvedHosts.length === 0
+                    && resolvedApHostPreview.unresolvedVehicles.length === 0
+                    && resolvedApHostPreview.ambiguousVehicles.length === 0 && (
+                    <p className="subtext left-note">No separate fallback AP hosts resolve from the current assignments yet.</p>
+                  )}
+                </div>
+              )}
+            </div>
+          </>
+        )}
         {buildSourceWorking && (
           <div className="busy-banner settings-field-full" aria-live="polite">
             Build and fleet context is updating. Deploy actions are locked.
@@ -3009,6 +3204,284 @@ function AssignmentCard({
       </div>
     </div>
   )
+}
+
+function normalizeVehicleName(value) {
+  return `${value || ''}`.trim()
+}
+
+function normalizeVehicleNameList(value) {
+  const rawValues = Array.isArray(value)
+    ? value
+    : value === undefined || value === null
+      ? []
+      : [value]
+  const normalized = []
+  const seen = new Set()
+
+  rawValues.forEach(raw => {
+    const parts = typeof raw === 'string' ? raw.split(/[\n,]+/) : [raw]
+    parts.forEach(part => {
+      const candidate = normalizeVehicleName(part)
+      if (!candidate || seen.has(candidate)) return
+      seen.add(candidate)
+      normalized.push(candidate)
+    })
+  })
+
+  return normalized
+}
+
+function defaultDeployNetworkPolicyDraft() {
+  return {
+    networkRole: 'default',
+    allowedApVehicles: [],
+    apSelection: 'ordered_then_strongest',
+  }
+}
+
+function normalizeDeployNetworkPolicyDraft(raw) {
+  const fallback = defaultDeployNetworkPolicyDraft()
+  if (!raw || typeof raw !== 'object') return fallback
+  return {
+    networkRole: ['default', 'ap', 'client'].includes(raw.networkRole) ? raw.networkRole : fallback.networkRole,
+    allowedApVehicles: normalizeVehicleNameList(
+      raw.allowedApVehicles
+      ?? raw.allowed_ap_vehicles
+      ?? raw.allowedApVehiclesText
+    ),
+    apSelection: ['ordered_then_strongest', 'strongest'].includes(raw.apSelection)
+      ? raw.apSelection
+      : fallback.apSelection,
+  }
+}
+
+function toFleetDeployText(value) {
+  const text = `${value ?? ''}`.trim()
+  return text || undefined
+}
+
+function buildFleetDeploySelection({
+  hostKey,
+  vehicleName,
+  target = null,
+  liveDevice = null,
+  networkPolicyDraft = null,
+}) {
+  const draft = normalizeDeployNetworkPolicyDraft(networkPolicyDraft)
+  const allowedApVehicles = normalizeVehicleNameList(draft.allowedApVehicles)
+  const hostname = toFleetDeployText(liveDevice?.hostname || target?.pi_host || target?.hostname || hostKey)
+  const resolvedVehicleName = toFleetDeployText(vehicleName)
+  if (!hostname || !resolvedVehicleName) return null
+
+  const selection = {
+    hostname,
+    vehicle_name: resolvedVehicleName,
+  }
+
+  const targetId = toFleetDeployText(getTargetId(target) || hostname)
+  const label = toFleetDeployText(target?.label || target?.name || target?.hostname || target?.pi_host || hostname)
+  const piUser = toFleetDeployText(target?.pi_user)
+  const deployRoot = toFleetDeployText(target?.deploy_root)
+  const serviceUnit = toFleetDeployText(target?.service_unit)
+  const sshKey = toFleetDeployText(target?.ssh_key)
+  const sshPass = toFleetDeployText(target?.ssh_pass)
+
+  if (targetId) selection.target_id = targetId
+  if (label) selection.label = label
+  if (piUser) selection.pi_user = piUser
+  if (deployRoot) selection.deploy_root = deployRoot
+  if (serviceUnit) selection.service_unit = serviceUnit
+  if (sshKey) selection.ssh_key = sshKey
+  if (sshPass) selection.ssh_pass = sshPass
+  if (draft.networkRole !== 'default') selection.network_role = draft.networkRole
+  if (allowedApVehicles.length > 0) selection.allowed_ap_vehicles = allowedApVehicles
+  if (
+    draft.apSelection
+    && (
+      selection.network_role
+      || allowedApVehicles.length > 0
+      || draft.apSelection !== defaultDeployNetworkPolicyDraft().apSelection
+    )
+  ) {
+    selection.ap_selection = draft.apSelection
+  }
+
+  return selection
+}
+
+function buildAssignedVehicleHostLookup(sessionAssignments = {}, targets = []) {
+  const resolved = new Map()
+  const ambiguous = new Map()
+
+  const recordAssignment = (hostValue, vehicleValue) => {
+    const host = normalizeHostname(hostValue)
+    const vehicle = normalizeVehicleName(vehicleValue)
+    if (!host || !vehicle) return
+
+    const existing = resolved.get(vehicle)
+    if (existing && existing !== host) {
+      const collisions = ambiguous.get(vehicle) || new Set([existing])
+      collisions.add(host)
+      ambiguous.set(vehicle, collisions)
+      return
+    }
+    resolved.set(vehicle, host)
+  }
+
+  Object.entries(sessionAssignments || {}).forEach(([host, vehicle]) => {
+    recordAssignment(host, vehicle)
+  })
+
+  ;(Array.isArray(targets) ? targets : []).forEach(target => {
+    const vehicle = normalizeVehicleName(target?.vehicle_name || target?.vehicleName)
+    if (!vehicle || resolved.has(vehicle)) return
+    recordAssignment(target?.pi_host || target?.hostname || target?.target_id, vehicle)
+  })
+
+  return {
+    resolved,
+    ambiguous: new Map(Array.from(ambiguous.entries()).map(([vehicle, hosts]) => [vehicle, Array.from(hosts).sort()])),
+  }
+}
+
+function resolveAllowedApVehicleHosts({
+  currentHostname = '',
+  allowedApVehicles = [],
+  sessionAssignments = {},
+  targets = [],
+}) {
+  const { resolved, ambiguous } = buildAssignedVehicleHostLookup(sessionAssignments, targets)
+  const currentHost = normalizeHostname(currentHostname)
+  const resolvedHosts = []
+  const unresolvedVehicles = []
+  const ambiguousVehicles = []
+
+  normalizeVehicleNameList(allowedApVehicles).forEach(vehicle => {
+    if (ambiguous.has(vehicle)) {
+      ambiguousVehicles.push(`${vehicle} -> ${ambiguous.get(vehicle).join(', ')}`)
+      return
+    }
+    const host = resolved.get(vehicle)
+    if (!host) {
+      unresolvedVehicles.push(vehicle)
+      return
+    }
+    if (host === currentHost || resolvedHosts.includes(host)) return
+    resolvedHosts.push(host)
+  })
+
+  return {
+    resolvedHosts,
+    unresolvedVehicles,
+    ambiguousVehicles,
+  }
+}
+
+function isPreviewObject(value) {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
+function fleetWifiPolicySources(vehicle) {
+  if (!isPreviewObject(vehicle)) return []
+  const sources = []
+  ;[
+    vehicle.fleet_authored_wifi_policy,
+    vehicle.fleetAuthoredWifiPolicy,
+    vehicle.wifi_policy,
+    vehicle.wifiPolicy,
+    vehicle.network_policy,
+    vehicle.networkPolicy,
+    vehicle.operator_wifi_policy,
+    vehicle.operatorWifiPolicy,
+    vehicle.operator_wifi,
+    vehicle.operatorWifi,
+    vehicle,
+  ].forEach(source => {
+    if (!isPreviewObject(source) || sources.includes(source)) return
+    sources.push(source)
+  })
+  return sources
+}
+
+function firstFleetPolicyText(sources, keys) {
+  for (const source of sources) {
+    for (const key of keys) {
+      const value = `${source?.[key] ?? ''}`.trim()
+      if (value) return value
+    }
+  }
+  return ''
+}
+
+function firstFleetPolicyList(sources, keys) {
+  for (const source of sources) {
+    for (const key of keys) {
+      const value = source?.[key]
+      if (Array.isArray(value)) {
+        const normalized = value.map(entry => `${entry ?? ''}`.trim()).filter(Boolean)
+        if (normalized.length > 0) return normalized
+      }
+      if (typeof value === 'string') {
+        const normalized = value.split(/[\n,]+/).map(entry => entry.trim()).filter(Boolean)
+        if (normalized.length > 0) return normalized
+      }
+    }
+  }
+  return []
+}
+
+function fleetPolicyHasValue(sources, keys) {
+  for (const source of sources) {
+    for (const key of keys) {
+      const value = source?.[key]
+      if (typeof value === 'string' && value.trim()) return true
+      if (Array.isArray(value) && value.some(entry => `${entry ?? ''}`.trim())) return true
+      if (typeof value === 'boolean') return true
+    }
+  }
+  return false
+}
+
+function formatFleetPolicyValue(value) {
+  const raw = `${value || ''}`.trim()
+  if (!raw) return ''
+  if (raw.toLowerCase() === 'ap') return 'AP'
+  return raw.replace(/_/g, ' ').replace(/\b\w/g, match => match.toUpperCase())
+}
+
+function summarizeFleetWifiPolicy(vehicle) {
+  const sources = fleetWifiPolicySources(vehicle)
+  if (sources.length === 0) return null
+
+  const entries = []
+  const networkRole = firstFleetPolicyText(sources, ['network_role', 'networkRole', 'runtime_network_role', 'runtimeNetworkRole'])
+  const apSelection = firstFleetPolicyText(sources, ['ap_selection', 'apSelection'])
+  const allowedApVehicles = firstFleetPolicyList(sources, ['allowed_ap_vehicles', 'allowedApVehicles'])
+  const allowedApHosts = firstFleetPolicyList(sources, ['resolved_ap_hosts', 'resolvedApHosts', 'allowed_ap_hosts', 'allowedApHosts', 'ap_hosts', 'apHosts'])
+  const travelRouterSsid = firstFleetPolicyText(sources, ['travel_router_ssid', 'travelRouterSsid', 'operator_wifi_ssid', 'operatorWifiSsid'])
+  const localApSsid = firstFleetPolicyText(sources, ['local_ap_ssid', 'localApSsid', 'fallback_ap_ssid', 'fallbackApSsid'])
+  const policySource = firstFleetPolicyText(sources, ['policy_source', 'policySource', 'source'])
+  const travelRouterSecret = fleetPolicyHasValue(sources, ['travel_router_psk', 'travelRouterPsk', 'travel_router_password', 'travelRouterPassword'])
+  const fallbackSecret = fleetPolicyHasValue(sources, ['fallback_psk', 'fallbackPsk', 'local_ap_password', 'localApPassword'])
+  const genericSecret = fleetPolicyHasValue(sources, ['operator_wifi_password', 'operatorWifiPassword', 'password', 'psk'])
+
+  if (policySource) entries.push({ label: 'Source', value: formatFleetPolicyValue(policySource) })
+  if (networkRole) entries.push({ label: 'Runtime role', value: formatFleetPolicyValue(networkRole) })
+  if (apSelection) entries.push({ label: 'AP selection', value: formatFleetPolicyValue(apSelection) })
+  if (allowedApVehicles.length > 0) entries.push({ label: 'Allowed AP vehicles', value: allowedApVehicles.join(', ') })
+  if (allowedApHosts.length > 0) {
+    entries.push({ label: allowedApVehicles.length > 0 ? 'Resolved AP hosts' : 'Allowed AP hosts', value: allowedApHosts.join(', ') })
+  }
+  if (travelRouterSsid) entries.push({ label: 'Travel router SSID', value: travelRouterSsid })
+  if (localApSsid) entries.push({ label: 'Fallback AP SSID', value: localApSsid })
+  if (travelRouterSecret) entries.push({ label: 'Travel router credentials', value: 'Configured in fleet policy' })
+  if (fallbackSecret) entries.push({ label: 'Fallback AP credentials', value: 'Configured in fleet policy' })
+  if (!travelRouterSecret && !fallbackSecret && genericSecret) {
+    entries.push({ label: 'Wi-Fi credentials', value: 'Configured in fleet policy' })
+  }
+
+  return entries.length > 0 ? entries : null
 }
 
 function RuntimeOverviewCard({ liveDevice, selectedTarget, connected, buildInfo, sshCommand, pollError }) {
@@ -3098,6 +3571,11 @@ function HardwareDetailPage({
   onDeploy,
   deploying,
   deployResult,
+  deployDeviceCount,
+  networkPolicyDraft,
+  deployAssignments,
+  deployTargets,
+  onNetworkPolicyChange,
 }) {
   const selectedTargetId = selectedTarget?.target_id || hostname || ''
   const missionReady = Boolean(hostname || selectedTargetId) && Boolean(assignedVehicleName)
@@ -3151,6 +3629,11 @@ function HardwareDetailPage({
             deploying={deploying}
             deployResult={deployResult}
             assignmentResult={assignmentResult}
+            deployDeviceCount={deployDeviceCount}
+            networkPolicyDraft={networkPolicyDraft}
+            deployAssignments={deployAssignments}
+            deployTargets={deployTargets}
+            onNetworkPolicyChange={onNetworkPolicyChange}
             onChange={onAssignmentChange}
             onDeploy={onDeploy}
             hostname={hostname || liveDevice?.hostname || selectedTarget?.pi_host || ''}
@@ -4344,6 +4827,7 @@ function App() {
   const [inventoryIoLoading, setInventoryIoLoading] = useState(false)
   const [deploying, setDeploying] = useState(false)
   const [deployResult, setDeployResult] = useState(null)
+  const [deployNetworkPolicyDrafts, setDeployNetworkPolicyDrafts] = useState({})
   const buildSourceRefreshRequestRef = useRef(0)
   const boardRefreshRequestRef = useRef(0)
   const buildSourceRefreshInFlightRef = useRef(null)
@@ -4355,6 +4839,15 @@ function App() {
     () => Object.fromEntries(uniqueTargets(targets).map(target => [target.target_id, target])),
     [targets]
   )
+  const targetByHostKey = useMemo(() => {
+    const map = new Map()
+    uniqueTargets(targets).forEach(target => {
+      const hostKey = normalizeHostname(target.pi_host || target.hostname || target.target_id)
+      if (!hostKey || map.has(hostKey)) return
+      map.set(hostKey, target)
+    })
+    return map
+  }, [targets])
   const liveLookup = useMemo(
     () => new Map(liveDevices.map(device => [normalizeHostname(device.hostname), device])),
     [liveDevices]
@@ -4388,6 +4881,33 @@ function App() {
     }
   }, [selectedDeviceHostname, selectedVehicleName])
   const selectedTargetId = selectedTarget?.target_id || selectedDeviceHostname || ''
+  const selectedDeployNetworkPolicyDraft = useMemo(
+    () => normalizeDeployNetworkPolicyDraft(deployNetworkPolicyDrafts[selectedDeviceHostKey]),
+    [deployNetworkPolicyDrafts, selectedDeviceHostKey]
+  )
+  const fleetDeployAssignments = useMemo(() => {
+    const next = { ...sessionAssignments }
+    if (selectedDeviceHostKey) {
+      if (selectedVehicleName) {
+        next[selectedDeviceHostKey] = selectedVehicleName
+      } else {
+        delete next[selectedDeviceHostKey]
+      }
+    }
+    return next
+  }, [selectedDeviceHostKey, selectedVehicleName, sessionAssignments])
+  const fleetDeployDevices = useMemo(
+    () => Object.entries(fleetDeployAssignments)
+      .map(([hostKey, vehicleName]) => buildFleetDeploySelection({
+        hostKey,
+        vehicleName,
+        target: targetByHostKey.get(hostKey) || null,
+        liveDevice: liveLookup.get(hostKey) || null,
+        networkPolicyDraft: deployNetworkPolicyDrafts[hostKey],
+      }))
+      .filter(Boolean),
+    [deployNetworkPolicyDrafts, fleetDeployAssignments, liveLookup, targetByHostKey]
+  )
   const workspacePaths = null
   const buildSourceSummary = useMemo(
     () => describeBuildSource(buildSource, buildSourceLoaded),
@@ -4927,17 +5447,72 @@ function App() {
     }
   }
 
+  const handleDeployNetworkPolicyChange = updates => {
+    if (!selectedDeviceHostKey) return
+    setDeployResult(null)
+    setDeployNetworkPolicyDrafts(prev => {
+      const nextDraft = normalizeDeployNetworkPolicyDraft({
+        ...normalizeDeployNetworkPolicyDraft(prev[selectedDeviceHostKey]),
+        ...updates,
+      })
+      const isDefaultDraft = (
+        nextDraft.networkRole === 'default'
+        && nextDraft.allowedApVehicles.length === 0
+        && nextDraft.apSelection === 'ordered_then_strongest'
+      )
+      if (isDefaultDraft) {
+        if (!prev[selectedDeviceHostKey]) return prev
+        const next = { ...prev }
+        delete next[selectedDeviceHostKey]
+        return next
+      }
+      return {
+        ...prev,
+        [selectedDeviceHostKey]: nextDraft,
+      }
+    })
+  }
+
   const handleDeploySelectedSource = async () => {
     if (!buildSourceLoaded || !buildSource || buildSource.kind === 'none') return
     if (!selectedTargetId && !selectedDeviceHostname) return
+    if (fleetDeployDevices.length === 0) {
+      setDeployResult({
+        success: false,
+        error: 'Assign at least one live device in this session before deploying.',
+      })
+      return
+    }
+
+    const seenVehicles = new Map()
+    const duplicateAssignment = fleetDeployDevices.find(device => {
+      const previousHost = seenVehicles.get(device.vehicle_name)
+      if (previousHost && previousHost !== device.hostname) {
+        return true
+      }
+      seenVehicles.set(device.vehicle_name, device.hostname)
+      return false
+    })
+    if (duplicateAssignment) {
+      const conflictingHost = seenVehicles.get(duplicateAssignment.vehicle_name)
+      setDeployResult({
+        success: false,
+        error: `${duplicateAssignment.vehicle_name} is assigned to both ${conflictingHost} and ${duplicateAssignment.hostname}. Clear the duplicate session assignment first.`,
+      })
+      return
+    }
+
     setDeploying(true)
     setDeployResult(null)
     try {
-      const data = normalizeFleetActionResult(await api(withDeviceScope('/api/fleet/deploy', {
-        targetId: selectedTargetId,
-        hostname: selectedDeviceHostname,
-        vehicleName: selectedVehicleName,
-      }), { method: 'POST' }))
+      const data = normalizeFleetActionResult(await api('/api/fleet/deploy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          devices: fleetDeployDevices,
+          session_assignments: fleetDeployAssignments,
+        }),
+      }))
 
       setDeployResult(data)
     } finally {
@@ -5087,6 +5662,11 @@ function App() {
           onDeploy={handleDeploySelectedSource}
           deploying={deploying}
           deployResult={deployResult}
+          deployDeviceCount={fleetDeployDevices.length}
+          networkPolicyDraft={selectedDeployNetworkPolicyDraft}
+          deployAssignments={fleetDeployAssignments}
+          deployTargets={targets}
+          onNetworkPolicyChange={handleDeployNetworkPolicyChange}
         />
       )}
     </div>

@@ -28,6 +28,39 @@ class FleetDefaultsModel(BaseModel):
     camera_rotate_degrees: float | None = None
     camera_calibration_file: str | None = None
     camera_preprocess_hook: str | None = None
+    network_role: Literal["default", "ap", "client"] | None = None
+    allowed_ap_vehicles: list[str] | None = None
+    ap_selection: Literal["ordered_then_strongest", "strongest"] | None = None
+
+    @field_validator("allowed_ap_vehicles", mode="before")
+    @classmethod
+    def _normalize_allowed_ap_vehicles(cls, value: object) -> list[str] | None:
+        if value is None:
+            return None
+
+        raw_values: list[object]
+        if isinstance(value, str):
+            raw_values = [value]
+        elif isinstance(value, (list, tuple, set)):
+            raw_values = list(value)
+        else:
+            raw_values = [value]
+
+        normalized: list[str] = []
+        seen: set[str] = set()
+        for raw in raw_values:
+            parts = (
+                [segment for segment in raw.split(",")]
+                if isinstance(raw, str)
+                else [str(raw)]
+            )
+            for part in parts:
+                candidate = part.strip()
+                if not candidate or candidate in seen:
+                    continue
+                seen.add(candidate)
+                normalized.append(candidate)
+        return normalized
 
 
 class FleetVehicleModel(FleetDefaultsModel):

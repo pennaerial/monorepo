@@ -348,6 +348,9 @@ def fleet_schema() -> FleetSchemaResponse:
                 name="defaults",
                 description="Shared per-vehicle knobs merged into every fleet entry.",
                 applies_to=["sim", "hardware", "real"],
+                constraints=[
+                    "network_role, allowed_ap_vehicles, and ap_selection are only used for hardware/real deploys.",
+                ],
                 fields=defaults_fields,
             ),
             FleetSectionSchemaResponse(
@@ -384,6 +387,8 @@ def fleet_schema() -> FleetSchemaResponse:
                 applies_to=["hardware", "real"],
                 constraints=[
                     "UAV hardware/real entries require px4_airframe_id.",
+                    "network_role may be ap, client, or default.",
+                    "allowed_ap_vehicles names other fleet vehicles and only affects fallback Wi-Fi policy.",
                 ],
                 fields=[
                     vehicle_fields[name]
@@ -391,6 +396,9 @@ def fleet_schema() -> FleetSchemaResponse:
                         "px4_airframe_id",
                         "px4_namespace",
                         "payload_controller",
+                        "network_role",
+                        "allowed_ap_vehicles",
+                        "ap_selection",
                     )
                     if name in vehicle_fields
                 ],

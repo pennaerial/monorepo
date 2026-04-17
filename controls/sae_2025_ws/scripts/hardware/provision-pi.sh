@@ -18,6 +18,15 @@ START_SERVICE="${START_SERVICE:-0}"
 INSTALL_PIGPIO="${INSTALL_PIGPIO:-1}"
 SERVICE_NAME="${SERVICE_NAME:-pennair-autonomy}"
 DEPLOY_ROOT="${DEPLOY_ROOT:-}"
+TRAVEL_ROUTER_SSID="${TRAVEL_ROUTER_SSID:-pennair_5G}"
+TRAVEL_ROUTER_PSK="${TRAVEL_ROUTER_PSK:-pennair123!}"
+DEFAULT_NETWORK_ROLE="${DEFAULT_NETWORK_ROLE:-client}"
+ALLOWED_AP_HOSTS="${ALLOWED_AP_HOSTS:-}"
+AP_SELECTION="${AP_SELECTION:-strongest}"
+FALLBACK_AP_PREFIX="${FALLBACK_AP_PREFIX:-pennair-ap}"
+FALLBACK_PSK="${FALLBACK_PSK:-pennair123!}"
+LOCAL_AP_SSID="${LOCAL_AP_SSID:-}"
+INSTALL_WIFI_FAILOVER="${INSTALL_WIFI_FAILOVER:-1}"
 
 usage() {
     cat <<EOF
@@ -43,6 +52,17 @@ Options:
                              Allow placeholder-style hostnames such as air-0x
   --deploy-root PATH         Deploy root for bootstrap (default: /home/<user>/pennair-deploy)
   --service NAME             Systemd service name for bootstrap (default: $SERVICE_NAME)
+  --travel-router-ssid SSID  Preferred travel-router Wi-Fi SSID
+  --travel-router-psk PASS   Password for the travel-router Wi-Fi profile
+  --network-role ROLE        Default fallback role at bootstrap: ap or client
+  --allowed-ap-hosts CSV     Optional fallback AP hostnames for client mode
+                             Empty means discover any visible PennAiR fallback AP
+                             matching the configured prefix
+  --ap-selection MODE        strongest or ordered_then_strongest
+  --fallback-psk PASS        Shared PSK for Pi-hosted fallback APs
+  --fallback-ap-prefix PREF  Prefix for Pi-hosted fallback AP SSIDs
+  --local-ap-ssid SSID       Override the local Pi-hosted fallback AP SSID
+  --no-wifi-failover         Skip NetworkManager failover setup during bootstrap
   --no-nopasswd-sudo         Do not install a passwordless sudoers drop-in
   --no-bootstrap             Skip hardware bootstrap after provisioning
   --start                    Start the runtime service during bootstrap
@@ -290,6 +310,37 @@ run_bootstrap() {
         bootstrap_args+=(--no-pigpio)
     fi
 
+    if [[ -n "$TRAVEL_ROUTER_SSID" ]]; then
+        bootstrap_args+=(--travel-router-ssid "$TRAVEL_ROUTER_SSID")
+    fi
+
+    if [[ -n "$TRAVEL_ROUTER_PSK" ]]; then
+        bootstrap_args+=(--travel-router-psk "$TRAVEL_ROUTER_PSK")
+    fi
+
+    bootstrap_args+=(--network-role "$DEFAULT_NETWORK_ROLE")
+    bootstrap_args+=(--ap-selection "$AP_SELECTION")
+
+    if [[ -n "$ALLOWED_AP_HOSTS" ]]; then
+        bootstrap_args+=(--allowed-ap-hosts "$ALLOWED_AP_HOSTS")
+    fi
+
+    if [[ -n "$FALLBACK_PSK" ]]; then
+        bootstrap_args+=(--fallback-psk "$FALLBACK_PSK")
+    fi
+
+    if [[ -n "$FALLBACK_AP_PREFIX" ]]; then
+        bootstrap_args+=(--fallback-ap-prefix "$FALLBACK_AP_PREFIX")
+    fi
+
+    if [[ -n "$LOCAL_AP_SSID" ]]; then
+        bootstrap_args+=(--local-ap-ssid "$LOCAL_AP_SSID")
+    fi
+
+    if [[ "$INSTALL_WIFI_FAILOVER" != "1" ]]; then
+        bootstrap_args+=(--no-wifi-failover)
+    fi
+
     deploy_info "Running hardware bootstrap"
     "$SCRIPT_DIR/bootstrap-pi.sh" "${bootstrap_args[@]}"
 }
@@ -327,6 +378,42 @@ while [[ $# -gt 0 ]]; do
         --service)
             SERVICE_NAME="$2"
             shift 2
+            ;;
+        --travel-router-ssid)
+            TRAVEL_ROUTER_SSID="$2"
+            shift 2
+            ;;
+        --travel-router-psk)
+            TRAVEL_ROUTER_PSK="$2"
+            shift 2
+            ;;
+        --network-role)
+            DEFAULT_NETWORK_ROLE="$2"
+            shift 2
+            ;;
+        --allowed-ap-hosts)
+            ALLOWED_AP_HOSTS="$2"
+            shift 2
+            ;;
+        --ap-selection)
+            AP_SELECTION="$2"
+            shift 2
+            ;;
+        --fallback-psk)
+            FALLBACK_PSK="$2"
+            shift 2
+            ;;
+        --fallback-ap-prefix)
+            FALLBACK_AP_PREFIX="$2"
+            shift 2
+            ;;
+        --local-ap-ssid)
+            LOCAL_AP_SSID="$2"
+            shift 2
+            ;;
+        --no-wifi-failover)
+            INSTALL_WIFI_FAILOVER=0
+            shift
             ;;
         --no-nopasswd-sudo)
             ENABLE_NOPASSWD_SUDO=0

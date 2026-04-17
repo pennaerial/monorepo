@@ -308,6 +308,7 @@ def _make_mode_manager(*, vehicle=None, auto_launch: bool = False) -> ModeManage
     manager.destroyed = False
     manager.stopped = False
     manager.get_logger = lambda: manager._logger
+    manager.spin_once = lambda: None
     manager.create_timer = lambda period, callback: _FakeTimer(callback)
     manager.create_client = lambda *args, **kwargs: None
     manager.destroy_client = lambda client: None
@@ -366,6 +367,7 @@ def _stub_mode_manager_init(
     self._shared_mode_state = {}
     self._auto_launch_timer = None
     self._logger = _FakeLogger()
+    self.spin_once = lambda: None
     self.create_timer = lambda period, callback: _FakeTimer(callback)
     self.get_logger = lambda: self._logger
     self.destroy_node = lambda: None
@@ -756,6 +758,46 @@ def test_start_mission_callback_reports_already_started():
     assert response.message == "Mission already started."
 
 
+def test_start_mission_writes_local_marker(tmp_path, monkeypatch):
+    _require_runtime_support()
+
+    marker_path = tmp_path / "mission-started"
+    monkeypatch.setenv(
+        mode_manager_module.MISSION_STARTED_MARKER_ENV,
+        str(marker_path),
+    )
+    manager = _make_mode_manager()
+    manager._runtime_vehicle_name = "uav_1"
+
+    assert ModeManager.start_mission(manager) is True
+
+    assert marker_path.is_file()
+    marker_text = marker_path.read_text(encoding="utf-8")
+    assert "started_at=" in marker_text
+    assert "vehicle_name=uav_1" in marker_text
+
+
+def test_mode_manager_destroy_node_clears_marker(tmp_path, monkeypatch):
+    _require_runtime_support()
+
+    marker_path = tmp_path / "mission-started"
+    marker_path.write_text("started\n", encoding="utf-8")
+    monkeypatch.setenv(
+        mode_manager_module.MISSION_STARTED_MARKER_ENV,
+        str(marker_path),
+    )
+    monkeypatch.setattr(
+        mode_manager_module.Node,
+        "destroy_node",
+        lambda _self: True,
+        raising=False,
+    )
+    manager = _make_mode_manager()
+
+    assert ModeManager.destroy_node(manager) is True
+    assert not marker_path.exists()
+
+
 def test_uav_mode_manager_rejects_payload_spec(monkeypatch):
     _require_runtime_support()
 
@@ -906,3 +948,79 @@ def test_mode_manager_terminate_deactivates_mode_and_stops_vehicle():
 
     assert events == ["deactivate", "stop", "destroy"]
     assert manager.active_mode is None
+
+
+def test_mode_manager_error_clears_marker_before_destroy(tmp_path, monkeypatch):
+    _require_runtime_support()
+
+    marker_path = tmp_path / "mission-started"
+    marker_path.write_text("started\n", encoding="utf-8")
+    monkeypatch.setenv(
+        mode_manager_module.MISSION_STARTED_MARKER_ENV,
+        str(marker_path),
+    )
+
+    events: list[str] = []
+    logger = _FakeLogger()
+
+    class _FakeMode:
+        def __init__(self) -> None:
+            self.active = True
+
+        def deactivate(self) -> None:
+            events.append("deactivate")
+            self.active = False
+
+    manager = object.__new__(ModeManager)
+    manager.vehicle = SimpleNamespace(stop=lambda: events.append("stop"))
+    manager.modes = {"start": _FakeMode()}
+    manager.transitions = {}
+    manager.active_mode = "start"
+    manager.get_logger = lambda: logger
+    manager.destroy_node = lambda: events.append("destroy")
+
+    ModeManager.handle_mode_state(manager, "error")
+
+    assert events == ["deactivate", "stop", "destroy"]
+    assert manager.active_mode is None
+    assert not marker_path.exists()
+    assert any(
+        level == "error" and "Switching to safe stop behavior." in message
+        for level, message in logger.messages
+    )
+
+
+def test_mode_manager_terminate_clears_marker_before_destroy(tmp_path, monkeypatch):
+    _require_runtime_support()
+
+    marker_path = tmp_path / "mission-started"
+    marker_path.write_text("started\n", encoding="utf-8")
+    monkeypatch.setenv(
+        mode_manager_module.MISSION_STARTED_MARKER_ENV,
+        str(marker_path),
+    )
+
+    events: list[str] = []
+    logger = _FakeLogger()
+
+    class _FakeMode:
+        def __init__(self) -> None:
+            self.active = True
+
+        def deactivate(self) -> None:
+            events.append("deactivate")
+            self.active = False
+
+    manager = object.__new__(ModeManager)
+    manager.vehicle = SimpleNamespace(stop=lambda: events.append("stop"))
+    manager.modes = {"start": _FakeMode()}
+    manager.transitions = {}
+    manager.active_mode = "start"
+    manager.get_logger = lambda: logger
+    manager.destroy_node = lambda: events.append("destroy")
+
+    ModeManager.handle_mode_state(manager, "terminate")
+
+    assert events == ["deactivate", "stop", "destroy"]
+    assert manager.active_mode is None
+    assert not marker_path.exists()

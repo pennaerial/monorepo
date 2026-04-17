@@ -68,6 +68,11 @@ def _make_mode_manager():
     manager.destroy_client = lambda client: None
     manager.destroy_node = lambda: None
     manager._stop_vehicle = lambda: None
+    manager._runtime_vehicle_name = "schema-test"
+    manager._current_comm_builder = None
+    manager._managed_registry = SimpleNamespace(
+        destroy_for_owner=lambda *args, **kwargs: None
+    )
     return manager
 
 
