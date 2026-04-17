@@ -296,8 +296,9 @@ class PayloadDLZNavigateMode(Mode):
         """
         strip, strip_start = _get_strip(bgr)
         hsv = cv2.cvtColor(strip, cv2.COLOR_BGR2HSV)
-        orange_mask = cv2.inRange(hsv, self._lower_a, self._upper_a) | cv2.inRange(
-            hsv, self._lower_a2, self._upper_a2
+        orange_mask = (
+            cv2.inRange(hsv, self._lower_a, self._upper_a)
+            | cv2.inRange(hsv, self._lower_a2, self._upper_a2)
         )
         blue_mask = cv2.inRange(hsv, self._lower_b, self._upper_b)
         current_color = _detect_current_color(orange_mask, blue_mask)
@@ -534,8 +535,9 @@ class PayloadDLZNavigateMode(Mode):
         crop = bgr[row_start:, col_start:col_end]
         hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
         if color == "A":
-            mask = cv2.inRange(hsv, self._lower_a, self._upper_a) | cv2.inRange(
-                hsv, self._lower_a2, self._upper_a2
+            mask = (
+                cv2.inRange(hsv, self._lower_a, self._upper_a)
+                | cv2.inRange(hsv, self._lower_a2, self._upper_a2)
             )
         else:
             mask = cv2.inRange(hsv, self._lower_b, self._upper_b)
@@ -868,8 +870,9 @@ class PayloadDLZNavigateMode(Mode):
         crop = bgr[row_start:row_end, col_start:col_end]
         hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
         if color == "A":
-            mask = cv2.inRange(hsv, self._lower_a, self._upper_a) | cv2.inRange(
-                hsv, self._lower_a2, self._upper_a2
+            mask = (
+                cv2.inRange(hsv, self._lower_a, self._upper_a)
+                | cv2.inRange(hsv, self._lower_a2, self._upper_a2)
             )
         else:
             mask = cv2.inRange(hsv, self._lower_b, self._upper_b)

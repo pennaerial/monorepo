@@ -21,8 +21,8 @@ modes:
 
       # ccw_lower_hsv: [100, 100, 100] # blue
       # ccw_upper_hsv: [130, 255, 255]
-      cw_lower_hsv: [160, 65, 196]  # pink (M81)
-      cw_upper_hsv: [170, 153, 255]
+      cw_lower_hsv: [141, 18, 122]  # red
+      cw_upper_hsv: [180, 255, 255]
       # cw_lower_hsv2: [165, 85, 100] # red/pink alt range
       # cw_upper_hsv2: [180, 252, 255]
 
@@ -47,8 +47,8 @@ modes:
       # tape_align_lower_hsv: [20, 100, 100]
       # tape_align_upper_hsv: [35, 255, 255] # yellow (tested outdoors)
 
-      tape_align_lower_hsv: [15, 80, 120]
-      tape_align_upper_hsv: [25, 255, 255] # yellow (M81)
+      tape_align_lower_hsv: [120, 31, 174]
+      tape_align_upper_hsv: [162, 255, 255] # corner color
 
       tape_align_angular_speed: 0.6
       tape_align_center_tol_px: 20.0

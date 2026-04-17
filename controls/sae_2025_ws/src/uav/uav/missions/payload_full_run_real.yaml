@@ -27,18 +27,18 @@ modes:
 
       # ccw_lower_hsv: [100, 100, 100] # blue
       # ccw_upper_hsv: [130, 255, 255]
-      cw_lower_hsv: [160, 65, 196]  # pink (M81)
-      cw_upper_hsv: [170, 153, 255]
+      cw_lower_hsv: [141, 50, 122]  # red
+      cw_upper_hsv: [180, 255, 255]
       # cw_lower_hsv2: [165, 85, 100] # red/pink alt range
       # cw_upper_hsv2: [180, 252, 255]
 
       drive_out_speed_mps: 0.1
-      detect_frames: 3
+      detect_frames: 2
       max_drive_out_s: 30.0
       drive_out_strip_frac: 0.30   # only the bottom 30% of the camera frame
       drive_out_min_pixels: 150
-      compressed_image: false
-      align_angular_speed: 0.7
+      compressed_image: true
+      align_angular_speed: 0.5
       center_tol_px: 30.0
       center_min_pixels: 150
       center_stable_frames: 1
@@ -53,8 +53,8 @@ modes:
       # tape_align_lower_hsv: [20, 100, 100]
       # tape_align_upper_hsv: [35, 255, 255] # yellow (tested outdoors)
 
-      tape_align_lower_hsv: [15, 80, 120]
-      tape_align_upper_hsv: [25, 255, 255] # yellow (M81)
+      tape_align_lower_hsv: [120, 31, 174]
+      tape_align_upper_hsv: [162, 255, 255] # corner color
 
       tape_align_angular_speed: 0.6
       tape_align_center_tol_px: 20.0
@@ -104,8 +104,8 @@ modes:
       # side (pink in the real arena).
       ccw_lower_hsv: [100, 100, 100] # blue
       ccw_upper_hsv: [130, 255, 255]
-      cw_lower_hsv: [160, 65, 196]  # pink
-      cw_upper_hsv: [170, 153, 255]
+      cw_lower_hsv: [141, 18, 122]  # red
+      cw_upper_hsv: [180, 255, 255]
       cw_lower_hsv2: [165, 85, 100] # red/pink alt range
       cw_upper_hsv2: [180, 252, 255]
     transitions:
@@ -147,11 +147,11 @@ modes:
       # HSV bounds — copy of payload_corner_navigate_real.yaml so the same
       # tape calibration is used. ccw_hsv = colour at the start of a CCW-
       # travel side (blue). cw_hsv = colour at the start of a CW-travel
-      # side (pink in the real arena).
+      # side (red in the real arena).
       ccw_lower_hsv: [100, 100, 100] # blue
       ccw_upper_hsv: [130, 255, 255]
-      cw_lower_hsv: [160, 65, 196]  # pink
-      cw_upper_hsv: [170, 153, 255]
+      cw_lower_hsv: [141, 18, 122]  # red
+      cw_upper_hsv: [180, 255, 255]
       cw_lower_hsv2: [165, 85, 100] # red/pink alt range
       cw_upper_hsv2: [180, 252, 255]
     transitions:

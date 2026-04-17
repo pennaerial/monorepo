@@ -55,8 +55,8 @@ modes:
       # side (pink in the real arena).
       ccw_lower_hsv: [100, 100, 100] # blue
       ccw_upper_hsv: [130, 255, 255]
-      cw_lower_hsv: [160, 65, 196]  # pink
-      cw_upper_hsv: [170, 153, 255]
+      cw_lower_hsv: [141, 18, 122]  # red
+      cw_upper_hsv: [180, 255, 255]
       cw_lower_hsv2: [165, 85, 100] # red/pink alt range
       cw_upper_hsv2: [180, 252, 255]
     transitions:
@@ -98,11 +98,11 @@ modes:
       # HSV bounds — copy of payload_corner_navigate_real.yaml so the same
       # tape calibration is used. ccw_hsv = colour at the start of a CCW-
       # travel side (blue). cw_hsv = colour at the start of a CW-travel
-      # side (pink in the real arena).
+      # side (red in the real arena).
       ccw_lower_hsv: [100, 100, 100] # blue
       ccw_upper_hsv: [130, 255, 255]
-      cw_lower_hsv: [160, 65, 196]  # pink
-      cw_upper_hsv: [170, 153, 255]
+      cw_lower_hsv: [141, 18, 122]  # red
+      cw_upper_hsv: [180, 255, 255]
       cw_lower_hsv2: [165, 85, 100] # red/pink alt range
       cw_upper_hsv2: [180, 252, 255]
     transitions:
