@@ -88,7 +88,9 @@ class PayloadDualApproachMode(Mode):
         color_drive_angular_scale: float = 0.3,
         color_min_detect_pixels: int = 50,
         # --- Termination / lost ---
-        stop_height_px: int = 100,
+        prime_height_px: int = 100,
+        stop_height_px: int = 300,
+        post_prime_lost_frames: int = 5,
         lost_timeout_s: float = 3.0,
         # --- Common ---
         compressed_image: bool = False,
@@ -115,7 +117,9 @@ class PayloadDualApproachMode(Mode):
         self.color_min_detect_pixels = int(color_min_detect_pixels)
 
         # Termination
+        self.prime_height_px = int(prime_height_px)
         self.stop_height_px = int(stop_height_px)
+        self.post_prime_lost_frames = int(post_prime_lost_frames)
         self.lost_timeout_s = float(lost_timeout_s)
 
         # Internals
@@ -154,6 +158,8 @@ class PayloadDualApproachMode(Mode):
         self._image_width = 0.0
         self._last_seen_time: Optional[float] = None
         self._last_log_time = 0.0
+        self._primed = False
+        self._lost_frames_after_prime = 0
 
     # ---- subscriptions ----
 
@@ -281,6 +287,8 @@ class PayloadDualApproachMode(Mode):
         self._image_width = 0.0
         self._last_seen_time = None
         self._last_log_time = 0.0
+        self._primed = False
+        self._lost_frames_after_prime = 0
         self.vehicle.set_servo(180.0)
         self.log("PayloadDualApproachMode: started, servo set to 180")
 
@@ -302,14 +310,38 @@ class PayloadDualApproachMode(Mode):
         # --- detect colour (needed for stop check regardless of source) ---
         mask, color_cx, color_cy, color_area, color_height = self._detect_color(bgr)
 
-        # Check stop condition on colour blob height
-        if color_height >= self.stop_height_px:
+        # Arm the stop trigger once the blob grows past the prime threshold.
+        if color_height >= self.prime_height_px and not self._primed:
+            self._primed = True
+            self.log(
+                f"PayloadDualApproachMode: primed "
+                f"(height={color_height}px >= {self.prime_height_px}px)"
+            )
+
+        # Track consecutive frames without a colour blob after priming so we
+        # can detect an overshoot (string has passed under the camera).
+        if self._primed:
+            if color_cx is None:
+                self._lost_frames_after_prime += 1
+            else:
+                self._lost_frames_after_prime = 0
+
+        stop_reason: Optional[str] = None
+        if self._primed:
+            if color_height >= self.stop_height_px:
+                stop_reason = f"stop_height hit (height={color_height}px)"
+            elif self._lost_frames_after_prime >= self.post_prime_lost_frames:
+                stop_reason = (
+                    f"overshoot ({self._lost_frames_after_prime} "
+                    f"lost frames after prime)"
+                )
+
+        if stop_reason is not None:
             self.vehicle.set_servo(0.0)
             self.vehicle.stop()
             self._done = True
             self.log(
-                f"PayloadDualApproachMode: stop_height hit "
-                f"(height={color_height}px) — servo set to 0, done"
+                f"PayloadDualApproachMode: {stop_reason} — servo set to 0, done"
             )
             self._publish_debug(
                 bgr, mask, "STOP", None, color_cx, color_cy, color_height

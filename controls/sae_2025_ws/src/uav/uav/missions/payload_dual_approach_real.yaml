@@ -16,6 +16,8 @@ modes:
       color_centering_threshold_px: 15
       color_drive_angular_scale: 0.00
       color_min_detect_pixels: 25
-      stop_height_px: 350
+      prime_height_px: 100
+      stop_height_px: 300
+      post_prime_lost_frames: 10
       lost_timeout_s: 0.0
       compressed_image: true
