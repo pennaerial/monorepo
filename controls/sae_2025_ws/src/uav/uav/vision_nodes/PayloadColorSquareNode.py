@@ -30,6 +30,7 @@ _MIN_COLOR_PIXELS = 20
 _COLOR_RATIO = 1.5
 # Minimum tape pixels (A+B combined) per row to include in boundary estimate
 _MIN_ROW_PIXELS = 3
+_COLOR_BLUR_KERNEL = (5, 5)
 
 
 def _detect_tape_following(
@@ -113,6 +114,11 @@ def _get_strip(bgr: np.ndarray) -> tuple[np.ndarray, int]:
     return bgr[strip_start:, :], strip_start
 
 
+def _preprocess_color_crop(bgr: np.ndarray) -> np.ndarray:
+    """Light denoising before HSV thresholding to stabilize tape masks."""
+    return cv2.GaussianBlur(bgr, _COLOR_BLUR_KERNEL, 0)
+
+
 class PayloadColorSquareNode(VisionNode):
     srv = PayloadColorSquareState
 
@@ -142,7 +148,7 @@ class PayloadColorSquareNode(VisionNode):
 
         bgr = self.convert_image_msg_to_frame(image_msg)
         strip, _ = _get_strip(bgr)
-        hsv = cv2.cvtColor(strip, cv2.COLOR_BGR2HSV)
+        hsv = cv2.cvtColor(_preprocess_color_crop(strip), cv2.COLOR_BGR2HSV)
 
         orange_mask = _red_mask(hsv)
         blue_mask = cv2.inRange(hsv, _LOWER_B, _UPPER_B)
@@ -163,7 +169,7 @@ class PayloadColorSquareNode(VisionNode):
             return
         bgr = self.convert_image_msg_to_frame(image_msg)
         strip, strip_start = _get_strip(bgr)
-        hsv = cv2.cvtColor(strip, cv2.COLOR_BGR2HSV)
+        hsv = cv2.cvtColor(_preprocess_color_crop(strip), cv2.COLOR_BGR2HSV)
         orange_mask = _red_mask(hsv)
         blue_mask = cv2.inRange(hsv, _LOWER_B, _UPPER_B)
         current_color = _detect_current_color(orange_mask, blue_mask)

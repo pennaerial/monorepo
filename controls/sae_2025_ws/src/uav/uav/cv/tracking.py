@@ -1,47 +1,135 @@
-# tracking.py
+from __future__ import annotations
+
 import cv2
 import numpy as np
 from typing import Optional, Tuple
 import os
+
+from uav.utils import blue, green, pink, yellow
+
+from .dlz_color_regions import detect_focused_dlz_paper_masks
+
+_NAMED_PAYLOAD_BOUNDS = {
+    "pink": pink,
+    "green": green,
+    "blue": blue,
+    "yellow": yellow,
+}
+_PAPER_MASK_KEYS = {
+    "green": "green_mask",
+    "blue": "blue_mask",
+    "purple": "purple_mask",
+}
+
+
+def _normalize_payload_color(
+    payload_color: str | None,
+    lower_payload,
+    upper_payload,
+) -> str:
+    if payload_color is not None:
+        return str(payload_color).strip().lower()
+
+    if lower_payload is None or upper_payload is None:
+        return "unknown"
+
+    lower = tuple(int(x) for x in np.asarray(lower_payload).reshape(-1))
+    upper = tuple(int(x) for x in np.asarray(upper_payload).reshape(-1))
+    for color_name, (named_lower, named_upper) in _NAMED_PAYLOAD_BOUNDS.items():
+        if lower == tuple(named_lower) and upper == tuple(named_upper):
+            return color_name
+    return "unknown"
+
+
+def _largest_contour_centroid(
+    mask: np.ndarray,
+) -> tuple[Optional[np.ndarray], Optional[int], Optional[int]]:
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    if not contours:
+        return None, None, None
+
+    largest_contour = max(contours, key=cv2.contourArea)
+    moments = cv2.moments(largest_contour)
+    if moments["m00"] == 0:
+        return largest_contour, None, None
+
+    cx = int(moments["m10"] / moments["m00"])
+    cy = int(moments["m01"] / moments["m00"])
+    return largest_contour, cx, cy
+
+
+def _legacy_focused_payload_mask(
+    focused_bgr: np.ndarray,
+    lower_payload,
+    upper_payload,
+) -> np.ndarray:
+    if lower_payload is None or upper_payload is None:
+        return np.zeros(focused_bgr.shape[:2], dtype=np.uint8)
+
+    hsv_image = cv2.cvtColor(focused_bgr, cv2.COLOR_BGR2HSV)
+    payload_mask = cv2.inRange(hsv_image, lower_payload, upper_payload)
+    kernel = np.ones((5, 5), np.uint8)
+    payload_mask = cv2.morphologyEx(payload_mask, cv2.MORPH_OPEN, kernel)
+    payload_mask = cv2.morphologyEx(payload_mask, cv2.MORPH_CLOSE, kernel)
+    return payload_mask
+
+
+def _resolved_payload_mask(
+    focused_bgr: np.ndarray,
+    requested_color: str,
+    lower_payload,
+    upper_payload,
+    paper_masks: dict[str, np.ndarray],
+) -> np.ndarray:
+    """Use the focused-DLZ classifier first, then fall back to HSV if needed."""
+    mask_key = _PAPER_MASK_KEYS.get(requested_color)
+    if mask_key is not None:
+        payload_mask = paper_masks[mask_key]
+        if np.any(payload_mask):
+            return payload_mask
+
+    return _legacy_focused_payload_mask(focused_bgr, lower_payload, upper_payload)
 
 
 def find_payload(
     image: np.ndarray,
     lower_zone: np.ndarray,
     upper_zone: np.ndarray,
-    lower_payload: np.ndarray,
-    upper_payload: np.ndarray,
+    lower_payload: np.ndarray | None,
+    upper_payload: np.ndarray | None,
     uuid: str,
     debug: bool = False,
     save_vision: bool = False,
+    payload_color: str | None = None,
 ) -> Optional[Tuple[int, int, bool]]:
     """
-    Detect payload in image using color thresholding.
+    Detect the requested payload paper or return the DLZ centre as a fallback.
 
     Args:
         image (np.ndarray): Input BGR image.
         lower_zone (np.ndarray): Lower HSV threshold for zone marker.
         upper_zone (np.ndarray): Upper HSV threshold for zone marker.
-        lower_payload (np.ndarray): Lower HSV threshold for payload.
-        upper_payload (np.ndarray): Upper HSV threshold for payload.
+        lower_payload (np.ndarray | None): Optional HSV fallback lower bound.
+        upper_payload (np.ndarray | None): Optional HSV fallback upper bound.
         debug (bool): If True, return an image with visualizations.
         save_vision (bool): If True, save the visualization image.
+        payload_color (str | None): Requested paper colour name.
 
     Returns:
-        Optional[Tuple[int, int, bool]]: A tuple (cx, cy, zone_empty) if detection is successful;
-        otherwise, None.
+        Optional[Tuple[int, int, bool]]: A tuple (cx, cy, dlz_empty) if detection
+        is successful; otherwise, None.
     """
-    # Convert to HSV color space.
     hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    requested_color = _normalize_payload_color(
+        payload_color, lower_payload, upper_payload
+    )
 
-    # Create zone mask and clean it using morphological operations.
     zone_mask = cv2.inRange(hsv_image, lower_zone, upper_zone)
     kernel = np.ones((5, 5), np.uint8)
     dilated = cv2.dilate(zone_mask, kernel, iterations=3)
     zone_mask = cv2.morphologyEx(dilated, cv2.MORPH_CLOSE, kernel)
     zone_mask = cv2.morphologyEx(zone_mask, cv2.MORPH_OPEN, kernel)
 
-    # Find all external contours in the zone mask.
     contours, _ = cv2.findContours(
         zone_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
     )
@@ -59,65 +147,58 @@ def find_payload(
             cv2.imwrite(os.path.join(path, f"payload_{time}.png"), vis_image)
         return None
 
-    # Find the largest zone contour.
     largest_zone_contour = max(contours, key=cv2.contourArea)
 
-    # Create a filled mask from the largest zone contour.
     zone_filled_mask = np.zeros_like(zone_mask)
     cv2.drawContours(
         zone_filled_mask, [largest_zone_contour], -1, 255, thickness=cv2.FILLED
     )
+    zone_moments = cv2.moments(zone_filled_mask)
+    if zone_moments["m00"] == 0:
+        return None
+    zone_cx = int(zone_moments["m10"] / zone_moments["m00"])
+    zone_cy = int(zone_moments["m01"] / zone_moments["m00"])
 
-    # Detect payload areas in the original HSV image.
-    payload_mask_full = cv2.inRange(hsv_image, lower_payload, upper_payload)
-
-    # Restrict the payload mask to the zone-filled region.
-    payload_mask = cv2.bitwise_and(payload_mask_full, zone_filled_mask)
-
-    # Clean the resulting payload mask.
-    payload_mask = cv2.morphologyEx(payload_mask, cv2.MORPH_OPEN, kernel)
-    payload_mask = cv2.morphologyEx(payload_mask, cv2.MORPH_CLOSE, kernel)
-
-    # Find external contours in the payload mask.
-    payload_contours, _ = cv2.findContours(
-        payload_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
-    )
-    largest_payload_contour = None
-
-    if (
-        payload_contours
-        and lower_payload is not lower_zone
-        and upper_payload is not upper_zone
-    ):
-        # If payload is detected, compute the centroid of the largest payload contour.
-        largest_payload_contour = max(payload_contours, key=cv2.contourArea)
-        M_payload = cv2.moments(largest_payload_contour)
-        if M_payload["m00"] == 0:
-            return None
-        cx, cy = (
-            int(M_payload["m10"] / M_payload["m00"]),
-            int(M_payload["m01"] / M_payload["m00"]),
-        )
+    focused_bgr = cv2.bitwise_and(image, image, mask=zone_filled_mask)
+    paper_masks = None
+    if requested_color == "pink":
+        payload_mask = zone_filled_mask.copy()
+        largest_payload_contour = largest_zone_contour
+        cx, cy = zone_cx, zone_cy
+        dlz_empty = False
     else:
-        # Fallback: if no payload is found, compute the centroid of the zone area.
-        M_zone = cv2.moments(zone_filled_mask)
-        if M_zone["m00"] == 0:
-            return None
-        cx, cy = int(M_zone["m10"] / M_zone["m00"]), int(M_zone["m01"] / M_zone["m00"])
+        paper_masks = detect_focused_dlz_paper_masks(focused_bgr)
+        payload_mask = _resolved_payload_mask(
+            focused_bgr,
+            requested_color,
+            lower_payload,
+            upper_payload,
+            paper_masks,
+        )
+
+        largest_payload_contour, cx, cy = _largest_contour_centroid(payload_mask)
+        if cx is None or cy is None:
+            cx, cy = zone_cx, zone_cy
+            dlz_empty = True
+        else:
+            dlz_empty = False
+
     if debug or save_vision:
         vis_image = image.copy()
 
         cv2.drawContours(vis_image, [largest_zone_contour], -1, (0, 255, 0), 2)
-        # If payload was detected, draw its contour.
-        if payload_contours:
+        if largest_payload_contour is not None:
             cv2.drawContours(vis_image, [largest_payload_contour], -1, (0, 255, 0), 2)
-        # Mark the detected center.
         cv2.circle(vis_image, (cx, cy), 5, (0, 0, 255), -1)
     if debug:
         cv2.namedWindow("Payload Tracking", cv2.WINDOW_AUTOSIZE)
         cv2.imshow("Payload Tracking", vis_image)
         cv2.imshow(f"DLZ Mask {lower_zone}, {upper_zone}", zone_mask)
-        cv2.imshow(f"Payload Mask {lower_payload}, {upper_payload}", payload_mask)
+        cv2.imshow(f"Payload Mask {requested_color}", payload_mask)
+        if paper_masks is not None:
+            cv2.imshow("Candidate Mask", paper_masks["candidate_mask"])
+            cv2.imshow("Proposal Mask", paper_masks["proposal_mask"])
+            cv2.imshow("Unknown Mask", paper_masks["unknown_mask"])
         cv2.waitKey(1)
     if save_vision:
         import time
@@ -127,6 +208,31 @@ def find_payload(
         cv2.imwrite(os.path.join(path, f"payload_{time}.png"), vis_image)
         cv2.imwrite(os.path.join(path, f"zone_mask_{time}.png"), zone_mask)
         cv2.imwrite(os.path.join(path, f"payload_mask_{time}.png"), payload_mask)
+        if paper_masks is not None:
+            cv2.imwrite(
+                os.path.join(path, f"candidate_mask_{time}.png"),
+                paper_masks["candidate_mask"],
+            )
+            cv2.imwrite(
+                os.path.join(path, f"proposal_mask_{time}.png"),
+                paper_masks["proposal_mask"],
+            )
+            cv2.imwrite(
+                os.path.join(path, f"green_mask_{time}.png"),
+                paper_masks["green_mask"],
+            )
+            cv2.imwrite(
+                os.path.join(path, f"blue_mask_{time}.png"),
+                paper_masks["blue_mask"],
+            )
+            cv2.imwrite(
+                os.path.join(path, f"purple_mask_{time}.png"),
+                paper_masks["purple_mask"],
+            )
+            cv2.imwrite(
+                os.path.join(path, f"unknown_mask_{time}.png"),
+                paper_masks["unknown_mask"],
+            )
 
     # def click_event(event, x, y, flags, param):
     #    if event == cv2.EVENT_LBUTTONDOWN:
@@ -139,7 +245,7 @@ def find_payload(
     #    cv2.imshow('image', image)
     #    cv2.waitKey(1)
 
-    return cx, cy, not bool(payload_contours)
+    return cx, cy, dlz_empty
 
 
 def rotate_image(image: np.ndarray, angle: float) -> np.ndarray:
@@ -256,6 +362,8 @@ if __name__ == "__main__":
             (170, 255, 255),
             (140, 155, 50),
             (170, 255, 255),
-            True,
+            "debug",
+            debug=True,
+            payload_color="pink",
         )
     )

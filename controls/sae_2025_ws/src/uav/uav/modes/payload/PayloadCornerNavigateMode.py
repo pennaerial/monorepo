@@ -4,7 +4,7 @@ out to a tape edge, align with it, then follow the border in the configured
 travel direction (cw / ccw) until reaching the first corner.
 
 Phase sequence:
-    DRIVE_OUT → TURN_TO_CENTER → LINE_FOLLOW → DONE
+    DRIVE_OUT → TURN_TO_CENTER → LINE_FOLLOW → TAPE_ALIGN → DONE
 
 DRIVE_OUT
     Drive forward at drive_out_speed_mps. Subscribes to the payload camera
@@ -24,11 +24,14 @@ DRIVE_OUT
                         Stop and advance to TURN_TO_CENTER.
 
 TURN_TO_CENTER
-    Rotate in place (always CCW) until the border tape is roughly centered in
-    the middle-third of the frame. Locks when the combined-mask centroid is
-    within center_tol_px of crop center for center_stable_frames consecutive
-    frames; the dominant colour observed during the lock seeds LINE_FOLLOW.
-    Caps rotation at max_turn_to_center_rad as a safety bail-out.
+    Rotate in place using the same search/turn/lock pattern as TAPE_ALIGN,
+    but on the combined border-tape centroid in the bottom-third crop. While
+    no tape is visible, rotate in the nominal search direction for the
+    configured travel direction. Once tape is visible, turn toward the
+    centroid until it stays within center_tol_px of crop center for
+    center_stable_frames consecutive frames; the dominant colour observed
+    during the lock seeds LINE_FOLLOW. Caps rotation at max_turn_to_center_rad
+    as a safety bail-out.
 
 LINE_FOLLOW
     Proportional-steering line follower on the currently-tracked colour's
@@ -53,6 +56,7 @@ from cv_bridge import CvBridge
 from rclpy.node import Node
 from sensor_msgs.msg import CompressedImage, Image
 
+from uav.cv.dlz_convex_hull import build_dlz_hull_mask
 from uav.vehicles.Payload import Payload
 
 from ..Mode import Mode
@@ -290,18 +294,58 @@ class PayloadCornerNavigateMode(Mode):
         cv2.drawContours(out, [largest], -1, 255, cv2.FILLED)
         return out
 
+    def _dlz_roi_mask(self, bgr: np.ndarray) -> np.ndarray:
+        roi_mask = build_dlz_hull_mask(bgr)
+        if roi_mask is None:
+            return np.full(bgr.shape[:2], 255, dtype=np.uint8)
+        return roi_mask
+
+    def _threshold_with_roi(
+        self,
+        hsv: np.ndarray,
+        lower: np.ndarray,
+        upper: np.ndarray,
+        roi_mask: np.ndarray,
+        *,
+        keep_largest: bool = False,
+    ) -> np.ndarray:
+        mask = cv2.inRange(hsv, lower, upper)
+        mask = cv2.bitwise_and(mask, roi_mask)
+        if keep_largest:
+            return self._largest_contour_mask(mask)
+        return mask
+
+    def _darken_outside_roi(self, debug: np.ndarray, roi_mask: np.ndarray) -> None:
+        outside = roi_mask == 0
+        if np.any(outside):
+            debug[outside] = (debug[outside] * 0.35).astype(np.uint8)
+
     def _lower_strip_color_counts(self, bgr: np.ndarray) -> Tuple[int, int]:
         """Return (color_a_pixels, color_b_pixels) in the bottom drive_out_strip_frac
         of the frame, cropped horizontally to the middle third so tape that
         only clips the corner of the FOV is ignored."""
         h, w = bgr.shape[:2]
+        roi_full = self._dlz_roi_mask(bgr)
         strip_start = int(h * (1.0 - self.drive_out_strip_frac))
         col_start = w // 3
         col_end = w - (w // 3)
         strip = bgr[strip_start:, col_start:col_end]
+        roi_strip = roi_full[strip_start:, col_start:col_end]
         hsv = cv2.cvtColor(strip, cv2.COLOR_BGR2HSV)
-        mask_a = self._largest_contour_mask(cv2.inRange(hsv, self._lower_a, self._upper_a))
-        mask_b = self._largest_contour_mask(cv2.inRange(hsv, self._lower_b, self._upper_b))
+        mask_a = self._threshold_with_roi(
+            hsv,
+            self._lower_a,
+            self._upper_a,
+            roi_strip,
+            keep_largest=True,
+        )
+        mask_b = self._threshold_with_roi(
+            hsv,
+            self._lower_b,
+            self._upper_b,
+            roi_strip,
+            keep_largest=True,
+        )
         return int(np.count_nonzero(mask_a)), int(np.count_nonzero(mask_b))
 
     def _middle_third_color_metrics(
@@ -318,13 +362,15 @@ class PayloadCornerNavigateMode(Mode):
 
         Returns ``(0, 0.0, None)`` if no colour is found."""
         h, w = bgr.shape[:2]
+        roi_full = self._dlz_roi_mask(bgr)
         row_start = int(h * 0.6)
         col_start = w // 3
         col_end = w - (w // 3)
         crop = bgr[row_start:, col_start:col_end]
+        roi_crop = roi_full[row_start:, col_start:col_end]
         hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
-        mask_a = cv2.inRange(hsv, self._lower_a, self._upper_a)
-        mask_b = cv2.inRange(hsv, self._lower_b, self._upper_b)
+        mask_a = self._threshold_with_roi(hsv, self._lower_a, self._upper_a, roi_crop)
+        mask_b = self._threshold_with_roi(hsv, self._lower_b, self._upper_b, roi_crop)
         count_a = int(np.count_nonzero(mask_a))
         count_b = int(np.count_nonzero(mask_b))
         total = count_a + count_b
@@ -354,13 +400,27 @@ class PayloadCornerNavigateMode(Mode):
 
         Returns ``(0, 0.0)`` if the colour is not found in the strip."""
         h, w = bgr.shape[:2]
+        roi_full = self._dlz_roi_mask(bgr)
         strip_start = int(h * (1.0 - self.line_follow_strip_frac))
         strip = bgr[strip_start:, :]
+        roi_strip = roi_full[strip_start:, :]
         hsv = cv2.cvtColor(strip, cv2.COLOR_BGR2HSV)
         if color == "A":
-            mask = self._largest_contour_mask(cv2.inRange(hsv, self._lower_a, self._upper_a))
+            mask = self._threshold_with_roi(
+                hsv,
+                self._lower_a,
+                self._upper_a,
+                roi_strip,
+                keep_largest=True,
+            )
         elif color == "B":
-            mask = self._largest_contour_mask(cv2.inRange(hsv, self._lower_b, self._upper_b))
+            mask = self._threshold_with_roi(
+                hsv,
+                self._lower_b,
+                self._upper_b,
+                roi_strip,
+                keep_largest=True,
+            )
         else:
             return 0, 0.0
         count = int(np.count_nonzero(mask))
@@ -460,12 +520,26 @@ class PayloadCornerNavigateMode(Mode):
         Returns ``(total, lateral_error_px, dominant, mask_a, mask_b, row_start)``.
         """
         h, w = bgr.shape[:2]
+        roi_full = self._dlz_roi_mask(bgr)
         row_start = int(h * 2 / 3)
         row_end = h * 9 // 10
         crop = bgr[row_start:row_end, :]
+        roi_crop = roi_full[row_start:row_end, :]
         hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
-        mask_a = self._largest_contour_mask(cv2.inRange(hsv, self._lower_a, self._upper_a))
-        mask_b = self._largest_contour_mask(cv2.inRange(hsv, self._lower_b, self._upper_b))
+        mask_a = self._threshold_with_roi(
+            hsv,
+            self._lower_a,
+            self._upper_a,
+            roi_crop,
+            keep_largest=True,
+        )
+        mask_b = self._threshold_with_roi(
+            hsv,
+            self._lower_b,
+            self._upper_b,
+            roi_crop,
+            keep_largest=True,
+        )
         count_a = int(np.count_nonzero(mask_a))
         count_b = int(np.count_nonzero(mask_b))
         total = count_a + count_b
@@ -484,59 +558,79 @@ class PayloadCornerNavigateMode(Mode):
             dominant = None
         return total, centroid_x - crop_center_x, dominant, mask_a, mask_b, row_start
 
+    def _centroid_align_step(
+        self,
+        *,
+        count: int,
+        lateral_px: float,
+        min_pixels: int,
+        center_tol_px: float,
+        stable_count: int,
+        stable_frames: int,
+        search_angular: float,
+        turn_angular_speed: float,
+    ) -> Tuple[str, int, float, bool]:
+        """Shared search/turn/lock controller for centroid-based alignment."""
+        if count < min_pixels:
+            return "searching", 0, search_angular, False
+
+        if abs(lateral_px) <= center_tol_px:
+            next_stable = stable_count + 1
+            locked = next_stable >= stable_frames
+            status = "LOCKED" if locked else "centering"
+            return status, next_stable, 0.0, locked
+
+        speed = abs(turn_angular_speed)
+        angular = -speed if lateral_px > 0.0 else speed
+        return "turning", 0, angular, False
+
     def _update_turn_to_center(self, time_delta: float) -> None:
-        # CCW travel → turn left (+), CW travel → turn right (-)
-        speed = self.align_angular_speed
-        angular = speed if self.direction == "ccw" else -speed
-        self._turn_to_center_rad += abs(angular) * time_delta
+        search_angular = (
+            self.align_angular_speed if self.direction == "ccw" else -self.align_angular_speed
+        )
 
         bgr = self._decode_image()
-        total = 0
-        lateral_error_px = 0.0
-        dominant: Optional[str] = None
-        if bgr is not None:
+        if bgr is None:
+            angular = search_angular
+        else:
             total, lateral_error_px, dominant, mask_a, mask_b, row_start = (
                 self._turn_both_color_metrics(bgr)
             )
-            # Accept condition matches DLZ corner logic (lenient one-sided):
-            #   ccw → accept when centroid on the RIGHT side
-            #         (lateral_error_px > -center_tol_px)
-            #   cw  → accept when centroid on the LEFT side
-            #         (lateral_error_px < center_tol_px)
-            if self.direction == "ccw":
-                side_ok = lateral_error_px > -self.center_tol_px
-            else:
-                side_ok = lateral_error_px < self.center_tol_px
-            if total >= self.center_min_pixels and side_ok:
-                if dominant is not None:
-                    self._latest_dominant = dominant
-                self._center_stable += 1
-                if self._center_stable >= self.center_stable_frames:
-                    self.vehicle.stop()
-                    self._prev_color = (
-                        self._latest_dominant or dominant or self._first_color or "A"
-                    )
-                    self._annotate_turn_to_center(
-                        bgr,
-                        mask_a,
-                        mask_b,
-                        row_start,
-                        total,
-                        lateral_error_px,
-                        dominant,
-                    )
-                    self._phase = "line_follow"
-                    self.log(
-                        f"PayloadCornerNavigateMode: TURN_TO_CENTER centered "
-                        f"(lat={lateral_error_px:.1f}px, total={total}px, "
-                        f"turned={math.degrees(self._turn_to_center_rad):.1f}°) "
-                        f"prev_color={self._prev_color} → LINE_FOLLOW"
-                    )
-                    return
-            else:
-                self._center_stable = 0
-                if dominant is not None:
-                    self._latest_dominant = dominant
+            if dominant is not None:
+                self._latest_dominant = dominant
+            status, self._center_stable, angular, locked = self._centroid_align_step(
+                count=total,
+                lateral_px=lateral_error_px,
+                min_pixels=self.center_min_pixels,
+                center_tol_px=self.center_tol_px,
+                stable_count=self._center_stable,
+                stable_frames=self.center_stable_frames,
+                search_angular=search_angular,
+                turn_angular_speed=self.align_angular_speed,
+            )
+            if locked:
+                self.vehicle.stop()
+                self._prev_color = (
+                    self._latest_dominant or dominant or self._first_color or "A"
+                )
+                self._annotate_turn_to_center(
+                    bgr,
+                    mask_a,
+                    mask_b,
+                    row_start,
+                    total,
+                    lateral_error_px,
+                    dominant,
+                    status,
+                )
+                self._phase = "line_follow"
+                self.log(
+                    f"PayloadCornerNavigateMode: TURN_TO_CENTER centered "
+                    f"(lat={lateral_error_px:.1f}px, total={total}px, "
+                    f"turned={math.degrees(self._turn_to_center_rad):.1f}°) "
+                    f"prev_color={self._prev_color} → LINE_FOLLOW"
+                )
+                return
 
             self._annotate_turn_to_center(
                 bgr,
@@ -546,7 +640,10 @@ class PayloadCornerNavigateMode(Mode):
                 total,
                 lateral_error_px,
                 dominant,
+                status,
             )
+
+        self._turn_to_center_rad += abs(angular) * time_delta
 
         if self._turn_to_center_rad >= self.max_turn_to_center_rad:
             self.vehicle.stop()
@@ -558,7 +655,10 @@ class PayloadCornerNavigateMode(Mode):
             )
             return
 
-        self.vehicle.drive(0.0, angular)
+        if angular == 0.0:
+            self.vehicle.stop()
+        else:
+            self.vehicle.drive(0.0, angular)
 
     # ------------------------------------------------------------------
     # Phase: LINE_FOLLOW
@@ -684,10 +784,17 @@ class PayloadCornerNavigateMode(Mode):
         ``lateral_error_px`` = centroid x minus strip center x; positive means
         tape is right of center."""
         h, w = bgr.shape[:2]
+        roi_full = self._dlz_roi_mask(bgr)
         strip_start = int(h * (1.0 - self.line_follow_strip_frac))
         strip = bgr[strip_start:, :]
+        roi_strip = roi_full[strip_start:, :]
         hsv = cv2.cvtColor(strip, cv2.COLOR_BGR2HSV)
-        mask = cv2.inRange(hsv, self._lower_black, self._upper_black)
+        mask = self._threshold_with_roi(
+            hsv,
+            self._lower_black,
+            self._upper_black,
+            roi_strip,
+        )
         count = int(np.count_nonzero(mask))
         if count == 0:
             return 0, 0.0
@@ -703,35 +810,38 @@ class PayloadCornerNavigateMode(Mode):
             return
 
         count, lateral_px = self._black_centroid_metrics(bgr)
+        status, self._tape_align_stable, angular, locked = self._centroid_align_step(
+            count=count,
+            lateral_px=lateral_px,
+            min_pixels=self.tape_align_min_pixels,
+            center_tol_px=self.tape_align_center_tol_px,
+            stable_count=self._tape_align_stable,
+            stable_frames=self.tape_align_stable_frames,
+            search_angular=self.tape_align_angular_speed,
+            turn_angular_speed=self.tape_align_angular_speed,
+        )
 
-        if count < self.tape_align_min_pixels:
-            # Tape not visible yet — rotate slowly to search
-            self.vehicle.drive(0.0, self.tape_align_angular_speed)
-            self._tape_align_stable = 0
-            self._annotate_tape_align(bgr, count, lateral_px, "searching")
+        if locked:
+            self.vehicle.stop()
+            self._annotate_tape_align(bgr, count, lateral_px, status)
+            self.log(
+                f"PayloadCornerNavigateMode: TAPE_ALIGN centered "
+                f"(lat={lateral_px:.1f}px, px={count}) → done"
+            )
+            self._done = True
+            return
+
+        if angular == 0.0:
+            self.vehicle.stop()
+        else:
+            self.vehicle.drive(0.0, angular)
+
+        self._annotate_tape_align(bgr, count, lateral_px, status)
+        if status == "searching":
             self.log(
                 f"PayloadCornerNavigateMode: TAPE_ALIGN searching (black_px={count})"
             )
-            return
-
-        # Proportional correction toward center
-        if abs(lateral_px) <= self.tape_align_center_tol_px:
-            self._tape_align_stable += 1
-            self.vehicle.stop()
-            if self._tape_align_stable >= self.tape_align_stable_frames:
-                self._annotate_tape_align(bgr, count, lateral_px, "LOCKED")
-                self.log(
-                    f"PayloadCornerNavigateMode: TAPE_ALIGN centered "
-                    f"(lat={lateral_px:.1f}px, px={count}) → done"
-                )
-                self._done = True
-            else:
-                self._annotate_tape_align(bgr, count, lateral_px, "centering")
-        else:
-            self._tape_align_stable = 0
-            direction = -1.0 if lateral_px > 0 else 1.0
-            self.vehicle.drive(0.0, direction * self.tape_align_angular_speed)
-            self._annotate_tape_align(bgr, count, lateral_px, "turning")
+        elif status == "turning":
             self.log(
                 f"PayloadCornerNavigateMode: TAPE_ALIGN turning "
                 f"lat={lateral_px:.1f}px black_px={count}"
@@ -803,15 +913,18 @@ class PayloadCornerNavigateMode(Mode):
             return
         debug = bgr.copy()
         h, w = bgr.shape[:2]
+        roi_full = self._dlz_roi_mask(bgr)
+        self._darken_outside_roi(debug, roi_full)
         y0 = int(h * (1.0 - self.drive_out_strip_frac))
         x0 = w // 3
         x1 = w - (w // 3)
         # Recompute the same masks the logic used so the contours exactly
         # match what DRIVE_OUT was thresholding on.
         strip = bgr[y0:, x0:x1]
+        roi_strip = roi_full[y0:, x0:x1]
         hsv = cv2.cvtColor(strip, cv2.COLOR_BGR2HSV)
-        mask_a = cv2.inRange(hsv, self._lower_a, self._upper_a)
-        mask_b = cv2.inRange(hsv, self._lower_b, self._upper_b)
+        mask_a = self._threshold_with_roi(hsv, self._lower_a, self._upper_a, roi_strip)
+        mask_b = self._threshold_with_roi(hsv, self._lower_b, self._upper_b, roi_strip)
         cv2.rectangle(debug, (x0, y0), (x1 - 1, h - 1), self._DBG_CROP, 1)
         self._draw_shifted_contours(debug, mask_a, x0, y0, self._DBG_COLOR_A, 2)
         self._draw_shifted_contours(debug, mask_b, x0, y0, self._DBG_COLOR_B, 2)
@@ -846,11 +959,14 @@ class PayloadCornerNavigateMode(Mode):
         total: int,
         lateral_error_px: float,
         dominant: Optional[str],
+        status: str,
     ) -> None:
         if self._annotated_pub is None or bgr is None:
             return
         debug = bgr.copy()
         h, w = bgr.shape[:2]
+        roi_full = self._dlz_roi_mask(bgr)
+        self._darken_outside_roi(debug, roi_full)
         row_end = h * 9 // 10
 
         # Darken rows outside the crop band.
@@ -871,45 +987,32 @@ class PayloadCornerNavigateMode(Mode):
         crop_cx = w // 2
         cv2.line(debug, (crop_cx, row_start), (crop_cx, row_end), (255, 255, 255), 1)
 
-        # Accept region (direction-dependent, lenient):
-        #   ccw → accept side = right; boundary at crop_cx - tol
-        #   cw  → accept side = left;  boundary at crop_cx + tol
-        if self.direction == "cw":
-            accept_boundary_x = int(crop_cx + self.center_tol_px)
-            accept_x0, accept_x1 = 0, accept_boundary_x
-        else:
-            accept_boundary_x = int(crop_cx - self.center_tol_px)
-            accept_x0, accept_x1 = accept_boundary_x, w
+        # Symmetric tolerance band around the crop center, matching the
+        # search/turn/lock logic used by TURN_TO_CENTER.
+        tol_left = int(crop_cx - self.center_tol_px)
+        tol_right = int(crop_cx + self.center_tol_px)
         overlay = debug.copy()
         cv2.rectangle(
             overlay,
-            (accept_x0, row_start),
-            (accept_x1, row_end),
+            (tol_left, row_start),
+            (tol_right, row_end),
             (0, 255, 0),
             thickness=-1,
         )
         cv2.addWeighted(overlay, 0.18, debug, 0.82, 0, dst=debug)
-        cv2.line(
-            debug,
-            (accept_boundary_x, row_start),
-            (accept_boundary_x, row_end),
-            (0, 255, 0),
-            2,
-        )
+        cv2.line(debug, (tol_left, row_start), (tol_left, row_end), self._DBG_TOL, 1)
+        cv2.line(debug, (tol_right, row_start), (tol_right, row_end), self._DBG_TOL, 1)
 
-        # Combined centroid line (green if in accept, orange otherwise).
+        # Combined centroid line (green if in tolerance, orange otherwise).
         if total >= self.center_min_pixels:
             centroid_x = int(crop_cx + lateral_error_px)
-            if self.direction == "ccw":
-                in_accept = lateral_error_px > -self.center_tol_px
-            else:
-                in_accept = lateral_error_px < self.center_tol_px
-            color = (0, 255, 0) if in_accept else (0, 140, 255)
+            in_tol = abs(lateral_error_px) <= self.center_tol_px
+            color = (0, 255, 0) if in_tol else (0, 140, 255)
             cv2.line(debug, (centroid_x, row_start), (centroid_x, row_end), color, 2)
 
         self._put_label(
             debug,
-            f"TURN_TO_CENTER dir={self.direction}",
+            f"TURN_TO_CENTER [{status}] dir={self.direction}",
             22,
             (0, 255, 255),
             0.6,
@@ -918,7 +1021,7 @@ class PayloadCornerNavigateMode(Mode):
         self._put_label(
             debug,
             f"total={total}px lat={lateral_error_px:+.1f}px "
-            f"tol=+/-{self.center_tol_px:.0f} dom={dominant}",
+            f"tol=+/-{self.center_tol_px:.0f} min={self.center_min_pixels} dom={dominant}",
             44,
         )
         self._put_label(
@@ -945,11 +1048,14 @@ class PayloadCornerNavigateMode(Mode):
             return
         debug = bgr.copy()
         h, w = bgr.shape[:2]
+        roi_full = self._dlz_roi_mask(bgr)
+        self._darken_outside_roi(debug, roi_full)
         y0 = int(h * (1.0 - self.line_follow_strip_frac))
         strip = bgr[y0:, :]
+        roi_strip = roi_full[y0:, :]
         hsv = cv2.cvtColor(strip, cv2.COLOR_BGR2HSV)
-        mask_a = cv2.inRange(hsv, self._lower_a, self._upper_a)
-        mask_b = cv2.inRange(hsv, self._lower_b, self._upper_b)
+        mask_a = self._threshold_with_roi(hsv, self._lower_a, self._upper_a, roi_strip)
+        mask_b = self._threshold_with_roi(hsv, self._lower_b, self._upper_b, roi_strip)
         mask_current = mask_a if current == "A" else mask_b
         mask_other = mask_b if current == "A" else mask_a
         cv2.rectangle(debug, (0, y0), (w - 1, h - 1), self._DBG_CROP, 1)
@@ -1018,12 +1124,20 @@ class PayloadCornerNavigateMode(Mode):
             return
         debug = bgr.copy()
         h, w = bgr.shape[:2]
+        roi_full = self._dlz_roi_mask(bgr)
+        self._darken_outside_roi(debug, roi_full)
         # Exactly match _black_centroid_metrics: bottom line_follow_strip_frac,
         # full width, same HSV thresholds, same center computation.
         y0 = int(h * (1.0 - self.line_follow_strip_frac))
         strip = bgr[y0:, :]
+        roi_strip = roi_full[y0:, :]
         hsv = cv2.cvtColor(strip, cv2.COLOR_BGR2HSV)
-        mask = cv2.inRange(hsv, self._lower_black, self._upper_black)
+        mask = self._threshold_with_roi(
+            hsv,
+            self._lower_black,
+            self._upper_black,
+            roi_strip,
+        )
         cv2.rectangle(debug, (0, y0), (w - 1, h - 1), self._DBG_CROP, 1)
         self._draw_shifted_contours(debug, mask, 0, y0, (180, 180, 180), 2)
         # Use float / 2.0 to match _black_centroid_metrics exactly.

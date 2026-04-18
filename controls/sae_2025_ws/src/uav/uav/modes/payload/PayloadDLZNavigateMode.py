@@ -11,6 +11,7 @@ from cv_bridge import CvBridge
 from rclpy.node import Node
 from sensor_msgs.msg import CompressedImage, Image
 
+from uav.cv.dlz_convex_hull import build_dlz_hull_mask
 from uav.vehicles.Payload import Payload
 from uav.vision_nodes import PayloadAprilTagNode
 from uav.vision_nodes.payload_perception_common import DEFAULT_TAG_FAMILY
@@ -56,6 +57,7 @@ _MIN_COLOR_PIXELS = 20
 _COLOR_RATIO = 1.5
 # Minimum tape pixels (A+B combined) per row to include in boundary estimate
 _MIN_ROW_PIXELS = 3
+_COLOR_BLUR_KERNEL = (5, 5)
 
 
 def _get_strip(bgr: np.ndarray) -> Tuple[np.ndarray, int]:
@@ -63,6 +65,11 @@ def _get_strip(bgr: np.ndarray) -> Tuple[np.ndarray, int]:
     height = bgr.shape[0]
     strip_start = int(height * _STRIP_START_FRAC)
     return bgr[strip_start:, :], strip_start
+
+
+def _preprocess_color_crop(bgr: np.ndarray) -> np.ndarray:
+    """Light denoising before HSV thresholding to stabilize tape masks."""
+    return cv2.GaussianBlur(bgr, _COLOR_BLUR_KERNEL, 0)
 
 
 def _detect_current_color(
@@ -286,6 +293,33 @@ class PayloadDLZNavigateMode(Mode):
             )
             return None
 
+    def _dlz_roi_mask(self, bgr: np.ndarray) -> np.ndarray:
+        roi_mask = build_dlz_hull_mask(bgr)
+        if roi_mask is None:
+            return np.full(bgr.shape[:2], 255, dtype=np.uint8)
+        return roi_mask
+
+    def _threshold_color_mask(
+        self,
+        hsv: np.ndarray,
+        roi_mask: np.ndarray,
+        *,
+        color: str,
+    ) -> np.ndarray:
+        if color == "A":
+            mask = (
+                cv2.inRange(hsv, self._lower_a, self._upper_a)
+                | cv2.inRange(hsv, self._lower_a2, self._upper_a2)
+            )
+        else:
+            mask = cv2.inRange(hsv, self._lower_b, self._upper_b)
+        return cv2.bitwise_and(mask, roi_mask)
+
+    def _darken_outside_roi(self, debug: np.ndarray, roi_mask: np.ndarray) -> None:
+        outside = roi_mask == 0
+        if np.any(outside):
+            debug[outside] = (debug[outside] * 0.35).astype(np.uint8)
+
     def _detect_color(
         self, bgr: np.ndarray
     ) -> Tuple[str, bool, float, float, np.ndarray, np.ndarray, np.ndarray, int]:
@@ -294,13 +328,12 @@ class PayloadDLZNavigateMode(Mode):
         Returns (current_color, boundary_detected, lateral_error_px,
                  boundary_angle, orange_mask, blue_mask, strip, strip_start).
         """
+        roi_full = self._dlz_roi_mask(bgr)
         strip, strip_start = _get_strip(bgr)
-        hsv = cv2.cvtColor(strip, cv2.COLOR_BGR2HSV)
-        orange_mask = (
-            cv2.inRange(hsv, self._lower_a, self._upper_a)
-            | cv2.inRange(hsv, self._lower_a2, self._upper_a2)
-        )
-        blue_mask = cv2.inRange(hsv, self._lower_b, self._upper_b)
+        roi_strip = roi_full[strip_start:, :]
+        hsv = cv2.cvtColor(_preprocess_color_crop(strip), cv2.COLOR_BGR2HSV)
+        orange_mask = self._threshold_color_mask(hsv, roi_strip, color="A")
+        blue_mask = self._threshold_color_mask(hsv, roi_strip, color="B")
         current_color = _detect_current_color(orange_mask, blue_mask)
         detected, lateral_error_px, boundary_angle = _detect_tape_following(
             orange_mask, blue_mask
@@ -527,20 +560,16 @@ class PayloadDLZNavigateMode(Mode):
         opposite-side tape cannot bias the centroid.
         """
         h, w = bgr.shape[:2]
+        roi_full = self._dlz_roi_mask(bgr)
         row_start = int(h * 0.6)
         # col_start = w // 3
         col_start = 0
         # col_end = w - (w // 3)
         col_end = w
         crop = bgr[row_start:, col_start:col_end]
-        hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
-        if color == "A":
-            mask = (
-                cv2.inRange(hsv, self._lower_a, self._upper_a)
-                | cv2.inRange(hsv, self._lower_a2, self._upper_a2)
-            )
-        else:
-            mask = cv2.inRange(hsv, self._lower_b, self._upper_b)
+        roi_crop = roi_full[row_start:, col_start:col_end]
+        hsv = cv2.cvtColor(_preprocess_color_crop(crop), cv2.COLOR_BGR2HSV)
+        mask = self._threshold_color_mask(hsv, roi_crop, color=color)
         count = int(np.count_nonzero(mask))
         if count == 0:
             return 0, 0.0, mask, row_start, col_start
@@ -647,6 +676,8 @@ class PayloadDLZNavigateMode(Mode):
             return
         debug = bgr.copy()
         h, w = bgr.shape[:2]
+        roi_full = self._dlz_roi_mask(bgr)
+        self._darken_outside_roi(debug, roi_full)
 
         # Contours of the single expected-colour mask — exactly what the
         # detector thresholded on for the centroid.
@@ -862,20 +893,16 @@ class PayloadDLZNavigateMode(Mode):
         Returns ``(0, 0.0, empty_mask, row_start, col_start)`` if no pixels
         found."""
         h, w = bgr.shape[:2]
+        roi_full = self._dlz_roi_mask(bgr)
         # Bottom third: top at 2h/3, bottom at h.
         row_start = int(h * 2 / 3)
         row_end = h * 9 // 10
         col_start = 0
         col_end = w
         crop = bgr[row_start:row_end, col_start:col_end]
-        hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
-        if color == "A":
-            mask = (
-                cv2.inRange(hsv, self._lower_a, self._upper_a)
-                | cv2.inRange(hsv, self._lower_a2, self._upper_a2)
-            )
-        else:
-            mask = cv2.inRange(hsv, self._lower_b, self._upper_b)
+        roi_crop = roi_full[row_start:row_end, col_start:col_end]
+        hsv = cv2.cvtColor(_preprocess_color_crop(crop), cv2.COLOR_BGR2HSV)
+        mask = self._threshold_color_mask(hsv, roi_crop, color=color)
         count = int(np.count_nonzero(mask))
         if count == 0:
             return 0, 0.0, mask, row_start, col_start
@@ -959,6 +986,8 @@ class PayloadDLZNavigateMode(Mode):
             return
         debug = bgr.copy()
         h, w = bgr.shape[:2]
+        roi_full = self._dlz_roi_mask(bgr)
+        self._darken_outside_roi(debug, roi_full)
         row_end = h * 9 // 10
         col_end = w - col_start
 
@@ -1074,6 +1103,8 @@ class PayloadDLZNavigateMode(Mode):
             return
         debug = bgr.copy()
         h, w = bgr.shape[:2]
+        roi_full = self._dlz_roi_mask(bgr)
+        self._darken_outside_roi(debug, roi_full)
         strip_w = w
 
         # Draw contours around detected colour regions — exactly what the
