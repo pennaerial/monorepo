@@ -8,6 +8,7 @@ import types
 
 import numpy as np
 import cv2
+import pytest
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 if str(PACKAGE_ROOT) not in sys.path:
@@ -110,10 +111,71 @@ PayloadDLZNavigateMode = importlib.import_module(
 ).PayloadDLZNavigateMode
 
 
+class _FakeLogger:
+    def info(self, _message: str) -> None:
+        pass
+
+    def warn(self, _message: str) -> None:
+        pass
+
+    def warning(self, _message: str) -> None:
+        pass
+
+    def error(self, _message: str) -> None:
+        pass
+
+
+class _FakeNode:
+    def __init__(self) -> None:
+        self._logger = _FakeLogger()
+
+    def get_logger(self) -> _FakeLogger:
+        return self._logger
+
+
+class _RecordingVehicle:
+    def __init__(self) -> None:
+        self.commands: list[tuple] = []
+
+    def drive(self, linear: float, angular: float) -> None:
+        self.commands.append(("drive", float(linear), float(angular)))
+
+    def stop(self) -> None:
+        self.commands.append(("stop",))
+
+
 def _orange_rect_frame() -> np.ndarray:
     frame = np.zeros((220, 260, 3), dtype=np.uint8)
     frame[40:180, 30:210] = ORANGE_BGR
     return frame
+
+
+def _empty_mask() -> np.ndarray:
+    return np.zeros((24, 24), dtype=np.uint8)
+
+
+def _make_turn_to_center_mode(**kwargs):
+    vehicle = _RecordingVehicle()
+    mode = PayloadCornerNavigateMode(
+        node=_FakeNode(),
+        vehicle=vehicle,
+        align_angular_speed=0.6,
+        center_tol_px=20.0,
+        center_min_pixels=50,
+        center_stable_frames=2,
+        **kwargs,
+    )
+    mode._phase = "turn_to_center"
+    mode._turn_to_center_rad = 0.0
+    mode._center_stable = 0
+    mode._latest_dominant = None
+    mode._first_color = "A"
+    mode._prev_color = None
+    mode._annotated_pub = None
+    mode._done = False
+    mode._terminate = False
+    mode._decode_image = lambda: np.zeros((32, 32, 3), dtype=np.uint8)
+    return mode, vehicle
 
 
 def test_build_dlz_hull_mask_keeps_orange_rectangle_and_excludes_outside():
@@ -173,3 +235,92 @@ def test_dlz_mode_detect_color_ignores_outside_dlz_distractors():
     assert lateral_error_px == 0.0
     assert np.count_nonzero(mask_a) == 0
     assert np.count_nonzero(mask_b) == 0
+
+
+@pytest.mark.parametrize(
+    ("direction", "expected_angular"),
+    [("ccw", 0.6), ("cw", -0.6)],
+)
+def test_turn_to_center_searches_in_nominal_direction_without_visible_tape(
+    direction: str,
+    expected_angular: float,
+):
+    mode, vehicle = _make_turn_to_center_mode(direction=direction)
+    mode._turn_both_color_metrics = lambda _bgr: (0, 0.0, None, _empty_mask(), _empty_mask(), 0)
+
+    mode._update_turn_to_center(0.5)
+
+    assert vehicle.commands[-1] == ("drive", 0.0, expected_angular)
+    assert mode._center_stable == 0
+    assert mode._turn_to_center_rad == pytest.approx(0.3)
+
+
+@pytest.mark.parametrize(
+    ("lateral_px", "expected_angular"),
+    [(35.0, -0.6), (-35.0, 0.6)],
+)
+def test_turn_to_center_turns_toward_center_from_centroid_sign(
+    lateral_px: float,
+    expected_angular: float,
+):
+    mode, vehicle = _make_turn_to_center_mode()
+    mode._turn_both_color_metrics = lambda _bgr: (
+        80,
+        lateral_px,
+        "A",
+        _empty_mask(),
+        _empty_mask(),
+        0,
+    )
+
+    mode._update_turn_to_center(0.25)
+
+    assert vehicle.commands[-1] == ("drive", 0.0, expected_angular)
+    assert mode._center_stable == 0
+    assert mode._turn_to_center_rad == pytest.approx(0.15)
+
+
+def test_turn_to_center_locks_after_stable_frames_and_seeds_prev_color():
+    mode, vehicle = _make_turn_to_center_mode()
+    mode._turn_both_color_metrics = lambda _bgr: (
+        80,
+        5.0,
+        "B",
+        _empty_mask(),
+        _empty_mask(),
+        0,
+    )
+
+    mode._update_turn_to_center(0.25)
+
+    assert vehicle.commands[-1] == ("stop",)
+    assert mode._center_stable == 1
+    assert mode._phase == "turn_to_center"
+    assert mode._latest_dominant == "B"
+
+    mode._update_turn_to_center(0.25)
+
+    assert vehicle.commands[-1] == ("stop",)
+    assert mode._center_stable == 2
+    assert mode._phase == "line_follow"
+    assert mode._prev_color == "B"
+    assert mode._turn_to_center_rad == pytest.approx(0.0)
+
+
+def test_turn_to_center_resets_stable_when_target_leaves_tolerance():
+    mode, vehicle = _make_turn_to_center_mode()
+    mode._center_stable = 1
+    mode._turn_both_color_metrics = lambda _bgr: (
+        80,
+        32.0,
+        "A",
+        _empty_mask(),
+        _empty_mask(),
+        0,
+    )
+
+    mode._update_turn_to_center(0.25)
+
+    assert mode._center_stable == 0
+    assert vehicle.commands[-1] == ("drive", 0.0, -0.6)
+    assert mode._turn_to_center_rad == pytest.approx(0.15)
