@@ -9,7 +9,8 @@ from typing_extensions import TypedDict
 
 HSVTriplet = tuple[int, int, int]
 HSVRange = tuple[HSVTriplet, HSVTriplet]
-_MAX_HULL_EXPANSION_RATIO = 1.35
+_INTERIOR_KERNEL_SIZE = 15
+_MIN_SURVIVING_CONTOUR_AREA = 5000
 
 
 class HSVRangeConfig(TypedDict):
@@ -91,127 +92,13 @@ def _mask_for_ranges(hsv: np.ndarray, ranges: Sequence[HSVRange]) -> np.ndarray:
     return mask
 
 
-def _normalized_kernel_size(kernel_size: int) -> int:
-    size = max(1, int(kernel_size))
-    if size % 2 == 0:
-        size += 1
-    return size
+def _corner_seed_points(width: int) -> tuple[tuple[int, int], ...]:
+    return ((0, 0), (width - 1, 0))
 
 
-def _clean_barrier_mask(mask: np.ndarray, kernel_size: int) -> np.ndarray:
-    size = _normalized_kernel_size(kernel_size)
-    if size <= 1:
-        return mask
-    kernel = np.ones((size, size), dtype=np.uint8)
-    cleaned = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
-    return cv2.morphologyEx(cleaned, cv2.MORPH_OPEN, kernel)
-
-
-def _corner_patch(mask: np.ndarray, corner: str, patch_size: int) -> np.ndarray:
-    height, width = mask.shape[:2]
-    patch = max(1, min(int(patch_size), height, width))
-    if corner == "top_left":
-        return mask[:patch, :patch]
-    if corner == "top_right":
-        return mask[:patch, width - patch :]
-    if corner == "bottom_left":
-        return mask[height - patch :, :patch]
-    if corner == "bottom_right":
-        return mask[height - patch :, width - patch :]
-    raise ValueError(f"Unsupported corner name {corner!r}.")
-
-
-def _corner_seed_points(width: int, height: int) -> tuple[tuple[str, tuple[int, int]], ...]:
-    return (
-        ("top_left", (0, 0)),
-        ("top_right", (width - 1, 0)),
-        ("bottom_left", (0, height - 1)),
-        ("bottom_right", (width - 1, height - 1)),
-    )
-
-
-def _valid_seed_points(
-    barrier_mask: np.ndarray,
-    reject_mask: np.ndarray | None,
-    config: DLZOrangeBarrierMaskConfig,
-) -> tuple[tuple[int, int], ...]:
-    height, width = barrier_mask.shape[:2]
-    seed_points: list[tuple[int, int]] = []
-    patch_area = float(
-        max(
-            1,
-            min(int(config.seed_patch_size_px), height, width)
-            * min(int(config.seed_patch_size_px), height, width),
-        )
-    )
-    for corner_name, seed_point in _corner_seed_points(width, height):
-        barrier_patch = _corner_patch(
-            barrier_mask, corner_name, config.seed_patch_size_px
-        )
-        barrier_ratio = float(np.count_nonzero(barrier_patch)) / patch_area
-        if barrier_ratio >= config.seed_barrier_ratio_threshold:
-            continue
-        if reject_mask is not None:
-            reject_patch = _corner_patch(
-                reject_mask, corner_name, config.seed_patch_size_px
-            )
-            reject_ratio = float(np.count_nonzero(reject_patch)) / patch_area
-            if reject_ratio >= config.seed_reject_ratio_threshold:
-                continue
-        seed_points.append(seed_point)
-    return tuple(seed_points)
-
-
-def _filter_components_by_area(
-    mask: np.ndarray, min_pixels: int
-) -> tuple[np.ndarray, int, int]:
-    binary_mask = (mask > 0).astype(np.uint8)
-    if not np.any(binary_mask):
-        return np.zeros_like(mask), 0, 0
-
-    label_count, labels, stats, _ = cv2.connectedComponentsWithStats(binary_mask, 8)
-    filtered = np.zeros_like(mask)
-    kept_components = 0
-    kept_pixels = 0
-
-    for label in range(1, label_count):
-        area = int(stats[label, cv2.CC_STAT_AREA])
-        if area < min_pixels:
-            continue
-        filtered[labels == label] = 255
-        kept_components += 1
-        kept_pixels += area
-
-    return filtered, kept_components, kept_pixels
-
-
-def _mask_bbox(mask: np.ndarray) -> tuple[int, int, int, int] | None:
-    points = cv2.findNonZero(mask)
-    if points is None:
-        return None
-    return tuple(int(value) for value in cv2.boundingRect(points))
-
-
-def _merge_candidate_regions(
-    mask: np.ndarray,
-) -> tuple[np.ndarray, tuple[int, int, int, int] | None, int, bool, float]:
+def _barrier_component_count(mask: np.ndarray) -> int:
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    if not contours:
-        return np.zeros_like(mask), None, 0, False, 0.0
-
-    if len(contours) == 1:
-        bbox = tuple(int(value) for value in cv2.boundingRect(contours[0]))
-        area_px = int(np.count_nonzero(mask))
-        return mask, bbox, 1, False, 1.0
-
-    union_area_px = float(max(1, np.count_nonzero(mask)))
-    hull_points = cv2.convexHull(np.vstack(contours))
-    hull_mask = np.zeros_like(mask)
-    cv2.drawContours(hull_mask, [hull_points], -1, 255, cv2.FILLED)
-    hull_area_px = float(np.count_nonzero(hull_mask))
-    expansion_ratio = hull_area_px / union_area_px
-    bbox = tuple(int(value) for value in cv2.boundingRect(hull_points))
-    return hull_mask, bbox, len(contours), True, expansion_ratio
+    return len(contours)
 
 
 def _passthrough_result(
@@ -252,9 +139,14 @@ def detect_dlz_orange_barrier_mask(
 ) -> DLZOrangeBarrierMaskResult:
     """Mask everything outside the orange DLZ while preserving frame geometry.
 
-    Orange is treated as the flood-fill barrier. Corner patches can be rejected
-    as seed candidates if they already contain orange or configured interior
-    colours, which avoids starting the outside flood fill from inside the DLZ.
+    Internally this follows the literal flood-fill hull algorithm:
+    threshold orange, flood fill from the two top corners, invert to get the
+    interior, erode+dilate with a fixed 15x15 kernel, then convex-hull every
+    surviving contour whose area is at least 5000 pixels.
+
+    For compatibility, the public config and result shapes are preserved. Under
+    this literal implementation only ``orange_barrier_hsv`` and
+    ``masked_pixel_bgr`` materially affect the output.
     """
 
     if not isinstance(bgr, np.ndarray):
@@ -263,52 +155,14 @@ def detect_dlz_orange_barrier_mask(
         raise ValueError("bgr must be an HxWx3 BGR image.")
 
     height, width = bgr.shape[:2]
-    frame_area = float(max(1, height * width))
-    empty_mask = np.zeros((height, width), dtype=np.uint8)
+    if height <= 0 or width <= 0:
+        raise ValueError("bgr must be non-empty.")
 
     hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
-    raw_barrier_mask = _clean_barrier_mask(
-        _mask_for_ranges(hsv, config.orange_barrier_hsv),
-        config.morphology_kernel_size,
-    )
-    barrier_mask, barrier_component_count, orange_pixels = _filter_components_by_area(
-        raw_barrier_mask,
-        max(1, int(config.min_component_pixels)),
-    )
-
-    if orange_pixels < max(0, int(config.min_orange_pixels)):
-        return _passthrough_result(
-            bgr=bgr,
-            barrier_mask=barrier_mask,
-            outside_fill_mask=empty_mask,
-            reason="orange_too_small",
-            component_bbox=None,
-            mask_area_px=0,
-            orange_pixels=orange_pixels,
-            seed_points=(),
-            barrier_component_count=barrier_component_count,
-            candidate_region_count=0,
-        )
-
-    reject_mask = (
-        _mask_for_ranges(hsv, config.seed_reject_hsv)
-        if config.seed_reject_hsv
-        else None
-    )
-    seed_points = _valid_seed_points(barrier_mask, reject_mask, config)
-    if not seed_points:
-        return _passthrough_result(
-            bgr=bgr,
-            barrier_mask=barrier_mask,
-            outside_fill_mask=empty_mask,
-            reason="no_seed_corners",
-            component_bbox=None,
-            mask_area_px=0,
-            orange_pixels=orange_pixels,
-            seed_points=(),
-            barrier_component_count=barrier_component_count,
-            candidate_region_count=0,
-        )
+    barrier_mask = _mask_for_ranges(hsv, config.orange_barrier_hsv)
+    orange_pixels = int(np.count_nonzero(barrier_mask))
+    barrier_component_count = _barrier_component_count(barrier_mask)
+    seed_points = _corner_seed_points(width)
 
     flood_fill_mask = np.zeros((height + 2, width + 2), dtype=np.uint8)
     flood_fill_mask[1:-1, 1:-1] = barrier_mask
@@ -321,12 +175,21 @@ def detect_dlz_orange_barrier_mask(
             newVal=255,
         )
 
-    raw_candidate_mask = cv2.bitwise_not(outside_fill_mask)
-    candidate_mask, candidate_region_count, _ = _filter_components_by_area(
-        raw_candidate_mask,
-        max(1, int(config.min_component_pixels)),
+    interior_mask = cv2.bitwise_not(outside_fill_mask)
+    kernel = np.ones((_INTERIOR_KERNEL_SIZE, _INTERIOR_KERNEL_SIZE), dtype=np.uint8)
+    interior_mask = cv2.erode(interior_mask, kernel)
+    interior_mask = cv2.dilate(interior_mask, kernel)
+
+    contours, _ = cv2.findContours(
+        interior_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
     )
-    if not np.any(candidate_mask):
+    surviving_contours = [
+        contour
+        for contour in contours
+        if cv2.contourArea(contour) >= _MIN_SURVIVING_CONTOUR_AREA
+    ]
+
+    if not surviving_contours:
         return _passthrough_result(
             bgr=bgr,
             barrier_mask=barrier_mask,
@@ -340,101 +203,16 @@ def detect_dlz_orange_barrier_mask(
             candidate_region_count=0,
         )
 
-    applied_mask, component_bbox, candidate_region_count, used_hull_merge, expansion_ratio = (
-        _merge_candidate_regions(candidate_mask)
-    )
-    if component_bbox is None:
-        return _passthrough_result(
-            bgr=bgr,
-            barrier_mask=barrier_mask,
-            outside_fill_mask=outside_fill_mask,
-            reason="no_dlz_region",
-            component_bbox=None,
-            mask_area_px=0,
-            orange_pixels=orange_pixels,
-            seed_points=seed_points,
-            barrier_component_count=barrier_component_count,
-            candidate_region_count=candidate_region_count,
-            used_hull_merge=used_hull_merge,
-        )
+    hull = cv2.convexHull(np.concatenate(surviving_contours, axis=0))
+    applied_mask = np.zeros((height, width), dtype=np.uint8)
+    cv2.drawContours(applied_mask, [hull], -1, 255, cv2.FILLED)
 
-    if used_hull_merge and expansion_ratio > _MAX_HULL_EXPANSION_RATIO:
-        return _passthrough_result(
-            bgr=bgr,
-            barrier_mask=barrier_mask,
-            outside_fill_mask=outside_fill_mask,
-            reason="hull_too_large",
-            component_bbox=component_bbox,
-            mask_area_px=int(np.count_nonzero(candidate_mask)),
-            orange_pixels=orange_pixels,
-            seed_points=seed_points,
-            barrier_component_count=barrier_component_count,
-            candidate_region_count=candidate_region_count,
-            used_hull_merge=True,
-        )
-
+    component_bbox = tuple(int(value) for value in cv2.boundingRect(hull))
     mask_area_px = int(np.count_nonzero(applied_mask))
-    mask_area_frac = mask_area_px / frame_area
-    if mask_area_frac < config.min_mask_area_frac:
-        return _passthrough_result(
-            bgr=bgr,
-            barrier_mask=barrier_mask,
-            outside_fill_mask=outside_fill_mask,
-            reason="dlz_too_small",
-            component_bbox=component_bbox,
-            mask_area_px=mask_area_px,
-            orange_pixels=orange_pixels,
-            seed_points=seed_points,
-            barrier_component_count=barrier_component_count,
-            candidate_region_count=candidate_region_count,
-            used_hull_merge=used_hull_merge,
-        )
-    if mask_area_frac > config.max_mask_area_frac:
-        return _passthrough_result(
-            bgr=bgr,
-            barrier_mask=barrier_mask,
-            outside_fill_mask=outside_fill_mask,
-            reason="dlz_too_large",
-            component_bbox=component_bbox,
-            mask_area_px=mask_area_px,
-            orange_pixels=orange_pixels,
-            seed_points=seed_points,
-            barrier_component_count=barrier_component_count,
-            candidate_region_count=candidate_region_count,
-            used_hull_merge=used_hull_merge,
-        )
-
-    bbox_width = component_bbox[2]
-    bbox_height = component_bbox[3]
-    bbox_span_ratio = max(bbox_width / max(width, 1), bbox_height / max(height, 1))
-    if bbox_span_ratio < config.min_bbox_span_ratio:
-        return _passthrough_result(
-            bgr=bgr,
-            barrier_mask=barrier_mask,
-            outside_fill_mask=outside_fill_mask,
-            reason="dlz_span_too_small",
-            component_bbox=component_bbox,
-            mask_area_px=mask_area_px,
-            orange_pixels=orange_pixels,
-            seed_points=seed_points,
-            barrier_component_count=barrier_component_count,
-            candidate_region_count=candidate_region_count,
-            used_hull_merge=used_hull_merge,
-        )
-
-    if config.dilate_iterations > 0:
-        kernel_size = _normalized_kernel_size(config.morphology_kernel_size)
-        kernel = np.ones((kernel_size, kernel_size), dtype=np.uint8)
-        applied_mask = cv2.dilate(
-            applied_mask,
-            kernel,
-            iterations=max(0, int(config.dilate_iterations)),
-        )
-        component_bbox = _mask_bbox(applied_mask)
-        mask_area_px = int(np.count_nonzero(applied_mask))
-
+    used_hull_merge = len(surviving_contours) > 1
     masked_frame = np.full_like(bgr, config.masked_pixel_bgr, dtype=bgr.dtype)
     cv2.copyTo(bgr, applied_mask, masked_frame)
+
     return DLZOrangeBarrierMaskResult(
         frame=masked_frame,
         applied_mask=applied_mask,
@@ -448,7 +226,7 @@ def detect_dlz_orange_barrier_mask(
         orange_pixels=orange_pixels,
         seed_points=seed_points,
         barrier_component_count=barrier_component_count,
-        candidate_region_count=candidate_region_count,
+        candidate_region_count=len(surviving_contours),
         used_hull_merge=used_hull_merge,
     )
 

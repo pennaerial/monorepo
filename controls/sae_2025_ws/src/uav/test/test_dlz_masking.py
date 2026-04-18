@@ -15,7 +15,7 @@ def _bgr_from_hsv(h: int, s: int, v: int) -> tuple[int, int, int]:
     return tuple(int(channel) for channel in bgr)
 
 
-def _blank_frame(height: int = 120, width: int = 160) -> np.ndarray:
+def _blank_frame(height: int = 220, width: int = 220) -> np.ndarray:
     frame = np.zeros((height, width, 3), dtype=np.uint8)
     frame[:] = (35, 40, 30)
     return frame
@@ -55,139 +55,171 @@ def _default_config() -> DLZOrangeBarrierMaskConfig:
     )
 
 
-def test_detect_dlz_orange_barrier_masks_inside_region_and_preserves_shape():
+def test_detect_dlz_orange_barrier_masks_large_rectangle_and_preserves_shape():
     frame = _blank_frame()
     orange_bgr = _bgr_from_hsv(15, 220, 220)
-    blue_bgr = _bgr_from_hsv(110, 220, 220)
-    purple_bgr = _bgr_from_hsv(150, 180, 220)
-    yellow_bgr = _bgr_from_hsv(25, 230, 230)
 
-    frame[18:102, 20:140] = orange_bgr
-    frame[34:90, 34:44] = blue_bgr
-    frame[52:62, 44:116] = purple_bgr
-    frame[26:94, 116:128] = yellow_bgr
+    frame[30:190, 40:180] = orange_bgr
 
     result = detect_dlz_orange_barrier_mask(frame, _default_config())
 
-    expected_mask = _rect_mask(frame.shape[0], frame.shape[1], 20, 18, 140, 102)
+    expected_mask = _rect_mask(frame.shape[0], frame.shape[1], 40, 30, 180, 190)
     assert result.plausible is True
     assert result.passthrough is False
     assert result.reason == "masked"
     assert result.frame.shape == frame.shape
     assert result.frame.dtype == frame.dtype
-    assert result.component_bbox == (20, 18, 120, 84)
+    assert result.applied_mask.dtype == np.uint8
     assert np.array_equal(result.applied_mask, expected_mask)
-    assert np.count_nonzero(result.outside_fill_mask) > 0
-    assert len(result.seed_points) == 4
+    assert np.array_equal(result.barrier_mask, expected_mask)
+    assert result.component_bbox == (40, 30, 140, 160)
+    assert result.mask_area_px == 140 * 160
+    assert result.orange_pixels == 140 * 160
+    assert result.seed_points == ((0, 0), (frame.shape[1] - 1, 0))
     assert result.barrier_component_count == 1
     assert result.candidate_region_count == 1
     assert result.used_hull_merge is False
-    assert np.array_equal(result.frame[18:102, 20:140], frame[18:102, 20:140])
+    assert np.count_nonzero(result.outside_fill_mask) > 0
+    assert np.array_equal(result.frame[expected_mask == 255], frame[expected_mask == 255])
     assert np.all(result.frame[expected_mask == 0] == 0)
 
 
-def test_detect_dlz_orange_barrier_ignores_small_barrier_components():
-    frame = _blank_frame()
-    orange_bgr = _bgr_from_hsv(15, 220, 220)
-
-    frame[18:102, 20:140] = orange_bgr
-    frame[6:14, 6:14] = orange_bgr
-    frame[6:14, 146:154] = orange_bgr
-
-    result = detect_dlz_orange_barrier_mask(frame, _default_config())
-
-    assert result.plausible is True
-    assert result.barrier_component_count == 1
-    assert result.orange_pixels == 120 * 84
-    assert result.component_bbox == (20, 18, 120, 84)
-    assert result.used_hull_merge is False
-
-
-def test_detect_dlz_orange_barrier_rejects_contaminated_corner_but_uses_other_seeds():
+def test_detect_dlz_orange_barrier_ignores_seed_reject_hsv_and_still_uses_top_seeds():
     frame = _blank_frame()
     orange_bgr = _bgr_from_hsv(15, 220, 220)
     purple_bgr = _bgr_from_hsv(150, 180, 220)
 
-    frame[20:104, 24:142] = orange_bgr
+    frame[30:190, 40:180] = orange_bgr
     frame[:24, :24] = purple_bgr
+    frame[:24, -24:] = purple_bgr
 
     result = detect_dlz_orange_barrier_mask(frame, _default_config())
 
     assert result.plausible is True
     assert result.passthrough is False
-    assert (0, 0) not in result.seed_points
-    assert len(result.seed_points) == 3
-    assert result.component_bbox == (24, 20, 118, 84)
+    assert result.reason == "masked"
+    assert result.seed_points == ((0, 0), (frame.shape[1] - 1, 0))
+    assert result.candidate_region_count == 1
 
 
-def test_detect_dlz_orange_barrier_returns_passthrough_when_no_seed_corner_is_valid():
+def test_detect_dlz_orange_barrier_returns_passthrough_when_no_contour_survives_area_cutoff():
     frame = _blank_frame()
     orange_bgr = _bgr_from_hsv(15, 220, 220)
-    purple_bgr = _bgr_from_hsv(150, 180, 220)
 
-    frame[20:104, 24:142] = orange_bgr
-    frame[:24, :24] = purple_bgr
-    frame[:24, -24:] = purple_bgr
-    frame[-24:, :24] = purple_bgr
-    frame[-24:, -24:] = purple_bgr
+    frame[40:90, 50:100] = orange_bgr
 
     result = detect_dlz_orange_barrier_mask(frame, _default_config())
 
     assert result.plausible is False
     assert result.passthrough is True
-    assert result.reason == "no_seed_corners"
-    assert result.seed_points == ()
+    assert result.reason == "no_dlz_region"
+    assert result.mask_area_px == 0
+    assert result.component_bbox is None
+    assert result.orange_pixels == 50 * 50
+    assert result.seed_points == ((0, 0), (frame.shape[1] - 1, 0))
+    assert result.barrier_component_count == 1
+    assert result.candidate_region_count == 0
+    assert result.used_hull_merge is False
     assert np.array_equal(result.frame, frame)
 
 
-def test_detect_dlz_orange_barrier_hulls_multiple_candidate_regions():
-    frame = _blank_frame()
+def test_detect_dlz_orange_barrier_ignores_subthreshold_contours_when_large_one_survives():
+    frame = _blank_frame(height=220, width=260)
     orange_bgr = _bgr_from_hsv(15, 220, 220)
 
-    frame[18:102, 18:58] = orange_bgr
-    frame[18:102, 62:102] = orange_bgr
+    frame[40:180, 30:130] = orange_bgr
+    frame[50:105, 180:220] = orange_bgr
 
-    result = detect_dlz_orange_barrier_mask(
-        frame,
-        DLZOrangeBarrierMaskConfig(
-            **{
-                **_default_config().__dict__,
-                "min_orange_pixels": 5000,
-                "max_mask_area_frac": 0.95,
-                "min_bbox_span_ratio": 0.50,
-            }
-        ),
-    )
+    result = detect_dlz_orange_barrier_mask(frame, _default_config())
 
-    expected_mask = _rect_mask(frame.shape[0], frame.shape[1], 18, 18, 102, 102)
+    expected_mask = _rect_mask(frame.shape[0], frame.shape[1], 30, 40, 130, 180)
     assert result.plausible is True
-    assert result.used_hull_merge is True
-    assert result.candidate_region_count == 2
-    assert result.component_bbox == (18, 18, 84, 84)
+    assert result.passthrough is False
+    assert result.reason == "masked"
+    assert result.seed_points == ((0, 0), (frame.shape[1] - 1, 0))
+    assert result.barrier_component_count == 2
+    assert result.candidate_region_count == 1
+    assert result.used_hull_merge is False
+    assert result.component_bbox == (30, 40, 100, 140)
     assert np.array_equal(result.applied_mask, expected_mask)
 
 
-def test_detect_dlz_orange_barrier_rejects_far_apart_regions_via_hull_guard():
-    frame = _blank_frame()
+def test_detect_dlz_orange_barrier_hulls_multiple_surviving_contours():
+    frame = _blank_frame(height=220, width=240)
     orange_bgr = _bgr_from_hsv(15, 220, 220)
 
-    frame[20:96, 8:28] = orange_bgr
-    frame[20:96, 132:152] = orange_bgr
+    frame[40:160, 20:80] = orange_bgr
+    frame[40:160, 140:200] = orange_bgr
+
+    result = detect_dlz_orange_barrier_mask(frame, _default_config())
+
+    expected_mask = _rect_mask(frame.shape[0], frame.shape[1], 20, 40, 200, 160)
+    assert result.plausible is True
+    assert result.passthrough is False
+    assert result.reason == "masked"
+    assert result.used_hull_merge is True
+    assert result.barrier_component_count == 2
+    assert result.candidate_region_count == 2
+    assert result.component_bbox == (20, 40, 180, 120)
+    assert np.array_equal(result.applied_mask, expected_mask)
+
+
+def test_detect_dlz_orange_barrier_ignores_legacy_seed_and_plausibility_guards():
+    frame = _blank_frame(height=220, width=260)
+    orange_bgr = _bgr_from_hsv(15, 220, 220)
+    purple_bgr = _bgr_from_hsv(150, 180, 220)
+
+    frame[40:180, 30:210] = orange_bgr
+    frame[:48, :48] = purple_bgr
+    frame[:48, -48:] = purple_bgr
 
     result = detect_dlz_orange_barrier_mask(
         frame,
         DLZOrangeBarrierMaskConfig(
             **{
                 **_default_config().__dict__,
-                "min_orange_pixels": 2500,
-                "max_mask_area_frac": 0.95,
+                "seed_reject_hsv": (((0, 0, 0), (180, 255, 255)),),
+                "seed_patch_size_px": 64,
+                "seed_barrier_ratio_threshold": 0.0,
+                "seed_reject_ratio_threshold": 0.0,
+                "min_orange_pixels": 999999,
+                "min_component_pixels": 999999,
+                "min_mask_area_frac": 0.90,
+                "max_mask_area_frac": 0.05,
+                "min_bbox_span_ratio": 0.99,
+                "morphology_kernel_size": 3,
+                "dilate_iterations": 7,
             }
         ),
     )
 
-    assert result.plausible is False
-    assert result.passthrough is True
-    assert result.reason == "hull_too_large"
-    assert result.candidate_region_count == 2
+    expected_mask = _rect_mask(frame.shape[0], frame.shape[1], 30, 40, 210, 180)
+    assert result.plausible is True
+    assert result.passthrough is False
+    assert result.reason == "masked"
+    assert result.seed_points == ((0, 0), (frame.shape[1] - 1, 0))
+    assert result.barrier_component_count == 1
+    assert result.candidate_region_count == 1
+    assert result.used_hull_merge is False
+    assert result.component_bbox == (30, 40, 180, 140)
+    assert np.array_equal(result.applied_mask, expected_mask)
+
+
+def test_detect_dlz_orange_barrier_keeps_far_apart_regions_when_they_survive():
+    frame = _blank_frame(height=240, width=320)
+    orange_bgr = _bgr_from_hsv(15, 220, 220)
+
+    frame[60:180, 20:80] = orange_bgr
+    frame[60:180, 220:280] = orange_bgr
+
+    result = detect_dlz_orange_barrier_mask(frame, _default_config())
+
+    expected_mask = _rect_mask(frame.shape[0], frame.shape[1], 20, 60, 280, 180)
+    assert result.plausible is True
+    assert result.passthrough is False
+    assert result.reason == "masked"
     assert result.used_hull_merge is True
-    assert np.array_equal(result.frame, frame)
+    assert result.barrier_component_count == 2
+    assert result.candidate_region_count == 2
+    assert result.component_bbox == (20, 60, 260, 120)
+    assert np.array_equal(result.applied_mask, expected_mask)

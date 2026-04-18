@@ -510,6 +510,265 @@
         },
         {
           "annotation": {
+            "kind": "bool"
+          },
+          "default": false,
+          "default_kind": "value",
+          "name": "dlz_mask_enabled",
+          "required": false
+        },
+        {
+          "annotation": {
+            "item": {
+              "kind": "int"
+            },
+            "kind": "list"
+          },
+          "default": [
+            5,
+            78,
+            158
+          ],
+          "default_kind": "value",
+          "name": "dlz_mask_lower_hsv",
+          "required": false
+        },
+        {
+          "annotation": {
+            "item": {
+              "kind": "int"
+            },
+            "kind": "list"
+          },
+          "default": [
+            25,
+            189,
+            255
+          ],
+          "default_kind": "value",
+          "name": "dlz_mask_upper_hsv",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.02,
+          "default_kind": "value",
+          "name": "dlz_mask_min_area_frac",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.98,
+          "default_kind": "value",
+          "name": "dlz_mask_max_area_frac",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.45,
+          "default_kind": "value",
+          "name": "dlz_mask_min_bbox_span_ratio",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "int"
+          },
+          "default": 400,
+          "default_kind": "value",
+          "name": "dlz_mask_min_orange_pixels",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "int"
+          },
+          "default": 200,
+          "default_kind": "value",
+          "name": "dlz_mask_min_component_pixels",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "int"
+          },
+          "default": 5,
+          "default_kind": "value",
+          "name": "dlz_mask_kernel_size",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "int"
+          },
+          "default": 1,
+          "default_kind": "value",
+          "name": "dlz_mask_dilate_iterations",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "int"
+          },
+          "default": 48,
+          "default_kind": "value",
+          "name": "dlz_mask_seed_patch_size_px",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.08,
+          "default_kind": "value",
+          "name": "dlz_mask_seed_barrier_ratio_threshold",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.08,
+          "default_kind": "value",
+          "name": "dlz_mask_seed_reject_ratio_threshold",
+          "required": false
+        },
+        {
+          "annotation": {
+            "item": {
+              "fields": [
+                {
+                  "annotation": {
+                    "item": {
+                      "kind": "int"
+                    },
+                    "kind": "list"
+                  },
+                  "name": "lower",
+                  "required": true
+                },
+                {
+                  "annotation": {
+                    "item": {
+                      "kind": "int"
+                    },
+                    "kind": "list"
+                  },
+                  "name": "upper",
+                  "required": true
+                }
+              ],
+              "kind": "typed_dict",
+              "name": "HSVRangeConfig"
+            },
+            "kind": "list"
+          },
+          "default": [],
+          "default_kind": "value",
+          "name": "dlz_mask_seed_reject_hsv_ranges",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "bool"
+          },
+          "default": false,
+          "default_kind": "value",
+          "name": "region_color_match_enabled",
+          "required": false
+        },
+        {
+          "annotation": {
+            "item": {
+              "kind": "int"
+            },
+            "kind": "list"
+          },
+          "default": [],
+          "default_kind": "value",
+          "name": "ccw_color_bgr",
+          "required": false
+        },
+        {
+          "annotation": {
+            "item": {
+              "kind": "int"
+            },
+            "kind": "list"
+          },
+          "default": [],
+          "default_kind": "value",
+          "name": "cw_color_bgr",
+          "required": false
+        },
+        {
+          "annotation": {
+            "item": {
+              "item": {
+                "kind": "int"
+              },
+              "kind": "list"
+            },
+            "kind": "list"
+          },
+          "default": [],
+          "default_kind": "value",
+          "name": "reject_colors_bgr",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "int"
+          },
+          "default": 45,
+          "default_kind": "value",
+          "name": "region_nonblack_min_value",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "int"
+          },
+          "default": 35,
+          "default_kind": "value",
+          "name": "region_nonblack_min_saturation",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "int"
+          },
+          "default": 20,
+          "default_kind": "value",
+          "name": "region_min_area_px",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 38.0,
+          "default_kind": "value",
+          "name": "region_match_max_distance_lab",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 8.0,
+          "default_kind": "value",
+          "name": "region_match_min_margin_lab",
+          "required": false
+        },
+        {
+          "annotation": {
             "kind": "float"
           },
           "default": 0.12,
@@ -647,6 +906,15 @@
           "annotation": {
             "kind": "float"
           },
+          "default": 0.001,
+          "default_kind": "value",
+          "name": "k_d",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
           "default": 0.5,
           "default_kind": "value",
           "name": "max_angular",
@@ -722,12 +990,47 @@
         }
       ],
       "params_schema": {
+        "$defs": {
+          "HSVRangeConfig": {
+            "additionalProperties": false,
+            "properties": {
+              "lower": {
+                "items": {
+                  "type": "integer"
+                },
+                "title": "Lower",
+                "type": "array"
+              },
+              "upper": {
+                "items": {
+                  "type": "integer"
+                },
+                "title": "Upper",
+                "type": "array"
+              }
+            },
+            "required": [
+              "lower",
+              "upper"
+            ],
+            "title": "HSVRangeConfig",
+            "type": "object"
+          }
+        },
         "additionalProperties": false,
         "properties": {
           "align_angular_speed": {
             "default": 0.4,
             "title": "Align Angular Speed",
             "type": "number"
+          },
+          "ccw_color_bgr": {
+            "default": [],
+            "items": {
+              "type": "integer"
+            },
+            "title": "Ccw Color Bgr",
+            "type": "array"
           },
           "ccw_lower_hsv": {
             "default": [
@@ -773,6 +1076,14 @@
             "title": "Compressed Image",
             "type": "boolean"
           },
+          "cw_color_bgr": {
+            "default": [],
+            "items": {
+              "type": "integer"
+            },
+            "title": "Cw Color Bgr",
+            "type": "array"
+          },
           "cw_lower_hsv": {
             "default": [
               85,
@@ -807,6 +1118,93 @@
             "title": "Direction",
             "type": "string"
           },
+          "dlz_mask_dilate_iterations": {
+            "default": 1,
+            "title": "Dlz Mask Dilate Iterations",
+            "type": "integer"
+          },
+          "dlz_mask_enabled": {
+            "default": false,
+            "title": "Dlz Mask Enabled",
+            "type": "boolean"
+          },
+          "dlz_mask_kernel_size": {
+            "default": 5,
+            "title": "Dlz Mask Kernel Size",
+            "type": "integer"
+          },
+          "dlz_mask_lower_hsv": {
+            "default": [
+              5,
+              78,
+              158
+            ],
+            "items": {
+              "type": "integer"
+            },
+            "title": "Dlz Mask Lower Hsv",
+            "type": "array"
+          },
+          "dlz_mask_max_area_frac": {
+            "default": 0.98,
+            "title": "Dlz Mask Max Area Frac",
+            "type": "number"
+          },
+          "dlz_mask_min_area_frac": {
+            "default": 0.02,
+            "title": "Dlz Mask Min Area Frac",
+            "type": "number"
+          },
+          "dlz_mask_min_bbox_span_ratio": {
+            "default": 0.45,
+            "title": "Dlz Mask Min Bbox Span Ratio",
+            "type": "number"
+          },
+          "dlz_mask_min_component_pixels": {
+            "default": 200,
+            "title": "Dlz Mask Min Component Pixels",
+            "type": "integer"
+          },
+          "dlz_mask_min_orange_pixels": {
+            "default": 400,
+            "title": "Dlz Mask Min Orange Pixels",
+            "type": "integer"
+          },
+          "dlz_mask_seed_barrier_ratio_threshold": {
+            "default": 0.08,
+            "title": "Dlz Mask Seed Barrier Ratio Threshold",
+            "type": "number"
+          },
+          "dlz_mask_seed_patch_size_px": {
+            "default": 48,
+            "title": "Dlz Mask Seed Patch Size Px",
+            "type": "integer"
+          },
+          "dlz_mask_seed_reject_hsv_ranges": {
+            "default": [],
+            "items": {
+              "$ref": "#/$defs/HSVRangeConfig"
+            },
+            "title": "Dlz Mask Seed Reject Hsv Ranges",
+            "type": "array"
+          },
+          "dlz_mask_seed_reject_ratio_threshold": {
+            "default": 0.08,
+            "title": "Dlz Mask Seed Reject Ratio Threshold",
+            "type": "number"
+          },
+          "dlz_mask_upper_hsv": {
+            "default": [
+              25,
+              189,
+              255
+            ],
+            "items": {
+              "type": "integer"
+            },
+            "title": "Dlz Mask Upper Hsv",
+            "type": "array"
+          },
           "drive_out_min_pixels": {
             "default": 150,
             "title": "Drive Out Min Pixels",
@@ -820,6 +1218,11 @@
           "drive_out_strip_frac": {
             "default": 0.3,
             "title": "Drive Out Strip Frac",
+            "type": "number"
+          },
+          "k_d": {
+            "default": 0.001,
+            "title": "K D",
             "type": "number"
           },
           "k_lat": {
@@ -856,6 +1259,47 @@
             "default": 6.283185307179586,
             "title": "Max Turn To Center Rad",
             "type": "number"
+          },
+          "region_color_match_enabled": {
+            "default": false,
+            "title": "Region Color Match Enabled",
+            "type": "boolean"
+          },
+          "region_match_max_distance_lab": {
+            "default": 38.0,
+            "title": "Region Match Max Distance Lab",
+            "type": "number"
+          },
+          "region_match_min_margin_lab": {
+            "default": 8.0,
+            "title": "Region Match Min Margin Lab",
+            "type": "number"
+          },
+          "region_min_area_px": {
+            "default": 20,
+            "title": "Region Min Area Px",
+            "type": "integer"
+          },
+          "region_nonblack_min_saturation": {
+            "default": 35,
+            "title": "Region Nonblack Min Saturation",
+            "type": "integer"
+          },
+          "region_nonblack_min_value": {
+            "default": 45,
+            "title": "Region Nonblack Min Value",
+            "type": "integer"
+          },
+          "reject_colors_bgr": {
+            "default": [],
+            "items": {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            "title": "Reject Colors Bgr",
+            "type": "array"
           },
           "tape_align_angular_speed": {
             "default": 0.6,
@@ -1204,10 +1648,294 @@
           "default_kind": "value",
           "name": "cw_upper_hsv2",
           "required": false
+        },
+        {
+          "annotation": {
+            "kind": "bool"
+          },
+          "default": false,
+          "default_kind": "value",
+          "name": "dlz_mask_enabled",
+          "required": false
+        },
+        {
+          "annotation": {
+            "item": {
+              "kind": "int"
+            },
+            "kind": "list"
+          },
+          "default": [
+            5,
+            78,
+            158
+          ],
+          "default_kind": "value",
+          "name": "dlz_mask_lower_hsv",
+          "required": false
+        },
+        {
+          "annotation": {
+            "item": {
+              "kind": "int"
+            },
+            "kind": "list"
+          },
+          "default": [
+            25,
+            189,
+            255
+          ],
+          "default_kind": "value",
+          "name": "dlz_mask_upper_hsv",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.02,
+          "default_kind": "value",
+          "name": "dlz_mask_min_area_frac",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.98,
+          "default_kind": "value",
+          "name": "dlz_mask_max_area_frac",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.45,
+          "default_kind": "value",
+          "name": "dlz_mask_min_bbox_span_ratio",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "int"
+          },
+          "default": 400,
+          "default_kind": "value",
+          "name": "dlz_mask_min_orange_pixels",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "int"
+          },
+          "default": 200,
+          "default_kind": "value",
+          "name": "dlz_mask_min_component_pixels",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "int"
+          },
+          "default": 5,
+          "default_kind": "value",
+          "name": "dlz_mask_kernel_size",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "int"
+          },
+          "default": 1,
+          "default_kind": "value",
+          "name": "dlz_mask_dilate_iterations",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "int"
+          },
+          "default": 48,
+          "default_kind": "value",
+          "name": "dlz_mask_seed_patch_size_px",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.08,
+          "default_kind": "value",
+          "name": "dlz_mask_seed_barrier_ratio_threshold",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.08,
+          "default_kind": "value",
+          "name": "dlz_mask_seed_reject_ratio_threshold",
+          "required": false
+        },
+        {
+          "annotation": {
+            "item": {
+              "fields": [
+                {
+                  "annotation": {
+                    "item": {
+                      "kind": "int"
+                    },
+                    "kind": "list"
+                  },
+                  "name": "lower",
+                  "required": true
+                },
+                {
+                  "annotation": {
+                    "item": {
+                      "kind": "int"
+                    },
+                    "kind": "list"
+                  },
+                  "name": "upper",
+                  "required": true
+                }
+              ],
+              "kind": "typed_dict",
+              "name": "HSVRangeConfig"
+            },
+            "kind": "list"
+          },
+          "default": [],
+          "default_kind": "value",
+          "name": "dlz_mask_seed_reject_hsv_ranges",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "bool"
+          },
+          "default": false,
+          "default_kind": "value",
+          "name": "region_color_match_enabled",
+          "required": false
+        },
+        {
+          "annotation": {
+            "item": {
+              "kind": "int"
+            },
+            "kind": "list"
+          },
+          "default": [],
+          "default_kind": "value",
+          "name": "ccw_color_bgr",
+          "required": false
+        },
+        {
+          "annotation": {
+            "item": {
+              "kind": "int"
+            },
+            "kind": "list"
+          },
+          "default": [],
+          "default_kind": "value",
+          "name": "cw_color_bgr",
+          "required": false
+        },
+        {
+          "annotation": {
+            "item": {
+              "item": {
+                "kind": "int"
+              },
+              "kind": "list"
+            },
+            "kind": "list"
+          },
+          "default": [],
+          "default_kind": "value",
+          "name": "reject_colors_bgr",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "int"
+          },
+          "default": 45,
+          "default_kind": "value",
+          "name": "region_nonblack_min_value",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "int"
+          },
+          "default": 35,
+          "default_kind": "value",
+          "name": "region_nonblack_min_saturation",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "int"
+          },
+          "default": 20,
+          "default_kind": "value",
+          "name": "region_min_area_px",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 38.0,
+          "default_kind": "value",
+          "name": "region_match_max_distance_lab",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 8.0,
+          "default_kind": "value",
+          "name": "region_match_min_margin_lab",
+          "required": false
         }
       ],
       "params_schema": {
         "$defs": {
+          "HSVRangeConfig": {
+            "additionalProperties": false,
+            "properties": {
+              "lower": {
+                "items": {
+                  "type": "integer"
+                },
+                "title": "Lower",
+                "type": "array"
+              },
+              "upper": {
+                "items": {
+                  "type": "integer"
+                },
+                "title": "Upper",
+                "type": "array"
+              }
+            },
+            "required": [
+              "lower",
+              "upper"
+            ],
+            "title": "HSVRangeConfig",
+            "type": "object"
+          },
           "TagTransitionRule": {
             "additionalProperties": false,
             "properties": {
@@ -1234,6 +1962,14 @@
         },
         "additionalProperties": false,
         "properties": {
+          "ccw_color_bgr": {
+            "default": [],
+            "items": {
+              "type": "integer"
+            },
+            "title": "Ccw Color Bgr",
+            "type": "array"
+          },
           "ccw_lower_hsv": {
             "default": [
               0,
@@ -1267,6 +2003,14 @@
             "default": 0.3,
             "title": "Corner Angular Speed",
             "type": "number"
+          },
+          "cw_color_bgr": {
+            "default": [],
+            "items": {
+              "type": "integer"
+            },
+            "title": "Cw Color Bgr",
+            "type": "array"
           },
           "cw_lower_hsv": {
             "default": [
@@ -1330,6 +2074,93 @@
             "title": "Direction",
             "type": "string"
           },
+          "dlz_mask_dilate_iterations": {
+            "default": 1,
+            "title": "Dlz Mask Dilate Iterations",
+            "type": "integer"
+          },
+          "dlz_mask_enabled": {
+            "default": false,
+            "title": "Dlz Mask Enabled",
+            "type": "boolean"
+          },
+          "dlz_mask_kernel_size": {
+            "default": 5,
+            "title": "Dlz Mask Kernel Size",
+            "type": "integer"
+          },
+          "dlz_mask_lower_hsv": {
+            "default": [
+              5,
+              78,
+              158
+            ],
+            "items": {
+              "type": "integer"
+            },
+            "title": "Dlz Mask Lower Hsv",
+            "type": "array"
+          },
+          "dlz_mask_max_area_frac": {
+            "default": 0.98,
+            "title": "Dlz Mask Max Area Frac",
+            "type": "number"
+          },
+          "dlz_mask_min_area_frac": {
+            "default": 0.02,
+            "title": "Dlz Mask Min Area Frac",
+            "type": "number"
+          },
+          "dlz_mask_min_bbox_span_ratio": {
+            "default": 0.45,
+            "title": "Dlz Mask Min Bbox Span Ratio",
+            "type": "number"
+          },
+          "dlz_mask_min_component_pixels": {
+            "default": 200,
+            "title": "Dlz Mask Min Component Pixels",
+            "type": "integer"
+          },
+          "dlz_mask_min_orange_pixels": {
+            "default": 400,
+            "title": "Dlz Mask Min Orange Pixels",
+            "type": "integer"
+          },
+          "dlz_mask_seed_barrier_ratio_threshold": {
+            "default": 0.08,
+            "title": "Dlz Mask Seed Barrier Ratio Threshold",
+            "type": "number"
+          },
+          "dlz_mask_seed_patch_size_px": {
+            "default": 48,
+            "title": "Dlz Mask Seed Patch Size Px",
+            "type": "integer"
+          },
+          "dlz_mask_seed_reject_hsv_ranges": {
+            "default": [],
+            "items": {
+              "$ref": "#/$defs/HSVRangeConfig"
+            },
+            "title": "Dlz Mask Seed Reject Hsv Ranges",
+            "type": "array"
+          },
+          "dlz_mask_seed_reject_ratio_threshold": {
+            "default": 0.08,
+            "title": "Dlz Mask Seed Reject Ratio Threshold",
+            "type": "number"
+          },
+          "dlz_mask_upper_hsv": {
+            "default": [
+              25,
+              189,
+              255
+            ],
+            "items": {
+              "type": "integer"
+            },
+            "title": "Dlz Mask Upper Hsv",
+            "type": "array"
+          },
           "k_ang": {
             "default": 0.4,
             "title": "K Ang",
@@ -1354,6 +2185,47 @@
             "default": 0.5,
             "title": "Max Angular",
             "type": "number"
+          },
+          "region_color_match_enabled": {
+            "default": false,
+            "title": "Region Color Match Enabled",
+            "type": "boolean"
+          },
+          "region_match_max_distance_lab": {
+            "default": 38.0,
+            "title": "Region Match Max Distance Lab",
+            "type": "number"
+          },
+          "region_match_min_margin_lab": {
+            "default": 8.0,
+            "title": "Region Match Min Margin Lab",
+            "type": "number"
+          },
+          "region_min_area_px": {
+            "default": 20,
+            "title": "Region Min Area Px",
+            "type": "integer"
+          },
+          "region_nonblack_min_saturation": {
+            "default": 35,
+            "title": "Region Nonblack Min Saturation",
+            "type": "integer"
+          },
+          "region_nonblack_min_value": {
+            "default": 45,
+            "title": "Region Nonblack Min Value",
+            "type": "integer"
+          },
+          "reject_colors_bgr": {
+            "default": [],
+            "items": {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            "title": "Reject Colors Bgr",
+            "type": "array"
           },
           "scan_duration_s": {
             "default": 1.0,
