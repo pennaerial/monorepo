@@ -11,8 +11,8 @@
 #include "payload/servo.hpp"
 
 constexpr int SERVO_PIN = 23;
-constexpr float PULSE_MIN = 1000.0f; // used to be 700.0f, but that was too low for the servo to reliably reach 0 degrees. Adjusted after testing with an oscilloscope.
-constexpr float PULSE_MAX = 2500.0f;
+constexpr float PULSE_MIN = 600.0f; // used to be 700.0f, but that was too low for the servo to reliably reach 0 degrees. Adjusted after testing with an oscilloscope.
+constexpr float PULSE_MAX = 2200.0f;
 constexpr int FREQ = 50;
 
 static int g_pi = -1;
