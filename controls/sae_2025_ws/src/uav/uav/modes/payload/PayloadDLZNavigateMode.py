@@ -56,6 +56,7 @@ _MIN_COLOR_PIXELS = 20
 _COLOR_RATIO = 1.5
 # Minimum tape pixels (A+B combined) per row to include in boundary estimate
 _MIN_ROW_PIXELS = 3
+_COLOR_BLUR_KERNEL = (5, 5)
 
 
 def _get_strip(bgr: np.ndarray) -> Tuple[np.ndarray, int]:
@@ -63,6 +64,11 @@ def _get_strip(bgr: np.ndarray) -> Tuple[np.ndarray, int]:
     height = bgr.shape[0]
     strip_start = int(height * _STRIP_START_FRAC)
     return bgr[strip_start:, :], strip_start
+
+
+def _preprocess_color_crop(bgr: np.ndarray) -> np.ndarray:
+    """Light denoising before HSV thresholding to stabilize tape masks."""
+    return cv2.GaussianBlur(bgr, _COLOR_BLUR_KERNEL, 0)
 
 
 def _detect_current_color(
@@ -295,7 +301,7 @@ class PayloadDLZNavigateMode(Mode):
                  boundary_angle, orange_mask, blue_mask, strip, strip_start).
         """
         strip, strip_start = _get_strip(bgr)
-        hsv = cv2.cvtColor(strip, cv2.COLOR_BGR2HSV)
+        hsv = cv2.cvtColor(_preprocess_color_crop(strip), cv2.COLOR_BGR2HSV)
         orange_mask = (
             cv2.inRange(hsv, self._lower_a, self._upper_a)
             | cv2.inRange(hsv, self._lower_a2, self._upper_a2)
@@ -533,7 +539,7 @@ class PayloadDLZNavigateMode(Mode):
         # col_end = w - (w // 3)
         col_end = w
         crop = bgr[row_start:, col_start:col_end]
-        hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
+        hsv = cv2.cvtColor(_preprocess_color_crop(crop), cv2.COLOR_BGR2HSV)
         if color == "A":
             mask = (
                 cv2.inRange(hsv, self._lower_a, self._upper_a)
@@ -868,7 +874,7 @@ class PayloadDLZNavigateMode(Mode):
         col_start = 0
         col_end = w
         crop = bgr[row_start:row_end, col_start:col_end]
-        hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
+        hsv = cv2.cvtColor(_preprocess_color_crop(crop), cv2.COLOR_BGR2HSV)
         if color == "A":
             mask = (
                 cv2.inRange(hsv, self._lower_a, self._upper_a)
