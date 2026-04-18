@@ -36,8 +36,8 @@ LINE_FOLLOW
     same 1.5× dominance rule as PayloadColorSquareNode) and stops on the
     first transition that matches the corner signature for the current
     direction:
-        direction="ccw" : B→A = corner  (red→blue with default YAML)
-        direction="cw"  : A→B = corner  (blue→red with default YAML)
+        direction="ccw" : B→A = corner  (purple→blue in the real DLZ)
+        direction="cw"  : A→B = corner  (blue→purple in the real DLZ)
     _prev_color is seeded from TURN_TO_CENTER's last dominant observation,
     falling back to the colour caught during DRIVE_OUT.
 """
@@ -53,11 +53,6 @@ from cv_bridge import CvBridge
 from rclpy.node import Node
 from sensor_msgs.msg import CompressedImage, Image
 
-from uav.cv.dlz_color_regions import (
-    DLZLineColorMaskConfig,
-    coerce_bgr_triplet,
-    detect_dlz_line_color_regions,
-)
 from uav.cv.dlz_masking import (
     DLZOrangeBarrierMaskConfig,
     DLZOrangeBarrierMaskResult,
@@ -65,6 +60,7 @@ from uav.cv.dlz_masking import (
     coerce_hsv_range_configs,
     detect_dlz_orange_barrier_mask,
 )
+from uav.cv.dlz_relative_color_masks import detect_dlz_relative_color_masks
 from uav.vehicles.Payload import Payload
 
 from ..Mode import Mode
@@ -85,7 +81,7 @@ class PayloadCornerNavigateMode(Mode):
         node: Node,
         vehicle: Payload,
         direction: str = "ccw",
-        # HSV color ranges — ccw=color A, cw=color B
+        # Legacy HSV colour ranges kept only so older mission YAML still loads.
         ccw_lower_hsv: list[int] = (0, 80, 80),
         ccw_upper_hsv: list[int] = (10, 255, 255),
         cw_lower_hsv: list[int] = (85, 120, 60),
@@ -133,7 +129,7 @@ class PayloadCornerNavigateMode(Mode):
         k_lat: float = 0.003,
         k_d: float = 0.001,
         max_angular: float = 0.5,
-        # TAPE_ALIGN — rotate until diagonal black-tape centroid is centered
+        # Legacy tape-align HSV params kept only for mission-compatibility.
         tape_align_lower_hsv: list[int] = (0, 0, 0),
         tape_align_upper_hsv: list[int] = (180, 255, 60),
         tape_align_angular_speed: float = 0.6,
@@ -147,10 +143,12 @@ class PayloadCornerNavigateMode(Mode):
             raise ValueError(f"direction must be 'cw' or 'ccw', got {direction!r}")
         self.direction = direction
 
-        self._lower_a = np.array(ccw_lower_hsv, dtype=np.uint8)
-        self._upper_a = np.array(ccw_upper_hsv, dtype=np.uint8)
-        self._lower_b = np.array(cw_lower_hsv, dtype=np.uint8)
-        self._upper_b = np.array(cw_upper_hsv, dtype=np.uint8)
+        # Legacy colour params are kept in the constructor so older checked-in
+        # mission files still load, but runtime masking now comes from the
+        # shared relative-orange DLZ heuristic:
+        #   A = blue / ccw side
+        #   B = purple / cw side
+        #   guide = green
         self.dlz_mask_enabled = bool(dlz_mask_enabled)
         self.dlz_mask_min_area_frac = float(dlz_mask_min_area_frac)
         if not (0.0 <= self.dlz_mask_min_area_frac <= 1.0):
@@ -206,31 +204,6 @@ class PayloadCornerNavigateMode(Mode):
                 0, int(dlz_mask_min_component_pixels)
             )
         self._dlz_mask_config = DLZOrangeBarrierMaskConfig(**dlz_mask_config_kwargs)
-        self.region_color_match_enabled = bool(region_color_match_enabled)
-        self._region_color_mask_config: Optional[DLZLineColorMaskConfig] = None
-        if self.region_color_match_enabled:
-            self._region_color_mask_config = DLZLineColorMaskConfig(
-                color_a_bgr=coerce_bgr_triplet(
-                    ccw_color_bgr,
-                    label="ccw_color_bgr",
-                ),
-                color_b_bgr=coerce_bgr_triplet(
-                    cw_color_bgr,
-                    label="cw_color_bgr",
-                ),
-                reject_colors_bgr=tuple(
-                    coerce_bgr_triplet(
-                        color_bgr,
-                        label=f"reject_colors_bgr[{index}]",
-                    )
-                    for index, color_bgr in enumerate(reject_colors_bgr)
-                ),
-                nonblack_min_value=int(region_nonblack_min_value),
-                nonblack_min_saturation=int(region_nonblack_min_saturation),
-                min_region_area_px=int(region_min_area_px),
-                match_max_distance_lab=float(region_match_max_distance_lab),
-                match_min_margin_lab=float(region_match_min_margin_lab),
-            )
 
         self.drive_out_speed_mps = float(drive_out_speed_mps)
         self.detect_frames = int(detect_frames)
@@ -260,8 +233,6 @@ class PayloadCornerNavigateMode(Mode):
         self.k_d = float(k_d)
         self.max_angular = float(max_angular)
 
-        self._lower_black = np.array(tape_align_lower_hsv, dtype=np.uint8)
-        self._upper_black = np.array(tape_align_upper_hsv, dtype=np.uint8)
         self.tape_align_angular_speed = float(tape_align_angular_speed)
         self.tape_align_center_tol_px = float(tape_align_center_tol_px)
         self.tape_align_min_pixels = int(tape_align_min_pixels)
@@ -448,45 +419,62 @@ class PayloadCornerNavigateMode(Mode):
         cv2.drawContours(out, [largest], -1, 255, cv2.FILLED)
         return out
 
-    def _threshold_color_masks(self, bgr: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-        hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
-        return (
-            cv2.inRange(hsv, self._lower_a, self._upper_a),
-            cv2.inRange(hsv, self._lower_b, self._upper_b),
-        )
-
-    def _crop_color_masks(
+    def _relative_color_masks(
         self,
         bgr: np.ndarray,
-        *,
-        keep_largest: bool = False,
-    ) -> Tuple[np.ndarray, np.ndarray]:
-        if self.region_color_match_enabled:
-            if self._region_color_mask_config is None:
-                raise RuntimeError("region color matching enabled without a config")
-            result = detect_dlz_line_color_regions(
-                bgr,
-                config=self._region_color_mask_config,
-            )
-            mask_a = result.mask_a
-            mask_b = result.mask_b
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        masked_bgr = self._mask_color_frame(bgr)
+        if self._debug_dlz_mask_result is not None and np.any(
+            self._debug_dlz_mask_result.applied_mask
+        ):
+            dlz_mask = self._debug_dlz_mask_result.applied_mask
         else:
-            mask_a, mask_b = self._threshold_color_masks(bgr)
+            dlz_mask = np.full(masked_bgr.shape[:2], 255, dtype=np.uint8)
+        result = detect_dlz_relative_color_masks(masked_bgr, dlz_mask=dlz_mask)
+        return masked_bgr, result.mask_blue, result.mask_purple, result.mask_green
+
+    def _crop_mask(
+        self,
+        mask: np.ndarray,
+        *,
+        row_start: int = 0,
+        row_end: Optional[int] = None,
+        col_start: int = 0,
+        col_end: Optional[int] = None,
+        keep_largest: bool = False,
+    ) -> np.ndarray:
+        row_end = mask.shape[0] if row_end is None else row_end
+        col_end = mask.shape[1] if col_end is None else col_end
+        cropped = mask[row_start:row_end, col_start:col_end].copy()
         if keep_largest:
-            mask_a = self._largest_contour_mask(mask_a)
-            mask_b = self._largest_contour_mask(mask_b)
-        return mask_a, mask_b
+            return self._largest_contour_mask(cropped)
+        return cropped
 
     def _lower_strip_color_counts(self, bgr: np.ndarray) -> Tuple[int, int]:
         """Return (color_a_pixels, color_b_pixels) in the bottom drive_out_strip_frac
         of the frame, cropped horizontally to the middle third so tape that
         only clips the corner of the FOV is ignored."""
+        _masked_bgr, mask_a_full, mask_b_full, _guide_mask = self._relative_color_masks(
+            bgr
+        )
         h, w = bgr.shape[:2]
         strip_start = int(h * (1.0 - self.drive_out_strip_frac))
         col_start = w // 3
         col_end = w - (w // 3)
-        strip = bgr[strip_start:, col_start:col_end]
-        mask_a, mask_b = self._crop_color_masks(strip, keep_largest=True)
+        mask_a = self._crop_mask(
+            mask_a_full,
+            row_start=strip_start,
+            col_start=col_start,
+            col_end=col_end,
+            keep_largest=True,
+        )
+        mask_b = self._crop_mask(
+            mask_b_full,
+            row_start=strip_start,
+            col_start=col_start,
+            col_end=col_end,
+            keep_largest=True,
+        )
         return int(np.count_nonzero(mask_a)), int(np.count_nonzero(mask_b))
 
     def _middle_third_color_metrics(
@@ -502,12 +490,25 @@ class PayloadCornerNavigateMode(Mode):
           neither dominates / no colour is found
 
         Returns ``(0, 0.0, None)`` if no colour is found."""
+        _masked_bgr, mask_a_full, mask_b_full, _guide_mask = self._relative_color_masks(
+            bgr
+        )
         h, w = bgr.shape[:2]
         row_start = int(h * 0.6)
         col_start = w // 3
         col_end = w - (w // 3)
-        crop = bgr[row_start:, col_start:col_end]
-        mask_a, mask_b = self._crop_color_masks(crop)
+        mask_a = self._crop_mask(
+            mask_a_full,
+            row_start=row_start,
+            col_start=col_start,
+            col_end=col_end,
+        )
+        mask_b = self._crop_mask(
+            mask_b_full,
+            row_start=row_start,
+            col_start=col_start,
+            col_end=col_end,
+        )
         count_a = int(np.count_nonzero(mask_a))
         count_b = int(np.count_nonzero(mask_b))
         total = count_a + count_b
@@ -536,14 +537,15 @@ class PayloadCornerNavigateMode(Mode):
         center x. Positive = colour is right of center.
 
         Returns ``(0, 0.0)`` if the colour is not found in the strip."""
+        _masked_bgr, mask_a_full, mask_b_full, _guide_mask = self._relative_color_masks(
+            bgr
+        )
         h, w = bgr.shape[:2]
         strip_start = int(h * (1.0 - self.line_follow_strip_frac))
-        strip = bgr[strip_start:, :]
-        mask_a, mask_b = self._crop_color_masks(strip, keep_largest=True)
         if color == "A":
-            mask = mask_a
+            mask = self._crop_mask(mask_a_full, row_start=strip_start, keep_largest=True)
         elif color == "B":
-            mask = mask_b
+            mask = self._crop_mask(mask_b_full, row_start=strip_start, keep_largest=True)
         else:
             return 0, 0.0
         count = int(np.count_nonzero(mask))
@@ -551,7 +553,7 @@ class PayloadCornerNavigateMode(Mode):
             return 0, 0.0
         ys, xs = np.nonzero(mask)
         centroid_x = float(xs.mean())
-        strip_center_x = strip.shape[1] / 2.0
+        strip_center_x = mask.shape[1] / 2.0
         return count, centroid_x - strip_center_x
 
     # ------------------------------------------------------------------
@@ -575,8 +577,7 @@ class PayloadCornerNavigateMode(Mode):
             self.vehicle.drive(self.drive_out_speed_mps, 0.0)
             return
 
-        masked_bgr = self._mask_color_frame(bgr)
-        count_a, count_b = self._lower_strip_color_counts(masked_bgr)
+        count_a, count_b = self._lower_strip_color_counts(bgr)
         color_seen = (
             count_a >= self.drive_out_min_pixels or count_b >= self.drive_out_min_pixels
         )
@@ -600,7 +601,7 @@ class PayloadCornerNavigateMode(Mode):
             else:
                 self._enter_streak = 0
                 self._first_color = None
-            self._annotate_drive_out(masked_bgr, count_a, count_b)
+            self._annotate_drive_out(bgr, count_a, count_b)
             self.vehicle.drive(self.drive_out_speed_mps, 0.0)
             return
 
@@ -609,7 +610,7 @@ class PayloadCornerNavigateMode(Mode):
             self._exit_streak += 1
             if self._exit_streak >= self.detect_frames:
                 self.vehicle.stop()
-                self._annotate_drive_out(masked_bgr, count_a, count_b)
+                self._annotate_drive_out(bgr, count_a, count_b)
                 self._phase = "turn_to_center"
                 self._turn_to_center_rad = 0.0
                 self._center_stable = 0
@@ -627,7 +628,7 @@ class PayloadCornerNavigateMode(Mode):
             elif count_b > count_a:
                 self._first_color = "B"
 
-        self._annotate_drive_out(masked_bgr, count_a, count_b)
+        self._annotate_drive_out(bgr, count_a, count_b)
         self.vehicle.drive(self.drive_out_speed_mps, 0.0)
 
     # ------------------------------------------------------------------
@@ -643,11 +644,24 @@ class PayloadCornerNavigateMode(Mode):
         colours (matching the old TURN_TO_CENTER behaviour).
         Returns ``(total, lateral_error_px, dominant, mask_a, mask_b, row_start)``.
         """
+        _masked_bgr, mask_a_full, mask_b_full, _guide_mask = self._relative_color_masks(
+            bgr
+        )
         h, w = bgr.shape[:2]
         row_start = int(h * 2 / 3)
         row_end = h * 9 // 10
-        crop = bgr[row_start:row_end, :]
-        mask_a, mask_b = self._crop_color_masks(crop, keep_largest=True)
+        mask_a = self._crop_mask(
+            mask_a_full,
+            row_start=row_start,
+            row_end=row_end,
+            keep_largest=True,
+        )
+        mask_b = self._crop_mask(
+            mask_b_full,
+            row_start=row_start,
+            row_end=row_end,
+            keep_largest=True,
+        )
         count_a = int(np.count_nonzero(mask_a))
         count_b = int(np.count_nonzero(mask_b))
         total = count_a + count_b
@@ -677,9 +691,8 @@ class PayloadCornerNavigateMode(Mode):
         lateral_error_px = 0.0
         dominant: Optional[str] = None
         if bgr is not None:
-            masked_bgr = self._mask_color_frame(bgr)
             total, lateral_error_px, dominant, mask_a, mask_b, row_start = (
-                self._turn_both_color_metrics(masked_bgr)
+                self._turn_both_color_metrics(bgr)
             )
             # Accept condition matches DLZ corner logic (lenient one-sided):
             #   ccw → accept when centroid on the RIGHT side
@@ -700,7 +713,7 @@ class PayloadCornerNavigateMode(Mode):
                         self._latest_dominant or dominant or self._first_color or "A"
                     )
                     self._annotate_turn_to_center(
-                        masked_bgr,
+                        bgr,
                         mask_a,
                         mask_b,
                         row_start,
@@ -722,7 +735,7 @@ class PayloadCornerNavigateMode(Mode):
                     self._latest_dominant = dominant
 
             self._annotate_turn_to_center(
-                masked_bgr,
+                bgr,
                 mask_a,
                 mask_b,
                 row_start,
@@ -753,14 +766,11 @@ class PayloadCornerNavigateMode(Mode):
             self.vehicle.drive(0.0, 0.0)
             return
 
-        masked_bgr = self._mask_color_frame(bgr)
         current = self._prev_color or "A"
         other = "B" if current == "A" else "A"
 
-        cur_count, cur_lateral_px = self._single_color_strip_metrics(masked_bgr, current)
-        other_count, other_lateral_px = self._single_color_strip_metrics(
-            masked_bgr, other
-        )
+        cur_count, cur_lateral_px = self._single_color_strip_metrics(bgr, current)
+        other_count, other_lateral_px = self._single_color_strip_metrics(bgr, other)
         transitioned_this_tick = False
 
         # After a mid-side swap, the "other" colour (residual from the
@@ -803,9 +813,7 @@ class PayloadCornerNavigateMode(Mode):
                     self._prev_color = other
                     current, other = other, current
                     cur_count, cur_lateral_px = other_count, other_lateral_px
-                    other_count, other_lateral_px = self._single_color_strip_metrics(
-                        masked_bgr, other
-                    )
+                    other_count, other_lateral_px = self._single_color_strip_metrics(bgr, other)
 
         # Stop condition: corner has been detected and the colour we are
         # following has dropped below the visibility threshold (we've driven
@@ -813,7 +821,7 @@ class PayloadCornerNavigateMode(Mode):
         if self._corner_color_seen and cur_count < self.line_follow_min_pixels:
             self.vehicle.stop()
             self._annotate_line_follow(
-                masked_bgr,
+                bgr,
                 current,
                 cur_count,
                 cur_lateral_px,
@@ -848,7 +856,7 @@ class PayloadCornerNavigateMode(Mode):
             angular = 0.0
 
         self._annotate_line_follow(
-            masked_bgr,
+            bgr,
             current,
             cur_count,
             cur_lateral_px,
@@ -864,22 +872,23 @@ class PayloadCornerNavigateMode(Mode):
     # Phase: TAPE_ALIGN
     # ------------------------------------------------------------------
 
-    def _black_centroid_metrics(self, bgr: np.ndarray) -> Tuple[int, float]:
-        """Return ``(pixel_count, lateral_error_px)`` for black tape in the
+    def _guide_centroid_metrics(self, bgr: np.ndarray) -> Tuple[int, float]:
+        """Return ``(pixel_count, lateral_error_px)`` for the green guide in the
         bottom ``line_follow_strip_frac`` of the frame, full width.
         ``lateral_error_px`` = centroid x minus strip center x; positive means
-        tape is right of center."""
+        guide is right of center."""
+        _masked_bgr, _mask_a_full, _mask_b_full, guide_mask_full = self._relative_color_masks(
+            bgr
+        )
         h, w = bgr.shape[:2]
         strip_start = int(h * (1.0 - self.line_follow_strip_frac))
-        strip = bgr[strip_start:, :]
-        hsv = cv2.cvtColor(strip, cv2.COLOR_BGR2HSV)
-        mask = cv2.inRange(hsv, self._lower_black, self._upper_black)
+        mask = self._crop_mask(guide_mask_full, row_start=strip_start)
         count = int(np.count_nonzero(mask))
         if count == 0:
             return 0, 0.0
-        ys, xs = np.nonzero(mask)
+        _ys, xs = np.nonzero(mask)
         centroid_x = float(xs.mean())
-        strip_center_x = strip.shape[1] / 2.0
+        strip_center_x = mask.shape[1] / 2.0
         return count, centroid_x - strip_center_x
 
     def _update_tape_align(self) -> None:
@@ -888,16 +897,15 @@ class PayloadCornerNavigateMode(Mode):
             self.vehicle.stop()
             return
 
-        masked_bgr = self._mask_color_frame(bgr)
-        count, lateral_px = self._black_centroid_metrics(masked_bgr)
+        count, lateral_px = self._guide_centroid_metrics(bgr)
 
         if count < self.tape_align_min_pixels:
             # Tape not visible yet — rotate slowly to search
             self.vehicle.drive(0.0, self.tape_align_angular_speed)
             self._tape_align_stable = 0
-            self._annotate_tape_align(masked_bgr, count, lateral_px, "searching")
+            self._annotate_tape_align(bgr, count, lateral_px, "searching")
             self.log(
-                f"PayloadCornerNavigateMode: TAPE_ALIGN searching (black_px={count})"
+                f"PayloadCornerNavigateMode: TAPE_ALIGN searching (green_px={count})"
             )
             return
 
@@ -906,22 +914,22 @@ class PayloadCornerNavigateMode(Mode):
             self._tape_align_stable += 1
             self.vehicle.stop()
             if self._tape_align_stable >= self.tape_align_stable_frames:
-                self._annotate_tape_align(masked_bgr, count, lateral_px, "LOCKED")
+                self._annotate_tape_align(bgr, count, lateral_px, "LOCKED")
                 self.log(
                     f"PayloadCornerNavigateMode: TAPE_ALIGN centered "
                     f"(lat={lateral_px:.1f}px, px={count}) → done"
                 )
                 self._done = True
             else:
-                self._annotate_tape_align(masked_bgr, count, lateral_px, "centering")
+                self._annotate_tape_align(bgr, count, lateral_px, "centering")
         else:
             self._tape_align_stable = 0
             direction = -1.0 if lateral_px > 0 else 1.0
             self.vehicle.drive(0.0, direction * self.tape_align_angular_speed)
-            self._annotate_tape_align(masked_bgr, count, lateral_px, "turning")
+            self._annotate_tape_align(bgr, count, lateral_px, "turning")
             self.log(
                 f"PayloadCornerNavigateMode: TAPE_ALIGN turning "
-                f"lat={lateral_px:.1f}px black_px={count}"
+                f"lat={lateral_px:.1f}px green_px={count}"
             )
 
     # ------------------------------------------------------------------
@@ -988,7 +996,10 @@ class PayloadCornerNavigateMode(Mode):
     def _annotate_drive_out(self, bgr: np.ndarray, count_a: int, count_b: int) -> None:
         if self._annotated_pub is None or bgr is None:
             return
-        debug = bgr.copy()
+        masked_bgr, mask_a_full, mask_b_full, _guide_mask = self._relative_color_masks(
+            bgr
+        )
+        debug = masked_bgr.copy()
         self._overlay_dlz_mask_debug(debug)
         h, w = bgr.shape[:2]
         y0 = int(h * (1.0 - self.drive_out_strip_frac))
@@ -996,8 +1007,20 @@ class PayloadCornerNavigateMode(Mode):
         x1 = w - (w // 3)
         # Recompute the same masks the logic used so the contours exactly
         # match what DRIVE_OUT was thresholding on.
-        strip = bgr[y0:, x0:x1]
-        mask_a, mask_b = self._crop_color_masks(strip, keep_largest=True)
+        mask_a = self._crop_mask(
+            mask_a_full,
+            row_start=y0,
+            col_start=x0,
+            col_end=x1,
+            keep_largest=True,
+        )
+        mask_b = self._crop_mask(
+            mask_b_full,
+            row_start=y0,
+            col_start=x0,
+            col_end=x1,
+            keep_largest=True,
+        )
         cv2.rectangle(debug, (x0, y0), (x1 - 1, h - 1), self._DBG_CROP, 1)
         self._draw_shifted_contours(debug, mask_a, x0, y0, self._DBG_COLOR_A, 2)
         self._draw_shifted_contours(debug, mask_b, x0, y0, self._DBG_COLOR_B, 2)
@@ -1036,7 +1059,10 @@ class PayloadCornerNavigateMode(Mode):
     ) -> None:
         if self._annotated_pub is None or bgr is None:
             return
-        debug = bgr.copy()
+        masked_bgr, _mask_a_full, _mask_b_full, _guide_mask = self._relative_color_masks(
+            bgr
+        )
+        debug = masked_bgr.copy()
         self._overlay_dlz_mask_debug(debug)
         h, w = bgr.shape[:2]
         row_end = h * 9 // 10
@@ -1132,12 +1158,15 @@ class PayloadCornerNavigateMode(Mode):
     ) -> None:
         if self._annotated_pub is None or bgr is None:
             return
-        debug = bgr.copy()
+        masked_bgr, mask_a_full, mask_b_full, _guide_mask = self._relative_color_masks(
+            bgr
+        )
+        debug = masked_bgr.copy()
         self._overlay_dlz_mask_debug(debug)
         h, w = bgr.shape[:2]
         y0 = int(h * (1.0 - self.line_follow_strip_frac))
-        strip = bgr[y0:, :]
-        mask_a, mask_b = self._crop_color_masks(strip, keep_largest=True)
+        mask_a = self._crop_mask(mask_a_full, row_start=y0, keep_largest=True)
+        mask_b = self._crop_mask(mask_b_full, row_start=y0, keep_largest=True)
         mask_current = mask_a if current == "A" else mask_b
         mask_other = mask_b if current == "A" else mask_a
         cv2.rectangle(debug, (0, y0), (w - 1, h - 1), self._DBG_CROP, 1)
@@ -1205,19 +1234,20 @@ class PayloadCornerNavigateMode(Mode):
     ) -> None:
         if self._annotated_pub is None or bgr is None:
             return
-        debug = bgr.copy()
+        masked_bgr, _mask_a_full, _mask_b_full, guide_mask_full = self._relative_color_masks(
+            bgr
+        )
+        debug = masked_bgr.copy()
         self._overlay_dlz_mask_debug(debug)
         h, w = bgr.shape[:2]
-        # Exactly match _black_centroid_metrics: bottom line_follow_strip_frac,
-        # full width, same HSV thresholds, same center computation.
+        # Exactly match _guide_centroid_metrics: bottom line_follow_strip_frac,
+        # full width, same center computation.
         y0 = int(h * (1.0 - self.line_follow_strip_frac))
-        strip = bgr[y0:, :]
-        hsv = cv2.cvtColor(strip, cv2.COLOR_BGR2HSV)
-        mask = cv2.inRange(hsv, self._lower_black, self._upper_black)
+        mask = self._crop_mask(guide_mask_full, row_start=y0)
         cv2.rectangle(debug, (0, y0), (w - 1, h - 1), self._DBG_CROP, 1)
-        self._draw_shifted_contours(debug, mask, 0, y0, (180, 180, 180), 2)
-        # Use float / 2.0 to match _black_centroid_metrics exactly.
-        strip_center_x = strip.shape[1] / 2.0
+        self._draw_shifted_contours(debug, mask, 0, y0, (0, 255, 0), 2)
+        # Use float / 2.0 to match _guide_centroid_metrics exactly.
+        strip_center_x = mask.shape[1] / 2.0
         # Tolerance band (green vertical lines).
         tol_left = int(strip_center_x - self.tape_align_center_tol_px)
         tol_right = int(strip_center_x + self.tape_align_center_tol_px)
@@ -1231,7 +1261,7 @@ class PayloadCornerNavigateMode(Mode):
             self._DBG_CENTER,
             1,
         )
-        # Black-tape centroid (green if in tolerance, orange otherwise).
+        # Guide centroid (green if in tolerance, orange otherwise).
         # Reconstruct the centroid position the same way the algorithm does:
         # centroid_x_in_strip = xs.mean(), lateral_px = centroid_x_in_strip - strip_center_x
         # so centroid_x_in_strip = strip_center_x + lateral_px, drawn at x offset 0.
@@ -1250,7 +1280,7 @@ class PayloadCornerNavigateMode(Mode):
         )
         self._put_label(
             debug,
-            f"black={count}px lat={lateral_px:+.1f}px "
+            f"green={count}px lat={lateral_px:+.1f}px "
             f"tol=+/-{self.tape_align_center_tol_px:.0f} "
             f"min={self.tape_align_min_pixels}",
             44,

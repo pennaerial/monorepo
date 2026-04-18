@@ -14,10 +14,19 @@ PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 if str(PACKAGE_ROOT) not in sys.path:
     sys.path.insert(0, str(PACKAGE_ROOT))
 
-BLUE_BGR = (177, 75, 54)
-PURPLE_BGR = (156, 85, 170)
-PINK_BGR = (127, 62, 147)
-YELLOW_BGR = (69, 201, 227)
+
+def _bgr_from_hsv(h: int, s: int, v: int) -> tuple[int, int, int]:
+    pixel = cv2.cvtColor(
+        np.uint8([[[h, s, v]]]),
+        cv2.COLOR_HSV2BGR,
+    )[0, 0]
+    return int(pixel[0]), int(pixel[1]), int(pixel[2])
+
+
+ORANGE_BGR = _bgr_from_hsv(15, 150, 220)
+BLUE_BGR = _bgr_from_hsv(105, 110, 170)
+PURPLE_BGR = _bgr_from_hsv(145, 100, 170)
+GREEN_BGR = _bgr_from_hsv(60, 100, 170)
 
 
 def _install_import_stubs() -> None:
@@ -95,8 +104,10 @@ PayloadDLZNavigateMode = importlib.import_module(
 ).PayloadDLZNavigateMode
 
 
-def _blank_frame(height: int = 180, width: int = 240) -> np.ndarray:
-    return np.zeros((height, width, 3), dtype=np.uint8)
+def _orange_frame(height: int = 180, width: int = 240) -> np.ndarray:
+    frame = np.zeros((height, width, 3), dtype=np.uint8)
+    frame[:] = ORANGE_BGR
+    return frame
 
 
 def _roi_ratio(mask: np.ndarray, x0: int, y0: int, x1: int, y1: int) -> float:
@@ -111,14 +122,6 @@ def payload_corner_mode():
     return PayloadCornerNavigateMode(
         node=SimpleNamespace(),
         vehicle=SimpleNamespace(),
-        ccw_lower_hsv=(100, 100, 100),
-        ccw_upper_hsv=(130, 255, 255),
-        cw_lower_hsv=(140, 0, 85),
-        cw_upper_hsv=(170, 255, 255),
-        region_color_match_enabled=True,
-        ccw_color_bgr=BLUE_BGR,
-        cw_color_bgr=PURPLE_BGR,
-        reject_colors_bgr=(PINK_BGR, YELLOW_BGR),
     )
 
 
@@ -127,25 +130,16 @@ def payload_dlz_mode():
     return PayloadDLZNavigateMode(
         node=SimpleNamespace(),
         vehicle=SimpleNamespace(),
-        ccw_lower_hsv=(100, 100, 100),
-        ccw_upper_hsv=(130, 255, 255),
-        cw_lower_hsv=(140, 0, 85),
-        cw_upper_hsv=(170, 255, 255),
-        region_color_match_enabled=True,
-        ccw_color_bgr=BLUE_BGR,
-        cw_color_bgr=PURPLE_BGR,
-        reject_colors_bgr=(PINK_BGR, YELLOW_BGR),
     )
 
 
-def test_corner_mode_turn_metrics_only_count_configured_blue_and_purple(
+def test_corner_mode_turn_metrics_use_blue_and_purple_and_ignore_green(
     payload_corner_mode,
 ):
-    frame = _blank_frame()
+    frame = _orange_frame()
     frame[124:158, 20:76] = BLUE_BGR
     frame[126:160, 144:224] = PURPLE_BGR
-    frame[124:160, 84:106] = PINK_BGR
-    frame[124:160, 112:136] = YELLOW_BGR
+    frame[124:160, 84:106] = GREEN_BGR
 
     total, lateral_error_px, dominant, mask_a, mask_b, row_start = (
         payload_corner_mode._turn_both_color_metrics(frame)
@@ -156,20 +150,43 @@ def test_corner_mode_turn_metrics_only_count_configured_blue_and_purple(
     assert dominant == "B"
     assert lateral_error_px > 0.0
 
-    assert _roi_ratio(mask_a, 20, 4, 76, 38) > 0.90
-    assert _roi_ratio(mask_b, 144, 6, 224, 40) > 0.90
+    assert _roi_ratio(mask_a, 20, 4, 76, 38) > 0.95
+    assert _roi_ratio(mask_b, 144, 6, 224, 40) > 0.95
     assert _roi_ratio(mask_a, 84, 4, 106, 40) < 0.05
     assert _roi_ratio(mask_b, 84, 4, 106, 40) < 0.05
-    assert _roi_ratio(mask_a, 112, 4, 136, 40) < 0.05
-    assert _roi_ratio(mask_b, 112, 4, 136, 40) < 0.05
 
 
-def test_dlz_mode_detect_color_ignores_pink_and_yellow_distractors(payload_dlz_mode):
-    frame = _blank_frame()
+def test_corner_mode_guide_metrics_follow_green_mask(payload_corner_mode):
+    frame = _orange_frame()
+    frame[110:180, 100:145] = GREEN_BGR
+
+    count, lateral_error_px = payload_corner_mode._guide_centroid_metrics(frame)
+    line_count, line_lateral_error_px = payload_corner_mode._single_color_strip_metrics(
+        frame,
+        "A",
+    )
+
+    assert count > 2500
+    assert abs(lateral_error_px) < 5.0
+    assert line_count == 0
+    assert line_lateral_error_px == 0.0
+
+
+def test_corner_mode_single_color_strip_metrics_follow_blue_mask(payload_corner_mode):
+    frame = _orange_frame()
+    frame[124:178, 40:120] = BLUE_BGR
+
+    count, lateral_error_px = payload_corner_mode._single_color_strip_metrics(frame, "A")
+
+    assert count > 3000
+    assert lateral_error_px < 0.0
+
+
+def test_dlz_mode_detect_color_maps_purple_to_a_and_blue_to_b(payload_dlz_mode):
+    frame = _orange_frame()
     frame[126:178, 24:124] = BLUE_BGR
     frame[126:178, 160:220] = PURPLE_BGR
-    frame[126:178, 126:144] = PINK_BGR
-    frame[126:178, 144:158] = YELLOW_BGR
+    frame[126:178, 126:158] = GREEN_BGR
 
     (
         current_color,
@@ -189,9 +206,7 @@ def test_dlz_mode_detect_color_ignores_pink_and_yellow_distractors(payload_dlz_m
     assert lateral_error_px < 0.0
     assert abs(boundary_angle) < 0.2
 
-    assert _roi_ratio(mask_b, 24, 6, 124, 58) > 0.90
-    assert _roi_ratio(mask_a, 160, 6, 220, 58) > 0.90
-    assert _roi_ratio(mask_a, 126, 6, 144, 58) < 0.05
-    assert _roi_ratio(mask_b, 126, 6, 144, 58) < 0.05
-    assert _roi_ratio(mask_a, 144, 6, 158, 58) < 0.05
-    assert _roi_ratio(mask_b, 144, 6, 158, 58) < 0.05
+    assert _roi_ratio(mask_a, 160, 6, 220, 58) > 0.95
+    assert _roi_ratio(mask_b, 24, 6, 124, 58) > 0.95
+    assert _roi_ratio(mask_a, 126, 6, 158, 58) < 0.05
+    assert _roi_ratio(mask_b, 126, 6, 158, 58) < 0.05

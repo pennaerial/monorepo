@@ -6,6 +6,9 @@ from pathlib import Path
 import cv2
 import numpy as np
 
+from uav.cv.dlz_masking import detect_dlz_orange_barrier_mask
+from uav.cv.dlz_relative_color_masks import detect_dlz_relative_color_masks
+
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff"}
 
 ORANGE_LOWER = np.array([5, 78, 158], dtype=np.uint8)
@@ -70,27 +73,17 @@ def _iter_image_paths(folder: Path) -> list[Path]:
 
 
 def get_dlz_hull(frame: np.ndarray) -> np.ndarray | None:
-    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-    orange_mask = cv2.inRange(hsv, ORANGE_LOWER, ORANGE_UPPER)
-
-    height, width = frame.shape[:2]
-    flood_fill_mask = np.zeros((height + 2, width + 2), dtype=np.uint8)
-    flood_fill_mask[1:-1, 1:-1] = orange_mask
-
-    fill_img = np.zeros((height, width), dtype=np.uint8)
-    cv2.floodFill(fill_img, flood_fill_mask.copy(), (0, 0), 255)
-    cv2.floodFill(fill_img, flood_fill_mask.copy(), (width - 1, 0), 255)
-
-    interior = cv2.bitwise_not(fill_img)
-    interior = cv2.erode(interior, DLZ_KERNEL)
-    interior = cv2.dilate(interior, DLZ_KERNEL)
-
-    contours, _ = cv2.findContours(interior, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    surviving = [contour for contour in contours if cv2.contourArea(contour) >= MIN_CONTOUR_AREA]
-    if not surviving:
+    dlz_result = detect_dlz_orange_barrier_mask(frame)
+    if not np.any(dlz_result.applied_mask):
         return None
-
-    return cv2.convexHull(np.concatenate(surviving, axis=0))
+    contours, _ = cv2.findContours(
+        dlz_result.applied_mask,
+        cv2.RETR_EXTERNAL,
+        cv2.CHAIN_APPROX_SIMPLE,
+    )
+    if not contours:
+        return None
+    return cv2.convexHull(np.concatenate(contours, axis=0))
 
 
 def _filter_components(
@@ -131,191 +124,41 @@ def _filter_components(
 def get_color_masks(
     frame: np.ndarray,
 ) -> tuple[np.ndarray | None, np.ndarray, np.ndarray, np.ndarray, np.ndarray, dict[str, object]]:
+    dlz_result = detect_dlz_orange_barrier_mask(frame)
     hull = get_dlz_hull(frame)
-    height, width = frame.shape[:2]
-    zeros = np.zeros((height, width), dtype=np.uint8)
-    if hull is None:
-        info: dict[str, object] = {
-            "orange_a0": 0,
-            "orange_b0": 0,
-            "orange_mask": zeros.copy(),
-            "orange_roi_mask": zeros.copy(),
-            "candidate_mask": zeros.copy(),
-            "green_raw_mask": zeros.copy(),
-            "purple_raw_mask": zeros.copy(),
-            "blue_strong_raw_mask": zeros.copy(),
-            "blue_strong_mask": zeros.copy(),
-            "residual_mask": zeros.copy(),
-            "residual2_mask": zeros.copy(),
-            "weak_blue_mask": zeros.copy(),
-            "weak_purple_mask": zeros.copy(),
-            "green_components": [],
-            "purple_components": [],
-            "blue_strong_components": [],
-            "weak_blue_components": [],
-            "weak_purple_components": [],
-        }
-        return None, zeros, zeros, zeros, zeros, info
-
-    dlz_mask = np.zeros((height, width), dtype=np.uint8)
-    cv2.drawContours(dlz_mask, [hull], -1, 255, thickness=cv2.FILLED)
-
-    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-    lab = cv2.cvtColor(frame, cv2.COLOR_BGR2LAB)
-
-    hue = hsv[:, :, 0]
-    saturation = hsv[:, :, 1]
-    value = hsv[:, :, 2]
-    lab_a = lab[:, :, 1].astype(np.int16)
-    lab_b = lab[:, :, 2].astype(np.int16)
-
-    orange_mask = cv2.inRange(hsv, ORANGE_LOWER, ORANGE_UPPER)
-    orange_roi = (orange_mask > 0) & (dlz_mask > 0)
-    if np.any(orange_roi):
-        orange_a = int(np.median(lab_a[orange_roi]))
-        orange_b = int(np.median(lab_b[orange_roi]))
+    if np.any(dlz_result.applied_mask):
+        dlz_mask = dlz_result.applied_mask
     else:
-        orange_a = int(np.median(lab_a[dlz_mask > 0]))
-        orange_b = int(np.median(lab_b[dlz_mask > 0]))
-
-    delta_a = lab_a - orange_a
-    delta_b = lab_b - orange_b
-    delta_ab = np.sqrt(delta_a.astype(np.float32) ** 2 + delta_b.astype(np.float32) ** 2)
-
-    candidate = (
-        (dlz_mask > 0)
-        & (delta_ab > CANDIDATE_DAB_MIN)
-        & (saturation >= CANDIDATE_S_MIN)
-        & (saturation <= CANDIDATE_S_MAX)
-        & (value > CANDIDATE_V_MIN)
-    ).astype(np.uint8) * 255
-
-    dist_to_boundary = cv2.distanceTransform(dlz_mask, cv2.DIST_L2, 5)
-
-    green_raw = ((candidate > 0) & (delta_a <= GREEN_DA_MAX)).astype(np.uint8) * 255
-    green_mask, green_components = _filter_components(
-        green_raw,
-        hue,
-        saturation,
-        delta_a,
-        delta_b,
-        dist_to_boundary,
-        lambda features: features["area"] >= 150 and features["dmax"] >= 5,
-    )
-
-    red_channel = frame[:, :, 2]
-    green_channel = frame[:, :, 1]
-    blue_channel = frame[:, :, 0]
-
-    purple_raw = (
-        (candidate > 0)
-        & (delta_b <= PURPLE_DB_MAX)
-        & (
-            (hue >= 145)
-            | ((hue <= 8) & (red_channel > green_channel) & (red_channel >= blue_channel - 10))
-        )
-    ).astype(np.uint8) * 255
-    purple_mask, purple_components = _filter_components(
-        purple_raw,
-        hue,
-        saturation,
-        delta_a,
-        delta_b,
-        dist_to_boundary,
-        lambda features: features["dmax"] >= PURPLE_KEEP_DMAX_MIN
-        and (
-            features["meanH"] >= PURPLE_KEEP_MEAN_H_MIN
-            or features["meanDB"] <= PURPLE_KEEP_MEAN_DB_MAX
-        ),
-    )
-
-    blue_strong_raw = (
-        (candidate > 0)
-        & (hue >= BLUE_STRONG_H_MIN)
-        & (hue <= BLUE_STRONG_H_MAX)
-        & (delta_b <= BLUE_STRONG_DB_MAX)
-    ).astype(np.uint8) * 255
-    blue_strong_mask, blue_strong_components = _filter_components(
-        blue_strong_raw,
-        hue,
-        saturation,
-        delta_a,
-        delta_b,
-        dist_to_boundary,
-        lambda features: features["area"] >= BLUE_STRONG_MIN_AREA
-        and features["dmax"] >= BLUE_STRONG_DMAX_MIN,
-    )
-
-    frame_has_green = np.count_nonzero(green_mask) > 0
-    frame_has_purple = np.count_nonzero(purple_mask) > 0
-    frame_has_blue_strong = np.count_nonzero(blue_strong_mask) > 0
-
-    residual = (
-        (candidate > 0)
-        & (green_mask == 0)
-        & (purple_mask == 0)
-        & (blue_strong_mask == 0)
-    ).astype(np.uint8) * 255
-
-    weak_blue_mask, weak_blue_components = _filter_components(
-        residual,
-        hue,
-        saturation,
-        delta_a,
-        delta_b,
-        dist_to_boundary,
-        lambda features: (frame_has_green or frame_has_blue_strong)
-        and features["area"] >= WEAK_BLUE_MIN_AREA
-        and features["h"] <= WEAK_BLUE_MAX_COMPONENT_H
-        and features["meanDA"] <= WEAK_BLUE_MEAN_DA_MAX
-        and features["meanDB"] <= WEAK_BLUE_MEAN_DB_MAX,
-    )
-
-    residual2 = ((residual > 0) & (weak_blue_mask == 0)).astype(np.uint8) * 255
-    weak_purple_mask, weak_purple_components = _filter_components(
-        residual2,
-        hue,
-        saturation,
-        delta_a,
-        delta_b,
-        dist_to_boundary,
-        lambda features: frame_has_green
-        and (not frame_has_purple)
-        and features["area"] >= WEAK_PURPLE_MIN_AREA
-        and features["h"] <= WEAK_PURPLE_MAX_COMPONENT_H
-        and features["x"] >= int(WEAK_PURPLE_MIN_X_FRAC * width)
-        and features["meanDB"] <= WEAK_PURPLE_MEAN_DB_MAX
-        and features["meanDA"] > WEAK_PURPLE_MEAN_DA_MIN,
-    )
-
-    blue_mask = cv2.bitwise_or(blue_strong_mask, weak_blue_mask)
-    purple_mask = cv2.bitwise_or(purple_mask, weak_purple_mask)
-
-    thin_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-    blue_mask = cv2.bitwise_and(cv2.dilate(blue_mask, thin_kernel, iterations=1), dlz_mask)
-    purple_mask = cv2.bitwise_and(cv2.dilate(purple_mask, thin_kernel, iterations=1), dlz_mask)
-
+        dlz_mask = np.zeros(frame.shape[:2], dtype=np.uint8)
+    result = detect_dlz_relative_color_masks(dlz_result.frame, dlz_mask=dlz_mask)
     info: dict[str, object] = {
-        "orange_a0": orange_a,
-        "orange_b0": orange_b,
-        "orange_mask": orange_mask,
-        "orange_roi_mask": orange_roi.astype(np.uint8) * 255,
-        "candidate_mask": candidate,
-        "green_raw_mask": green_raw,
-        "purple_raw_mask": purple_raw,
-        "blue_strong_raw_mask": blue_strong_raw,
-        "blue_strong_mask": blue_strong_mask,
-        "residual_mask": residual,
-        "residual2_mask": residual2,
-        "weak_blue_mask": weak_blue_mask,
-        "weak_purple_mask": weak_purple_mask,
-        "green_components": green_components,
-        "purple_components": purple_components,
-        "blue_strong_components": blue_strong_components,
-        "weak_blue_components": weak_blue_components,
-        "weak_purple_components": weak_purple_components,
+        "orange_a0": result.orange_a0,
+        "orange_b0": result.orange_b0,
+        "orange_mask": result.orange_mask,
+        "orange_roi_mask": result.orange_roi_mask,
+        "candidate_mask": result.candidate_mask,
+        "green_raw_mask": result.green_raw_mask,
+        "purple_raw_mask": result.purple_raw_mask,
+        "blue_strong_raw_mask": result.blue_strong_raw_mask,
+        "blue_strong_mask": result.blue_strong_mask,
+        "residual_mask": result.residual_mask,
+        "residual2_mask": result.residual2_mask,
+        "weak_blue_mask": result.weak_blue_mask,
+        "weak_purple_mask": result.weak_purple_mask,
+        "green_components": result.green_components,
+        "purple_components": result.purple_components,
+        "blue_strong_components": result.blue_strong_components,
+        "weak_blue_components": result.weak_blue_components,
+        "weak_purple_components": result.weak_purple_components,
     }
-    return hull, dlz_mask, green_mask, blue_mask, purple_mask, info
+    return (
+        hull,
+        result.dlz_mask,
+        result.mask_green,
+        result.mask_blue,
+        result.mask_purple,
+        info,
+    )
 
 
 def overlay_masks(

@@ -11,11 +11,6 @@ from cv_bridge import CvBridge
 from rclpy.node import Node
 from sensor_msgs.msg import CompressedImage, Image
 
-from uav.cv.dlz_color_regions import (
-    DLZLineColorMaskConfig,
-    coerce_bgr_triplet,
-    detect_dlz_line_color_regions,
-)
 from uav.cv.dlz_masking import (
     DLZOrangeBarrierMaskConfig,
     DLZOrangeBarrierMaskResult,
@@ -23,6 +18,7 @@ from uav.cv.dlz_masking import (
     coerce_hsv_range_configs,
     detect_dlz_orange_barrier_mask,
 )
+from uav.cv.dlz_relative_color_masks import detect_dlz_relative_color_masks
 from uav.vehicles.Payload import Payload
 from uav.vision_nodes import PayloadAprilTagNode
 from uav.vision_nodes.payload_perception_common import DEFAULT_TAG_FAMILY
@@ -48,17 +44,19 @@ _TURN_MAX_RAD = 2.0 * math.pi  # safety timeout (radians)
 _VALID_START_PHASES = ("wait_for_plane", "scan_tags", "line_follow")
 
 # ---------------------------------------------------------------------------
-# Inline colour detection. HSV bounds are now constructor parameters (see
-# ccw_*_hsv / cw_*_hsv) so the same pink/red/blue calibrations as
-# PayloadCornerNavigateMode can be reused.
+# Inline colour detection now uses the shared relative-orange DLZ heuristic.
+# Legacy HSV/BGR params remain in the constructor only so older mission YAML
+# still loads.
 # ---------------------------------------------------------------------------
 # Internal A/B labelling:
 #   A = "cw-start colour" (the colour you'd land on when travelling CW)
 #   B = "ccw-start colour" (the colour you'd land on when travelling CCW)
-# So cw_*_hsv configures A and ccw_*_hsv configures B. This is the opposite
-# of PayloadCornerNavigateMode's internal mapping, because DLZNavigate's
-# corner transition is A→B for ccw while Corner's is B→A — the yaml-level
-# ccw/cw colour still refers to the same physical tape in both modes.
+# In the real DLZ this maps to:
+#   A = purple / cw side
+#   B = blue / ccw side
+# This is the opposite of PayloadCornerNavigateMode's internal mapping,
+# because DLZNavigate's corner transition is A→B for ccw while Corner's is
+# B→A, even though both refer to the same physical tape colours.
 
 # Fraction of the full frame height where the processing strip starts (bottom 4/9)
 _STRIP_START_FRAC = 6 / 9
@@ -78,12 +76,12 @@ def _get_strip(bgr: np.ndarray) -> Tuple[np.ndarray, int]:
 
 
 def _detect_current_color(
-    orange_mask: np.ndarray,
-    blue_mask: np.ndarray,
+    mask_a: np.ndarray,
+    mask_b: np.ndarray,
 ) -> str:
-    """Determine dominant tape color. Returns "A" (red), "B" (blue), or "none"."""
-    a_count = int(np.count_nonzero(orange_mask))
-    b_count = int(np.count_nonzero(blue_mask))
+    """Determine dominant tape colour. Returns ``"A"``, ``"B"``, or ``"none"``."""
+    a_count = int(np.count_nonzero(mask_a))
+    b_count = int(np.count_nonzero(mask_b))
     total = a_count + b_count
     if total < _MIN_COLOR_PIXELS:
         return "none"
@@ -95,13 +93,13 @@ def _detect_current_color(
 
 
 def _detect_tape_following(
-    orange_mask: np.ndarray,
-    blue_mask: np.ndarray,
+    mask_a: np.ndarray,
+    mask_b: np.ndarray,
 ) -> Tuple[bool, float, float]:
     """Find tape centre and return (boundary_detected, lateral_error_px, boundary_angle)."""
-    strip_height, strip_width = orange_mask.shape[:2]
+    strip_height, strip_width = mask_a.shape[:2]
     frame_cx = strip_width / 2.0
-    tape_mask = cv2.bitwise_or(orange_mask, blue_mask)
+    tape_mask = cv2.bitwise_or(mask_a, mask_b)
 
     row_cx: list[tuple[int, float]] = []
     for row in range(strip_height):
@@ -152,13 +150,13 @@ class PayloadDLZNavigateMode(Mode):
         If target_transitions == 0 → done immediately (already at the dock side).
 
     TURN_ONTO_TAPE
-        Rotate in place until the combined red/blue tape is centred in the
+        Rotate in place until the combined purple/blue tape is centred in the
         detection strip (vision-based; safety timeout at 2π rad):
           direction="cw"  → turn left  (positive angular)
           direction="ccw" → turn right (negative angular)
 
     LINE_FOLLOW
-        Follow the combined red/blue tape strip. Detect colour transitions (A↔B)
+        Follow the combined purple/blue tape strip. Detect colour transitions (A↔B)
         to count segments and execute corner turns:
           direction="cw"  : B→A transition = corner → turn right 90°
           direction="ccw" : A→B transition = corner → turn left  90°
@@ -198,8 +196,7 @@ class PayloadDLZNavigateMode(Mode):
         tag_size_m: float = 0.0508,
         tag_family: str = DEFAULT_TAG_FAMILY,
         compressed_image: bool = False,
-        # HSV bounds — same semantics as PayloadCornerNavigateMode. Defaults
-        # match that mode (ccw=red, cw=blue) so calibrations can be shared.
+        # Legacy HSV bounds kept only for mission-compatibility.
         ccw_lower_hsv: list[int] = (0, 80, 80),
         ccw_upper_hsv: list[int] = (10, 255, 255),
         cw_lower_hsv: list[int] = (85, 120, 60),
@@ -260,13 +257,12 @@ class PayloadDLZNavigateMode(Mode):
         self.tag_family = str(tag_family) if tag_family else DEFAULT_TAG_FAMILY
         self.compressed_image = bool(compressed_image)
 
-        # A = cw-start colour, B = ccw-start colour (see module docstring).
-        self._lower_a = np.array(cw_lower_hsv, dtype=np.uint8)
-        self._upper_a = np.array(cw_upper_hsv, dtype=np.uint8)
-        self._lower_a2 = np.array(cw_lower_hsv2, dtype=np.uint8)
-        self._upper_a2 = np.array(cw_upper_hsv2, dtype=np.uint8)
-        self._lower_b = np.array(ccw_lower_hsv, dtype=np.uint8)
-        self._upper_b = np.array(ccw_upper_hsv, dtype=np.uint8)
+        # Legacy colour params are kept in the constructor so older checked-in
+        # mission files still load, but runtime masking now comes from the
+        # shared relative-orange DLZ heuristic:
+        #   A = purple / cw side
+        #   B = blue / ccw side
+        #   guide = green
         self.dlz_mask_enabled = bool(dlz_mask_enabled)
         self.dlz_mask_min_area_frac = float(dlz_mask_min_area_frac)
         if not (0.0 <= self.dlz_mask_min_area_frac <= 1.0):
@@ -322,31 +318,6 @@ class PayloadDLZNavigateMode(Mode):
                 0, int(dlz_mask_min_component_pixels)
             )
         self._dlz_mask_config = DLZOrangeBarrierMaskConfig(**dlz_mask_config_kwargs)
-        self.region_color_match_enabled = bool(region_color_match_enabled)
-        self._region_color_mask_config: Optional[DLZLineColorMaskConfig] = None
-        if self.region_color_match_enabled:
-            self._region_color_mask_config = DLZLineColorMaskConfig(
-                color_a_bgr=coerce_bgr_triplet(
-                    cw_color_bgr,
-                    label="cw_color_bgr",
-                ),
-                color_b_bgr=coerce_bgr_triplet(
-                    ccw_color_bgr,
-                    label="ccw_color_bgr",
-                ),
-                reject_colors_bgr=tuple(
-                    coerce_bgr_triplet(
-                        color_bgr,
-                        label=f"reject_colors_bgr[{index}]",
-                    )
-                    for index, color_bgr in enumerate(reject_colors_bgr)
-                ),
-                nonblack_min_value=int(region_nonblack_min_value),
-                nonblack_min_saturation=int(region_nonblack_min_saturation),
-                min_region_area_px=int(region_min_area_px),
-                match_max_distance_lab=float(region_match_max_distance_lab),
-                match_min_margin_lab=float(region_match_min_margin_lab),
-            )
 
         self._bridge = CvBridge()
         self._image_sub = None
@@ -443,24 +414,33 @@ class PayloadDLZNavigateMode(Mode):
             f"seeds={len(self._debug_dlz_mask_result.seed_points)}"
         )
 
-    def _threshold_color_masks(self, bgr: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-        hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
-        return (
-            cv2.inRange(hsv, self._lower_a, self._upper_a)
-            | cv2.inRange(hsv, self._lower_a2, self._upper_a2),
-            cv2.inRange(hsv, self._lower_b, self._upper_b),
-        )
+    def _relative_color_masks(
+        self,
+        bgr: np.ndarray,
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        masked_bgr = self._mask_color_frame(bgr)
+        if self._debug_dlz_mask_result is not None and np.any(
+            self._debug_dlz_mask_result.applied_mask
+        ):
+            dlz_mask = self._debug_dlz_mask_result.applied_mask
+        else:
+            dlz_mask = np.full(masked_bgr.shape[:2], 255, dtype=np.uint8)
+        result = detect_dlz_relative_color_masks(masked_bgr, dlz_mask=dlz_mask)
+        # DLZNavigate keeps A=cw/purple and B=ccw/blue.
+        return masked_bgr, result.mask_purple, result.mask_blue, result.mask_green
 
-    def _crop_color_masks(self, bgr: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-        if self.region_color_match_enabled:
-            if self._region_color_mask_config is None:
-                raise RuntimeError("region color matching enabled without a config")
-            result = detect_dlz_line_color_regions(
-                bgr,
-                config=self._region_color_mask_config,
-            )
-            return result.mask_a, result.mask_b
-        return self._threshold_color_masks(bgr)
+    def _crop_mask(
+        self,
+        mask: np.ndarray,
+        *,
+        row_start: int = 0,
+        row_end: Optional[int] = None,
+        col_start: int = 0,
+        col_end: Optional[int] = None,
+    ) -> np.ndarray:
+        row_end = mask.shape[0] if row_end is None else row_end
+        col_end = mask.shape[1] if col_end is None else col_end
+        return mask[row_start:row_end, col_start:col_end].copy()
 
     def _detect_color(
         self, bgr: np.ndarray
@@ -470,8 +450,12 @@ class PayloadDLZNavigateMode(Mode):
         Returns (current_color, boundary_detected, lateral_error_px,
                  boundary_angle, mask_a, mask_b, strip, strip_start).
         """
-        strip, strip_start = _get_strip(bgr)
-        orange_mask, blue_mask = self._crop_color_masks(strip)
+        masked_bgr, mask_a_full, mask_b_full, _guide_mask = self._relative_color_masks(
+            bgr
+        )
+        strip, strip_start = _get_strip(masked_bgr)
+        orange_mask = self._crop_mask(mask_a_full, row_start=strip_start)
+        blue_mask = self._crop_mask(mask_b_full, row_start=strip_start)
         current_color = _detect_current_color(orange_mask, blue_mask)
         detected, lateral_error_px, boundary_angle = _detect_tape_following(
             orange_mask, blue_mask
@@ -698,18 +682,29 @@ class PayloadDLZNavigateMode(Mode):
         (positive = right). Only the expected colour is computed — the
         opposite-side tape cannot bias the centroid.
         """
+        _masked_bgr, mask_a_full, mask_b_full, _guide_mask = self._relative_color_masks(
+            bgr
+        )
         h, w = bgr.shape[:2]
         row_start = int(h * 0.6)
         # col_start = w // 3
         col_start = 0
         # col_end = w - (w // 3)
         col_end = w
-        crop = bgr[row_start:, col_start:col_end]
-        mask_a, mask_b = self._crop_color_masks(crop)
         if color == "A":
-            mask = mask_a
+            mask = self._crop_mask(
+                mask_a_full,
+                row_start=row_start,
+                col_start=col_start,
+                col_end=col_end,
+            )
         else:
-            mask = mask_b
+            mask = self._crop_mask(
+                mask_b_full,
+                row_start=row_start,
+                col_start=col_start,
+                col_end=col_end,
+            )
         count = int(np.count_nonzero(mask))
         if count == 0:
             return 0, 0.0, mask, row_start, col_start
@@ -720,9 +715,9 @@ class PayloadDLZNavigateMode(Mode):
 
     def _update_turn_onto_tape(self, time_delta: float) -> None:
         # Rotate in place until the expected-colour tape is centred in the
-        # middle-third of the frame. Only the colour we're about to follow is
+        # lower processing strip. Only the colour we're about to follow is
         # masked — the opposite-side tape cannot pull the centroid.
-        #   direction="cw"  → turn left  (+), expect colour A (red)
+        #   direction="cw"  → turn left  (+), expect colour A (purple)
         #   direction="ccw" → turn right (-), expect colour B (blue)
         angular = self._turn_angular()
         self._angle_turned += abs(angular) * time_delta
@@ -732,14 +727,13 @@ class PayloadDLZNavigateMode(Mode):
         count = 0
         lateral_error_px = 0.0
         if bgr is not None:
-            masked_bgr = self._mask_color_frame(bgr)
             (
                 count,
                 lateral_error_px,
                 mask,
                 row_start,
                 col_start,
-            ) = self._middle_third_single_color_metrics(masked_bgr, expected_color)
+            ) = self._middle_third_single_color_metrics(bgr, expected_color)
 
             # Stop condition depends on travel direction (lenient variant —
             # mirrors the corner-turn termination):
@@ -759,7 +753,7 @@ class PayloadDLZNavigateMode(Mode):
                     # LINE_FOLLOW's first transition is off the expected colour.
                     self._prev_color = expected_color
                     self._annotate_turn_onto_tape(
-                        masked_bgr,
+                        bgr,
                         row_start,
                         col_start,
                         mask,
@@ -781,7 +775,7 @@ class PayloadDLZNavigateMode(Mode):
                 self._turn_stable = 0
 
             self._annotate_turn_onto_tape(
-                masked_bgr,
+                bgr,
                 row_start,
                 col_start,
                 mask,
@@ -815,7 +809,10 @@ class PayloadDLZNavigateMode(Mode):
     ) -> None:
         if self._annotated_pub is None or bgr is None:
             return
-        debug = bgr.copy()
+        masked_bgr, _mask_a_full, _mask_b_full, _guide_mask = self._relative_color_masks(
+            bgr
+        )
+        debug = masked_bgr.copy()
         self._overlay_dlz_mask_debug(debug)
         h, w = bgr.shape[:2]
 
@@ -825,7 +822,7 @@ class PayloadDLZNavigateMode(Mode):
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         cv2.drawContours(debug, [c + shift for c in contours], -1, (255, 255, 255), 2)
 
-        # Crop boundary (top row, left+right columns) — middle-third bottom-40%.
+        # Crop boundary (top row, left+right columns) for the full-width lower strip.
         col_end = w - col_start
         cv2.line(debug, (0, row_start), (w, row_start), (80, 80, 80), 1)
         cv2.line(debug, (col_start, row_start), (col_start, h - 1), (80, 80, 80), 1)
@@ -917,7 +914,6 @@ class PayloadDLZNavigateMode(Mode):
             self.vehicle.drive(0.0, 0.0)
             return
 
-        masked_bgr = self._mask_color_frame(bgr)
         # Inline colour detection
         (
             curr,
@@ -928,7 +924,7 @@ class PayloadDLZNavigateMode(Mode):
             blue_mask,
             strip,
             strip_start,
-        ) = self._detect_color(masked_bgr)
+        ) = self._detect_color(bgr)
 
         transitioned = False
         is_corner = False
@@ -946,7 +942,7 @@ class PayloadDLZNavigateMode(Mode):
             if self._transitions >= self.target_transitions:
                 self.vehicle.stop()
                 self._annotate_line_follow(
-                    masked_bgr,
+                    bgr,
                     strip_start,
                     orange_mask,
                     blue_mask,
@@ -970,7 +966,7 @@ class PayloadDLZNavigateMode(Mode):
                 self._corner_target_color = self._prev_color
                 self._prev_lateral_error = None
                 self._annotate_line_follow(
-                    masked_bgr,
+                    bgr,
                     strip_start,
                     orange_mask,
                     blue_mask,
@@ -1012,7 +1008,7 @@ class PayloadDLZNavigateMode(Mode):
             angular = 0.0
 
         self._annotate_line_follow(
-            masked_bgr,
+            bgr,
             strip_start,
             orange_mask,
             blue_mask,
@@ -1033,18 +1029,31 @@ class PayloadDLZNavigateMode(Mode):
         for a single colour in the bottom third of the frame, full frame width.
         Returns ``(0, 0.0, empty_mask, row_start, col_start)`` if no pixels
         found."""
+        _masked_bgr, mask_a_full, mask_b_full, _guide_mask = self._relative_color_masks(
+            bgr
+        )
         h, w = bgr.shape[:2]
         # Bottom third: top at 2h/3, bottom at h.
         row_start = int(h * 2 / 3)
         row_end = h * 9 // 10
         col_start = 0
         col_end = w
-        crop = bgr[row_start:row_end, col_start:col_end]
-        mask_a, mask_b = self._crop_color_masks(crop)
         if color == "A":
-            mask = mask_a
+            mask = self._crop_mask(
+                mask_a_full,
+                row_start=row_start,
+                row_end=row_end,
+                col_start=col_start,
+                col_end=col_end,
+            )
         else:
-            mask = mask_b
+            mask = self._crop_mask(
+                mask_b_full,
+                row_start=row_start,
+                row_end=row_end,
+                col_start=col_start,
+                col_end=col_end,
+            )
         count = int(np.count_nonzero(mask))
         if count == 0:
             return 0, 0.0, mask, row_start, col_start
@@ -1069,9 +1078,8 @@ class PayloadDLZNavigateMode(Mode):
 
         bgr = self._decode_image()
         if bgr is not None:
-            masked_bgr = self._mask_color_frame(bgr)
             total, lateral_error_px, mask, row_start, col_start = (
-                self._corner_single_color_metrics(masked_bgr, self._corner_target_color)
+                self._corner_single_color_metrics(bgr, self._corner_target_color)
             )
             # Stop condition depends on travel direction (lenient):
             #   cw  → accept when centroid on the LEFT side of the crop
@@ -1086,7 +1094,7 @@ class PayloadDLZNavigateMode(Mode):
                 self._corner_stable += 1
                 if self._corner_stable >= _CORNER_STABLE_FRAMES:
                     self._annotate_corner_turn(
-                        masked_bgr,
+                        bgr,
                         mask,
                         row_start,
                         col_start,
@@ -1106,7 +1114,7 @@ class PayloadDLZNavigateMode(Mode):
                 self._corner_stable = 0
 
             self._annotate_corner_turn(
-                masked_bgr,
+                bgr,
                 mask,
                 row_start,
                 col_start,
@@ -1137,7 +1145,10 @@ class PayloadDLZNavigateMode(Mode):
     ) -> None:
         if self._annotated_pub is None or bgr is None:
             return
-        debug = bgr.copy()
+        masked_bgr, _mask_a_full, _mask_b_full, _guide_mask = self._relative_color_masks(
+            bgr
+        )
+        debug = masked_bgr.copy()
         self._overlay_dlz_mask_debug(debug)
         h, w = bgr.shape[:2]
         row_end = h * 9 // 10
@@ -1254,7 +1265,10 @@ class PayloadDLZNavigateMode(Mode):
     ) -> None:
         if self._annotated_pub is None or bgr is None:
             return
-        debug = bgr.copy()
+        masked_bgr, _mask_a_full, _mask_b_full, _guide_mask = self._relative_color_masks(
+            bgr
+        )
+        debug = masked_bgr.copy()
         self._overlay_dlz_mask_debug(debug)
         h, w = bgr.shape[:2]
         strip_w = w
