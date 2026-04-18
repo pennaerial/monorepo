@@ -9,13 +9,13 @@ modes:
       tag_max_forward_speed: 0.2
       tag_angular_gain: 0.003
       tag_yaw_gain: 0.6
-      lower_hsv: [10, 80, 120]
-      upper_hsv: [25, 255, 255]
-      color_forward_speed: 0.2
-      color_angular_gain: 0.0045
+      lower_hsv: [100, 80, 50]
+      upper_hsv: [130, 255, 255]
+      color_forward_speed: 0.05
+      color_angular_gain: 0.005
       color_centering_threshold_px: 15
-      color_drive_angular_scale: 0.3
-      color_min_detect_pixels: 50
-      stop_height_px: 400
+      color_drive_angular_scale: 0.00
+      color_min_detect_pixels: 25
+      stop_height_px: 350
       lost_timeout_s: 0.0
       compressed_image: true
