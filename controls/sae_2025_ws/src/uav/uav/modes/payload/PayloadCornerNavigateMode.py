@@ -53,6 +53,7 @@ from cv_bridge import CvBridge
 from rclpy.node import Node
 from sensor_msgs.msg import CompressedImage, Image
 
+from uav.cv.dlz_convex_hull import build_dlz_hull_mask
 from uav.vehicles.Payload import Payload
 
 from ..Mode import Mode
@@ -290,18 +291,58 @@ class PayloadCornerNavigateMode(Mode):
         cv2.drawContours(out, [largest], -1, 255, cv2.FILLED)
         return out
 
+    def _dlz_roi_mask(self, bgr: np.ndarray) -> np.ndarray:
+        roi_mask = build_dlz_hull_mask(bgr)
+        if roi_mask is None:
+            return np.full(bgr.shape[:2], 255, dtype=np.uint8)
+        return roi_mask
+
+    def _threshold_with_roi(
+        self,
+        hsv: np.ndarray,
+        lower: np.ndarray,
+        upper: np.ndarray,
+        roi_mask: np.ndarray,
+        *,
+        keep_largest: bool = False,
+    ) -> np.ndarray:
+        mask = cv2.inRange(hsv, lower, upper)
+        mask = cv2.bitwise_and(mask, roi_mask)
+        if keep_largest:
+            return self._largest_contour_mask(mask)
+        return mask
+
+    def _darken_outside_roi(self, debug: np.ndarray, roi_mask: np.ndarray) -> None:
+        outside = roi_mask == 0
+        if np.any(outside):
+            debug[outside] = (debug[outside] * 0.35).astype(np.uint8)
+
     def _lower_strip_color_counts(self, bgr: np.ndarray) -> Tuple[int, int]:
         """Return (color_a_pixels, color_b_pixels) in the bottom drive_out_strip_frac
         of the frame, cropped horizontally to the middle third so tape that
         only clips the corner of the FOV is ignored."""
         h, w = bgr.shape[:2]
+        roi_full = self._dlz_roi_mask(bgr)
         strip_start = int(h * (1.0 - self.drive_out_strip_frac))
         col_start = w // 3
         col_end = w - (w // 3)
         strip = bgr[strip_start:, col_start:col_end]
+        roi_strip = roi_full[strip_start:, col_start:col_end]
         hsv = cv2.cvtColor(strip, cv2.COLOR_BGR2HSV)
-        mask_a = self._largest_contour_mask(cv2.inRange(hsv, self._lower_a, self._upper_a))
-        mask_b = self._largest_contour_mask(cv2.inRange(hsv, self._lower_b, self._upper_b))
+        mask_a = self._threshold_with_roi(
+            hsv,
+            self._lower_a,
+            self._upper_a,
+            roi_strip,
+            keep_largest=True,
+        )
+        mask_b = self._threshold_with_roi(
+            hsv,
+            self._lower_b,
+            self._upper_b,
+            roi_strip,
+            keep_largest=True,
+        )
         return int(np.count_nonzero(mask_a)), int(np.count_nonzero(mask_b))
 
     def _middle_third_color_metrics(
@@ -318,13 +359,15 @@ class PayloadCornerNavigateMode(Mode):
 
         Returns ``(0, 0.0, None)`` if no colour is found."""
         h, w = bgr.shape[:2]
+        roi_full = self._dlz_roi_mask(bgr)
         row_start = int(h * 0.6)
         col_start = w // 3
         col_end = w - (w // 3)
         crop = bgr[row_start:, col_start:col_end]
+        roi_crop = roi_full[row_start:, col_start:col_end]
         hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
-        mask_a = cv2.inRange(hsv, self._lower_a, self._upper_a)
-        mask_b = cv2.inRange(hsv, self._lower_b, self._upper_b)
+        mask_a = self._threshold_with_roi(hsv, self._lower_a, self._upper_a, roi_crop)
+        mask_b = self._threshold_with_roi(hsv, self._lower_b, self._upper_b, roi_crop)
         count_a = int(np.count_nonzero(mask_a))
         count_b = int(np.count_nonzero(mask_b))
         total = count_a + count_b
@@ -354,13 +397,27 @@ class PayloadCornerNavigateMode(Mode):
 
         Returns ``(0, 0.0)`` if the colour is not found in the strip."""
         h, w = bgr.shape[:2]
+        roi_full = self._dlz_roi_mask(bgr)
         strip_start = int(h * (1.0 - self.line_follow_strip_frac))
         strip = bgr[strip_start:, :]
+        roi_strip = roi_full[strip_start:, :]
         hsv = cv2.cvtColor(strip, cv2.COLOR_BGR2HSV)
         if color == "A":
-            mask = self._largest_contour_mask(cv2.inRange(hsv, self._lower_a, self._upper_a))
+            mask = self._threshold_with_roi(
+                hsv,
+                self._lower_a,
+                self._upper_a,
+                roi_strip,
+                keep_largest=True,
+            )
         elif color == "B":
-            mask = self._largest_contour_mask(cv2.inRange(hsv, self._lower_b, self._upper_b))
+            mask = self._threshold_with_roi(
+                hsv,
+                self._lower_b,
+                self._upper_b,
+                roi_strip,
+                keep_largest=True,
+            )
         else:
             return 0, 0.0
         count = int(np.count_nonzero(mask))
@@ -460,12 +517,26 @@ class PayloadCornerNavigateMode(Mode):
         Returns ``(total, lateral_error_px, dominant, mask_a, mask_b, row_start)``.
         """
         h, w = bgr.shape[:2]
+        roi_full = self._dlz_roi_mask(bgr)
         row_start = int(h * 2 / 3)
         row_end = h * 9 // 10
         crop = bgr[row_start:row_end, :]
+        roi_crop = roi_full[row_start:row_end, :]
         hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
-        mask_a = self._largest_contour_mask(cv2.inRange(hsv, self._lower_a, self._upper_a))
-        mask_b = self._largest_contour_mask(cv2.inRange(hsv, self._lower_b, self._upper_b))
+        mask_a = self._threshold_with_roi(
+            hsv,
+            self._lower_a,
+            self._upper_a,
+            roi_crop,
+            keep_largest=True,
+        )
+        mask_b = self._threshold_with_roi(
+            hsv,
+            self._lower_b,
+            self._upper_b,
+            roi_crop,
+            keep_largest=True,
+        )
         count_a = int(np.count_nonzero(mask_a))
         count_b = int(np.count_nonzero(mask_b))
         total = count_a + count_b
@@ -684,10 +755,17 @@ class PayloadCornerNavigateMode(Mode):
         ``lateral_error_px`` = centroid x minus strip center x; positive means
         tape is right of center."""
         h, w = bgr.shape[:2]
+        roi_full = self._dlz_roi_mask(bgr)
         strip_start = int(h * (1.0 - self.line_follow_strip_frac))
         strip = bgr[strip_start:, :]
+        roi_strip = roi_full[strip_start:, :]
         hsv = cv2.cvtColor(strip, cv2.COLOR_BGR2HSV)
-        mask = cv2.inRange(hsv, self._lower_black, self._upper_black)
+        mask = self._threshold_with_roi(
+            hsv,
+            self._lower_black,
+            self._upper_black,
+            roi_strip,
+        )
         count = int(np.count_nonzero(mask))
         if count == 0:
             return 0, 0.0
@@ -803,15 +881,18 @@ class PayloadCornerNavigateMode(Mode):
             return
         debug = bgr.copy()
         h, w = bgr.shape[:2]
+        roi_full = self._dlz_roi_mask(bgr)
+        self._darken_outside_roi(debug, roi_full)
         y0 = int(h * (1.0 - self.drive_out_strip_frac))
         x0 = w // 3
         x1 = w - (w // 3)
         # Recompute the same masks the logic used so the contours exactly
         # match what DRIVE_OUT was thresholding on.
         strip = bgr[y0:, x0:x1]
+        roi_strip = roi_full[y0:, x0:x1]
         hsv = cv2.cvtColor(strip, cv2.COLOR_BGR2HSV)
-        mask_a = cv2.inRange(hsv, self._lower_a, self._upper_a)
-        mask_b = cv2.inRange(hsv, self._lower_b, self._upper_b)
+        mask_a = self._threshold_with_roi(hsv, self._lower_a, self._upper_a, roi_strip)
+        mask_b = self._threshold_with_roi(hsv, self._lower_b, self._upper_b, roi_strip)
         cv2.rectangle(debug, (x0, y0), (x1 - 1, h - 1), self._DBG_CROP, 1)
         self._draw_shifted_contours(debug, mask_a, x0, y0, self._DBG_COLOR_A, 2)
         self._draw_shifted_contours(debug, mask_b, x0, y0, self._DBG_COLOR_B, 2)
@@ -851,6 +932,8 @@ class PayloadCornerNavigateMode(Mode):
             return
         debug = bgr.copy()
         h, w = bgr.shape[:2]
+        roi_full = self._dlz_roi_mask(bgr)
+        self._darken_outside_roi(debug, roi_full)
         row_end = h * 9 // 10
 
         # Darken rows outside the crop band.
@@ -945,11 +1028,14 @@ class PayloadCornerNavigateMode(Mode):
             return
         debug = bgr.copy()
         h, w = bgr.shape[:2]
+        roi_full = self._dlz_roi_mask(bgr)
+        self._darken_outside_roi(debug, roi_full)
         y0 = int(h * (1.0 - self.line_follow_strip_frac))
         strip = bgr[y0:, :]
+        roi_strip = roi_full[y0:, :]
         hsv = cv2.cvtColor(strip, cv2.COLOR_BGR2HSV)
-        mask_a = cv2.inRange(hsv, self._lower_a, self._upper_a)
-        mask_b = cv2.inRange(hsv, self._lower_b, self._upper_b)
+        mask_a = self._threshold_with_roi(hsv, self._lower_a, self._upper_a, roi_strip)
+        mask_b = self._threshold_with_roi(hsv, self._lower_b, self._upper_b, roi_strip)
         mask_current = mask_a if current == "A" else mask_b
         mask_other = mask_b if current == "A" else mask_a
         cv2.rectangle(debug, (0, y0), (w - 1, h - 1), self._DBG_CROP, 1)
@@ -1018,12 +1104,20 @@ class PayloadCornerNavigateMode(Mode):
             return
         debug = bgr.copy()
         h, w = bgr.shape[:2]
+        roi_full = self._dlz_roi_mask(bgr)
+        self._darken_outside_roi(debug, roi_full)
         # Exactly match _black_centroid_metrics: bottom line_follow_strip_frac,
         # full width, same HSV thresholds, same center computation.
         y0 = int(h * (1.0 - self.line_follow_strip_frac))
         strip = bgr[y0:, :]
+        roi_strip = roi_full[y0:, :]
         hsv = cv2.cvtColor(strip, cv2.COLOR_BGR2HSV)
-        mask = cv2.inRange(hsv, self._lower_black, self._upper_black)
+        mask = self._threshold_with_roi(
+            hsv,
+            self._lower_black,
+            self._upper_black,
+            roi_strip,
+        )
         cv2.rectangle(debug, (0, y0), (w - 1, h - 1), self._DBG_CROP, 1)
         self._draw_shifted_contours(debug, mask, 0, y0, (180, 180, 180), 2)
         # Use float / 2.0 to match _black_centroid_metrics exactly.

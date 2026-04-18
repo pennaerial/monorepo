@@ -44,18 +44,23 @@ def build_debug_masks(
 
 
 def get_dlz_hull(
-    frame: np.ndarray, interior: np.ndarray | None = None
+    frame: np.ndarray,
+    interior: np.ndarray | None = None,
+    *,
+    verbose: bool = False,
 ) -> np.ndarray | None:
     if interior is None:
         _, _, _, interior = build_debug_masks(frame)
     contours, _ = cv2.findContours(interior, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-    print(f"  Found {len(contours)} contours:")
+    if verbose:
+        print(f"  Found {len(contours)} contours:")
     surviving: list[np.ndarray] = []
     for i, contour in enumerate(contours):
         area = cv2.contourArea(contour)
         status = "PASS" if area >= MIN_CONTOUR_AREA else "FAIL"
-        print(f"    contour {i}: area={area:.0f} [{status}]")
+        if verbose:
+            print(f"    contour {i}: area={area:.0f} [{status}]")
         if area >= MIN_CONTOUR_AREA:
             surviving.append(contour)
 
@@ -64,6 +69,18 @@ def get_dlz_hull(
 
     all_points = np.concatenate(surviving, axis=0)
     return cv2.convexHull(all_points)
+
+
+def build_dlz_hull_mask(
+    frame: np.ndarray,
+    interior: np.ndarray | None = None,
+) -> np.ndarray | None:
+    hull = get_dlz_hull(frame, interior=interior, verbose=False)
+    if hull is None:
+        return None
+    mask = np.zeros(frame.shape[:2], dtype=np.uint8)
+    cv2.drawContours(mask, [hull], -1, 255, thickness=cv2.FILLED)
+    return mask
 
 
 def main() -> int:
@@ -94,7 +111,7 @@ def main() -> int:
         print(f"[{i + 1}/{len(paths)}] {os.path.basename(path)}")
 
         preprocessed, orange_mask, fill_img, interior = build_debug_masks(frame)
-        hull = get_dlz_hull(frame, interior=interior)
+        hull = get_dlz_hull(frame, interior=interior, verbose=True)
 
         debug = frame.copy()
         if hull is not None:
