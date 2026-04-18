@@ -17,7 +17,7 @@ modes:
       # Target colours in standard HSV: blue=(240°,100%,100%), red=(0°,100%,100%).
       # OpenCV hue is 0-179 (half of standard), so 240°→120 and 0°→0. Tight
       # hue bands around each target, S/V ≥100 to tolerate real lighting.
-      ccw_lower_hsv: [100, 100, 100] # blue (tested outdoors)  (was [100, 100, 100])
+      ccw_lower_hsv: [93, 100, 100] # blue (tested outdoors)  (was [100, 100, 100])
       ccw_upper_hsv: [130, 255, 255] #        (was [140, 255, 255])
       # cw_lower_hsv: [170, 140, 120]   # red   (was [0, 100, 100])
       # cw_upper_hsv: [180, 255, 255]  #        (was [10, 255, 255])
@@ -29,8 +29,8 @@ modes:
       # ccw_upper_hsv: [130, 255, 255]
       # cw_lower_hsv: [141, 18, 122]  # red
       # cw_upper_hsv: [180, 255, 255]
-      cw_lower_hsv: [140, 0, 85]  # purple
-      cw_upper_hsv: [170, 255, 255]
+      cw_lower_hsv: [116, 0, 116]  # purple
+      cw_upper_hsv: [150, 255, 255]
 
       drive_out_speed_mps: 0.1
       detect_frames: 2
@@ -51,8 +51,10 @@ modes:
       # TAPE_ALIGN — rotate until diagonal black-tape centroid is centered
       # tape_align_lower_hsv: [0, 0, 0] # black
       # tape_align_upper_hsv: [180, 255, 60]
-      tape_align_lower_hsv: [21, 100, 200]
-      tape_align_upper_hsv: [30, 255, 255] # yellow (tested outdoors)
+      # tape_align_lower_hsv: [21, 100, 200]
+      # tape_align_upper_hsv: [30, 255, 255] # yellow (tested outdoors)
+      tape_align_lower_hsv: [30, 0, 142] # green
+      tape_align_upper_hsv: [58, 255, 255]
 
       # tape_align_lower_hsv: [120, 31, 174]
       # tape_align_upper_hsv: [162, 255, 255] # corner colorr

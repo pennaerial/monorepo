@@ -6,8 +6,10 @@ import sys
 import cv2
 import numpy as np
 
-ORANGE_LOWER = np.array([5, 78, 158], dtype=np.uint8)
-ORANGE_UPPER = np.array([25, 189, 255], dtype=np.uint8)
+ORANGE_LOWER = np.array([5, 122, 125], dtype=np.uint8)
+ORANGE_UPPER = np.array([25, 255, 255], dtype=np.uint8)
+# ORANGE_LOWER = np.array([5, 78, 158], dtype=np.uint8) #old
+# ORANGE_UPPER = np.array([25, 189, 255], dtype=np.uint8)
 MIN_CONTOUR_AREA = 5000
 BLUR_KERNEL = (5, 5)
 MORPH_KERNEL = (15, 15)
