@@ -311,7 +311,26 @@ void GPIOController::dead_reckon_callback(
   cmd_angular_.store(angular_cmd);
   control_mode_.store(ControlMode::DEAD_RECKONING);
 
+  const double timeout_s = (request->timeout_sec > 0.0) ? request->timeout_sec : 30.0;  // <= 0 falls back to 30 s
+  const auto deadline = std::chrono::steady_clock::now() +
+    std::chrono::duration<double>(timeout_s);
+
   while (control_mode_.load() == ControlMode::DEAD_RECKONING && !shutdown_requested_.load()) {
+    if (std::chrono::steady_clock::now() >= deadline) {
+      cmd_linear_.store(0.0);
+      cmd_angular_.store(0.0);
+      dr_left_done_.store(true);
+      dr_right_done_.store(true);
+      control_mode_.store(ControlMode::NORMAL);
+      if (left_motor_) {left_motor_->hard_brake();}
+      if (right_motor_) {right_motor_->hard_brake();}
+      RCLCPP_WARN(
+        node_->get_logger(),
+        "DeadReckon | TIMEOUT after %.1f s — motors stopped", timeout_s);
+      response->success = false;
+      response->message = "Dead reckoning timed out after " + std::to_string(timeout_s) + " s";
+      return;
+    }
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
 

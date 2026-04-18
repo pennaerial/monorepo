@@ -2,11 +2,23 @@ modes:
   start:
     mode: payload.PayloadWaitForDriveOutMode
     params:
-      dark_threshold: 100
-      clear_ratio: 0.3
-      wait_seconds: 15.0
+      # DLZ color detection (HSV) — tune per lighting conditions
+      dlz_color_lower_hsv: [5, 120, 120]
+      dlz_color_upper_hsv: [20, 255, 255]
+      dlz_color_pixel_threshold: 0.10   # 10% of frame must match DLZ color
+      # Stillness detection (optical flow magnitude)
+      stillness_threshold: 2.0       # px/frame — raise to ~4-6 if vibration causes false resets
+      stillness_window: 15           # frames to average (~0.5s at 30fps)
+      stillness_flow_crop_frac: 0.4  # discard top 40% of frame before optical flow (use bottom 60%)
+      # Obstruction retreat (still but no orange for N frames → nudge back)
+      obstruction_frames: 20
+      obstruction_retreat_linear: -0.05
+      obstruction_retreat_speed: 1.5
+      obstruction_retreat_timeout_sec: 0.2
+      # Confirmation timer
+      wait_seconds: 7.0
       turn_angular: 3.14
-      turn_speed: 1.5
+      turn_speed: 1.0
       compressed_image: false
       debug: true
     #transitions:

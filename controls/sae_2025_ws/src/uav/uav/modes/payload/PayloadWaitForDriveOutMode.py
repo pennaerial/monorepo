@@ -1,10 +1,17 @@
 """
-PayloadWaitForDriveOutMode — waits until the payload is fully unreeled from the plane.
+PayloadWaitForDriveOutMode — waits until the plane has landed on the DLZ.
 
-While reeled in, the camera sees mostly darkness (obstructed by the plane body).
-Once unreeled, the obstruction clears and the frame brightens. When the non-dark
-pixel ratio stays above `clear_ratio` for `wait_seconds` continuously, the mode
-transitions to reverse.
+Primary detection: HSV orange mask — does the camera see the orange DLZ?
+Complementary:    sparse optical-flow stillness check — is the payload stationary?
+
+When orange coverage >= orange_pixel_threshold AND the frame has been still
+(mean optical-flow magnitude < stillness_threshold over stillness_window frames)
+continuously for wait_seconds, the plane is confirmed landed → transition to reverse.
+
+Obstruction handling: if the frame is still but orange is absent, an object may
+be blocking the camera (plane belly, etc.). This is logged but does not block the
+timer — the mode relies on the primary orange signal to confirm. If orange is also
+absent while moving, the plane is still in flight.
 
 CV runs inline (no separate vision node). The v4l2 + camera nodes still launch.
 
@@ -15,8 +22,9 @@ Transitions:
 from __future__ import annotations
 
 import math
+from collections import deque
 from enum import Enum
-from typing import Optional
+from typing import Optional, List
 
 import cv2
 import numpy as np
@@ -31,16 +39,20 @@ from ..Mode import Mode
 
 class DriveOutState(Enum):
     WAIT_UNREEL = 0
-    REVERSING = 1
-    TURNING = 2
-    DONE = 3
+    OBSTRUCTION_RETREAT = 1
+    REVERSING = 2
+    TURNING = 3
+    DONE = 4
 
 
 class PayloadWaitForDriveOutMode(Mode):
     """
-    Subscribe to the payload camera and measure frame brightness. Once the
-    non-dark pixel ratio exceeds `clear_ratio` continuously for `wait_seconds`,
-    reverse briefly, turn, and terminate.
+    Subscribe to the payload camera and detect when the plane has landed on the
+    DLZ. Confirmation requires BOTH:
+      1. Orange HSV coverage >= orange_pixel_threshold  (DLZ visible)
+      2. Frame optical-flow magnitude < stillness_threshold  (payload not moving)
+
+    Both conditions must hold continuously for wait_seconds before proceeding.
     """
 
     mission_target = "payload"
@@ -52,9 +64,22 @@ class PayloadWaitForDriveOutMode(Mode):
         self,
         node: Node,
         vehicle: Payload,
-        dark_threshold: int = 30,
-        clear_ratio: float = 0.3,
+        # DLZ color detection
+        dlz_color_lower_hsv: List[int] = (5, 120, 120),
+        dlz_color_upper_hsv: List[int] = (20, 255, 255),
+        dlz_color_pixel_threshold: float = 0.04,
+        # Stillness detection (optical flow)
+        stillness_threshold: float = 2.0,
+        stillness_window: int = 15,
+        stillness_flow_crop_frac: float = 0.4,  # top fraction to discard (0.4 = use bottom 60%)
+        # Obstruction retreat (still but no orange)
+        obstruction_frames: int = 20,
+        obstruction_retreat_linear: float = -0.05,
+        obstruction_retreat_speed: float = 1.5,
+        obstruction_retreat_timeout_sec: float = 0.2,
+        # Confirmation timer
         wait_seconds: float = 2.0,
+        # Drive-out motion params
         turn_angular: float = math.pi,
         turn_speed: float = 1.85,
         compressed_image: bool = False,
@@ -62,8 +87,20 @@ class PayloadWaitForDriveOutMode(Mode):
     ):
         super().__init__(node, vehicle)
         self.vehicle: Payload = vehicle
-        self.dark_threshold = int(dark_threshold)
-        self.clear_ratio = float(clear_ratio)
+
+        self._dlz_lower = np.array(dlz_color_lower_hsv, dtype=np.uint8)
+        self._dlz_upper = np.array(dlz_color_upper_hsv, dtype=np.uint8)
+        self.dlz_color_pixel_threshold = float(dlz_color_pixel_threshold)
+
+        self.stillness_threshold = float(stillness_threshold)
+        self.stillness_window = int(stillness_window)
+        self.stillness_flow_crop_frac = float(stillness_flow_crop_frac)
+
+        self.obstruction_frames = int(obstruction_frames)
+        self.obstruction_retreat_linear = float(obstruction_retreat_linear)
+        self.obstruction_retreat_speed = float(obstruction_retreat_speed)
+        self.obstruction_retreat_timeout_sec = float(obstruction_retreat_timeout_sec)
+
         self.wait_seconds = float(wait_seconds)
         self.turn_angular = float(turn_angular)
         self.turn_speed = float(turn_speed)
@@ -98,6 +135,10 @@ class PayloadWaitForDriveOutMode(Mode):
         self._dr_future = None
         self.state = DriveOutState.WAIT_UNREEL
 
+        # Optical-flow state
+        self._prev_gray: Optional[np.ndarray] = None
+        self._flow_deltas: deque = deque(maxlen=self.stillness_window)
+
     def _on_image(self, msg: Image) -> None:
         self._latest_image = msg
 
@@ -109,45 +150,120 @@ class PayloadWaitForDriveOutMode(Mode):
         if msg is None:
             return None
         if isinstance(msg, CompressedImage):
-            frame = self._bridge.compressed_imgmsg_to_cv2(msg, desired_encoding="bgr8")
-        else:
-            frame = self._bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
-        return frame
+            return self._bridge.compressed_imgmsg_to_cv2(msg, desired_encoding="bgr8")
+        return self._bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
 
     def _now(self) -> float:
         return self.node.get_clock().now().nanoseconds * 1e-9
 
-    def _measure_and_publish(self, bgr: np.ndarray) -> float:
-        gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
-        non_dark_mask = gray > self.dark_threshold
-        ratio = float(np.count_nonzero(non_dark_mask)) / gray.size
+    def _check_orange(self, bgr: np.ndarray) -> tuple[bool, float]:
+        hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
+        mask = cv2.inRange(hsv, self._dlz_lower, self._dlz_upper)
+        coverage = float(np.count_nonzero(mask)) / mask.size
+        return coverage >= self.dlz_color_pixel_threshold, coverage, mask
+
+    def _check_stillness(self, bgr: np.ndarray) -> bool:
+        gray_full = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
+        crop_row = int(gray_full.shape[0] * self.stillness_flow_crop_frac)
+        gray = gray_full[crop_row:, :]
+
+        if self._prev_gray is None:
+            self._prev_gray = gray
+            return False
+
+        pts = cv2.goodFeaturesToTrack(
+            self._prev_gray, maxCorners=80, qualityLevel=0.3, minDistance=7
+        )
+        if pts is None:
+            # No trackable features — blank or obstructed, treat as still
+            self._prev_gray = gray
+            return True
+
+        next_pts, status, _ = cv2.calcOpticalFlowPyrLK(
+            self._prev_gray, gray, pts, None
+        )
+        self._prev_gray = gray
+
+        good = status.ravel() == 1
+        if good.sum() == 0:
+            return True
+
+        motion = float(np.linalg.norm(next_pts[good] - pts[good], axis=1).mean())
+        self._flow_deltas.append(motion)
+
+        if len(self._flow_deltas) < self.stillness_window:
+            return False
+        return float(np.mean(self._flow_deltas)) < self.stillness_threshold
+
+    def _detect_and_publish(self, bgr: np.ndarray) -> tuple[bool, bool]:
+        """Run orange and stillness checks, publish debug image. Returns (orange_found, is_still)."""
+        orange_found, coverage, orange_mask = self._check_orange(bgr)
+        is_still = self._check_stillness(bgr)
 
         if self.debug_pub is not None:
             vis = bgr.copy()
-            vis[non_dark_mask] = (0, 200, 0)
+            # Highlight orange pixels
+            vis[orange_mask > 0] = (0, 140, 255)
+
             elapsed = (
                 (self._now() - self._clear_since)
                 if self._clear_since is not None
                 else 0.0
             )
+
+            if orange_found and is_still:
+                state_label = "CONFIRMED"
+                label_color = (0, 255, 0)
+            elif is_still and not orange_found:
+                state_label = "OBSTRUCTED"
+                label_color = (0, 140, 255)
+            elif orange_found and not is_still:
+                state_label = "IN-FLIGHT (orange ignored)"
+                label_color = (0, 165, 255)
+            else:
+                state_label = "IN-FLIGHT"
+                label_color = (128, 128, 128)
+
             cv2.putText(
                 vis,
-                f"non-dark={ratio:.2f} thresh={self.dark_threshold}",
+                state_label,
                 (8, 30),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.7,
+                label_color,
+                2,
+            )
+            cv2.putText(
+                vis,
+                f"dlz={coverage:.2f} thresh={self.dlz_color_pixel_threshold:.2f}",
+                (8, 58),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.6,
+                (0, 255, 255),
+                2,
+            )
+            flow_mean = (
+                float(np.mean(self._flow_deltas)) if self._flow_deltas else 0.0
+            )
+            cv2.putText(
+                vis,
+                f"flow={flow_mean:.2f} thresh={self.stillness_threshold:.2f}",
+                (8, 82),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.6,
                 (0, 255, 255),
                 2,
             )
             cv2.putText(
                 vis,
                 f"timer={elapsed:.1f}/{self.wait_seconds:.1f}s",
-                (8, 60),
+                (8, 106),
                 cv2.FONT_HERSHEY_SIMPLEX,
-                0.7,
+                0.6,
                 (0, 255, 255),
                 2,
             )
+
             ok, buf = cv2.imencode(".jpg", vis, [cv2.IMWRITE_JPEG_QUALITY, 60])
             if ok:
                 msg = CompressedImage()
@@ -156,14 +272,17 @@ class PayloadWaitForDriveOutMode(Mode):
                 msg.data = buf.tobytes()
                 self.debug_pub.publish(msg)
 
-        return ratio
+        return orange_found, is_still
 
     def on_enter(self) -> None:
         self._done = False
         self._clear_since = None
         self._dr_future = None
+        self._obstruction_count = 0
         self.state = DriveOutState.WAIT_UNREEL
-        self.log("waiting for unreel (watching for dark→bright transition)")
+        self._prev_gray = None
+        self._flow_deltas.clear()
+        self.log("waiting for DLZ (orange HSV + stillness check)")
         self.vehicle.set_servo(0.0)
 
     def on_update(self, time_delta: float) -> None:
@@ -176,29 +295,68 @@ class PayloadWaitForDriveOutMode(Mode):
                 self.log("no camera image yet")
                 return
 
-            ratio = self._measure_and_publish(bgr)
+            orange_found, is_still = self._detect_and_publish(bgr)
             now = self._now()
 
-            if ratio >= self.clear_ratio:
+            if orange_found and is_still:
                 if self._clear_since is None:
                     self._clear_since = now
                     self.log(
-                        f"frame bright (ratio={ratio:.2f}) — starting {self.wait_seconds}s timer"
+                        f"DLZ confirmed in view and still — starting {self.wait_seconds}s timer"
                     )
                 elapsed = now - self._clear_since
-                self.log(f"clear for {elapsed:.1f}/{self.wait_seconds:.1f}s")
+                self.log(f"confirmed for {elapsed:.1f}/{self.wait_seconds:.1f}s")
                 if elapsed >= self.wait_seconds:
-                    self.log("unreel confirmed — moving to reverse")
+                    self.log("landing confirmed — moving to reverse")
                     self.state = DriveOutState.REVERSING
+
             else:
                 if self._clear_since is not None:
-                    self.log(f"went dark again (ratio={ratio:.2f}) — resetting timer")
+                    if is_still and not orange_found:
+                        self.log("camera obstructed (still but no orange) — resetting timer")
+                    elif orange_found and not is_still:
+                        self.log("orange visible but moving — in-flight false positive, ignoring")
+                    else:
+                        self.log("in flight, no DLZ — resetting timer")
                 self._clear_since = None
+
+                if is_still and not orange_found:
+                    self._obstruction_count += 1
+                    self.log(
+                        f"obstruction count {self._obstruction_count}/{self.obstruction_frames}"
+                    )
+                    if self._obstruction_count >= self.obstruction_frames:
+                        self._obstruction_count = 0
+                        self._clear_since = None
+                        self.state = DriveOutState.OBSTRUCTION_RETREAT
+                        self.log("obstruction confirmed — retreating to clear camera")
+                else:
+                    self._obstruction_count = 0
+
+        elif self.state == DriveOutState.OBSTRUCTION_RETREAT:
+            if self._dr_future is None:
+                self._dr_future = self.vehicle.dead_reckon(
+                    linear=self.obstruction_retreat_linear,
+                    angular=0.0,
+                    speed=self.obstruction_retreat_speed,
+                    timeout_sec=self.obstruction_retreat_timeout_sec,
+                )
+            elif self._dr_future.done():
+                result = self._dr_future.result()
+                self.log(
+                    f"obstruction retreat done success={result.success} — resuming DLZ watch"
+                )
+                self._dr_future = None
+                # Reset optical-flow so motion from the retreat doesn't linger
+                self._prev_gray = None
+                self._flow_deltas.clear()
+                self.state = DriveOutState.WAIT_UNREEL
+
         elif self.state == DriveOutState.REVERSING:
             self.vehicle.set_servo(180.0)
             if self._dr_future is None:
                 self._dr_future = self.vehicle.dead_reckon(
-                    linear=-0.05, angular=0.0, speed=self.turn_speed
+                    linear=-0.05, angular=0.0, speed=self.turn_speed, timeout_sec=5.0
                 )
             elif self._dr_future.done():
                 result = self._dr_future.result()
@@ -207,10 +365,11 @@ class PayloadWaitForDriveOutMode(Mode):
                 )
                 self._dr_future = None
                 self.state = DriveOutState.TURNING
+
         elif self.state == DriveOutState.TURNING:
             if self._dr_future is None:
                 self._dr_future = self.vehicle.dead_reckon(
-                    linear=0.0, angular=self.turn_angular, speed=self.turn_speed
+                    linear=0.0, angular=self.turn_angular, speed=self.turn_speed, timeout_sec=5.0
                 )
             elif self._dr_future.done():
                 result = self._dr_future.result()

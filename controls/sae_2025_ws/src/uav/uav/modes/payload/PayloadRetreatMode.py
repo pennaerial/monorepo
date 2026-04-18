@@ -188,7 +188,7 @@ class PayloadRetreatMode(Mode):
             if self._turn_future is None:
                 angular = self.turn_angular * self.turn_direction
                 self._turn_future = self.vehicle.dead_reckon(
-                    0.0, angular, self.turn_speed
+                    0.0, angular, self.turn_speed, timeout_sec=5.0
                 )
                 self.log(
                     f"PayloadRetreatMode: sent dead_reckon for {math.degrees(self.turn_angular):.0f}° turn at {self.turn_speed} rad/s"
