@@ -283,15 +283,39 @@ class PayloadCornerNavigateMode(Mode):
             )
             return None
 
-    def _largest_contour_mask(self, mask: np.ndarray) -> np.ndarray:
-        """Return a new mask containing only the largest contour, or an empty
-        mask if none found. Used by processing paths to ignore small noise blobs."""
+    def _primary_contour_mask(
+        self,
+        mask: np.ndarray,
+        *,
+        min_area_px: int = 0,
+    ) -> np.ndarray:
+        """Return a new mask containing one preferred contour.
+
+        If multiple contours clear ``min_area_px``, choose the one with the
+        smallest bounding-box width. If only one contour clears the threshold,
+        keep that contour. If no contour clears the threshold, fall back to the
+        largest contour by area so low-signal frames behave like the old path.
+        """
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         if not contours:
             return np.zeros_like(mask)
-        largest = max(contours, key=cv2.contourArea)
+
+        passing = [c for c in contours if cv2.contourArea(c) >= float(min_area_px)]
+        if len(passing) >= 2:
+            chosen = min(
+                passing,
+                key=lambda contour: (
+                    cv2.boundingRect(contour)[2],
+                    -cv2.contourArea(contour),
+                ),
+            )
+        elif len(passing) == 1:
+            chosen = passing[0]
+        else:
+            chosen = max(contours, key=cv2.contourArea)
+
         out = np.zeros_like(mask)
-        cv2.drawContours(out, [largest], -1, 255, cv2.FILLED)
+        cv2.drawContours(out, [chosen], -1, 255, cv2.FILLED)
         return out
 
     def _dlz_roi_mask(self, bgr: np.ndarray) -> np.ndarray:
@@ -307,12 +331,13 @@ class PayloadCornerNavigateMode(Mode):
         upper: np.ndarray,
         roi_mask: np.ndarray,
         *,
-        keep_largest: bool = False,
+        keep_primary: bool = False,
+        primary_min_area_px: int = 0,
     ) -> np.ndarray:
         mask = cv2.inRange(hsv, lower, upper)
         mask = cv2.bitwise_and(mask, roi_mask)
-        if keep_largest:
-            return self._largest_contour_mask(mask)
+        if keep_primary:
+            return self._primary_contour_mask(mask, min_area_px=primary_min_area_px)
         return mask
 
     def _darken_outside_roi(self, debug: np.ndarray, roi_mask: np.ndarray) -> None:
@@ -337,14 +362,16 @@ class PayloadCornerNavigateMode(Mode):
             self._lower_a,
             self._upper_a,
             roi_strip,
-            keep_largest=True,
+            keep_primary=True,
+            primary_min_area_px=self.drive_out_min_pixels,
         )
         mask_b = self._threshold_with_roi(
             hsv,
             self._lower_b,
             self._upper_b,
             roi_strip,
-            keep_largest=True,
+            keep_primary=True,
+            primary_min_area_px=self.drive_out_min_pixels,
         )
         return int(np.count_nonzero(mask_a)), int(np.count_nonzero(mask_b))
 
@@ -411,7 +438,8 @@ class PayloadCornerNavigateMode(Mode):
                 self._lower_a,
                 self._upper_a,
                 roi_strip,
-                keep_largest=True,
+                keep_primary=True,
+                primary_min_area_px=self.line_follow_min_pixels,
             )
         elif color == "B":
             mask = self._threshold_with_roi(
@@ -419,7 +447,8 @@ class PayloadCornerNavigateMode(Mode):
                 self._lower_b,
                 self._upper_b,
                 roi_strip,
-                keep_largest=True,
+                keep_primary=True,
+                primary_min_area_px=self.line_follow_min_pixels,
             )
         else:
             return 0, 0.0
@@ -531,14 +560,16 @@ class PayloadCornerNavigateMode(Mode):
             self._lower_a,
             self._upper_a,
             roi_crop,
-            keep_largest=True,
+            keep_primary=True,
+            primary_min_area_px=self.center_min_pixels,
         )
         mask_b = self._threshold_with_roi(
             hsv,
             self._lower_b,
             self._upper_b,
             roi_crop,
-            keep_largest=True,
+            keep_primary=True,
+            primary_min_area_px=self.center_min_pixels,
         )
         count_a = int(np.count_nonzero(mask_a))
         count_b = int(np.count_nonzero(mask_b))
@@ -923,8 +954,22 @@ class PayloadCornerNavigateMode(Mode):
         strip = bgr[y0:, x0:x1]
         roi_strip = roi_full[y0:, x0:x1]
         hsv = cv2.cvtColor(strip, cv2.COLOR_BGR2HSV)
-        mask_a = self._threshold_with_roi(hsv, self._lower_a, self._upper_a, roi_strip)
-        mask_b = self._threshold_with_roi(hsv, self._lower_b, self._upper_b, roi_strip)
+        mask_a = self._threshold_with_roi(
+            hsv,
+            self._lower_a,
+            self._upper_a,
+            roi_strip,
+            keep_primary=True,
+            primary_min_area_px=self.drive_out_min_pixels,
+        )
+        mask_b = self._threshold_with_roi(
+            hsv,
+            self._lower_b,
+            self._upper_b,
+            roi_strip,
+            keep_primary=True,
+            primary_min_area_px=self.drive_out_min_pixels,
+        )
         cv2.rectangle(debug, (x0, y0), (x1 - 1, h - 1), self._DBG_CROP, 1)
         self._draw_shifted_contours(debug, mask_a, x0, y0, self._DBG_COLOR_A, 2)
         self._draw_shifted_contours(debug, mask_b, x0, y0, self._DBG_COLOR_B, 2)
@@ -1054,8 +1099,22 @@ class PayloadCornerNavigateMode(Mode):
         strip = bgr[y0:, :]
         roi_strip = roi_full[y0:, :]
         hsv = cv2.cvtColor(strip, cv2.COLOR_BGR2HSV)
-        mask_a = self._threshold_with_roi(hsv, self._lower_a, self._upper_a, roi_strip)
-        mask_b = self._threshold_with_roi(hsv, self._lower_b, self._upper_b, roi_strip)
+        mask_a = self._threshold_with_roi(
+            hsv,
+            self._lower_a,
+            self._upper_a,
+            roi_strip,
+            keep_primary=True,
+            primary_min_area_px=self.line_follow_min_pixels,
+        )
+        mask_b = self._threshold_with_roi(
+            hsv,
+            self._lower_b,
+            self._upper_b,
+            roi_strip,
+            keep_primary=True,
+            primary_min_area_px=self.line_follow_min_pixels,
+        )
         mask_current = mask_a if current == "A" else mask_b
         mask_other = mask_b if current == "A" else mask_a
         cv2.rectangle(debug, (0, y0), (w - 1, h - 1), self._DBG_CROP, 1)

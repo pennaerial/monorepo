@@ -178,6 +178,12 @@ def _make_turn_to_center_mode(**kwargs):
     return mode, vehicle
 
 
+def _contour_bbox(mask: np.ndarray) -> tuple[int, int, int, int]:
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    assert len(contours) == 1
+    return cv2.boundingRect(contours[0])
+
+
 def test_build_dlz_hull_mask_keeps_orange_rectangle_and_excludes_outside():
     frame = _orange_rect_frame()
 
@@ -235,6 +241,32 @@ def test_dlz_mode_detect_color_ignores_outside_dlz_distractors():
     assert lateral_error_px == 0.0
     assert np.count_nonzero(mask_a) == 0
     assert np.count_nonzero(mask_b) == 0
+
+
+def test_primary_contour_mask_chooses_smallest_width_when_multiple_contours_pass():
+    mode = PayloadCornerNavigateMode(node=_FakeNode(), vehicle=_RecordingVehicle())
+    mask = np.zeros((100, 120), dtype=np.uint8)
+    cv2.rectangle(mask, (8, 20), (40, 70), 255, cv2.FILLED)
+    cv2.rectangle(mask, (72, 12), (82, 82), 255, cv2.FILLED)
+
+    selected = mode._primary_contour_mask(mask, min_area_px=200)
+    x, _y, w, _h = _contour_bbox(selected)
+
+    assert x >= 72
+    assert w <= 11
+
+
+def test_primary_contour_mask_ignores_narrow_noise_that_fails_threshold():
+    mode = PayloadCornerNavigateMode(node=_FakeNode(), vehicle=_RecordingVehicle())
+    mask = np.zeros((100, 120), dtype=np.uint8)
+    cv2.rectangle(mask, (10, 25), (28, 80), 255, cv2.FILLED)
+    cv2.rectangle(mask, (75, 10), (79, 22), 255, cv2.FILLED)
+
+    selected = mode._primary_contour_mask(mask, min_area_px=150)
+    x, _y, w, _h = _contour_bbox(selected)
+
+    assert x <= 10
+    assert w >= 19
 
 
 @pytest.mark.parametrize(

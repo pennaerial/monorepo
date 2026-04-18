@@ -171,11 +171,11 @@ modes:
       # upper_hsv: [25, 255, 255]
       lower_hsv: [100, 100, 100]
       upper_hsv: [130, 255, 255]
-      color_forward_speed: 0.2
+      color_forward_speed: 0.1
       color_angular_gain: 0.0045
       color_centering_threshold_px: 15
       color_drive_angular_scale: 0.1
-      color_min_detect_pixels: 50
+      color_min_detect_pixels: 35
       stop_height_px: 360
       lost_timeout_s: 0.0
       compressed_image: true
