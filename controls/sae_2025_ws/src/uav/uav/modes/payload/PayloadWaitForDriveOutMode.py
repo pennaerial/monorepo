@@ -179,9 +179,7 @@ class PayloadWaitForDriveOutMode(Mode):
             self._prev_gray = gray
             return True
 
-        next_pts, status, _ = cv2.calcOpticalFlowPyrLK(
-            self._prev_gray, gray, pts, None
-        )
+        next_pts, status, _ = cv2.calcOpticalFlowPyrLK(self._prev_gray, gray, pts, None)
         self._prev_gray = gray
 
         good = status.ravel() == 1
@@ -242,9 +240,7 @@ class PayloadWaitForDriveOutMode(Mode):
                 (0, 255, 255),
                 2,
             )
-            flow_mean = (
-                float(np.mean(self._flow_deltas)) if self._flow_deltas else 0.0
-            )
+            flow_mean = float(np.mean(self._flow_deltas)) if self._flow_deltas else 0.0
             cv2.putText(
                 vis,
                 f"flow={flow_mean:.2f} thresh={self.stillness_threshold:.2f}",
@@ -313,9 +309,13 @@ class PayloadWaitForDriveOutMode(Mode):
             else:
                 if self._clear_since is not None:
                     if is_still and not orange_found:
-                        self.log("camera obstructed (still but no orange) — resetting timer")
+                        self.log(
+                            "camera obstructed (still but no orange) — resetting timer"
+                        )
                     elif orange_found and not is_still:
-                        self.log("orange visible but moving — in-flight false positive, ignoring")
+                        self.log(
+                            "orange visible but moving — in-flight false positive, ignoring"
+                        )
                     else:
                         self.log("in flight, no DLZ — resetting timer")
                 self._clear_since = None
@@ -369,7 +369,10 @@ class PayloadWaitForDriveOutMode(Mode):
         elif self.state == DriveOutState.TURNING:
             if self._dr_future is None:
                 self._dr_future = self.vehicle.dead_reckon(
-                    linear=0.0, angular=self.turn_angular, speed=self.turn_speed, timeout_sec=5.0
+                    linear=0.0,
+                    angular=self.turn_angular,
+                    speed=self.turn_speed,
+                    timeout_sec=5.0,
                 )
             elif self._dr_future.done():
                 result = self._dr_future.result()

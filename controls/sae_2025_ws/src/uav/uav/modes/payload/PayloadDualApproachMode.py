@@ -85,13 +85,13 @@ class PayloadDualApproachMode(Mode):
         color_forward_speed: float = 0.015,
         color_angular_gain: float = 0.003,
         color_centering_threshold_px: int = 15,
-        color_drive_angular_scale: float = 0.3,
+        color_drive_angular_scale: float = 0.0,
         color_min_detect_pixels: int = 50,
         # --- Termination / lost ---
         prime_height_px: int = 100,
         stop_height_px: int = 300,
         post_prime_lost_frames: int = 5,
-        lost_timeout_s: float = 3.0,
+        lost_timeout_s: float = 5.0,
         # --- Common ---
         compressed_image: bool = False,
     ):
@@ -160,6 +160,7 @@ class PayloadDualApproachMode(Mode):
         self._last_log_time = 0.0
         self._primed = False
         self._lost_frames_after_prime = 0
+        self._last_phase: Optional[str] = None
 
     # ---- subscriptions ----
 
@@ -289,6 +290,7 @@ class PayloadDualApproachMode(Mode):
         self._last_log_time = 0.0
         self._primed = False
         self._lost_frames_after_prime = 0
+        self._last_phase = None
         self.vehicle.set_servo(180.0)
         self.log("PayloadDualApproachMode: started, servo set to 180")
 
@@ -310,19 +312,31 @@ class PayloadDualApproachMode(Mode):
         # --- detect colour (needed for stop check regardless of source) ---
         mask, color_cx, color_cy, color_area, color_height = self._detect_color(bgr)
 
-        # Arm the stop trigger once the blob grows past the prime threshold.
-        if color_height >= self.prime_height_px and not self._primed:
+        # Hoisted so the prime gate and the colour controller below share them.
+        if color_cx is not None:
+            lateral_error = color_cx - image_center
+            centered = abs(lateral_error) <= self.color_centering_threshold_px
+        else:
+            lateral_error = 0.0
+            centered = False
+
+        # Arm only when close AND centered: in that state the controller drives
+        # straight (color_drive_angular_scale = 0), so trajectory is
+        # deterministic and any later contour loss is genuine overshoot.
+        if not self._primed and color_height >= self.prime_height_px and centered:
             self._primed = True
             self.log(
                 f"PayloadDualApproachMode: primed "
-                f"(height={color_height}px >= {self.prime_height_px}px)"
+                f"(height={color_height}px >= {self.prime_height_px}px, centered)"
             )
 
-        # Track consecutive frames without a colour blob after priming so we
-        # can detect an overshoot (string has passed under the camera).
+        # Only tick the lost-frames counter when we were actually driving
+        # straight — rotation during ALIGN can lose the contour without any
+        # overshoot having occurred.
         if self._primed:
             if color_cx is None:
-                self._lost_frames_after_prime += 1
+                if self._last_phase == "COLOR_DRIVE":
+                    self._lost_frames_after_prime += 1
             else:
                 self._lost_frames_after_prime = 0
 
@@ -340,9 +354,7 @@ class PayloadDualApproachMode(Mode):
             self.vehicle.set_servo(0.0)
             self.vehicle.stop()
             self._done = True
-            self.log(
-                f"PayloadDualApproachMode: {stop_reason} — servo set to 0, done"
-            )
+            self.log(f"PayloadDualApproachMode: {stop_reason} — servo set to 0, done")
             self._publish_debug(
                 bgr, mask, "STOP", None, color_cx, color_cy, color_height
             )
@@ -360,6 +372,7 @@ class PayloadDualApproachMode(Mode):
                 self.tag_yaw_gain * tag.yaw_error
             )
             self.vehicle.drive(linear, angular)
+            self._last_phase = "TAG"
             self._publish_debug(bgr, mask, "TAG", tag, color_cx, color_cy, color_height)
             if now - self._last_log_time >= 1.0:
                 self._last_log_time = now
@@ -372,9 +385,7 @@ class PayloadDualApproachMode(Mode):
         # --- fallback to colour ---
         if color_cx is not None and color_area >= self.color_min_detect_pixels:
             self._last_seen_time = now
-            lateral_error = color_cx - image_center
             angular = -self.color_angular_gain * lateral_error
-            centered = abs(lateral_error) <= self.color_centering_threshold_px
 
             if not centered:
                 self.vehicle.drive(0.0, angular)
@@ -384,6 +395,7 @@ class PayloadDualApproachMode(Mode):
                 self.vehicle.drive(self.color_forward_speed, drive_angular)
                 phase = "COLOR_DRIVE"
 
+            self._last_phase = phase
             self._publish_debug(
                 bgr, mask, phase, None, color_cx, color_cy, color_height
             )
@@ -396,6 +408,7 @@ class PayloadDualApproachMode(Mode):
             return
 
         # --- nothing visible ---
+        self._last_phase = "LOST"
         self._publish_debug(bgr, mask, "LOST", None, color_cx, color_cy, color_height)
         if (
             self._last_seen_time is not None

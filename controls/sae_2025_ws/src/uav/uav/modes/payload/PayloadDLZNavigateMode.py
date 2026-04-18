@@ -307,9 +307,8 @@ class PayloadDLZNavigateMode(Mode):
         color: str,
     ) -> np.ndarray:
         if color == "A":
-            mask = (
-                cv2.inRange(hsv, self._lower_a, self._upper_a)
-                | cv2.inRange(hsv, self._lower_a2, self._upper_a2)
+            mask = cv2.inRange(hsv, self._lower_a, self._upper_a) | cv2.inRange(
+                hsv, self._lower_a2, self._upper_a2
             )
         else:
             mask = cv2.inRange(hsv, self._lower_b, self._upper_b)

@@ -98,9 +98,7 @@ def detect_focused_dlz_paper_masks(
         cv2.Canny(blur_lab[:, :, 1], 6, 18),
         cv2.Canny(blur_lab[:, :, 2], 6, 18),
     )
-    edge_mask = cv2.morphologyEx(
-        edge_mask, cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8)
-    )
+    edge_mask = cv2.morphologyEx(edge_mask, cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8))
     edge_mask = cv2.dilate(edge_mask, np.ones((3, 3), np.uint8), iterations=1)
     edge_mask = cv2.bitwise_and(edge_mask, dlz_mask)
 

@@ -67,7 +67,9 @@ def _install_import_stubs() -> None:
         sensor_msgs_msg.CompressedImage = type("CompressedImage", (), {})
         sensor_msgs_msg.Image = type("Image", (), {})
         sensor_msgs.msg = sensor_msgs_msg
-        sys.modules.update({"sensor_msgs": sensor_msgs, "sensor_msgs.msg": sensor_msgs_msg})
+        sys.modules.update(
+            {"sensor_msgs": sensor_msgs, "sensor_msgs.msg": sensor_msgs_msg}
+        )
 
     if "uav.vehicles.Payload" not in sys.modules:
         payload_module = types.ModuleType("uav.vehicles.Payload")
@@ -278,7 +280,14 @@ def test_turn_to_center_searches_in_nominal_direction_without_visible_tape(
     expected_angular: float,
 ):
     mode, vehicle = _make_turn_to_center_mode(direction=direction)
-    mode._turn_both_color_metrics = lambda _bgr: (0, 0.0, None, _empty_mask(), _empty_mask(), 0)
+    mode._turn_both_color_metrics = lambda _bgr: (
+        0,
+        0.0,
+        None,
+        _empty_mask(),
+        _empty_mask(),
+        0,
+    )
 
     mode._update_turn_to_center(0.5)
 

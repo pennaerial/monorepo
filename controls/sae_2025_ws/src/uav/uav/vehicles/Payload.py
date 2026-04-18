@@ -113,7 +113,9 @@ class Payload(Vehicle):
     def set_servo(self, degree: float) -> None:
         self.servo_publisher.publish(ServoCommand(degree=float(degree)))
 
-    def dead_reckon(self, linear: float, angular: float, speed: float, timeout_sec: float = 30.0):
+    def dead_reckon(
+        self, linear: float, angular: float, speed: float, timeout_sec: float = 30.0
+    ):
         request = DeadReckon.Request()
         request.linear = float(linear)
         request.angular = float(angular)

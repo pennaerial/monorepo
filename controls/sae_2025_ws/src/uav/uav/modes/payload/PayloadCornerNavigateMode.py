@@ -617,7 +617,9 @@ class PayloadCornerNavigateMode(Mode):
 
     def _update_turn_to_center(self, time_delta: float) -> None:
         search_angular = (
-            self.align_angular_speed if self.direction == "ccw" else -self.align_angular_speed
+            self.align_angular_speed
+            if self.direction == "ccw"
+            else -self.align_angular_speed
         )
 
         bgr = self._decode_image()
@@ -779,7 +781,11 @@ class PayloadCornerNavigateMode(Mode):
         # Steer purely on the current colour's centroid so the other colour
         # cannot pull the centroid off the side we're following.
         if cur_count >= self.line_follow_min_pixels:
-            d_term = self.k_d * (cur_lateral_px - self._prev_lateral_px) / max(time_delta, 1e-3)
+            d_term = (
+                self.k_d
+                * (cur_lateral_px - self._prev_lateral_px)
+                / max(time_delta, 1e-3)
+            )
             angular = float(
                 np.clip(
                     -(self.k_lat * cur_lateral_px + d_term),
