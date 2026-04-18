@@ -19,7 +19,7 @@ class PayloadTrackingNode(VisionNode):
     def __init__(self):
         super().__init__(self.__class__.srv, node_name=self.node_name())
 
-        self.color_map = {"pink": pink, "green": green, "blue": blue, "yellow": yellow}
+        self.color_map = {"green": green, "blue": blue, "yellow": yellow}
 
         # Initialize Kalman filter
         self.kalman = cv2.KalmanFilter(4, 2)
@@ -64,13 +64,20 @@ class PayloadTrackingNode(VisionNode):
         # prediction = self.kalman.predict()
         # predicted_x, predicted_y = prediction[0, 0], prediction[1, 0]
         # Get raw detection
+        requested_color = str(request.payload_color).strip().lower()
+        payload_bounds = self.color_map.get(requested_color)
+        lower_payload = upper_payload = None
+        if payload_bounds is not None:
+            lower_payload, upper_payload = payload_bounds
         detection = find_payload(
             image,
             *pink,
-            *(self.color_map[request.payload_color]),
+            lower_payload,
+            upper_payload,
             self.uuid,
             self.debug,
             self.save_vision,
+            payload_color=requested_color,
         )
         dlz_empty = False
         if detection is not None:
