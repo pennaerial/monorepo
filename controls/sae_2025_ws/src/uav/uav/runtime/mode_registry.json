@@ -647,6 +647,15 @@
           "annotation": {
             "kind": "float"
           },
+          "default": 0.001,
+          "default_kind": "value",
+          "name": "k_d",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
           "default": 0.5,
           "default_kind": "value",
           "name": "max_angular",
@@ -820,6 +829,11 @@
           "drive_out_strip_frac": {
             "default": 0.3,
             "title": "Drive Out Strip Frac",
+            "type": "number"
+          },
+          "k_d": {
+            "default": 0.001,
+            "title": "K D",
             "type": "number"
           },
           "k_lat": {
@@ -1561,7 +1575,7 @@
           "annotation": {
             "kind": "float"
           },
-          "default": 0.3,
+          "default": 0.0,
           "default_kind": "value",
           "name": "color_drive_angular_scale",
           "required": false
@@ -1581,14 +1595,32 @@
           },
           "default": 100,
           "default_kind": "value",
+          "name": "prime_height_px",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "int"
+          },
+          "default": 300,
+          "default_kind": "value",
           "name": "stop_height_px",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "int"
+          },
+          "default": 5,
+          "default_kind": "value",
+          "name": "post_prime_lost_frames",
           "required": false
         },
         {
           "annotation": {
             "kind": "float"
           },
-          "default": 3.0,
+          "default": 5.0,
           "default_kind": "value",
           "name": "lost_timeout_s",
           "required": false
@@ -1617,7 +1649,7 @@
             "type": "integer"
           },
           "color_drive_angular_scale": {
-            "default": 0.3,
+            "default": 0.0,
             "title": "Color Drive Angular Scale",
             "type": "number"
           },
@@ -1637,7 +1669,7 @@
             "type": "boolean"
           },
           "lost_timeout_s": {
-            "default": 3.0,
+            "default": 5.0,
             "title": "Lost Timeout S",
             "type": "number"
           },
@@ -1653,8 +1685,18 @@
             "title": "Lower Hsv",
             "type": "array"
           },
-          "stop_height_px": {
+          "post_prime_lost_frames": {
+            "default": 5,
+            "title": "Post Prime Lost Frames",
+            "type": "integer"
+          },
+          "prime_height_px": {
             "default": 100,
+            "title": "Prime Height Px",
+            "type": "integer"
+          },
+          "stop_height_px": {
+            "default": 300,
             "title": "Stop Height Px",
             "type": "integer"
           },
@@ -2118,7 +2160,7 @@
     "payload.PayloadWaitForDriveOutMode": {
       "class_name": "PayloadWaitForDriveOutMode",
       "class_path": "uav.modes.payload.PayloadWaitForDriveOutMode",
-      "description": "Subscribe to the payload camera and measure frame brightness. Once the",
+      "description": "Subscribe to the payload camera and detect when the plane has landed on the",
       "display_name": "PayloadWaitForDriveOutMode",
       "mission_target": "payload",
       "mode_id": "payload.PayloadWaitForDriveOutMode",
@@ -2126,20 +2168,43 @@
       "param_fields": [
         {
           "annotation": {
-            "kind": "int"
+            "item": {
+              "kind": "int"
+            },
+            "kind": "list"
           },
-          "default": 30,
+          "default": [
+            5,
+            120,
+            120
+          ],
           "default_kind": "value",
-          "name": "dark_threshold",
+          "name": "dlz_color_lower_hsv",
+          "required": false
+        },
+        {
+          "annotation": {
+            "item": {
+              "kind": "int"
+            },
+            "kind": "list"
+          },
+          "default": [
+            20,
+            255,
+            255
+          ],
+          "default_kind": "value",
+          "name": "dlz_color_upper_hsv",
           "required": false
         },
         {
           "annotation": {
             "kind": "float"
           },
-          "default": 0.3,
+          "default": 0.04,
           "default_kind": "value",
-          "name": "clear_ratio",
+          "name": "dlz_color_pixel_threshold",
           "required": false
         },
         {
@@ -2148,7 +2213,70 @@
           },
           "default": 2.0,
           "default_kind": "value",
-          "name": "wait_seconds",
+          "name": "stillness_threshold",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "int"
+          },
+          "default": 15,
+          "default_kind": "value",
+          "name": "stillness_window",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.4,
+          "default_kind": "value",
+          "name": "stillness_flow_crop_frac",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": -0.05,
+          "default_kind": "value",
+          "name": "obstruction_retreat_linear",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 1.5,
+          "default_kind": "value",
+          "name": "obstruction_retreat_speed",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 0.2,
+          "default_kind": "value",
+          "name": "obstruction_retreat_timeout_sec",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 7.0,
+          "default_kind": "value",
+          "name": "dlz_color_wait_seconds",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "int"
+          },
+          "default": 20,
+          "default_kind": "value",
+          "name": "obstruction_frames",
           "required": false
         },
         {
@@ -2191,25 +2319,84 @@
       "params_schema": {
         "additionalProperties": false,
         "properties": {
-          "clear_ratio": {
-            "default": 0.3,
-            "title": "Clear Ratio",
-            "type": "number"
-          },
           "compressed_image": {
             "default": false,
             "title": "Compressed Image",
             "type": "boolean"
           },
-          "dark_threshold": {
-            "default": 30,
-            "title": "Dark Threshold",
-            "type": "integer"
-          },
           "debug": {
             "default": false,
             "title": "Debug",
             "type": "boolean"
+          },
+          "dlz_color_lower_hsv": {
+            "default": [
+              5,
+              120,
+              120
+            ],
+            "items": {
+              "type": "integer"
+            },
+            "title": "Dlz Color Lower Hsv",
+            "type": "array"
+          },
+          "dlz_color_pixel_threshold": {
+            "default": 0.04,
+            "title": "Dlz Color Pixel Threshold",
+            "type": "number"
+          },
+          "dlz_color_upper_hsv": {
+            "default": [
+              20,
+              255,
+              255
+            ],
+            "items": {
+              "type": "integer"
+            },
+            "title": "Dlz Color Upper Hsv",
+            "type": "array"
+          },
+          "dlz_color_wait_seconds": {
+            "default": 7.0,
+            "title": "Dlz Color Wait Seconds",
+            "type": "number"
+          },
+          "obstruction_frames": {
+            "default": 20,
+            "title": "Obstruction Frames",
+            "type": "integer"
+          },
+          "obstruction_retreat_linear": {
+            "default": -0.05,
+            "title": "Obstruction Retreat Linear",
+            "type": "number"
+          },
+          "obstruction_retreat_speed": {
+            "default": 1.5,
+            "title": "Obstruction Retreat Speed",
+            "type": "number"
+          },
+          "obstruction_retreat_timeout_sec": {
+            "default": 0.2,
+            "title": "Obstruction Retreat Timeout Sec",
+            "type": "number"
+          },
+          "stillness_flow_crop_frac": {
+            "default": 0.4,
+            "title": "Stillness Flow Crop Frac",
+            "type": "number"
+          },
+          "stillness_threshold": {
+            "default": 2.0,
+            "title": "Stillness Threshold",
+            "type": "number"
+          },
+          "stillness_window": {
+            "default": 15,
+            "title": "Stillness Window",
+            "type": "integer"
           },
           "turn_angular": {
             "default": 3.141592653589793,
@@ -2219,11 +2406,6 @@
           "turn_speed": {
             "default": 1.85,
             "title": "Turn Speed",
-            "type": "number"
-          },
-          "wait_seconds": {
-            "default": 2.0,
-            "title": "Wait Seconds",
             "type": "number"
           }
         },

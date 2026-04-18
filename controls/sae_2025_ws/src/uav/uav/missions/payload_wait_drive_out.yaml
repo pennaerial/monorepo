@@ -15,8 +15,8 @@ modes:
       obstruction_retreat_linear: -0.05
       obstruction_retreat_speed: 1.5
       obstruction_retreat_timeout_sec: 0.2
-      # Confirmation timer
-      wait_seconds: 7.0
+      # Confirmation timers
+      dlz_color_wait_seconds: 7.0
       turn_angular: 3.14
       turn_speed: 1.0
       compressed_image: false

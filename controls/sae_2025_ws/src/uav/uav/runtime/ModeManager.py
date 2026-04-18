@@ -538,7 +538,11 @@ class ModeManager(Node):
             self._stop_vehicle()
             self.destroy_node()
         elif state != "continue":
-            self.switch_mode(self.transition(state))
+            next_mode = self.transition(state)
+            if next_mode == "terminate":
+                self.handle_mode_state("terminate")
+            else:
+                self.switch_mode(next_mode)
 
     def create_publisher(self, msg_type, topic: str, *args, **kwargs):
         return self._create_entity(

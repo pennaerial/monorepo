@@ -3,8 +3,8 @@ modes:
     mode: payload.PayloadWaitForDriveOutMode
     params:
       # DLZ color detection (HSV) — tune per lighting conditions
-      dlz_color_lower_hsv: [5, 120, 120]
-      dlz_color_upper_hsv: [20, 255, 255]
+      dlz_color_lower_hsv: [5, 122, 125]
+      dlz_color_upper_hsv: [25, 255, 255]
       dlz_color_pixel_threshold: 0.10   # 10% of frame must match DLZ color
       # Stillness detection (optical flow magnitude)
       stillness_threshold: 2.0          # px/frame — raise to ~4-6 if vibration causes false resets
@@ -15,9 +15,44 @@ modes:
       obstruction_retreat_linear: -0.05
       obstruction_retreat_speed: 1.5
       obstruction_retreat_timeout_sec: 0.2
-      # Confirmation timer
-      wait_seconds: 7.0
+      # Confirmation timers
+      dlz_color_wait_seconds: 7.0
       turn_angular: 3.14
       turn_speed: 1.0
       compressed_image: false
       debug: true
+    transitions:
+      complete: corner_navigate
+
+  corner_navigate:
+    mode: payload.PayloadCornerNavigateMode
+    params:
+      direction: ccw
+      ccw_lower_hsv: [100, 100, 100] # blue (tested outdoors)
+      ccw_upper_hsv: [130, 255, 255]
+      cw_lower_hsv: [140, 0, 85]     # purple
+      cw_upper_hsv: [170, 255, 255]
+      drive_out_speed_mps: 0.1
+      detect_frames: 3
+      max_drive_out_s: 30.0
+      drive_out_strip_frac: 0.30
+      drive_out_min_pixels: 150
+      compressed_image: false
+      align_angular_speed: 0.7
+      center_tol_px: 30.0
+      center_min_pixels: 150
+      center_stable_frames: 1
+      line_follow_speed_mps: 0.10
+      line_follow_strip_frac: 0.40
+      line_follow_min_pixels: 50
+      k_lat: 0.003
+      k_d: 0.0005
+      max_angular: 1.3
+      tape_align_lower_hsv: [21, 100, 200]
+      tape_align_upper_hsv: [30, 255, 255] # yellow (tested outdoors)
+      tape_align_angular_speed: 0.6
+      tape_align_center_tol_px: 20.0
+      tape_align_min_pixels: 100
+      tape_align_stable_frames: 3
+    transitions:
+      complete: terminate
