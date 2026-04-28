@@ -1,0 +1,16 @@
+name: Deploy Docs
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - run: pip install "mkdocs<2.0" mkdocs-material mkdocstrings[python] mkdocs-gen-files mkdocs-literate-nav
+      - run: mkdocs gh-deploy --force

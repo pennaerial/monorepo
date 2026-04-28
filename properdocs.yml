@@ -1,0 +1,31 @@
+site_name: PennAir Monorepo
+repo_url: https://github.com/pennaerial/monorepo
+
+theme:
+  name: material
+
+
+
+nav:
+  - Home: index.md
+  - Controls:
+    - Overview: controls/index.md
+    - UAV: controls/uav.md
+    - Payload: controls/payload.md
+    - Integration: controls/integration.md
+    - Simulation: controls/sim.md
+    - Tools: controls/tools.md
+    - Custom Sim Bridge: controls/custom_sim_bridge.md
+    - Custom Gz Plugins: controls/custom_gz_plugins.md
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths:
+            - controls/sae_2025_ws/src
+  - gen-files:
+      scripts:
+        - docs/gen_pages.py
+  - literate-nav:
