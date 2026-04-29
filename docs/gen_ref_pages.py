@@ -1,4 +1,7 @@
-"""Generate the code reference pages."""
+"""
+Generate the code reference pages.
+Referenced this guide: https://mkdocstrings.github.io/recipes/
+"""
 
 from pathlib import Path
 import mkdocs_gen_files
@@ -36,6 +39,7 @@ nav = mkdocs_gen_files.Nav()
 
 for path in sorted(src.rglob("*.py")):
 
+    # restict to only listed python packages
     valid_module = False
     for pkg_module in PYTHON_PACKAGE_MODULE_ROOTS:
         if str(path).startswith(str(pkg_module)):
@@ -44,15 +48,16 @@ for path in sorted(src.rglob("*.py")):
     if not valid_module:
         continue
 
-    # -----------------------------
-    # Convert to module path relative to Python package root
-    # -----------------------------
+    # ex: uav/uav/modes/Mode
     module_path = path.relative_to(src).with_suffix("")
     parts = list(module_path.parts)
 
     if not parts:
         continue
 
+    # skip irrelevant directories within package.
+    # only relevant code in ros packages are the inner dir, like uav/uav or sim/sim
+    # launch files can be hand documented
     if any(part in PY_PKG_SKIP_DIRS for part in parts):
         continue
 

@@ -1,16 +1,45 @@
-name: Deploy Docs
+name: Docs
 
 on:
   push:
     branches: [main]
+  pull_request:
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.10"
-      - run: pip install "mkdocs<2.0" mkdocs-material mkdocstrings[python] mkdocs-gen-files mkdocs-literate-nav
-      - run: mkdocs gh-deploy --force
+      - run: |
+          pip install \
+            properdocs \
+            mkdocs-material \
+            mkdocstrings[python] \
+            mkdocs-gen-files \
+            mkdocs-literate-nav \
+            mkdocs-section-index \
+            mkdoxy
+      - run: properdocs build
+
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - run: |
+          pip install \
+            properdocs \
+            mkdocs-material \
+            mkdocstrings[python] \
+            mkdocs-gen-files \
+            mkdocs-literate-nav \
+            mkdocs-section-index \
+            mkdoxy
+      - run: properdocs gh-deploy --force
