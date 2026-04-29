@@ -3,29 +3,46 @@ repo_url: https://github.com/pennaerial/monorepo
 
 theme:
   name: material
-
+  logo: https://www.pennaerial.com/wp-content/uploads/2023/08/b-removebg-preview-150x150.png
+  icon:
+    repo: fontawesome/solid/trash
+  features:
+    - navigation.tabs
 
 
 nav:
   - Home: index.md
-  - Controls:
-    - Overview: controls/index.md
-    - UAV: controls/uav.md
-    - Payload: controls/payload.md
-    - Integration: controls/integration.md
-    - Simulation: controls/sim.md
-    - Tools: controls/tools.md
-    - Custom Sim Bridge: controls/custom_sim_bridge.md
-    - Custom Gz Plugins: controls/custom_gz_plugins.md
+  - Getting Started: getting-started.md
+  - API Reference:
+    - Python: reference/
+    - C++:
+      - payload: payload/annotated.md
+      - custom_sim_bridge: custom_sim_bridge/annotated.md
 
 plugins:
   - search
+  - gen-files:
+      scripts:
+        - docs/gen_ref_pages.py
   - mkdocstrings:
       handlers:
         python:
           paths:
             - controls/sae_2025_ws/src
-  - gen-files:
-      scripts:
-        - docs/gen_pages.py
   - literate-nav:
+      nav_file: SUMMARY.md
+  - section-index
+  - mkdoxy:
+      projects:
+        payload:
+          src-dirs: controls/sae_2025_ws/src/payload/include controls/sae_2025_ws/src/payload/src
+          full-doc: true
+          doxy-cfg:
+            OUTPUT_LANGUAGE: English
+            EXTRACT_ALL: YES
+        custom_sim_bridge:
+          src-dirs: controls/sae_2025_ws/src/custom_sim_bridge/include controls/sae_2025_ws/src/custom_sim_bridge/src
+          full-doc: true
+          doxy-cfg:
+            OUTPUT_LANGUAGE: English
+            EXTRACT_ALL: YES
