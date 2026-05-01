@@ -1,6 +1,6 @@
 # tools
 
-Developer tools for the SAE 2025 workspace.
+Various developer tools
 
 ---
 

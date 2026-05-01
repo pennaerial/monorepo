@@ -1,6 +1,6 @@
 # custom_gz_msgs
 
-Custom Gazebo Harmonic protobuf message definitions for the SAE 2025 simulation environment.
+Custom Gazebo Harmonic protobuf message definitions for the simulation environment.
 
 For general information on creating Gazebo messages, see the [official guide](https://gazebosim.org/api/msgs/10/index.html).
 

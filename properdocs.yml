@@ -14,14 +14,15 @@ theme:
 nav:
   - Home: index.md
   - Getting Started: getting-started.md
-  - Packages: packages/
   - Concepts: concepts.md
+  - Packages: packages/
   - API Reference:
     - Python: reference/
     - C++:
       - payload: payload/annotated.md
       - custom_sim_bridge: custom_sim_bridge/annotated.md
       - custom_gz_plugins: custom_gz_plugins/annotated.md
+  - Docs Setup: docs-setup.md
 
 plugins:
   - search

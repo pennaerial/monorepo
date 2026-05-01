@@ -1,6 +1,6 @@
 # custom_gz_plugins
 
-Custom Gazebo Harmonic system plugins for the SAE 2025 simulation environment.
+Custom Gazebo Harmonic system plugins for simulation.
 
 For general information on creating Gazebo system plugins, see the [official guide](https://gazebosim.org/api/sim/8/createsystemplugins.html).
 
