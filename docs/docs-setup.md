@@ -4,6 +4,15 @@ Docs are built with [MkDocs](https://www.mkdocs.org/) via the `properdocs` wrapp
 
 ## Serving locally
 
+Install dependencies:
+
+```bash
+sudo apt-get install -y doxygen
+pip install properdocs mkdocs-material "mkdocstrings[python]" mkdocs-gen-files mkdocs-literate-nav mkdocs-section-index mkdoxy
+```
+
+Then serve:
+
 ```bash
 properdocs serve
 ```
