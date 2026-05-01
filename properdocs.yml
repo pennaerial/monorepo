@@ -3,7 +3,8 @@ repo_url: https://github.com/pennaerial/monorepo
 
 theme:
   name: material
-  logo: https://www.pennaerial.com/wp-content/uploads/2023/08/b-removebg-preview-150x150.png
+  logo: assets/pennair-preview-150x150.png
+  favicon: assets/pennair-preview-150x150.png
   icon:
     repo: fontawesome/solid/trash
   features:
@@ -13,18 +14,21 @@ theme:
 nav:
   - Home: index.md
   - Getting Started: getting-started.md
+  - Packages: packages/
   - Concepts: concepts.md
   - API Reference:
     - Python: reference/
     - C++:
       - payload: payload/annotated.md
       - custom_sim_bridge: custom_sim_bridge/annotated.md
+      - custom_gz_plugins: custom_gz_plugins/annotated.md
 
 plugins:
   - search
   - gen-files:
       scripts:
         - docs/gen_ref_pages.py
+        - docs/gen_pkg_pages.py
   - mkdocstrings:
       handlers:
         python:
@@ -43,6 +47,12 @@ plugins:
             EXTRACT_ALL: YES
         custom_sim_bridge:
           src-dirs: controls/sae_2025_ws/src/custom_sim_bridge/include controls/sae_2025_ws/src/custom_sim_bridge/src
+          full-doc: true
+          doxy-cfg:
+            OUTPUT_LANGUAGE: English
+            EXTRACT_ALL: YES
+        custom_gz_plugins:
+          src-dirs: controls/sae_2025_ws/src/custom_gz_plugins/src
           full-doc: true
           doxy-cfg:
             OUTPUT_LANGUAGE: English

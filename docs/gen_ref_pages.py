@@ -3,20 +3,25 @@ Generate the code reference pages.
 Referenced this guide: https://mkdocstrings.github.io/recipes/
 """
 
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
 import mkdocs_gen_files
+from doc_utils import find_ros_packages
 
 root = Path(__file__).resolve().parent.parent
 src = root / "controls" / "sae_2025_ws" / "src"
 
-# -----------------------------
-# Python package roots (REAL import roots)
-# -----------------------------
+# Auto-detect Python module roots.
+# A root is any dir with __init__.py whose parent is a direct-child ROS package
+# of src.
 PYTHON_PACKAGE_MODULE_ROOTS = {
-    src / "sim" / "sim",
-    src / "uav" / "uav",
-    src / "udp_bridge" / "udp_bridge",
-    src / "tools",
+    child
+    for pkg_dir in find_ros_packages(src, ament_type="python")
+    for child in pkg_dir.iterdir()
+    if child.is_dir() and (child / "__init__.py").exists()
 }
 
 # -----------------------------
