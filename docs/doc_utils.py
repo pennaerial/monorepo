@@ -74,8 +74,3 @@ if __name__ == "__main__":
     print("\nCMAKE:")
     for pkg in find_ros_packages(Path("controls/sae_2025_ws/src"), ament_type="cmake"):
         print(pkg)
-
-
-
-
-

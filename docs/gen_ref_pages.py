@@ -27,14 +27,7 @@ PYTHON_PACKAGE_MODULE_ROOTS = {
 # -----------------------------
 # Skip ROS/non-Python API dirs
 # -----------------------------
-PY_PKG_SKIP_DIRS = {
-    "launch",
-    "config",
-    "urdf",
-    "meshes",
-    "worlds",
-    "models"
-}
+PY_PKG_SKIP_DIRS = {"launch", "config", "urdf", "meshes", "worlds", "models"}
 
 SKIP_FILES = {
     "setup",
@@ -43,7 +36,6 @@ SKIP_FILES = {
 nav = mkdocs_gen_files.Nav()
 
 for path in sorted(src.rglob("*.py")):
-
     # restict to only listed python packages
     valid_module = False
     for pkg_module in PYTHON_PACKAGE_MODULE_ROOTS:

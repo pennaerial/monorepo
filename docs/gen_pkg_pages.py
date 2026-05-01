@@ -53,9 +53,11 @@ for pkg_dir in packages:
     readme = pkg_dir / "README.md"
     docs_dir = pkg_dir / "docs"
 
-    supplementary = sorted(
-        f for f in docs_dir.iterdir() if f.is_file() and f.suffix == ".md"
-    ) if docs_dir.is_dir() else []
+    supplementary = (
+        sorted(f for f in docs_dir.iterdir() if f.is_file() and f.suffix == ".md")
+        if docs_dir.is_dir()
+        else []
+    )
 
     if readme.exists():
         dest = Path("packages", pkg_name, "README.md")
@@ -81,7 +83,9 @@ for pkg_dir in packages:
         with mkdocs_gen_files.open(dest, "w") as fd:
             fd.write(doc_file.read_text())
         mkdocs_gen_files.set_edit_path(dest, doc_file.relative_to(REPO_ROOT))
-        nav[(pkg_name, doc_file.stem)] = Path(pkg_name, "docs", doc_file.name).as_posix()
+        nav[(pkg_name, doc_file.stem)] = Path(
+            pkg_name, "docs", doc_file.name
+        ).as_posix()
 
 with mkdocs_gen_files.open("packages/SUMMARY.md", "w") as nav_file:
     nav_file.writelines(nav.build_literate_nav())
