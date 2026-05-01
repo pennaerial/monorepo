@@ -245,7 +245,7 @@ def load_mission_spec_compat(path: str | Path | dict[str, Any]) -> MissionSpecCo
         unknown_targets = sorted(
             next_mode
             for next_mode in mode_spec.transitions.values()
-            if next_mode not in modes
+            if next_mode not in modes and next_mode != "terminate"
         )
         if unknown_targets:
             raise ValueError(

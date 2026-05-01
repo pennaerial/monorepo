@@ -700,6 +700,7 @@ def test_payload_bootstrap_forwards_auto_launch(monkeypatch, auto_launch):
         "vehicle_name": "payload_0",
         "peer_heartbeat_hz": 12.0,
         "peer_stale_timeout_s": 0.75,
+        "vision_debug": False,
     }
     bootstrap.get_parameter = lambda name: _FakeParameter(parameters[name])
 

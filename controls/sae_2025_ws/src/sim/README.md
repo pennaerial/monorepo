@@ -1,5 +1,7 @@
 # `sim` Package
 
+Gazebo Harmonic simulation backend — world generation, multi-vehicle spawning, hoop-course scoring, and stage configuration.
+
 ## Extra Dependency
 ```bash
 sudo apt install ros-humble-tf-transformations

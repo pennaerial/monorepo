@@ -39,3 +39,5 @@ crash course/data/MNIST/raw/*
 
 node_modules
 *venv
+.claude
+site/

@@ -1,6 +1,6 @@
 # custom_sim_bridge
 
-Pluginlib-based ROS 2 bridge plugins that translate between ROS 2 services and Gazebo Harmonic transport for the SAE 2025 simulation environment.
+Pluginlib-based ROS 2 bridge plugins that translate between ROS 2 services and Gazebo Harmonic transport for simulation.
 
 For general information on pluginlib, see the [official guide](https://docs.ros.org/en/rolling/Tutorials/Beginner-Client-Libraries/Pluginlib.html).
 

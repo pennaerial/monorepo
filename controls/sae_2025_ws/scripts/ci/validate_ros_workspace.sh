@@ -31,7 +31,7 @@ rosdep install -r -i -y --rosdistro "$ROS_DISTRO" \
 
 ci_log "Building shared hardware dependencies"
 colcon build \
-    --packages-select payload_interfaces px4_msgs uav_interfaces actuator_msgs
+    --packages-select payload_interfaces px4_msgs uav_interfaces actuator_msgs udp_bridge
 
 ci_log "Building hardware payload package"
 ci_source_workspace "$WORKSPACE_ROOT"
