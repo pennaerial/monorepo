@@ -664,6 +664,7 @@ def test_build_runtime_parameters_for_uav(stack_launch_module):
         vehicle_name="uav_3",
         auto_launch=True,
         debug=1,
+        vision_debug=False,
         servo_only=0,
         vehicle_class_name="MULTICOPTER",
         camera_mount_offsets=[0.1, 0.2, 0.3],
@@ -687,6 +688,7 @@ def test_build_runtime_parameters_for_payload(stack_launch_module):
         vehicle_name="payload_0",
         auto_launch=False,
         debug=True,
+        vision_debug=False,
         servo_only=True,
         vehicle_class_name=None,
         camera_mount_offsets=[],
@@ -696,6 +698,7 @@ def test_build_runtime_parameters_for_payload(stack_launch_module):
         "mode_map": "/tmp/payload.yaml",
         "auto_launch": False,
         "vehicle_name": "payload_0",
+        "vision_debug": False,
     }
 
 
@@ -707,6 +710,7 @@ def test_build_runtime_parameters_rejects_missing_vehicle_class(stack_launch_mod
             vehicle_name="uav",
             auto_launch=True,
             debug=False,
+            vision_debug=False,
             servo_only=False,
             vehicle_class_name=None,
             camera_mount_offsets=[0.0, 0.0, 0.0],
@@ -723,6 +727,7 @@ def test_build_runtime_parameters_rejects_bad_camera_offsets(stack_launch_module
             vehicle_name="uav",
             auto_launch=True,
             debug=False,
+            vision_debug=False,
             servo_only=False,
             vehicle_class_name="MULTICOPTER",
             camera_mount_offsets=[0.0, 0.0],
