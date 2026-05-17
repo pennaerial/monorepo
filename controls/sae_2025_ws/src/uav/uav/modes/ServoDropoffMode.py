@@ -4,8 +4,9 @@ from rclpy.node import Node
 
 from uav.vehicles.UAV import UAV
 
-from ..Mode import Mode
+from uav.modes.Mode import Mode
 
+from ..Mode import Mode
 
 class ServoDropoffMode(Mode):
     """

@@ -3,7 +3,7 @@ from rclpy.node import Node
 
 from uav.vehicles.UAV import UAV
 
-from ..Mode import Mode
+from uav.modes.Mode import Mode
 
 
 class NavGPSMode(Mode):

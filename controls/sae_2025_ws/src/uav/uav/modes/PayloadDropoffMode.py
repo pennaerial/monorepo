@@ -8,7 +8,7 @@ from uav.vehicles.UAV import UAV
 from uav.vision_nodes import PayloadTrackingNode
 from uav_interfaces.srv import PayloadTracking
 
-from ..Mode import Mode
+from uav.modes.Mode import Mode
 
 
 class PayloadDropoffMode(Mode):

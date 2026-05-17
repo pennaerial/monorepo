@@ -3,7 +3,7 @@ from px4_msgs.msg import VehicleStatus
 
 from uav.vehicles.UAV import UAV
 
-from ..Mode import Mode
+from uav.modes.Mode import Mode
 
 
 class LandingMode(Mode):

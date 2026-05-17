@@ -1,3 +1,3 @@
-from .vtol.TransitionMode import TransitionMode
+from uav.modes.vtol.TransitionMode import TransitionMode
 
 __all__ = ["TransitionMode"]
