@@ -3,8 +3,14 @@ from importlib import import_module
 __all__ = [
     "PayloadAprilTagApproachMode",
     "PayloadColorStringApproachMode",
+    "PayloadCornerNavigateMode",
+    "PayloadDLZNavigateMode",
     "PayloadDualApproachMode",
+    "PayloadIdleMode",
+    "PayloadPeerFleetTestMode",
     "PayloadRetreatMode",
+    "PayloadScanForTagMode",
+    "PayloadWaitForDriveOutMode",
 ]
 
 
