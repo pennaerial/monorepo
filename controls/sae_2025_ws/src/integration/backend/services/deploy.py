@@ -1473,7 +1473,7 @@ def _local_source_package_names(
     _, _, mission_spec = _mission_source_for(ctx, merged)
     packages = list(_LOCAL_SOURCE_BASE_PACKAGES)
     if mission_spec.target == "payload":
-        packages.append("payload")
+        packages.append("payload_controller")
     return packages
 
 

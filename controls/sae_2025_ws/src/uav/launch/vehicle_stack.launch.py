@@ -443,7 +443,7 @@ def _payload_launch_action(*, vehicle_name: str, controller: str, sim_entity_nam
     return IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(
-                get_package_share_directory("payload"), "launch", "payload.launch.py"
+                get_package_share_directory("payload_controller"), "launch", "payload_controller.launch.py"
             )
         ),
         launch_arguments=launch_arguments.items(),

@@ -1038,7 +1038,7 @@ def test_build_local_source_bundle_scopes_packages_for_target(tmp_path, monkeypa
         "px4_msgs",
         "uav_interfaces",
         "uav",
-        "payload",
+        "payload_controller",
     ):
         package_dir = repo_src / package_name
         package_dir.mkdir(parents=True, exist_ok=True)
@@ -1098,7 +1098,7 @@ def test_build_local_source_bundle_scopes_packages_for_target(tmp_path, monkeypa
         "px4_msgs",
         "uav_interfaces",
         "uav",
-        "payload",
+        "payload_controller",
     ]
     assert bundle_name.startswith("local-codebase-")
 
