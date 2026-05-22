@@ -1,0 +1,18 @@
+backend:
+  kind: real
+
+defaults:
+  auto_launch: false
+  debug: true
+  vision_debug: true
+  debug_vision_node: false
+  save_vision_milliseconds: 0
+  servo_only: false
+  camera_mount_offsets: [0.0, 0.0, 0.0]
+  camera_calibration_file: payload_0_camera_info.yaml
+  camera_preprocess_hook: ""
+
+vehicles:
+  - name: payload_00
+    controllable: payload_00
+    mission: payload_wait_drive_corner

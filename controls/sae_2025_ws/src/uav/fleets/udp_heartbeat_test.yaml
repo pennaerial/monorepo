@@ -1,0 +1,44 @@
+# UDP heartbeat bridge test fleet.
+#
+# Run this independently on each Pi. Change `name` to match the Pi's identity:
+#   Pi 0 → payload_0  (auto-assigns UDP port 5000)
+#   Pi 1 → payload_1  (auto-assigns UDP port 5001)
+#   Pi 2 → payload_2  (auto-assigns UDP port 5002)
+#   ...
+#
+# Launch command (on each Pi):
+#   ros2 launch uav fleet.launch.py \
+#     fleet_file:=$(pwd)/src/uav/uav/fleets/udp_heartbeat_test.yaml
+#
+# Monitor received heartbeats from the other Pi:
+#   ros2 topic echo /payload_0/udp_bridge/in/heartbeat
+#
+# Monitor raw bridge debug traffic:
+#   ros2 topic echo /payload_0/udp_bridge/debug
+
+backend:
+  kind: real
+
+defaults:
+  auto_launch: true
+  debug: true
+  vision_debug: false
+  debug_vision_node: false
+  force_camera: false
+  save_vision_milliseconds: 0
+  servo_only: false
+  camera_input_transport: compressed
+  camera_rotate_degrees: 180.0
+
+vehicles:
+  # Change `name` to match this Pi (payload_0, payload_1, etc.)
+  # The UDP bridge port is auto-assigned from the name: payload_N → 500N.
+  - name: payload_0
+    mission: payload_udp_test
+
+    # udp_port: auto-assigned from vehicle name (payload_0 → 5000).
+    #   Set to 0 to disable, or set explicitly to override.
+    # udp_port: 5000
+    udp_topics:
+      - "heartbeat:payload_interfaces/msg/PayloadHeartbeat"
+    udp_broadcast_ip: "10.42.0.255"

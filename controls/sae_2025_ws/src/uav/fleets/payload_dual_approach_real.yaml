@@ -1,0 +1,21 @@
+backend:
+  kind: real
+  px4_path: ~/PX4-Autopilot
+
+defaults:
+  auto_launch: true
+  debug: true
+  vision_debug: true
+  debug_vision_node: false
+  save_vision_milliseconds: 0
+  servo_only: false
+  camera_mount_offsets: [0.0, 0.0, 0.0]
+  camera_input_transport: compressed
+  # camera_rotate_degrees: 0.0
+  camera_preprocess_hook: ""
+
+vehicles:
+  - name: payload_0
+    controllable: payload_0
+    mission: payload_dual_approach_real
+    # camera_mount_offsets: [0.2, 0.0, 0.0]

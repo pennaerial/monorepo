@@ -1,0 +1,38 @@
+backend:
+  kind: real
+  px4_path: ~/PX4-Autopilot
+
+defaults:
+  auto_launch: true
+  debug: true
+  vision_debug: true
+  debug_vision_node: false
+  save_vision_milliseconds: 0
+  servo_only: false
+  camera_mount_offsets: [0.0, 0.0, 0.0]
+  # camera_input_transport: compressed
+  # camera_rotate_degrees: 0.0
+  camera_preprocess_hook: ""
+
+vehicles:
+  - name: payload_0
+    controllable: payload_0
+    mission: payload_full_run
+    camera_mount_offsets: [0.2, 0.0, 0.0]
+    # UDP bridge auto-assigns port 5000 (payload_0 → 5000+0). Override if needed:
+    # udp_port: 5000
+    # udp_all_ports: [5000, 5001, 5002, 5003]
+    # udp_topics:
+    #   - "heartbeat:payload_interfaces/msg/PayloadHeartbeat"
+    # udp_broadcast_ip: "10.42.0.255"
+
+  - name: payload_1
+    controllable: payload_1
+    mission: payload_full_run
+    camera_mount_offsets: [0.2, 0.0, 0.0]
+    # UDP bridge auto-assigns port 5001 (payload_1 → 5000+1). Override if needed:
+    # udp_port: 5001
+    # udp_all_ports: [5000, 5001, 5002, 5003]
+    # udp_topics:
+    #   - "heartbeat:payload_interfaces/msg/PayloadHeartbeat"
+    # udp_broadcast_ip: "10.42.0.255"
