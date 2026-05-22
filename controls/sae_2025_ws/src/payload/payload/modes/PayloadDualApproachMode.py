@@ -21,14 +21,15 @@ from cv_bridge import CvBridge
 from rclpy.node import Node
 from sensor_msgs.msg import CameraInfo, CompressedImage, Image
 
-from uav.vehicles.Payload import Payload
+from payload.payload import Payload
 from uav.vision_nodes.payload_perception_common import (
     DEFAULT_TAG_FAMILY,
     AprilTagDetectorCache,
     detect_payload_apriltags,
 )
 
-from ..Mode import Mode
+from vehicle_core.mode import Mode
+from vehicle_core.runtime.plugin_loader import register_plugin
 
 
 def _color_blob_info(
@@ -59,6 +60,7 @@ def _color_blob_info(
     return (cx, cy, int(a), bh)
 
 
+@register_plugin(name="payload.PayloadDualApproachMode", base_cls=Mode)
 class PayloadDualApproachMode(Mode):
     """Approach using AprilTag when visible, HSV colour fallback otherwise."""
 

@@ -20,8 +20,9 @@ from sensor_msgs.msg import CompressedImage, Image
 from payload_interfaces.msg import DriveCommand
 from cv_bridge import CvBridge
 
-from ..Mode import Mode
-from uav.vehicles.Payload import Payload
+from vehicle_core.mode import Mode
+from vehicle_core.runtime.plugin_loader import register_plugin
+from payload.payload import Payload
 from uav.vision_nodes import PayloadAprilTagNode
 
 # HSV range for white (high value, low saturation)
@@ -29,6 +30,7 @@ _WHITE_LOWER = np.array([0, 0, 200], dtype=np.uint8)
 _WHITE_UPPER = np.array([180, 30, 255], dtype=np.uint8)
 
 
+@register_plugin(name="payload.PayloadRetreatMode", base_cls=Mode)
 class PayloadRetreatMode(Mode):
     """
     Drive the payload to the edge of the DLZ, then turn 180° to face the center.

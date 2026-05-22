@@ -56,10 +56,11 @@ from cv_bridge import CvBridge
 from rclpy.node import Node
 from sensor_msgs.msg import CompressedImage, Image
 
-from uav.cv.dlz_convex_hull import build_dlz_hull_mask
-from uav.vehicles.Payload import Payload
+from vehicle_core.cv.dlz_convex_hull import build_dlz_hull_mask
+from payload.payload import Payload
 
-from ..Mode import Mode
+from vehicle_core.mode import Mode
+from vehicle_core.runtime.plugin_loader import register_plugin
 
 # Mirrors PayloadColorSquareNode._COLOR_RATIO: when one tape colour has at
 # least this many times more pixels than the other in the line-follow strip,
@@ -67,6 +68,7 @@ from ..Mode import Mode
 _COLOR_DOMINANCE_RATIO = 1.5
 
 
+@register_plugin(name="payload.PayloadCornerNavigateMode", base_cls=Mode)
 class PayloadCornerNavigateMode(Mode):
     mission_target = "payload"
     transition_labels = ("complete",)

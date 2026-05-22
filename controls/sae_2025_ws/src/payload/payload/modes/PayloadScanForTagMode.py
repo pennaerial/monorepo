@@ -9,16 +9,18 @@ from cv_bridge import CvBridge
 from rclpy.node import Node
 from sensor_msgs.msg import CompressedImage, Image
 
-from uav.vehicles.Payload import Payload
+from payload.payload import Payload
 from uav.vision_nodes import PayloadAprilTagNode
 from uav.vision_nodes.payload_perception_common import DEFAULT_TAG_FAMILY
 from uav_interfaces.srv import PayloadAprilTagState
 
-from ..Mode import Mode
+from vehicle_core.mode import Mode
+from vehicle_core.runtime.plugin_loader import register_plugin
 
 _TWO_PI = 2.0 * math.pi
 
 
+@register_plugin(name="payload.PayloadScanForTagMode", base_cls=Mode)
 class PayloadScanForTagMode(Mode):
     """
     Spin in place looking for a specific AprilTag.

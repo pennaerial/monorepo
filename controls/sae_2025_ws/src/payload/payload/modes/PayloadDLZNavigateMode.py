@@ -11,13 +11,14 @@ from cv_bridge import CvBridge
 from rclpy.node import Node
 from sensor_msgs.msg import CompressedImage, Image
 
-from uav.cv.dlz_convex_hull import build_dlz_hull_mask
-from uav.vehicles.Payload import Payload
+from vehicle_core.cv.dlz_convex_hull import build_dlz_hull_mask
+from payload.payload import Payload
 from uav.vision_nodes import PayloadAprilTagNode
 from uav.vision_nodes.payload_perception_common import DEFAULT_TAG_FAMILY
 from uav_interfaces.srv import PayloadAprilTagState
 
-from ..Mode import Mode
+from vehicle_core.mode import Mode
+from vehicle_core.runtime.plugin_loader import register_plugin
 
 # Corner-turn vision thresholds (mirrors PayloadCornerNavigateMode defaults)
 _CORNER_CENTER_TOL_PX = 75.0  # lateral error tolerance (px)
@@ -129,6 +130,7 @@ class TagTransitionRule(TypedDict):
     direction: Literal["cw", "ccw"]
 
 
+@register_plugin(name="payload.PayloadDLZNavigateMode", base_cls=Mode)
 class PayloadDLZNavigateMode(Mode):
     """
     Navigate the payload along the alternating-colour square border of the DLZ.

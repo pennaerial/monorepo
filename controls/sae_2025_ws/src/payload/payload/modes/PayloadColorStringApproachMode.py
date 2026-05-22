@@ -27,9 +27,10 @@ from cv_bridge import CvBridge
 from rclpy.node import Node
 from sensor_msgs.msg import CompressedImage, Image
 
-from uav.vehicles.Payload import Payload
+from payload.payload import Payload
 
-from ..Mode import Mode
+from vehicle_core.mode import Mode
+from vehicle_core.runtime.plugin_loader import register_plugin
 
 
 def _vertical_blob_centroid_area(
@@ -87,6 +88,7 @@ def _vertical_blob_centroid_area(
     return (best_cx, best_cy, best_area_i)
 
 
+@register_plugin(name="payload.PayloadColorStringApproachMode", base_cls=Mode)
 class PayloadColorStringApproachMode(Mode):
     """Drive toward a coloured target using HSV blob detection."""
 

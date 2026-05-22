@@ -32,9 +32,10 @@ from cv_bridge import CvBridge
 from rclpy.node import Node
 from sensor_msgs.msg import CompressedImage, Image
 
-from uav.vehicles.Payload import Payload
+from payload.payload import Payload
 
-from ..Mode import Mode
+from vehicle_core.mode import Mode
+from vehicle_core.runtime.plugin_loader import register_plugin
 
 
 class DriveOutState(Enum):
@@ -45,6 +46,7 @@ class DriveOutState(Enum):
     DONE = 4
 
 
+@register_plugin(name="payload.PayloadWaitForDriveOutMode", base_cls=Mode)
 class PayloadWaitForDriveOutMode(Mode):
     """
     Subscribe to the payload camera and detect when the plane has landed on the

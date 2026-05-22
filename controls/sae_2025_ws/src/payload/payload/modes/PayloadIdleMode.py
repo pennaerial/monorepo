@@ -4,13 +4,14 @@ mission logic."""
 
 from rclpy.node import Node
 
-from uav.vehicles.Payload import Payload
-
-from ..Mode import Mode
+from payload.payload import Payload
+from vehicle_core.mode import Mode
+from vehicle_core.runtime.plugin_loader import register_plugin
 
 _FOREVER = 0.0
 
 
+@register_plugin(name="payload.PayloadIdleMode", base_cls=Mode)
 class PayloadIdleMode(Mode):
     mission_target = "payload"
     required_vision_nodes = ()

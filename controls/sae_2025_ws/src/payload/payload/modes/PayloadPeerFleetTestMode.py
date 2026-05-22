@@ -20,11 +20,13 @@ from typing import Mapping
 from rclpy.node import Node
 from std_msgs.msg import String
 
-from uav.vehicles.Payload import Payload
+from payload.payload import Payload
 
-from ..Mode import Mode
+from vehicle_core.mode import Mode
+from vehicle_core.runtime.plugin_loader import register_plugin
 
 
+@register_plugin(name="payload.PayloadPeerFleetTestMode", base_cls=Mode)
 class PayloadPeerFleetTestMode(Mode):
     """Passive multi-payload communication demo for fleet bring-up."""
 

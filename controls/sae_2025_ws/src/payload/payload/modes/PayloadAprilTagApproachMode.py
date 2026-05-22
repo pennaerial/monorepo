@@ -8,14 +8,16 @@ from sensor_msgs.msg import CameraInfo, CompressedImage, Image
 from cv_bridge import CvBridge
 import cv2
 
-from uav.vehicles.Payload import Payload
+from payload.payload import Payload
+
 from uav.vision_nodes.payload_perception_common import (
     DEFAULT_TAG_FAMILY,
     AprilTagDetectorCache,
     detect_payload_apriltags,
 )
 
-from ..Mode import Mode
+from vehicle_core.mode import Mode
+from vehicle_core.runtime.plugin_loader import register_plugin
 
 
 @dataclass(frozen=True)
@@ -30,6 +32,7 @@ class TagObservation:
     area: float
 
 
+@register_plugin(name="payload.PayloadAprilTagApproachMode", base_cls=Mode)
 class PayloadAprilTagApproachMode(Mode):
     """Drive the payload toward one AprilTag and terminate once close enough."""
 
