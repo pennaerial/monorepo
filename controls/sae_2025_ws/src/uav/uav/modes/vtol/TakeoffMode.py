@@ -8,9 +8,11 @@ from rclpy.node import Node
 from uav.vehicles.UAV import get_nav_state_str
 from uav.vehicles.VTOL import VTOL
 
-from ...Mode import Mode
+from vehicle_core.mode import Mode
+from vehicle_core.runtime.plugin_loader import register_plugin
 
 
+@register_plugin(name="uav.vtol.TakeoffMode", base_cls=Mode)
 class TakeoffMode(Mode):
     """
     A VTOL takeoff mode that supports both vertical and runway-style launches.

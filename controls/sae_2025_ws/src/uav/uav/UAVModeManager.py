@@ -6,9 +6,9 @@ from std_srvs.srv import Trigger
 from uav.vehicles.AirframeClass import AirframeClass
 from uav.vehicles.Multicopter import Multicopter
 from uav.vehicles.VTOL import VTOL
-from uav.modes.uav.LandingMode import LandingMode
-from .ModeManager import ModeManager
-from .mission_spec import MissionSpec
+from uav.modes.LandingMode import LandingMode
+from vehicle_core.mode_manager import ModeManager
+from vehicle_core.runtime.mission_spec import MissionSpec
 
 
 class UAVModeManager(ModeManager):
@@ -59,6 +59,7 @@ class UAVModeManager(ModeManager):
             "vehicle_name": vehicle_name,
         }
 
+        # TODO: use dependency injection here instead
         if vehicle_class == AirframeClass.VTOL:
             self.vehicle = VTOL(self, **vehicle_kwargs)
         else:

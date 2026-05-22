@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import rclpy
 from rclpy.node import Node
 from px4_msgs.msg import TrajectorySetpoint
@@ -9,9 +7,10 @@ from typing import List
 
 from uav.vehicles.UAV import UAV
 
-from uav.modes.Mode import Mode
+from vehicle_core.mode import Mode
+from vehicle_core.runtime.plugin_loader import register_plugin
 
-
+@register_plugin(name="uav.WaypointMission", base_cls=Mode)
 class WaypointMission(Mode):
     """
     Simple waypoint mission for testing scoring node.

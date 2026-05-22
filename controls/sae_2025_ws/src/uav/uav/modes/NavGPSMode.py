@@ -2,10 +2,10 @@ from typing import Literal
 from rclpy.node import Node
 
 from uav.vehicles.UAV import UAV
+from vehicle_core.mode import Mode
+from vehicle_core.runtime.plugin_loader import register_plugin
 
-from uav.modes.Mode import Mode
-
-
+@register_plugin(name="uav.NavGPSMode", base_cls=Mode)
 class NavGPSMode(Mode):
     """
     A mode for navigating to a GPS coordinate

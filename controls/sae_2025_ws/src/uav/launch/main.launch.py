@@ -17,7 +17,7 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.logging import get_logger
 from launch.substitutions import LaunchConfiguration
 
-from uav.runtime.mission_spec import MissionSpec, mission_path_for_name
+from vehicle_core.runtime.mission_spec import MissionSpec, mission_path_for_name
 from uav.utils import find_folder_with_heuristic, get_airframe_details, vehicle_id_dict
 
 
@@ -228,7 +228,7 @@ def _single_vehicle_config(context, params: dict) -> tuple[dict, dict | None]:
     airframe_id = None
     if mission_spec.is_uav:
         airframe_id = _resolve_airframe_id(params.get("airframe", "quadcopter"))
-        vehicle_class, _, airframe_model = get_airframe_details(px4_path, airframe_id)
+        vehicle_class, airframe_model = get_airframe_details(px4_path, airframe_id)
         vehicle_class_name = vehicle_class.name
         if not model:
             model = airframe_model

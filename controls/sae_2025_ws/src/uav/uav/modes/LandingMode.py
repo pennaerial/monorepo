@@ -2,13 +2,13 @@ from rclpy.node import Node
 from px4_msgs.msg import VehicleStatus
 
 from uav.vehicles.UAV import UAV
+from vehicle_core.mode import Mode
+from vehicle_core.runtime.plugin_loader import register_plugin
 
-from uav.modes.Mode import Mode
-
-
+@register_plugin(name="uav.LandingMode", base_cls=Mode)
 class LandingMode(Mode):
     """
-    A mode for taking off vertically.
+    A mode for landing vertically.
     """
 
     mission_target = "uav"

@@ -2,7 +2,7 @@ modes:
   start:
     mode: uav.vtol.TakeoffMode
     params:
-      takeoff_type: horizontal
+      takeoff_type: vertical
     transitions:
       complete: GPS
 

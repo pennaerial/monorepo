@@ -1,7 +1,7 @@
 # payload_tracking_node.py
 import cv2
 import numpy as np
-from uav.cv.tracking import find_payload, compute_3d_vector, rotate_image
+from vehicle_core.cv.tracking import find_payload, compute_3d_vector, rotate_image
 from uav.vision_nodes import VisionNode
 from uav_interfaces.srv import PayloadTracking
 import rclpy

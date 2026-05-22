@@ -17,8 +17,8 @@ from launch.logging import get_logger
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
-from uav.runtime.mission_spec import MissionSpec, mission_path_for_name
-from uav.runtime.vision_loader import load_vision_class
+from vehicle_core.runtime.mission_spec import MissionSpec, mission_path_for_name
+from vehicle_core.runtime.vision_loader import load_vision_class
 from uav.utils import (
     camel_to_snake,
     find_folder_with_heuristic,
@@ -443,7 +443,9 @@ def _payload_launch_action(*, vehicle_name: str, controller: str, sim_entity_nam
     return IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(
-                get_package_share_directory("payload_controller"), "launch", "payload_controller.launch.py"
+                get_package_share_directory("payload_controller"),
+                "launch",
+                "payload_controller.launch.py",
             )
         ),
         launch_arguments=launch_arguments.items(),

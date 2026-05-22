@@ -4,9 +4,12 @@ from typing import Literal
 
 from uav.vehicles.VTOL import VTOL
 
-from ...Mode import Mode
+from vehicle_core.mode import Mode
+
+from vehicle_core.runtime.plugin_loader import register_plugin
 
 
+@register_plugin(name="uav.vtol.TransitionMode", base_cls=Mode)
 class TransitionMode(Mode):
     """
     A VTOL-only mode for transitioning between multicopter and fixed-wing flight.

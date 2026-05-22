@@ -18,8 +18,8 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.logging import get_logger
 from launch.substitutions import LaunchConfiguration
 
-from uav.runtime.fleet_spec import load_fleet_document
-from uav.runtime.mission_spec import MissionSpec, mission_path_for_name
+from vehicle_core.runtime.fleet_spec import load_fleet_document
+from vehicle_core.runtime.mission_spec import MissionSpec, mission_path_for_name
 
 _SHARED_DEFAULT_KEYS = {
     "auto_launch",
