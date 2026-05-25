@@ -15,8 +15,8 @@
   <depend>generate_parameter_library</depend>
   <depend>custom_gz_msgs</depend>
   
-  <build_depend>gz-transport13</build_depend>
-  <build_depend>gz-msgs10</build_depend>
+  <build_depend>gz_transport_vendor</build_depend>
+  <build_depend>gz_msgs_vendor</build_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

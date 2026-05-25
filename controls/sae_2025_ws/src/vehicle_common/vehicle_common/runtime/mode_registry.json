@@ -2844,21 +2844,13 @@
       "param_fields": [
         {
           "annotation": {
-            "kind": "union",
-            "options": [
-              {
-                "item": {
-                  "item": {
-                    "kind": "float"
-                  },
-                  "kind": "list"
-                },
-                "kind": "list"
+            "item": {
+              "item": {
+                "kind": "float"
               },
-              {
-                "kind": "none"
-              }
-            ]
+              "kind": "list"
+            },
+            "kind": "list"
           },
           "default": null,
           "default_kind": "none",
@@ -2926,22 +2918,15 @@
             "type": "number"
           },
           "waypoints": {
-            "anyOf": [
-              {
-                "items": {
-                  "items": {
-                    "type": "number"
-                  },
-                  "type": "array"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
             "default": null,
-            "title": "Waypoints"
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "title": "Waypoints",
+            "type": "array"
           }
         },
         "title": "WaypointMissionParams",
