@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, ClassVar, Generic, Mapping, TypeVar
+from typing import TYPE_CHECKING, Any, ClassVar, Generic, Mapping, Protocol, TypeVar, cast
 
 from rclpy.node import Node
 
@@ -10,6 +10,14 @@ if TYPE_CHECKING:
     from uav.vision_nodes import VisionNode
 
 VehicleT = TypeVar("VehicleT", bound=Vehicle)
+
+
+class _ModeManagerNode(Protocol):
+    def get_vision_client(self, vision_node: type["VisionNode"]) -> Any:
+        ...
+
+    def shared_state_for(self, mode_or_class: object) -> dict[str, Any]:
+        ...
 
 
 class Mode(Generic[VehicleT], ABC):
@@ -53,7 +61,7 @@ class Mode(Generic[VehicleT], ABC):
         """
         pass
 
-    def send_request(self, vision_node: type["VisionNode"], request):
+    def send_request(self, vision_node: type["VisionNode"], request: Any):
         """
         Send a request to a service.
 
@@ -64,7 +72,8 @@ class Mode(Generic[VehicleT], ABC):
         service_name = self.vehicle.vision_service_name(vision_node)
         future = self.pending_requests.get(service_name)
         if future is None:
-            client = self.node.get_vision_client(vision_node)
+            node = cast(_ModeManagerNode, self.node)
+            client = node.get_vision_client(vision_node)
             future = client.call_async(request)
             if future is None:
                 return None
@@ -173,7 +182,7 @@ class Mode(Generic[VehicleT], ABC):
         """
         Return persistent ModeManager-owned state for this mode class.
         """
-        return self.node.shared_state_for(self)
+        return cast(_ModeManagerNode, self.node).shared_state_for(self)
 
     def log(self, message: str) -> None:
         """
