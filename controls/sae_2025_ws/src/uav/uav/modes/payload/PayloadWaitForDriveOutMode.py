@@ -330,8 +330,9 @@ class PayloadWaitForDriveOutMode(Mode[Payload]):
                 )
             elif self._dr_future.done():
                 result = self._dr_future.result()
+                success = bool(result is not None and result.success)
                 self.log(
-                    f"obstruction retreat done success={result.success} — resuming DLZ watch"
+                    f"obstruction retreat done success={success} — resuming DLZ watch"
                 )
                 self._dr_future = None
                 # Reset optical-flow so motion from the retreat doesn't linger
@@ -347,8 +348,9 @@ class PayloadWaitForDriveOutMode(Mode[Payload]):
                 )
             elif self._dr_future.done():
                 result = self._dr_future.result()
+                success = bool(result is not None and result.success)
                 self.log(
-                    f"PayloadWaitForDriveOutMode: reverse done success={result.success} — settling"
+                    f"PayloadWaitForDriveOutMode: reverse done success={success} — settling"
                 )
                 self._dr_future = None
                 self.state = DriveOutState.TURNING
@@ -363,8 +365,9 @@ class PayloadWaitForDriveOutMode(Mode[Payload]):
                 )
             elif self._dr_future.done():
                 result = self._dr_future.result()
+                success = bool(result is not None and result.success)
                 self.log(
-                    f"PayloadWaitForDriveOutMode: turn done success={result.success} — terminating"
+                    f"PayloadWaitForDriveOutMode: turn done success={success} — terminating"
                 )
                 self._dr_future = None
                 self._done = True

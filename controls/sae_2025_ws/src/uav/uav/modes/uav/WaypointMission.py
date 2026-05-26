@@ -5,11 +5,22 @@ from rclpy.node import Node
 from px4_msgs.msg import TrajectorySetpoint
 import math
 import time
-from typing import List
+from typing import Sequence, cast
 
 from uav.vehicles.UAV import UAV
 
 from ..Mode import Mode
+
+Waypoint = tuple[float, float, float]
+
+
+def _coerce_waypoints(waypoints: Sequence[Sequence[float]] | None) -> list[Waypoint]:
+    if waypoints is None:
+        return []
+    return [
+        (float(waypoint[0]), float(waypoint[1]), float(waypoint[2]))
+        for waypoint in waypoints
+    ]
 
 
 class WaypointMission(Mode[UAV]):
@@ -22,7 +33,7 @@ class WaypointMission(Mode[UAV]):
         self,
         node: Node,
         vehicle: UAV,
-        waypoints: List[List[float]] = None,
+        waypoints: Sequence[Sequence[float]] | None = None,
         waypoint_tolerance: float = 0.5,
         speed: float = 1.0,
         loiter_time: float = 1.0,
@@ -31,7 +42,7 @@ class WaypointMission(Mode[UAV]):
         super().__init__(node, vehicle)
 
         # Mission parameters
-        self.waypoints = waypoints or []
+        self.waypoints = _coerce_waypoints(waypoints)
         self.current_waypoint = 0
         self.waypoint_tolerance = waypoint_tolerance
         self.speed = speed
@@ -163,7 +174,7 @@ def main(args=None):
         def arm(self):
             pass
 
-    uav = DummyUAV()
+    uav = cast(UAV, DummyUAV())
 
     # Test waypoints
     test_waypoints = [
