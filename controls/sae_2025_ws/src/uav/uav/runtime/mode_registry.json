@@ -205,10 +205,19 @@
       "param_fields": [
         {
           "annotation": {
-            "item": {
-              "kind": "int"
-            },
-            "kind": "list"
+            "items": [
+              {
+                "kind": "int"
+              },
+              {
+                "kind": "int"
+              },
+              {
+                "kind": "int"
+              }
+            ],
+            "kind": "tuple",
+            "variadic": false
           },
           "default": [
             0,
@@ -221,10 +230,19 @@
         },
         {
           "annotation": {
-            "item": {
-              "kind": "int"
-            },
-            "kind": "list"
+            "items": [
+              {
+                "kind": "int"
+              },
+              {
+                "kind": "int"
+              },
+              {
+                "kind": "int"
+              }
+            ],
+            "kind": "tuple",
+            "variadic": false
           },
           "default": [
             179,
@@ -374,9 +392,19 @@
               0,
               30
             ],
-            "items": {
-              "type": "integer"
-            },
+            "maxItems": 3,
+            "minItems": 3,
+            "prefixItems": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              }
+            ],
             "title": "Lower Hsv",
             "type": "array"
           },
@@ -401,9 +429,19 @@
               40,
               120
             ],
-            "items": {
-              "type": "integer"
-            },
+            "maxItems": 3,
+            "minItems": 3,
+            "prefixItems": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              }
+            ],
             "title": "Upper Hsv",
             "type": "array"
           },
@@ -446,10 +484,19 @@
         },
         {
           "annotation": {
-            "item": {
-              "kind": "int"
-            },
-            "kind": "list"
+            "items": [
+              {
+                "kind": "int"
+              },
+              {
+                "kind": "int"
+              },
+              {
+                "kind": "int"
+              }
+            ],
+            "kind": "tuple",
+            "variadic": false
           },
           "default": [
             0,
@@ -462,10 +509,19 @@
         },
         {
           "annotation": {
-            "item": {
-              "kind": "int"
-            },
-            "kind": "list"
+            "items": [
+              {
+                "kind": "int"
+              },
+              {
+                "kind": "int"
+              },
+              {
+                "kind": "int"
+              }
+            ],
+            "kind": "tuple",
+            "variadic": false
           },
           "default": [
             10,
@@ -478,10 +534,19 @@
         },
         {
           "annotation": {
-            "item": {
-              "kind": "int"
-            },
-            "kind": "list"
+            "items": [
+              {
+                "kind": "int"
+              },
+              {
+                "kind": "int"
+              },
+              {
+                "kind": "int"
+              }
+            ],
+            "kind": "tuple",
+            "variadic": false
           },
           "default": [
             85,
@@ -494,10 +559,19 @@
         },
         {
           "annotation": {
-            "item": {
-              "kind": "int"
-            },
-            "kind": "list"
+            "items": [
+              {
+                "kind": "int"
+              },
+              {
+                "kind": "int"
+              },
+              {
+                "kind": "int"
+              }
+            ],
+            "kind": "tuple",
+            "variadic": false
           },
           "default": [
             140,
@@ -663,10 +737,19 @@
         },
         {
           "annotation": {
-            "item": {
-              "kind": "int"
-            },
-            "kind": "list"
+            "items": [
+              {
+                "kind": "int"
+              },
+              {
+                "kind": "int"
+              },
+              {
+                "kind": "int"
+              }
+            ],
+            "kind": "tuple",
+            "variadic": false
           },
           "default": [
             0,
@@ -679,10 +762,19 @@
         },
         {
           "annotation": {
-            "item": {
-              "kind": "int"
-            },
-            "kind": "list"
+            "items": [
+              {
+                "kind": "int"
+              },
+              {
+                "kind": "int"
+              },
+              {
+                "kind": "int"
+              }
+            ],
+            "kind": "tuple",
+            "variadic": false
           },
           "default": [
             180,
@@ -744,9 +836,19 @@
               80,
               80
             ],
-            "items": {
-              "type": "integer"
-            },
+            "maxItems": 3,
+            "minItems": 3,
+            "prefixItems": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              }
+            ],
             "title": "Ccw Lower Hsv",
             "type": "array"
           },
@@ -756,9 +858,19 @@
               255,
               255
             ],
-            "items": {
-              "type": "integer"
-            },
+            "maxItems": 3,
+            "minItems": 3,
+            "prefixItems": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              }
+            ],
             "title": "Ccw Upper Hsv",
             "type": "array"
           },
@@ -788,9 +900,19 @@
               120,
               60
             ],
-            "items": {
-              "type": "integer"
-            },
+            "maxItems": 3,
+            "minItems": 3,
+            "prefixItems": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              }
+            ],
             "title": "Cw Lower Hsv",
             "type": "array"
           },
@@ -800,9 +922,19 @@
               255,
               255
             ],
-            "items": {
-              "type": "integer"
-            },
+            "maxItems": 3,
+            "minItems": 3,
+            "prefixItems": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              }
+            ],
             "title": "Cw Upper Hsv",
             "type": "array"
           },
@@ -887,9 +1019,19 @@
               0,
               0
             ],
-            "items": {
-              "type": "integer"
-            },
+            "maxItems": 3,
+            "minItems": 3,
+            "prefixItems": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              }
+            ],
             "title": "Tape Align Lower Hsv",
             "type": "array"
           },
@@ -909,9 +1051,19 @@
               255,
               60
             ],
-            "items": {
-              "type": "integer"
-            },
+            "maxItems": 3,
+            "minItems": 3,
+            "prefixItems": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              }
+            ],
             "title": "Tape Align Upper Hsv",
             "type": "array"
           }
@@ -1125,10 +1277,19 @@
         },
         {
           "annotation": {
-            "item": {
-              "kind": "int"
-            },
-            "kind": "list"
+            "items": [
+              {
+                "kind": "int"
+              },
+              {
+                "kind": "int"
+              },
+              {
+                "kind": "int"
+              }
+            ],
+            "kind": "tuple",
+            "variadic": false
           },
           "default": [
             0,
@@ -1141,10 +1302,19 @@
         },
         {
           "annotation": {
-            "item": {
-              "kind": "int"
-            },
-            "kind": "list"
+            "items": [
+              {
+                "kind": "int"
+              },
+              {
+                "kind": "int"
+              },
+              {
+                "kind": "int"
+              }
+            ],
+            "kind": "tuple",
+            "variadic": false
           },
           "default": [
             10,
@@ -1157,10 +1327,19 @@
         },
         {
           "annotation": {
-            "item": {
-              "kind": "int"
-            },
-            "kind": "list"
+            "items": [
+              {
+                "kind": "int"
+              },
+              {
+                "kind": "int"
+              },
+              {
+                "kind": "int"
+              }
+            ],
+            "kind": "tuple",
+            "variadic": false
           },
           "default": [
             85,
@@ -1173,10 +1352,19 @@
         },
         {
           "annotation": {
-            "item": {
-              "kind": "int"
-            },
-            "kind": "list"
+            "items": [
+              {
+                "kind": "int"
+              },
+              {
+                "kind": "int"
+              },
+              {
+                "kind": "int"
+              }
+            ],
+            "kind": "tuple",
+            "variadic": false
           },
           "default": [
             140,
@@ -1189,10 +1377,19 @@
         },
         {
           "annotation": {
-            "item": {
-              "kind": "int"
-            },
-            "kind": "list"
+            "items": [
+              {
+                "kind": "int"
+              },
+              {
+                "kind": "int"
+              },
+              {
+                "kind": "int"
+              }
+            ],
+            "kind": "tuple",
+            "variadic": false
           },
           "default": [
             255,
@@ -1205,10 +1402,19 @@
         },
         {
           "annotation": {
-            "item": {
-              "kind": "int"
-            },
-            "kind": "list"
+            "items": [
+              {
+                "kind": "int"
+              },
+              {
+                "kind": "int"
+              },
+              {
+                "kind": "int"
+              }
+            ],
+            "kind": "tuple",
+            "variadic": false
           },
           "default": [
             255,
@@ -1254,9 +1460,19 @@
               80,
               80
             ],
-            "items": {
-              "type": "integer"
-            },
+            "maxItems": 3,
+            "minItems": 3,
+            "prefixItems": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              }
+            ],
             "title": "Ccw Lower Hsv",
             "type": "array"
           },
@@ -1266,9 +1482,19 @@
               255,
               255
             ],
-            "items": {
-              "type": "integer"
-            },
+            "maxItems": 3,
+            "minItems": 3,
+            "prefixItems": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              }
+            ],
             "title": "Ccw Upper Hsv",
             "type": "array"
           },
@@ -1288,9 +1514,19 @@
               120,
               60
             ],
-            "items": {
-              "type": "integer"
-            },
+            "maxItems": 3,
+            "minItems": 3,
+            "prefixItems": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              }
+            ],
             "title": "Cw Lower Hsv",
             "type": "array"
           },
@@ -1300,9 +1536,19 @@
               255,
               255
             ],
-            "items": {
-              "type": "integer"
-            },
+            "maxItems": 3,
+            "minItems": 3,
+            "prefixItems": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              }
+            ],
             "title": "Cw Lower Hsv2",
             "type": "array"
           },
@@ -1312,9 +1558,19 @@
               255,
               255
             ],
-            "items": {
-              "type": "integer"
-            },
+            "maxItems": 3,
+            "minItems": 3,
+            "prefixItems": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              }
+            ],
             "title": "Cw Upper Hsv",
             "type": "array"
           },
@@ -1324,9 +1580,19 @@
               255,
               255
             ],
-            "items": {
-              "type": "integer"
-            },
+            "maxItems": 3,
+            "minItems": 3,
+            "prefixItems": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              }
+            ],
             "title": "Cw Upper Hsv2",
             "type": "array"
           },
@@ -1514,10 +1780,19 @@
         },
         {
           "annotation": {
-            "item": {
-              "kind": "int"
-            },
-            "kind": "list"
+            "items": [
+              {
+                "kind": "int"
+              },
+              {
+                "kind": "int"
+              },
+              {
+                "kind": "int"
+              }
+            ],
+            "kind": "tuple",
+            "variadic": false
           },
           "default": [
             20,
@@ -1530,10 +1805,19 @@
         },
         {
           "annotation": {
-            "item": {
-              "kind": "int"
-            },
-            "kind": "list"
+            "items": [
+              {
+                "kind": "int"
+              },
+              {
+                "kind": "int"
+              },
+              {
+                "kind": "int"
+              }
+            ],
+            "kind": "tuple",
+            "variadic": false
           },
           "default": [
             35,
@@ -1679,9 +1963,19 @@
               100,
               100
             ],
-            "items": {
-              "type": "integer"
-            },
+            "maxItems": 3,
+            "minItems": 3,
+            "prefixItems": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              }
+            ],
             "title": "Lower Hsv",
             "type": "array"
           },
@@ -1748,9 +2042,19 @@
               255,
               255
             ],
-            "items": {
-              "type": "integer"
-            },
+            "maxItems": 3,
+            "minItems": 3,
+            "prefixItems": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              }
+            ],
             "title": "Upper Hsv",
             "type": "array"
           }
@@ -2168,10 +2472,19 @@
       "param_fields": [
         {
           "annotation": {
-            "item": {
-              "kind": "int"
-            },
-            "kind": "list"
+            "items": [
+              {
+                "kind": "int"
+              },
+              {
+                "kind": "int"
+              },
+              {
+                "kind": "int"
+              }
+            ],
+            "kind": "tuple",
+            "variadic": false
           },
           "default": [
             5,
@@ -2184,10 +2497,19 @@
         },
         {
           "annotation": {
-            "item": {
-              "kind": "int"
-            },
-            "kind": "list"
+            "items": [
+              {
+                "kind": "int"
+              },
+              {
+                "kind": "int"
+              },
+              {
+                "kind": "int"
+              }
+            ],
+            "kind": "tuple",
+            "variadic": false
           },
           "default": [
             20,
@@ -2335,9 +2657,19 @@
               120,
               120
             ],
-            "items": {
-              "type": "integer"
-            },
+            "maxItems": 3,
+            "minItems": 3,
+            "prefixItems": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              }
+            ],
             "title": "Dlz Color Lower Hsv",
             "type": "array"
           },
@@ -2352,9 +2684,19 @@
               255,
               255
             ],
-            "items": {
-              "type": "integer"
-            },
+            "maxItems": 3,
+            "minItems": 3,
+            "prefixItems": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              }
+            ],
             "title": "Dlz Color Upper Hsv",
             "type": "array"
           },

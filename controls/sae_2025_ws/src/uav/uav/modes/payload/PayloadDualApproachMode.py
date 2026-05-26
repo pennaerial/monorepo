@@ -79,8 +79,8 @@ class PayloadDualApproachMode(Mode[Payload]):
         tag_angular_gain: float = 0.003,
         tag_yaw_gain: float = 0.6,
         # --- Colour params ---
-        lower_hsv: list[int] = (20, 100, 100),
-        upper_hsv: list[int] = (35, 255, 255),
+        lower_hsv: tuple[int, int, int] = (20, 100, 100),
+        upper_hsv: tuple[int, int, int] = (35, 255, 255),
         color_forward_speed: float = 0.015,
         color_angular_gain: float = 0.003,
         color_centering_threshold_px: int = 15,

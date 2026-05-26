@@ -77,10 +77,10 @@ class PayloadCornerNavigateMode(Mode[Payload]):
         vehicle: Payload,
         direction: str = "ccw",
         # HSV color ranges — ccw=color A, cw=color B
-        ccw_lower_hsv: list[int] = (0, 80, 80),
-        ccw_upper_hsv: list[int] = (10, 255, 255),
-        cw_lower_hsv: list[int] = (85, 120, 60),
-        cw_upper_hsv: list[int] = (140, 255, 255),
+        ccw_lower_hsv: tuple[int, int, int] = (0, 80, 80),
+        ccw_upper_hsv: tuple[int, int, int] = (10, 255, 255),
+        cw_lower_hsv: tuple[int, int, int] = (85, 120, 60),
+        cw_upper_hsv: tuple[int, int, int] = (140, 255, 255),
         # DRIVE_OUT
         drive_out_speed_mps: float = 0.12,
         detect_frames: int = 3,
@@ -102,8 +102,8 @@ class PayloadCornerNavigateMode(Mode[Payload]):
         k_d: float = 0.001,
         max_angular: float = 0.5,
         # TAPE_ALIGN — rotate until diagonal black-tape centroid is centered
-        tape_align_lower_hsv: list[int] = (0, 0, 0),
-        tape_align_upper_hsv: list[int] = (180, 255, 60),
+        tape_align_lower_hsv: tuple[int, int, int] = (0, 0, 0),
+        tape_align_upper_hsv: tuple[int, int, int] = (180, 255, 60),
         tape_align_angular_speed: float = 0.6,
         tape_align_center_tol_px: float = 20.0,
         tape_align_min_pixels: int = 100,

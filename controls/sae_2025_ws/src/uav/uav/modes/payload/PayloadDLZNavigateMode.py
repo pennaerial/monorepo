@@ -194,12 +194,12 @@ class PayloadDLZNavigateMode(Mode[Payload]):
         compressed_image: bool = False,
         # HSV bounds — same semantics as PayloadCornerNavigateMode. Defaults
         # match that mode (ccw=red, cw=blue) so calibrations can be shared.
-        ccw_lower_hsv: list[int] = (0, 80, 80),
-        ccw_upper_hsv: list[int] = (10, 255, 255),
-        cw_lower_hsv: list[int] = (85, 120, 60),
-        cw_upper_hsv: list[int] = (140, 255, 255),
-        cw_lower_hsv2: list[int] = (255, 255, 255),
-        cw_upper_hsv2: list[int] = (255, 255, 255),
+        ccw_lower_hsv: tuple[int, int, int] = (0, 80, 80),
+        ccw_upper_hsv: tuple[int, int, int] = (10, 255, 255),
+        cw_lower_hsv: tuple[int, int, int] = (85, 120, 60),
+        cw_upper_hsv: tuple[int, int, int] = (140, 255, 255),
+        cw_lower_hsv2: tuple[int, int, int] = (255, 255, 255),
+        cw_upper_hsv2: tuple[int, int, int] = (255, 255, 255),
     ):
         super().__init__(node, vehicle)
         direction = str(direction).lower().strip()

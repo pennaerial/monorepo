@@ -24,7 +24,7 @@ from __future__ import annotations
 import math
 from collections import deque
 from enum import Enum
-from typing import Optional, List
+from typing import Optional
 
 import cv2
 import numpy as np
@@ -64,8 +64,8 @@ class PayloadWaitForDriveOutMode(Mode[Payload]):
         node: Node,
         vehicle: Payload,
         # DLZ color detection
-        dlz_color_lower_hsv: List[int] = (5, 120, 120),
-        dlz_color_upper_hsv: List[int] = (20, 255, 255),
+        dlz_color_lower_hsv: tuple[int, int, int] = (5, 120, 120),
+        dlz_color_upper_hsv: tuple[int, int, int] = (20, 255, 255),
         dlz_color_pixel_threshold: float = 0.04,
         # Stillness detection (optical flow)
         stillness_threshold: float = 2.0,
