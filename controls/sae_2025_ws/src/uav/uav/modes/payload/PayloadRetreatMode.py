@@ -11,7 +11,7 @@ Designed for a white DLZ on a green/grass background. No AprilTag library requir
 """
 
 import math
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union
 
 import cv2
 import numpy as np
@@ -81,7 +81,7 @@ class PayloadRetreatMode(Mode[Payload]):
         self._image_sub = None
         self._info_sub = None
         self._drive_pub = None
-        self._image: Optional[object] = None
+        self._image: Optional[Union[CompressedImage, Image]] = None
 
         self._phase: str = "drive_to_edge"
         self._edge_stable_count: int = 0
@@ -126,15 +126,16 @@ class PayloadRetreatMode(Mode[Payload]):
         self.node.destroy_publisher(self._drive_pub)
 
     def on_update(self, time_delta: float) -> None:
-        if self._done or self._image is None:
+        image = self._image
+        if self._done or image is None:
             return
 
         try:
-            if self.compressed_image:
-                buf = np.frombuffer(self._image.data, dtype=np.uint8)
+            if isinstance(image, CompressedImage):
+                buf = np.frombuffer(image.data, dtype=np.uint8)
                 bgr = cv2.imdecode(buf, cv2.IMREAD_COLOR)
             else:
-                bgr = self._bridge.imgmsg_to_cv2(self._image, desired_encoding="bgr8")
+                bgr = self._bridge.imgmsg_to_cv2(image, desired_encoding="bgr8")
         except Exception as exc:
             self.node.get_logger().warn(
                 f"PayloadRetreatMode: image decode failed: {exc}"
@@ -205,7 +206,7 @@ class PayloadRetreatMode(Mode[Payload]):
     # ROS callbacks
     # ------------------------------------------------------------------
 
-    def _image_cb(self, msg) -> None:
+    def _image_cb(self, msg: Union[CompressedImage, Image]) -> None:
         self._image = msg
 
     # ------------------------------------------------------------------

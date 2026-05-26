@@ -15,7 +15,7 @@ operator verifies peer discovery, disconnect handling, and reconnect behavior.
 from __future__ import annotations
 
 import json
-from typing import Mapping
+from typing import Callable, Mapping
 
 from rclpy.node import Node
 from std_msgs.msg import String
@@ -69,9 +69,7 @@ class PayloadPeerFleetTestMode(Mode[Payload]):
             peer_name: self.node.create_subscription(
                 String,
                 vehicle.namespaced_path(local_topic, namespace=f"/{peer_name}"),
-                lambda message, peer_name=peer_name: self._on_peer_message(
-                    peer_name, message
-                ),
+                self._peer_message_callback(peer_name),
                 10,
             )
             for peer_name in self._peer_names
@@ -106,6 +104,12 @@ class PayloadPeerFleetTestMode(Mode[Payload]):
         self._peer_message_counts[peer_name] = (
             self._peer_message_counts.get(peer_name, 0) + 1
         )
+
+    def _peer_message_callback(self, peer_name: str) -> Callable[[String], None]:
+        def callback(message: String) -> None:
+            self._on_peer_message(peer_name, message)
+
+        return callback
 
     def _on_shared_message(self, message: String) -> None:
         self._shared_message_count += 1
