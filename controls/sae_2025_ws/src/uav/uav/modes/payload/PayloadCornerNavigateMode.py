@@ -48,7 +48,7 @@ LINE_FOLLOW
 from __future__ import annotations
 
 import math
-from typing import Optional, Tuple
+from typing import Any, Optional, Tuple, cast
 
 import cv2
 import numpy as np
@@ -909,9 +909,9 @@ class PayloadCornerNavigateMode(Mode[Payload]):
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         if not contours:
             return
-        shift = np.array([[[x_offset, y_offset]]])
-        shifted = [c + shift for c in contours]
-        cv2.drawContours(debug, shifted, -1, color, thickness)
+        shift = np.array([[[x_offset, y_offset]]], dtype=np.int32)
+        shifted = [np.asarray(contour, dtype=np.int32) + shift for contour in contours]
+        cv2.drawContours(debug, cast(Any, shifted), -1, color, thickness)
 
     def _put_label(
         self,

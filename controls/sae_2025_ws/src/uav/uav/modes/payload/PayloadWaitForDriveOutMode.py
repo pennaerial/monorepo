@@ -178,8 +178,13 @@ class PayloadWaitForDriveOutMode(Mode[Payload]):
             self._prev_gray = gray
             return True
 
-        next_pts, status, _ = cv2.calcOpticalFlowPyrLK(self._prev_gray, gray, pts, None)
+        next_pts, status, _ = cv2.calcOpticalFlowPyrLK(
+            self._prev_gray, gray, pts, pts.copy()
+        )
         self._prev_gray = gray
+
+        if next_pts is None or status is None:
+            return True
 
         good = status.ravel() == 1
         if good.sum() == 0:

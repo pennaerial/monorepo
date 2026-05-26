@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from typing import Literal, Optional, Tuple
+from typing import Literal, Optional, Sequence, Tuple
 
 from typing_extensions import TypedDict
 
@@ -122,6 +122,15 @@ def _detect_tape_following(
         boundary_angle = 0.0
 
     return True, lateral_error_px, boundary_angle
+
+
+def _shift_contours(
+    contours: Sequence[object],
+    x_offset: int,
+    y_offset: int,
+) -> list[np.ndarray]:
+    shift = np.array([[[x_offset, y_offset]]], dtype=np.int32)
+    return [np.asarray(contour, dtype=np.int32) + shift for contour in contours]
 
 
 class TagTransitionRule(TypedDict):
@@ -306,8 +315,9 @@ class PayloadDLZNavigateMode(Mode[Payload]):
         color: str,
     ) -> np.ndarray:
         if color == "A":
-            mask = cv2.inRange(hsv, self._lower_a, self._upper_a) | cv2.inRange(
-                hsv, self._lower_a2, self._upper_a2
+            mask = cv2.bitwise_or(
+                cv2.inRange(hsv, self._lower_a, self._upper_a),
+                cv2.inRange(hsv, self._lower_a2, self._upper_a2),
             )
         else:
             mask = cv2.inRange(hsv, self._lower_b, self._upper_b)
@@ -679,9 +689,14 @@ class PayloadDLZNavigateMode(Mode[Payload]):
 
         # Contours of the single expected-colour mask — exactly what the
         # detector thresholded on for the centroid.
-        shift = np.array([[[col_start, row_start]]])
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        cv2.drawContours(debug, [c + shift for c in contours], -1, (255, 255, 255), 2)
+        cv2.drawContours(
+            debug,
+            _shift_contours(contours, col_start, row_start),
+            -1,
+            (255, 255, 255),
+            2,
+        )
 
         # Crop boundary (top row, left+right columns) — middle-third bottom-40%.
         col_end = w - col_start
@@ -999,7 +1014,7 @@ class PayloadDLZNavigateMode(Mode[Payload]):
 
         # Draw contours of the target colour mask (offset by the crop origin).
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        shifted = [c + np.array([[[col_start, row_start]]]) for c in contours]
+        shifted = _shift_contours(contours, col_start, row_start)
         cv2.drawContours(debug, shifted, -1, (255, 255, 255), 2)
 
         # Crop boundary — bottom third of the frame, full width.
@@ -1110,13 +1125,13 @@ class PayloadDLZNavigateMode(Mode[Payload]):
         orange_contours, _ = cv2.findContours(
             orange_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
         )
-        shifted_orange = [c + np.array([[[0, strip_start]]]) for c in orange_contours]
+        shifted_orange = _shift_contours(orange_contours, 0, strip_start)
         cv2.drawContours(debug, shifted_orange, -1, (255, 255, 255), 2)
 
         blue_contours, _ = cv2.findContours(
             blue_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
         )
-        shifted_blue = [c + np.array([[[0, strip_start]]]) for c in blue_contours]
+        shifted_blue = _shift_contours(blue_contours, 0, strip_start)
         cv2.drawContours(debug, shifted_blue, -1, (255, 255, 255), 2)
 
         # Strip boundary line

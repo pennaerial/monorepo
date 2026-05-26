@@ -7,6 +7,7 @@ from rclpy.node import Node
 from sensor_msgs.msg import CameraInfo, CompressedImage, Image
 from cv_bridge import CvBridge
 import cv2
+import numpy as np
 
 from uav.vehicles.Payload import Payload
 from uav.vision_nodes.payload_perception_common import (
@@ -104,7 +105,7 @@ class PayloadAprilTagApproachMode(Mode[Payload]):
         if self._latest_camera_info is None:
             self._latest_camera_info = msg
 
-    def _get_bgr_frame(self) -> Optional[object]:
+    def _get_bgr_frame(self) -> Optional[np.ndarray]:
         msg = self._latest_image
         if msg is None:
             return None
