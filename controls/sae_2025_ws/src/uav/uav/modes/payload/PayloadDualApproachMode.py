@@ -140,8 +140,13 @@ class PayloadDualApproachMode(Mode[Payload]):
         else:
             self.node.create_subscription(Image, cam_topic, self._on_image, 1)
 
+        camera_info_topic = vehicle.camera_info_topic
+        if camera_info_topic is None:
+            raise RuntimeError(
+                f"Vehicle '{vehicle.name}' does not expose a camera info topic."
+            )
         self.node.create_subscription(
-            CameraInfo, vehicle.camera_info_topic, self._on_camera_info, 1
+            CameraInfo, camera_info_topic, self._on_camera_info, 1
         )
 
         self._debug_pub = None

@@ -118,15 +118,19 @@ class PayloadWaitForDriveOutMode(Mode[Payload]):
                 1,
             )
 
+        image_topic = vehicle.image_topic
+        if image_topic is None:
+            raise RuntimeError(f"Vehicle '{vehicle.name}' does not expose an image topic.")
+
         if self._compressed:
             self.node.create_subscription(
                 CompressedImage,
-                f"{vehicle.image_topic}/compressed",
+                f"{image_topic}/compressed",
                 self._on_compressed_image,
                 1,
             )
         else:
-            self.node.create_subscription(Image, vehicle.image_topic, self._on_image, 1)
+            self.node.create_subscription(Image, image_topic, self._on_image, 1)
 
         self._done = False
         self._clear_since: Optional[float] = None

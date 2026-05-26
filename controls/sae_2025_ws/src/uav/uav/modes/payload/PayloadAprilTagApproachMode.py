@@ -72,18 +72,27 @@ class PayloadAprilTagApproachMode(Mode[Payload]):
         self._detector_cache = AprilTagDetectorCache()
         self._detector = self._detector_cache.get(self.tag_family)
 
+        image_topic = vehicle.image_topic
+        if image_topic is None:
+            raise RuntimeError(f"Vehicle '{vehicle.name}' does not expose an image topic.")
+        camera_info_topic = vehicle.camera_info_topic
+        if camera_info_topic is None:
+            raise RuntimeError(
+                f"Vehicle '{vehicle.name}' does not expose a camera info topic."
+            )
+
         if bool(compressed):
             self.node.create_subscription(
                 CompressedImage,
-                f"{vehicle.image_topic}/compressed",
+                f"{image_topic}/compressed",
                 self._on_compressed_image,
                 1,
             )
         else:
-            self.node.create_subscription(Image, vehicle.image_topic, self._on_image, 1)
+            self.node.create_subscription(Image, image_topic, self._on_image, 1)
 
         self.node.create_subscription(
-            CameraInfo, vehicle.camera_info_topic, self._on_camera_info, 1
+            CameraInfo, camera_info_topic, self._on_camera_info, 1
         )
 
         self._done = False
