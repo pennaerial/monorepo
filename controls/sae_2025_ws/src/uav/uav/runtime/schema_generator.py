@@ -62,9 +62,14 @@ def _iter_mode_classes() -> list[type[Mode[Any]]]:
             )
             continue
         for value in vars(module).values():
+            if not isinstance(value, type):
+                continue
+            try:
+                is_mode_class = issubclass(value, Mode)
+            except TypeError:
+                continue
             if (
-                isinstance(value, type)
-                and issubclass(value, Mode)
+                is_mode_class
                 and value is not Mode
                 and not inspect.isabstract(value)
                 and value.__module__ == module.__name__
