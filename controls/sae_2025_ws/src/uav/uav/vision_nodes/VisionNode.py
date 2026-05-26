@@ -1,4 +1,5 @@
 import os
+from typing import Any, ClassVar
 import uuid
 
 import cv2
@@ -19,6 +20,8 @@ class VisionNode(Node):
     Provides an interface for handling image streams, processing frames,
     and managing vision-based tasks such as tracking and calibration.
     """
+
+    srv: ClassVar[Any]
 
     @classmethod
     def node_name(cls):
