@@ -122,8 +122,10 @@ class PayloadRetreatMode(Mode[Payload]):
         self._publish_drive(0.0, 0.0)
         if self.camera_debug:
             cv2.destroyWindow("PayloadRetreatMode")
-        self.node.destroy_subscription(self._image_sub)
-        self.node.destroy_publisher(self._drive_pub)
+        if self._image_sub is not None:
+            self.node.destroy_subscription(self._image_sub)
+        if self._drive_pub is not None:
+            self.node.destroy_publisher(self._drive_pub)
 
     def on_update(self, time_delta: float) -> None:
         if self._done or self._image is None:
