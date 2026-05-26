@@ -48,7 +48,7 @@ LINE_FOLLOW
 from __future__ import annotations
 
 import math
-from typing import Optional, Tuple
+from typing import Optional, Tuple, cast
 
 import cv2
 import numpy as np
@@ -60,6 +60,7 @@ from uav.cv.dlz_convex_hull import build_dlz_hull_mask
 from uav.vehicles.Payload import Payload
 
 from ..Mode import Mode
+from .dlz_navigation_state import DLZDirection, set_dlz_navigation_direction
 
 # Mirrors PayloadColorSquareNode._COLOR_RATIO: when one tape colour has at
 # least this many times more pixels than the other in the line-follow strip,
@@ -113,7 +114,7 @@ class PayloadCornerNavigateMode(Mode[Payload]):
         direction = str(direction).lower().strip()
         if direction not in ("cw", "ccw"):
             raise ValueError(f"direction must be 'cw' or 'ccw', got {direction!r}")
-        self.direction = direction
+        self.direction: DLZDirection = cast(DLZDirection, direction)
 
         self._lower_a = np.array(ccw_lower_hsv, dtype=np.uint8)
         self._upper_a = np.array(ccw_upper_hsv, dtype=np.uint8)
@@ -257,9 +258,7 @@ class PayloadCornerNavigateMode(Mode[Payload]):
         if self._annotated_pub is not None:
             self.node.destroy_publisher(self._annotated_pub)
             self._annotated_pub = None
-        # Expose the resolved travel direction for downstream modes, matching
-        # the convention used by PayloadDLZNavigateMode.on_exit.
-        self.node.dlz_navigate_direction = self.direction
+        set_dlz_navigation_direction(self.node, self.direction)
 
     # ------------------------------------------------------------------
     # ROS callbacks

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from typing import Literal, Optional, Tuple
+from typing import Literal, Optional, Tuple, cast
 
 from typing_extensions import TypedDict
 
@@ -18,6 +18,11 @@ from uav.vision_nodes.payload_perception_common import DEFAULT_TAG_FAMILY
 from uav_interfaces.srv import PayloadAprilTagState
 
 from ..Mode import Mode
+from .dlz_navigation_state import (
+    DLZDirection,
+    DLZStartPhase,
+    set_dlz_navigation_direction,
+)
 
 # Corner-turn vision thresholds (mirrors PayloadCornerNavigateMode defaults)
 _CORNER_CENTER_TOL_PX = 75.0  # lateral error tolerance (px)
@@ -173,7 +178,7 @@ class PayloadDLZNavigateMode(Mode[Payload]):
         self,
         node: Node,
         vehicle: Payload,
-        direction: Literal["cw", "ccw"] = "ccw",
+        direction: DLZDirection = "ccw",
         target_transitions: int = 1,
         turn_angular_speed: float = 0.5,
         corner_angular_speed: float = 0.3,
@@ -186,9 +191,7 @@ class PayloadDLZNavigateMode(Mode[Payload]):
         tag_transition_table: dict[str, TagTransitionRule] | None = None,
         detect_frames: int = 5,
         scan_duration_s: float = 1.0,
-        start_phase: Literal[
-            "wait_for_plane", "scan_tags", "line_follow"
-        ] = "wait_for_plane",
+        start_phase: DLZStartPhase = "wait_for_plane",
         tag_size_m: float = 0.0508,
         tag_family: str = DEFAULT_TAG_FAMILY,
         compressed_image: bool = False,
@@ -202,18 +205,21 @@ class PayloadDLZNavigateMode(Mode[Payload]):
         cw_upper_hsv2: list[int] = (255, 255, 255),
     ):
         super().__init__(node, vehicle)
-        direction = str(direction).lower().strip()
-        if direction not in ("cw", "ccw"):
-            raise ValueError(f"direction must be 'cw' or 'ccw', got {direction!r}")
-        start_phase = str(start_phase).lower().strip()
-        if start_phase not in _VALID_START_PHASES:
+        direction_value = str(direction).lower().strip()
+        if direction_value not in ("cw", "ccw"):
             raise ValueError(
-                f"start_phase must be one of {_VALID_START_PHASES}, got {start_phase!r}"
+                f"direction must be 'cw' or 'ccw', got {direction_value!r}"
+            )
+        start_phase_value = str(start_phase).lower().strip()
+        if start_phase_value not in _VALID_START_PHASES:
+            raise ValueError(
+                f"start_phase must be one of {_VALID_START_PHASES}, got {start_phase_value!r}"
             )
 
         # Fallback defaults (overwritten by table lookup at runtime)
-        self._default_direction = direction
+        self._default_direction: DLZDirection = cast(DLZDirection, direction_value)
         self._default_target_transitions = int(target_transitions)
+        self.direction: DLZDirection = self._default_direction
 
         self.turn_angular_speed = float(turn_angular_speed)
         self.corner_angular_speed = float(corner_angular_speed)
@@ -226,7 +232,7 @@ class PayloadDLZNavigateMode(Mode[Payload]):
         self.tag_transition_table = dict(tag_transition_table or {})
         self.detect_frames = int(detect_frames)
         self.scan_duration_s = float(scan_duration_s)
-        self.start_phase = start_phase
+        self.start_phase = cast(DLZStartPhase, start_phase_value)
         self.tag_size_m = float(tag_size_m)
         self.tag_family = str(tag_family) if tag_family else DEFAULT_TAG_FAMILY
         self.compressed_image = bool(compressed_image)
@@ -359,7 +365,7 @@ class PayloadDLZNavigateMode(Mode[Payload]):
                 f"PayloadDLZNavigateMode: annotated publish failed: {exc}"
             )
 
-    def _match_table(self, seen_ids: set[int]) -> Optional[dict]:
+    def _match_table(self, seen_ids: set[int]) -> Optional[TagTransitionRule]:
         """
         Match seen tag IDs against tag_transition_table.
         Key format: comma-separated AND-groups, each group pipe-separated ORs.
@@ -456,9 +462,7 @@ class PayloadDLZNavigateMode(Mode[Payload]):
         if self._annotated_pub is not None:
             self.node.destroy_publisher(self._annotated_pub)
             self._annotated_pub = None
-        # Expose the resolved travel direction so PayloadScanForTagMode can
-        # spin in the same direction as the DLZ navigation just travelled.
-        self.node.dlz_navigate_direction = self.direction
+        set_dlz_navigation_direction(self.node, self.direction)
 
     # ------------------------------------------------------------------
     # Phase: WAIT_FOR_PLANE
@@ -513,7 +517,12 @@ class PayloadDLZNavigateMode(Mode[Payload]):
         )
         entry = self._match_table(self._seen_tag_ids)
         if entry is not None:
-            self.direction = str(entry["direction"]).lower().strip()
+            entry_direction = str(entry["direction"]).lower().strip()
+            if entry_direction not in ("cw", "ccw"):
+                raise ValueError(
+                    f"tag_transition_table direction must be 'cw' or 'ccw', got {entry_direction!r}"
+                )
+            self.direction = cast(DLZDirection, entry_direction)
             self.target_transitions = int(entry["transitions"])
             self.log(
                 f"PayloadDLZNavigateMode: table match → direction={self.direction}  "

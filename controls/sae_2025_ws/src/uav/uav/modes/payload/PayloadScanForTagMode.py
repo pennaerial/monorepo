@@ -15,6 +15,7 @@ from uav.vision_nodes.payload_perception_common import DEFAULT_TAG_FAMILY
 from uav_interfaces.srv import PayloadAprilTagState
 
 from ..Mode import Mode
+from .dlz_navigation_state import get_dlz_navigation_direction
 
 _TWO_PI = 2.0 * math.pi
 
@@ -60,7 +61,7 @@ class PayloadScanForTagMode(Mode[Payload]):
         # Match spin direction to however PayloadDLZNavigateMode was travelling.
         # CCW travel → positive angular (spin left/CCW).
         # CW  travel → negative angular (spin right/CW).
-        nav_direction = getattr(self.node, "dlz_navigate_direction", None)
+        nav_direction = get_dlz_navigation_direction(self.node)
         if nav_direction == "cw":
             self._signed_spin_speed = -self.spin_angular_speed
         else:
