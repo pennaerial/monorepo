@@ -5,7 +5,7 @@ import inspect
 import os
 from pathlib import Path
 from time import time
-from typing import Any, Callable, Iterator, get_type_hints
+from typing import Any, Callable, Iterator, cast, get_type_hints
 
 from rclpy.node import Node
 from std_srvs.srv import Trigger
@@ -57,10 +57,10 @@ class ModeManager(Node):
         peer_stale_timeout_s: float = 0.5,
     ) -> None:
         super().__init__(node_name)
-        self.vehicle = None
-        self.modes = {}
-        self.transitions = {}
-        self.active_mode = None
+        self.vehicle: Any = None
+        self.modes: dict[str, Mode[Any]] = {}
+        self.transitions: dict[str, dict[str, str]] = {}
+        self.active_mode: str | None = None
         self.last_update_time = time()
         self._vision_clients = {}
         self.timer = None
@@ -89,8 +89,8 @@ class ModeManager(Node):
         if self.auto_launch:
             self._auto_launch_timer = self.create_timer(0.1, self._maybe_auto_launch)
 
-    def get_active_mode(self) -> Mode:
-        return self.modes[self.active_mode]
+    def get_active_mode(self) -> Mode[Any]:
+        return self.modes[cast(str, self.active_mode)]
 
     def _now_seconds(self) -> float:
         return self.get_clock().now().nanoseconds * 1e-9
@@ -227,7 +227,7 @@ class ModeManager(Node):
     def _mode_peer_names(self, mode_or_class: object) -> tuple[str, ...]:
         return declared_remote_peer_names(mode_or_class, self._runtime_vehicle_name)
 
-    def _mode_connection_status(self, mode: Mode) -> dict[str, bool]:
+    def _mode_connection_status(self, mode: Mode[Any]) -> dict[str, bool]:
         return relevant_connection_status(
             self._peer_connections.status(),
             peer_vehicle_names=self._mode_peer_names(mode),
@@ -270,11 +270,11 @@ class ModeManager(Node):
     def _instantiate_mode(
         self,
         *,
-        mode_class: type[Mode],
+        mode_class: type[Mode[Any]],
         args: dict[str, Any],
         mode_id: str,
         peer_vehicle_names: tuple[str, ...],
-    ) -> Mode:
+    ) -> Mode[Any]:
         mode_instance = mode_class.__new__(mode_class)
         if not isinstance(mode_instance, mode_class):
             raise TypeError(
@@ -341,7 +341,7 @@ class ModeManager(Node):
             return bool(self._raw_method(f"destroy_{kind}")(entity))
         return getattr(registry, f"destroy_{kind}")(entity)
 
-    def initialize_mode(self, mode_id: str, params: dict) -> Mode:
+    def initialize_mode(self, mode_id: str, params: dict) -> Mode[Any]:
         mode_entry = mode_entry_for_mode_id(mode_id)
         mode_class = load_mode_class(mode_entry.class_path)
         peer_vehicle_names = self._mode_peer_names(mode_class)
@@ -401,7 +401,7 @@ class ModeManager(Node):
             self.add_mode(mode_name, mode)
             self.transitions[mode_name] = mode_info.transitions
 
-    def add_mode(self, mode_name: str, mode_instance: Mode) -> None:
+    def add_mode(self, mode_name: str, mode_instance: Mode[Any]) -> None:
         self.modes[mode_name] = mode_instance
         self.get_logger().info(f"Mode {mode_name} registered.")
 

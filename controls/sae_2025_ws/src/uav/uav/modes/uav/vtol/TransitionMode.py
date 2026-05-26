@@ -7,7 +7,7 @@ from uav.vehicles.VTOL import VTOL
 from ...Mode import Mode
 
 
-class TransitionMode(Mode):
+class TransitionMode(Mode[VTOL]):
     """
     A VTOL-only mode for transitioning between multicopter and fixed-wing flight.
     """

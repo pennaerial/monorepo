@@ -19,7 +19,7 @@ from ..Mode import Mode
 _TWO_PI = 2.0 * math.pi
 
 
-class PayloadScanForTagMode(Mode):
+class PayloadScanForTagMode(Mode[Payload]):
     """
     Spin in place looking for a specific AprilTag.
 
@@ -29,7 +29,6 @@ class PayloadScanForTagMode(Mode):
                       should reposition and try again
     """
 
-    mission_target = "payload"
     required_vision_nodes = (PayloadAprilTagNode,)
     transition_labels = ("found", "not_found")
     requires_camera = True

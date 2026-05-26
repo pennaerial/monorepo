@@ -45,10 +45,10 @@ def _is_typed_dict(annotation: object) -> bool:
     )
 
 
-def _iter_mode_classes() -> list[type[Mode]]:
+def _iter_mode_classes() -> list[type[Mode[Any]]]:
     import uav.modes as mode_package
 
-    discovered: dict[str, type[Mode]] = {}
+    discovered: dict[str, type[Mode[Any]]] = {}
     for module_info in pkgutil.walk_packages(
         mode_package.__path__, prefix=f"{mode_package.__name__}."
     ):
@@ -66,6 +66,7 @@ def _iter_mode_classes() -> list[type[Mode]]:
                 isinstance(value, type)
                 and issubclass(value, Mode)
                 and value is not Mode
+                and not inspect.isabstract(value)
                 and value.__module__ == module.__name__
             ):
                 discovered[mode_id_for(value)] = value
@@ -73,7 +74,7 @@ def _iter_mode_classes() -> list[type[Mode]]:
 
 
 def _normalized_annotation(
-    mode_class: type[Mode], *, name: str, annotation: object, default: object
+    mode_class: type[Mode[Any]], *, name: str, annotation: object, default: object
 ) -> object:
     if annotation in (inspect.Parameter.empty, None, Any, object):
         if default not in (inspect.Parameter.empty, None) and type(default) in {
@@ -101,7 +102,7 @@ def _normalized_annotation(
     return annotation
 
 
-def mode_params_model(mode_class: type[Mode]) -> type[BaseModel]:
+def mode_params_model(mode_class: type[Mode[Any]]) -> type[BaseModel]:
     signature = inspect.signature(mode_class.__init__)
     type_hints = get_type_hints(mode_class.__init__)
     field_definitions: dict[str, tuple[object, object]] = {}
@@ -242,7 +243,9 @@ def _normalize_annotation_spec(annotation: object) -> dict[str, Any]:
     raise TypeError(f"Unsupported schema annotation: {annotation!r}")
 
 
-def _field_specs_for_mode(mode_class: type[Mode]) -> tuple[ModeParamFieldSpec, ...]:
+def _field_specs_for_mode(
+    mode_class: type[Mode[Any]],
+) -> tuple[ModeParamFieldSpec, ...]:
     signature = inspect.signature(mode_class.__init__)
     type_hints = get_type_hints(mode_class.__init__)
     fields: list[ModeParamFieldSpec] = []
@@ -276,18 +279,12 @@ def _field_specs_for_mode(mode_class: type[Mode]) -> tuple[ModeParamFieldSpec, .
     return tuple(fields)
 
 
-def build_mode_registry_entry(mode_class: type[Mode]) -> ModeRegistryEntry:
+def build_mode_registry_entry(mode_class: type[Mode[Any]]) -> ModeRegistryEntry:
     mode_id = mode_id_for(mode_class)
     mission_target = mission_target_from_mode_id(mode_id)
     if mission_target not in {"uav", "payload"}:
         raise ValueError(
             f"Mode '{mode_id}' must live under the 'uav' or 'payload' public mode namespace."
-        )
-    declared_target = getattr(mode_class, "mission_target", None)
-    if declared_target is not None and declared_target != mission_target:
-        raise ValueError(
-            f"Mode '{mode_id}' declares mission_target '{declared_target}', "
-            f"but its namespace requires '{mission_target}'."
         )
     peer_vehicle_names = tuple(
         sorted(
