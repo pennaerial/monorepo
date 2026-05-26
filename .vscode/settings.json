@@ -1,3 +1,19 @@
 {
-    "python.linting.enabled": false
+    "python.linting.enabled": false,
+    "python.analysis.extraPaths": [
+        "${workspaceFolder}/controls/sae_2025_ws/src/integration",
+        "${workspaceFolder}/controls/sae_2025_ws/src/sim",
+        "${workspaceFolder}/controls/sae_2025_ws/src/tools",
+        "${workspaceFolder}/controls/sae_2025_ws/src/uav",
+        "${workspaceFolder}/controls/sae_2025_ws/install/actuator_msgs/local/lib/python3.10/dist-packages",
+        "${workspaceFolder}/controls/sae_2025_ws/install/payload_interfaces/local/lib/python3.10/dist-packages",
+        "${workspaceFolder}/controls/sae_2025_ws/install/px4_msgs/local/lib/python3.10/dist-packages",
+        "${workspaceFolder}/controls/sae_2025_ws/install/ros_gz_interfaces/local/lib/python3.10/dist-packages",
+        "${workspaceFolder}/controls/sae_2025_ws/install/ros_ign_interfaces/local/lib/python3.10/dist-packages",
+        "${workspaceFolder}/controls/sae_2025_ws/install/sim/lib/python3.10/site-packages",
+        "${workspaceFolder}/controls/sae_2025_ws/install/sim_interfaces/local/lib/python3.10/dist-packages",
+        "${workspaceFolder}/controls/sae_2025_ws/install/tools/lib/python3.10/site-packages",
+        "${workspaceFolder}/controls/sae_2025_ws/install/uav/lib/python3.10/site-packages",
+        "${workspaceFolder}/controls/sae_2025_ws/install/uav_interfaces/local/lib/python3.10/dist-packages"
+    ]
 }
