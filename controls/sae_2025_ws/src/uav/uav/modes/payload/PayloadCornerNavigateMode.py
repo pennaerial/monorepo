@@ -157,7 +157,7 @@ class PayloadCornerNavigateMode(Mode[Payload]):
 
         self._bridge = CvBridge()
         self._image_sub = None
-        self._image: Optional[object] = None
+        self._image: Optional[CompressedImage | Image] = None
         self._annotated_pub = None
 
     # ------------------------------------------------------------------
@@ -265,17 +265,18 @@ class PayloadCornerNavigateMode(Mode[Payload]):
     # ROS callbacks
     # ------------------------------------------------------------------
 
-    def _image_cb(self, msg) -> None:
+    def _image_cb(self, msg: CompressedImage | Image) -> None:
         self._image = msg
 
     def _decode_image(self) -> Optional[np.ndarray]:
-        if self._image is None:
+        image = self._image
+        if image is None:
             return None
         try:
-            if self.compressed_image:
-                buf = np.frombuffer(self._image.data, dtype=np.uint8)
+            if isinstance(image, CompressedImage):
+                buf = np.frombuffer(image.data, dtype=np.uint8)
                 return cv2.imdecode(buf, cv2.IMREAD_COLOR)
-            return self._bridge.imgmsg_to_cv2(self._image, desired_encoding="bgr8")
+            return self._bridge.imgmsg_to_cv2(image, desired_encoding="bgr8")
         except Exception as exc:
             self.node.get_logger().warn(
                 f"PayloadCornerNavigateMode: image decode failed: {exc}"
