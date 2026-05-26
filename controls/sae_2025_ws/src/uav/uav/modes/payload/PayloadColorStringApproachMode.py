@@ -130,15 +130,19 @@ class PayloadColorStringApproachMode(Mode[Payload]):
         self._bridge = CvBridge()
         self._latest_image: Optional[Image | CompressedImage] = None
 
+        image_topic = vehicle.image_topic
+        if image_topic is None:
+            raise RuntimeError(f"Vehicle '{vehicle.name}' does not expose an image topic.")
+
         if bool(compressed):
             self.node.create_subscription(
                 CompressedImage,
-                f"{vehicle.image_topic}/compressed",
+                f"{image_topic}/compressed",
                 self._on_image,
                 1,
             )
         else:
-            self.node.create_subscription(Image, vehicle.image_topic, self._on_image, 1)
+            self.node.create_subscription(Image, image_topic, self._on_image, 1)
 
         self._debug_pub = None
         if getattr(self.node, "vision_debug", False):
