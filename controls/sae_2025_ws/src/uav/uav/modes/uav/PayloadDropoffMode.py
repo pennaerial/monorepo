@@ -39,8 +39,8 @@ class PayloadDropoffMode(Mode[UAV]):
 
         self.response = None
         self.done = False
-        self.offsets = offsets
-        self.camera_offsets = self.vehicle.camera_offsets
+        self.offsets = (0.0, 0.0, 0.0) if offsets is None else offsets
+        self.camera_offsets = tuple(self.vehicle.camera_offsets)
         self.mode = (
             0  # 0 for uav centering, 1 for landing, 2 for retracting, 3 for taking off
         )
@@ -49,8 +49,14 @@ class PayloadDropoffMode(Mode[UAV]):
         """
         Periodic logic for lowering payload and handling obstacles.
         """
+        roll = self.vehicle.roll
+        pitch = self.vehicle.pitch
+        if roll is None or pitch is None:
+            self.log("Waiting for attitude data.")
+            return
+
         # If UAV is unstable, skip the update
-        if self.vehicle.roll > 0.1 or self.vehicle.pitch > 0.1:
+        if roll > 0.1 or pitch > 0.1:
             self.log("Roll or pitch detected. Waiting for stabilization.")
             return
 
@@ -70,9 +76,15 @@ class PayloadDropoffMode(Mode[UAV]):
                 self.done = True
             return
 
+        local_position = self.vehicle.get_local_position()
+        yaw = self.vehicle.yaw
+        if local_position is None or yaw is None:
+            self.log("Waiting for local position and yaw data.")
+            return
+
         request = PayloadTracking.Request()
-        request.altitude = -self.vehicle.get_local_position()[2]
-        request.yaw = float(self.vehicle.yaw)
+        request.altitude = -local_position[2]
+        request.yaw = float(yaw)
         request.payload_color = "pink"
         response = self.send_request(PayloadTrackingNode, request)
 

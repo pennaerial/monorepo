@@ -37,14 +37,26 @@ class PayloadPickupMode(Mode[UAV]):
         """
         Periodic logic for lowering payload and handling obstacles.
         """
+        roll = self.vehicle.roll
+        pitch = self.vehicle.pitch
+        if roll is None or pitch is None:
+            self.log("Waiting for attitude data.")
+            return
+
         # If UAV is unstable, skip the update
-        if self.vehicle.roll > 0.1 or self.vehicle.pitch > 0.1:
+        if roll > 0.1 or pitch > 0.1:
             self.log("Roll or pitch detected. Waiting for stabilization.")
             return
 
+        local_position = self.vehicle.get_local_position()
+        yaw = self.vehicle.yaw
+        if local_position is None or yaw is None:
+            self.log("Waiting for local position and yaw data.")
+            return
+
         request = PayloadTracking.Request()
-        request.altitude = -self.vehicle.get_local_position()[2]
-        request.yaw = float(self.vehicle.yaw)
+        request.altitude = -local_position[2]
+        request.yaw = float(yaw)
         request.payload_color = self.color
         response = self.send_request(PayloadTrackingNode, request)
 
@@ -84,7 +96,7 @@ class PayloadPickupMode(Mode[UAV]):
                 and np.abs(direction[1]) < request.altitude / 50
             ):
                 if request.altitude < 0.5:
-                    self.goal_pos = self.vehicle.get_local_position()
+                    self.goal_pos = local_position
                     return
                 else:
                     direction = [0, 0, request.altitude / self.altitude_constant]

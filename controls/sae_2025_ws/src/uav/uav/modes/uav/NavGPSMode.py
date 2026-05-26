@@ -5,6 +5,10 @@ from uav.vehicles.UAV import UAV
 
 from ..Mode import Mode
 
+Coordinate = tuple[float, float, float]
+CoordinateSystem = Literal["GPS", "LOCAL"]
+Waypoint = tuple[Coordinate, float, CoordinateSystem]
+
 
 class NavGPSMode(Mode[UAV]):
     """
@@ -20,9 +24,7 @@ class NavGPSMode(Mode[UAV]):
         self,
         node: Node,
         vehicle: UAV,
-        coordinates: list[
-            tuple[tuple[float, float, float], float, Literal["GPS", "LOCAL"]]
-        ],
+        coordinates: list[Waypoint],
         margin: float = 1,
     ):
         """
@@ -37,11 +39,11 @@ class NavGPSMode(Mode[UAV]):
         """
         super().__init__(node, vehicle)
         self.coordinates = coordinates
-        self.goal = None
+        self.goal: Coordinate | None = None
         self.margin = margin
         self.index = -1
-        self.coordinate_system = None
-        self.target = None
+        self.coordinate_system: CoordinateSystem | None = None
+        self.target: Coordinate | None = None
         self.wait_time = 0.0
 
     def on_update(self, time_delta: float) -> None:
@@ -49,7 +51,11 @@ class NavGPSMode(Mode[UAV]):
         Periodic logic for setting gps coord.
         """
         dist = 0
-        if self.index != -1:
+        if (
+            self.index != -1
+            and self.coordinate_system is not None
+            and self.goal is not None
+        ):
             dist = self.vehicle.distance_to_waypoint(self.coordinate_system, self.goal)
 
         # Determine if we're waiting at a waypoint (lock yaw to prevent spinning)
@@ -71,7 +77,7 @@ class NavGPSMode(Mode[UAV]):
             )
 
         # Consolidated debug output - single line with all information
-        if self.index != -1 and self.target is not None:
+        if self.index != -1 and self.target is not None and self.goal is not None:
             curr_pos = self.vehicle.get_local_position()
             curr_gps = self.vehicle.get_gps()
             yaw = (
@@ -118,6 +124,8 @@ class NavGPSMode(Mode[UAV]):
                     self.index
                 ]
                 self.target = self.get_local_target()
+                if self.target is None:
+                    return
                 self.log(
                     f"Moving to waypoint {self.index + 1}/{len(self.coordinates)}: {self.goal} (wait time: {self.wait_time}s)"
                 )
@@ -128,20 +136,27 @@ class NavGPSMode(Mode[UAV]):
                 )
                 self.wait_time -= time_delta
 
-    def get_local_target(self) -> tuple[float, float, float]:
+    def get_local_target(self) -> Coordinate | None:
         """
         Get the local target of the UAV.
 
         Returns:
             tuple[float, float, float]: The local target of the UAV.
         """
+        goal = self.goal
+        if goal is None:
+            self.log("Waiting for waypoint before computing local target.")
+            return None
+
         if self.coordinate_system == "GPS":
-            local_target = self.vehicle.gps_to_local(self.goal)
+            local_target = self.vehicle.gps_to_local(goal)
+            if local_target is None:
+                self.log("Waiting for GPS origin before computing local target.")
+                return None
             return local_target
         elif self.coordinate_system == "LOCAL":
             # LOCAL coordinates are already in NED frame relative to origin
-            local_target = tuple(float(x) for x in self.goal)
-            return local_target
+            return (float(goal[0]), float(goal[1]), float(goal[2]))
         else:
             raise ValueError(f"Invalid coordinate system {self.coordinate_system}")
 

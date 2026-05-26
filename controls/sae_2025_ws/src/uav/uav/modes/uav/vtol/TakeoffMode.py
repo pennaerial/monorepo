@@ -115,9 +115,16 @@ class TakeoffMode(Mode[VTOL]):
                 "FW takeoff Step 2: transition complete. Starting disarm->takeoff->arm sequence."
             )
 
-            lat = self.vehicle.global_position.lat
-            lon = self.vehicle.global_position.lon
-            alt = self.vehicle.global_position.alt
+            global_position = self.vehicle.global_position
+            if global_position is None:
+                self.node.get_logger().info(
+                    "FW takeoff: Waiting for global position before runway takeoff."
+                )
+                return
+
+            lat = global_position.lat
+            lon = global_position.lon
+            alt = global_position.alt
             self.node.get_logger().info(f"Current GPS: {lat}, {lon}, {alt}")
 
             if (
