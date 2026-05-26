@@ -30,10 +30,9 @@ class TagObservation:
     area: float
 
 
-class PayloadAprilTagApproachMode(Mode):
+class PayloadAprilTagApproachMode(Mode[Payload]):
     """Drive the payload toward one AprilTag and terminate once close enough."""
 
-    mission_target = "payload"
     required_vision_nodes = ()
     requires_camera = True
     transition_labels = ("done", "tag_lost")
@@ -55,7 +54,6 @@ class PayloadAprilTagApproachMode(Mode):
         completion_state: str = "done",
     ):
         super().__init__(node, vehicle)
-        self.vehicle: Payload = vehicle
         self._completion_state = completion_state
         self.tag_id = None if tag_id is None else int(tag_id)
         self.tag_size_m = float(tag_size_m)

@@ -67,8 +67,7 @@ from ..Mode import Mode
 _COLOR_DOMINANCE_RATIO = 1.5
 
 
-class PayloadCornerNavigateMode(Mode):
-    mission_target = "payload"
+class PayloadCornerNavigateMode(Mode[Payload]):
     transition_labels = ("complete",)
     requires_camera = True
 

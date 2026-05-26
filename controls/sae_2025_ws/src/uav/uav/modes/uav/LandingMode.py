@@ -6,12 +6,10 @@ from uav.vehicles.UAV import UAV
 from ..Mode import Mode
 
 
-class LandingMode(Mode):
+class LandingMode(Mode[UAV]):
     """
     A mode for taking off vertically.
     """
-
-    mission_target = "uav"
 
     def __init__(self, node: Node, vehicle: UAV):
         """

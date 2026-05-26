@@ -129,7 +129,7 @@ class TagTransitionRule(TypedDict):
     direction: Literal["cw", "ccw"]
 
 
-class PayloadDLZNavigateMode(Mode):
+class PayloadDLZNavigateMode(Mode[Payload]):
     """
     Navigate the payload along the alternating-colour square border of the DLZ.
 
@@ -165,7 +165,6 @@ class PayloadDLZNavigateMode(Mode):
         Test keys in YAML order — put more-specific rules first.
     """
 
-    mission_target = "payload"
     required_vision_nodes = (PayloadAprilTagNode,)
     transition_labels = ("done",)
     requires_camera = True

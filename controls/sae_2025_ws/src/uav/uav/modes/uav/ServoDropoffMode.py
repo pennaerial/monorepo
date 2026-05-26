@@ -7,12 +7,11 @@ from uav.vehicles.UAV import UAV
 from ..Mode import Mode
 
 
-class ServoDropoffMode(Mode):
+class ServoDropoffMode(Mode[UAV]):
     """
     A mode for dropping off the payload.
     """
 
-    mission_target = "uav"
     transition_labels = ("complete",)
 
     def __init__(

@@ -29,7 +29,7 @@ _WHITE_LOWER = np.array([0, 0, 200], dtype=np.uint8)
 _WHITE_UPPER = np.array([180, 30, 255], dtype=np.uint8)
 
 
-class PayloadRetreatMode(Mode):
+class PayloadRetreatMode(Mode[Payload]):
     """
     Drive the payload to the edge of the DLZ, then turn 180° to face the center.
 
@@ -44,7 +44,6 @@ class PayloadRetreatMode(Mode):
     Publishes DriveCommand to the payload's own namespaced command topic.
     """
 
-    mission_target = "payload"
     required_vision_nodes = (PayloadAprilTagNode,)
     transition_labels = ()
 

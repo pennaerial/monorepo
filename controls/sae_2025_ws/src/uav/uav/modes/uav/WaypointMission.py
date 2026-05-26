@@ -12,13 +12,11 @@ from uav.vehicles.UAV import UAV
 from ..Mode import Mode
 
 
-class WaypointMission(Mode):
+class WaypointMission(Mode[UAV]):
     """
     Simple waypoint mission for testing scoring node.
     Flies through a series of waypoints defined in YAML.
     """
-
-    mission_target = "uav"
 
     def __init__(
         self,

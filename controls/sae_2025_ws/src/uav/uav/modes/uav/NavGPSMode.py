@@ -6,12 +6,11 @@ from uav.vehicles.UAV import UAV
 from ..Mode import Mode
 
 
-class NavGPSMode(Mode):
+class NavGPSMode(Mode[UAV]):
     """
     A mode for navigating to a GPS coordinate
     """
 
-    mission_target = "uav"
     transition_labels = ("complete",)
 
     # TODO: Create "RELATIVE" navigation system, which initializes direction vectors once in the beginning
