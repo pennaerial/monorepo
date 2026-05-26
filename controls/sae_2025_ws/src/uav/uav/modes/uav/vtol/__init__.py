@@ -1,6 +1,11 @@
 from importlib import import_module
+from typing import TYPE_CHECKING
 
 __all__ = ["TakeoffMode", "TransitionMode"]
+
+if TYPE_CHECKING:
+    from .TakeoffMode import TakeoffMode
+    from .TransitionMode import TransitionMode
 
 
 def __getattr__(name: str):

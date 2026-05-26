@@ -1,10 +1,14 @@
 from importlib import import_module
+from typing import TYPE_CHECKING
 
 __all__ = ["Mode"]
 
 _EXPORTS = {
     "Mode": ".Mode",
 }
+
+if TYPE_CHECKING:
+    from .Mode import Mode
 
 
 def __getattr__(name: str):
