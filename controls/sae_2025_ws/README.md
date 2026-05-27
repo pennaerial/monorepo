@@ -53,7 +53,7 @@ sudo apt-get upgrade
 1. Add the ROS 2 Humble setup script to your `~/.bashrc` to automatically source it. YOU ONLY EVER NEED TO DO THIS ONCE:
 
     ```bash
-    echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc
+    echo "source /opt/ros/jazzy/setup.bash" >> ~/.bashrc
     ```
     For context, `>>` pipes the output of the preceding command into the succeeding file. Running the above command multiple times will just paste in `source /opt/...` multiple times into `~/.bashrc`. This setup script sets up your shell instance to recognize ROS2.
 
@@ -67,7 +67,7 @@ sudo apt-get upgrade
 3. Make sure you have all of your ROS dependencies installed:
    ```bash
    # From the workspace (this) directory
-   rosdep install -r --from-paths src -i -y --rosdistro humble
+   rosdep install -r --from-paths src -i -y --rosdistro jazzy
    ```
    `rosdep` on Ubuntu 22.04/Jammy does not provide a Pydantic v2 package, so install that separately in the Python environment you use for `uav`:
    ```bash
@@ -90,7 +90,7 @@ sudo apt-get upgrade
 
     ```bash
     sudo apt-get update
-    sudo apt install ros-humble-cv-bridge python3-opencv python3-pip build-essential cmake
+    sudo apt install ros-jazzy-cv-bridge python3-opencv python3-pip build-essential cmake
     python3 -m pip install "pydantic>=2,<3" apriltag
     ```
     `uav` mission and fleet loading now require `pydantic>=2,<3`, and AprilTag missions still require the Python `apriltag` package. Use the distro `python3-opencv` package for `cv2`; do not install `opencv-python` just to get AprilTag support.
@@ -111,7 +111,7 @@ You might run into the following issues during the build process. Here are solut
 2. **Missing `gps_msgs`**:
    
     ```bash
-    sudo apt-get install ros-humble-gps-msgs
+    sudo apt-get install ros-jazzy-gps-msgs
     ```
 
 3. **Missing `vision_msgs`**:
@@ -142,7 +142,7 @@ You might run into the following issues during the build process. Here are solut
 The current entry point is `ros2 launch uav main.launch.py`. This launch file brings up the selected mission, Gazebo, PX4 SITL, the camera bridge, and the relevant vision / payload nodes.
 
 ```bash
-source /opt/ros/humble/setup.bash
+source /opt/ros/jazzy/setup.bash
 export GZ_VERSION=harmonic
 cd ~/{path_to_monorepo}/controls/sae_2025_ws
 colcon build --packages-select payload sim uav --symlink-install

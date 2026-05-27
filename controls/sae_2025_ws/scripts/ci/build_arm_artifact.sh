@@ -7,7 +7,7 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 . "$SCRIPT_DIR/common.sh"
 
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(ci_workspace_root)}"
-ROS_DISTRO="${ROS_DISTRO:-humble}"
+ROS_DISTRO="${ROS_DISTRO:-jazzy}"
 
 cd "$WORKSPACE_ROOT"
 

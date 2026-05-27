@@ -7,7 +7,7 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 . "$SCRIPT_DIR/common.sh"
 
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(ci_workspace_root)}"
-ROS_DISTRO="${ROS_DISTRO:-humble}"
+ROS_DISTRO="${ROS_DISTRO:-jazzy}"
 PYTEST_TARGETS="${PYTEST_TARGETS:-src/uav/test/test_mission_spec.py src/uav/test/test_schema_models.py src/uav/test/test_schema_registry_runtime.py src/uav/test/test_auto_launch.py src/uav/test/test_runtime_behavior.py src/uav/test/test_launch_helpers.py src/uav/test/test_fleet_launch.py src/sim/test/test_orchestration.py src/integration/test/test_config.py src/integration/test/test_deploy.py src/integration/test/test_schema.py}"
 # LIVE_PYTEST_TARGETS="${LIVE_PYTEST_TARGETS:-src/uav/test/test_peer_stack_reconnect.py}"
 INSTALL_DEPS="${INSTALL_DEPS:-1}"

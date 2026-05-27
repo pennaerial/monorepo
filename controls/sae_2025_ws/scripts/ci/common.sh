@@ -11,7 +11,7 @@ ci_workspace_root() {
 }
 
 ci_ros_distro() {
-    echo "${ROS_DISTRO:-humble}"
+    echo "${ROS_DISTRO:-jazzy}"
 }
 
 ci_log() {

@@ -56,7 +56,7 @@ def _runtime_shell(target_ctx: TargetContext, command: str) -> str:
     return f"""
         set -e
         cd {target_ctx.ssh.q(paths["deploy_root"])}
-        source /opt/ros/humble/setup.bash
+        source /opt/ros/jazzy/setup.bash
         source {target_ctx.ssh.q(paths["current_link"])}/install/setup.bash
         {command}
     """
