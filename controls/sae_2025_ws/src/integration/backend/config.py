@@ -30,6 +30,22 @@ def _normalize_fleet_file(value: object) -> str:
     return Path(raw.replace("\\", "/")).name.strip()
 
 
+def _optional_float(value: object, *, field: str) -> float | None:
+    if value in (None, ""):
+        return None
+    if isinstance(value, bool) or not isinstance(value, int | float | str):
+        raise ValueError(f"{field} must be numeric when provided.")
+    return float(value)
+
+
+def _optional_int(value: object, *, field: str) -> int | None:
+    if value in (None, ""):
+        return None
+    if isinstance(value, bool) or not isinstance(value, int | float | str):
+        raise ValueError(f"{field} must be an integer when provided.")
+    return int(value)
+
+
 @dataclass(slots=True)
 class OperatorConfig:
     github_repo: str
@@ -608,21 +624,16 @@ class BuildSourceRecord:
             name=str(payload.get("name", "")).strip(),
             date=str(payload.get("date", "")).strip(),
             download_url=str(payload.get("download_url", "")).strip(),
-            size_mb=(
-                float(payload["size_mb"])
-                if payload.get("size_mb") not in (None, "")
-                else None
-            ),
+            size_mb=_optional_float(payload.get("size_mb"), field="size_mb"),
             branch=str(payload.get("branch", "")).strip(),
             artifact_name=str(payload.get("artifact_name", "")).strip(),
             workflow_name=str(payload.get("workflow_name", "")).strip(),
             workflow_event=str(payload.get("workflow_event", "")).strip(),
             workflow_conclusion=str(payload.get("workflow_conclusion", "")).strip(),
             local_artifact_path=str(payload.get("local_artifact_path", "")).strip(),
-            local_artifact_size_bytes=(
-                int(payload["local_artifact_size_bytes"])
-                if payload.get("local_artifact_size_bytes") not in (None, "")
-                else None
+            local_artifact_size_bytes=_optional_int(
+                payload.get("local_artifact_size_bytes"),
+                field="local_artifact_size_bytes",
             ),
             codebase_root=str(payload.get("codebase_root", "")).strip(),
             fleet_file=fleet_file,

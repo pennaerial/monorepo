@@ -8,6 +8,7 @@ from ..context import AppContext
 from ..models import (
     ConfigResponse,
     MessageResponse,
+    OperatorConfigPayload,
 )
 
 
@@ -17,7 +18,9 @@ def build_router(ctx: AppContext) -> APIRouter:
     @router.get("", response_model=ConfigResponse)
     async def get_config() -> ConfigResponse:
         return ConfigResponse(
-            config=ctx.operator_config.to_safe_dict(),
+            config=OperatorConfigPayload.model_validate(
+                ctx.operator_config.to_safe_dict()
+            ),
         )
 
     @router.post("", response_model=MessageResponse)

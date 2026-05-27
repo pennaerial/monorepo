@@ -29,7 +29,7 @@ _DISCOVERY_SNAPSHOT: dict[str, dict[str, object]] = {}
 
 def _require_zeroconf():
     try:
-        from zeroconf import IPVersion, ServiceBrowser, ServiceListener, Zeroconf
+        from zeroconf import IPVersion, ServiceBrowser, ServiceListener, Zeroconf  # pyright: ignore[reportMissingImports]
     except ModuleNotFoundError as exc:
         raise RuntimeError(
             "Missing Python dependency `zeroconf`. "
@@ -91,10 +91,29 @@ def _snapshot_key(hostname: str) -> str:
     return normalized or (hostname or "").strip().lower()
 
 
+def _float_snapshot_value(
+    entry: dict[str, object], key: str, *, default: float = 0.0
+) -> float:
+    value = entry.get(key, default)
+    if isinstance(value, bool) or not isinstance(value, int | float | str):
+        return default
+    try:
+        return float(value)
+    except ValueError:
+        return default
+
+
+def _string_sequence_value(entry: dict[str, object], key: str) -> list[str]:
+    value = entry.get(key, [])
+    if not isinstance(value, list | tuple | set):
+        return []
+    return [str(item) for item in value if str(item).strip()]
+
+
 def _mark_snapshot_stale(now_monotonic: float | None = None) -> None:
     now_value = now_monotonic if now_monotonic is not None else time.monotonic()
     for key, entry in list(_DISCOVERY_SNAPSHOT.items()):
-        last_seen = float(entry.get("last_seen_monotonic", 0.0) or 0.0)
+        last_seen = _float_snapshot_value(entry, "last_seen_monotonic")
         age = (
             now_value - last_seen if last_seen else _DISCOVERY_STALE_WINDOW_SECONDS + 1
         )
@@ -107,7 +126,7 @@ def _mark_snapshot_stale(now_monotonic: float | None = None) -> None:
 def _prune_snapshot(now_monotonic: float | None = None) -> None:
     now_value = now_monotonic if now_monotonic is not None else time.monotonic()
     for key, entry in list(_DISCOVERY_SNAPSHOT.items()):
-        last_seen = float(entry.get("last_seen_monotonic", 0.0) or 0.0)
+        last_seen = _float_snapshot_value(entry, "last_seen_monotonic")
         age = (
             now_value - last_seen if last_seen else _DISCOVERY_STALE_WINDOW_SECONDS + 1
         )
@@ -142,7 +161,7 @@ def _update_snapshot(discovered: list[_DiscoveredService]) -> None:
         if key in fresh_keys:
             entry["discovery_stale"] = False
             continue
-        last_seen = float(entry.get("last_seen_monotonic", 0.0) or 0.0)
+        last_seen = _float_snapshot_value(entry, "last_seen_monotonic")
         age = (
             now_monotonic - last_seen
             if last_seen
@@ -169,7 +188,7 @@ def _snapshot_cards(ctx: AppContext) -> list[dict[str, object]]:
                     entry.get("hardware_id") or _snapshot_key(hostname) or hostname
                 ),
                 "hostname": hostname,
-                "addresses": list(entry.get("addresses", []) or []),
+                "addresses": _string_sequence_value(entry, "addresses"),
                 "service_name": entry.get("service_name"),
                 "service_type": entry.get("service_type"),
                 "last_seen_at": entry.get("last_seen_at"),
@@ -264,7 +283,7 @@ def _resolve_socket_addresses(hostname: str) -> set[str]:
         for info in socket.getaddrinfo(hostname, None, family=socket.AF_UNSPEC):
             sockaddr = info[4]
             if isinstance(sockaddr, tuple) and sockaddr:
-                addresses.add(sockaddr[0])
+                addresses.add(str(sockaddr[0]))
     except OSError:
         return set()
     return addresses
@@ -300,7 +319,7 @@ def _browse_services_zeroconf(timeout_s: float) -> list[_DiscoveredService]:
                 self.found[key] = record
             addresses = info.parsed_addresses(IPVersion.All) or []
             for address in addresses:
-                record.addresses.add(address)
+                record.addresses.add(str(address))
 
     zeroconf = Zeroconf(ip_version=IPVersion.All)
     listener = Listener(zeroconf)

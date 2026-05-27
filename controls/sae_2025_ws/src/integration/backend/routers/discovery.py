@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from ..context import AppContext
-from ..models import HardwareDiscoveryResponse
+from ..models import HardwareDiscoveryResponse, LiveHardwareDeviceResponse
 
 
 def build_router(ctx: AppContext) -> APIRouter:
@@ -15,7 +15,13 @@ def build_router(ctx: AppContext) -> APIRouter:
 
         try:
             devices = await discovery.live_hardware_cards(ctx)
-            return HardwareDiscoveryResponse(success=True, devices=devices)
+            return HardwareDiscoveryResponse(
+                success=True,
+                devices=[
+                    LiveHardwareDeviceResponse.model_validate(device)
+                    for device in devices
+                ],
+            )
         except Exception as exc:
             return HardwareDiscoveryResponse(success=False, error=str(exc))
 

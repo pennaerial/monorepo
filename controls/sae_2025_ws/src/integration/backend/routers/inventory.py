@@ -109,20 +109,32 @@ def build_router(ctx: AppContext) -> APIRouter:
                 replace_existing=str(replace_existing or "").strip().lower()
                 in {"1", "true", "yes", "on"},
             )
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
         except json.JSONDecodeError as exc:
             raise HTTPException(
                 status_code=400,
                 detail="Inventory import file must be valid JSON.",
             ) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        imported_count_value = summary.get("targets_imported", 0)
+        imported_count = (
+            imported_count_value if isinstance(imported_count_value, int) else 0
+        )
+        target_ids_value = summary.get("target_ids", [])
+        target_ids = (
+            [str(target_id) for target_id in target_ids_value]
+            if isinstance(target_ids_value, list)
+            else []
+        )
+        active_target_id_value = summary.get("active_target_id")
+        active_target_id = (
+            active_target_id_value if isinstance(active_target_id_value, str) else None
+        )
 
         return InventoryMutationResponse(
-            output=(
-                f"Imported {summary['targets_imported']} target(s): "
-                + ", ".join(summary["target_ids"])
-            ),
-            active_target_id=summary["active_target_id"],
+            output=(f"Imported {imported_count} target(s): " + ", ".join(target_ids)),
+            active_target_id=active_target_id,
         )
 
     return router
