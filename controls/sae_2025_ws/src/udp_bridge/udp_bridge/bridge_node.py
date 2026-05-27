@@ -31,6 +31,7 @@ Packet wire format
     Bytes 3-6  : sequence number (big-endian uint32)
 """
 
+from collections.abc import Sequence
 import socket
 import struct
 import threading
@@ -51,6 +52,61 @@ _PING_INTERVAL_S = 1.0
 _DEFAULT_PEER_TTL_S = 3.0  # 3× ping interval — tolerates 2 dropped pings
 
 
+def _parameter_value(node: Node, name: str) -> object:
+    return node.get_parameter(name).value
+
+
+def _int_parameter(node: Node, name: str) -> int:
+    value = _parameter_value(node, name)
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError(f"Parameter {name!r} must be an integer.")
+    return value
+
+
+def _int_list_parameter(node: Node, name: str) -> list[int]:
+    value = _parameter_value(node, name)
+    if isinstance(value, (str, bytes)) or not isinstance(value, Sequence):
+        raise ValueError(f"Parameter {name!r} must be an integer array.")
+
+    result: list[int] = []
+    for item in value:
+        if isinstance(item, bool) or not isinstance(item, int):
+            raise ValueError(f"Parameter {name!r} must contain only integers.")
+        result.append(item)
+    return result
+
+
+def _str_parameter(node: Node, name: str) -> str:
+    value = _parameter_value(node, name)
+    if not isinstance(value, str):
+        raise ValueError(f"Parameter {name!r} must be a string.")
+    return value
+
+
+def _str_list_parameter(
+    node: Node, name: str, *, default: list[str] | None = None
+) -> list[str]:
+    value = _parameter_value(node, name)
+    if value is None and default is not None:
+        return list(default)
+    if isinstance(value, (str, bytes)) or not isinstance(value, Sequence):
+        raise ValueError(f"Parameter {name!r} must be a string array.")
+
+    result: list[str] = []
+    for item in value:
+        if not isinstance(item, str):
+            raise ValueError(f"Parameter {name!r} must contain only strings.")
+        result.append(item)
+    return result
+
+
+def _float_parameter(node: Node, name: str) -> float:
+    value = _parameter_value(node, name)
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"Parameter {name!r} must be numeric.")
+    return float(value)
+
+
 class BridgeNode(Node):
     def __init__(self):
         super().__init__("udp_bridge")
@@ -61,11 +117,11 @@ class BridgeNode(Node):
         self.declare_parameter("topics", rclpy.Parameter.Type.STRING_ARRAY)
         self.declare_parameter("peer_ttl", _DEFAULT_PEER_TTL_S)
 
-        self._my_port: int = self.get_parameter("my_port").value
-        all_ports: list[int] = list(self.get_parameter("all_ports").value)
-        self._broadcast_ip: str = self.get_parameter("broadcast_ip").value
+        self._my_port = _int_parameter(self, "my_port")
+        all_ports = _int_list_parameter(self, "all_ports")
+        self._broadcast_ip = _str_parameter(self, "broadcast_ip")
         self._peer_ports: list[int] = [p for p in all_ports if p != self._my_port]
-        self._peer_ttl: float = float(self.get_parameter("peer_ttl").value)
+        self._peer_ttl = _float_parameter(self, "peer_ttl")
         self._ping_seq = 0
         self._stop = threading.Event()
 
@@ -79,8 +135,7 @@ class BridgeNode(Node):
         self._in_publishers: list = []  # indexed by topic_id
         self._out_subscribers: list = []  # keep refs so they aren't GC'd
 
-        _topics_raw = self.get_parameter("topics").value
-        topics_param: list[str] = list(_topics_raw) if _topics_raw is not None else []
+        topics_param = _str_list_parameter(self, "topics", default=[])
         for i, entry in enumerate(topics_param):
             if ":" not in entry:
                 raise ValueError(
