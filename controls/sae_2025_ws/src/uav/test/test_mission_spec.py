@@ -9,28 +9,21 @@ from typing import Any
 
 import pytest
 
-if "rclpy" not in sys.modules:
-    rclpy: Any = types.ModuleType("rclpy")
-    node_mod: Any = types.ModuleType("rclpy.node")
+from uav.test_support.ros_stubs import ensure_basic_rclpy_stubs
 
-    class Node:
-        def __init__(self, *_args, **_kwargs) -> None:
-            pass
 
-    node_mod.Node = Node
-    rclpy.node = node_mod
-    sys.modules.update({"rclpy": rclpy, "rclpy.node": node_mod})
+ensure_basic_rclpy_stubs()
 
-from uav.modes.Mode import Mode
-import uav.runtime.mission_spec as mission_spec_module
-import uav.runtime.schema as schema_module
-from uav.runtime.mission_spec import (
+from uav.modes.Mode import Mode  # noqa: E402
+import uav.runtime.mission_spec as mission_spec_module  # noqa: E402
+import uav.runtime.schema as schema_module  # noqa: E402
+from uav.runtime.mission_spec import (  # noqa: E402
     MissionSpec,
     load_mode_class,
     load_mission_spec,
     mission_path_for_name,
     mission_root,
-)
+)  # noqa: E402
 
 
 def _write_mission(tmp_path: Path, contents: str) -> Path:

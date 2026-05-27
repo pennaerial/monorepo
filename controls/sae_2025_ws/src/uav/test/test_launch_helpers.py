@@ -1,147 +1,24 @@
 from __future__ import annotations
 
-import importlib
 import importlib.util
 import sys
 from pathlib import Path
 from types import SimpleNamespace
-import types
 
 import pytest
 
-
-def _import_module_if_available(name: str):
-    try:
-        return importlib.import_module(name)
-    except ModuleNotFoundError:
-        return None
-
-
-def _purge_fake_rclpy_modules() -> None:
-    fake_rclpy = sys.modules.get("rclpy")
-    if fake_rclpy is not None and not hasattr(fake_rclpy, "__path__"):
-        for module_name in list(sys.modules):
-            if module_name == "rclpy" or module_name.startswith("rclpy."):
-                del sys.modules[module_name]
-
-
-def _ensure_launch_import_stubs() -> None:
-    ament_index_python = sys.modules.get("ament_index_python")
-    if ament_index_python is None:
-        ament_index_python = _import_module_if_available("ament_index_python")
-    if ament_index_python is None:
-        ament_index_python = types.ModuleType("ament_index_python")
-        sys.modules["ament_index_python"] = ament_index_python
-
-    ament_index_packages = sys.modules.get("ament_index_python.packages")
-    if ament_index_packages is None:
-        ament_index_packages = _import_module_if_available(
-            "ament_index_python.packages"
-        )
-    if ament_index_packages is None:
-        ament_index_packages = types.ModuleType("ament_index_python.packages")
-        sys.modules["ament_index_python.packages"] = ament_index_packages
-    if not hasattr(ament_index_packages, "get_package_share_directory"):
-        setattr(
-            ament_index_packages,
-            "get_package_share_directory",
-            lambda _name: str(Path(__file__).resolve().parents[1]),
-        )
-    setattr(ament_index_python, "packages", ament_index_packages)
-
-    launch_module = sys.modules.get("launch")
-    if launch_module is None:
-        launch_module = _import_module_if_available("launch")
-    if launch_module is None:
-        launch_module = types.ModuleType("launch")
-        sys.modules["launch"] = launch_module
-    if not hasattr(launch_module, "LaunchDescription"):
-        setattr(launch_module, "LaunchDescription", type("LaunchDescription", (), {}))
-
-    launch_actions = sys.modules.get("launch.actions")
-    if launch_actions is None:
-        launch_actions = _import_module_if_available("launch.actions")
-    if launch_actions is None:
-        launch_actions = types.ModuleType("launch.actions")
-        sys.modules["launch.actions"] = launch_actions
-    for name in (
-        "DeclareLaunchArgument",
-        "ExecuteProcess",
-        "IncludeLaunchDescription",
-        "OpaqueFunction",
-    ):
-        if not hasattr(launch_actions, name):
-            setattr(launch_actions, name, type(name, (), {}))
-
-    launch_sources = sys.modules.get("launch.launch_description_sources")
-    if launch_sources is None:
-        launch_sources = _import_module_if_available(
-            "launch.launch_description_sources"
-        )
-    if launch_sources is None:
-        launch_sources = types.ModuleType("launch.launch_description_sources")
-        sys.modules["launch.launch_description_sources"] = launch_sources
-    if not hasattr(launch_sources, "PythonLaunchDescriptionSource"):
-        setattr(
-            launch_sources,
-            "PythonLaunchDescriptionSource",
-            type("PythonLaunchDescriptionSource", (), {}),
-        )
-
-    launch_logging = sys.modules.get("launch.logging")
-    if launch_logging is None:
-        launch_logging = _import_module_if_available("launch.logging")
-    if launch_logging is None:
-        launch_logging = types.ModuleType("launch.logging")
-        sys.modules["launch.logging"] = launch_logging
-    if not hasattr(launch_logging, "get_logger"):
-        setattr(
-            launch_logging,
-            "get_logger",
-            lambda *_args, **_kwargs: SimpleNamespace(
-                warning=lambda *_a, **_k: None,
-                warn=lambda *_a, **_k: None,
-                info=lambda *_a, **_k: None,
-            ),
-        )
-
-    launch_substitutions = sys.modules.get("launch.substitutions")
-    if launch_substitutions is None:
-        launch_substitutions = _import_module_if_available("launch.substitutions")
-    if launch_substitutions is None:
-        launch_substitutions = types.ModuleType("launch.substitutions")
-        sys.modules["launch.substitutions"] = launch_substitutions
-    if not hasattr(launch_substitutions, "LaunchConfiguration"):
-        setattr(
-            launch_substitutions,
-            "LaunchConfiguration",
-            type("LaunchConfiguration", (), {}),
-        )
-
-    launch_ros = sys.modules.get("launch_ros")
-    if launch_ros is None:
-        launch_ros = _import_module_if_available("launch_ros")
-    if launch_ros is None:
-        launch_ros = types.ModuleType("launch_ros")
-        sys.modules["launch_ros"] = launch_ros
-
-    launch_ros_actions = sys.modules.get("launch_ros.actions")
-    if launch_ros_actions is None:
-        launch_ros_actions = _import_module_if_available("launch_ros.actions")
-    if launch_ros_actions is None:
-        launch_ros_actions = types.ModuleType("launch_ros.actions")
-        sys.modules["launch_ros.actions"] = launch_ros_actions
-    if not hasattr(launch_ros_actions, "Node"):
-        setattr(launch_ros_actions, "Node", type("Node", (), {}))
-    setattr(launch_ros, "actions", launch_ros_actions)
+from uav.test_support.ros_stubs import (
+    ensure_launch_import_stubs,
+    purge_fake_rclpy_modules,
+)
 
 
 def _load_launch_module(filename: str, module_name: str):
     # Runtime-behavior tests install lightweight rclpy doubles into sys.modules.
     # launch_ros must see the real ROS Python packages if they are available.
-    _purge_fake_rclpy_modules()
-    _ensure_launch_import_stubs()
+    purge_fake_rclpy_modules()
     package_root = Path(__file__).resolve().parents[1]
+    ensure_launch_import_stubs(package_root, include_launch_ros=True)
     if str(package_root) not in sys.path:
         sys.path.insert(0, str(package_root))
     sim_package_root = Path(__file__).resolve().parents[2] / "sim"
