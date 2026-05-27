@@ -48,7 +48,7 @@ LINE_FOLLOW
 from __future__ import annotations
 
 import math
-from typing import Optional, Tuple, cast
+from typing import Optional, Tuple
 
 import cv2
 import numpy as np
@@ -60,7 +60,11 @@ from uav.cv.dlz_convex_hull import build_dlz_hull_mask
 from uav.vehicles.Payload import Payload
 
 from ..Mode import Mode
-from .dlz_navigation_state import DLZDirection, set_dlz_navigation_direction
+from .dlz_navigation_state import (
+    DLZDirection,
+    parse_dlz_direction,
+    set_dlz_navigation_direction,
+)
 
 # Mirrors PayloadColorSquareNode._COLOR_RATIO: when one tape colour has at
 # least this many times more pixels than the other in the line-follow strip,
@@ -111,10 +115,10 @@ class PayloadCornerNavigateMode(Mode[Payload]):
         tape_align_stable_frames: int = 3,
     ):
         super().__init__(node, vehicle)
-        direction = str(direction).lower().strip()
-        if direction not in ("cw", "ccw"):
+        direction_value = parse_dlz_direction(direction)
+        if direction_value is None:
             raise ValueError(f"direction must be 'cw' or 'ccw', got {direction!r}")
-        self.direction: DLZDirection = cast(DLZDirection, direction)
+        self.direction: DLZDirection = direction_value
 
         self._lower_a = np.array(ccw_lower_hsv, dtype=np.uint8)
         self._upper_a = np.array(ccw_upper_hsv, dtype=np.uint8)

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from typing import Literal, Optional, Tuple, cast
+from typing import Literal, Optional, Tuple
 
 from typing_extensions import TypedDict
 
@@ -21,6 +21,8 @@ from ..Mode import Mode
 from .dlz_navigation_state import (
     DLZDirection,
     DLZStartPhase,
+    parse_dlz_direction,
+    parse_dlz_start_phase,
     set_dlz_navigation_direction,
 )
 
@@ -38,8 +40,6 @@ _TURN_CENTER_TOL_PX = 50.0  # lateral error tolerance (px)
 _TURN_CENTER_MIN_PX = 150  # minimum tape pixels to trust centering
 _TURN_STABLE_FRAMES = 2  # consecutive centred frames before locking
 _TURN_MAX_RAD = 2.0 * math.pi  # safety timeout (radians)
-
-_VALID_START_PHASES = ("wait_for_plane", "scan_tags", "line_follow")
 
 # ---------------------------------------------------------------------------
 # Inline colour detection. HSV bounds are now constructor parameters (see
@@ -205,19 +205,19 @@ class PayloadDLZNavigateMode(Mode[Payload]):
         cw_upper_hsv2: list[int] = (255, 255, 255),
     ):
         super().__init__(node, vehicle)
-        direction_value = str(direction).lower().strip()
-        if direction_value not in ("cw", "ccw"):
+        direction_value = parse_dlz_direction(direction)
+        if direction_value is None:
+            raise ValueError(f"direction must be 'cw' or 'ccw', got {direction!r}")
+        start_phase_value = parse_dlz_start_phase(start_phase)
+        if start_phase_value is None:
             raise ValueError(
-                f"direction must be 'cw' or 'ccw', got {direction_value!r}"
-            )
-        start_phase_value = str(start_phase).lower().strip()
-        if start_phase_value not in _VALID_START_PHASES:
-            raise ValueError(
-                f"start_phase must be one of {_VALID_START_PHASES}, got {start_phase_value!r}"
+                "start_phase must be one of "
+                "'wait_for_plane', 'scan_tags', or 'line_follow', "
+                f"got {start_phase!r}"
             )
 
         # Fallback defaults (overwritten by table lookup at runtime)
-        self._default_direction: DLZDirection = cast(DLZDirection, direction_value)
+        self._default_direction: DLZDirection = direction_value
         self._default_target_transitions = int(target_transitions)
         self.direction: DLZDirection = self._default_direction
 
@@ -232,7 +232,7 @@ class PayloadDLZNavigateMode(Mode[Payload]):
         self.tag_transition_table = dict(tag_transition_table or {})
         self.detect_frames = int(detect_frames)
         self.scan_duration_s = float(scan_duration_s)
-        self.start_phase = cast(DLZStartPhase, start_phase_value)
+        self.start_phase = start_phase_value
         self.tag_size_m = float(tag_size_m)
         self.tag_family = str(tag_family) if tag_family else DEFAULT_TAG_FAMILY
         self.compressed_image = bool(compressed_image)
@@ -517,12 +517,13 @@ class PayloadDLZNavigateMode(Mode[Payload]):
         )
         entry = self._match_table(self._seen_tag_ids)
         if entry is not None:
-            entry_direction = str(entry["direction"]).lower().strip()
-            if entry_direction not in ("cw", "ccw"):
+            entry_direction = parse_dlz_direction(entry["direction"])
+            if entry_direction is None:
                 raise ValueError(
-                    f"tag_transition_table direction must be 'cw' or 'ccw', got {entry_direction!r}"
+                    "tag_transition_table direction must be 'cw' or 'ccw', "
+                    f"got {entry['direction']!r}"
                 )
-            self.direction = cast(DLZDirection, entry_direction)
+            self.direction = entry_direction
             self.target_transitions = int(entry["transitions"])
             self.log(
                 f"PayloadDLZNavigateMode: table match → direction={self.direction}  "
