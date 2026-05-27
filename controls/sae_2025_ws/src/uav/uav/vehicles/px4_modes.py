@@ -1,5 +1,8 @@
 # Adapted from: https://github.com/PX4/PX4-Autopilot/blob/main/src/modules/commander/px4_custom_mode.h
+from __future__ import annotations
+
 from enum import Enum
+from typing import TypeAlias
 
 
 class FloatEnum(Enum):
@@ -49,13 +52,23 @@ class PX4CustomSubModePosctl(FloatEnum):
     SLOW = 2.0
 
 
+PX4ModeValue: TypeAlias = (
+    int | float | PX4CustomMainMode | PX4CustomSubModeAuto | PX4CustomSubModePosctl
+)
+
+
 class PX4CustomMode:
-    def __init__(self, main_mode=0, sub_mode=0, reserved=0):
+    def __init__(
+        self,
+        main_mode: PX4ModeValue = 0,
+        sub_mode: PX4ModeValue = 0,
+        reserved: int = 0,
+    ) -> None:
         self.reserved = reserved
         self.main_mode = main_mode
         self.sub_mode = sub_mode
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<PX4CustomMode main_mode={self.main_mode} sub_mode={self.sub_mode}>"
 
 
@@ -87,7 +100,7 @@ NAVIGATION_STATE_EXTERNAL7 = 24.0
 NAVIGATION_STATE_EXTERNAL8 = 25.0
 
 
-def get_px4_custom_mode(nav_state):
+def get_px4_custom_mode(nav_state: float) -> PX4CustomMode:
     """Translate a navigation state into a PX4 custom mode."""
     custom_mode = PX4CustomMode()
 
