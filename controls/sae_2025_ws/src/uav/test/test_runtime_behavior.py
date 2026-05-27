@@ -4,6 +4,7 @@ import importlib
 import sys
 import types
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
@@ -20,14 +21,14 @@ def _import_module_if_available(name: str):
 
 
 def _install_ros_test_doubles() -> None:
-    ament_index_python = sys.modules.get("ament_index_python")
+    ament_index_python: Any = sys.modules.get("ament_index_python")
     if ament_index_python is None:
         ament_index_python = _import_module_if_available("ament_index_python")
     if ament_index_python is None:
         ament_index_python = types.ModuleType("ament_index_python")
         sys.modules["ament_index_python"] = ament_index_python
 
-    ament_index_packages = sys.modules.get("ament_index_python.packages")
+    ament_index_packages: Any = sys.modules.get("ament_index_python.packages")
     if ament_index_packages is None:
         ament_index_packages = _import_module_if_available(
             "ament_index_python.packages"
@@ -45,7 +46,7 @@ def _install_ros_test_doubles() -> None:
         ament_index_packages.get_package_share_directory = lambda _name: ""
     ament_index_python.packages = ament_index_packages
 
-    rclpy = sys.modules.get("rclpy")
+    rclpy: Any = sys.modules.get("rclpy")
     if rclpy is None:
         rclpy = _import_module_if_available("rclpy")
     if rclpy is None:
@@ -54,7 +55,7 @@ def _install_ros_test_doubles() -> None:
     if not hasattr(rclpy, "ok"):
         rclpy.ok = lambda: True
 
-    node_mod = sys.modules.get("rclpy.node")
+    node_mod: Any = sys.modules.get("rclpy.node")
     if node_mod is None:
         node_mod = _import_module_if_available("rclpy.node")
     if node_mod is None:
@@ -67,7 +68,7 @@ def _install_ros_test_doubles() -> None:
 
         node_mod.Node = Node
 
-    executors_mod = sys.modules.get("rclpy.executors")
+    executors_mod: Any = sys.modules.get("rclpy.executors")
     if executors_mod is None:
         executors_mod = _import_module_if_available("rclpy.executors")
     if executors_mod is None:
@@ -80,7 +81,7 @@ def _install_ros_test_doubles() -> None:
 
         executors_mod.ExternalShutdownException = ExternalShutdownException
 
-    clock_mod = sys.modules.get("rclpy.clock")
+    clock_mod: Any = sys.modules.get("rclpy.clock")
     if clock_mod is None:
         clock_mod = _import_module_if_available("rclpy.clock")
     if clock_mod is None:
@@ -89,7 +90,7 @@ def _install_ros_test_doubles() -> None:
     if not hasattr(clock_mod, "Clock"):
         clock_mod.Clock = _placeholder("Clock")
 
-    parameter_mod = sys.modules.get("rclpy.parameter")
+    parameter_mod: Any = sys.modules.get("rclpy.parameter")
     if parameter_mod is None:
         parameter_mod = _import_module_if_available("rclpy.parameter")
     if parameter_mod is None:
@@ -98,7 +99,7 @@ def _install_ros_test_doubles() -> None:
     if not hasattr(parameter_mod, "Parameter"):
         parameter_mod.Parameter = _placeholder("Parameter")
 
-    validate_namespace_mod = sys.modules.get("rclpy.validate_namespace")
+    validate_namespace_mod: Any = sys.modules.get("rclpy.validate_namespace")
     if validate_namespace_mod is None:
         validate_namespace_mod = _import_module_if_available("rclpy.validate_namespace")
     if validate_namespace_mod is None:
@@ -107,7 +108,7 @@ def _install_ros_test_doubles() -> None:
     if not hasattr(validate_namespace_mod, "validate_namespace"):
         validate_namespace_mod.validate_namespace = lambda namespace: None
 
-    validate_node_name_mod = sys.modules.get("rclpy.validate_node_name")
+    validate_node_name_mod: Any = sys.modules.get("rclpy.validate_node_name")
     if validate_node_name_mod is None:
         validate_node_name_mod = _import_module_if_available("rclpy.validate_node_name")
     if validate_node_name_mod is None:
@@ -116,7 +117,7 @@ def _install_ros_test_doubles() -> None:
     if not hasattr(validate_node_name_mod, "validate_node_name"):
         validate_node_name_mod.validate_node_name = lambda node_name: None
 
-    qos_mod = sys.modules.get("rclpy.qos")
+    qos_mod: Any = sys.modules.get("rclpy.qos")
     if qos_mod is None:
         qos_mod = _import_module_if_available("rclpy.qos")
     if qos_mod is None:
@@ -140,8 +141,8 @@ def _install_ros_test_doubles() -> None:
     rclpy.qos = qos_mod
 
     if "std_srvs" not in sys.modules:
-        std_srvs = types.ModuleType("std_srvs")
-        std_srvs_srv = types.ModuleType("std_srvs.srv")
+        std_srvs: Any = types.ModuleType("std_srvs")
+        std_srvs_srv: Any = types.ModuleType("std_srvs.srv")
 
         class Trigger:
             Request = _placeholder("Request")
@@ -152,15 +153,15 @@ def _install_ros_test_doubles() -> None:
         sys.modules.update({"std_srvs": std_srvs, "std_srvs.srv": std_srvs_srv})
 
     if "std_msgs" not in sys.modules:
-        std_msgs = types.ModuleType("std_msgs")
-        std_msgs_msg = types.ModuleType("std_msgs.msg")
+        std_msgs: Any = types.ModuleType("std_msgs")
+        std_msgs_msg: Any = types.ModuleType("std_msgs.msg")
         std_msgs_msg.Empty = _placeholder("Empty")
         std_msgs.msg = std_msgs_msg
         sys.modules.update({"std_msgs": std_msgs, "std_msgs.msg": std_msgs_msg})
 
     if "px4_msgs" not in sys.modules:
-        px4_msgs = types.ModuleType("px4_msgs")
-        px4_msgs_msg = types.ModuleType("px4_msgs.msg")
+        px4_msgs: Any = types.ModuleType("px4_msgs")
+        px4_msgs_msg: Any = types.ModuleType("px4_msgs.msg")
 
         class VehicleStatus:
             NAVIGATION_STATE_AUTO_LOITER = 1
@@ -186,9 +187,9 @@ def _install_ros_test_doubles() -> None:
         sys.modules.update({"px4_msgs": px4_msgs, "px4_msgs.msg": px4_msgs_msg})
 
     if "payload_interfaces" not in sys.modules:
-        payload_interfaces = types.ModuleType("payload_interfaces")
-        payload_interfaces_msg = types.ModuleType("payload_interfaces.msg")
-        payload_interfaces_srv = types.ModuleType("payload_interfaces.srv")
+        payload_interfaces: Any = types.ModuleType("payload_interfaces")
+        payload_interfaces_msg: Any = types.ModuleType("payload_interfaces.msg")
+        payload_interfaces_srv: Any = types.ModuleType("payload_interfaces.srv")
         payload_interfaces_msg.DriveCommand = _placeholder("DriveCommand")
         payload_interfaces_msg.ServoCommand = _placeholder("ServoCommand")
 

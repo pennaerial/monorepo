@@ -5,6 +5,7 @@ import sys
 import textwrap
 from types import SimpleNamespace
 import types
+from typing import Any
 
 import pytest
 
@@ -15,17 +16,17 @@ def _placeholder(name: str):
 
 def _install_ros_test_doubles() -> None:
     if "rclpy" not in sys.modules:
-        rclpy = types.ModuleType("rclpy")
+        rclpy: Any = types.ModuleType("rclpy")
         rclpy.init = lambda *args, **kwargs: None
         rclpy.shutdown = lambda: None
         rclpy.ok = lambda: True
-        node_mod = types.ModuleType("rclpy.node")
-        executors_mod = types.ModuleType("rclpy.executors")
-        clock_mod = types.ModuleType("rclpy.clock")
-        parameter_mod = types.ModuleType("rclpy.parameter")
-        validate_namespace_mod = types.ModuleType("rclpy.validate_namespace")
-        validate_node_name_mod = types.ModuleType("rclpy.validate_node_name")
-        qos_mod = types.ModuleType("rclpy.qos")
+        node_mod: Any = types.ModuleType("rclpy.node")
+        executors_mod: Any = types.ModuleType("rclpy.executors")
+        clock_mod: Any = types.ModuleType("rclpy.clock")
+        parameter_mod: Any = types.ModuleType("rclpy.parameter")
+        validate_namespace_mod: Any = types.ModuleType("rclpy.validate_namespace")
+        validate_node_name_mod: Any = types.ModuleType("rclpy.validate_node_name")
+        qos_mod: Any = types.ModuleType("rclpy.qos")
 
         class Node:
             def __init__(self, *_args, **_kwargs) -> None:
@@ -65,8 +66,8 @@ def _install_ros_test_doubles() -> None:
         )
 
     if "std_srvs" not in sys.modules:
-        std_srvs = types.ModuleType("std_srvs")
-        std_srvs_srv = types.ModuleType("std_srvs.srv")
+        std_srvs: Any = types.ModuleType("std_srvs")
+        std_srvs_srv: Any = types.ModuleType("std_srvs.srv")
 
         class Trigger:
             Request = _placeholder("Request")
@@ -77,8 +78,8 @@ def _install_ros_test_doubles() -> None:
         sys.modules.update({"std_srvs": std_srvs, "std_srvs.srv": std_srvs_srv})
 
     if "std_msgs" not in sys.modules:
-        std_msgs = types.ModuleType("std_msgs")
-        std_msgs_msg = types.ModuleType("std_msgs.msg")
+        std_msgs: Any = types.ModuleType("std_msgs")
+        std_msgs_msg: Any = types.ModuleType("std_msgs.msg")
         std_msgs_msg.Empty = _placeholder("Empty")
         std_msgs.msg = std_msgs_msg
         sys.modules.update({"std_msgs": std_msgs, "std_msgs.msg": std_msgs_msg})

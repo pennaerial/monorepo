@@ -24,8 +24,9 @@ def _load_fleet_module():
     spec = importlib.util.spec_from_file_location(
         "uav_fleet_launch_schema_tests", launch_path
     )
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Unable to load launch module from {launch_path}")
     module = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
     spec.loader.exec_module(module)
     return module
 

@@ -6,6 +6,7 @@ from pathlib import Path
 import sys
 from types import SimpleNamespace
 import types
+from typing import Any
 
 import pytest
 
@@ -17,6 +18,8 @@ def _import_module_if_available(name: str):
         return None
 
 
+std_msgs: Any
+std_msgs_msg: Any
 if "std_msgs" not in sys.modules:
     std_msgs = _import_module_if_available("std_msgs")
 else:
@@ -28,14 +31,14 @@ if std_msgs is None:
     std_msgs.msg = std_msgs_msg
     sys.modules.update({"std_msgs": std_msgs, "std_msgs.msg": std_msgs_msg})
 
-ament_index_python = sys.modules.get("ament_index_python")
+ament_index_python: Any = sys.modules.get("ament_index_python")
 if ament_index_python is None:
     ament_index_python = _import_module_if_available("ament_index_python")
 if ament_index_python is None:
     ament_index_python = types.ModuleType("ament_index_python")
     sys.modules["ament_index_python"] = ament_index_python
 
-ament_index_packages = sys.modules.get("ament_index_python.packages")
+ament_index_packages: Any = sys.modules.get("ament_index_python.packages")
 if ament_index_packages is None:
     ament_index_packages = _import_module_if_available("ament_index_python.packages")
 if ament_index_packages is None:
@@ -51,8 +54,10 @@ if not hasattr(ament_index_packages, "get_package_share_directory"):
     ament_index_packages.get_package_share_directory = lambda _name: str(
         Path(__file__).resolve().parents[1]
     )
-sys.modules["ament_index_python"].packages = ament_index_packages
+setattr(sys.modules["ament_index_python"], "packages", ament_index_packages)
 
+std_srvs: Any
+std_srvs_srv: Any
 if "std_srvs" not in sys.modules:
     std_srvs = _import_module_if_available("std_srvs")
 else:
@@ -69,7 +74,7 @@ if std_srvs is None:
     std_srvs.srv = std_srvs_srv
     sys.modules.update({"std_srvs": std_srvs, "std_srvs.srv": std_srvs_srv})
 
-launch_module = sys.modules.get("launch")
+launch_module: Any = sys.modules.get("launch")
 if launch_module is None:
     launch_module = _import_module_if_available("launch")
 if launch_module is None:
@@ -78,7 +83,7 @@ if launch_module is None:
 if not hasattr(launch_module, "LaunchDescription"):
     launch_module.LaunchDescription = type("LaunchDescription", (), {})
 
-launch_actions = sys.modules.get("launch.actions")
+launch_actions: Any = sys.modules.get("launch.actions")
 if launch_actions is None:
     launch_actions = _import_module_if_available("launch.actions")
 if launch_actions is None:
@@ -93,7 +98,7 @@ for name in (
     if not hasattr(launch_actions, name):
         setattr(launch_actions, name, type(name, (), {}))
 
-launch_sources = sys.modules.get("launch.launch_description_sources")
+launch_sources: Any = sys.modules.get("launch.launch_description_sources")
 if launch_sources is None:
     launch_sources = _import_module_if_available("launch.launch_description_sources")
 if launch_sources is None:
@@ -104,7 +109,7 @@ if not hasattr(launch_sources, "PythonLaunchDescriptionSource"):
         "PythonLaunchDescriptionSource", (), {}
     )
 
-launch_logging = sys.modules.get("launch.logging")
+launch_logging: Any = sys.modules.get("launch.logging")
 if launch_logging is None:
     launch_logging = _import_module_if_available("launch.logging")
 if launch_logging is None:
@@ -117,7 +122,7 @@ if not hasattr(launch_logging, "get_logger"):
         info=lambda *_a, **_k: None,
     )
 
-launch_substitutions = sys.modules.get("launch.substitutions")
+launch_substitutions: Any = sys.modules.get("launch.substitutions")
 if launch_substitutions is None:
     launch_substitutions = _import_module_if_available("launch.substitutions")
 if launch_substitutions is None:
@@ -126,7 +131,7 @@ if launch_substitutions is None:
 if not hasattr(launch_substitutions, "LaunchConfiguration"):
     launch_substitutions.LaunchConfiguration = type("LaunchConfiguration", (), {})
 
-rclpy = sys.modules.get("rclpy")
+rclpy: Any = sys.modules.get("rclpy")
 if rclpy is None:
     rclpy = _import_module_if_available("rclpy")
 if rclpy is None:
@@ -139,7 +144,7 @@ if not hasattr(rclpy, "shutdown"):
 if not hasattr(rclpy, "ok"):
     rclpy.ok = lambda: True
 
-node_mod = sys.modules.get("rclpy.node")
+node_mod: Any = sys.modules.get("rclpy.node")
 if node_mod is None:
     node_mod = _import_module_if_available("rclpy.node")
 if node_mod is None:
@@ -153,7 +158,7 @@ if not hasattr(node_mod, "Node"):
 
     node_mod.Node = Node
 
-executors_mod = sys.modules.get("rclpy.executors")
+executors_mod: Any = sys.modules.get("rclpy.executors")
 if executors_mod is None:
     executors_mod = _import_module_if_available("rclpy.executors")
 if executors_mod is None:
@@ -166,7 +171,7 @@ if not hasattr(executors_mod, "ExternalShutdownException"):
 
     executors_mod.ExternalShutdownException = ExternalShutdownException
 
-clock_mod = sys.modules.get("rclpy.clock")
+clock_mod: Any = sys.modules.get("rclpy.clock")
 if clock_mod is None:
     clock_mod = _import_module_if_available("rclpy.clock")
 if clock_mod is None:
@@ -175,7 +180,7 @@ if clock_mod is None:
 if not hasattr(clock_mod, "Clock"):
     clock_mod.Clock = type("Clock", (), {})
 
-parameter_mod = sys.modules.get("rclpy.parameter")
+parameter_mod: Any = sys.modules.get("rclpy.parameter")
 if parameter_mod is None:
     parameter_mod = _import_module_if_available("rclpy.parameter")
 if parameter_mod is None:
@@ -184,7 +189,7 @@ if parameter_mod is None:
 if not hasattr(parameter_mod, "Parameter"):
     parameter_mod.Parameter = type("Parameter", (), {})
 
-validate_namespace_mod = sys.modules.get("rclpy.validate_namespace")
+validate_namespace_mod: Any = sys.modules.get("rclpy.validate_namespace")
 if validate_namespace_mod is None:
     validate_namespace_mod = _import_module_if_available("rclpy.validate_namespace")
 if validate_namespace_mod is None:
@@ -193,7 +198,7 @@ if validate_namespace_mod is None:
 if not hasattr(validate_namespace_mod, "validate_namespace"):
     validate_namespace_mod.validate_namespace = lambda namespace: None
 
-validate_node_name_mod = sys.modules.get("rclpy.validate_node_name")
+validate_node_name_mod: Any = sys.modules.get("rclpy.validate_node_name")
 if validate_node_name_mod is None:
     validate_node_name_mod = _import_module_if_available("rclpy.validate_node_name")
 if validate_node_name_mod is None:
@@ -202,7 +207,7 @@ if validate_node_name_mod is None:
 if not hasattr(validate_node_name_mod, "validate_node_name"):
     validate_node_name_mod.validate_node_name = lambda node_name: None
 
-qos_mod = sys.modules.get("rclpy.qos")
+qos_mod: Any = sys.modules.get("rclpy.qos")
 if qos_mod is None:
     qos_mod = _import_module_if_available("rclpy.qos")
 if qos_mod is None:
@@ -228,6 +233,9 @@ rclpy.qos = qos_mod
 from uav.runtime.ModeManager import ModeManager  # noqa: E402
 
 try:
+    uav_mission_module: Any
+    uav_manager_module: Any
+    UAVModeManager: Any
     import uav.runtime.uav_mission as uav_mission_module
     import uav.runtime.UAVModeManager as uav_manager_module
     from uav.runtime.UAVModeManager import UAVModeManager
@@ -239,6 +247,8 @@ except ModuleNotFoundError as exc:
     UAVModeManager = None
 
 try:
+    payload_mission_module: Any
+    payload_manager_module: Any
     import uav.runtime.payload_mission as payload_mission_module
     import uav.runtime.PayloadModeManager as payload_manager_module
 except ModuleNotFoundError as exc:
@@ -396,8 +406,9 @@ def _stub_mode_manager_init(
 def _load_main_launch_module():
     launch_path = Path(__file__).resolve().parents[1] / "launch" / "main.launch.py"
     spec = importlib.util.spec_from_file_location("uav_main_launch", launch_path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Unable to load launch module from {launch_path}")
     module = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
     spec.loader.exec_module(module)
     return module
 

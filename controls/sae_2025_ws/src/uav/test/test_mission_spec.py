@@ -5,12 +5,13 @@ import textwrap
 from types import SimpleNamespace
 import sys
 import types
+from typing import Any
 
 import pytest
 
 if "rclpy" not in sys.modules:
-    rclpy = types.ModuleType("rclpy")
-    node_mod = types.ModuleType("rclpy.node")
+    rclpy: Any = types.ModuleType("rclpy")
+    node_mod: Any = types.ModuleType("rclpy.node")
 
     class Node:
         def __init__(self, *_args, **_kwargs) -> None:
@@ -343,7 +344,7 @@ def test_invalid_mode_target_is_rejected(monkeypatch, mission_target):
 
 def test_load_mode_class_accepts_module_path(monkeypatch):
     module_name = "uav.modes.payload.PayloadAprilTagApproachMode"
-    fake_module = types.ModuleType(module_name)
+    fake_module: Any = types.ModuleType(module_name)
 
     class PayloadAprilTagApproachMode(Mode):
         mission_target = "payload"

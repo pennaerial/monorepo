@@ -42,10 +42,12 @@ def _ensure_launch_import_stubs() -> None:
         ament_index_packages = types.ModuleType("ament_index_python.packages")
         sys.modules["ament_index_python.packages"] = ament_index_packages
     if not hasattr(ament_index_packages, "get_package_share_directory"):
-        ament_index_packages.get_package_share_directory = lambda _name: str(
-            Path(__file__).resolve().parents[1]
+        setattr(
+            ament_index_packages,
+            "get_package_share_directory",
+            lambda _name: str(Path(__file__).resolve().parents[1]),
         )
-    ament_index_python.packages = ament_index_packages
+    setattr(ament_index_python, "packages", ament_index_packages)
 
     launch_module = sys.modules.get("launch")
     if launch_module is None:
@@ -54,7 +56,7 @@ def _ensure_launch_import_stubs() -> None:
         launch_module = types.ModuleType("launch")
         sys.modules["launch"] = launch_module
     if not hasattr(launch_module, "LaunchDescription"):
-        launch_module.LaunchDescription = type("LaunchDescription", (), {})
+        setattr(launch_module, "LaunchDescription", type("LaunchDescription", (), {}))
 
     launch_actions = sys.modules.get("launch.actions")
     if launch_actions is None:
@@ -80,8 +82,10 @@ def _ensure_launch_import_stubs() -> None:
         launch_sources = types.ModuleType("launch.launch_description_sources")
         sys.modules["launch.launch_description_sources"] = launch_sources
     if not hasattr(launch_sources, "PythonLaunchDescriptionSource"):
-        launch_sources.PythonLaunchDescriptionSource = type(
-            "PythonLaunchDescriptionSource", (), {}
+        setattr(
+            launch_sources,
+            "PythonLaunchDescriptionSource",
+            type("PythonLaunchDescriptionSource", (), {}),
         )
 
     launch_logging = sys.modules.get("launch.logging")
@@ -91,10 +95,14 @@ def _ensure_launch_import_stubs() -> None:
         launch_logging = types.ModuleType("launch.logging")
         sys.modules["launch.logging"] = launch_logging
     if not hasattr(launch_logging, "get_logger"):
-        launch_logging.get_logger = lambda *_args, **_kwargs: SimpleNamespace(
-            warning=lambda *_a, **_k: None,
-            warn=lambda *_a, **_k: None,
-            info=lambda *_a, **_k: None,
+        setattr(
+            launch_logging,
+            "get_logger",
+            lambda *_args, **_kwargs: SimpleNamespace(
+                warning=lambda *_a, **_k: None,
+                warn=lambda *_a, **_k: None,
+                info=lambda *_a, **_k: None,
+            ),
         )
 
     launch_substitutions = sys.modules.get("launch.substitutions")
@@ -104,7 +112,11 @@ def _ensure_launch_import_stubs() -> None:
         launch_substitutions = types.ModuleType("launch.substitutions")
         sys.modules["launch.substitutions"] = launch_substitutions
     if not hasattr(launch_substitutions, "LaunchConfiguration"):
-        launch_substitutions.LaunchConfiguration = type("LaunchConfiguration", (), {})
+        setattr(
+            launch_substitutions,
+            "LaunchConfiguration",
+            type("LaunchConfiguration", (), {}),
+        )
 
     launch_ros = sys.modules.get("launch_ros")
     if launch_ros is None:
@@ -120,8 +132,8 @@ def _ensure_launch_import_stubs() -> None:
         launch_ros_actions = types.ModuleType("launch_ros.actions")
         sys.modules["launch_ros.actions"] = launch_ros_actions
     if not hasattr(launch_ros_actions, "Node"):
-        launch_ros_actions.Node = type("Node", (), {})
-    launch_ros.actions = launch_ros_actions
+        setattr(launch_ros_actions, "Node", type("Node", (), {}))
+    setattr(launch_ros, "actions", launch_ros_actions)
 
 
 def _load_launch_module(filename: str, module_name: str):
@@ -137,8 +149,9 @@ def _load_launch_module(filename: str, module_name: str):
         sys.path.insert(0, str(sim_package_root))
     launch_path = package_root / "launch" / filename
     spec = importlib.util.spec_from_file_location(module_name, launch_path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Unable to load launch module from {launch_path}")
     module = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
     spec.loader.exec_module(module)
     return module
 

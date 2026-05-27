@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 from types import SimpleNamespace
 import types
+from typing import Any
 
 import numpy as np
 import cv2
@@ -38,8 +39,8 @@ def _roi_ratio(mask: np.ndarray, x0: int, y0: int, x1: int, y1: int) -> float:
 
 def _install_import_stubs() -> None:
     if "rclpy" not in sys.modules:
-        rclpy = types.ModuleType("rclpy")
-        node_module = types.ModuleType("rclpy.node")
+        rclpy: Any = types.ModuleType("rclpy")
+        node_module: Any = types.ModuleType("rclpy.node")
 
         class Node:
             pass
@@ -49,7 +50,7 @@ def _install_import_stubs() -> None:
         sys.modules.update({"rclpy": rclpy, "rclpy.node": node_module})
 
     if "cv_bridge" not in sys.modules:
-        cv_bridge = types.ModuleType("cv_bridge")
+        cv_bridge: Any = types.ModuleType("cv_bridge")
 
         class CvBridge:
             def imgmsg_to_cv2(self, *_args, **_kwargs):
@@ -62,8 +63,8 @@ def _install_import_stubs() -> None:
         sys.modules["cv_bridge"] = cv_bridge
 
     if "sensor_msgs" not in sys.modules:
-        sensor_msgs = types.ModuleType("sensor_msgs")
-        sensor_msgs_msg = types.ModuleType("sensor_msgs.msg")
+        sensor_msgs: Any = types.ModuleType("sensor_msgs")
+        sensor_msgs_msg: Any = types.ModuleType("sensor_msgs.msg")
         sensor_msgs_msg.CompressedImage = type("CompressedImage", (), {})
         sensor_msgs_msg.Image = type("Image", (), {})
         sensor_msgs.msg = sensor_msgs_msg
@@ -72,17 +73,17 @@ def _install_import_stubs() -> None:
         )
 
     if "uav.vehicles.Payload" not in sys.modules:
-        payload_module = types.ModuleType("uav.vehicles.Payload")
+        payload_module: Any = types.ModuleType("uav.vehicles.Payload")
         payload_module.Payload = type("Payload", (), {})
         sys.modules["uav.vehicles.Payload"] = payload_module
 
     if "uav.vision_nodes" not in sys.modules:
-        vision_nodes = types.ModuleType("uav.vision_nodes")
+        vision_nodes: Any = types.ModuleType("uav.vision_nodes")
         vision_nodes.PayloadAprilTagNode = type("PayloadAprilTagNode", (), {})
         sys.modules["uav.vision_nodes"] = vision_nodes
 
     if "uav.vision_nodes.payload_perception_common" not in sys.modules:
-        common = types.ModuleType("uav.vision_nodes.payload_perception_common")
+        common: Any = types.ModuleType("uav.vision_nodes.payload_perception_common")
         common.DEFAULT_TAG_FAMILY = "tag36h11"
         sys.modules["uav.vision_nodes.payload_perception_common"] = common
 
@@ -90,7 +91,7 @@ def _install_import_stubs() -> None:
         sys.modules["uav_interfaces"] = types.ModuleType("uav_interfaces")
 
     if "uav_interfaces.srv" not in sys.modules:
-        srv_module = types.ModuleType("uav_interfaces.srv")
+        srv_module: Any = types.ModuleType("uav_interfaces.srv")
 
         class PayloadAprilTagState:
             class Request:
