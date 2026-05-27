@@ -9,6 +9,7 @@ import shutil
 import signal
 import subprocess
 import time
+from typing import cast
 
 import pytest
 
@@ -104,7 +105,7 @@ class _PeerStackObserver(Node):
                 String,
                 f"/{vehicle_name}/peer_test/state",
                 lambda message, vehicle_name=vehicle_name: self._on_status(
-                    vehicle_name, message
+                    vehicle_name, cast(String, message)
                 ),
                 10,
             )
@@ -388,6 +389,12 @@ def _launch_vehicle_stack(
     )
 
 
+def _status_int(status: dict[str, object], key: str) -> int:
+    value = status[key]
+    assert isinstance(value, int)
+    return value
+
+
 @pytest.fixture
 def live_ros_environment(monkeypatch):
     _require_uav_package()
@@ -483,9 +490,9 @@ def test_vehicle_stack_peer_reconnect_recovers_state_and_traffic(
         assert observer.shared_counts_by_sender.get("payload_0", 0) > 0
         assert observer.shared_counts_by_sender.get("payload_1", 0) > 0
 
-        payload_0_peer_before_disconnect = int(status_0["peer_received_total"])
-        payload_0_shared_before_disconnect = int(
-            status_0["shared_remote_received_total"]
+        payload_0_peer_before_disconnect = _status_int(status_0, "peer_received_total")
+        payload_0_shared_before_disconnect = _status_int(
+            status_0, "shared_remote_received_total"
         )
         payload_1_shared_events_before_disconnect = (
             observer.shared_counts_by_sender.get("payload_1", 0)
@@ -502,9 +509,12 @@ def test_vehicle_stack_peer_reconnect_recovers_state_and_traffic(
             state="waiting",
             disconnected_peers=["payload_1"],
         )
-        assert int(waiting_0["peer_received_total"]) >= payload_0_peer_before_disconnect
         assert (
-            int(waiting_0["shared_remote_received_total"])
+            _status_int(waiting_0, "peer_received_total")
+            >= payload_0_peer_before_disconnect
+        )
+        assert (
+            _status_int(waiting_0, "shared_remote_received_total")
             >= payload_0_shared_before_disconnect
         )
 
@@ -563,15 +573,15 @@ def test_vehicle_stack_peer_reconnect_recovers_state_and_traffic(
             shared_remote_received_total=1,
         )
         assert (
-            int(reconnect_status_0["peer_received_total"])
+            _status_int(reconnect_status_0, "peer_received_total")
             > payload_0_peer_before_disconnect
         )
         assert (
-            int(reconnect_status_0["shared_remote_received_total"])
+            _status_int(reconnect_status_0, "shared_remote_received_total")
             > payload_0_shared_before_disconnect
         )
-        assert int(reconnect_status_1["peer_received_total"]) > 0
-        assert int(reconnect_status_1["shared_remote_received_total"]) > 0
+        assert _status_int(reconnect_status_1, "peer_received_total") > 0
+        assert _status_int(reconnect_status_1, "shared_remote_received_total") > 0
         assert (
             observer.shared_counts_by_sender.get("payload_1", 0)
             > payload_1_shared_events_before_disconnect
