@@ -4,7 +4,7 @@ import importlib
 import sys
 import types
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
@@ -290,8 +290,8 @@ class _TrackingMode:
         return self.status
 
 
-def _make_mode_manager(*, vehicle=None, auto_launch: bool = False) -> ModeManager:
-    manager = object.__new__(ModeManager)
+def _make_mode_manager(*, vehicle=None, auto_launch: bool = False) -> Any:
+    manager = cast(Any, object.__new__(ModeManager))
     manager.vehicle = vehicle
     manager.modes = {}
     manager.transitions = {}
@@ -409,7 +409,9 @@ def _make_bootstrap(module_cls, params: dict[str, object]):
     return bootstrap
 
 
-def _fake_mission_spec(*, target: str, is_uav: bool, is_payload: bool, vision_nodes=()):
+def _fake_mission_spec(
+    *, target: str, is_uav: bool, is_payload: bool, vision_nodes=()
+) -> Any:
     return SimpleNamespace(
         target=target,
         is_uav=is_uav,
@@ -438,7 +440,7 @@ def test_initialize_mode_happy_path(monkeypatch):
             required: int,
             optional: str = "default",
         ) -> None:
-            super().__init__(node, vehicle)
+            super().__init__(node, cast(Any, vehicle))
             self.required = required
             self.optional = optional
 
@@ -478,7 +480,7 @@ def test_initialize_mode_missing_required_parameter(monkeypatch):
         mission_target = "uav"
 
         def __init__(self, node, vehicle: _ExpectedVehicle, required: int) -> None:
-            super().__init__(node, vehicle)
+            super().__init__(node, cast(Any, vehicle))
             self.required = required
 
         def on_update(self, time_delta: float) -> None:
@@ -510,7 +512,7 @@ def test_initialize_mode_rejects_unexpected_parameter(monkeypatch):
         mission_target = "uav"
 
         def __init__(self, node, vehicle: _ExpectedVehicle, required: int) -> None:
-            super().__init__(node, vehicle)
+            super().__init__(node, cast(Any, vehicle))
             self.required = required
 
         def on_update(self, time_delta: float) -> None:
@@ -544,7 +546,7 @@ def test_initialize_mode_rejects_vehicle_type_mismatch(monkeypatch):
         mission_target = "uav"
 
         def __init__(self, node, vehicle: _ExpectedVehicle, required: int) -> None:
-            super().__init__(node, vehicle)
+            super().__init__(node, cast(Any, vehicle))
             self.required = required
 
         def on_update(self, time_delta: float) -> None:
@@ -615,7 +617,7 @@ def test_setup_vision_deduplicates_clients(monkeypatch):
 
     assert list(manager.vision_clients) == [canonical_name]
     assert ModeManager.get_vision_client(manager, FakeVisionNode) is client
-    assert created_clients == [(FakeVisionNode.srv, "vision/FakeVisionNode")]
+    assert created_clients == [(cast(Any, FakeVisionNode).srv, "vision/FakeVisionNode")]
 
 
 def test_setup_vision_rejects_vehicle_without_camera():
@@ -738,7 +740,7 @@ def test_create_entity_falls_back_to_raw_node_during_node_init(monkeypatch):
         raising=False,
     )
 
-    manager = object.__new__(ModeManager)
+    manager = cast(Any, object.__new__(ModeManager))
 
     publisher = ModeManager.create_publisher(manager, object, "/parameter_events", 10)
 
@@ -914,7 +916,7 @@ def test_mode_manager_stop_vehicle_without_rclpy_guard():
     _require_runtime_support()
 
     stop_calls: list[str] = []
-    manager = object.__new__(ModeManager)
+    manager = cast(Any, object.__new__(ModeManager))
     manager.vehicle = SimpleNamespace(stop=lambda: stop_calls.append("stop"))
     manager.get_logger = lambda: _FakeLogger()
 
@@ -937,7 +939,7 @@ def test_mode_manager_terminate_deactivates_mode_and_stops_vehicle():
             events.append("deactivate")
             self.active = False
 
-    manager = object.__new__(ModeManager)
+    manager = cast(Any, object.__new__(ModeManager))
     manager.vehicle = SimpleNamespace(stop=lambda: events.append("stop"))
     manager.modes = {"start": _FakeMode()}
     manager.transitions = {}
@@ -972,7 +974,7 @@ def test_mode_manager_error_clears_marker_before_destroy(tmp_path, monkeypatch):
             events.append("deactivate")
             self.active = False
 
-    manager = object.__new__(ModeManager)
+    manager = cast(Any, object.__new__(ModeManager))
     manager.vehicle = SimpleNamespace(stop=lambda: events.append("stop"))
     manager.modes = {"start": _FakeMode()}
     manager.transitions = {}
@@ -1012,7 +1014,7 @@ def test_mode_manager_terminate_clears_marker_before_destroy(tmp_path, monkeypat
             events.append("deactivate")
             self.active = False
 
-    manager = object.__new__(ModeManager)
+    manager = cast(Any, object.__new__(ModeManager))
     manager.vehicle = SimpleNamespace(stop=lambda: events.append("stop"))
     manager.modes = {"start": _FakeMode()}
     manager.transitions = {}
