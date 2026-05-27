@@ -228,7 +228,7 @@ def _single_vehicle_config(context, params: dict) -> tuple[dict, dict | None]:
     airframe_id = None
     if mission_spec.is_uav:
         airframe_id = _resolve_airframe_id(params.get("airframe", "quadcopter"))
-        vehicle_class, _, airframe_model = get_airframe_details(px4_path, airframe_id)
+        vehicle_class, airframe_model = get_airframe_details(px4_path, airframe_id)
         vehicle_class_name = vehicle_class.name
         if not model:
             model = airframe_model
