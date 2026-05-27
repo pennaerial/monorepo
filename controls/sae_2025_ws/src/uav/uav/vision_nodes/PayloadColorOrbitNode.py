@@ -85,10 +85,15 @@ class PayloadColorOrbitNode(VisionNode):
             tag_size_m,
         )
         for observation in observations:
+            pose_x = observation.pose_x
+            pose_y = observation.pose_y
+            pose_yaw = observation.pose_yaw
+            if pose_x is None or pose_y is None or pose_yaw is None:
+                continue
             response.tag_ids.append(int(observation.tag_id))
-            response.pose_x.append(float(observation.pose_x))
-            response.pose_y.append(float(observation.pose_y))
-            response.pose_yaw.append(float(observation.pose_yaw))
+            response.pose_x.append(float(pose_x))
+            response.pose_y.append(float(pose_y))
+            response.pose_yaw.append(float(pose_yaw))
             response.tvec_x.append(float(observation.tvec_x))
             response.tvec_y.append(float(observation.tvec_y))
             response.tvec_z.append(float(observation.tvec_z))

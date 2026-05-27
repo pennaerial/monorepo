@@ -18,6 +18,17 @@ from .VisionNode import VisionNode
 from .payload_perception_common import detect_payload_unreeled
 
 
+def _hsv_triplet(values, default: tuple[int, int, int]) -> tuple[int, int, int]:
+    if not any(values):
+        return default
+    hsv_values = tuple(int(v) for v in values)
+    if len(hsv_values) != 3:
+        raise ValueError(
+            f"HSV bounds must contain exactly 3 values, got {hsv_values!r}."
+        )
+    return hsv_values
+
+
 class PayloadDriveOutNode(VisionNode):
     srv = PayloadDriveOutState
 
@@ -55,16 +66,8 @@ class PayloadDriveOutNode(VisionNode):
             return response
 
         frame = self.convert_image_msg_to_frame(image_msg)
-        lower = (
-            tuple(int(v) for v in request.lower_hsv)
-            if any(request.lower_hsv)
-            else (0, 0, 180)
-        )
-        upper = (
-            tuple(int(v) for v in request.upper_hsv)
-            if any(request.upper_hsv)
-            else (180, 20, 255)
-        )
+        lower = _hsv_triplet(request.lower_hsv, (0, 0, 180))
+        upper = _hsv_triplet(request.upper_hsv, (180, 20, 255))
         bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR) if frame.shape[2] == 3 else frame
         _, clear_ratio, _, debug_frame = detect_payload_unreeled(
             bgr, lower, upper, debug=self.debug
