@@ -66,6 +66,10 @@ def _target_context(target_ctx: object) -> TargetContext:
     return cast(TargetContext, target_ctx)
 
 
+def _response_dict(value: object) -> dict[str, Any]:
+    return cast(dict[str, Any], value)
+
+
 class _FakeSSHResult:
     def __init__(self, *, returncode: int = 0, stdout: str = "", stderr: str = ""):
         self.returncode = returncode
@@ -132,9 +136,9 @@ class _FakeAsyncClient:
     def __init__(
         self,
         *,
-        releases_payload: dict,
-        artifacts_payload: dict,
-        commit_payloads: dict[str, dict] | None = None,
+        releases_payload: object,
+        artifacts_payload: object,
+        commit_payloads: dict[str, object] | None = None,
         response_overrides: dict[str, _FakeResponse] | None = None,
     ):
         self.releases_payload = releases_payload
@@ -1530,7 +1534,7 @@ def test_get_fleet_catalog_reuses_stale_exact_build_cache_after_rate_limit(
         )
     )
 
-    first = asyncio.run(deploy_service.get_fleet_catalog(ctx))
+    first = _response_dict(asyncio.run(deploy_service.get_fleet_catalog(ctx)))
     assert first["success"] is True
     assert sorted(first["available_fleets"]) == ["alpha.yaml", "beta.yaml"]
     first_catalog_dir = deploy_service._fleet_catalog_dir(ctx)
@@ -1581,7 +1585,7 @@ def test_get_fleet_catalog_reuses_stale_exact_build_cache_after_rate_limit(
         ),
     )
 
-    second = asyncio.run(deploy_service.get_fleet_catalog(ctx))
+    second = _response_dict(asyncio.run(deploy_service.get_fleet_catalog(ctx)))
 
     assert second["success"] is True
     assert sorted(second["available_fleets"]) == ["alpha.yaml", "beta.yaml"]
@@ -1678,24 +1682,28 @@ def test_build_source_round_trip_and_local_artifact_cache(tmp_path):
     )
     ctx = _make_context(tmp_path, target, fleet_file=tmp_path / "fleet.yaml")
 
-    result = asyncio.run(
-        deploy_service.set_github_build_source(
-            ctx,
-            source="release",
-            tag="build-deadbeef",
-            sha="deadbee",
-            name="build-deadbeef",
+    result = _response_dict(
+        asyncio.run(
+            deploy_service.set_github_build_source(
+                ctx,
+                source="release",
+                tag="build-deadbeef",
+                sha="deadbee",
+                name="build-deadbeef",
+            )
         )
     )
     assert result["success"] is True
     assert result["source"]["kind"] == "github"
     assert result["source"]["tag"] == "build-deadbeef"
 
-    result = asyncio.run(
-        deploy_service.set_local_artifact_build_source(
-            ctx,
-            filename="hardware-build.tar.gz",
-            file_bytes=b"deploy-bundle",
+    result = _response_dict(
+        asyncio.run(
+            deploy_service.set_local_artifact_build_source(
+                ctx,
+                filename="hardware-build.tar.gz",
+                file_bytes=b"deploy-bundle",
+            )
         )
     )
     assert result["success"] is True
@@ -1726,7 +1734,7 @@ def test_deploy_selected_source_dispatches_to_persisted_selection(
         ap_selection="strongest",
     )
 
-    calls: list[tuple[str, dict[str, object]]] = []
+    calls: list[tuple[str, dict[str, Any]]] = []
 
     async def fake_download_build(inner_ctx, **kwargs):
         calls.append(("github", kwargs))
@@ -1853,13 +1861,15 @@ def test_fleet_catalog_exposes_local_artifact_fleets_and_validates_selection(
     )
     assert result["success"] is True
 
-    catalog = asyncio.run(deploy_service.get_fleet_catalog(ctx))
+    catalog = _response_dict(asyncio.run(deploy_service.get_fleet_catalog(ctx)))
     assert catalog["success"] is True
     assert len(catalog["available_fleets"]) == 2
 
     selected_fleet = catalog["available_fleets"][0]
-    result = asyncio.run(
-        deploy_service.set_global_fleet_file(ctx, fleet_file=selected_fleet)
+    result = _response_dict(
+        asyncio.run(
+            deploy_service.set_global_fleet_file(ctx, fleet_file=selected_fleet)
+        )
     )
     assert result["success"] is True
     assert selected_fleet in result["source"]["available_fleets"]
@@ -1869,8 +1879,10 @@ def test_fleet_catalog_exposes_local_artifact_fleets_and_validates_selection(
         "vehicles:\n  - name: uav_9\n    mission: hover\n",
         encoding="utf-8",
     )
-    result = asyncio.run(
-        deploy_service.set_global_fleet_file(ctx, fleet_file=str(rogue_fleet))
+    result = _response_dict(
+        asyncio.run(
+            deploy_service.set_global_fleet_file(ctx, fleet_file=str(rogue_fleet))
+        )
     )
     assert result["success"] is False
     assert "selected build source" in result["error"].lower()
@@ -1886,19 +1898,21 @@ def test_local_artifact_catalog_dedupes_mirrored_fleet_filenames(tmp_path):
 
     bundle_path = _write_mirrored_fleet_bundle(tmp_path, fleet_name="shared.yaml")
 
-    result = asyncio.run(
-        deploy_service.set_local_artifact_build_source(
-            ctx,
-            filename="mirrored-fleet-bundle.tar.gz",
-            file_bytes=bundle_path.read_bytes(),
+    result = _response_dict(
+        asyncio.run(
+            deploy_service.set_local_artifact_build_source(
+                ctx,
+                filename="mirrored-fleet-bundle.tar.gz",
+                file_bytes=bundle_path.read_bytes(),
+            )
         )
     )
     assert result["success"] is True
     assert result["source"]["fleet_catalog_error"] is None
     assert result["source"]["available_fleets"] == ["shared.yaml"]
 
-    result = asyncio.run(
-        deploy_service.set_global_fleet_file(ctx, fleet_file="shared.yaml")
+    result = _response_dict(
+        asyncio.run(deploy_service.set_global_fleet_file(ctx, fleet_file="shared.yaml"))
     )
     assert result["success"] is True
     assert result["source"]["fleet_file"] == "shared.yaml"
@@ -2225,7 +2239,7 @@ def test_perform_action_threads_operator_ap_vehicles_to_deploy(tmp_path, monkeyp
             "ap_selection": "strongest",
         }
     )
-    captured: dict[str, object] = {}
+    captured: dict[str, Any] = {}
 
     async def fake_deploy_selected_source(
         inner_ctx,
@@ -2447,11 +2461,15 @@ def test_build_source_change_preserves_matching_fleet_filename(tmp_path):
         name="shared.yaml",
     )
 
-    result = asyncio.run(deploy_service.set_local_codebase_build_source(ctx))
+    result = _response_dict(
+        asyncio.run(deploy_service.set_local_codebase_build_source(ctx))
+    )
     assert result["success"] is True
 
-    result = asyncio.run(
-        deploy_service.set_global_fleet_file(ctx, fleet_file=str(shared_fleet))
+    result = _response_dict(
+        asyncio.run(
+            deploy_service.set_global_fleet_file(ctx, fleet_file=str(shared_fleet))
+        )
     )
     assert result["success"] is True
     assert result["source"]["fleet_file"] == "shared.yaml"
@@ -2460,11 +2478,13 @@ def test_build_source_change_preserves_matching_fleet_filename(tmp_path):
         tmp_path,
         fleet_names=("shared.yaml", "backup.yaml"),
     )
-    result = asyncio.run(
-        deploy_service.set_local_artifact_build_source(
-            ctx,
-            filename="fleet-bundle.tar.gz",
-            file_bytes=bundle_path.read_bytes(),
+    result = _response_dict(
+        asyncio.run(
+            deploy_service.set_local_artifact_build_source(
+                ctx,
+                filename="fleet-bundle.tar.gz",
+                file_bytes=bundle_path.read_bytes(),
+            )
         )
     )
 
@@ -2487,11 +2507,15 @@ def test_build_source_change_clears_missing_fleet_filename(tmp_path):
         name="primary.yaml",
     )
 
-    result = asyncio.run(deploy_service.set_local_codebase_build_source(ctx))
+    result = _response_dict(
+        asyncio.run(deploy_service.set_local_codebase_build_source(ctx))
+    )
     assert result["success"] is True
 
-    result = asyncio.run(
-        deploy_service.set_global_fleet_file(ctx, fleet_file=str(primary_fleet))
+    result = _response_dict(
+        asyncio.run(
+            deploy_service.set_global_fleet_file(ctx, fleet_file=str(primary_fleet))
+        )
     )
     assert result["success"] is True
     assert result["source"]["fleet_file"] == "primary.yaml"
@@ -2500,11 +2524,13 @@ def test_build_source_change_clears_missing_fleet_filename(tmp_path):
         tmp_path,
         fleet_names=("backup.yaml",),
     )
-    result = asyncio.run(
-        deploy_service.set_local_artifact_build_source(
-            ctx,
-            filename="fleet-bundle.tar.gz",
-            file_bytes=bundle_path.read_bytes(),
+    result = _response_dict(
+        asyncio.run(
+            deploy_service.set_local_artifact_build_source(
+                ctx,
+                filename="fleet-bundle.tar.gz",
+                file_bytes=bundle_path.read_bytes(),
+            )
         )
     )
 
@@ -2547,7 +2573,7 @@ def test_fleet_catalog_discovers_nested_actions_artifact_tarball(tmp_path, monke
         )
     )
 
-    catalog = asyncio.run(deploy_service.get_fleet_catalog(ctx))
+    catalog = _response_dict(asyncio.run(deploy_service.get_fleet_catalog(ctx)))
 
     assert catalog["success"] is True
     assert catalog["fleet_catalog_error"] is None

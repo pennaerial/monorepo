@@ -6,7 +6,7 @@ import sys
 import types
 from pathlib import Path
 from types import SimpleNamespace
-from typing import cast
+from typing import Any, cast
 
 import httpx
 import pytest
@@ -682,7 +682,7 @@ def test_fleet_action_accepts_query_scoped_single_device(client, monkeypatch):
 def test_build_deploy_route_accepts_network_policy_fields(client, monkeypatch):
     from backend.services import deploy as deploy_service
 
-    captured: dict[str, object] = {}
+    captured: dict[str, Any] = {}
 
     async def fake_deploy_selected_source(
         ctx,
