@@ -5,6 +5,7 @@ import sys
 import types
 from pathlib import Path
 from types import SimpleNamespace
+from typing import cast
 import subprocess
 
 
@@ -18,6 +19,7 @@ sys.modules.setdefault("backend", backend_pkg)
 
 from backend import discovery  # noqa: E402
 from backend.config import InventoryStore, OperatorConfig  # noqa: E402
+from backend.context import AppContext  # noqa: E402
 
 
 def _reset_discovery_snapshot() -> None:
@@ -53,7 +55,7 @@ def _make_operator(tmp_path: Path) -> OperatorConfig:
     )
 
 
-def _make_context(tmp_path: Path) -> SimpleNamespace:
+def _make_context(tmp_path: Path) -> AppContext:
     operator = _make_operator(tmp_path)
     inventory = InventoryStore(
         operator.inventory_path,
@@ -74,7 +76,7 @@ def _make_context(tmp_path: Path) -> SimpleNamespace:
             "service_unit": "pennair-autonomy.service",
         }
     )
-    return SimpleNamespace(list_targets=inventory.list_targets)
+    return cast(AppContext, SimpleNamespace(list_targets=inventory.list_targets))
 
 
 def test_live_hardware_cards_return_hostname_scoped_devices(tmp_path, monkeypatch):
@@ -146,7 +148,7 @@ def test_live_hardware_cards_ignore_inventory_matches(tmp_path, monkeypatch):
             "service_unit": "pennair-autonomy.service",
         }
     )
-    ctx = SimpleNamespace(list_targets=inventory.list_targets)
+    ctx = cast(AppContext, SimpleNamespace(list_targets=inventory.list_targets))
 
     monkeypatch.setattr(
         discovery,

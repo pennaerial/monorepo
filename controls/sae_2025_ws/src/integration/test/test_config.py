@@ -4,6 +4,7 @@ import json
 import sys
 import types
 from pathlib import Path
+from typing import cast
 
 import pytest
 
@@ -23,6 +24,13 @@ from backend.config import (  # noqa: E402
     TargetRecord,
     build_source_store_paths,
 )
+
+
+_TargetStoreDict = dict[str, str | bool | None]
+
+
+def _target_store_dict(data: dict[str, object]) -> _TargetStoreDict:
+    return cast(_TargetStoreDict, data)
 
 
 def _make_operator(tmp_path: Path) -> OperatorConfig:
@@ -173,7 +181,7 @@ def test_inventory_store_round_trips_through_disk(tmp_path):
         operator_config=operator,
         default_deploy_root=operator.default_deploy_root,
     )
-    created, was_created = store.upsert_target(_make_target())
+    created, was_created = store.upsert_target(_target_store_dict(_make_target()))
     assert was_created is True
     assert created.target_id == "pi-1"
 
@@ -236,7 +244,7 @@ def test_inventory_store_round_trips_through_disk(tmp_path):
         operator_config=_make_operator(tmp_path),
         default_deploy_root="/home/penn/pennair-deploy",
     )
-    created, _ = lone_store.upsert_target(_make_target())
+    created, _ = lone_store.upsert_target(_target_store_dict(_make_target()))
     lone_store.delete_target(created.target_id)
     assert lone_store.list_targets() == []
     assert lone_store.active_target_id() == ""
@@ -251,7 +259,7 @@ def test_inventory_store_revalidates_existing_target_updates(tmp_path):
         operator_config=operator,
         default_deploy_root=operator.default_deploy_root,
     )
-    store.upsert_target(_make_target())
+    store.upsert_target(_target_store_dict(_make_target()))
 
     with pytest.raises(ValueError, match="invalid pi_host"):
         store.upsert_target(
@@ -269,7 +277,7 @@ def test_inventory_store_exports_and_imports(tmp_path):
         operator_config=operator,
         default_deploy_root=operator.default_deploy_root,
     )
-    store.upsert_target(_make_target())
+    store.upsert_target(_target_store_dict(_make_target()))
 
     created, was_created = store.upsert_target(
         {
@@ -286,7 +294,7 @@ def test_inventory_store_exports_and_imports(tmp_path):
 
     payload = store.export_payload()
     assert payload["active_target_id"] == "pi-1"
-    assert len(payload["targets"]) == 2
+    assert len(cast(list[object], payload["targets"])) == 2
 
     summary = store.import_payload(
         {
@@ -344,7 +352,7 @@ def test_build_source_store_persists_separately_from_inventory(tmp_path):
         operator_config=operator,
         default_deploy_root=operator.default_deploy_root,
     )
-    inventory.upsert_target(_make_target())
+    inventory.upsert_target(_target_store_dict(_make_target()))
     source_path, cache_dir = build_source_store_paths(operator.inventory_path)
     store = BuildSourceStore(source_path, cache_dir=cache_dir)
 

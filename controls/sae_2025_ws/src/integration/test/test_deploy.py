@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import io
-import inspect
 import sys
 import tarfile
 import types
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any, cast
 import zipfile
 
 import pytest
@@ -26,8 +26,8 @@ backend_pkg.__path__ = [str(PACKAGE_ROOT / "backend")]
 sys.modules.setdefault("backend", backend_pkg)
 
 context_pkg = types.ModuleType("backend.context")
-context_pkg.AppContext = type("AppContext", (), {})
-context_pkg.TargetContext = type("TargetContext", (), {})
+setattr(context_pkg, "AppContext", type("AppContext", (), {}))
+setattr(context_pkg, "TargetContext", type("TargetContext", (), {}))
 sys.modules.setdefault("backend.context", context_pkg)
 
 services_pkg = types.ModuleType("backend.services")
@@ -41,7 +41,29 @@ from backend.config import (  # noqa: E402
     TargetRecord,
     build_source_store_paths,
 )
+from backend.context import AppContext, TargetContext  # noqa: E402
 from backend.services import deploy as deploy_service  # noqa: E402
+
+
+_TargetStoreDict = dict[str, str | bool | None]
+
+
+def _target_store_dict(target: TargetRecord) -> _TargetStoreDict:
+    return cast(_TargetStoreDict, target.to_store_dict())
+
+
+def _minimal_context(tmp_path: Path) -> AppContext:
+    return cast(
+        AppContext,
+        SimpleNamespace(
+            base_dir=tmp_path / "src" / "integration",
+            operator_config=_make_operator(tmp_path),
+        ),
+    )
+
+
+def _target_context(target_ctx: object) -> TargetContext:
+    return cast(TargetContext, target_ctx)
 
 
 class _FakeSSHResult:
@@ -243,28 +265,18 @@ def _make_context(
     *,
     fleet_file: Path | None = None,
     extra_targets: list[TargetRecord] | None = None,
-) -> SimpleNamespace:
+) -> AppContext:
     base_dir = tmp_path / "src" / "integration"
     base_dir.mkdir(parents=True, exist_ok=True)
     operator = _make_operator(tmp_path)
-    inventory_kwargs = {
-        "operator_config": operator,
-        "default_deploy_root": operator.default_deploy_root,
-    }
-    if "seed_target" in inspect.signature(InventoryStore).parameters:
-        inventory = InventoryStore(
-            operator.inventory_path,
-            seed_target=target,
-            **inventory_kwargs,
-        )
-    else:
-        inventory = InventoryStore(
-            operator.inventory_path,
-            **inventory_kwargs,
-        )
-        inventory.upsert_target(target.to_store_dict())
+    inventory = InventoryStore(
+        operator.inventory_path,
+        operator_config=operator,
+        default_deploy_root=operator.default_deploy_root,
+    )
+    inventory.upsert_target(_target_store_dict(target))
     for extra_target in extra_targets or []:
-        inventory.upsert_target(extra_target.to_store_dict())
+        inventory.upsert_target(_target_store_dict(extra_target))
     build_source_path, cache_dir = build_source_store_paths(operator.inventory_path)
     build_source_store = BuildSourceStore(
         build_source_path,
@@ -317,18 +329,21 @@ def _make_context(
             ssh=_FakeSSH(result=_FakeSSHResult()),
         )
 
-    return SimpleNamespace(
-        base_dir=base_dir,
-        operator_config=operator,
-        inventory=inventory,
-        build_source_store=build_source_store,
-        require_deploy_context=require_deploy_context,
-        resolve_target=lambda target_id=None: SimpleNamespace(
-            target=inventory.get_target(target_id),
-            ssh=_FakeSSH(result=_FakeSSHResult()),
+    return cast(
+        AppContext,
+        SimpleNamespace(
+            base_dir=base_dir,
+            operator_config=operator,
+            inventory=inventory,
+            build_source_store=build_source_store,
+            require_deploy_context=require_deploy_context,
+            resolve_target=lambda target_id=None: SimpleNamespace(
+                target=inventory.get_target(target_id),
+                ssh=_FakeSSH(result=_FakeSSHResult()),
+            ),
+            resolve_live_target=resolve_live_target,
+            list_targets=inventory.list_targets,
         ),
-        resolve_live_target=resolve_live_target,
-        list_targets=inventory.list_targets,
     )
 
 
@@ -990,7 +1005,7 @@ def test_release_metadata_payload_and_summary(tmp_path):
     target_ctx = SimpleNamespace(target=target)
 
     metadata = deploy_service._release_metadata_payload(
-        target_ctx,
+        _target_context(target_ctx),
         release_id="20260411-build-hover",
         source_type="source-build",
         source_label="local-uav.tar.gz",
@@ -1112,10 +1127,7 @@ def test_build_local_source_bundle_scopes_packages_for_target(tmp_path, monkeypa
 
 
 def test_list_builds_combines_releases_and_artifacts(tmp_path, monkeypatch):
-    ctx = SimpleNamespace(
-        base_dir=tmp_path / "src" / "integration",
-        operator_config=_make_operator(tmp_path),
-    )
+    ctx = _minimal_context(tmp_path)
 
     fake_httpx = SimpleNamespace(
         AsyncClient=lambda timeout=20: _FakeAsyncClient(
@@ -1252,10 +1264,7 @@ def test_list_builds_combines_releases_and_artifacts(tmp_path, monkeypatch):
 def test_list_builds_enriches_actions_artifacts_from_workflow_run_lookup(
     tmp_path, monkeypatch
 ):
-    ctx = SimpleNamespace(
-        base_dir=tmp_path / "src" / "integration",
-        operator_config=_make_operator(tmp_path),
-    )
+    ctx = _minimal_context(tmp_path)
 
     run_id = "42"
     artifact_id = "99"
@@ -1334,10 +1343,7 @@ def test_list_builds_enriches_actions_artifacts_from_workflow_run_lookup(
 
 
 def test_list_builds_uses_cached_response_for_repeat_requests(tmp_path, monkeypatch):
-    ctx = SimpleNamespace(
-        base_dir=tmp_path / "src" / "integration",
-        operator_config=_make_operator(tmp_path),
-    )
+    ctx = _minimal_context(tmp_path)
 
     client_creations = 0
 
@@ -1379,10 +1385,7 @@ def test_list_builds_uses_cached_response_for_repeat_requests(tmp_path, monkeypa
 def test_list_builds_returns_stale_cache_when_github_rate_limited(
     tmp_path, monkeypatch
 ):
-    ctx = SimpleNamespace(
-        base_dir=tmp_path / "src" / "integration",
-        operator_config=_make_operator(tmp_path),
-    )
+    ctx = _minimal_context(tmp_path)
     ctx.operator_config.github_token = ""
 
     base_httpx = SimpleNamespace(
@@ -1910,7 +1913,7 @@ def test_ensure_runtime_prereqs_uses_shared_deploy_lib(tmp_path):
     ctx = _make_context(tmp_path, target)
     helper_path = _write_deploy_lib(tmp_path)
 
-    target_ctx = ctx.resolve_target("pi-runtime-prereqs")
+    target_ctx = cast(Any, ctx.resolve_target("pi-runtime-prereqs"))
     asyncio.run(deploy_service._ensure_runtime_prereqs(ctx, target_ctx))
 
     paths = target_ctx.target.deploy_paths()
@@ -1933,7 +1936,7 @@ def test_ensure_source_build_prereqs_uses_shared_deploy_lib(tmp_path):
     ctx = _make_context(tmp_path, target)
     helper_path = _write_deploy_lib(tmp_path)
 
-    target_ctx = ctx.resolve_target("pi-source-prereqs")
+    target_ctx = cast(Any, ctx.resolve_target("pi-source-prereqs"))
     asyncio.run(deploy_service._ensure_source_build_prereqs(ctx, target_ctx))
 
     paths = target_ctx.target.deploy_paths()
@@ -1958,7 +1961,7 @@ def test_runner_script_disables_nounset_only_around_ros_setup(tmp_path):
         ssh=_FakeSSH(result=_FakeSSHResult()),
     )
 
-    script = deploy_service._runner_script(target_ctx)
+    script = deploy_service._runner_script(_target_context(target_ctx))
 
     assert "set -euo pipefail" in script
     assert "set +u" in script
@@ -2087,7 +2090,7 @@ def test_activate_release_polls_stability_and_rolls_back_on_instability(tmp_path
     with pytest.raises(RuntimeError, match="Reverted to the previous release"):
         asyncio.run(
             deploy_service._activate_release(
-                target_ctx,
+                _target_context(target_ctx),
                 release_dir="/home/penn/pennair-deploy/releases/release-new",
                 previous_target="/home/penn/pennair-deploy/releases/release-old",
             )
@@ -2419,7 +2422,7 @@ def test_batch_action_marks_top_level_failure_when_any_row_fails(tmp_path, monke
 
     result = asyncio.run(
         fleet_service.batch_action(
-            SimpleNamespace(),
+            cast(AppContext, SimpleNamespace()),
             action="deploy",
         )
     )

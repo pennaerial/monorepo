@@ -6,6 +6,7 @@ import sys
 import types
 from pathlib import Path
 from types import SimpleNamespace
+from typing import cast
 
 import httpx
 import pytest
@@ -32,6 +33,14 @@ from backend.config import (  # noqa: E402
     TargetRecord,
     build_source_store_paths,
 )
+from backend.context import AppContext  # noqa: E402
+
+
+_TargetStoreDict = dict[str, str | bool | None]
+
+
+def _target_store_dict(target: TargetRecord) -> _TargetStoreDict:
+    return cast(_TargetStoreDict, target.to_store_dict())
 
 
 def _assert_api_device_card(
@@ -107,27 +116,17 @@ def _make_target() -> TargetRecord:
     )
 
 
-def _make_context(tmp_path: Path) -> SimpleNamespace:
+def _make_context(tmp_path: Path) -> AppContext:
     base_dir = tmp_path / "src" / "integration"
     base_dir.mkdir(parents=True, exist_ok=True)
     operator = _make_operator(tmp_path)
     target = _make_target()
-    inventory_kwargs = {
-        "operator_config": operator,
-        "default_deploy_root": operator.default_deploy_root,
-    }
-    if "seed_target" in inspect.signature(InventoryStore).parameters:
-        inventory = InventoryStore(
-            operator.inventory_path,
-            seed_target=target,
-            **inventory_kwargs,
-        )
-    else:
-        inventory = InventoryStore(
-            operator.inventory_path,
-            **inventory_kwargs,
-        )
-        inventory.upsert_target(target.to_store_dict())
+    inventory = InventoryStore(
+        operator.inventory_path,
+        operator_config=operator,
+        default_deploy_root=operator.default_deploy_root,
+    )
+    inventory.upsert_target(_target_store_dict(target))
     build_source_path, cache_dir = build_source_store_paths(operator.inventory_path)
     build_source_store = BuildSourceStore(
         build_source_path,
@@ -232,15 +231,18 @@ def _make_context(tmp_path: Path) -> SimpleNamespace:
             ),
         )
 
-    return SimpleNamespace(
-        base_dir=base_dir,
-        operator_config=operator,
-        inventory=inventory,
-        build_source_store=build_source_store,
-        require_deploy_context=lambda require_build_source=True: None,
-        resolve_target=resolve_target,
-        resolve_live_target=resolve_live_target,
-        list_targets=inventory.list_targets,
+    return cast(
+        AppContext,
+        SimpleNamespace(
+            base_dir=base_dir,
+            operator_config=operator,
+            inventory=inventory,
+            build_source_store=build_source_store,
+            require_deploy_context=lambda require_build_source=True: None,
+            resolve_target=resolve_target,
+            resolve_live_target=resolve_live_target,
+            list_targets=inventory.list_targets,
+        ),
     )
 
 
