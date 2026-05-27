@@ -13,14 +13,27 @@ import xml.etree.ElementTree as ET
 import zipfile
 from copy import deepcopy
 from pathlib import Path
+from typing import TypedDict
 
 import yaml
 
 from ..context import AppContext, TargetContext
-from ..mission_compat import load_mission_spec_compat
-from ..models import RuntimeNetworkPolicyOverride
+from ..mission_compat import MissionSpecCompat, load_mission_spec_compat
+from ..models import ApSelection, NetworkRole, RuntimeNetworkPolicyOverride
 from uav.runtime.fleet_spec import load_fleet_document
-from uav.runtime.mission_spec import MissionSpec
+from uav.runtime.mission_spec import MissionSpec  # noqa: F401
+
+
+class _FleetNetworkPolicy(TypedDict):
+    network_role: NetworkRole | None
+    allowed_ap_vehicles: list[str]
+    ap_selection: ApSelection | None
+
+
+class _FleetCatalogCachePayload(TypedDict):
+    catalog: dict[str, Path]
+    source: str | None
+
 
 _ARTIFACT_NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 _SOURCE_BUNDLE_EXTENSIONS = (".tar.gz", ".tgz", ".zip")
@@ -54,7 +67,7 @@ _FLEET_CATALOG_CACHE_TTL_SECONDS = 60.0
 _COMMIT_SUBJECT_CACHE_TTL_SECONDS = 1800.0
 _WORKFLOW_RUN_CACHE_TTL_SECONDS = 1800.0
 _BUILD_LIST_CACHE: dict[tuple[object, ...], tuple[float, dict[str, object]]] = {}
-_FLEET_CATALOG_CACHE: dict[str, tuple[float, dict[str, object]]] = {}
+_FLEET_CATALOG_CACHE: dict[str, tuple[float, _FleetCatalogCachePayload]] = {}
 _COMMIT_SUBJECT_CACHE: dict[str, tuple[float, str | None]] = {}
 _WORKFLOW_RUN_CACHE: dict[str, tuple[float, dict[str, object] | None]] = {}
 
@@ -105,14 +118,24 @@ def _normalize_vehicle_name(value: object) -> str:
     return str(value or "").strip()
 
 
-def _normalize_network_role(value: object) -> str | None:
+def _normalize_network_role(value: object) -> NetworkRole | None:
     candidate = str(value or "").strip().lower()
-    return candidate if candidate in {"default", "ap", "client"} else None
+    if candidate == "default":
+        return "default"
+    if candidate == "ap":
+        return "ap"
+    if candidate == "client":
+        return "client"
+    return None
 
 
-def _normalize_ap_selection(value: object) -> str | None:
+def _normalize_ap_selection(value: object) -> ApSelection | None:
     candidate = str(value or "").strip().lower()
-    return candidate if candidate in {"ordered_then_strongest", "strongest"} else None
+    if candidate == "ordered_then_strongest":
+        return "ordered_then_strongest"
+    if candidate == "strongest":
+        return "strongest"
+    return None
 
 
 def _normalize_vehicle_name_list(value: object) -> list[str]:
@@ -144,11 +167,16 @@ def _normalize_vehicle_name_list(value: object) -> list[str]:
     return normalized
 
 
+def _fleet_vehicle_entries(shared_fleet: dict[str, object]) -> list[dict[str, object]]:
+    vehicles = shared_fleet.get("vehicles", [])
+    if not isinstance(vehicles, list):
+        return []
+    return [vehicle for vehicle in vehicles if isinstance(vehicle, dict)]
+
+
 def _fleet_vehicle_names(shared_fleet: dict[str, object]) -> list[str]:
     names: list[str] = []
-    for vehicle in shared_fleet.get("vehicles", []) or []:
-        if not isinstance(vehicle, dict):
-            continue
+    for vehicle in _fleet_vehicle_entries(shared_fleet):
         name = _normalize_vehicle_name(vehicle.get("name"))
         if name:
             names.append(name)
@@ -157,7 +185,7 @@ def _fleet_vehicle_names(shared_fleet: dict[str, object]) -> list[str]:
 
 def _fleet_network_policy_from_merged_vehicle(
     merged_vehicle: dict[str, object],
-) -> dict[str, object]:
+) -> _FleetNetworkPolicy:
     return {
         "network_role": _normalize_network_role(merged_vehicle.get("network_role")),
         "allowed_ap_vehicles": _normalize_vehicle_name_list(
@@ -170,11 +198,9 @@ def _fleet_network_policy_from_merged_vehicle(
 def _fleet_network_policy_lookup(
     shared_fleet: dict[str, object],
     fleet_defaults: dict[str, object],
-) -> dict[str, dict[str, object]]:
-    policies: dict[str, dict[str, object]] = {}
-    for vehicle in shared_fleet.get("vehicles", []) or []:
-        if not isinstance(vehicle, dict):
-            continue
+) -> dict[str, _FleetNetworkPolicy]:
+    policies: dict[str, _FleetNetworkPolicy] = {}
+    for vehicle in _fleet_vehicle_entries(shared_fleet):
         name = _normalize_vehicle_name(vehicle.get("name"))
         if not name:
             continue
@@ -188,8 +214,8 @@ def _fleet_allowed_ap_vehicle_names(
     *,
     shared_fleet: dict[str, object],
     vehicle_name: str,
-    vehicle_policy: dict[str, object],
-    policy_lookup: dict[str, dict[str, object]],
+    vehicle_policy: _FleetNetworkPolicy,
+    policy_lookup: dict[str, _FleetNetworkPolicy],
 ) -> list[str]:
     explicit = [
         candidate
@@ -249,7 +275,7 @@ def _resolve_fleet_allowed_ap_hosts(
     *,
     target_ctx: TargetContext,
     vehicle_name: str,
-    policy_lookup: dict[str, dict[str, object]],
+    policy_lookup: dict[str, _FleetNetworkPolicy],
     candidate_vehicles: list[str],
     error_prefix: str,
     empty_resolution_message: str,
@@ -846,7 +872,7 @@ def _build_list_cache_set(
 
 def _fleet_catalog_cache_get(
     cache_key: str, *, allow_stale: bool = False
-) -> dict[str, object] | None:
+) -> _FleetCatalogCachePayload | None:
     cached = _FLEET_CATALOG_CACHE.get(cache_key)
     if cached is None:
         return None
@@ -858,8 +884,8 @@ def _fleet_catalog_cache_get(
 
 
 def _fleet_catalog_cache_set(
-    cache_key: str, payload: dict[str, object]
-) -> dict[str, object]:
+    cache_key: str, payload: _FleetCatalogCachePayload
+) -> _FleetCatalogCachePayload:
     cached_payload = deepcopy(payload)
     _FLEET_CATALOG_CACHE[cache_key] = (monotonic(), cached_payload)
     return deepcopy(cached_payload)
@@ -905,6 +931,8 @@ def _github_error_message(
     response = getattr(exc, "response", None)
     status_code = getattr(response, "status_code", None)
     if status_code != 403:
+        return None
+    if response is None:
         return None
 
     message = ""
@@ -1108,8 +1136,8 @@ def _runtime_vehicle_from_config(
         "auto_launch": _bool_value(merged_vehicle.get("auto_launch"), default=False),
         "debug": _bool_value(merged_vehicle.get("debug"), default=False),
         "vision_debug": _bool_value(merged_vehicle.get("vision_debug"), default=False),
-        "save_vision_milliseconds": int(
-            merged_vehicle.get("save_vision_milliseconds", 0) or 0
+        "save_vision_milliseconds": _int_value(
+            merged_vehicle.get("save_vision_milliseconds"), default=0
         ),
         "servo_only": _bool_value(merged_vehicle.get("servo_only"), default=False),
         "camera_mount_offsets": _normalized_camera_offsets(
@@ -1118,11 +1146,9 @@ def _runtime_vehicle_from_config(
         "camera_input_transport": str(
             merged_vehicle.get("camera_input_transport", "compressed")
         ).strip(),
-        "camera_rotate_degrees": float(
-            merged_vehicle.get(
-                "camera_rotate_degrees", 180.0 if mission_target == "payload" else 0.0
-            )
-            or 0.0
+        "camera_rotate_degrees": _float_value(
+            merged_vehicle.get("camera_rotate_degrees"),
+            default=180.0 if mission_target == "payload" else 0.0,
         ),
         "camera_preprocess_hook": str(
             merged_vehicle.get("camera_preprocess_hook", "")
@@ -1136,7 +1162,7 @@ def _runtime_vehicle_from_config(
     if mission_target == "uav":
         px4_airframe_id = merged_vehicle.get("px4_airframe_id")
         runtime_vehicle["px4_airframe_id"] = (
-            int(px4_airframe_id) if px4_airframe_id is not None else None
+            _int_value(px4_airframe_id) if px4_airframe_id is not None else None
         )
         runtime_vehicle["px4_namespace"] = (
             str(merged_vehicle.get("px4_namespace", vehicle_name)).strip()
@@ -1175,7 +1201,9 @@ def _fleet_preview(ctx: AppContext, fleet_file: str) -> dict[str, object]:
             merged = deepcopy(defaults)
             merged.update(vehicle)
             vehicle_name = str(vehicle.get("name", "")).strip()
-            fleet_policy = policy_lookup.get(vehicle_name, {})
+            fleet_policy = policy_lookup.get(
+                vehicle_name
+            ) or _fleet_network_policy_from_merged_vehicle(merged)
             try:
                 runtime_vehicle, local_mission_path, _ = _runtime_vehicle_from_config(
                     ctx,
@@ -1255,7 +1283,7 @@ def _vehicle_from_fleet(fleet: dict, vehicle_name: str) -> dict:
 
 def _mission_source_for(
     ctx: AppContext, vehicle: dict
-) -> tuple[str, Path, MissionSpec]:
+) -> tuple[str, Path, MissionSpecCompat]:
     mission_path = str(vehicle.get("mission_path", "")).strip()
     if mission_path:
         local_path = _resolve_local_path(ctx, mission_path)
@@ -1275,6 +1303,22 @@ def _normalized_camera_offsets(value: object) -> list[float]:
     if isinstance(value, list) and len(value) == 3:
         return [float(component) for component in value]
     return [0.0, 0.0, 0.0]
+
+
+def _int_value(value: object, *, default: int = 0) -> int:
+    if value in (None, ""):
+        return default
+    if isinstance(value, bool) or not isinstance(value, int | float | str):
+        raise ValueError(f"Expected integer value, received {value!r}.")
+    return int(value)
+
+
+def _float_value(value: object, *, default: float = 0.0) -> float:
+    if value in (None, ""):
+        return default
+    if isinstance(value, bool) or not isinstance(value, int | float | str):
+        raise ValueError(f"Expected numeric value, received {value!r}.")
+    return float(value)
 
 
 def _bool_value(value: object, *, default: bool) -> bool:
@@ -2672,10 +2716,11 @@ async def set_global_fleet_file(
             success=True,
             output=f"Fleet selected: {selected}",
         )
-        if response.get("source"):
-            response["source"]["fleet_catalog_source"] = catalog_source
-            response["source"]["available_fleets"] = sorted(catalog_lookup)
-            response["source"]["fleet_options"] = sorted(catalog_lookup)
+        source_payload = response.get("source")
+        if isinstance(source_payload, dict):
+            source_payload["fleet_catalog_source"] = catalog_source
+            source_payload["available_fleets"] = sorted(catalog_lookup)
+            source_payload["fleet_options"] = sorted(catalog_lookup)
         return response
     except Exception as exc:
         return _build_source_response(
@@ -3155,7 +3200,7 @@ async def list_builds(
                 return None
             cached_subject = _commit_subject_cache_get(commit_sha)
             if cached_subject is not ...:
-                return cached_subject
+                return cached_subject if isinstance(cached_subject, str) else None
             if commit_lookup_rate_limited:
                 return None
             try:
@@ -3189,7 +3234,7 @@ async def list_builds(
                 return None
             cached_run = _workflow_run_cache_get(run_id)
             if cached_run is not ...:
-                return cached_run
+                return cached_run if isinstance(cached_run, dict) else None
             if workflow_lookup_rate_limited:
                 return None
             try:
@@ -3262,7 +3307,7 @@ async def list_builds(
                 if commit_sha:
                     artifact_commit_shas.append(commit_sha)
 
-            unique_commit_shas = {
+            unique_commit_shas: dict[str, str | None] = {
                 sha: None for sha in (release_commit_shas + artifact_commit_shas) if sha
             }
             for commit_sha in unique_commit_shas:
@@ -3397,11 +3442,11 @@ async def download_build(
         return {"success": False, "error": "GITHUB_REPO not configured"}
 
     tmp_path = ""
+    extract_dir: Path | None = None
     try:
         httpx = _require_httpx()
         headers = _github_headers(ctx)
         artifact_name = ""
-        extract_dir: Path | None = None
         async with httpx.AsyncClient(timeout=300, follow_redirects=True) as client:
             if source == "actions":
                 if not artifact_id:
@@ -3480,7 +3525,7 @@ async def download_build(
     finally:
         if tmp_path and os.path.exists(tmp_path):
             os.unlink(tmp_path)
-        if "extract_dir" in locals() and extract_dir is not None:
+        if extract_dir is not None:
             shutil.rmtree(extract_dir, ignore_errors=True)
 
 
