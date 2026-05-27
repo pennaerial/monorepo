@@ -45,6 +45,21 @@ class UAVMissionBootstrap(Node):
             )
         return float(value)
 
+    def _float_list_parameter(self, name: str) -> list[float]:
+        value = self.get_parameter(name).value
+        if not isinstance(value, (list, tuple)):
+            raise ValueError(
+                f"uav_mission requires numeric list parameter '{name}', received {value!r}."
+            )
+        offsets: list[float] = []
+        for item in value:
+            if not isinstance(item, (int, float)) or isinstance(item, bool):
+                raise ValueError(
+                    f"uav_mission requires numeric list parameter '{name}', received {value!r}."
+                )
+            offsets.append(float(item))
+        return offsets
+
     def manager_kwargs(self) -> dict:
         mission_path = str(self.get_parameter("mode_map").value)
         if not mission_path:
@@ -66,7 +81,7 @@ class UAVMissionBootstrap(Node):
             "vehicle_class": AirframeClass.parse(
                 self.get_parameter("vehicle_class").value
             ),
-            "camera_offsets": list(self.get_parameter("camera_mount_offsets").value),
+            "camera_offsets": self._float_list_parameter("camera_mount_offsets"),
             "peer_heartbeat_hz": self._float_parameter("peer_heartbeat_hz"),
             "peer_stale_timeout_s": self._float_parameter("peer_stale_timeout_s"),
             "node_name": "mission",
