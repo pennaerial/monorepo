@@ -2,7 +2,7 @@ import importlib
 import os
 import time
 import uuid
-from typing import Callable
+from typing import Callable, cast
 
 import cv2
 import numpy as np
@@ -14,6 +14,8 @@ from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from sensor_msgs.msg import CameraInfo, CompressedImage, Image
 from std_msgs.msg import Bool
 from uav_interfaces.srv import CameraData
+
+PreprocessHook = Callable[[np.ndarray], np.ndarray]
 
 
 class Camera(Node):
@@ -72,7 +74,7 @@ class Camera(Node):
         self.input_transport = self._resolve_transport_mode(
             str(self.get_parameter("input_transport").value).strip()
         )
-        self.rotate_degrees = float(self.get_parameter("rotate_degrees").value)
+        self.rotate_degrees = self._float_parameter("rotate_degrees")
         self.preprocess_hook_name = str(
             self.get_parameter("preprocess_hook").value
         ).strip()
@@ -185,9 +187,7 @@ class Camera(Node):
             queue_size,
         )
 
-        self.save_vision_milliseconds = int(
-            self.get_parameter("save_vision_milliseconds").value
-        )
+        self.save_vision_milliseconds = self._int_parameter("save_vision_milliseconds")
         self.vision_debug = bool(self.get_parameter("debug").value)
         self.uuid = str(uuid.uuid4())
         self.last_saved_time = time.time_ns() // 1_000_000
@@ -277,9 +277,19 @@ class Camera(Node):
             )
         return cleaned.lstrip("/")
 
-    def _load_preprocess_hook(
-        self, hook_path: str
-    ) -> Callable[[np.ndarray], np.ndarray] | None:
+    def _float_parameter(self, param_name: str) -> float:
+        value = self.get_parameter(param_name).value
+        if isinstance(value, bool) or not isinstance(value, int | float | str):
+            raise ValueError(f"{param_name} must be a numeric parameter.")
+        return float(value)
+
+    def _int_parameter(self, param_name: str) -> int:
+        value = self.get_parameter(param_name).value
+        if isinstance(value, bool) or not isinstance(value, int | float | str):
+            raise ValueError(f"{param_name} must be an integer parameter.")
+        return int(value)
+
+    def _load_preprocess_hook(self, hook_path: str) -> PreprocessHook | None:
         if not hook_path:
             return None
         module_path = hook_path
@@ -294,7 +304,7 @@ class Camera(Node):
             raise TypeError(
                 f"Configured preprocess_hook '{hook_path}' is not callable."
             )
-        return hook
+        return cast(PreprocessHook, hook)
 
     def _rotate_frame(self, frame: np.ndarray) -> np.ndarray:
         normalized_degrees = self.rotate_degrees % 360.0
