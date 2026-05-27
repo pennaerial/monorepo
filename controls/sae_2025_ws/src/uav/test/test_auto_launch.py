@@ -6,7 +6,7 @@ from pathlib import Path
 import sys
 from types import SimpleNamespace
 import types
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
@@ -281,8 +281,8 @@ class _FakeTimer:
         self.cancelled = True
 
 
-def _make_mode_manager(*, ready: bool) -> ModeManager:
-    manager = object.__new__(ModeManager)
+def _make_mode_manager(*, ready: bool) -> Any:
+    manager = cast(Any, object.__new__(ModeManager))
     manager.vehicle = None
     manager.modes = {}
     manager.transitions = {}

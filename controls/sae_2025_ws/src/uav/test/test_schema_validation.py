@@ -4,6 +4,7 @@ import importlib.util
 import sys
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any, cast
 
 import pytest
 import yaml
@@ -51,8 +52,8 @@ class _TrackingMode:
         return self.status
 
 
-def _make_mode_manager():
-    manager = object.__new__(ModeManager)
+def _make_mode_manager() -> Any:
+    manager = cast(Any, object.__new__(ModeManager))
     manager.vehicle = None
     manager.modes = {}
     manager.transitions = {}
