@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import cv2
 import numpy as np
-from collections.abc import Sequence
 from typing import Optional, Tuple
 import os
 
 from uav.utils import blue, green, pink, yellow
 
 from .dlz_color_regions import detect_focused_dlz_paper_masks
+from .hsv import HsvBound, hsv_bound_array
 
 _NAMED_PAYLOAD_BOUNDS = {
     "pink": pink,
@@ -21,11 +21,6 @@ _PAPER_MASK_KEYS = {
     "blue": "blue_mask",
     "purple": "purple_mask",
 }
-HsvBound = Sequence[int] | np.ndarray
-
-
-def _hsv_bound_array(bound: HsvBound) -> np.ndarray:
-    return np.asarray(bound, dtype=np.uint8)
 
 
 def _normalize_payload_color(
@@ -74,7 +69,7 @@ def _legacy_focused_payload_mask(
 
     hsv_image = cv2.cvtColor(focused_bgr, cv2.COLOR_BGR2HSV)
     payload_mask = cv2.inRange(
-        hsv_image, _hsv_bound_array(lower_payload), _hsv_bound_array(upper_payload)
+        hsv_image, hsv_bound_array(lower_payload), hsv_bound_array(upper_payload)
     )
     kernel = np.ones((5, 5), np.uint8)
     payload_mask = cv2.morphologyEx(payload_mask, cv2.MORPH_OPEN, kernel)
@@ -133,7 +128,7 @@ def find_payload(
     )
 
     zone_mask = cv2.inRange(
-        hsv_image, _hsv_bound_array(lower_zone), _hsv_bound_array(upper_zone)
+        hsv_image, hsv_bound_array(lower_zone), hsv_bound_array(upper_zone)
     )
     kernel = np.ones((5, 5), np.uint8)
     dilated = cv2.dilate(zone_mask, kernel, iterations=3)
