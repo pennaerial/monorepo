@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from typing import Any
 
 package_root = Path(__file__).resolve().parents[1]
 if str(package_root) not in sys.path:
@@ -350,8 +351,9 @@ def test_resolve_stage_world_loads_specific_stage_and_merges_world_overrides(
 
 
 def test_resolve_stage_world_rejects_non_mapping_overrides():
+    bad_overrides: Any = ["bad"]
     try:
-        resolve_stage_world(world_name="sae", world_overrides=["bad"])
+        resolve_stage_world(world_name="sae", world_overrides=bad_overrides)
     except ValueError as exc:
         assert "world_overrides must be a mapping" in str(exc)
     else:
