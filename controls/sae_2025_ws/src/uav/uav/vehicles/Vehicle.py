@@ -44,10 +44,12 @@ class Vehicle(ABC):
 
     @staticmethod
     def _vision_node_name(vision_node: object) -> str:
-        if hasattr(vision_node, "node_name"):
-            return vision_node.node_name()
-        if hasattr(vision_node, "__name__"):
-            return vision_node.__name__
+        node_name = getattr(vision_node, "node_name", None)
+        if callable(node_name):
+            return str(node_name())
+        class_name = getattr(vision_node, "__name__", None)
+        if isinstance(class_name, str):
+            return class_name
         return str(vision_node)
 
     def _default_camera_path(self, suffix: str) -> str | None:
@@ -79,8 +81,9 @@ class Vehicle(ABC):
             raise RuntimeError(
                 f"Vehicle '{self.name}' does not expose a namespaced camera contract."
             )
-        if hasattr(vision_node, "service_name"):
-            return vision_node.service_name()
+        service_name = getattr(vision_node, "service_name", None)
+        if callable(service_name):
+            return str(service_name())
         return self.namespaced_path(f"vision/{self._vision_node_name(vision_node)}")
 
     @abstractmethod

@@ -69,10 +69,10 @@ class UAV(Vehicle):
         self.failsafe = False
         self.failsafe_px4 = False
         self.failsafe_trigger = False
-        self.vehicle_status = None
-        self.vehicle_attitude = None
-        self.nav_state = None
-        self.arm_state = None
+        self.vehicle_status: VehicleStatus | None = None
+        self.vehicle_attitude: VehicleAttitude | None = None
+        self.nav_state: int | None = None
+        self.arm_state: int | None = None
 
         self.system_id = 1
         self.component_id = 1
@@ -87,19 +87,19 @@ class UAV(Vehicle):
 
         # set takeoff parameters
         self.origin_set = False
-        self.roll = None
-        self.pitch = None
-        self.yaw = None
+        self.roll: float | None = None
+        self.pitch: float | None = None
+        self.yaw: float | None = None
         self.takeoff_amount = takeoff_amount
         self.attempted_takeoff = False
 
         # Initialize drone position
-        self.local_origin = None
-        self.gps_origin = None
+        self.local_origin: tuple[float, float, float] | None = None
+        self.gps_origin: tuple[float, float, float] | None = None
 
         # Store current drone position
-        self.global_position = None
-        self.local_position = None
+        self.global_position: VehicleGlobalPosition | None = None
+        self.local_position: VehicleLocalPosition | None = None
 
     # -------------------------
     # Public commands
@@ -112,11 +112,39 @@ class UAV(Vehicle):
         )
         self.node.get_logger().info("Sent Arm Command")
 
+    def _require_global_position(self) -> VehicleGlobalPosition:
+        if self.global_position is None:
+            raise RuntimeError("No GPS data available.")
+        return self.global_position
+
+    def _require_local_position(self) -> VehicleLocalPosition:
+        if self.local_position is None:
+            raise RuntimeError("No local position data available.")
+        return self.local_position
+
+    def _require_gps(self) -> tuple[float, float, float]:
+        gps = self.get_gps()
+        if gps is None:
+            raise RuntimeError("No GPS data available.")
+        return gps
+
+    def _require_local_position_tuple(self) -> tuple[float, float, float]:
+        position = self.get_local_position()
+        if position is None:
+            raise RuntimeError("No local position data available.")
+        return position
+
+    def _require_yaw(self) -> float:
+        if self.yaw is None:
+            raise RuntimeError("No yaw data available.")
+        return self.yaw
+
     def set_origin(self):
-        if self.global_position and self.yaw:
-            lat = self.global_position.lat
-            lon = self.global_position.lon
-            alt = self.global_position.alt
+        if self.global_position is not None and self.yaw is not None:
+            global_position = self.global_position
+            lat = global_position.lat
+            lon = global_position.lon
+            alt = global_position.alt
             self.node.get_logger().info(f"Setting origin to {lat}, {lon}, {alt}")
             self._send_vehicle_command(
                 VehicleCommand.VEHICLE_CMD_SET_GPS_GLOBAL_ORIGIN,
@@ -136,7 +164,7 @@ class UAV(Vehicle):
     def distance_to_waypoint(self, coordinate_system, waypoint) -> float:
         """Calculate the distance to the current waypoint."""
         if coordinate_system == "GPS":
-            curr_gps = self.get_gps()
+            curr_gps = self._require_gps()
             return self.gps_distance_3d(
                 waypoint[0],
                 waypoint[1],
@@ -146,11 +174,15 @@ class UAV(Vehicle):
                 curr_gps[2],
             )
         elif coordinate_system == "LOCAL":
-            return np.sqrt(
-                (self.local_position.x - waypoint[0]) ** 2
-                + (self.local_position.y - waypoint[1]) ** 2
-                + (self.local_position.z - waypoint[2]) ** 2
+            local_position = self._require_local_position()
+            return float(
+                np.sqrt(
+                    (local_position.x - waypoint[0]) ** 2
+                    + (local_position.y - waypoint[1]) ** 2
+                    + (local_position.z - waypoint[2]) ** 2
+                )
             )
+        raise ValueError(f"Unsupported coordinate system: {coordinate_system}")
 
     def hover(self):
         self._send_vehicle_command(
@@ -189,9 +221,10 @@ class UAV(Vehicle):
         """
         if not self.attempted_takeoff:
             self.attempted_takeoff = True
-            lat = self.global_position.lat
-            lon = self.global_position.lon
-            alt = self.global_position.alt
+            global_position = self._require_global_position()
+            lat = global_position.lat
+            lon = global_position.lon
+            alt = global_position.alt
             takeoff_gps = (lat, lon, alt + self.takeoff_amount)
             self._send_vehicle_command(
                 VehicleCommand.VEHICLE_CMD_NAV_TAKEOFF,
@@ -237,9 +270,10 @@ class UAV(Vehicle):
         """
         x, y, z = coordinate
         if relative:
-            x += self.local_position.x
-            y += self.local_position.y
-            z += self.local_position.z
+            local_position = self._require_local_position()
+            x += local_position.x
+            y += local_position.y
+            z += local_position.z
 
         msg = TrajectorySetpoint()
         msg.position = [float(x), float(y), float(z)]
@@ -259,8 +293,9 @@ class UAV(Vehicle):
     def calculate_yaw(self, x: float, y: float) -> float:
         """Calculate the yaw angle to point towards the next waypoint."""
         # Calculate relative position
-        dx = x - self.local_position.x
-        dy = y - self.local_position.y
+        local_position = self._require_local_position()
+        dx = x - local_position.x
+        dy = y - local_position.y
 
         # If very close to target (hovering), maintain current yaw to prevent spinning
         # caused by noisy position estimates when dx/dy are near zero
@@ -312,11 +347,16 @@ class UAV(Vehicle):
         Returns:
             float: The 3D distance between the two points in feet.
         """
-        # Earth's radius in feet (using an average value)
-        curr_x, curr_y, curr_z = self.gps_to_local((lat1, lon1, alt1))
-        tar_x, tar_y, tar_z = self.gps_to_local((lat2, lon2, alt2))
-        return np.sqrt(
-            (curr_x - tar_x) ** 2 + (curr_y - tar_y) ** 2 + (curr_z - tar_z) ** 2
+        current_local = self.gps_to_local((lat1, lon1, alt1))
+        target_local = self.gps_to_local((lat2, lon2, alt2))
+        if current_local is None or target_local is None:
+            raise RuntimeError("Unable to convert GPS coordinates to local frame.")
+        curr_x, curr_y, curr_z = current_local
+        tar_x, tar_y, tar_z = target_local
+        return float(
+            np.sqrt(
+                (curr_x - tar_x) ** 2 + (curr_y - tar_y) ** 2 + (curr_z - tar_z) ** 2
+            )
         )
 
     def gps_to_local(self, target):
@@ -361,15 +401,16 @@ class UAV(Vehicle):
         :param relative: If True, the point is relative to the current local position.
         :return: A tuple (goal_x, goal_y, goal_z) representing the point in the global frame.
         """
-        current_pos = self.get_local_position()
         point_x, point_y, point_z = point
+        yaw = self._require_yaw()
 
         # Rotate the x and y points according to the UAV's yaw angle.
-        rotated_point_x = point_x * math.cos(self.yaw) - point_y * math.sin(self.yaw)
-        rotated_point_y = point_x * math.sin(self.yaw) + point_y * math.cos(self.yaw)
+        rotated_point_x = point_x * math.cos(yaw) - point_y * math.sin(yaw)
+        rotated_point_y = point_x * math.sin(yaw) + point_y * math.cos(yaw)
 
         # The z-point remains unchanged.
         if relative:
+            current_pos = self._require_local_position_tuple()
             return (
                 current_pos[0] + rotated_point_x,
                 current_pos[1] + rotated_point_y,

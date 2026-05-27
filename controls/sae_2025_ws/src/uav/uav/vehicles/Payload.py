@@ -1,3 +1,5 @@
+from typing import Any, Protocol, cast
+
 from rclpy.node import Node
 
 from payload_interfaces.msg import (
@@ -11,6 +13,23 @@ from payload_interfaces.srv import DeadReckon, TimedDrive
 from .Vehicle import Vehicle
 
 _DEFAULT_UDP_HEARTBEAT_HZ = 10.0
+
+
+class _RawNodeApi(Protocol):
+    def create_publisher(self, *args: Any, **kwargs: Any) -> Any: ...
+    def create_subscription(self, *args: Any, **kwargs: Any) -> Any: ...
+    def create_timer(self, *args: Any, **kwargs: Any) -> Any: ...
+
+
+class _PeerConnections(Protocol):
+    def status(self) -> dict[str, bool]: ...
+
+
+class _PayloadRuntimeNode(Protocol):
+    _raw_node_api: _RawNodeApi
+    _peer_connections: _PeerConnections
+
+    def _now_seconds(self) -> float: ...
 
 
 class Payload(Vehicle):
@@ -54,7 +73,8 @@ class Payload(Vehicle):
         self._udp_heartbeat_seq = 0
         self._latest_motor_state: MotorState | None = None
 
-        raw = node._raw_node_api
+        runtime_node = cast(_PayloadRuntimeNode, node)
+        raw = runtime_node._raw_node_api
         self._udp_heartbeat_pub = raw.create_publisher(
             PayloadHeartbeat, "udp_bridge/out/heartbeat", 10
         )
@@ -75,7 +95,8 @@ class Payload(Vehicle):
     def _publish_udp_heartbeat(self) -> None:
         msg = PayloadHeartbeat()
 
-        now = self.node._now_seconds()
+        runtime_node = cast(_PayloadRuntimeNode, self.node)
+        now = runtime_node._now_seconds()
         msg.stamp.sec = int(now)
         msg.stamp.nanosec = int((now % 1.0) * 1e9)
 
@@ -87,7 +108,7 @@ class Payload(Vehicle):
         msg.mission_started = getattr(self.node, "timer", None) is not None
         msg.is_error = bool(self.heartbeat_state.get("is_error", False))
 
-        peer_status: dict[str, bool] = self.node._peer_connections.status()
+        peer_status = runtime_node._peer_connections.status()
         msg.connected_peers = [p for p, alive in peer_status.items() if alive]
         msg.disconnected_peers = [p for p, alive in peer_status.items() if not alive]
 
