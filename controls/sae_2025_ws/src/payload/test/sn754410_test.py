@@ -1,4 +1,4 @@
-import pigpio
+import pigpio  # pyright: ignore[reportMissingImports]
 import time
 
 # ----------------------
