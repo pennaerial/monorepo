@@ -19,6 +19,8 @@ from rclpy.node import Node
 
 from payload_interfaces.msg import MotorState
 
+_ANIMATION: FuncAnimation | None = None
+
 
 class MotorStatePlotter(Node):
     def __init__(self, topic: str, window_sec: float) -> None:
@@ -128,7 +130,8 @@ def main() -> None:
         return left_set_line, left_meas_line, right_set_line, right_meas_line
 
     interval_ms = max(1, int(1000.0 / args.refresh_hz))
-    fig._animation = FuncAnimation(fig, update, interval=interval_ms, blit=False)
+    global _ANIMATION
+    _ANIMATION = FuncAnimation(fig, update, interval=interval_ms, blit=False)
 
     try:
         plt.show()
