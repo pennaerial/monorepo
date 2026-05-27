@@ -48,9 +48,11 @@ LINE_FOLLOW
 from __future__ import annotations
 
 import math
-from typing import Any, Optional, Tuple, cast
+from collections.abc import Sequence
+from typing import Optional, Tuple, cast
 
 import cv2
+from cv2.typing import MatLike
 import numpy as np
 from cv_bridge import CvBridge
 from rclpy.node import Node
@@ -65,6 +67,15 @@ from ..Mode import Mode
 # least this many times more pixels than the other in the line-follow strip,
 # we treat it as the new dominant colour and trigger a transition.
 _COLOR_DOMINANCE_RATIO = 1.5
+
+
+def _draw_cv_contours(
+    image: np.ndarray,
+    contours: Sequence[MatLike],
+    color: Tuple[int, int, int],
+    thickness: int,
+) -> None:
+    cv2.drawContours(image, contours, -1, color, thickness)
 
 
 class PayloadCornerNavigateMode(Mode[Payload]):
@@ -911,8 +922,11 @@ class PayloadCornerNavigateMode(Mode[Payload]):
         if not contours:
             return
         shift = np.array([[[x_offset, y_offset]]], dtype=np.int32)
-        shifted = [np.asarray(contour, dtype=np.int32) + shift for contour in contours]
-        cv2.drawContours(debug, cast(Any, shifted), -1, color, thickness)
+        shifted: list[MatLike] = [
+            cast(MatLike, np.asarray(contour, dtype=np.int32) + shift)
+            for contour in contours
+        ]
+        _draw_cv_contours(debug, shifted, color, thickness)
 
     def _put_label(
         self,

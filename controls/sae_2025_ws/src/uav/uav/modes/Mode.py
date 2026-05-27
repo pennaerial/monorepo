@@ -1,5 +1,14 @@
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, ClassVar, Generic, Mapping, Protocol, TypeVar, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    ClassVar,
+    Generic,
+    Mapping,
+    Protocol,
+    TypeVar,
+    cast,
+)
 
 from rclpy.node import Node
 
@@ -13,11 +22,9 @@ VehicleT = TypeVar("VehicleT", bound=Vehicle)
 
 
 class _ModeManagerNode(Protocol):
-    def get_vision_client(self, vision_node: type["VisionNode"]) -> Any:
-        ...
+    def get_vision_client(self, vision_node: type["VisionNode"]) -> Any: ...
 
-    def shared_state_for(self, mode_or_class: object) -> dict[str, Any]:
-        ...
+    def shared_state_for(self, mode_or_class: object) -> dict[str, Any]: ...
 
 
 class Mode(Generic[VehicleT], ABC):
@@ -85,9 +92,11 @@ class Mode(Generic[VehicleT], ABC):
 
         response = future.result()
         self.pending_requests.pop(service_name, None)
-        assert type(response) is vision_node.srv.Response, (
-            f"Expected response type {vision_node.srv.Response}, got {type(response)}."
-        )
+        response_type = vision_node.srv.Response
+        if not isinstance(response, response_type):
+            raise TypeError(
+                f"Expected response type {response_type}, got {type(response)}."
+            )
         return response
 
     def on_exit(self) -> None:
