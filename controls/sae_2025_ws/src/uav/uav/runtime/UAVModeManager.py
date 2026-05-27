@@ -1,10 +1,12 @@
 from time import time
+from typing import cast
 
 from px4_msgs.msg import VehicleStatus
 from std_srvs.srv import Trigger
 
 from uav.vehicles.AirframeClass import AirframeClass
 from uav.vehicles.Multicopter import Multicopter
+from uav.vehicles.UAV import UAV
 from uav.vehicles.VTOL import VTOL
 from uav.modes.uav.LandingMode import LandingMode
 from .ModeManager import ModeManager
@@ -71,47 +73,54 @@ class UAVModeManager(ModeManager):
         )
         self.setup_modes(mission_spec)
 
+    def _uav_vehicle(self) -> UAV | None:
+        vehicle = self.vehicle
+        if vehicle is None:
+            return None
+        return cast(UAV, vehicle)
+
     def _auto_launch_ready(self) -> bool:
-        if self.vehicle is None:
+        vehicle = self._uav_vehicle()
+        if vehicle is None:
             return False
         return (
-            self.vehicle.vehicle_status is not None
-            and self.vehicle.vehicle_attitude is not None
-            and self.vehicle.yaw is not None
-            and self.vehicle.local_position is not None
-            and self.vehicle.global_position is not None
-            and bool(self.vehicle.flight_check)
+            vehicle.vehicle_status is not None
+            and vehicle.vehicle_attitude is not None
+            and vehicle.yaw is not None
+            and vehicle.local_position is not None
+            and vehicle.global_position is not None
+            and bool(vehicle.flight_check)
         )
 
     def trigger_failsafe(self, request, response):
         self.get_logger().info("Failsafe triggered via service call")
-        if self.vehicle is not None and hasattr(self.vehicle, "failsafe_trigger"):
-            self.vehicle.failsafe_trigger = True
-            self.vehicle.failsafe = (
-                self.vehicle.failsafe_px4 or self.vehicle.failsafe_trigger
-            )
+        vehicle = self._uav_vehicle()
+        if vehicle is not None:
+            vehicle.failsafe_trigger = True
+            vehicle.failsafe = vehicle.failsafe_px4 or vehicle.failsafe_trigger
         response.success = True
         response.message = "Failsafe triggered."
         return response
 
     def spin_once(self) -> None:
         current_time = time()
-        if self.vehicle is None:
+        vehicle = self._uav_vehicle()
+        if vehicle is None:
             return
 
         if self.active_mode is None:
             self.switch_mode("start")
 
-        if self.vehicle.failsafe:
-            if not self.vehicle.emergency_landing:
-                self.vehicle.hover()
+        if vehicle.failsafe:
+            if not vehicle.emergency_landing:
+                vehicle.hover()
                 self.get_logger().warn("Failsafe: Switching to AUTO_LOITER mode.")
-                self.vehicle.emergency_landing = True
+                vehicle.emergency_landing = True
             if (
-                self.vehicle.nav_state == VehicleStatus.NAVIGATION_STATE_AUTO_LOITER
-                or self.vehicle.arm_state != VehicleStatus.ARMING_STATE_ARMED
+                vehicle.nav_state == VehicleStatus.NAVIGATION_STATE_AUTO_LOITER
+                or vehicle.arm_state != VehicleStatus.ARMING_STATE_ARMED
             ):
-                self.vehicle.land()
+                vehicle.land()
                 self.get_logger().warn("Failsafe: Initiating landing.")
             return
 
@@ -119,24 +128,24 @@ class UAVModeManager(ModeManager):
             self._run_active_mode(current_time)
             return
 
-        if not self.vehicle.origin_set:
-            self.vehicle.set_origin()
+        if not vehicle.origin_set:
+            vehicle.set_origin()
 
-        if self.vehicle.arm_state != VehicleStatus.ARMING_STATE_ARMED:
+        if vehicle.arm_state != VehicleStatus.ARMING_STATE_ARMED:
             self.get_logger().info(
-                f"UAV is not armed. Current arm state: {self.vehicle.arm_state}"
+                f"UAV is not armed. Current arm state: {vehicle.arm_state}"
             )
             if (
                 self.active_mode is not None
                 and isinstance(self.get_active_mode(), LandingMode)
-                and self.vehicle.nav_state != VehicleStatus.NAVIGATION_STATE_AUTO_LAND
+                and vehicle.nav_state != VehicleStatus.NAVIGATION_STATE_AUTO_LAND
             ):
                 self.get_logger().info("Successfully Landed UAV")
                 self.get_logger().info("Finishing Mission")
                 self.destroy_node()
                 return
 
-            if self.vehicle.attempted_takeoff and self.active_mode is not None:
+            if vehicle.attempted_takeoff and self.active_mode is not None:
                 self.get_logger().error(
                     "UAV disarmed unexpectedly after takeoff attempt. Terminating to prevent infinite cycle."
                 )
@@ -146,18 +155,18 @@ class UAVModeManager(ModeManager):
                 self.destroy_node()
                 return
 
-            self.vehicle.arm()
+            vehicle.arm()
             self.get_logger().info("Arming UAV")
             self.start_time = current_time
             return
 
-        if self.vehicle.local_position is None or self.vehicle.global_position is None:
+        if vehicle.local_position is None or vehicle.global_position is None:
             return
 
-        self.vehicle.publish_offboard_control_heartbeat_signal()
+        vehicle.publish_offboard_control_heartbeat_signal()
         self._run_active_mode(current_time)
 
-        if self.vehicle.nav_state == VehicleStatus.NAVIGATION_STATE_AUTO_LAND:
+        if vehicle.nav_state == VehicleStatus.NAVIGATION_STATE_AUTO_LAND:
             self.get_logger().info("Landing")
 
     def handle_mode_state(self, state: str) -> None:
@@ -165,8 +174,9 @@ class UAVModeManager(ModeManager):
             self.get_logger().error(
                 f"Error in mode {self.active_mode}. Switching to failsafe."
             )
-            if self.vehicle is not None:
-                self.vehicle.failsafe = True
+            vehicle = self._uav_vehicle()
+            if vehicle is not None:
+                vehicle.failsafe = True
             return
         if state == "terminate":
             self.get_logger().info("Mission has completed.")

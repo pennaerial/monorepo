@@ -5,7 +5,7 @@ import inspect
 import os
 from pathlib import Path
 from time import time
-from typing import Any, Callable, Iterator, get_type_hints
+from typing import Any, Callable, Iterator, cast, get_type_hints
 
 from rclpy.node import Node
 from std_srvs.srv import Trigger
@@ -30,15 +30,15 @@ from .vision_loader import canonical_vision_node_path, load_vision_class
 
 @dataclass(frozen=True)
 class _RawNodeApi:
-    create_publisher: Callable[..., object]
-    create_subscription: Callable[..., object]
-    create_client: Callable[..., object]
-    create_service: Callable[..., object]
-    create_timer: Callable[..., object]
-    destroy_publisher: Callable[[object], bool | None]
-    destroy_subscription: Callable[[object], bool | None]
-    destroy_client: Callable[[object], bool | None]
-    destroy_timer: Callable[[object], bool | None] | None
+    create_publisher: Callable[..., Any]
+    create_subscription: Callable[..., Any]
+    create_client: Callable[..., Any]
+    create_service: Callable[..., Any]
+    create_timer: Callable[..., Any]
+    destroy_publisher: Callable[..., bool | None]
+    destroy_subscription: Callable[..., bool | None]
+    destroy_client: Callable[..., bool | None]
+    destroy_timer: Callable[..., bool | None] | None
 
 
 MISSION_STARTED_MARKER_ENV = "PENNAIR_MISSION_STARTED_MARKER_PATH"
@@ -57,15 +57,15 @@ class ModeManager(Node):
         peer_stale_timeout_s: float = 0.5,
     ) -> None:
         super().__init__(node_name)
-        self.vehicle = None
-        self.modes = {}
-        self.transitions = {}
-        self.active_mode = None
+        self.vehicle: Vehicle | None = None
+        self.modes: dict[str, Mode] = {}
+        self.transitions: dict[str, dict[str, str]] = {}
+        self.active_mode: str | None = None
         self.last_update_time = time()
-        self._vision_clients = {}
-        self.timer = None
+        self._vision_clients: dict[str, Any] = {}
+        self.timer: Any | None = None
         self.auto_launch = bool(auto_launch)
-        self._auto_launch_timer = None
+        self._auto_launch_timer: Any | None = None
         self._runtime_vehicle_name = normalize_vehicle_name(vehicle_name)
         self.peer_heartbeat_hz = float(peer_heartbeat_hz)
         self.peer_stale_timeout_s = float(peer_stale_timeout_s)
@@ -78,8 +78,8 @@ class ModeManager(Node):
                 "peer_stale_timeout_s must be positive, "
                 f"got {self.peer_stale_timeout_s!r}."
             )
-        self._shared_mode_state = {}
-        self._current_comm_builder = None
+        self._shared_mode_state: dict[str, dict[str, Any]] = {}
+        self._current_comm_builder: ModeCommBuilder | None = None
         self._runtime_closed = False
         self._initialize_comms_runtime(vehicle_name=vehicle_name)
         self.start_mission_service = self.create_service(
@@ -90,7 +90,10 @@ class ModeManager(Node):
             self._auto_launch_timer = self.create_timer(0.1, self._maybe_auto_launch)
 
     def get_active_mode(self) -> Mode:
-        return self.modes[self.active_mode]
+        active_mode = self.active_mode
+        if active_mode is None:
+            raise RuntimeError("No active mode is set.")
+        return self.modes[active_mode]
 
     def _now_seconds(self) -> float:
         return self.get_clock().now().nanoseconds * 1e-9
@@ -204,11 +207,14 @@ class ModeManager(Node):
             )
 
     @property
-    def vision_clients(self) -> dict:
+    def vision_clients(self) -> dict[str, Any]:
         return self._vision_clients
 
-    def _connect_vision_client(self, vision_class):
-        service_name = self.vehicle.vision_service_name(vision_class)
+    def _connect_vision_client(self, vision_class: type[Any]) -> tuple[Any, str]:
+        vehicle = self.vehicle
+        if vehicle is None:
+            raise ValueError("Vision nodes require an active vehicle camera contract.")
+        service_name = vehicle.vision_service_name(vision_class)
         while True:
             client = super().create_client(vision_class.srv, service_name)
             if client.wait_for_service(timeout_sec=1.0):
@@ -258,14 +264,14 @@ class ModeManager(Node):
         finally:
             self._current_comm_builder = previous_builder
 
-    def _raw_method(self, name: str):
+    def _raw_method(self, name: str) -> Callable[..., Any]:
         raw_node_api = getattr(self, "_raw_node_api", None)
         if raw_node_api is not None:
             return getattr(raw_node_api, name)
         raw_method = getattr(super(ModeManager, self), name, None)
         if raw_method is not None:
             return raw_method
-        return getattr(Node, name)
+        return cast(Callable[..., Any], getattr(Node, name))
 
     def _instantiate_mode(
         self,
@@ -304,7 +310,7 @@ class ModeManager(Node):
         name: str,
         args: tuple[Any, ...],
         kwargs: dict[str, Any],
-    ):
+    ) -> Any:
         if not hasattr(self, "_runtime_vehicle_name"):
             return self._raw_method(f"create_{kind}")(
                 interface_type,
@@ -335,7 +341,7 @@ class ModeManager(Node):
             kwargs=kwargs,
         )
 
-    def _destroy_entity(self, *, kind: str, entity) -> bool:
+    def _destroy_entity(self, *, kind: str, entity: object) -> bool:
         registry = getattr(self, "_managed_registry", None)
         if registry is None:
             return bool(self._raw_method(f"destroy_{kind}")(entity))
@@ -409,7 +415,10 @@ class ModeManager(Node):
         self.get_logger().info(
             f"Transitioning from {self.active_mode} based on state {state}."
         )
-        return self.transitions[self.active_mode][state]
+        active_mode = self.active_mode
+        if active_mode is None:
+            raise RuntimeError("No active mode is set.")
+        return self.transitions[active_mode][state]
 
     def switch_mode(self, mode_name: str) -> None:
         if self.active_mode:
@@ -502,6 +511,9 @@ class ModeManager(Node):
         self._write_mission_started_marker()
         return True
 
+    def spin_once(self) -> None:
+        raise NotImplementedError("ModeManager subclasses must implement spin_once().")
+
     def _cancel_auto_launch_timer(self) -> None:
         if self._auto_launch_timer is None:
             return
@@ -544,7 +556,9 @@ class ModeManager(Node):
             else:
                 self.switch_mode(next_mode)
 
-    def create_publisher(self, msg_type, topic: str, *args, **kwargs):
+    def create_publisher(
+        self, msg_type: object, topic: str, *args: Any, **kwargs: Any
+    ) -> Any:
         return self._create_entity(
             kind="publisher",
             interface_type=msg_type,
@@ -553,7 +567,9 @@ class ModeManager(Node):
             kwargs=kwargs,
         )
 
-    def create_subscription(self, msg_type, topic: str, *args, **kwargs):
+    def create_subscription(
+        self, msg_type: object, topic: str, *args: Any, **kwargs: Any
+    ) -> Any:
         return self._create_entity(
             kind="subscription",
             interface_type=msg_type,
@@ -562,7 +578,9 @@ class ModeManager(Node):
             kwargs=kwargs,
         )
 
-    def create_client(self, srv_type, srv_name: str, *args, **kwargs):
+    def create_client(
+        self, srv_type: object, srv_name: str, *args: Any, **kwargs: Any
+    ) -> Any:
         return self._create_entity(
             kind="client",
             interface_type=srv_type,
@@ -571,7 +589,9 @@ class ModeManager(Node):
             kwargs=kwargs,
         )
 
-    def create_service(self, srv_type, srv_name: str, *args, **kwargs):
+    def create_service(
+        self, srv_type: object, srv_name: str, *args: Any, **kwargs: Any
+    ) -> Any:
         return self._create_entity(
             kind="service",
             interface_type=srv_type,
@@ -580,13 +600,13 @@ class ModeManager(Node):
             kwargs=kwargs,
         )
 
-    def destroy_publisher(self, publisher) -> bool:
+    def destroy_publisher(self, publisher: object) -> bool:
         return self._destroy_entity(kind="publisher", entity=publisher)
 
-    def destroy_subscription(self, subscription) -> bool:
+    def destroy_subscription(self, subscription: object) -> bool:
         return self._destroy_entity(kind="subscription", entity=subscription)
 
-    def destroy_client(self, client) -> bool:
+    def destroy_client(self, client: object) -> bool:
         return self._destroy_entity(kind="client", entity=client)
 
     def _close_runtime_helpers(self) -> None:
@@ -600,7 +620,7 @@ class ModeManager(Node):
         if peer_connections is not None:
             peer_connections.close()
 
-    def destroy_node(self) -> bool:
+    def destroy_node(self) -> Any:
         self._clear_mission_started_marker()
         if getattr(self, "active_mode", None):
             self._deactivate_active_mode()

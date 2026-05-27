@@ -53,12 +53,12 @@ class ManagedCommRegistry:
         self,
         *,
         connection_status: Callable[[], Mapping[str, bool]],
-        raw_create_publisher: Callable[..., object],
-        raw_create_subscription: Callable[..., object],
-        raw_create_client: Callable[..., object],
-        raw_destroy_publisher: Callable[[object], bool | None],
-        raw_destroy_subscription: Callable[[object], bool | None],
-        raw_destroy_client: Callable[[object], bool | None],
+        raw_create_publisher: Callable[..., Any],
+        raw_create_subscription: Callable[..., Any],
+        raw_create_client: Callable[..., Any],
+        raw_destroy_publisher: Callable[..., bool | None],
+        raw_destroy_subscription: Callable[..., bool | None],
+        raw_destroy_client: Callable[..., bool | None],
     ) -> None:
         self._connection_status = connection_status
         self._raw_create_publisher = raw_create_publisher

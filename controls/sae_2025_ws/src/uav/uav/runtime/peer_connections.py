@@ -1,11 +1,19 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import Callable, Mapping
+from typing import Any, Callable, Mapping, Protocol
 
 from std_msgs.msg import Empty
 
 HEARTBEAT_TOPIC_SUFFIX = "mode_manager/heartbeat"
+
+
+class _ConnectionChangeCallback(Protocol):
+    def __call__(self, peer_name: str, *, connected: bool) -> None: ...
+
+
+class _HeartbeatPublisher(Protocol):
+    def publish(self, message: Empty) -> Any: ...
 
 
 def normalize_vehicle_name(vehicle_name: str | None) -> str:
@@ -64,13 +72,13 @@ class PeerConnectionTracker:
         peer_heartbeat_hz: float = 10.0,
         peer_stale_timeout_s: float = 0.5,
         now_seconds: Callable[[], float],
-        on_connection_change: Callable[[str], None] | Callable[..., None],
-        raw_create_publisher: Callable[..., object],
-        raw_create_subscription: Callable[..., object],
-        raw_destroy_publisher: Callable[[object], bool | None],
-        raw_destroy_subscription: Callable[[object], bool | None],
-        raw_create_timer: Callable[..., object],
-        raw_destroy_timer: Callable[[object], bool | None] | None = None,
+        on_connection_change: _ConnectionChangeCallback,
+        raw_create_publisher: Callable[..., Any],
+        raw_create_subscription: Callable[..., Any],
+        raw_destroy_publisher: Callable[..., bool | None],
+        raw_destroy_subscription: Callable[..., bool | None],
+        raw_create_timer: Callable[..., Any],
+        raw_destroy_timer: Callable[..., bool | None] | None = None,
     ) -> None:
         self._runtime_vehicle_name = normalize_vehicle_name(runtime_vehicle_name)
         self.peer_heartbeat_hz = float(peer_heartbeat_hz)
@@ -84,8 +92,8 @@ class PeerConnectionTracker:
         self._raw_create_timer = raw_create_timer
         self._raw_destroy_timer = raw_destroy_timer
 
-        self._heartbeat_publisher = None
-        self._heartbeat_timer = None
+        self._heartbeat_publisher: _HeartbeatPublisher | None = None
+        self._heartbeat_timer: Any | None = None
         self._heartbeat_subscriptions: dict[str, object] = {}
         self._connected: dict[str, bool] = {}
         self._last_seen: dict[str, float | None] = {}
