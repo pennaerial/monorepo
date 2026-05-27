@@ -1,4 +1,5 @@
 from importlib import import_module
+from typing import TYPE_CHECKING
 
 __all__ = [
     "MissionSpec",
@@ -39,6 +40,28 @@ _EXPORTS = {
     "UAVModeManager": ".UAVModeManager",
     "PayloadModeManager": ".PayloadModeManager",
 }
+
+if TYPE_CHECKING:
+    from .ModeManager import ModeManager
+    from .PayloadModeManager import PayloadModeManager
+    from .UAVModeManager import UAVModeManager
+    from .fleet_spec import FleetDocumentModel, load_fleet_document
+    from .mission_spec import (
+        MissionDocumentModel,
+        MissionSpec,
+        ModeSpec,
+        load_mission_spec,
+        load_mode_class,
+        mission_path_for_name,
+    )
+    from .schema import (
+        fleet_document_schema,
+        mission_document_schema,
+        mode_entry_for_class_path,
+        mode_entry_for_mode_id,
+        mode_registry_entries,
+        schema_registry_document,
+    )
 
 
 def __getattr__(name: str):
