@@ -1,5 +1,7 @@
 from ament_index_python.packages import get_package_share_directory
 import os
+from typing import Any
+
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
@@ -17,7 +19,7 @@ def launch_setup(context):
     controller_override = LaunchConfiguration("controller").perform(context)
     payload_node_name = sim_entity_name or vehicle_name
 
-    parameters = [payload_params_path]
+    parameters: list[Any] = [payload_params_path]
     if controller_override:
         parameters.append({"controller": controller_override})
 

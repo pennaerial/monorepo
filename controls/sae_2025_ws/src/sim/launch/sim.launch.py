@@ -3,6 +3,7 @@
 import json
 import logging
 import os
+from typing import Any
 
 import launch
 from launch import LaunchDescription
@@ -133,7 +134,7 @@ def launch_setup(context, *args, **kwargs):
     server_config_path = os.path.join(
         os.path.dirname(os.path.realpath(__file__)), "server.config"
     )
-    gz_sim_env = {
+    gz_sim_env: dict[Any, Any] = {
         "GZ_SIM_RESOURCE_PATH": os.path.join(model_store, "models"),
         "GZ_SIM_SERVER_CONFIG_PATH": server_config_path,
     }
