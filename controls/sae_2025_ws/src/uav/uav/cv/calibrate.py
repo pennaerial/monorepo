@@ -1,8 +1,8 @@
 import numpy as np
 import cv2
 import scipy.stats as stats
-from recalibrate import detect_contour
-from confidence import confidence
+from .recalibrate import detect_contour
+from .confidence import confidence
 
 
 def calibrate(frame):
