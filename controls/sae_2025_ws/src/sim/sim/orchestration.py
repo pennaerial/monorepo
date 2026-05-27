@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
@@ -124,8 +125,8 @@ def resolve_stage_world(
     *,
     world_name: str,
     mission_stage: str | None = "",
-    world_overrides: dict[str, Any] | None = None,
-    logger=None,
+    world_overrides: object | None = None,
+    logger: logging.Logger | None = None,
 ) -> dict[str, Any]:
     resolved_world_name = str(world_name).strip()
     if not resolved_world_name:
@@ -141,7 +142,7 @@ def resolve_stage_world(
 
     sim_stage_params, sim_config_path = load_sim_parameters(
         resolved_world_name,
-        logger=logger,
+        logger=logger or logging.getLogger(__name__),
         competition_name=resolved_world_name,
         mission_stage=resolved_stage,
     )

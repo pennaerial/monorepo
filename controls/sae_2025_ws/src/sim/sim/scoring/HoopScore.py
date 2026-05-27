@@ -151,13 +151,12 @@ class HoopScoringNode(ScoringNode):
             # rclpy.spin_until_future_complete(self, future)
             # rclpy.spin_until_future_complete(self, future)
 
-            if future.result() is None:
+            response = future.result()
+            if response is None:
                 self.get_logger().error(
                     f"'list_hoops' failed with exception: {future.exception()}"
                 )
                 raise RuntimeError("Service call to 'list_hoops' failed")
-
-            response = future.result()
 
             # Expecting response.hoops to be a list of HoopPose messages
             self.hoop_poses = []

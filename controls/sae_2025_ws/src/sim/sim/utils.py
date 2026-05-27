@@ -237,6 +237,7 @@ def find_package_resource(
             return path
 
     # Fallback to installed location (for production/deployed packages)
+    installed_path: Path | None = None
     try:
         from ament_index_python.packages import get_package_share_directory
 
@@ -264,9 +265,6 @@ def find_package_resource(
             logger.debug(f"Could not get package share directory: {e}")
 
     # If not found, raise error
-    all_paths = source_paths + [
-        installed_path if "installed_path" in locals() else "N/A"
-    ]
     resource_name = relative_path.name if relative_path.name else str(relative_path)
     raise FileNotFoundError(
         f"{resource_type.capitalize()} '{resource_name}' not found. "

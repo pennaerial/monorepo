@@ -23,7 +23,7 @@ class CourseStyle(ABC):
         uav: Tuple[float, float, float],
         num_hoops: int,
         max_dist: int,
-        height: int,
+        height: float,
         rng: Optional[random.Random] = None,
     ):
         self.dlz = dlz
@@ -48,7 +48,7 @@ class AscentCourse(CourseStyle):
         uav: Tuple[float, float, float],
         num_hoops: int,
         max_dist: int,
-        start_height: int,
+        start_height: float,
         rng: Optional[random.Random] = None,
     ):
         super().__init__(dlz, uav, num_hoops, max_dist, start_height, rng)
@@ -107,7 +107,7 @@ class DescentCourse(CourseStyle):
         uav: Tuple[float, float, float],
         num_hoops: int,
         max_dist: int,
-        start_height: int,
+        start_height: float,
         rng: Optional[random.Random] = None,
     ):
         super().__init__(dlz, uav, num_hoops, max_dist, start_height, rng)
@@ -169,7 +169,7 @@ class SlalomCourse(CourseStyle):
         num_hoops: int,
         max_dist: int,
         width: int,
-        height: int,
+        height: float,
         rng: Optional[random.Random] = None,
     ):
         super().__init__(dlz, uav, num_hoops, max_dist, height, rng)
@@ -417,7 +417,7 @@ class HoopCourseNode(WorldNode):
         num_hoops: int,
         max_dist: int,
         template_world: str,
-        height: int,
+        height: float,
         physics: Optional[dict] = None,
         output_filename: Optional[str] = None,
         seed: Optional[int] = None,
@@ -551,7 +551,7 @@ class HoopCourseNode(WorldNode):
             )
         return dlz_entities
 
-    def generate_world(self) -> None:
+    def generate_world(self) -> bool:
         """
         Generate the world file with hoops and DLZs.
 
@@ -567,7 +567,7 @@ class HoopCourseNode(WorldNode):
 
             if self.course.lower() == "previous":
                 self.get_logger().info("Using previous world configuration")
-                return
+                return True
 
             elif self.course.lower() == "ascent":
                 course = AscentCourse(
