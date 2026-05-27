@@ -1,4 +1,5 @@
 from importlib import import_module
+from typing import TYPE_CHECKING
 
 __all__ = [
     "AirframeClass",
@@ -8,6 +9,14 @@ __all__ = [
     "VTOL",
     "Multicopter",
 ]
+
+if TYPE_CHECKING:
+    from .AirframeClass import AirframeClass
+    from .Multicopter import Multicopter
+    from .Payload import Payload
+    from .UAV import UAV
+    from .VTOL import VTOL
+    from .Vehicle import Vehicle
 
 
 def __getattr__(name: str):
