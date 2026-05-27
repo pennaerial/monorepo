@@ -10,23 +10,29 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from .mode_paths import normalize_public_mode_id
 
-try:
-    from ament_index_python.packages import (
-        PackageNotFoundError,
-        get_package_share_directory,
-    )
-except ModuleNotFoundError:
-
-    class PackageNotFoundError(Exception):
-        pass
-
-    def get_package_share_directory(_package_name: str) -> str:
-        raise PackageNotFoundError
-
 
 VALID_MISSION_TARGETS = {"uav", "payload"}
 _TOP_LEVEL_KEYS = {"modes"}
 _MODE_KEYS = {"mode", "params", "transitions"}
+
+
+class PackageNotFoundError(Exception):
+    pass
+
+
+def get_package_share_directory(package_name: str) -> str:
+    try:
+        from ament_index_python.packages import (
+            PackageNotFoundError as AmentPackageNotFoundError,
+            get_package_share_directory as ament_get_package_share_directory,
+        )
+    except ModuleNotFoundError as exc:
+        raise PackageNotFoundError from exc
+
+    try:
+        return ament_get_package_share_directory(package_name)
+    except AmentPackageNotFoundError as exc:
+        raise PackageNotFoundError from exc
 
 
 class MissionModeDocumentModel(BaseModel):

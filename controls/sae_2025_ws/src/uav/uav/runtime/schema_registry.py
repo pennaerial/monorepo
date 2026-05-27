@@ -4,7 +4,7 @@ from functools import lru_cache, reduce
 import json
 import operator
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from pydantic import BaseModel, ConfigDict, create_model
 from typing_extensions import NotRequired, Required, TypedDict
@@ -110,7 +110,7 @@ def _annotation_from_spec(annotation: dict[str, Any], *, name_hint: str) -> obje
         return type(None)
     if kind == "literal":
         choices = tuple(annotation.get("choices", ()))
-        return Literal.__getitem__(choices)
+        return cast(Any, Literal).__getitem__(choices)
     if kind == "list":
         return list[
             _annotation_from_spec(annotation["item"], name_hint=f"{name_hint}_item")
@@ -141,7 +141,7 @@ def _annotation_from_spec(annotation: dict[str, Any], *, name_hint: str) -> obje
                 fields[field["name"]] = Required[field_type]
             else:
                 fields[field["name"]] = NotRequired[field_type]
-        return TypedDict(_typed_dict_name(name_hint), fields)
+        return cast(Any, TypedDict)(_typed_dict_name(name_hint), fields)
     if kind == "union":
         options = [
             _annotation_from_spec(option, name_hint=f"{name_hint}_{index}")
@@ -216,5 +216,5 @@ def params_model_for_entry(mode_id: str) -> type[BaseModel]:
         f"{entry.class_name}Params",
         __config__=ConfigDict(extra="forbid"),
         __module__=__name__,
-        **field_definitions,
+        **cast(Any, field_definitions),
     )

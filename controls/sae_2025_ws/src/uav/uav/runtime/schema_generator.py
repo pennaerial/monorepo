@@ -11,7 +11,7 @@ import math
 import pkgutil
 from pathlib import Path
 import types
-from typing import Any, Literal, Union, get_args, get_origin, get_type_hints
+from typing import Any, Literal, Union, cast, get_args, get_origin, get_type_hints
 
 from pydantic import BaseModel, ConfigDict, create_model
 
@@ -29,6 +29,8 @@ from .schema_registry import (
     dump_mode_registry_document,
     registry_path,
 )
+
+DefaultKind = Literal["missing", "none", "value", "nan"]
 
 
 def _doc_summary(obj: object) -> str:
@@ -88,8 +90,9 @@ def _normalized_annotation(
         )
 
     if annotation in {dict, list, tuple, set}:
+        annotation_name = getattr(annotation, "__name__", repr(annotation))
         raise TypeError(
-            f"Mode '{mode_id_for(mode_class)}' parameter '{name}' must use a typed collection annotation, not bare '{annotation.__name__}'."
+            f"Mode '{mode_id_for(mode_class)}' parameter '{name}' must use a typed collection annotation, not bare '{annotation_name}'."
         )
 
     origin = get_origin(annotation)
@@ -129,7 +132,7 @@ def mode_params_model(mode_class: type[Mode]) -> type[BaseModel]:
         f"{mode_class.__name__}Params",
         __config__=ConfigDict(extra="forbid"),
         __module__=mode_class.__module__,
-        **field_definitions,
+        **cast(Any, field_definitions),
     )
 
 
@@ -158,7 +161,7 @@ def _sanitize_json_schema(value: Any) -> Any:
     return value
 
 
-def _default_payload(default: object) -> tuple[str, Any | None]:
+def _default_payload(default: object) -> tuple[DefaultKind, Any | None]:
     if default is inspect.Parameter.empty:
         return "missing", None
     if default is None:
@@ -181,9 +184,10 @@ def _normalize_annotation_spec(annotation: object) -> dict[str, Any]:
         return {"kind": "none"}
 
     if _is_typed_dict(annotation):
-        type_hints = get_type_hints(annotation)
-        required_keys = set(annotation.__required_keys__)
-        optional_keys = set(annotation.__optional_keys__)
+        typed_dict = cast(Any, annotation)
+        type_hints = get_type_hints(typed_dict)
+        required_keys = set(typed_dict.__required_keys__)
+        optional_keys = set(typed_dict.__optional_keys__)
         fields = []
         for name in sorted(required_keys | optional_keys):
             fields.append(
@@ -195,7 +199,7 @@ def _normalize_annotation_spec(annotation: object) -> dict[str, Any]:
             )
         return {
             "kind": "typed_dict",
-            "name": annotation.__name__,
+            "name": getattr(typed_dict, "__name__", str(annotation)),
             "fields": fields,
         }
 
