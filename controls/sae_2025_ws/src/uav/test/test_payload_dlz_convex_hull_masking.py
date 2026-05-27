@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 from types import SimpleNamespace
 import types
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import cv2
@@ -19,8 +19,9 @@ from uav.cv.dlz_convex_hull import build_dlz_hull_mask  # noqa: E402
 
 
 def _bgr_from_hsv(h: int, s: int, v: int) -> tuple[int, int, int]:
+    hsv_pixel = np.array([[[h, s, v]]], dtype=np.uint8)
     pixel = cv2.cvtColor(
-        np.uint8([[[h, s, v]]]),
+        cast(Any, hsv_pixel),
         cv2.COLOR_HSV2BGR,
     )[0, 0]
     return int(pixel[0]), int(pixel[1]), int(pixel[2])
@@ -184,7 +185,8 @@ def _make_turn_to_center_mode(**kwargs):
 def _contour_bbox(mask: np.ndarray) -> tuple[int, int, int, int]:
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     assert len(contours) == 1
-    return cv2.boundingRect(contours[0])
+    x, y, width, height = cv2.boundingRect(contours[0])
+    return int(x), int(y), int(width), int(height)
 
 
 def test_build_dlz_hull_mask_keeps_orange_rectangle_and_excludes_outside():
