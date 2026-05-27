@@ -5,7 +5,7 @@ import sys
 import textwrap
 from types import SimpleNamespace
 import types
-from typing import Any
+from typing import Any, Mapping, cast
 
 import pytest
 
@@ -236,8 +236,8 @@ class _RecordingNode:
         return SimpleNamespace(kind="service", name=service_name)
 
 
-def _make_mode_manager() -> ModeManager:
-    manager = object.__new__(ModeManager)
+def _make_mode_manager() -> Any:
+    manager = cast(Any, object.__new__(ModeManager))
     manager.vehicle = _FakeVehicle()
     manager.modes = {}
     manager.transitions = {}
@@ -409,7 +409,9 @@ def test_build_mode_registry_entry_includes_peer_vehicle_names():
         def __init__(self, node, vehicle) -> None:
             super().__init__(node, vehicle)
 
-        def on_disconnect(self, time_delta: float, peers: dict[str, bool]) -> None:
+        def on_disconnect(
+            self, time_delta: float, connection_status: Mapping[str, bool]
+        ) -> None:
             pass
 
         def on_update(self, time_delta: float) -> None:
@@ -530,7 +532,9 @@ def test_mode_manager_validates_peer_and_shared_entity_namespaces(monkeypatch):
             )
             self.shared_pub = self.node.create_publisher(object, "/shared/debug", 1)
 
-        def on_disconnect(self, time_delta: float, peers: dict[str, bool]) -> None:
+        def on_disconnect(
+            self, time_delta: float, connection_status: Mapping[str, bool]
+        ) -> None:
             pass
 
         def on_update(self, time_delta: float) -> None:
@@ -575,7 +579,9 @@ def test_mode_manager_validates_peer_and_shared_entity_namespaces(monkeypatch):
     )
 
     manager = _make_mode_manager()
-    mode = ModeManager.initialize_mode(manager, "fake.module.PeerAwareMode", {})
+    mode = cast(
+        Any, ModeManager.initialize_mode(manager, "fake.module.PeerAwareMode", {})
+    )
     _configure_manager_for_mode(manager, mode)
 
     with manager._use_comm_builder(
@@ -634,7 +640,7 @@ def test_run_active_mode_uses_connection_ready_for_gating():
             self.connection_checks: list[dict[str, bool]] = []
             self.status_checks = 0
 
-        def connection_ready(self, connection_status: dict[str, bool]) -> bool:
+        def connection_ready(self, connection_status: Mapping[str, bool]) -> bool:
             self.connection_checks.append(dict(connection_status))
             return True
 
@@ -642,7 +648,7 @@ def test_run_active_mode_uses_connection_ready_for_gating():
             self.update_calls.append(time_delta)
 
         def on_disconnect(
-            self, time_delta: float, connection_status: dict[str, bool]
+            self, time_delta: float, connection_status: Mapping[str, bool]
         ) -> None:
             self.disconnect_calls.append((time_delta, dict(connection_status)))
 
@@ -688,12 +694,12 @@ def test_run_active_mode_passes_full_connection_status_to_disconnect():
             self.connection_checks: list[dict[str, bool]] = []
             self.status_checks = 0
 
-        def connection_ready(self, connection_status: dict[str, bool]) -> bool:
+        def connection_ready(self, connection_status: Mapping[str, bool]) -> bool:
             self.connection_checks.append(dict(connection_status))
             return False
 
         def on_disconnect(
-            self, time_delta: float, connection_status: dict[str, bool]
+            self, time_delta: float, connection_status: Mapping[str, bool]
         ) -> None:
             self.disconnect_calls.append((time_delta, dict(connection_status)))
 
@@ -732,7 +738,9 @@ def test_mode_connection_ready_defaults_to_all_declared_peers_connected():
         def __init__(self, node, vehicle) -> None:
             super().__init__(node, vehicle)
 
-        def on_disconnect(self, time_delta: float, peers: dict[str, bool]) -> None:
+        def on_disconnect(
+            self, time_delta: float, connection_status: Mapping[str, bool]
+        ) -> None:
             pass
 
         def on_update(self, time_delta: float) -> None:
@@ -741,7 +749,7 @@ def test_mode_connection_ready_defaults_to_all_declared_peers_connected():
         def check_status(self) -> str:
             return "continue"
 
-    mode = PeerAwareMode(_RecordingNode(), _FakeVehicle())
+    mode = PeerAwareMode(cast(Any, _RecordingNode()), cast(Any, _FakeVehicle()))
 
     assert mode.connection_ready({"uav_1": True, "uav_2": True}) is True
     assert mode.connection_ready({"uav_1": True, "uav_2": False}) is False
@@ -761,7 +769,9 @@ def test_peer_client_wrapper_rebinds_on_connection_changes(monkeypatch):
         def __init__(self, node, vehicle) -> None:
             super().__init__(node, vehicle)
 
-        def on_disconnect(self, time_delta: float, peers: dict[str, bool]) -> None:
+        def on_disconnect(
+            self, time_delta: float, connection_status: Mapping[str, bool]
+        ) -> None:
             pass
 
         def on_update(self, time_delta: float) -> None:
@@ -870,7 +880,9 @@ def test_managed_entity_descriptors_use_persistent_and_active_phases(monkeypatch
             super().__init__(node, vehicle)
             self.node.create_publisher(object, "/shared/debug", 1)
 
-        def on_disconnect(self, time_delta: float, peers: dict[str, bool]) -> None:
+        def on_disconnect(
+            self, time_delta: float, connection_status: Mapping[str, bool]
+        ) -> None:
             pass
 
         def on_enter(self) -> None:
@@ -930,7 +942,9 @@ def test_shared_state_for_is_keyed_by_canonical_mode_path():
         def __init__(self, node, vehicle) -> None:
             super().__init__(node, vehicle)
 
-        def on_disconnect(self, time_delta: float, peers: dict[str, bool]) -> None:
+        def on_disconnect(
+            self, time_delta: float, connection_status: Mapping[str, bool]
+        ) -> None:
             pass
 
         def on_update(self, time_delta: float) -> None:
@@ -966,7 +980,9 @@ def test_peer_entity_usage_instrumentation_matches_declared_peers():
             super().__init__(node, vehicle)
             self.node.create_subscription(object, "/uav_2/status", lambda _msg: None, 1)
 
-        def on_disconnect(self, time_delta: float, peers: dict[str, bool]) -> None:
+        def on_disconnect(
+            self, time_delta: float, connection_status: Mapping[str, bool]
+        ) -> None:
             pass
 
         def on_enter(self) -> None:
@@ -980,7 +996,7 @@ def test_peer_entity_usage_instrumentation_matches_declared_peers():
             return "continue"
 
     node = _RecordingNode()
-    mode = InstrumentedPeerMode(node, _FakeVehicle())
+    mode = InstrumentedPeerMode(cast(Any, node), cast(Any, _FakeVehicle()))
     mode.activate()
 
     assert _observed_peer_vehicle_names(node.calls, mode.peer_vehicle_names) == {
