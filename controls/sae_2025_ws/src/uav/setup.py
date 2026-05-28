@@ -2,7 +2,6 @@ from glob import glob
 import os
 from pathlib import Path
 import sys
-from typing import Protocol, cast
 
 from setuptools import find_packages, setup
 from setuptools.command.build_py import build_py as _build_py
@@ -11,10 +10,6 @@ from setuptools.command.install import install as _install
 
 package_name = "uav"
 _SCHEMA_REGISTRY_REFRESHED = False
-
-
-class _CommandWithRun(Protocol):
-    def run(self) -> None: ...
 
 
 def _missing_pydantic_v2(exc: ImportError) -> bool:
@@ -48,22 +43,22 @@ def _refresh_mode_schema_registry() -> None:
     _SCHEMA_REGISTRY_REFRESHED = True
 
 
-class _RefreshSchemaRegistryMixin:
+class build_py(_build_py):
     def run(self) -> None:
         _refresh_mode_schema_registry()
-        cast(_CommandWithRun, super()).run()
+        super().run()
 
 
-class build_py(_RefreshSchemaRegistryMixin, _build_py):
-    pass
+class develop(_develop):
+    def run(self) -> None:
+        _refresh_mode_schema_registry()
+        super().run()
 
 
-class develop(_RefreshSchemaRegistryMixin, _develop):
-    pass
-
-
-class install(_RefreshSchemaRegistryMixin, _install):
-    pass
+class install(_install):
+    def run(self) -> None:
+        _refresh_mode_schema_registry()
+        super().run()
 
 
 setup(
