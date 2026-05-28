@@ -67,7 +67,8 @@ def _target_context(target_ctx: object) -> TargetContext:
 
 
 def _response_dict(value: object) -> dict[str, Any]:
-    return cast(dict[str, Any], value)
+    assert isinstance(value, dict)
+    return value
 
 
 class _FakeSSHResult:
