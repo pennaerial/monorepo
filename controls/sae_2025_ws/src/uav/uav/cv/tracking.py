@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
 import cv2
 import numpy as np
 from typing import Optional, Tuple
@@ -9,7 +8,6 @@ import os
 from uav.utils import blue, green, pink, yellow
 
 from .dlz_color_regions import detect_focused_dlz_paper_masks
-from .hsv import to_hsv_array
 
 _NAMED_PAYLOAD_BOUNDS = {
     "pink": pink,
@@ -26,8 +24,8 @@ _PAPER_MASK_KEYS = {
 
 def _normalize_payload_color(
     payload_color: str | None,
-    lower_payload,
-    upper_payload,
+    lower_payload: np.ndarray | None,
+    upper_payload: np.ndarray | None,
 ) -> str:
     if payload_color is not None:
         return str(payload_color).strip().lower()
@@ -35,8 +33,8 @@ def _normalize_payload_color(
     if lower_payload is None or upper_payload is None:
         return "unknown"
 
-    lower = tuple(int(x) for x in np.asarray(lower_payload).reshape(-1))
-    upper = tuple(int(x) for x in np.asarray(upper_payload).reshape(-1))
+    lower = tuple(int(x) for x in lower_payload.reshape(-1))
+    upper = tuple(int(x) for x in upper_payload.reshape(-1))
     for color_name, (named_lower, named_upper) in _NAMED_PAYLOAD_BOUNDS.items():
         if lower == tuple(named_lower) and upper == tuple(named_upper):
             return color_name
@@ -62,16 +60,14 @@ def _largest_contour_centroid(
 
 def _legacy_focused_payload_mask(
     focused_bgr: np.ndarray,
-    lower_payload: Sequence[int] | np.ndarray | None,
-    upper_payload: Sequence[int] | np.ndarray | None,
+    lower_payload: np.ndarray | None,
+    upper_payload: np.ndarray | None,
 ) -> np.ndarray:
     if lower_payload is None or upper_payload is None:
         return np.zeros(focused_bgr.shape[:2], dtype=np.uint8)
 
     hsv_image = cv2.cvtColor(focused_bgr, cv2.COLOR_BGR2HSV)
-    payload_mask = cv2.inRange(
-        hsv_image, to_hsv_array(lower_payload), to_hsv_array(upper_payload)
-    )
+    payload_mask = cv2.inRange(hsv_image, lower_payload, upper_payload)
     kernel = np.ones((5, 5), np.uint8)
     payload_mask = cv2.morphologyEx(payload_mask, cv2.MORPH_OPEN, kernel)
     payload_mask = cv2.morphologyEx(payload_mask, cv2.MORPH_CLOSE, kernel)
@@ -81,8 +77,8 @@ def _legacy_focused_payload_mask(
 def _resolved_payload_mask(
     focused_bgr: np.ndarray,
     requested_color: str,
-    lower_payload,
-    upper_payload,
+    lower_payload: np.ndarray | None,
+    upper_payload: np.ndarray | None,
     paper_masks: dict[str, np.ndarray],
 ) -> np.ndarray:
     """Use the focused-DLZ classifier first, then fall back to HSV if needed."""
@@ -97,10 +93,10 @@ def _resolved_payload_mask(
 
 def find_payload(
     image: np.ndarray,
-    lower_zone: Sequence[int] | np.ndarray,
-    upper_zone: Sequence[int] | np.ndarray,
-    lower_payload: Sequence[int] | np.ndarray | None,
-    upper_payload: Sequence[int] | np.ndarray | None,
+    lower_zone: np.ndarray,
+    upper_zone: np.ndarray,
+    lower_payload: np.ndarray | None,
+    upper_payload: np.ndarray | None,
     uuid: str,
     debug: bool = False,
     save_vision: bool = False,
@@ -128,9 +124,7 @@ def find_payload(
         payload_color, lower_payload, upper_payload
     )
 
-    zone_mask = cv2.inRange(
-        hsv_image, to_hsv_array(lower_zone), to_hsv_array(upper_zone)
-    )
+    zone_mask = cv2.inRange(hsv_image, lower_zone, upper_zone)
     kernel = np.ones((5, 5), np.uint8)
     dilated = cv2.dilate(zone_mask, kernel, iterations=3)
     zone_mask = cv2.morphologyEx(dilated, cv2.MORPH_CLOSE, kernel)
@@ -368,10 +362,10 @@ if __name__ == "__main__":
     print(
         find_payload(
             image,
-            (140, 155, 50),
-            (170, 255, 255),
-            (140, 155, 50),
-            (170, 255, 255),
+            np.array((140, 155, 50), dtype=np.uint8),
+            np.array((170, 255, 255), dtype=np.uint8),
+            np.array((140, 155, 50), dtype=np.uint8),
+            np.array((170, 255, 255), dtype=np.uint8),
             "debug",
             debug=True,
             payload_color="pink",

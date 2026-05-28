@@ -5,7 +5,7 @@ from .recalibrate import detect_contour
 from .confidence import confidence
 
 
-def calibrate(frame):
+def calibrate(frame: np.ndarray) -> tuple[float, float]:
     """
     Returns color range with best confidence interval
     Args:
@@ -29,10 +29,10 @@ def calibrate(frame):
 
     while high - low > 0.01:
         mid = (low + high) / 2
-        points, range = find_points_range(mid, std, color, frame)
+        points, value_range = find_points_range(mid, std, color, frame)
 
-        if len(points) > 0:
-            curr_range = range
+        if points is not None:
+            curr_range = value_range
             low = mid
             best_confidence = (low + high) / 2
         else:
@@ -45,16 +45,23 @@ def calibrate(frame):
 
     best_neighborhood_range = curr_range
     for conf in neighborhood_conf:
-        points, range = find_points_range(conf, std, color, frame)
+        points, value_range = find_points_range(conf, std, color, frame)
+        if points is None:
+            continue
         curr_conf = confidence(points, -1, *frame.shape)
-        if len(points) > 0 and curr_conf > best_confidence:
+        if curr_conf > best_confidence:
             best_confidence = curr_conf
-            best_neighborhood_range = range
+            best_neighborhood_range = value_range
 
     return best_neighborhood_range
 
 
-def find_points_range(prob, std, color, frame):
+def find_points_range(
+    prob: float,
+    std: float,
+    color: float,
+    frame: np.ndarray,
+) -> tuple[np.ndarray | None, tuple[float, float]]:
     """
     Finds the points and color value range corresponding to some probability, std, and color
 
@@ -66,7 +73,7 @@ def find_points_range(prob, std, color, frame):
         points (List[Int]): list of points in the image which correspond to range
         range (Tuple[Int, Int]): color range corresponding to prob
     """
-    z_score = stats.norm.ppf(prob)
-    range = (color - z_score * std, color + z_score * std)
-    points = detect_contour(frame, range)
-    return points, range
+    z_score = float(stats.norm.ppf(prob))
+    value_range = (float(color - z_score * std), float(color + z_score * std))
+    points = detect_contour(frame, value_range)
+    return points, value_range

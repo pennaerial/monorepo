@@ -38,7 +38,7 @@ def process_video(input_path: str):
         points, center = threshold(threshold_range, prev_center, frame)
 
         if points is not None and center is not None:
-            new_points = [conversion(p, 100) for p in points]
+            new_points = [conversion(p, 100) for p in points.reshape(-1, 2)]
             print(new_points)
 
             conf = confidence(points, -1, *frame.shape[:2])

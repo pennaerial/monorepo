@@ -17,16 +17,18 @@ from sensor_msgs.msg import CompressedImage
 
 from uav_interfaces.srv import PayloadDriveOutState
 
-from uav.cv.hsv import HsvTriplet, to_hsv_triplet
-
 from .VisionNode import VisionNode
 from .payload_perception_common import detect_payload_unreeled
 
 
 def _request_hsv_or_default(
-    values: Sequence[int] | np.ndarray, default: HsvTriplet
-) -> HsvTriplet:
-    hsv = to_hsv_triplet(values)
+    values: Sequence[int] | np.ndarray,
+    default: tuple[int, int, int],
+) -> tuple[int, int, int]:
+    hsv_values = np.asarray(values).reshape(-1)
+    if hsv_values.size != 3:
+        raise ValueError(f"HSV bounds must contain exactly 3 values, got {values!r}.")
+    hsv = (int(hsv_values[0]), int(hsv_values[1]), int(hsv_values[2]))
     return default if hsv == (0, 0, 0) else hsv
 
 

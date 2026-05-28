@@ -6,7 +6,9 @@ def distance(c1: tuple[int, int], c2: tuple[int, int]) -> int:
     return (c1[0] - c2[0]) ** 2 + (c1[1] - c2[1]) ** 2
 
 
-def detect_contour(threshold, frame):
+def detect_contour(
+    threshold, frame: np.ndarray
+) -> tuple[list[np.ndarray], list[tuple[int, int]]]:
     hsl = cv2.cvtColor(frame, cv2.COLOR_BGR2HLS)
     hsl = cv2.GaussianBlur(hsl, (5, 5), 0)
 
@@ -48,7 +50,7 @@ def detect_contour(threshold, frame):
 def threshold(thresh, prev_center, frame):
     new_contours, new_centers = detect_contour(thresh, frame)
 
-    contour = None
+    contour: np.ndarray | None = None
     center = None
     closest = float("inf")
     for i, c2 in enumerate(new_centers):
@@ -61,7 +63,6 @@ def threshold(thresh, prev_center, frame):
     if contour is not None and center is not None:
         cv2.drawContours(frame, [contour], -1, (0, 255, 0), 2)
         cv2.circle(frame, center, 2, (0, 0, 255), -1)
-        contour = [x[0] for x in contour]
 
     # cv2.imshow('Image 2 Matches', frame)
     # print(contour)
