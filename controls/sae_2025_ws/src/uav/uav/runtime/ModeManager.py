@@ -57,7 +57,7 @@ class ModeManager(Node):
         peer_stale_timeout_s: float = 0.5,
     ) -> None:
         super().__init__(node_name)
-        self.vehicle: Any = None
+        self.vehicle: Vehicle | None = None
         self.modes: dict[str, Mode[Any]] = {}
         self.transitions: dict[str, dict[str, str]] = {}
         self.active_mode: str | None = None
@@ -208,7 +208,10 @@ class ModeManager(Node):
         return self._vision_clients
 
     def _connect_vision_client(self, vision_class):
-        service_name = self.vehicle.vision_service_name(vision_class)
+        vehicle = self.vehicle
+        if vehicle is None:
+            raise ValueError("Vision nodes require an active vehicle camera contract.")
+        service_name = vehicle.vision_service_name(vision_class)
         while True:
             client = super().create_client(vision_class.srv, service_name)
             if client.wait_for_service(timeout_sec=1.0):
