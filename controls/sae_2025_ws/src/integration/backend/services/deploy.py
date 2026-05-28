@@ -929,10 +929,10 @@ def _github_error_message(
     during_commit_lookup: bool = False,
 ) -> str | None:
     response = getattr(exc, "response", None)
+    if response is None:
+        return None
     status_code = getattr(response, "status_code", None)
     if status_code != 403:
-        return None
-    if response is None:
         return None
 
     message = ""
