@@ -68,13 +68,13 @@ class Payload(Vehicle):
         # UDP heartbeat.  Supported keys:
         #   tag_visible (bool), tag_distance_m (float), tag_bearing_deg (float),
         #   is_error (bool)
-        self.heartbeat_state: dict = {}
+        self.heartbeat_state: dict[str, bool | float] = {}
 
         self._udp_heartbeat_seq = 0
         self._latest_motor_state: MotorState | None = None
 
-        runtime_node = cast(_PayloadRuntimeNode, node)
-        raw = runtime_node._raw_node_api
+        self._runtime_node = cast(_PayloadRuntimeNode, node)
+        raw = self._runtime_node._raw_node_api
         self._udp_heartbeat_pub = raw.create_publisher(
             PayloadHeartbeat, "udp_bridge/out/heartbeat", 10
         )
@@ -95,8 +95,7 @@ class Payload(Vehicle):
     def _publish_udp_heartbeat(self) -> None:
         msg = PayloadHeartbeat()
 
-        runtime_node = cast(_PayloadRuntimeNode, self.node)
-        now = runtime_node._now_seconds()
+        now = self._runtime_node._now_seconds()
         msg.stamp.sec = int(now)
         msg.stamp.nanosec = int((now % 1.0) * 1e9)
 
@@ -108,7 +107,7 @@ class Payload(Vehicle):
         msg.mission_started = getattr(self.node, "timer", None) is not None
         msg.is_error = bool(self.heartbeat_state.get("is_error", False))
 
-        peer_status = runtime_node._peer_connections.status()
+        peer_status = self._runtime_node._peer_connections.status()
         msg.connected_peers = [p for p, alive in peer_status.items() if alive]
         msg.disconnected_peers = [p for p, alive in peer_status.items() if not alive]
 
