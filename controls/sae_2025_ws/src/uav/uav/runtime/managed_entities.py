@@ -1,15 +1,5 @@
 from __future__ import annotations
 
-from typing import Any, Protocol, cast
-
-
-class _Publisher(Protocol):
-    def publish(self, message: Any) -> Any: ...
-
-
-class _Client(Protocol):
-    def call_async(self, request: Any) -> Any: ...
-
 
 class ManagedEntity:
     def __init__(self, spec):
@@ -44,11 +34,14 @@ class ManagedEntity:
 
 
 class ManagedPublisher(ManagedEntity):
-    def publish(self, message) -> None:
+    def publish(self, message: object) -> None:
         entity = self.get_underlying()
         if entity is None or self.destroyed:
             return None
-        cast(_Publisher, entity).publish(message)
+        publish = getattr(entity, "publish", None)
+        if not callable(publish):
+            return None
+        publish(message)
         return None
 
 
@@ -62,10 +55,13 @@ class ManagedClient(ManagedEntity):
             return False
         return bool(wait_for_service(timeout_sec=timeout_sec))
 
-    def call_async(self, request):
+    def call_async(self, request: object):
         entity = self.get_underlying()
         if entity is None or self.destroyed:
             return None
         if not self.wait_for_service(timeout_sec=0.0):
             return None
-        return cast(_Client, entity).call_async(request)
+        call_async = getattr(entity, "call_async", None)
+        if not callable(call_async):
+            return None
+        return call_async(request)
