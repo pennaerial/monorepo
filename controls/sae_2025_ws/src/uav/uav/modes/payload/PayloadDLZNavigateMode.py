@@ -125,12 +125,12 @@ def _detect_tape_following(
 
 
 def _shift_contours(
-    contours: Sequence[object],
+    contours: Sequence[np.ndarray],
     x_offset: int,
     y_offset: int,
 ) -> list[np.ndarray]:
     shift = np.array([[[x_offset, y_offset]]], dtype=np.int32)
-    return [np.asarray(contour, dtype=np.int32) + shift for contour in contours]
+    return [contour + shift for contour in contours]
 
 
 class TagTransitionRule(TypedDict):
