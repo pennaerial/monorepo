@@ -12,17 +12,6 @@ from uav.vehicles.UAV import UAV
 from ..Mode import Mode
 
 
-def _coerce_waypoints(
-    waypoints: Optional[List[List[float]]],
-) -> list[tuple[float, float, float]]:
-    if waypoints is None:
-        return []
-    return [
-        (float(waypoint[0]), float(waypoint[1]), float(waypoint[2]))
-        for waypoint in waypoints
-    ]
-
-
 class WaypointMission(Mode[UAV]):
     """
     Simple waypoint mission for testing scoring node.
@@ -42,7 +31,10 @@ class WaypointMission(Mode[UAV]):
         super().__init__(node, vehicle)
 
         # Mission parameters
-        self.waypoints = _coerce_waypoints(waypoints)
+        self.waypoints = [
+            (float(waypoint[0]), float(waypoint[1]), float(waypoint[2]))
+            for waypoint in (waypoints or [])
+        ]
         self.current_waypoint = 0
         self.waypoint_tolerance = waypoint_tolerance
         self.speed = speed
