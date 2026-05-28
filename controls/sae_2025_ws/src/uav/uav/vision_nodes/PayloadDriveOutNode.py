@@ -7,17 +7,27 @@ A high white_ratio means the ramp/floor is visible and clear to drive out.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 import cv2
+import numpy as np
 import rclpy
 from rclpy.executors import ExternalShutdownException
 from sensor_msgs.msg import CompressedImage
 
 from uav_interfaces.srv import PayloadDriveOutState
 
-from uav.cv.hsv import hsv_bound_or_default
+from uav.cv.hsv import HsvTriplet, to_hsv_triplet
 
 from .VisionNode import VisionNode
 from .payload_perception_common import detect_payload_unreeled
+
+
+def _request_hsv_or_default(
+    values: Sequence[int] | np.ndarray, default: HsvTriplet
+) -> HsvTriplet:
+    hsv = to_hsv_triplet(values)
+    return default if hsv == (0, 0, 0) else hsv
 
 
 class PayloadDriveOutNode(VisionNode):
@@ -57,8 +67,8 @@ class PayloadDriveOutNode(VisionNode):
             return response
 
         frame = self.convert_image_msg_to_frame(image_msg)
-        lower = hsv_bound_or_default(request.lower_hsv, (0, 0, 180))
-        upper = hsv_bound_or_default(request.upper_hsv, (180, 20, 255))
+        lower = _request_hsv_or_default(request.lower_hsv, (0, 0, 180))
+        upper = _request_hsv_or_default(request.upper_hsv, (180, 20, 255))
         bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR) if frame.shape[2] == 3 else frame
         _, clear_ratio, _, debug_frame = detect_payload_unreeled(
             bgr, lower, upper, debug=self.debug

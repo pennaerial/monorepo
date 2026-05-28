@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 import cv2
 import numpy as np
 from typing import Optional, Tuple
@@ -8,7 +9,7 @@ import os
 from uav.utils import blue, green, pink, yellow
 
 from .dlz_color_regions import detect_focused_dlz_paper_masks
-from .hsv import HsvBound, hsv_bound_array
+from .hsv import to_hsv_array
 
 _NAMED_PAYLOAD_BOUNDS = {
     "pink": pink,
@@ -61,15 +62,15 @@ def _largest_contour_centroid(
 
 def _legacy_focused_payload_mask(
     focused_bgr: np.ndarray,
-    lower_payload: HsvBound | None,
-    upper_payload: HsvBound | None,
+    lower_payload: Sequence[int] | np.ndarray | None,
+    upper_payload: Sequence[int] | np.ndarray | None,
 ) -> np.ndarray:
     if lower_payload is None or upper_payload is None:
         return np.zeros(focused_bgr.shape[:2], dtype=np.uint8)
 
     hsv_image = cv2.cvtColor(focused_bgr, cv2.COLOR_BGR2HSV)
     payload_mask = cv2.inRange(
-        hsv_image, hsv_bound_array(lower_payload), hsv_bound_array(upper_payload)
+        hsv_image, to_hsv_array(lower_payload), to_hsv_array(upper_payload)
     )
     kernel = np.ones((5, 5), np.uint8)
     payload_mask = cv2.morphologyEx(payload_mask, cv2.MORPH_OPEN, kernel)
@@ -96,10 +97,10 @@ def _resolved_payload_mask(
 
 def find_payload(
     image: np.ndarray,
-    lower_zone: HsvBound,
-    upper_zone: HsvBound,
-    lower_payload: HsvBound | None,
-    upper_payload: HsvBound | None,
+    lower_zone: Sequence[int] | np.ndarray,
+    upper_zone: Sequence[int] | np.ndarray,
+    lower_payload: Sequence[int] | np.ndarray | None,
+    upper_payload: Sequence[int] | np.ndarray | None,
     uuid: str,
     debug: bool = False,
     save_vision: bool = False,
@@ -128,7 +129,7 @@ def find_payload(
     )
 
     zone_mask = cv2.inRange(
-        hsv_image, hsv_bound_array(lower_zone), hsv_bound_array(upper_zone)
+        hsv_image, to_hsv_array(lower_zone), to_hsv_array(upper_zone)
     )
     kernel = np.ones((5, 5), np.uint8)
     dilated = cv2.dilate(zone_mask, kernel, iterations=3)
