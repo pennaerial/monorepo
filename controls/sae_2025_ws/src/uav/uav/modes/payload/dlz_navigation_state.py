@@ -26,11 +26,13 @@ def _supports_shared_state(node: object) -> TypeGuard[_SharedStateProvider]:
 
 def _shared_state_for(node: object) -> dict[str, object]:
     if not _supports_shared_state(node):
-        return {}
+        raise TypeError("DLZ navigation state requires node.shared_state_for().")
     state = node.shared_state_for(_DLZ_STATE_KEY)
     if isinstance(state, dict):
         return cast(dict[str, object], state)
-    return {}
+    raise TypeError(
+        f"DLZ navigation shared state must be a dict, got {type(state).__name__}."
+    )
 
 
 def parse_dlz_direction(value: object) -> DLZDirection | None:
