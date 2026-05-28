@@ -4,7 +4,7 @@ ROS 2 / Gazebo Harmonic autonomy stack for Penn Aerial Robotics multi-UAV missio
 
 ## Quick Links
 
-- [Getting Started](getting-started.md)
+- [Getting Started](onboarding/getting-started.md)
 - [Packages](packages/)
 - [UAV Quickstart](packages/uav/docs/quickstart.md)
 - [API Reference — Python](reference/)
