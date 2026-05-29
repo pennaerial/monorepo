@@ -11,7 +11,7 @@ from uav.vehicles.VTOL import VTOL
 from ...Mode import Mode
 
 
-class TakeoffMode(Mode):
+class TakeoffMode(Mode[VTOL]):
     """
     A VTOL takeoff mode that supports both vertical and runway-style launches.
     """

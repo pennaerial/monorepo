@@ -11,8 +11,7 @@ from ..Mode import Mode
 _FOREVER = 0.0
 
 
-class PayloadIdleMode(Mode):
-    mission_target = "payload"
+class PayloadIdleMode(Mode[Payload]):
     required_vision_nodes = ()
     requires_camera = False
     transition_labels = ("complete",)

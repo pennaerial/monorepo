@@ -8,12 +8,11 @@ from uav_interfaces.srv import PayloadTracking
 from ..Mode import Mode
 
 
-class PayloadPickupMode(Mode):
+class PayloadPickupMode(Mode[UAV]):
     """
     A mode for picking up a payload.
     """
 
-    mission_target = "uav"
     required_vision_nodes = (PayloadTrackingNode,)
     transition_labels = ("complete",)
 

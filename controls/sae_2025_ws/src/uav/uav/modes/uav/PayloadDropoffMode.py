@@ -11,12 +11,11 @@ from uav_interfaces.srv import PayloadTracking
 from ..Mode import Mode
 
 
-class PayloadDropoffMode(Mode):
+class PayloadDropoffMode(Mode[UAV]):
     """
     A mode for dropping off the payload.
     """
 
-    mission_target = "uav"
     required_vision_nodes = (PayloadTrackingNode,)
     transition_labels = ("complete",)
 

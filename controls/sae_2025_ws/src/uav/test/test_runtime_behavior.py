@@ -214,6 +214,7 @@ def _install_ros_test_doubles() -> None:
 _install_ros_test_doubles()
 
 from uav.modes.Mode import Mode  # noqa: E402
+from uav.vehicles.Vehicle import Vehicle  # noqa: E402
 from uav.runtime.ModeManager import ModeManager  # noqa: E402
 import uav.runtime.ModeManager as mode_manager_module  # noqa: E402
 import uav.runtime.uav_mission as uav_mission_module  # noqa: E402
@@ -222,12 +223,20 @@ import uav.runtime.payload_mission as payload_mission_module  # noqa: E402
 import uav.runtime.PayloadModeManager as payload_manager_module  # noqa: E402
 
 
-class _ExpectedVehicle:
-    pass
+class _ExpectedVehicle(Vehicle):
+    def __init__(self) -> None:
+        pass
+
+    def stop(self) -> None:
+        pass
 
 
-class _OtherVehicle:
-    pass
+class _OtherVehicle(Vehicle):
+    def __init__(self) -> None:
+        pass
+
+    def stop(self) -> None:
+        pass
 
 
 class _FakeLogger:
@@ -427,9 +436,7 @@ def _require_runtime_support() -> None:
 def test_initialize_mode_happy_path(monkeypatch):
     _require_runtime_support()
 
-    class FakeMode(Mode):
-        mission_target = "uav"
-
+    class FakeMode(Mode[_ExpectedVehicle]):
         def __init__(
             self,
             node,
@@ -473,9 +480,7 @@ def test_initialize_mode_happy_path(monkeypatch):
 def test_initialize_mode_missing_required_parameter(monkeypatch):
     _require_runtime_support()
 
-    class FakeMode(Mode):
-        mission_target = "uav"
-
+    class FakeMode(Mode[_ExpectedVehicle]):
         def __init__(self, node, vehicle: _ExpectedVehicle, required: int) -> None:
             super().__init__(node, vehicle)
             self.required = required
@@ -505,9 +510,7 @@ def test_initialize_mode_missing_required_parameter(monkeypatch):
 def test_initialize_mode_rejects_unexpected_parameter(monkeypatch):
     _require_runtime_support()
 
-    class FakeMode(Mode):
-        mission_target = "uav"
-
+    class FakeMode(Mode[_ExpectedVehicle]):
         def __init__(self, node, vehicle: _ExpectedVehicle, required: int) -> None:
             super().__init__(node, vehicle)
             self.required = required
@@ -539,9 +542,7 @@ def test_initialize_mode_rejects_unexpected_parameter(monkeypatch):
 def test_initialize_mode_rejects_vehicle_type_mismatch(monkeypatch):
     _require_runtime_support()
 
-    class FakeMode(Mode):
-        mission_target = "uav"
-
+    class FakeMode(Mode[_ExpectedVehicle]):
         def __init__(self, node, vehicle: _ExpectedVehicle, required: int) -> None:
             super().__init__(node, vehicle)
             self.required = required
