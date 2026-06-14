@@ -167,7 +167,6 @@ class PayloadDLZNavigateMode(Mode):
         Test keys in YAML order — put more-specific rules first.
     """
 
-    mission_target = "payload"
     required_vision_nodes = (PayloadAprilTagNode,)
     transition_labels = ("done",)
     requires_camera = True

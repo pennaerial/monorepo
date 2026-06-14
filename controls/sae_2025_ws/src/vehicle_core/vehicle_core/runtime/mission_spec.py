@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import importlib
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
@@ -20,6 +20,9 @@ from ament_index_python.packages import (
 VALID_MISSION_TARGETS = {"uav", "payload"}
 _TOP_LEVEL_KEYS = {"modes"}
 _MODE_KEYS = {"mode", "params", "transitions"}
+
+if TYPE_CHECKING:
+    from uav.modes.Mode import Mode
 
 
 class MissionModeDocumentModel(BaseModel):
@@ -64,7 +67,7 @@ def mission_path_for_name(mission_name: str) -> str:
     return str(_mission_roots()[0] / f"{mission_name}.yaml")
 
 
-def load_mode_class(class_path: str):
+def load_mode_class(class_path: str) -> type["Mode[Any]"]:
     class_name = class_path.rsplit(".", 1)[-1]
     try:
         module = importlib.import_module(class_path)
@@ -212,7 +215,7 @@ def load_mission_spec(path: str | Path | dict[str, Any]) -> MissionSpec:
         mission_target = mode_entry.mission_target
         if mission_target not in VALID_MISSION_TARGETS:
             raise ValueError(
-                f"Mode '{mode_id}' must declare mission_target as one of {sorted(VALID_MISSION_TARGETS)}."
+                f"Mode '{mode_id}' must resolve mission_target as one of {sorted(VALID_MISSION_TARGETS)}."
             )
         mode_targets.add(mission_target)
         vision_nodes.update(mode_entry.required_vision_nodes)

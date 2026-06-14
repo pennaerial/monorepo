@@ -151,9 +151,13 @@ def _resolve_airframe_id(config: dict) -> int:
             raise ValueError(f"Unknown airframe name: {airframe_value}") from exc
 
 
-def _resolve_uav_airframe(config: dict, px4_path: str) -> tuple[object, int, str]:
+def _resolve_uav_airframe(
+    config: dict, px4_path: str
+) -> tuple[AirframeClass, int, str]:
     airframe_id = _resolve_airframe_id(config)
     vehicle_class, model_name = get_airframe_details(px4_path, airframe_id)
+    if not isinstance(vehicle_class, AirframeClass):
+        raise ValueError(f"Unexpected airframe class: {vehicle_class!r}.")
     model = str(config.get("model", "")).strip() or model_name
     return vehicle_class, int(airframe_id), model
 
@@ -267,12 +271,13 @@ def _build_camera_actions(
 ) -> list:
     save_vision = save_vision_milliseconds > 0
     actions = []
+    vehicle_name = str(camera_contract["vehicle_name"])
 
     if sim:
         actions.extend(
             _sim_camera_bridge_actions(
                 world_name=sim_world_name,
-                vehicle_name=str(camera_contract["vehicle_name"]),
+                vehicle_name=vehicle_name,
                 sim_entity_name=sim_entity_name,
                 mission_target=str(camera_contract["mission_target"]),
             )
@@ -350,8 +355,8 @@ def _build_camera_actions(
         Node(
             package="uav",
             executable="camera",
-            namespace=camera_contract["vehicle_name"],
-            name=f"{camera_contract['vehicle_name']}_camera",
+            namespace=vehicle_name,
+            name=f"{vehicle_name}_camera",
             output="screen",
             parameters=[camera_parameters],
         )
@@ -371,8 +376,8 @@ def _build_camera_actions(
             Node(
                 package="uav",
                 executable=executable,
-                namespace=camera_contract["vehicle_name"],
-                name=f"{camera_contract['vehicle_name']}_{executable}",
+                namespace=vehicle_name,
+                name=f"{vehicle_name}_{executable}",
                 output="screen",
                 parameters=[
                     {
@@ -596,8 +601,8 @@ def launch_setup(context, *args, **kwargs):
     ) or _resolve_force_camera(config, logger=logger)
 
     px4_path = ""
-    vehicle_class = None
-    autostart = None
+    vehicle_class: AirframeClass | None = None
+    autostart: int | None = None
     model = str(config.get("model", "")).strip()
     if mission_spec.is_uav:
         px4_path = find_folder_with_heuristic(
@@ -647,8 +652,11 @@ def launch_setup(context, *args, **kwargs):
             "v4l2_camera will fall back to its default camera_info behavior."
         )
 
-    camera_actions = (
-        _build_camera_actions(
+    camera_actions = []
+    if requires_camera:
+        if camera_contract is None:
+            raise ValueError(f"Vehicle '{vehicle_name}' requires a camera contract.")
+        camera_actions = _build_camera_actions(
             mission_spec=mission_spec,
             camera_contract=camera_contract,
             vision_nodes=list(mission_spec.vision_nodes),
@@ -659,9 +667,6 @@ def launch_setup(context, *args, **kwargs):
             debug_vision_node=debug_vision_node,
             save_vision_milliseconds=save_vision_milliseconds,
         )
-        if requires_camera
-        else []
-    )
 
     mission_node = Node(
         package="uav",
@@ -734,6 +739,10 @@ def launch_setup(context, *args, **kwargs):
         actions.append(_middleware_action(sim=sim, config=config))
 
     if mission_spec.is_uav and launch_px4_sitl:
+        if autostart is None:
+            raise ValueError(
+                f"Vehicle '{vehicle_name}' cannot launch PX4 SITL without a valid UAV airframe."
+            )
         actions.append(
             _px4_sitl_action(
                 px4_path=px4_path,

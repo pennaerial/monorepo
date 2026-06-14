@@ -17,7 +17,6 @@ class PayloadDropoffMode(Mode):
     A mode for dropping off the payload.
     """
 
-    mission_target = "uav"
     required_vision_nodes = (PayloadTrackingNode,)
     transition_labels = ("complete",)
 

@@ -11,7 +11,6 @@ class ServoDropoffMode(Mode):
     A mode for dropping off the payload.
     """
 
-    mission_target = "uav"
     transition_labels = ("complete",)
 
     def __init__(

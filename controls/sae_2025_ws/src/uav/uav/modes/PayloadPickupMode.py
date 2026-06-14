@@ -15,7 +15,6 @@ class PayloadPickupMode(Mode):
     A mode for picking up a payload.
     """
 
-    mission_target = "uav"
     required_vision_nodes = (PayloadTrackingNode,)
     transition_labels = ("complete",)
 

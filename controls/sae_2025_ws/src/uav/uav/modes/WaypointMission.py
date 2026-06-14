@@ -17,8 +17,6 @@ class WaypointMission(Mode):
     Flies through a series of waypoints defined in YAML.
     """
 
-    mission_target = "uav"
-
     def __init__(
         self,
         node: Node,

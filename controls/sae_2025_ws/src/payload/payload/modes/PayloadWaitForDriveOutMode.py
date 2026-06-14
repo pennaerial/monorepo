@@ -57,7 +57,6 @@ class PayloadWaitForDriveOutMode(Mode):
     Both conditions must hold continuously for wait_seconds before proceeding.
     """
 
-    mission_target = "payload"
     required_vision_nodes = ()
     requires_camera = True
     transition_labels = ("complete",)
@@ -88,7 +87,6 @@ class PayloadWaitForDriveOutMode(Mode):
         debug: bool = False,
     ):
         super().__init__(node, vehicle)
-        self.vehicle: Payload = vehicle
 
         self._dlz_lower = np.array(dlz_color_lower_hsv, dtype=np.uint8)
         self._dlz_upper = np.array(dlz_color_upper_hsv, dtype=np.uint8)

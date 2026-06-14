@@ -46,7 +46,6 @@ class PayloadRetreatMode(Mode):
     Publishes DriveCommand to the payload's own namespaced command topic.
     """
 
-    mission_target = "payload"
     required_vision_nodes = (PayloadAprilTagNode,)
     transition_labels = ()
 

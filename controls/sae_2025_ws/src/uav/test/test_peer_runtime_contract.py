@@ -87,6 +87,7 @@ def _install_ros_test_doubles() -> None:
 _install_ros_test_doubles()
 
 from uav.modes.Mode import Mode  # noqa: E402
+from uav.vehicles.Vehicle import Vehicle  # noqa: E402
 from uav.runtime.ModeManager import ModeManager  # noqa: E402
 import uav.runtime.ModeManager as mode_manager_module  # noqa: E402
 from uav.runtime.managed_comms import (  # noqa: E402
@@ -201,7 +202,7 @@ class _FakeLogger:
         pass
 
 
-class _FakeVehicle:
+class _FakeVehicle(Vehicle):
     def __init__(self, name: str = "payload_0") -> None:
         self.name = name
         self.has_camera = False
@@ -401,8 +402,7 @@ def test_build_mode_registry_entry_includes_peer_vehicle_names():
         "registry_peer_vehicle_names",
     )
 
-    class PeerAwareMode(Mode):
-        mission_target = "payload"
+    class PeerAwareMode(Mode[_FakeVehicle]):
         peer_vehicle_names = ("uav_2", "payload_1")
 
         def __init__(self, node, vehicle) -> None:
@@ -420,6 +420,7 @@ def test_build_mode_registry_entry_includes_peer_vehicle_names():
     PeerAwareMode.__module__ = "uav.modes.payload.PeerAwareMode"
     entry = build_mode_registry_entry(PeerAwareMode)
 
+    assert entry.mission_target == "payload"
     assert entry.peer_vehicle_names == ("payload_1", "uav_2")
 
 
@@ -429,8 +430,7 @@ def test_build_mode_registry_entry_allows_peer_mode_without_on_disconnect():
         "registry_peer_vehicle_names",
     )
 
-    class PeerAwareMode(Mode):
-        mission_target = "payload"
+    class PeerAwareMode(Mode[_FakeVehicle]):
         peer_vehicle_names = ("uav_3",)
 
         def __init__(self, node, vehicle) -> None:
@@ -446,6 +446,41 @@ def test_build_mode_registry_entry_allows_peer_mode_without_on_disconnect():
     entry = build_mode_registry_entry(PeerAwareMode)
 
     assert entry.peer_vehicle_names == ("uav_3",)
+
+
+def test_build_mode_registry_entry_allows_direct_generic_mode_base():
+    class DirectMode(Mode[_FakeVehicle]):
+        def __init__(self, node, vehicle) -> None:
+            super().__init__(node, vehicle)
+
+        def on_update(self, time_delta: float) -> None:
+            pass
+
+        def check_status(self) -> str:
+            return "continue"
+
+    DirectMode.__module__ = "uav.modes.payload.DirectMode"
+    entry = build_mode_registry_entry(DirectMode)
+
+    assert entry.mode_id == "payload.DirectMode"
+    assert entry.mission_target == "payload"
+
+
+def test_build_mode_registry_entry_rejects_unsupported_namespace():
+    class UnsupportedNamespaceMode(Mode[_FakeVehicle]):
+        def __init__(self, node, vehicle) -> None:
+            super().__init__(node, vehicle)
+
+        def on_update(self, time_delta: float) -> None:
+            pass
+
+        def check_status(self) -> str:
+            return "continue"
+
+    UnsupportedNamespaceMode.__module__ = "uav.modes.boat.UnsupportedNamespaceMode"
+
+    with pytest.raises(ValueError, match="must live under"):
+        build_mode_registry_entry(UnsupportedNamespaceMode)
 
 
 def test_load_mission_spec_collects_sorted_peer_vehicle_names_union(
@@ -518,8 +553,7 @@ def test_mode_manager_validates_peer_and_shared_entity_namespaces(monkeypatch):
         "manager_create_service",
     )
 
-    class PeerAwareMode(Mode):
-        mission_target = "payload"
+    class PeerAwareMode(Mode[_FakeVehicle]):
         peer_vehicle_names = ("uav_1",)
 
         def __init__(self, node, vehicle) -> None:
@@ -622,8 +656,7 @@ def test_run_active_mode_uses_connection_ready_for_gating():
         "manager_disconnect_runtime",
     )
 
-    class PeerAwareMode(Mode):
-        mission_target = "payload"
+    class PeerAwareMode(Mode[_FakeVehicle]):
         peer_vehicle_names = ("uav_1", "uav_2")
 
         def __init__(self, node, vehicle) -> None:
@@ -676,8 +709,7 @@ def test_run_active_mode_passes_full_connection_status_to_disconnect():
         "manager_disconnect_runtime",
     )
 
-    class PeerAwareMode(Mode):
-        mission_target = "payload"
+    class PeerAwareMode(Mode[_FakeVehicle]):
         peer_vehicle_names = ("uav_1", "uav_2")
 
         def __init__(self, node, vehicle) -> None:
@@ -724,8 +756,7 @@ def test_run_active_mode_passes_full_connection_status_to_disconnect():
 def test_mode_connection_ready_defaults_to_all_declared_peers_connected():
     _xfail_if_missing_peer_features("mode_peer_vehicle_names", "mode_connection_ready")
 
-    class PeerAwareMode(Mode):
-        mission_target = "payload"
+    class PeerAwareMode(Mode[_FakeVehicle]):
         peer_vehicle_names = ("uav_1", "uav_2")
 
         def __init__(self, node, vehicle) -> None:
@@ -753,8 +784,7 @@ def test_peer_client_wrapper_rebinds_on_connection_changes(monkeypatch):
         "manager_create_client",
     )
 
-    class PeerAwareMode(Mode):
-        mission_target = "payload"
+    class PeerAwareMode(Mode[_FakeVehicle]):
         peer_vehicle_names = ("uav_1",)
 
         def __init__(self, node, vehicle) -> None:
@@ -861,8 +891,7 @@ def test_managed_entity_descriptors_use_persistent_and_active_phases(monkeypatch
         "manager_create_publisher",
     )
 
-    class PhaseAwareMode(Mode):
-        mission_target = "payload"
+    class PhaseAwareMode(Mode[_FakeVehicle]):
         peer_vehicle_names = ("uav_1",)
 
         def __init__(self, node, vehicle) -> None:
@@ -923,9 +952,7 @@ def test_shared_state_for_is_keyed_by_canonical_mode_path():
 
     manager = _make_mode_manager()
 
-    class SharedStateMode(Mode):
-        mission_target = "payload"
-
+    class SharedStateMode(Mode[_FakeVehicle]):
         def __init__(self, node, vehicle) -> None:
             super().__init__(node, vehicle)
 
@@ -957,8 +984,7 @@ def test_peer_entity_usage_instrumentation_matches_declared_peers():
         "mode_on_disconnect",
     )
 
-    class InstrumentedPeerMode(Mode):
-        mission_target = "payload"
+    class InstrumentedPeerMode(Mode[_FakeVehicle]):
         peer_vehicle_names = ("payload_1", "uav_2")
 
         def __init__(self, node, vehicle) -> None:

@@ -64,7 +64,6 @@ def _color_blob_info(
 class PayloadDualApproachMode(Mode):
     """Approach using AprilTag when visible, HSV colour fallback otherwise."""
 
-    mission_target = "payload"
     required_vision_nodes = ()
     requires_camera = True
     transition_labels = ()
@@ -98,7 +97,6 @@ class PayloadDualApproachMode(Mode):
         compressed_image: bool = False,
     ):
         super().__init__(node, vehicle)
-        self.vehicle: Payload = vehicle
 
         # AprilTag
         self.tag_id = None if tag_id is None else int(tag_id)

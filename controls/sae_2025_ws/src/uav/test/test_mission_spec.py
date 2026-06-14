@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import textwrap
+from typing import Any
 from types import SimpleNamespace
 import sys
 import types
@@ -337,7 +338,7 @@ def test_invalid_mode_target_is_rejected(monkeypatch, mission_target):
         lambda _mode_id, params: params,
     )
 
-    with pytest.raises(ValueError, match="must declare mission_target"):
+    with pytest.raises(ValueError, match="must resolve mission_target"):
         load_mission_spec({"modes": {"start": {"mode": "fake.module.FakeMode"}}})
 
 
@@ -345,9 +346,7 @@ def test_load_mode_class_accepts_module_path(monkeypatch):
     module_name = "uav.modes.payload.PayloadAprilTagApproachMode"
     fake_module = types.ModuleType(module_name)
 
-    class PayloadAprilTagApproachMode(Mode):
-        mission_target = "payload"
-
+    class PayloadAprilTagApproachMode(Mode[Any]):
         def __init__(self, node, vehicle) -> None:
             super().__init__(node, vehicle)
 
@@ -364,7 +363,7 @@ def test_load_mode_class_accepts_module_path(monkeypatch):
     mode_class = load_mode_class("uav.modes.payload.PayloadAprilTagApproachMode")
 
     assert mode_class.__name__ == "PayloadAprilTagApproachMode"
-    assert mode_class.mission_target == "payload"
+    assert issubclass(mode_class, Mode)
 
 
 def test_checked_in_peer_fleet_test_mission_loads_with_peer_union():
@@ -388,11 +387,10 @@ def test_load_mode_class_falls_back_from_class_path(tmp_path, monkeypatch):
         package_name="test_modes",
         module_name="fake_mode",
         body="""
+        from typing import Any
         from uav.modes.Mode import Mode
 
-        class FakeMode(Mode):
-            mission_target = "uav"
-
+        class FakeMode(Mode[Any]):
             def __init__(self, node, vehicle):
                 super().__init__(node, vehicle)
 

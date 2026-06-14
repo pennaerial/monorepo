@@ -92,7 +92,6 @@ def _vertical_blob_centroid_area(
 class PayloadColorStringApproachMode(Mode):
     """Drive toward a coloured target using HSV blob detection."""
 
-    mission_target = "payload"
     required_vision_nodes = ()
     requires_camera = True
     transition_labels = ()
@@ -116,7 +115,6 @@ class PayloadColorStringApproachMode(Mode):
         use_global_hsv_centroid: bool = False,
     ):
         super().__init__(node, vehicle)
-        self.vehicle: Payload = vehicle
 
         self._lower_hsv = np.array(lower_hsv, dtype=np.uint8)
         self._upper_hsv = np.array(upper_hsv, dtype=np.uint8)

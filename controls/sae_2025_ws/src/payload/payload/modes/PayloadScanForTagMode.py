@@ -31,7 +31,6 @@ class PayloadScanForTagMode(Mode):
                       should reposition and try again
     """
 
-    mission_target = "payload"
     required_vision_nodes = (PayloadAprilTagNode,)
     transition_labels = ("found", "not_found")
     requires_camera = True

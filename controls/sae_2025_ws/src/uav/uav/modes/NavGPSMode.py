@@ -11,7 +11,6 @@ class NavGPSMode(Mode):
     A mode for navigating to a GPS coordinate
     """
 
-    mission_target = "uav"
     transition_labels = ("complete",)
 
     # TODO: Create "RELATIVE" navigation system, which initializes direction vectors once in the beginning

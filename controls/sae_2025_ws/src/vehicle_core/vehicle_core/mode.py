@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, ClassVar, Mapping
+from typing import TYPE_CHECKING, ClassVar, Generic, Mapping, TypeVar
 
 from rclpy.node import Node
 
@@ -9,20 +9,21 @@ from vehicle_core.runtime.vision_loader import canonical_vision_node_path
 if TYPE_CHECKING:
     from uav.vision_nodes import VisionNode
 
+VehicleT = TypeVar("VehicleT", bound=Vehicle)
 
-class Mode(ABC):
+
+class Mode(Generic[VehicleT], ABC):
     """
     Base class for UAV operational modes within a ROS 2 node.
     Provides a structured template for implementing autonomous behaviors.
     """
 
-    mission_target: ClassVar[str | None] = None
     required_vision_nodes: ClassVar[tuple[object, ...]] = ()
     peer_vehicle_names: ClassVar[tuple[str, ...]] = ()
     requires_camera: ClassVar[bool] = False
     transition_labels: ClassVar[tuple[str, ...]] = ()
 
-    def __init__(self, node: Node, vehicle: Vehicle):
+    def __init__(self, node: Node, vehicle: VehicleT):
         """
         Initialize the mode with a reference to the ROS 2 node.
 
@@ -32,7 +33,7 @@ class Mode(ABC):
         """
         self.node = node
         self.active = False
-        self.vehicle: Vehicle = vehicle
+        self.vehicle: VehicleT = vehicle
         self.pending_requests = {}
 
     @classmethod

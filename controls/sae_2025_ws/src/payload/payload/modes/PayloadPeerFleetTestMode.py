@@ -30,7 +30,6 @@ from vehicle_core.runtime.plugin_loader import register_plugin
 class PayloadPeerFleetTestMode(Mode):
     """Passive multi-payload communication demo for fleet bring-up."""
 
-    mission_target = "payload"
     required_vision_nodes = ()
     peer_vehicle_names = ("payload_0", "payload_1")
     requires_camera = False
@@ -45,7 +44,6 @@ class PayloadPeerFleetTestMode(Mode):
         shared_topic: str = "/shared/peer_test/broadcast",
     ) -> None:
         super().__init__(node, vehicle)
-        self.vehicle: Payload = vehicle
         self.publish_period_s = float(publish_period_s)
         self._local_topic = vehicle.namespaced_path(local_topic)
         self._shared_topic = str(shared_topic).strip() or "/shared/peer_test/broadcast"

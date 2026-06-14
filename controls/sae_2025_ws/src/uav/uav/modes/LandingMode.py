@@ -11,8 +11,6 @@ class LandingMode(Mode):
     A mode for landing vertically.
     """
 
-    mission_target = "uav"
-
     def __init__(self, node: Node, vehicle: UAV):
         """
         Initialize the LandingMode
