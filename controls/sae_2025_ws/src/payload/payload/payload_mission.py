@@ -5,7 +5,7 @@ from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 
 from .PayloadModeManager import PayloadModeManager
-from vehicle_core.runtime.mission_spec import MissionSpec, mission_path_for_name
+from vehicle_common.runtime.mission_spec import MissionSpec, mission_path_for_name
 
 
 class PayloadMissionBootstrap(Node):

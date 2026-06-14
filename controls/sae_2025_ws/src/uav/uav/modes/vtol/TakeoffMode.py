@@ -8,8 +8,8 @@ from rclpy.node import Node
 from uav.vehicles.UAV import get_nav_state_str
 from uav.vehicles.VTOL import VTOL
 
-from vehicle_core.mode import Mode
-from vehicle_core.runtime.plugin_loader import register_plugin
+from vehicle_common.mode import Mode
+from vehicle_common.runtime.plugin_loader import register_plugin
 
 
 @register_plugin(name="uav.vtol.TakeoffMode", base_cls=Mode)

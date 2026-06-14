@@ -5,8 +5,8 @@ from uav.vehicles.UAV import UAV
 from uav.vision_nodes import PayloadTrackingNode
 from uav_interfaces.srv import PayloadTracking
 
-from vehicle_core.mode import Mode
-from vehicle_core.runtime.plugin_loader import register_plugin
+from vehicle_common.mode import Mode
+from vehicle_common.runtime.plugin_loader import register_plugin
 
 
 @register_plugin(name="uav.PayloadPickupMode", base_cls=Mode)

@@ -9,7 +9,7 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
 from .mode_paths import normalize_public_mode_id
-from vehicle_core.mode import Mode
+from vehicle_common.mode import Mode
 
 from ament_index_python.packages import (
     PackageNotFoundError,

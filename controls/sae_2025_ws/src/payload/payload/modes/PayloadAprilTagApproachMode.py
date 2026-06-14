@@ -16,8 +16,8 @@ from uav.vision_nodes.payload_perception_common import (
     detect_payload_apriltags,
 )
 
-from vehicle_core.mode import Mode
-from vehicle_core.runtime.plugin_loader import register_plugin
+from vehicle_common.mode import Mode
+from vehicle_common.runtime.plugin_loader import register_plugin
 
 
 @dataclass(frozen=True)

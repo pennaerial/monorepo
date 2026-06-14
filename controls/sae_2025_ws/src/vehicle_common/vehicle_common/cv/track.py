@@ -1,9 +1,9 @@
 import numpy as np
 import cv2
-from vehicle_core.cv.calibrate import calibrate
-from vehicle_core.cv.recalibrate import recalibrate
-from vehicle_core.cv.threshold import threshold
-from vehicle_core.cv.confidence import confidence
+from vehicle_common.cv.calibrate import calibrate
+from vehicle_common.cv.recalibrate import recalibrate
+from vehicle_common.cv.threshold import threshold
+from vehicle_common.cv.confidence import confidence
 
 range = ((0, 0, 180), (225, 225, 255))
 

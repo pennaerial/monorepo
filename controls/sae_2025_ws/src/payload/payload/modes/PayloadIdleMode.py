@@ -5,8 +5,8 @@ mission logic."""
 from rclpy.node import Node
 
 from payload.payload import Payload
-from vehicle_core.mode import Mode
-from vehicle_core.runtime.plugin_loader import register_plugin
+from vehicle_common.mode import Mode
+from vehicle_common.runtime.plugin_loader import register_plugin
 
 _FOREVER = 0.0
 

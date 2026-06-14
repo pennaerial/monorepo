@@ -10,23 +10,23 @@ from typing import Any, Callable, Iterator, cast, get_type_hints
 from rclpy.node import Node
 from std_srvs.srv import Trigger
 
-from vehicle_core.vehicle import Vehicle
-from vehicle_core.mode import Mode
-from vehicle_core.runtime.comm_naming import ManagedCommKind, resolve_managed_target
-from vehicle_core.runtime.comm_policy import ManagedCommLifetime, managed_creation_phase_error
-from vehicle_core.runtime.managed_comms import ModeCommBuilder
-from vehicle_core.runtime.managed_registry import ManagedCommRegistry
-from vehicle_core.runtime.mode_paths import canonical_mode_path
-from vehicle_core.runtime.mission_spec import MissionSpec, load_mode_class
-from vehicle_core.runtime.schema import mode_entry_for_mode_id
-from vehicle_core.runtime.peer_connections import (
+from vehicle_common.vehicle import Vehicle
+from vehicle_common.mode import Mode
+from vehicle_common.runtime.comm_naming import ManagedCommKind, resolve_managed_target
+from vehicle_common.runtime.comm_policy import ManagedCommLifetime, managed_creation_phase_error
+from vehicle_common.runtime.managed_comms import ModeCommBuilder
+from vehicle_common.runtime.managed_registry import ManagedCommRegistry
+from vehicle_common.runtime.mode_paths import canonical_mode_path
+from vehicle_common.runtime.mission_spec import MissionSpec, load_mode_class
+from vehicle_common.runtime.schema import mode_entry_for_mode_id
+from vehicle_common.runtime.peer_connections import (
     PeerConnectionTracker,
     declared_remote_peer_names,
     relevant_connection_status,
     normalize_vehicle_name,
 )
-from vehicle_core.runtime.vision_loader import canonical_vision_node_path, load_vision_class
-from vehicle_core.runtime.plugin_loader import load_plugin_cls, plugins_to_json
+from vehicle_common.runtime.vision_loader import canonical_vision_node_path, load_vision_class
+from vehicle_common.runtime.plugin_loader import load_plugin_cls, plugins_to_json
 
 
 @dataclass(frozen=True)

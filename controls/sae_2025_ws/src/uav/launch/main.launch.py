@@ -17,7 +17,7 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.logging import get_logger
 from launch.substitutions import LaunchConfiguration
 
-from vehicle_core.runtime.mission_spec import MissionSpec, mission_path_for_name
+from vehicle_common.runtime.mission_spec import MissionSpec, mission_path_for_name
 from uav.utils import find_folder_with_heuristic, get_airframe_details, vehicle_id_dict
 
 

@@ -1,8 +1,8 @@
 import numpy as np
 import cv2
 import scipy.stats as stats
-from vehicle_core.cv.recalibrate import detect_contour
-from vehicle_core.cv.confidence import confidence
+from vehicle_common.cv.recalibrate import detect_contour
+from vehicle_common.cv.confidence import confidence
 
 
 def calibrate(frame):

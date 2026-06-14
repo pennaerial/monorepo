@@ -7,8 +7,8 @@ from typing import List
 
 from uav.vehicles.UAV import UAV
 
-from vehicle_core.mode import Mode
-from vehicle_core.runtime.plugin_loader import register_plugin
+from vehicle_common.mode import Mode
+from vehicle_common.runtime.plugin_loader import register_plugin
 
 @register_plugin(name="uav.WaypointMission", base_cls=Mode)
 class WaypointMission(Mode):

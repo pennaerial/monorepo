@@ -3,8 +3,8 @@ from typing import TYPE_CHECKING, ClassVar, Generic, Mapping, TypeVar
 
 from rclpy.node import Node
 
-from vehicle_core.vehicle import Vehicle
-from vehicle_core.runtime.vision_loader import canonical_vision_node_path
+from vehicle_common.vehicle import Vehicle
+from vehicle_common.runtime.vision_loader import canonical_vision_node_path
 
 if TYPE_CHECKING:
     from uav.vision_nodes import VisionNode

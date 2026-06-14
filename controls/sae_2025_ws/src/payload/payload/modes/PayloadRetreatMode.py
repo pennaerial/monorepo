@@ -20,8 +20,8 @@ from sensor_msgs.msg import CompressedImage, Image
 from payload_interfaces.msg import DriveCommand
 from cv_bridge import CvBridge
 
-from vehicle_core.mode import Mode
-from vehicle_core.runtime.plugin_loader import register_plugin
+from vehicle_common.mode import Mode
+from vehicle_common.runtime.plugin_loader import register_plugin
 from payload.payload import Payload
 from uav.vision_nodes import PayloadAprilTagNode
 

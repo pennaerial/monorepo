@@ -1,13 +1,13 @@
 from setuptools import find_packages, setup
 
-package_name = "vehicle_core"
+package_name = "vehicle_common"
 
 setup(
     name=package_name,
     version="0.0.0",
     packages=find_packages(exclude=["test"]),
     package_data={
-        "vehicle_core.runtime": ["mode_registry.json"],
+        "vehicle_common.runtime": ["mode_registry.json"],
     },
     data_files=[
         ("share/ament_index/resource_index/packages", ["resource/" + package_name]),
@@ -26,7 +26,7 @@ setup(
     },
     entry_points={
         "console_scripts": [
-                "test_plugin_loader = vehicle_core.runtime.plugin_loader:main"
+                "test_plugin_loader = vehicle_common.runtime.plugin_loader:main"
             ],
     },
 )

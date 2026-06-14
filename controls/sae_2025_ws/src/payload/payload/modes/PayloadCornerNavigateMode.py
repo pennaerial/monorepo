@@ -56,11 +56,11 @@ from cv_bridge import CvBridge
 from rclpy.node import Node
 from sensor_msgs.msg import CompressedImage, Image
 
-from vehicle_core.cv.dlz_convex_hull import build_dlz_hull_mask
+from vehicle_common.cv.dlz_convex_hull import build_dlz_hull_mask
 from payload.payload import Payload
 
-from vehicle_core.mode import Mode
-from vehicle_core.runtime.plugin_loader import register_plugin
+from vehicle_common.mode import Mode
+from vehicle_common.runtime.plugin_loader import register_plugin
 
 # Mirrors PayloadColorSquareNode._COLOR_RATIO: when one tape colour has at
 # least this many times more pixels than the other in the line-follow strip,

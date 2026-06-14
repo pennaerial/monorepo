@@ -2,8 +2,8 @@
 from time import time
 
 from payload.payload import Payload
-from vehicle_core.mode_manager import ModeManager
-from vehicle_core.runtime.mission_spec import MissionSpec
+from vehicle_common.mode_manager import ModeManager
+from vehicle_common.runtime.mission_spec import MissionSpec
 
 
 class PayloadModeManager(ModeManager):

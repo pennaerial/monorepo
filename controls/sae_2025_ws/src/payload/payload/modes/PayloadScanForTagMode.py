@@ -14,8 +14,8 @@ from uav.vision_nodes import PayloadAprilTagNode
 from uav.vision_nodes.payload_perception_common import DEFAULT_TAG_FAMILY
 from uav_interfaces.srv import PayloadAprilTagState
 
-from vehicle_core.mode import Mode
-from vehicle_core.runtime.plugin_loader import register_plugin
+from vehicle_common.mode import Mode
+from vehicle_common.runtime.plugin_loader import register_plugin
 
 _TWO_PI = 2.0 * math.pi
 

@@ -15,7 +15,7 @@ from typing import Any, Literal, Union, get_args, get_origin, get_type_hints
 
 from pydantic import BaseModel, ConfigDict, create_model
 
-from vehicle_core.mode import Mode
+from vehicle_common.mode import Mode
 
 from .mode_paths import (
     implementation_mode_path,

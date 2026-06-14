@@ -17,8 +17,8 @@ from launch.logging import get_logger
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
-from vehicle_core.runtime.mission_spec import MissionSpec, mission_path_for_name
-from vehicle_core.runtime.vision_loader import load_vision_class
+from vehicle_common.runtime.mission_spec import MissionSpec, mission_path_for_name
+from vehicle_common.runtime.vision_loader import load_vision_class
 from uav.utils import (
     camel_to_snake,
     find_folder_with_heuristic,

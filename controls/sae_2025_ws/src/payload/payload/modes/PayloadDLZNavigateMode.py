@@ -11,14 +11,14 @@ from cv_bridge import CvBridge
 from rclpy.node import Node
 from sensor_msgs.msg import CompressedImage, Image
 
-from vehicle_core.cv.dlz_convex_hull import build_dlz_hull_mask
+from vehicle_common.cv.dlz_convex_hull import build_dlz_hull_mask
 from payload.payload import Payload
 from uav.vision_nodes import PayloadAprilTagNode
 from uav.vision_nodes.payload_perception_common import DEFAULT_TAG_FAMILY
 from uav_interfaces.srv import PayloadAprilTagState
 
-from vehicle_core.mode import Mode
-from vehicle_core.runtime.plugin_loader import register_plugin
+from vehicle_common.mode import Mode
+from vehicle_common.runtime.plugin_loader import register_plugin
 
 # Corner-turn vision thresholds (mirrors PayloadCornerNavigateMode defaults)
 _CORNER_CENTER_TOL_PX = 75.0  # lateral error tolerance (px)

@@ -7,7 +7,7 @@ from payload_interfaces.msg import (
     ServoCommand,
 )
 from payload_interfaces.srv import DeadReckon, TimedDrive
-from vehicle_core.vehicle import Vehicle
+from vehicle_common.vehicle import Vehicle
 
 _DEFAULT_UDP_HEARTBEAT_HZ = 10.0
 
