@@ -24,8 +24,8 @@ _PAPER_MASK_KEYS = {
 
 def _normalize_payload_color(
     payload_color: str | None,
-    lower_payload,
-    upper_payload,
+    lower_payload: np.ndarray | None,
+    upper_payload: np.ndarray | None,
 ) -> str:
     if payload_color is not None:
         return str(payload_color).strip().lower()
@@ -33,8 +33,8 @@ def _normalize_payload_color(
     if lower_payload is None or upper_payload is None:
         return "unknown"
 
-    lower = tuple(int(x) for x in np.asarray(lower_payload).reshape(-1))
-    upper = tuple(int(x) for x in np.asarray(upper_payload).reshape(-1))
+    lower = tuple(int(x) for x in lower_payload.reshape(-1))
+    upper = tuple(int(x) for x in upper_payload.reshape(-1))
     for color_name, (named_lower, named_upper) in _NAMED_PAYLOAD_BOUNDS.items():
         if lower == tuple(named_lower) and upper == tuple(named_upper):
             return color_name
@@ -60,8 +60,8 @@ def _largest_contour_centroid(
 
 def _legacy_focused_payload_mask(
     focused_bgr: np.ndarray,
-    lower_payload,
-    upper_payload,
+    lower_payload: np.ndarray | None,
+    upper_payload: np.ndarray | None,
 ) -> np.ndarray:
     if lower_payload is None or upper_payload is None:
         return np.zeros(focused_bgr.shape[:2], dtype=np.uint8)
@@ -77,8 +77,8 @@ def _legacy_focused_payload_mask(
 def _resolved_payload_mask(
     focused_bgr: np.ndarray,
     requested_color: str,
-    lower_payload,
-    upper_payload,
+    lower_payload: np.ndarray | None,
+    upper_payload: np.ndarray | None,
     paper_masks: dict[str, np.ndarray],
 ) -> np.ndarray:
     """Use the focused-DLZ classifier first, then fall back to HSV if needed."""
@@ -134,12 +134,13 @@ def find_payload(
         zone_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
     )
     if not contours:
+        vis_image = image.copy() if debug or save_vision else None
         if debug or save_vision:
-            vis_image = image.copy()
-        if debug:
+            assert vis_image is not None
+        if debug and vis_image is not None:
             cv2.imshow("Payload Tracking", vis_image)
             cv2.waitKey(1)
-        if save_vision:
+        if save_vision and vis_image is not None:
             import time
 
             time = int(time.time())
@@ -183,6 +184,7 @@ def find_payload(
         else:
             dlz_empty = False
 
+    vis_image: np.ndarray | None = None
     if debug or save_vision:
         vis_image = image.copy()
 
@@ -190,7 +192,7 @@ def find_payload(
         if largest_payload_contour is not None:
             cv2.drawContours(vis_image, [largest_payload_contour], -1, (0, 255, 0), 2)
         cv2.circle(vis_image, (cx, cy), 5, (0, 0, 255), -1)
-    if debug:
+    if debug and vis_image is not None:
         cv2.namedWindow("Payload Tracking", cv2.WINDOW_AUTOSIZE)
         cv2.imshow("Payload Tracking", vis_image)
         cv2.imshow(f"DLZ Mask {lower_zone}, {upper_zone}", zone_mask)
@@ -200,7 +202,7 @@ def find_payload(
             cv2.imshow("Proposal Mask", paper_masks["proposal_mask"])
             cv2.imshow("Unknown Mask", paper_masks["unknown_mask"])
         cv2.waitKey(1)
-    if save_vision:
+    if save_vision and vis_image is not None:
         import time
 
         time = int(time.time())
@@ -278,7 +280,7 @@ def find_dlz(
     lower_green: np.ndarray,
     upper_green: np.ndarray,
     debug: bool = False,
-) -> Optional[Tuple[int, int, np.ndarray]]:
+) -> Optional[Tuple[int, int, np.ndarray | None]]:
     """
     Detect payload in image using color thresholding.
 
@@ -290,8 +292,8 @@ def find_dlz(
         upper_green (np.ndarray): Upper HSV threshold for green payload.
 
     Returns:
-        Optional[Tuple[int, int, np.ndarray]]: A tuple (cx, cy, visualization_image)
-        if detection is successful; otherwise, None.
+        Optional[Tuple[int, int, np.ndarray | None]]: A tuple
+        (cx, cy, visualization_image) if detection is successful; otherwise, None.
     """
     hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
@@ -355,13 +357,15 @@ if __name__ == "__main__":
     image = cv2.imread(
         "/Users/ethanyu/VSCodeProjects/monorepo/good_images/image_20250322_191023.png"
     )
+    if image is None:
+        raise RuntimeError("Unable to read debug image.")
     print(
         find_payload(
             image,
-            (140, 155, 50),
-            (170, 255, 255),
-            (140, 155, 50),
-            (170, 255, 255),
+            np.array((140, 155, 50), dtype=np.uint8),
+            np.array((170, 255, 255), dtype=np.uint8),
+            np.array((140, 155, 50), dtype=np.uint8),
+            np.array((170, 255, 255), dtype=np.uint8),
             "debug",
             debug=True,
             payload_color="pink",

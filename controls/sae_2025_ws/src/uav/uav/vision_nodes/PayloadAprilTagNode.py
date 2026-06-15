@@ -87,10 +87,15 @@ class PayloadAprilTagNode(VisionNode):
 
         response.image_width = int(camera_info.width)
         for observation in observations:
+            pose_x = observation.pose_x
+            pose_y = observation.pose_y
+            pose_yaw = observation.pose_yaw
+            if pose_x is None or pose_y is None or pose_yaw is None:
+                continue
             response.tag_ids.append(int(observation.tag_id))
-            response.pose_x.append(float(observation.pose_x))
-            response.pose_y.append(float(observation.pose_y))
-            response.pose_yaw.append(float(observation.pose_yaw))
+            response.pose_x.append(float(pose_x))
+            response.pose_y.append(float(pose_y))
+            response.pose_yaw.append(float(pose_yaw))
             response.tvec_x.append(float(observation.tvec_x))
             response.tvec_y.append(float(observation.tvec_y))
             response.tvec_z.append(float(observation.tvec_z))
@@ -239,8 +244,9 @@ class PayloadAprilTagNode(VisionNode):
             )
             if ok:
                 axis_len = tag_size_m * 0.5
-                axes_3d = np.float32(
-                    [[0, 0, 0], [axis_len, 0, 0], [0, axis_len, 0], [0, 0, axis_len]]
+                axes_3d = np.array(
+                    [[0, 0, 0], [axis_len, 0, 0], [0, axis_len, 0], [0, 0, axis_len]],
+                    dtype=np.float32,
                 )
                 projected, _ = cv2.projectPoints(
                     axes_3d, rvec, tvec, camera_matrix, np.zeros((4, 1))
@@ -279,7 +285,11 @@ class PayloadAprilTagNode(VisionNode):
                 f"lat err: {lateral_error_px:+.1f} px",
                 f"yaw err: {primary.yaw_error:+.3f} rad  (0=orthogonal)",
             ]
-            if primary.pose_x is not None:
+            if (
+                primary.pose_x is not None
+                and primary.pose_y is not None
+                and primary.pose_yaw is not None
+            ):
                 lines.append(
                     f"pose:    x={primary.pose_x:.3f}  y={primary.pose_y:.3f}  yaw={math.degrees(primary.pose_yaw):.1f} deg"
                 )

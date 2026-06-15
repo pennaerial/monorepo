@@ -3,7 +3,7 @@ import rclpy
 from sensor_msgs.msg import Image, CompressedImage
 import cv2 as cv
 import numpy as np
-import pupil_apriltags
+import pupil_apriltags  # pyright: ignore[reportMissingImports]
 from cv_bridge import CvBridge
 
 
@@ -50,6 +50,9 @@ class AprilTagDebugger(Node):
     def _compressed_cb(self, msg: CompressedImage):
         buf = np.frombuffer(msg.data, dtype=np.uint8)
         frame = cv.imdecode(buf, cv.IMREAD_COLOR)
+        if frame is None:
+            self.get_logger().warn("Failed to decode compressed image.")
+            return
         self._process_and_show(frame)
 
     def _process_and_show(self, frame: np.ndarray):
