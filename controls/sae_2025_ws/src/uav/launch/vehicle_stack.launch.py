@@ -718,11 +718,12 @@ def launch_setup(context, *args, **kwargs):
 
     actions = []
     if mission_spec.is_payload and launch_payload_backend:
-        payload_controller = "SimController" if sim else "GPIOController"
+        default_controller = "SimController" if sim else "GPIOController"
+        controller_override = str(config.get("payload_controller", "")).strip()
         actions.append(
             _payload_launch_action(
                 vehicle_name=vehicle_name,
-                controller=payload_controller,
+                controller=controller_override or default_controller,
                 sim_entity_name=sim_entity_name,
             )
         )
