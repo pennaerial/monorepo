@@ -13,20 +13,25 @@ from std_srvs.srv import Trigger
 from vehicle_common.vehicle import Vehicle
 from vehicle_common.mode import Mode
 from vehicle_common.runtime.comm_naming import ManagedCommKind, resolve_managed_target
-from vehicle_common.runtime.comm_policy import ManagedCommLifetime, managed_creation_phase_error
+from vehicle_common.runtime.comm_policy import (
+    ManagedCommLifetime,
+    managed_creation_phase_error,
+)
 from vehicle_common.runtime.managed_comms import ModeCommBuilder
 from vehicle_common.runtime.managed_registry import ManagedCommRegistry
 from vehicle_common.runtime.mode_paths import canonical_mode_path
-from vehicle_common.runtime.mission_spec import MissionSpec, load_mode_class
-from vehicle_common.runtime.schema import mode_entry_for_mode_id
+from vehicle_common.runtime.mission_spec import MissionSpec
 from vehicle_common.runtime.peer_connections import (
     PeerConnectionTracker,
     declared_remote_peer_names,
     relevant_connection_status,
     normalize_vehicle_name,
 )
-from vehicle_common.runtime.vision_loader import canonical_vision_node_path, load_vision_class
-from vehicle_common.runtime.plugin_loader import load_plugin_cls, plugins_to_json
+from vehicle_common.runtime.vision_loader import (
+    canonical_vision_node_path,
+    load_vision_class,
+)
+from vehicle_common.runtime.plugin_loader import load_plugin_cls
 
 
 @dataclass(frozen=True)
@@ -405,7 +410,6 @@ class ModeManager(Node):
 
     def setup_modes(self, mission_spec: MissionSpec) -> None:
         for mode_name, mode_info in mission_spec.modes.items():
-
             mode = self.initialize_mode(mode_info.mode_id, mode_info.params)
             self.add_mode(mode_name, mode)
             self.transitions[mode_name] = mode_info.transitions

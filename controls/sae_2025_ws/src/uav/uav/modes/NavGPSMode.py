@@ -5,6 +5,7 @@ from uav.vehicles.UAV import UAV
 from vehicle_common.mode import Mode
 from vehicle_common.runtime.plugin_loader import register_plugin
 
+
 @register_plugin(name="uav.NavGPSMode", base_cls=Mode)
 class NavGPSMode(Mode):
     """

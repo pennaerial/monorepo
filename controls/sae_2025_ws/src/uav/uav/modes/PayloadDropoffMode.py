@@ -11,6 +11,7 @@ from uav_interfaces.srv import PayloadTracking
 from vehicle_common.mode import Mode
 from vehicle_common.runtime.plugin_loader import register_plugin
 
+
 @register_plugin(name="uav.PayloadDropoffMode", base_cls=Mode)
 class PayloadDropoffMode(Mode):
     """
