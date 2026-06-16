@@ -19,6 +19,8 @@ def process_video(input_path: str):
     cap = cv2.VideoCapture(input_path)
 
     opened, first_frame = cap.read()
+    if not opened or first_frame is None:
+        raise ValueError(f"Could not read first frame from {input_path}")
 
     prev_frame = first_frame
     prev_center = (0, 0)
@@ -26,21 +28,24 @@ def process_video(input_path: str):
     threshold_range = calibrate(first_frame)
 
     while cap.isOpened():
-        _, frame = cap.read()
+        ok, frame = cap.read()
+        if not ok or frame is None:
+            break
 
         if recalibrate(frame, prev_frame, range):
             threshold_range = calibrate(frame)
 
         points, center = threshold(threshold_range, prev_center, frame)
 
-        new_points = [conversion(p, 100) for p in points]
-        print(new_points)
+        if points is not None and center is not None:
+            new_points = [conversion(p, 100) for p in points.reshape(-1, 2)]
+            print(new_points)
 
-        conf = confidence(points, -1, *frame[:2])
-        print(f"{conf:.2f}, {center}")
+            conf = confidence(points, -1, *frame.shape[:2])
+            print(f"{conf:.2f}, {center}")
+            prev_center = center
 
         prev_frame = frame
-        prev_center = center
 
         if cv2.waitKey(1) & 0xFF == ord("q"):
             break

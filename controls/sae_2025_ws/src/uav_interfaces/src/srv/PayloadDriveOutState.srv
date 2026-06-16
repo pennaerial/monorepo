@@ -1,3 +1,4 @@
+# All-zero HSV bounds use the node's defaults because ROS fixed arrays default to zero.
 int32[3] lower_hsv    # HSV lower bound for detection mask e.g. [0, 0, 180]
 int32[3] upper_hsv    # HSV upper bound for detection mask e.g. [180, 20, 255]
 ---

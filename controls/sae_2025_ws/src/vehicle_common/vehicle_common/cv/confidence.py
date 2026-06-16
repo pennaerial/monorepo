@@ -2,18 +2,17 @@ import cv2
 import numpy as np
 
 
-def fit_quadrilateral(contour):
-    print(contour)
-    return cv2.boxPoints(cv2.minAreaRect(np.array(list(contour))))
+def fit_quadrilateral(contour: np.ndarray) -> np.ndarray:
+    return cv2.boxPoints(cv2.minAreaRect(contour))
 
 
-def rect_confidence(contour, height, width):
+def rect_confidence(contour: np.ndarray, height: int, width: int) -> float:
     # Create empty masks
     mask1 = np.zeros((height, width), dtype=np.uint8)
     mask2 = np.zeros((height, width), dtype=np.uint8)
 
     # Convert the box into a contour (it needs to be a list of points)
-    box = np.int0(fit_quadrilateral(contour))  # Convert to integer points
+    box = fit_quadrilateral(contour).astype(np.int32)
 
     # Draw the contour of the original contour on mask1
     cv2.drawContours(mask1, [contour], 0, 255, thickness=cv2.FILLED)
@@ -30,7 +29,12 @@ def rect_confidence(contour, height, width):
     return confidence
 
 
-def confidence(contour, target_area, height, width):
+def confidence(
+    contour: np.ndarray,
+    target_area: float,
+    height: int,
+    width: int,
+) -> float:
     # use target_area negative as a proxy for not suppying a target area
     if target_area < 0:
         return rect_confidence(contour, height, width)

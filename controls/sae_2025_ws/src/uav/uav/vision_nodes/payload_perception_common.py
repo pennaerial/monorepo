@@ -269,9 +269,7 @@ def _solve_detection_pose(
     *,
     flags: int | None = None,
     min_forward_distance_m: float | None = None,
-) -> Optional[
-    tuple[int, np.ndarray, np.ndarray, np.ndarray, float, float, float, float]
-]:
+) -> Optional[tuple[int, np.ndarray, np.ndarray, float, float, float, float, float]]:
     tag_id = int(getattr(detection, "tag_id", -1))
     corners = np.asarray(detection.corners, dtype=np.float32)
     if len(corners) != 4:
@@ -490,7 +488,8 @@ Examples:
     if command == "unreeled":
         mask, ratio, count, debug_frame = detect_payload_unreeled(bgr, debug=True)
         print(f"white_ratio={ratio:.4f}  white_count={count}")
-        cv2.imshow("detect_payload_unreeled", debug_frame)
+        if debug_frame is not None:
+            cv2.imshow("detect_payload_unreeled", debug_frame)
         cv2.imshow("white_mask", mask)
         print("Press any key to close.")
         cv2.waitKey(0)

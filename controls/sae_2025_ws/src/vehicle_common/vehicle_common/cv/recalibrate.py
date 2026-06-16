@@ -2,10 +2,10 @@ import cv2
 import numpy as np
 
 
-def detect_contour(frame, range):
+def detect_contour(frame: np.ndarray, bounds) -> np.ndarray | None:
     frame = cv2.GaussianBlur(frame, (5, 5), 0)
     # Threshold to isolate potential contours
-    thresh = cv2.inRange(frame, *range)
+    thresh = cv2.inRange(frame, *bounds)
 
     contours, _ = cv2.findContours(thresh, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
     valid_contours = []
@@ -39,14 +39,10 @@ def detect_contour(frame, range):
         )  # Sort by area ratio, highest first
         _, best_contour, _ = total[0]  # Choose the best contour based on area ratio
         return best_contour
-    else:
-        return set()
+    return None
 
 
-def contourNeighborhood(img, contour, margin):
-    if contour is None:
-        raise ValueError("No valid contour found.")
-
+def contourNeighborhood(img: np.ndarray, contour: np.ndarray, margin: int):
     x, y, w, h = cv2.boundingRect(contour)
     x = max(0, x - margin)
     y = max(0, y - margin)
@@ -76,9 +72,9 @@ def kl_divergence(img1, img2):
     return kl.astype(np.float32)
 
 
-def check(frame1, frame2, range):
-    contour1 = detect_contour(frame1, range)
-    contour2 = detect_contour(frame2, range)
+def check(frame1: np.ndarray, frame2: np.ndarray, bounds) -> np.float32:
+    contour1 = detect_contour(frame1, bounds)
+    contour2 = detect_contour(frame2, bounds)
 
     if contour1 is None or contour2 is None:
         raise ValueError("No valid contours detected in one or both images.")
@@ -90,12 +86,14 @@ def check(frame1, frame2, range):
     return kl_divergence(region1, region2)
 
 
-def recalibrate(frame1, frame2, range):
+def recalibrate(frame1: np.ndarray, frame2: np.ndarray, bounds) -> bool:
     try:
-        print("THE DIVERGENCE IS " + (str)(check(frame1, frame2, range)))
+        divergence = check(frame1, frame2, bounds)
     except ValueError as e:
         print(f"Error: {e}")
-    return (check(frame1, frame2, range)) > 5
+        return False
+    print("THE DIVERGENCE IS " + str(divergence))
+    return bool(divergence > 5)
 
 
 if __name__ == "__main__":
@@ -105,6 +103,8 @@ if __name__ == "__main__":
     img1 = cv2.imread("/Users/rushilpatel/Desktop/Recalibrate1.png")
     img2 = cv2.imread("/Users/rushilpatel/Desktop/Recalibrate2.png")
     img3 = cv2.imread("/Users/rushilpatel/Desktop/Recalibrate3.png")
+    if img1 is None or img2 is None or img3 is None:
+        raise RuntimeError("Unable to read one or more debug images.")
 
     print(recalibrate(img1, img2, range))
     print(recalibrate(img2, img3, range))

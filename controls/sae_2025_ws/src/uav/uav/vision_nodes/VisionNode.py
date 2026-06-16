@@ -29,10 +29,6 @@ class VisionNode(Node):
         del camera_namespace
         return f"vision/{cls.node_name()}"
 
-    @classmethod
-    def __str__(cls):
-        return cls.node_name()
-
     def __init__(
         self,
         custom_service,
@@ -248,7 +244,10 @@ class VisionNode(Node):
         Converts a ROS 2 Image message to a NumPy array.
         """
         if isinstance(msg, CompressedImage):
-            return self.bridge.compressed_imgmsg_to_cv2(msg, desired_encoding="bgr8")
+            frame = self.bridge.compressed_imgmsg_to_cv2(msg, desired_encoding="bgr8")
+            if frame is None:
+                raise ValueError("Unable to decode compressed image message.")
+            return frame
         if self.sim:
             img_data = np.frombuffer(msg.data, dtype=np.uint8)
             frame = img_data.reshape((msg.height, msg.width, 3))

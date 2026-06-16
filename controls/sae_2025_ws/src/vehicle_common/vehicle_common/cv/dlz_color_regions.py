@@ -106,7 +106,7 @@ def detect_focused_dlz_paper_masks(
 
     proposal_mask = np.zeros_like(candidate_mask)
     num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(
-        (split_mask > 0).astype(np.uint8), 8
+        (split_mask > 0).astype(np.uint8), connectivity=8
     )
 
     for label in range(1, num_labels):
@@ -169,7 +169,7 @@ def detect_focused_dlz_paper_masks(
 
         out = np.zeros_like(mask)
         n, cc_labels, cc_stats, _ = cv2.connectedComponentsWithStats(
-            (cleaned > 0).astype(np.uint8), 8
+            (cleaned > 0).astype(np.uint8), connectivity=8
         )
 
         for cc in range(1, n):

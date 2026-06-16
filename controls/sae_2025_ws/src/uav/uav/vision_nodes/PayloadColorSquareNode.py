@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from typing import Any
 
 import cv2
 import numpy as np
@@ -129,7 +130,7 @@ class PayloadColorSquareNode(VisionNode):
             self.vision_service,
             self.service_callback,
         )
-        self._debug_pub: CompressedImage | None = None
+        self._debug_pub: Any | None = None
         if self.debug:
             debug_topic = self.vision_service + "/debug_image/compressed"
             self._debug_pub = self.create_publisher(CompressedImage, debug_topic, 1)
@@ -207,14 +208,19 @@ class PayloadColorSquareNode(VisionNode):
         orange_contours, _ = cv2.findContours(
             orange_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
         )
-        shifted_orange = [c + np.array([[[0, strip_start]]]) for c in orange_contours]
+        offset = np.array([[[0, strip_start]]], dtype=np.int32)
+        shifted_orange = [
+            (contour + offset).astype(np.int32) for contour in orange_contours
+        ]
         cv2.drawContours(debug, shifted_orange, -1, (255, 255, 255), 2)
 
         # White contours around detected blue regions
         blue_contours, _ = cv2.findContours(
             blue_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
         )
-        shifted_blue = [c + np.array([[[0, strip_start]]]) for c in blue_contours]
+        shifted_blue = [
+            (contour + offset).astype(np.int32) for contour in blue_contours
+        ]
         cv2.drawContours(debug, shifted_blue, -1, (255, 255, 255), 2)
 
         # Faint grey line at the strip cut

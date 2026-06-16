@@ -1,15 +1,20 @@
 import cv2
+import numpy as np
 
 
-def distance(c1, c2):
+def distance(c1: tuple[int, int], c2: tuple[int, int]) -> int:
     return (c1[0] - c2[0]) ** 2 + (c1[1] - c2[1]) ** 2
 
 
-def detect_contour(threshold, frame):
+def detect_contour(
+    threshold, frame: np.ndarray
+) -> tuple[list[np.ndarray], list[tuple[int, int]]]:
     hsl = cv2.cvtColor(frame, cv2.COLOR_BGR2HLS)
     hsl = cv2.GaussianBlur(hsl, (5, 5), 0)
 
-    thresh = cv2.inRange(hsl, (0, threshold[0], 0), (180, threshold[1], 255))
+    lower = np.array([0, int(threshold[0]), 0], dtype=np.uint8)
+    upper = np.array([180, int(threshold[1]), 255], dtype=np.uint8)
+    thresh = cv2.inRange(hsl, lower, upper)
     # thresh = cv2.inRange(hsl, (80, 100, 0), (180, 255, 255))
     # thresh = cv2.inRange(hsl, (140, 50, 80), (180, 255, 255))
 
@@ -45,7 +50,7 @@ def detect_contour(threshold, frame):
 def threshold(thresh, prev_center, frame):
     new_contours, new_centers = detect_contour(thresh, frame)
 
-    contour = None
+    contour: np.ndarray | None = None
     center = None
     closest = float("inf")
     for i, c2 in enumerate(new_centers):
@@ -55,10 +60,9 @@ def threshold(thresh, prev_center, frame):
             center = c2
             closest = center_distance
 
-    if contour is not None:
+    if contour is not None and center is not None:
         cv2.drawContours(frame, [contour], -1, (0, 255, 0), 2)
         cv2.circle(frame, center, 2, (0, 0, 255), -1)
-        contour = [x[0] for x in contour]
 
     # cv2.imshow('Image 2 Matches', frame)
     # print(contour)
@@ -69,6 +73,8 @@ if __name__ == "__main__":
     cap = cv2.VideoCapture("DJI_0033.mov")
     thresh = (170, 255)
     ret, prev = cap.read()
+    if not ret or prev is None:
+        raise RuntimeError("Unable to read initial frame.")
     prev = cv2.resize(prev, (2704 // 2, 1520 // 2))
     _, prev_centers = detect_contour(thresh, prev)
     prev_center = None
@@ -77,6 +83,8 @@ if __name__ == "__main__":
 
     while cap.isOpened():
         ret, frame = cap.read()
+        if not ret or frame is None:
+            break
         frame = cv2.resize(frame, (2704 // 2, 1520 // 2))
         if frame is not None:
             # If the payload was in the previous frame
