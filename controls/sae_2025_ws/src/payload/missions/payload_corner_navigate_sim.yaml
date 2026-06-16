@@ -6,6 +6,8 @@
 modes:
   start:
     mode: payload.PayloadCornerNavigateMode
+    transitions:
+      complete: terminate
     params:
       direction: ccw
       # Target colours in standard HSV: blue=(240°,100%,100%), red=(0°,100%,100%).
