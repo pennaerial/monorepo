@@ -378,6 +378,13 @@ def _vehicle_stack_configs(fleet: dict) -> tuple[dict, list[dict]]:
 def launch_setup(context, *args, **kwargs):
     logger = get_logger("fleet.launch")
     fleet = _load_fleet_file(context)
+
+    px4_path_override = LaunchConfiguration("px4_path").perform(context).strip()
+    if px4_path_override:
+        if not isinstance(fleet.get("backend"), dict):
+            fleet["backend"] = {}
+        fleet["backend"]["px4_path"] = px4_path_override
+
     backend, vehicles = _vehicle_stack_configs(fleet)
 
     actions = []
@@ -436,6 +443,7 @@ def generate_launch_description():
     return LaunchDescription(
         [
             DeclareLaunchArgument("fleet_file", default_value=""),
+            DeclareLaunchArgument("px4_path", default_value=""),
             OpaqueFunction(function=launch_setup),
         ]
     )
