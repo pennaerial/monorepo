@@ -17,6 +17,7 @@ from launch.logging import get_logger
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
+from uav.vehicles.AirframeClass import AirframeClass
 from vehicle_common.runtime.mission_spec import MissionSpec, mission_path_for_name
 from vehicle_common.runtime.vision_loader import load_vision_class
 from uav.utils import (
@@ -50,6 +51,14 @@ def _runtime_executable_for(mission_spec: MissionSpec) -> str:
         return "uav_mission"
     if mission_spec.is_payload:
         return "payload_mission"
+    raise ValueError(f"Unsupported mission target '{mission_spec.target}'.")
+
+
+def _runtime_package_for(mission_spec: MissionSpec) -> str:
+    if mission_spec.is_uav:
+        return "uav"
+    if mission_spec.is_payload:
+        return "payload"
     raise ValueError(f"Unsupported mission target '{mission_spec.target}'.")
 
 
@@ -552,6 +561,7 @@ def launch_setup(context, *args, **kwargs):
     mission_path = _resolve_mission_path(config)
     mission_spec = MissionSpec.load(mission_path)
     runtime_executable = _runtime_executable_for(mission_spec)
+    runtime_package = _runtime_package_for(mission_spec)
 
     vehicle_name = str(config.get("vehicle_name", "")).strip()
     if not vehicle_name:
@@ -669,7 +679,7 @@ def launch_setup(context, *args, **kwargs):
         )
 
     mission_node = Node(
-        package="uav",
+        package=runtime_package,
         executable=runtime_executable,
         namespace=vehicle_name,
         output="screen",
