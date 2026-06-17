@@ -86,27 +86,27 @@ def _install_ros_test_doubles() -> None:
 
 _install_ros_test_doubles()
 
-from uav.modes.Mode import Mode  # noqa: E402
-from uav.vehicles.Vehicle import Vehicle  # noqa: E402
-from uav.runtime.ModeManager import ModeManager  # noqa: E402
-import uav.runtime.ModeManager as mode_manager_module  # noqa: E402
-from uav.runtime.managed_comms import (  # noqa: E402
+from vehicle_common.mode import Mode  # noqa: E402
+from vehicle_common.vehicle import Vehicle  # noqa: E402
+from vehicle_common.mode_manager import ModeManager  # noqa: E402
+import vehicle_common.mode_manager as mode_manager_module  # noqa: E402
+from vehicle_common.runtime.managed_comms import (  # noqa: E402
     ManagedCommRegistry,
 )
-from uav.runtime.managed_entities import (  # noqa: E402
+from vehicle_common.runtime.managed_entities import (  # noqa: E402
     ManagedClient,
     ManagedEntity,
     ManagedPublisher,
 )
-from uav.runtime.mode_paths import canonical_mode_path  # noqa: E402
-from uav.runtime.peer_connections import (  # noqa: E402
+from vehicle_common.runtime.mode_paths import canonical_mode_path  # noqa: E402
+from vehicle_common.runtime.peer_connections import (  # noqa: E402
     PeerConnectionTracker,
     declared_remote_peer_names,
 )
-from uav.runtime.mission_spec import MissionSpec, load_mission_spec  # noqa: E402
-import uav.runtime.schema as schema_module  # noqa: E402
-from uav.runtime.schema_generator import build_mode_registry_entry  # noqa: E402
-from uav.runtime.schema_registry import ModeRegistryEntry  # noqa: E402
+from vehicle_common.runtime.mission_spec import MissionSpec, load_mission_spec  # noqa: E402
+import vehicle_common.runtime.schema as schema_module  # noqa: E402
+from vehicle_common.runtime.schema_generator import build_mode_registry_entry  # noqa: E402
+from vehicle_common.runtime.schema_registry import ModeRegistryEntry  # noqa: E402
 
 
 def _xfail_if_missing_peer_features(*features: str) -> None:

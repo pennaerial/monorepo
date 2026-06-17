@@ -6,9 +6,9 @@ import subprocess
 import sys
 import textwrap
 
-import uav.runtime.mission_spec as mission_spec_module
-from uav.runtime.mission_spec import load_mission_spec
-from uav.runtime.schema_registry import load_mode_registry_document
+import vehicle_common.runtime.mission_spec as mission_spec_module
+from vehicle_common.runtime.mission_spec import load_mission_spec
+from vehicle_common.runtime.schema_registry import load_mode_registry_document
 
 
 def _write_mission(tmp_path: Path, contents: str) -> Path:
@@ -58,12 +58,14 @@ def test_load_mission_spec_works_without_ros_setup(tmp_path):
     )
 
     package_root = Path(__file__).resolve().parents[1]
+    vehicle_common_root = str(package_root.parent / "vehicle_common")
     command = textwrap.dedent(
         f"""
         import json
         import sys
         sys.path.insert(0, {str(package_root)!r})
-        from uav.runtime.mission_spec import load_mission_spec
+        sys.path.insert(0, {vehicle_common_root!r})
+        from vehicle_common.runtime.mission_spec import load_mission_spec
 
         mission = load_mission_spec({str(mission_path)!r})
         print(json.dumps({{
@@ -74,7 +76,7 @@ def test_load_mission_spec_works_without_ros_setup(tmp_path):
         }}, sort_keys=True))
         """
     )
-    env = {**os.environ, "PYTHONPATH": str(package_root)}
+    env = {**os.environ, "PYTHONPATH": f"{package_root}:{vehicle_common_root}"}
     result = subprocess.run(
         [sys.executable, "-c", command],
         capture_output=True,
@@ -90,13 +92,15 @@ def test_load_mission_spec_works_without_ros_setup(tmp_path):
 
 def test_load_fleet_document_works_without_ros_setup():
     package_root = Path(__file__).resolve().parents[1]
-    fleet_path = package_root / "uav" / "fleets" / "example_fleet.yaml"
+    vehicle_common_root = str(package_root.parent / "vehicle_common")
+    fleet_path = package_root / "fleets" / "example_fleet.yaml"
     command = textwrap.dedent(
         f"""
         import json
         import sys
         sys.path.insert(0, {str(package_root)!r})
-        from uav.runtime.fleet_spec import load_fleet_document
+        sys.path.insert(0, {vehicle_common_root!r})
+        from vehicle_common.runtime.fleet_spec import load_fleet_document
 
         fleet = load_fleet_document({str(fleet_path)!r})
         print(json.dumps({{
@@ -105,7 +109,7 @@ def test_load_fleet_document_works_without_ros_setup():
         }}, sort_keys=True))
         """
     )
-    env = {**os.environ, "PYTHONPATH": str(package_root)}
+    env = {**os.environ, "PYTHONPATH": f"{package_root}:{vehicle_common_root}"}
     result = subprocess.run(
         [sys.executable, "-c", command],
         capture_output=True,

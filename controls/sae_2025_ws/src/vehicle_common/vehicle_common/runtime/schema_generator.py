@@ -364,7 +364,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         if not check_schema_registry(path=args.output):
             print(
                 f"Committed schema registry at '{args.output}' is stale. "
-                "Regenerate it with `python3 -m uav.runtime.schema_generator`."
+                "Regenerate it with `python3 -m vehicle_common.runtime.schema_generator`."
             )
             return 1
         print(f"Committed schema registry at '{args.output}' is up to date.")

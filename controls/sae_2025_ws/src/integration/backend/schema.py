@@ -3,19 +3,19 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from uav.runtime.fleet_spec import (
+from vehicle_common.runtime.fleet_spec import (
     FleetDefaultsModel,
     FleetDocumentModel,
     FleetVehicleModel,
     HardwareBackendModel,
     SimBackendModel,
 )
-from uav.runtime.mission_spec import (
+from vehicle_common.runtime.mission_spec import (
     MissionDocumentModel,
     mission_path_for_name,
     mission_root,
 )
-from uav.runtime.schema import repo_fleet_paths
+from vehicle_common.runtime.schema import repo_fleet_paths
 
 from .models import (
     FleetSchemaResponse,

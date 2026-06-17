@@ -8,16 +8,16 @@ import sys
 
 import pytest
 
-from uav.runtime.fleet_spec import FleetDocumentModel, load_fleet_document
-from uav.runtime.mission_spec import load_mission_spec
-from uav.runtime.schema import (
+from vehicle_common.runtime.fleet_spec import FleetDocumentModel, load_fleet_document
+from vehicle_common.runtime.mission_spec import load_mission_spec
+from vehicle_common.runtime.schema import (
     fleet_document_schema,
     mission_document_schema,
     mode_entry_for_class_path,
     mode_registry_entries,
     schema_registry_document,
 )
-from uav.runtime.schema_registry import ModeRegistryEntry
+from vehicle_common.runtime.schema_registry import ModeRegistryEntry
 
 
 def _write_yaml(tmp_path: Path, name: str, contents: str) -> Path:
@@ -89,12 +89,14 @@ def test_schema_registry_document_exposes_mode_entries_and_document_schemas():
 
 def test_mode_schema_registry_loads_without_mode_imports():
     package_root = Path(__file__).resolve().parents[1]
+    vehicle_common_root = str(package_root.parent / "vehicle_common")
     command = textwrap.dedent(
         f"""
         import json
         import sys
         sys.path.insert(0, {str(package_root)!r})
-        from uav.runtime.schema import mode_entry_for_class_path, mode_registry_entries
+        sys.path.insert(0, {vehicle_common_root!r})
+        from vehicle_common.runtime.schema import mode_entry_for_class_path, mode_registry_entries
 
         takeoff = mode_entry_for_class_path("uav.vtol.TakeoffMode")
         payload_paths = [entry.mode_id for entry in mode_registry_entries(mission_target="payload")]
@@ -104,7 +106,7 @@ def test_mode_schema_registry_loads_without_mode_imports():
         }}, sort_keys=True))
         """
     )
-    env = {**os.environ, "PYTHONPATH": str(package_root)}
+    env = {**os.environ, "PYTHONPATH": f"{package_root}:{vehicle_common_root}"}
     result = subprocess.run(
         [sys.executable, "-c", command],
         capture_output=True,
@@ -154,7 +156,7 @@ def test_mission_spec_rejects_invalid_mode_params(tmp_path):
 
 
 def test_fleet_document_model_validates_checked_in_examples():
-    fleets_dir = Path(__file__).resolve().parent.parent / "uav" / "fleets"
+    fleets_dir = Path(__file__).resolve().parent.parent / "fleets"
     assert fleets_dir.is_dir()
 
     for fleet_path in sorted(fleets_dir.glob("*.yaml")):

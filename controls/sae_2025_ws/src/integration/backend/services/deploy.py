@@ -19,8 +19,8 @@ import yaml
 from ..context import AppContext, TargetContext
 from ..mission_compat import load_mission_spec_compat
 from ..models import RuntimeNetworkPolicyOverride
-from uav.runtime.fleet_spec import load_fleet_document
-from uav.runtime.mission_spec import MissionSpec
+from vehicle_common.runtime.fleet_spec import load_fleet_document
+from vehicle_common.runtime.mission_spec import MissionSpec
 
 _ARTIFACT_NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 _SOURCE_BUNDLE_EXTENSIONS = (".tar.gz", ".tgz", ".zip")

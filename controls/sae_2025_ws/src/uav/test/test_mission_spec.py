@@ -21,10 +21,10 @@ if "rclpy" not in sys.modules:
     rclpy.node = node_mod
     sys.modules.update({"rclpy": rclpy, "rclpy.node": node_mod})
 
-from uav.modes.Mode import Mode
-import uav.runtime.mission_spec as mission_spec_module
-import uav.runtime.schema as schema_module
-from uav.runtime.mission_spec import (
+from vehicle_common.mode import Mode
+import vehicle_common.runtime.mission_spec as mission_spec_module
+import vehicle_common.runtime.schema as schema_module
+from vehicle_common.runtime.mission_spec import (
     MissionSpec,
     load_mode_class,
     load_mission_spec,
@@ -369,7 +369,6 @@ def test_load_mode_class_accepts_module_path(monkeypatch):
 def test_checked_in_peer_fleet_test_mission_loads_with_peer_union():
     mission_path = (
         Path(__file__).resolve().parent.parent
-        / "uav"
         / "missions"
         / "payload_peer_fleet_test.yaml"
     )
@@ -426,7 +425,7 @@ def test_load_mode_class_rejects_non_mode_subclass(tmp_path, monkeypatch):
 
 
 def test_all_repo_missions_load_with_explicit_schema():
-    missions_dir = Path(__file__).resolve().parent.parent / "uav" / "missions"
+    missions_dir = Path(__file__).resolve().parent.parent / "missions"
     assert missions_dir.is_dir()
 
     for mission_path in sorted(missions_dir.glob("*.yaml")):
@@ -461,6 +460,6 @@ def test_mission_root_falls_back_to_source_tree(monkeypatch):
         _raise_package_not_found,
     )
 
-    expected = Path(mission_spec_module.__file__).resolve().parent.parent / "missions"
+    expected = Path(mission_spec_module.__file__).resolve().parents[3] / "uav" / "missions"
     assert mission_root() == expected
     assert Path(mission_path_for_name("basic")) == expected / "basic.yaml"

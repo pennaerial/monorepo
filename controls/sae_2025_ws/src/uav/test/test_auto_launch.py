@@ -225,12 +225,12 @@ rclpy.validate_namespace = validate_namespace_mod
 rclpy.validate_node_name = validate_node_name_mod
 rclpy.qos = qos_mod
 
-from uav.runtime.ModeManager import ModeManager  # noqa: E402
+from vehicle_common.mode_manager import ModeManager  # noqa: E402
 
 try:
-    import uav.runtime.uav_mission as uav_mission_module
-    import uav.runtime.UAVModeManager as uav_manager_module
-    from uav.runtime.UAVModeManager import UAVModeManager
+    import uav.uav_mission as uav_mission_module
+    import uav.UAVModeManager as uav_manager_module
+    from uav.UAVModeManager import UAVModeManager
 except ModuleNotFoundError as exc:
     if exc.name != "px4_msgs":
         raise
@@ -239,8 +239,8 @@ except ModuleNotFoundError as exc:
     UAVModeManager = None
 
 try:
-    import uav.runtime.payload_mission as payload_mission_module
-    import uav.runtime.PayloadModeManager as payload_manager_module
+    import payload.payload_mission as payload_mission_module
+    import payload.PayloadModeManager as payload_manager_module
 except ModuleNotFoundError as exc:
     if exc.name != "payload_interfaces":
         raise

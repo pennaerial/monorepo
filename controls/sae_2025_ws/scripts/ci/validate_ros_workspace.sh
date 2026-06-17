@@ -58,7 +58,7 @@ python3 -m py_compile "${python_files[@]}"
 ci_log "Checking committed mode schema registry"
 ci_source_workspace "$WORKSPACE_ROOT"
 PYTHONPATH="$WORKSPACE_ROOT/src/uav:${PYTHONPATH:-}" \
-    python3 -m uav.runtime.schema_generator --check
+    python3 -m vehicle_common.runtime.schema_generator --check
 
 ci_log "Running pytest suite"
 ci_source_workspace "$WORKSPACE_ROOT"

@@ -213,14 +213,14 @@ def _install_ros_test_doubles() -> None:
 
 _install_ros_test_doubles()
 
-from uav.modes.Mode import Mode  # noqa: E402
-from uav.vehicles.Vehicle import Vehicle  # noqa: E402
-from uav.runtime.ModeManager import ModeManager  # noqa: E402
-import uav.runtime.ModeManager as mode_manager_module  # noqa: E402
-import uav.runtime.uav_mission as uav_mission_module  # noqa: E402
-from uav.runtime.UAVModeManager import UAVModeManager  # noqa: E402
-import uav.runtime.payload_mission as payload_mission_module  # noqa: E402
-import uav.runtime.PayloadModeManager as payload_manager_module  # noqa: E402
+from vehicle_common.mode import Mode  # noqa: E402
+from vehicle_common.vehicle import Vehicle  # noqa: E402
+from vehicle_common.mode_manager import ModeManager  # noqa: E402
+import vehicle_common.mode_manager as mode_manager_module  # noqa: E402
+import uav.uav_mission as uav_mission_module  # noqa: E402
+from uav.UAVModeManager import UAVModeManager  # noqa: E402
+import payload.payload_mission as payload_mission_module  # noqa: E402
+import payload.PayloadModeManager as payload_manager_module  # noqa: E402
 
 
 class _ExpectedVehicle(Vehicle):
