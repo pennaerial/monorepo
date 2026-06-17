@@ -460,6 +460,8 @@ def test_mission_root_falls_back_to_source_tree(monkeypatch):
         _raise_package_not_found,
     )
 
-    expected = Path(mission_spec_module.__file__).resolve().parents[3] / "uav" / "missions"
+    expected = (
+        Path(mission_spec_module.__file__).resolve().parents[3] / "uav" / "missions"
+    )
     assert mission_root() == expected
     assert Path(mission_path_for_name("basic")) == expected / "basic.yaml"

@@ -24,6 +24,7 @@ _MODE_KEYS = {"mode", "params", "transitions"}
 if TYPE_CHECKING:
     from vehicle_common.mode import Mode
 
+
 class MissionModeDocumentModel(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
