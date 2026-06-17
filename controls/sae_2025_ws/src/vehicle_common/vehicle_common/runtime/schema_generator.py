@@ -282,10 +282,6 @@ def _field_specs_for_mode(
 def build_mode_registry_entry(mode_class: type[Mode[Any]]) -> ModeRegistryEntry:
     mode_id = mode_id_for(mode_class)
     mission_target = mission_target_from_mode_id(mode_id)
-    if mission_target not in {"uav", "payload"}:
-        raise ValueError(
-            f"Mode '{mode_id}' must live under the 'uav' or 'payload' public mode namespace."
-        )
     peer_vehicle_names = tuple(
         sorted(
             {
