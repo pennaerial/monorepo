@@ -85,7 +85,3 @@ def plugins_to_json() -> str:
 ## import_plugins gets called when any module imports plugin_loader for the first time
 discover_plugins(("uav.modes", "payload.modes"))
 # print(f"[plugin_loader] discovery took {(_time.monotonic() - _t0) * 1000:.1f}ms", flush=True)
-
-
-def main():
-    print(plugins_to_json())
