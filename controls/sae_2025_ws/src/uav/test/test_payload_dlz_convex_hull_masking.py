@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import importlib
 import sys
-from pathlib import Path
 from types import SimpleNamespace
 import types
 
@@ -10,11 +8,9 @@ import numpy as np
 import cv2
 import pytest
 
-PACKAGE_ROOT = Path(__file__).resolve().parents[1]
-if str(PACKAGE_ROOT) not in sys.path:
-    sys.path.insert(0, str(PACKAGE_ROOT))
-
-from uav.cv.dlz_convex_hull import build_dlz_hull_mask  # noqa: E402
+from vehicle_common.cv.dlz_convex_hull import build_dlz_hull_mask
+from payload.modes.PayloadCornerNavigateMode import PayloadCornerNavigateMode
+from payload.modes.PayloadDLZNavigateMode import PayloadDLZNavigateMode
 
 
 def _bgr_from_hsv(h: int, s: int, v: int) -> tuple[int, int, int]:
@@ -105,12 +101,12 @@ def _install_import_stubs() -> None:
 
 _install_import_stubs()
 
-PayloadCornerNavigateMode = importlib.import_module(
-    "uav.modes.payload.PayloadCornerNavigateMode"
-).PayloadCornerNavigateMode
-PayloadDLZNavigateMode = importlib.import_module(
-    "uav.modes.payload.PayloadDLZNavigateMode"
-).PayloadDLZNavigateMode
+# PayloadCornerNavigateMode = importlib.import_module(
+#     "uav.modes.payload.PayloadCornerNavigateMode"
+# ).PayloadCornerNavigateMode
+# PayloadDLZNavigateMode = importlib.import_module(
+#     "uav.modes.payload.PayloadDLZNavigateMode"
+# ).PayloadDLZNavigateMode
 
 
 class _FakeLogger:
