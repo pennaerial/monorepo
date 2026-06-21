@@ -1,6 +1,11 @@
 from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
 
-from rclpy.node import Node
+if TYPE_CHECKING:
+    from rclpy.node import Node
+else:
+    # Avoid forcing ROS imports on pure-Python spec loaders; Node is type-hint only.
+    Node = object
 
 
 class Vehicle(ABC):
