@@ -17,9 +17,9 @@ from launch.logging import get_logger
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
-from uav.runtime.mission_spec import MissionSpec, mission_path_for_name
-from uav.runtime.vision_loader import load_vision_class
 from uav.vehicles.AirframeClass import AirframeClass
+from vehicle_common.runtime.mission_spec import MissionSpec, mission_path_for_name
+from vehicle_common.runtime.vision_loader import load_vision_class
 from uav.utils import (
     camel_to_snake,
     find_folder_with_heuristic,
@@ -51,6 +51,14 @@ def _runtime_executable_for(mission_spec: MissionSpec) -> str:
         return "uav_mission"
     if mission_spec.is_payload:
         return "payload_mission"
+    raise ValueError(f"Unsupported mission target '{mission_spec.target}'.")
+
+
+def _runtime_package_for(mission_spec: MissionSpec) -> str:
+    if mission_spec.is_uav:
+        return "uav"
+    if mission_spec.is_payload:
+        return "payload"
     raise ValueError(f"Unsupported mission target '{mission_spec.target}'.")
 
 
@@ -449,7 +457,9 @@ def _payload_launch_action(*, vehicle_name: str, controller: str, sim_entity_nam
     return IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(
-                get_package_share_directory("payload"), "launch", "payload.launch.py"
+                get_package_share_directory("payload_controller"),
+                "launch",
+                "payload_controller.launch.py",
             )
         ),
         launch_arguments=launch_arguments.items(),
@@ -551,6 +561,7 @@ def launch_setup(context, *args, **kwargs):
     mission_path = _resolve_mission_path(config)
     mission_spec = MissionSpec.load(mission_path)
     runtime_executable = _runtime_executable_for(mission_spec)
+    runtime_package = _runtime_package_for(mission_spec)
 
     vehicle_name = str(config.get("vehicle_name", "")).strip()
     if not vehicle_name:
@@ -668,7 +679,7 @@ def launch_setup(context, *args, **kwargs):
         )
 
     mission_node = Node(
-        package="uav",
+        package=runtime_package,
         executable=runtime_executable,
         namespace=vehicle_name,
         output="screen",
@@ -707,11 +718,12 @@ def launch_setup(context, *args, **kwargs):
 
     actions = []
     if mission_spec.is_payload and launch_payload_backend:
-        payload_controller = "SimController" if sim else "GPIOController"
+        default_controller = "SimController" if sim else "GPIOController"
+        controller_override = str(config.get("payload_controller", "")).strip()
         actions.append(
             _payload_launch_action(
                 vehicle_name=vehicle_name,
-                controller=payload_controller,
+                controller=controller_override or default_controller,
                 sim_entity_name=sim_entity_name,
             )
         )

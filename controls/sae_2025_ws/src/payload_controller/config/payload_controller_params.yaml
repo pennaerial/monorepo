@@ -1,0 +1,58 @@
+/**:
+  ros__parameters:
+    # Name of the controller plugin to instantiate.
+    # This defaults to hardware and should be overridden to SimController in simulation launch.
+    controller: GPIOController
+
+    pins:
+      # Preferred explicit left/right mapping.
+      # On this hardware: A* pins are RIGHT motor, B* pins are LEFT motor.
+      LEFT_PWM: 13
+      LEFT_IN1: 20
+      LEFT_IN2: 16
+      RIGHT_PWM: 18
+      RIGHT_IN1: 15
+      RIGHT_IN2: 14
+
+      ENCA_CH1: 5
+      ENCA_CH2: 6
+      ENCB_CH1: 10
+      ENCB_CH2: 9
+      SERVO: 23
+
+    motor:
+      pwm_frequency: 200.0
+      max_wheel_rpm: 200.0
+      max_norm_speed: 1.0
+
+    encoder:
+      output_cpr: 617
+      left_sign: 1
+      right_sign: 1
+
+    kinematics:
+      wheel_radius_m: 0.01611839
+      wheel_separation_m: 0.12132
+
+    pid:
+      left_kp: 0.003
+      left_ki: 0.0036
+      left_kd: 0.0
+      right_kp: 0.003
+      right_ki: 0.0036
+      right_kd: 0.0
+      i_clamp: 1.0
+      output_limit_norm: 1.0
+      stop_deadband_rpm: 1.0
+      velocity_alpha: 1.0
+
+    control:
+      loop_ms: 50
+
+    servo:
+      pulse_min_us: 600.0
+      pulse_max_us: 2200.0
+      frequency: 50
+
+    sim:
+      world_name: "sae"

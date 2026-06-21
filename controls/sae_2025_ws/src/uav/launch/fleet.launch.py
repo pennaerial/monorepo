@@ -18,8 +18,8 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.logging import get_logger
 from launch.substitutions import LaunchConfiguration
 
-from uav.runtime.fleet_spec import load_fleet_document
-from uav.runtime.mission_spec import MissionSpec, mission_path_for_name
+from vehicle_common.runtime.fleet_spec import load_fleet_document
+from vehicle_common.runtime.mission_spec import MissionSpec, mission_path_for_name
 
 _SHARED_DEFAULT_KEYS = {
     "auto_launch",
@@ -378,6 +378,13 @@ def _vehicle_stack_configs(fleet: dict) -> tuple[dict, list[dict]]:
 def launch_setup(context, *args, **kwargs):
     logger = get_logger("fleet.launch")
     fleet = _load_fleet_file(context)
+
+    px4_path_override = LaunchConfiguration("px4_path").perform(context).strip()
+    if px4_path_override:
+        if not isinstance(fleet.get("backend"), dict):
+            fleet["backend"] = {}
+        fleet["backend"]["px4_path"] = px4_path_override
+
     backend, vehicles = _vehicle_stack_configs(fleet)
 
     actions = []
@@ -436,6 +443,7 @@ def generate_launch_description():
     return LaunchDescription(
         [
             DeclareLaunchArgument("fleet_file", default_value=""),
+            DeclareLaunchArgument("px4_path", default_value=""),
             OpaqueFunction(function=launch_setup),
         ]
     )

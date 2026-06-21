@@ -1,0 +1,242 @@
+cmake_minimum_required(VERSION 3.8)
+project(payload_controller)
+
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
+
+# find dependencies
+find_package(ament_cmake REQUIRED)
+find_package(generate_parameter_library REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(payload_interfaces REQUIRED)
+find_package(pluginlib REQUIRED)
+
+set(PAYLOAD_BUILD_SIM_CONTROLLER "AUTO" CACHE STRING
+  "Build the SimController backend (AUTO, ON, OFF)")
+set_property(CACHE PAYLOAD_BUILD_SIM_CONTROLLER PROPERTY STRINGS AUTO ON OFF)
+
+set(PAYLOAD_BUILD_GPIO_CONTROLLER "AUTO" CACHE STRING
+  "Build the GPIOController backend (AUTO, ON, OFF)")
+set_property(CACHE PAYLOAD_BUILD_GPIO_CONTROLLER PROPERTY STRINGS AUTO ON OFF)
+
+string(TOUPPER "${PAYLOAD_BUILD_SIM_CONTROLLER}" PAYLOAD_BUILD_SIM_CONTROLLER)
+string(TOUPPER "${PAYLOAD_BUILD_GPIO_CONTROLLER}" PAYLOAD_BUILD_GPIO_CONTROLLER)
+
+include_directories(include)
+
+generate_parameter_library(
+  payload_controller_parameters
+  config/payload_controller_params.schema.yaml
+)
+
+set(payload_controller_targets "")
+set(build_payload_sim_controller FALSE)
+set(build_payload_gpio_controller FALSE)
+
+if(PAYLOAD_BUILD_SIM_CONTROLLER STREQUAL "ON")
+  find_package(gz-transport13 REQUIRED)
+  find_package(gz-msgs10 REQUIRED)
+  set(build_payload_sim_controller TRUE)
+elseif(PAYLOAD_BUILD_SIM_CONTROLLER STREQUAL "AUTO")
+  find_package(gz-transport13 QUIET)
+  find_package(gz-msgs10 QUIET)
+  if(TARGET gz-transport13::gz-transport13 AND TARGET gz-msgs10::gz-msgs10)
+    set(build_payload_sim_controller TRUE)
+  else()
+    message(STATUS
+      "Skipping SimController because Gazebo development packages were not found.")
+  endif()
+elseif(NOT PAYLOAD_BUILD_SIM_CONTROLLER STREQUAL "OFF")
+  message(FATAL_ERROR
+    "PAYLOAD_BUILD_SIM_CONTROLLER must be one of: AUTO, ON, OFF")
+endif()
+
+if(build_payload_sim_controller)
+  add_library(payload_sim_controller SHARED
+    src/sim_controller.cpp
+  )
+  ament_target_dependencies(payload_sim_controller
+    rclcpp
+    payload_interfaces
+    pluginlib
+  )
+  target_link_libraries(payload_sim_controller
+    payload_controller_parameters
+    gz-transport13::gz-transport13
+    gz-msgs10::gz-msgs10
+  )
+  target_compile_definitions(payload_sim_controller PRIVATE BUILD_SIM)
+  list(APPEND payload_controller_targets payload_sim_controller)
+endif()
+
+if(PAYLOAD_BUILD_GPIO_CONTROLLER STREQUAL "ON")
+  find_library(PIGPIO_LIBRARY NAMES pigpiod_if2 REQUIRED)
+  find_path(PIGPIO_INCLUDE_DIR NAMES pigpiod_if2.h REQUIRED)
+  set(build_payload_gpio_controller TRUE)
+elseif(PAYLOAD_BUILD_GPIO_CONTROLLER STREQUAL "AUTO")
+  find_library(PIGPIO_LIBRARY NAMES pigpiod_if2)
+  find_path(PIGPIO_INCLUDE_DIR NAMES pigpiod_if2.h)
+  if(PIGPIO_LIBRARY AND PIGPIO_INCLUDE_DIR)
+    set(build_payload_gpio_controller TRUE)
+  else()
+    message(STATUS
+      "Skipping GPIOController because pigpiod_if2 development files were not found. "
+      "Install pigpio to enable the hardware backend.")
+  endif()
+elseif(NOT PAYLOAD_BUILD_GPIO_CONTROLLER STREQUAL "OFF")
+  message(FATAL_ERROR
+    "PAYLOAD_BUILD_GPIO_CONTROLLER must be one of: AUTO, ON, OFF")
+endif()
+
+if(build_payload_gpio_controller)
+  add_library(payload_gpio_controller SHARED
+    src/gpio_controller.cpp
+    src/encoder.cpp
+    src/control_math.cpp
+    src/motor.cpp
+    src/servo.cpp
+    src/gpio.cpp
+  )
+  ament_target_dependencies(payload_gpio_controller
+    rclcpp
+    payload_interfaces
+    pluginlib
+  )
+  target_link_libraries(payload_gpio_controller
+    payload_controller_parameters
+    ${PIGPIO_LIBRARY}
+  )
+  target_include_directories(payload_gpio_controller PUBLIC ${PIGPIO_INCLUDE_DIR})
+  target_compile_definitions(payload_gpio_controller PRIVATE BUILD_GPIO)
+  list(APPEND payload_controller_targets payload_gpio_controller)
+
+  # --- Motor test executable (hardware only) ---
+  add_executable(test_motor
+    test/test_motor.cpp
+    src/motor.cpp
+    src/servo.cpp
+    src/gpio.cpp
+    src/encoder.cpp
+  )
+  target_include_directories(test_motor PRIVATE include ${PIGPIO_INCLUDE_DIR})
+  ament_target_dependencies(test_motor rclcpp)
+  target_link_libraries(test_motor ${PIGPIO_LIBRARY})
+  install(TARGETS test_motor DESTINATION lib/${PROJECT_NAME})
+
+  add_executable(test_servo
+    test/test_servo.cpp
+    src/servo.cpp
+    src/gpio.cpp
+  )
+  target_include_directories(test_servo PRIVATE include ${PIGPIO_INCLUDE_DIR})
+  ament_target_dependencies(test_servo rclcpp)
+  target_link_libraries(test_servo ${PIGPIO_LIBRARY})
+  install(TARGETS test_servo DESTINATION lib/${PROJECT_NAME})
+endif()
+
+if(NOT payload_controller_targets)
+  message(FATAL_ERROR
+    "payload requires at least one controller backend. Enable the simulation "
+    "backend by installing Gazebo development packages, or enable the hardware "
+    "backend by installing pigpio.")
+endif()
+
+pluginlib_export_plugin_description_file(payload_controller plugins.xml)
+
+# --- Payload executable ---
+add_executable(payload_controller
+  src/payload_controller.cpp
+  src/main.cpp
+)
+
+ament_target_dependencies(payload_controller
+  rclcpp
+  payload_interfaces
+  pluginlib
+)
+
+target_link_libraries(payload_controller
+  payload_controller_parameters
+)
+
+install(TARGETS ${payload_controller_targets}
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+)
+
+install(TARGETS payload_controller
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+# Install include, launch, config directories
+install(DIRECTORY include/
+  DESTINATION include
+)
+install(DIRECTORY
+  launch
+  DESTINATION share/${PROJECT_NAME}
+)
+install(DIRECTORY
+  config
+  DESTINATION share/${PROJECT_NAME}
+)
+
+
+
+
+
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+  find_package(ament_lint_auto REQUIRED)
+  # the following line skips the linter which checks for copyrights
+  # comment the line when a copyright and license is added to all source files
+  set(ament_cmake_copyright_FOUND TRUE)
+  # the following line skips cpplint (only works in a git repo)
+  # comment the line when this package is in a git repo and when
+  # a copyright and license is added to all source files
+  set(ament_cmake_cpplint_FOUND TRUE)
+  ament_lint_auto_find_test_dependencies()
+
+  ament_add_gtest(test_control_math
+    test/test_control_math.cpp
+    src/control_math.cpp
+  )
+  if(TARGET test_control_math)
+    target_include_directories(test_control_math PRIVATE include)
+  endif()
+
+  ament_add_gtest(test_payload_shutdown
+    test/test_payload_shutdown.cpp
+    src/payload_controller.cpp
+  )
+  if(TARGET test_payload_shutdown)
+    target_include_directories(test_payload_shutdown PRIVATE include)
+    ament_target_dependencies(test_payload_shutdown
+      rclcpp
+      payload_interfaces
+      pluginlib
+    )
+    target_link_libraries(test_payload_shutdown payload_controller_parameters)
+  endif()
+
+  if(build_payload_gpio_controller)
+    ament_add_gtest(test_gpio_controller_shutdown
+      test/test_gpio_controller_shutdown.cpp
+    )
+    if(TARGET test_gpio_controller_shutdown)
+      target_include_directories(test_gpio_controller_shutdown PRIVATE include)
+      ament_target_dependencies(test_gpio_controller_shutdown
+        rclcpp
+        payload_interfaces
+        pluginlib
+      )
+      target_link_libraries(test_gpio_controller_shutdown
+        payload_gpio_controller
+      )
+    endif()
+  endif()
+endif()
+
+ament_package()
