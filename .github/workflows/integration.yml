@@ -11,6 +11,9 @@ on:
     paths:
       - ".github/workflows/integration.yml"
       - "controls/sae_2025_ws/src/integration/**"
+      # Integration tests import these pure-Python packages; re-run when they change.
+      - "controls/sae_2025_ws/src/vehicle_common/**"
+      - "controls/sae_2025_ws/src/uav/**"
   workflow_dispatch:
 
 permissions:
@@ -36,11 +39,35 @@ jobs:
           cache: "npm"
           cache-dependency-path: controls/sae_2025_ws/src/integration/frontend/package-lock.json
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install integration backend dependencies
+        run: |
+          python3 -m pip install \
+            fastapi \
+            python-multipart \
+            httpx \
+            "pydantic>=2,<3" \
+            pyyaml \
+            pytest
+
       - name: Compile integration backend
         working-directory: controls/sae_2025_ws/src/integration
         run: |
           mapfile -t py_files < <(find backend -name '*.py' | sort)
           python3 -m py_compile "${py_files[@]}" app.py
+
+      - name: Test integration backend
+        working-directory: controls/sae_2025_ws/src/integration
+        # The backend imports pure-Python vehicle_common (and uav) modules; put
+        # them on PYTHONPATH. These run with no ROS install — the spec layer was
+        # decoupled from rclpy/ament_index_python so no colcon build is needed.
+        run: |
+          PYTHONPATH="$PWD:$PWD/../uav:$PWD/../vehicle_common" \
+            python3 -m pytest test
 
       - name: Build integration frontend
         working-directory: controls/sae_2025_ws/src/integration/frontend
