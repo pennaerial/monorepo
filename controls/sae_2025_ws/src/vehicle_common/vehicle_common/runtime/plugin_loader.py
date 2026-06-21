@@ -35,7 +35,7 @@ def get_plugins(base_cls: type[T]) -> dict[str, type[T]]:
     return _registry[base_cls]
 
 
-def import_plugins(modules: tuple[str, ...] = ("uav", "payload")):
+def discover_plugins(modules: tuple[str, ...] = ("uav", "payload")):
     for module in modules:
         try:
             pkg = importlib.import_module(module)
@@ -83,7 +83,7 @@ def plugins_to_json() -> str:
 # _t0 = _time.monotonic()
 
 ## import_plugins gets called when any module imports plugin_loader for the first time
-import_plugins(("uav.modes", "payload.modes"))
+discover_plugins(("uav.modes", "payload.modes"))
 # print(f"[plugin_loader] discovery took {(_time.monotonic() - _t0) * 1000:.1f}ms", flush=True)
 
 
