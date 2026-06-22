@@ -51,13 +51,7 @@ jobs:
 
       - name: Install integration backend dependencies
         run: |
-          python3 -m pip install \
-            fastapi \
-            python-multipart \
-            httpx \
-            "pydantic>=2,<3" \
-            pyyaml \
-            pytest
+          python3 -m pip install -r controls/sae_2025_ws/src/integration/requirements.txt
 
       - name: Compile integration backend
         working-directory: controls/sae_2025_ws/src/integration

@@ -507,10 +507,25 @@ def test_target_scoped_upload_routes_require_device_scope(client):
     assert response.status_code == 400
 
 
+def _iter_app_routes(routes):
+    """Yield routes across FastAPI/Starlette versions.
+
+    Starlette <1.0 flattened included routers into ``app.routes``; Starlette 1.x
+    wraps each ``include_router`` call in an ``_IncludedRouter`` whose real routes
+    live under ``original_router.routes``. Walk both layouts so route lookups do
+    not depend on the installed version.
+    """
+    for route in routes:
+        yield route
+        nested = getattr(getattr(route, "original_router", None), "routes", None)
+        if nested:
+            yield from _iter_app_routes(nested)
+
+
 def test_terminal_websocket_accepts_hostname_scope(client):
     route = next(
         route
-        for route in client.app.routes
+        for route in _iter_app_routes(client.app.routes)
         if getattr(route, "path", "") == "/ws/mission/terminal"
     )
     target_param = inspect.signature(route.endpoint).parameters["target_id"]

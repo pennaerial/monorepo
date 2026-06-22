@@ -50,10 +50,10 @@ if missing:
 PY
   )"; then
     echo "Backend Python dependencies missing (${missing_modules:-unknown}). Installing..."
-    if ! "$python_bin" -m pip install "fastapi[standard]" python-multipart httpx "pydantic>=2,<3" zeroconf; then
+    if ! "$python_bin" -m pip install -r "$SCRIPT_DIR/requirements.txt"; then
       echo "Error: failed to install backend Python dependencies."
       echo "Try manually:"
-      echo "  $python_bin -m pip install \"fastapi[standard]\" python-multipart httpx \"pydantic>=2,<3\" zeroconf"
+      echo "  $python_bin -m pip install -r \"$SCRIPT_DIR/requirements.txt\""
       exit 1
     fi
   fi
