@@ -46,30 +46,30 @@ def _is_typed_dict(annotation: object) -> bool:
 
 
 def _iter_mode_classes() -> list[type[Mode[Any]]]:
-    import uav.modes as mode_package
-
     discovered: dict[str, type[Mode[Any]]] = {}
-    for module_info in pkgutil.walk_packages(
-        mode_package.__path__, prefix=f"{mode_package.__name__}."
-    ):
-        try:
-            module = importlib.import_module(module_info.name)
-        except ImportError as exc:
-            print(
-                f"WARNING: skipping mode module '{module_info.name}' "
-                f"(missing dependency: {exc})",
-                file=sys.stderr,
-            )
-            continue
-        for value in vars(module).values():
-            if (
-                isinstance(value, type)
-                and issubclass(value, Mode)
-                and value is not Mode
-                and not inspect.isabstract(value)
-                and value.__module__ == module.__name__
-            ):
-                discovered[mode_id_for(value)] = value
+    for package_name in ("uav.modes", "payload.modes"):
+        mode_package = importlib.import_module(package_name)
+        for module_info in pkgutil.walk_packages(
+            mode_package.__path__, prefix=f"{mode_package.__name__}."
+        ):
+            try:
+                module = importlib.import_module(module_info.name)
+            except ImportError as exc:
+                print(
+                    f"WARNING: skipping mode module '{module_info.name}' "
+                    f"(missing dependency: {exc})",
+                    file=sys.stderr,
+                )
+                continue
+            for value in vars(module).values():
+                if (
+                    isinstance(value, type)
+                    and issubclass(value, Mode)
+                    and value is not Mode
+                    and not inspect.isabstract(value)
+                    and value.__module__ == module.__name__
+                ):
+                    discovered[mode_id_for(value)] = value
     return [discovered[key] for key in sorted(discovered)]
 
 

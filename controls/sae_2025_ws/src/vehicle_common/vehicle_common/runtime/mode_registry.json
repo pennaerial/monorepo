@@ -2,12 +2,12 @@
   "modes": {
     "payload.PayloadAprilTagApproachMode": {
       "class_name": "PayloadAprilTagApproachMode",
-      "class_path": "uav.modes.payload.PayloadAprilTagApproachMode",
+      "class_path": "payload.modes.PayloadAprilTagApproachMode",
       "description": "Drive the payload toward one AprilTag and terminate once close enough.",
       "display_name": "PayloadAprilTagApproachMode",
       "mission_target": "payload",
       "mode_id": "payload.PayloadAprilTagApproachMode",
-      "module_path": "uav.modes.payload.PayloadAprilTagApproachMode",
+      "module_path": "payload.modes.PayloadAprilTagApproachMode",
       "param_fields": [
         {
           "annotation": {
@@ -196,12 +196,12 @@
     },
     "payload.PayloadColorStringApproachMode": {
       "class_name": "PayloadColorStringApproachMode",
-      "class_path": "uav.modes.payload.PayloadColorStringApproachMode",
+      "class_path": "payload.modes.PayloadColorStringApproachMode",
       "description": "Drive toward a coloured target using HSV blob detection.",
       "display_name": "PayloadColorStringApproachMode",
       "mission_target": "payload",
       "mode_id": "payload.PayloadColorStringApproachMode",
-      "module_path": "uav.modes.payload.PayloadColorStringApproachMode",
+      "module_path": "payload.modes.PayloadColorStringApproachMode",
       "param_fields": [
         {
           "annotation": {
@@ -428,12 +428,12 @@
     },
     "payload.PayloadCornerNavigateMode": {
       "class_name": "PayloadCornerNavigateMode",
-      "class_path": "uav.modes.payload.PayloadCornerNavigateMode",
+      "class_path": "payload.modes.PayloadCornerNavigateMode",
       "description": "Base class for UAV operational modes within a ROS 2 node.",
       "display_name": "PayloadCornerNavigateMode",
       "mission_target": "payload",
       "mode_id": "payload.PayloadCornerNavigateMode",
-      "module_path": "uav.modes.payload.PayloadCornerNavigateMode",
+      "module_path": "payload.modes.PayloadCornerNavigateMode",
       "param_fields": [
         {
           "annotation": {
@@ -928,12 +928,12 @@
     },
     "payload.PayloadDLZNavigateMode": {
       "class_name": "PayloadDLZNavigateMode",
-      "class_path": "uav.modes.payload.PayloadDLZNavigateMode",
+      "class_path": "payload.modes.PayloadDLZNavigateMode",
       "description": "Navigate the payload along the alternating-colour square border of the DLZ.",
       "display_name": "PayloadDLZNavigateMode",
       "mission_target": "payload",
       "mode_id": "payload.PayloadDLZNavigateMode",
-      "module_path": "uav.modes.payload.PayloadDLZNavigateMode",
+      "module_path": "payload.modes.PayloadDLZNavigateMode",
       "param_fields": [
         {
           "annotation": {
@@ -1434,12 +1434,12 @@
     },
     "payload.PayloadDualApproachMode": {
       "class_name": "PayloadDualApproachMode",
-      "class_path": "uav.modes.payload.PayloadDualApproachMode",
+      "class_path": "payload.modes.PayloadDualApproachMode",
       "description": "Approach using AprilTag when visible, HSV colour fallback otherwise.",
       "display_name": "PayloadDualApproachMode",
       "mission_target": "payload",
       "mode_id": "payload.PayloadDualApproachMode",
-      "module_path": "uav.modes.payload.PayloadDualApproachMode",
+      "module_path": "payload.modes.PayloadDualApproachMode",
       "param_fields": [
         {
           "annotation": {
@@ -1765,12 +1765,12 @@
     },
     "payload.PayloadIdleMode": {
       "class_name": "PayloadIdleMode",
-      "class_path": "uav.modes.payload.PayloadIdleMode",
+      "class_path": "payload.modes.PayloadIdleMode",
       "description": "Base class for UAV operational modes within a ROS 2 node.",
       "display_name": "PayloadIdleMode",
       "mission_target": "payload",
       "mode_id": "payload.PayloadIdleMode",
-      "module_path": "uav.modes.payload.PayloadIdleMode",
+      "module_path": "payload.modes.PayloadIdleMode",
       "param_fields": [
         {
           "annotation": {
@@ -1803,12 +1803,12 @@
     },
     "payload.PayloadPeerFleetTestMode": {
       "class_name": "PayloadPeerFleetTestMode",
-      "class_path": "uav.modes.payload.PayloadPeerFleetTestMode",
+      "class_path": "payload.modes.PayloadPeerFleetTestMode",
       "description": "Passive multi-payload communication demo for fleet bring-up.",
       "display_name": "PayloadPeerFleetTestMode",
       "mission_target": "payload",
       "mode_id": "payload.PayloadPeerFleetTestMode",
-      "module_path": "uav.modes.payload.PayloadPeerFleetTestMode",
+      "module_path": "payload.modes.PayloadPeerFleetTestMode",
       "param_fields": [
         {
           "annotation": {
@@ -1870,12 +1870,12 @@
     },
     "payload.PayloadRetreatMode": {
       "class_name": "PayloadRetreatMode",
-      "class_path": "uav.modes.payload.PayloadRetreatMode",
+      "class_path": "payload.modes.PayloadRetreatMode",
       "description": "Drive the payload to the edge of the DLZ, then turn 180\u00b0 to face the center.",
       "display_name": "PayloadRetreatMode",
       "mission_target": "payload",
       "mode_id": "payload.PayloadRetreatMode",
-      "module_path": "uav.modes.payload.PayloadRetreatMode",
+      "module_path": "payload.modes.PayloadRetreatMode",
       "param_fields": [
         {
           "annotation": {
@@ -2048,12 +2048,12 @@
     },
     "payload.PayloadScanForTagMode": {
       "class_name": "PayloadScanForTagMode",
-      "class_path": "uav.modes.payload.PayloadScanForTagMode",
+      "class_path": "payload.modes.PayloadScanForTagMode",
       "description": "Spin in place looking for a specific AprilTag.",
       "display_name": "PayloadScanForTagMode",
       "mission_target": "payload",
       "mode_id": "payload.PayloadScanForTagMode",
-      "module_path": "uav.modes.payload.PayloadScanForTagMode",
+      "module_path": "payload.modes.PayloadScanForTagMode",
       "param_fields": [
         {
           "annotation": {
@@ -2159,12 +2159,12 @@
     },
     "payload.PayloadWaitForDriveOutMode": {
       "class_name": "PayloadWaitForDriveOutMode",
-      "class_path": "uav.modes.payload.PayloadWaitForDriveOutMode",
+      "class_path": "payload.modes.PayloadWaitForDriveOutMode",
       "description": "Subscribe to the payload camera and detect when the plane has landed on the",
       "display_name": "PayloadWaitForDriveOutMode",
       "mission_target": "payload",
       "mode_id": "payload.PayloadWaitForDriveOutMode",
-      "module_path": "uav.modes.payload.PayloadWaitForDriveOutMode",
+      "module_path": "payload.modes.PayloadWaitForDriveOutMode",
       "param_fields": [
         {
           "annotation": {
@@ -2421,12 +2421,12 @@
     },
     "uav.LandingMode": {
       "class_name": "LandingMode",
-      "class_path": "uav.modes.uav.LandingMode",
-      "description": "A mode for taking off vertically.",
+      "class_path": "uav.modes.LandingMode",
+      "description": "A mode for landing vertically.",
       "display_name": "LandingMode",
       "mission_target": "uav",
       "mode_id": "uav.LandingMode",
-      "module_path": "uav.modes.uav.LandingMode",
+      "module_path": "uav.modes.LandingMode",
       "param_fields": [],
       "params_schema": {
         "additionalProperties": false,
@@ -2441,12 +2441,12 @@
     },
     "uav.NavGPSMode": {
       "class_name": "NavGPSMode",
-      "class_path": "uav.modes.uav.NavGPSMode",
+      "class_path": "uav.modes.NavGPSMode",
       "description": "A mode for navigating to a GPS coordinate",
       "display_name": "NavGPSMode",
       "mission_target": "uav",
       "mode_id": "uav.NavGPSMode",
-      "module_path": "uav.modes.uav.NavGPSMode",
+      "module_path": "uav.modes.NavGPSMode",
       "param_fields": [
         {
           "annotation": {
@@ -2559,12 +2559,12 @@
     },
     "uav.PayloadDropoffMode": {
       "class_name": "PayloadDropoffMode",
-      "class_path": "uav.modes.uav.PayloadDropoffMode",
+      "class_path": "uav.modes.PayloadDropoffMode",
       "description": "A mode for dropping off the payload.",
       "display_name": "PayloadDropoffMode",
       "mission_target": "uav",
       "mode_id": "uav.PayloadDropoffMode",
-      "module_path": "uav.modes.uav.PayloadDropoffMode",
+      "module_path": "uav.modes.PayloadDropoffMode",
       "param_fields": [
         {
           "annotation": {
@@ -2647,12 +2647,12 @@
     },
     "uav.PayloadPickupMode": {
       "class_name": "PayloadPickupMode",
-      "class_path": "uav.modes.uav.PayloadPickupMode",
+      "class_path": "uav.modes.PayloadPickupMode",
       "description": "A mode for picking up a payload.",
       "display_name": "PayloadPickupMode",
       "mission_target": "uav",
       "mode_id": "uav.PayloadPickupMode",
-      "module_path": "uav.modes.uav.PayloadPickupMode",
+      "module_path": "uav.modes.PayloadPickupMode",
       "param_fields": [
         {
           "annotation": {
@@ -2687,12 +2687,12 @@
     },
     "uav.ServoDropoffMode": {
       "class_name": "ServoDropoffMode",
-      "class_path": "uav.modes.uav.ServoDropoffMode",
+      "class_path": "uav.modes.ServoDropoffMode",
       "description": "A mode for dropping off the payload.",
       "display_name": "ServoDropoffMode",
       "mission_target": "uav",
       "mode_id": "uav.ServoDropoffMode",
-      "module_path": "uav.modes.uav.ServoDropoffMode",
+      "module_path": "uav.modes.ServoDropoffMode",
       "param_fields": [
         {
           "annotation": {
@@ -2835,12 +2835,12 @@
     },
     "uav.WaypointMission": {
       "class_name": "WaypointMission",
-      "class_path": "uav.modes.uav.WaypointMission",
+      "class_path": "uav.modes.WaypointMission",
       "description": "Simple waypoint mission for testing scoring node.",
       "display_name": "WaypointMission",
       "mission_target": "uav",
       "mode_id": "uav.WaypointMission",
-      "module_path": "uav.modes.uav.WaypointMission",
+      "module_path": "uav.modes.WaypointMission",
       "param_fields": [
         {
           "annotation": {
@@ -2954,12 +2954,12 @@
     },
     "uav.vtol.TakeoffMode": {
       "class_name": "TakeoffMode",
-      "class_path": "uav.modes.uav.vtol.TakeoffMode",
+      "class_path": "uav.modes.vtol.TakeoffMode",
       "description": "A VTOL takeoff mode that supports both vertical and runway-style launches.",
       "display_name": "TakeoffMode",
       "mission_target": "uav",
       "mode_id": "uav.vtol.TakeoffMode",
-      "module_path": "uav.modes.uav.vtol.TakeoffMode",
+      "module_path": "uav.modes.vtol.TakeoffMode",
       "param_fields": [
         {
           "annotation": {
@@ -3065,12 +3065,12 @@
     },
     "uav.vtol.TransitionMode": {
       "class_name": "TransitionMode",
-      "class_path": "uav.modes.uav.vtol.TransitionMode",
+      "class_path": "uav.modes.vtol.TransitionMode",
       "description": "A VTOL-only mode for transitioning between multicopter and fixed-wing flight.",
       "display_name": "TransitionMode",
       "mission_target": "uav",
       "mode_id": "uav.vtol.TransitionMode",
-      "module_path": "uav.modes.uav.vtol.TransitionMode",
+      "module_path": "uav.modes.vtol.TransitionMode",
       "param_fields": [
         {
           "annotation": {
