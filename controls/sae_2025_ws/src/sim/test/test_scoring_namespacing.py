@@ -3,6 +3,16 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
+
+# The scoring package imports generated message types (sim_interfaces), which are
+# only built in a full sim workspace. Skip cleanly when they are unavailable
+# (e.g. the hardware-focused CI build) instead of failing collection.
+pytest.importorskip(
+    "sim_interfaces",
+    reason="sim scoring requires the built sim_interfaces messages",
+)
+
 package_root = Path(__file__).resolve().parents[1]
 if str(package_root) not in sys.path:
     sys.path.insert(0, str(package_root))

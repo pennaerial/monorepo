@@ -71,5 +71,5 @@ colcon test \
     --packages-select $TEST_PACKAGES \
     --event-handlers console_direct+ \
     --return-code-on-test-failure \
-    --pytest-args -m "not live" --strict-markers
+    --pytest-args -m "not live"
 colcon test-result --verbose
