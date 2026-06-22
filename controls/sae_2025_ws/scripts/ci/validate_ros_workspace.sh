@@ -8,7 +8,7 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(ci_workspace_root)}"
 ROS_DISTRO="${ROS_DISTRO:-humble}"
-TEST_PACKAGES="${TEST_PACKAGES:-uav sim}"
+TEST_PACKAGES="${TEST_PACKAGES:-vehicle_common payload uav sim}"
 INSTALL_DEPS="${INSTALL_DEPS:-1}"
 
 cd "$WORKSPACE_ROOT"
@@ -26,7 +26,8 @@ ci_refresh_apt_lists
 rosdep update --rosdistro "$ROS_DISTRO"
 rosdep install -r -i -y --rosdistro "$ROS_DISTRO" \
     --from-paths src/uav src/uav_interfaces src/px4_msgs src/actuator_msgs \
-    src/payload src/payload_interfaces src/tools src/vehicle_common src/payload_controller
+    src/payload src/payload_interfaces src/tools src/vehicle_common \
+    src/payload_controller src/sim src/udp_bridge
 
 ci_log "Building shared hardware dependencies"
 colcon build \

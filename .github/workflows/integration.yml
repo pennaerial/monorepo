@@ -6,6 +6,10 @@ on:
     paths:
       - ".github/workflows/integration.yml"
       - "controls/sae_2025_ws/src/integration/**"
+      # Integration tests import these pure-Python packages; re-run when they change.
+      - "controls/sae_2025_ws/src/vehicle_common/**"
+      - "controls/sae_2025_ws/src/uav/**"
+      - "controls/sae_2025_ws/src/payload/**"
   pull_request:
     branches: [main, master]
     paths:
@@ -14,6 +18,7 @@ on:
       # Integration tests import these pure-Python packages; re-run when they change.
       - "controls/sae_2025_ws/src/vehicle_common/**"
       - "controls/sae_2025_ws/src/uav/**"
+      - "controls/sae_2025_ws/src/payload/**"
   workflow_dispatch:
 
 permissions:

@@ -124,5 +124,5 @@ ci_install_pigpio() {
 }
 
 ci_py_files() {
-    find src/uav src/sim src/tools -name '*.py' | sort
+    find src/uav src/payload src/vehicle_common src/sim src/tools -name '*.py' | sort
 }
