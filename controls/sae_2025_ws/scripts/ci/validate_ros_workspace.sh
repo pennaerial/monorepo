@@ -65,10 +65,11 @@ PYTHONPATH="$WORKSPACE_ROOT/src/uav:${PYTHONPATH:-}" \
 
 ci_log "Running colcon test"
 ci_source_workspace "$WORKSPACE_ROOT"
+export PYTEST_DISABLE_PLUGIN_AUTOLOAD=1
 # colcon discovers packages' tests, exclude live tests by marker.
 colcon test \
     --packages-select $TEST_PACKAGES \
     --event-handlers console_direct+ \
     --return-code-on-test-failure \
-    --pytest-args -m "not live"
+    --pytest-args -m "not live" --strict-markers
 colcon test-result --verbose
