@@ -95,7 +95,17 @@ sudo apt-get upgrade
     ```
     `uav` mission and fleet loading now require `pydantic>=2,<3`, and AprilTag missions still require the Python `apriltag` package. Use the distro `python3-opencv` package for `cv2`; do not install `opencv-python` just to get AprilTag support.
 
-3. If you are running payload hardware on a Raspberry Pi, also complete the one-time `pigpio` / `pigpiod` setup in [src/payload/README.md](src/payload/README.md). The payload GPIO controller will not start unless `pigpiod` is running.
+3. We now install `ros-gz` separately. To install:
+    ```bash
+    sudo sh -c 'echo "deb [arch=$(dpkg --print-architecture)] http://packages.ros.org/ros2/ubuntu $(lsb_release -cs) main" > /etc/apt/sources.list.d/ros2-latest.list'
+    curl -s https://raw.githubusercontent.com/ros/rosdistro/master/ros.asc | sudo apt-key add -
+    sudo apt-get update
+    sudo apt install ros-jazzy-ros-gz
+    ```
+
+    Original instructions from [gazebosim/ros_gz](https://github.com/gazebosim/ros_gz/tree/jazzy).
+
+4. If you are running payload hardware on a Raspberry Pi, also complete the one-time `pigpio` / `pigpiod` setup in [src/payload/README.md](src/payload/README.md). The payload GPIO controller will not start unless `pigpiod` is running.
 ---
 
 ## Solving Common Issues
