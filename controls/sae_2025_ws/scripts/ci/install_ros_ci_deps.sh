@@ -35,3 +35,9 @@ python3 -m pip install --no-cache-dir \
     "fastapi[standard]" \
     httpx \
     python-multipart
+
+# Prebuild px4_msgs so per-PR validation does not recompile it (~6 min). Keep
+# this commit in sync with the px4_msgs submodule gitlink; validate_ros_workspace.sh
+# fails the build if they drift.
+PX4_MSGS_COMMIT="86d8239e962f6939e05c3737784f60c02fa884db"
+ci_build_px4_msgs "$PX4_MSGS_COMMIT"

@@ -29,9 +29,32 @@ rosdep install -r -i -y --rosdistro "$ROS_DISTRO" \
     src/payload src/payload_interfaces src/tools src/vehicle_common \
     src/payload_controller src/sim src/udp_bridge
 
+ci_log "Resolving prebuilt px4_msgs"
+PX4_MSGS_PREFIX="$(ci_px4_msgs_prefix)"
+BUILD_PX4_MSGS=1
+if [[ -f "$PX4_MSGS_PREFIX/PINNED_COMMIT" ]]; then
+    baked_commit="$(cat "$PX4_MSGS_PREFIX/PINNED_COMMIT")"
+    # The checked-out submodule commit (in CI this equals the pinned gitlink).
+    pinned_commit="$(git -C src/px4_msgs rev-parse HEAD 2>/dev/null || true)"
+    if [[ -n "$pinned_commit" && "$baked_commit" != "$pinned_commit" ]]; then
+        ci_log "ERROR: prebuilt px4_msgs ($baked_commit) does not match the checked-out submodule ($pinned_commit)."
+        ci_log "Update PX4_MSGS_COMMIT in scripts/ci/install_ros_ci_deps.sh and rebuild the CI image,"
+        ci_log "or run 'git submodule update --init src/px4_msgs' to match the pin."
+        exit 1
+    fi
+    ci_log "Using prebuilt px4_msgs ($baked_commit)"
+    ci_source_setup "$PX4_MSGS_PREFIX/setup.sh"
+    BUILD_PX4_MSGS=0
+else
+    ci_log "No prebuilt px4_msgs found; building it from source"
+fi
+
 ci_log "Building shared hardware dependencies"
-colcon build \
-    --packages-select payload_interfaces px4_msgs uav_interfaces actuator_msgs udp_bridge vehicle_common
+shared_packages=(payload_interfaces uav_interfaces actuator_msgs udp_bridge vehicle_common)
+if [[ "$BUILD_PX4_MSGS" == "1" ]]; then
+    shared_packages+=(px4_msgs)
+fi
+colcon build --packages-select "${shared_packages[@]}"
 
 ci_log "Building hardware payload package"
 ci_source_workspace "$WORKSPACE_ROOT"
