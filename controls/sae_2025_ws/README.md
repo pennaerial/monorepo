@@ -21,7 +21,8 @@ Before you begin, make sure you have the following installed:
 - PX4 Autopilot
 - QGroundControl
 
-> [!NOTE] "Updating from Ubuntu 22.04"
+> [!NOTE]
+> **Updating from Ubuntu 22.04**
 > If you're still on Ubuntu 22.04, we've now updated our stack to 24.04 and updated to ros `jazzy`. Follow the instructions in [ubuntu-update.md](/docs/ubuntu-update.md) for updating to 24.04.
 
 You can refer to https://freedcamp.com/view/3502859/tasks/panel/task/61666972 for this process.
