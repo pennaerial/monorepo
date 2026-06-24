@@ -8,7 +8,6 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(ci_workspace_root)}"
 ROS_DISTRO="${ROS_DISTRO:-humble}"
-TEST_PACKAGES="${TEST_PACKAGES:-vehicle_common payload uav sim}"
 INSTALL_DEPS="${INSTALL_DEPS:-1}"
 
 cd "$WORKSPACE_ROOT"
@@ -66,9 +65,16 @@ PYTHONPATH="$WORKSPACE_ROOT/src/uav:${PYTHONPATH:-}" \
 ci_log "Running colcon test"
 ci_source_workspace "$WORKSPACE_ROOT"
 export PYTEST_DISABLE_PLUGIN_AUTOLOAD=1
+
+# Vendored packages we build from source but never modify or test.
+# ros_gz is a metapackage; ask colcon for member names so new ones stay excluded.
+mapfile -t VENDORED_GZ < <(colcon list --base-paths "$WORKSPACE_ROOT/src/ros_gz" --names-only 2>/dev/null | sort -u)
+
+SKIP_PACKAGE_ARGS=(px4_msgs actuator_msgs "${VENDORED_GZ[@]}")
+
 # colcon discovers packages' tests, exclude live tests by marker.
 colcon test \
-    --packages-select $TEST_PACKAGES \
+    --packages-skip "${SKIP_PACKAGE_ARGS[@]}" \
     --event-handlers console_direct+ \
     --return-code-on-test-failure \
     --pytest-args -m "not live"
