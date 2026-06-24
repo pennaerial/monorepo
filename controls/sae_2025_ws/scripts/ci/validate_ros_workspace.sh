@@ -10,6 +10,13 @@ WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(ci_workspace_root)}"
 ROS_DISTRO="${ROS_DISTRO:-humble}"
 INSTALL_DEPS="${INSTALL_DEPS:-1}"
 
+WORKSPACE_PACKAGES=(
+    vehicle_common payload_interfaces uav_interfaces udp_bridge
+    px4_msgs actuator_msgs
+    payload payload_controller uav tools sim
+)
+VENDORED_PACKAGES=(px4_msgs actuator_msgs)
+
 cd "$WORKSPACE_ROOT"
 
 if [[ "$INSTALL_DEPS" != "0" ]]; then
@@ -28,27 +35,8 @@ rosdep install -r -i -y --rosdistro "$ROS_DISTRO" \
     src/payload src/payload_interfaces src/tools src/vehicle_common \
     src/payload_controller src/sim src/udp_bridge
 
-ci_log "Building shared hardware dependencies"
-colcon build \
-    --packages-select payload_interfaces px4_msgs uav_interfaces actuator_msgs udp_bridge vehicle_common
-
-ci_log "Building hardware payload package"
-ci_source_workspace "$WORKSPACE_ROOT"
-colcon build \
-    --packages-select payload payload_controller \
-    --cmake-args -DBUILD_SIM=OFF
-
-ci_log "Building uav package"
-ci_source_workspace "$WORKSPACE_ROOT"
-colcon build --packages-select uav
-
-ci_log "Building tools package"
-ci_source_workspace "$WORKSPACE_ROOT"
-colcon build --packages-select tools
-
-ci_log "Building sim package"
-ci_source_ros
-colcon build --packages-select sim
+ci_log "Building workspace"
+colcon build --packages-select "${WORKSPACE_PACKAGES[@]}"
 
 ci_log "Compiling Python sources"
 mapfile -t python_files < <(ci_py_files)
@@ -66,15 +54,10 @@ ci_log "Running colcon test"
 ci_source_workspace "$WORKSPACE_ROOT"
 export PYTEST_DISABLE_PLUGIN_AUTOLOAD=1
 
-# Vendored packages we build from source but never modify or test.
-# ros_gz is a metapackage; ask colcon for member names so new ones stay excluded.
-mapfile -t VENDORED_GZ < <(colcon list --base-paths "$WORKSPACE_ROOT/src/ros_gz" --names-only 2>/dev/null | sort -u)
-
-SKIP_PACKAGE_ARGS=(px4_msgs actuator_msgs "${VENDORED_GZ[@]}")
-
-# colcon discovers packages' tests, exclude live tests by marker.
+# Test what we built minus vendored deps; exclude live tests by marker.
 colcon test \
-    --packages-skip "${SKIP_PACKAGE_ARGS[@]}" \
+    --packages-select "${WORKSPACE_PACKAGES[@]}" \
+    --packages-skip "${VENDORED_PACKAGES[@]}" \
     --event-handlers console_direct+ \
     --return-code-on-test-failure \
     --pytest-args -m "not live"
