@@ -126,3 +126,28 @@ ci_install_pigpio() {
 ci_py_files() {
     find src/uav src/payload src/vehicle_common src/sim src/tools -name '*.py' | sort
 }
+
+ci_px4_msgs_prefix() {
+    echo "/opt/px4_msgs"
+}
+
+# Build px4_msgs commit $1 (a commit SHA), and echo the exact commit baked so validation can detect submodule drift.
+ci_build_px4_msgs() {
+    local commit="$1"
+    local prefix=$(ci_px4_msgs_prefix)
+    local ws="/tmp/px4_msgs_ws"
+
+    ci_log "Building px4_msgs ($commit) into $prefix"
+    rm -rf "$ws"
+    git clone https://github.com/PX4/px4_msgs.git "$ws/src/px4_msgs"
+    git -C "$ws/src/px4_msgs" checkout "$commit" #checks out the specified commit in detached head state
+
+    (
+        cd "$ws"
+        ci_source_ros
+        colcon build --merge-install --install-base "$prefix"
+    )
+
+    echo "$commit" > "$prefix/PINNED_COMMIT"
+    rm -rf "$ws"
+}
