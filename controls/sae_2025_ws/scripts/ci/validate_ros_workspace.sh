@@ -8,9 +8,15 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(ci_workspace_root)}"
 ROS_DISTRO="${ROS_DISTRO:-humble}"
-PYTEST_TARGETS="${PYTEST_TARGETS:-src/uav/test/test_mission_spec.py src/uav/test/test_schema_models.py src/uav/test/test_schema_registry_runtime.py src/uav/test/test_auto_launch.py src/uav/test/test_runtime_behavior.py src/uav/test/test_launch_helpers.py src/uav/test/test_fleet_launch.py src/sim/test/test_orchestration.py src/integration/test/test_config.py src/integration/test/test_deploy.py src/integration/test/test_schema.py}"
-# LIVE_PYTEST_TARGETS="${LIVE_PYTEST_TARGETS:-src/uav/test/test_peer_stack_reconnect.py}"
 INSTALL_DEPS="${INSTALL_DEPS:-1}"
+
+# px4_msgs is left off because it is prebuilt into CI image
+WORKSPACE_PACKAGES=(
+    vehicle_common payload_interfaces uav_interfaces udp_bridge
+    actuator_msgs
+    payload payload_controller uav tools sim
+)
+VENDORED_PACKAGES=(px4_msgs actuator_msgs)
 
 cd "$WORKSPACE_ROOT"
 
@@ -27,29 +33,37 @@ ci_refresh_apt_lists
 rosdep update --rosdistro "$ROS_DISTRO"
 rosdep install -r -i -y --rosdistro "$ROS_DISTRO" \
     --from-paths src/uav src/uav_interfaces src/px4_msgs src/actuator_msgs \
-    src/payload src/payload_interfaces src/tools src/vehicle_common src/payload_controller
+    src/payload src/payload_interfaces src/tools src/vehicle_common \
+    src/payload_controller src/sim src/udp_bridge
 
-ci_log "Building shared hardware dependencies"
-colcon build \
-    --packages-select payload_interfaces px4_msgs uav_interfaces actuator_msgs udp_bridge vehicle_common
+  ci_log "Resolving prebuilt px4_msgs"
+  PX4_MSGS_PREFIX="$(ci_px4_msgs_prefix)"
+  BUILD_PX4_MSGS=1
+# checks if the file /opt/px4_msgs/PINNED_COMMIT exists because that is where we stored the px4_msgs commit of the image
+  if [[ -f "$PX4_MSGS_PREFIX/PINNED_COMMIT" ]]; then
+      built_commit="$(cat "$PX4_MSGS_PREFIX/PINNED_COMMIT")"
+      pinned_commit="$(git -C src/px4_msgs rev-parse HEAD 2>/dev/null || true)"
+      if [[ -n "$pinned_commit" && "$built_commit" != "$pinned_commit" ]]; then
+          ci_log "ERROR: prebuilt px4_msgs ($built_commit) does not match the checked-out submodule ($pinned_commit)."
+          ci_log "Update PX4_MSGS_COMMIT in scripts/ci/install_ros_ci_deps.sh and rebuild the CI image,"
+          ci_log "or run 'git submodule update --init src/px4_msgs' to match the pin."
+          exit 1
+      fi
+      ci_log "Using prebuilt px4_msgs ($built_commit)"
+      ci_source_setup "$PX4_MSGS_PREFIX/setup.sh"
+      BUILD_PX4_MSGS=0
+  else
+      ci_log "No prebuilt px4_msgs found; building it from source"
+  fi
 
-ci_log "Building hardware payload package"
-ci_source_workspace "$WORKSPACE_ROOT"
-colcon build \
-    --packages-select payload payload_controller \
-    --cmake-args -DBUILD_SIM=OFF
 
-ci_log "Building uav package"
-ci_source_workspace "$WORKSPACE_ROOT"
-colcon build --packages-select uav
+  ci_log "Building workspace"
+  build_packages=("${WORKSPACE_PACKAGES[@]}")
+  if [[ "$BUILD_PX4_MSGS" == "1" ]]; then
+      build_packages+=(px4_msgs)
+  fi
+  colcon build --packages-select "${build_packages[@]}"
 
-ci_log "Building tools package"
-ci_source_workspace "$WORKSPACE_ROOT"
-colcon build --packages-select tools
-
-ci_log "Building sim package"
-ci_source_ros
-colcon build --packages-select sim
 
 ci_log "Compiling Python sources"
 mapfile -t python_files < <(ci_py_files)
@@ -57,20 +71,21 @@ python3 -m py_compile "${python_files[@]}"
 
 ci_log "Checking committed mode schema registry"
 ci_source_workspace "$WORKSPACE_ROOT"
+SCHEMA_REGISTRY_PATH="$WORKSPACE_ROOT/src/vehicle_common/vehicle_common/runtime/mode_registry.json"
 PYTHONPATH="$WORKSPACE_ROOT/src/uav:${PYTHONPATH:-}" \
-    python3 -m vehicle_common.runtime.schema_generator
-PYTHONPATH="$WORKSPACE_ROOT/src/uav:${PYTHONPATH:-}" \
-    python3 -m vehicle_common.runtime.schema_generator --check
+    python3 -m vehicle_common.runtime.schema_generator \
+    --check \
+    --output "$SCHEMA_REGISTRY_PATH"
 
-ci_log "Running pytest suite"
+ci_log "Running colcon test"
 ci_source_workspace "$WORKSPACE_ROOT"
-# Ignore globally installed pytest entrypoints from unrelated packages like anyio.
-PYTHONPATH="$WORKSPACE_ROOT/src/uav:$WORKSPACE_ROOT/src/sim:${PYTHONPATH:-}" \
-PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 \
-    python3 -m pytest $PYTEST_TARGETS
+export PYTEST_DISABLE_PLUGIN_AUTOLOAD=1
 
-# ci_log "Running live peer reconnect pytest suite"
-# ci_source_workspace "$WORKSPACE_ROOT"
-# PYTHONPATH="$WORKSPACE_ROOT/src/uav:$WORKSPACE_ROOT/src/sim:${PYTHONPATH:-}" \
-# PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 \
-#     python3 -m pytest $LIVE_PYTEST_TARGETS
+# Test what we built minus vendored deps; exclude live tests by marker.
+colcon test \
+    --packages-select "${WORKSPACE_PACKAGES[@]}" \
+    --packages-skip "${VENDORED_PACKAGES[@]}" \
+    --event-handlers console_direct+ \
+    --return-code-on-test-failure \
+    --pytest-args -m "not live"
+colcon test-result --verbose

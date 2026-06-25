@@ -11,11 +11,6 @@ from pydantic import BaseModel, ConfigDict, Field
 from .mode_paths import normalize_public_mode_id
 from vehicle_common.mode import Mode
 
-from ament_index_python.packages import (
-    PackageNotFoundError,
-    get_package_share_directory,
-)
-
 
 VALID_MISSION_TARGETS = {"uav", "payload"}
 _TOP_LEVEL_KEYS = {"modes"}
@@ -40,7 +35,13 @@ class MissionDocumentModel(BaseModel):
 
 
 def _mission_roots() -> list[Path]:
-    # Installed: check share directories for each package that owns missions.
+    # Lazy import: ament_index_python ships only with ROS, so importing it at
+    # module top level would force ROS onto pure-Python consumers
+    from ament_index_python.packages import (
+        PackageNotFoundError,
+        get_package_share_directory,
+    )
+
     roots = []
     for pkg in ("uav", "payload"):
         try:

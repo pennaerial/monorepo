@@ -1,13 +1,16 @@
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, ClassVar, Generic, Mapping, TypeVar
 
-from rclpy.node import Node
-
 from vehicle_common.vehicle import Vehicle
 from vehicle_common.runtime.vision_loader import canonical_vision_node_path
 
 if TYPE_CHECKING:
+    from rclpy.node import Node
     from uav.vision_nodes import VisionNode
+else:
+    # Avoid forcing ROS imports on pure-Python consumers (mission/fleet spec loading, integration backend)
+    # Node is annotation-only but must exist at runtime for get_type_hints().
+    Node = object
 
 VehicleT = TypeVar("VehicleT", bound=Vehicle)
 

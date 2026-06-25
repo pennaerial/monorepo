@@ -1,4 +1,5 @@
 # # ruff: noqa: E402
+# # Live hardware/peer-stack tests. Tests that are marked `@pytest.mark.live` and excluded from CI
 #
 # from __future__ import annotations
 #
@@ -405,6 +406,7 @@
 #             rclpy.shutdown()
 #
 #
+# @pytest.mark.live  # requires real hardware/running peer stack; excluded from CI by `-m "not live"`
 # def test_vehicle_stack_peer_reconnect_recovers_state_and_traffic(
 #     tmp_path: Path, live_ros_environment: dict[str, str]
 # ) -> None:

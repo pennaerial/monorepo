@@ -1,14 +1,11 @@
 from __future__ import annotations
 
 import argparse
-import sys
 from collections.abc import Sequence
 from enum import Enum
-import importlib
 import inspect
 import json
 import math
-import pkgutil
 from pathlib import Path
 import types
 from typing import Any, Literal, Union, get_args, get_origin, get_type_hints
@@ -16,6 +13,7 @@ from typing import Any, Literal, Union, get_args, get_origin, get_type_hints
 from pydantic import BaseModel, ConfigDict, create_model
 
 from vehicle_common.mode import Mode
+from vehicle_common.runtime import plugin_loader
 
 from .mode_paths import (
     implementation_mode_path,
@@ -46,31 +44,8 @@ def _is_typed_dict(annotation: object) -> bool:
 
 
 def _iter_mode_classes() -> list[type[Mode[Any]]]:
-    import uav.modes as mode_package
-
-    discovered: dict[str, type[Mode[Any]]] = {}
-    for module_info in pkgutil.walk_packages(
-        mode_package.__path__, prefix=f"{mode_package.__name__}."
-    ):
-        try:
-            module = importlib.import_module(module_info.name)
-        except ImportError as exc:
-            print(
-                f"WARNING: skipping mode module '{module_info.name}' "
-                f"(missing dependency: {exc})",
-                file=sys.stderr,
-            )
-            continue
-        for value in vars(module).values():
-            if (
-                isinstance(value, type)
-                and issubclass(value, Mode)
-                and value is not Mode
-                and not inspect.isabstract(value)
-                and value.__module__ == module.__name__
-            ):
-                discovered[mode_id_for(value)] = value
-    return [discovered[key] for key in sorted(discovered)]
+    # Source modes from the plugin loader registry, the same one the runtime loads from.
+    return sorted(plugin_loader.get_plugins(Mode).values(), key=mode_id_for)
 
 
 def _normalized_annotation(
