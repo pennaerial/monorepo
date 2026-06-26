@@ -30,6 +30,7 @@ from sim.utils import (
     camel_to_snake,
     load_sim_launch_parameters,
 )
+from uav.utils import DEFAULT_PX4_PATH
 
 
 def _is_truthy_env(name: str) -> bool:
@@ -305,7 +306,7 @@ def launch_setup(context, *args, **kwargs):
 def generate_launch_description():
     return LaunchDescription(
         [
-            DeclareLaunchArgument("px4_path", default_value="~/PX4-Autopilot"),
+            DeclareLaunchArgument("px4_path", default_value=DEFAULT_PX4_PATH),
             DeclareLaunchArgument("model", default_value=""),
             DeclareLaunchArgument("spawn_uav_model", default_value="false"),
             DeclareLaunchArgument("backend_json", default_value=""),

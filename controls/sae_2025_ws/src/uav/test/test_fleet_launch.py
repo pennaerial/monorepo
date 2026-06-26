@@ -246,6 +246,26 @@ def test_backend_config_accepts_real_backend(fleet_launch_module):
     assert backend["px4_path"] == "~/PX4-Autopilot"
 
 
+def test_backend_config_defaults_px4_path_to_submodule(fleet_launch_module):
+    fleet = {
+        "backend": {"kind": "hardware"},
+        "vehicles": [
+            {
+                "name": "uav_alpha",
+                "mission_path": "/tmp/hover.yaml",
+                "kind": "uav",
+                "px4_airframe_id": 4004,
+            }
+        ],
+    }
+
+    backend = fleet_launch_module._backend_config(fleet)
+
+    # When the fleet omits px4_path, it falls back to the in-repo submodule
+    # default rather than the legacy ~/PX4-Autopilot home checkout.
+    assert backend["px4_path"] == fleet_launch_module.DEFAULT_PX4_PATH
+
+
 def test_real_backend_does_not_import_sim(monkeypatch):
     _ensure_launch_import_stubs()
     package_root = Path(__file__).resolve().parents[1]

@@ -1,6 +1,5 @@
 backend:
   kind: real
-  px4_path: ~/PX4-Autopilot
   # world_name: sae
   # mission_stage: line_following
 
