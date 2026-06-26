@@ -19,7 +19,7 @@ find_package(custom_gz_msgs REQUIRED)
 
 # DynamicDetachableJoint plugin
 add_library(DynamicDetachableJoint SHARED
-  src/dynamic_detachable_joint/DynamicDetachableJoint.cc
+  src/dynamic_detachable_joint/DynamicDetachableJoint.cpp
 )
 
 target_include_directories(DynamicDetachableJoint PRIVATE
