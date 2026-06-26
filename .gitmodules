@@ -9,3 +9,7 @@
 	path = controls/sae_2025_ws/src/ros_gz
 	url = https://github.com/gazebosim/ros_gz.git
 	branch = humble
+[submodule "PX4-Autopilot"]
+	path = PX4-Autopilot
+	url = git@github.com:pennaerial/PX4-Autopilot.git
+	branch = release/1.17
