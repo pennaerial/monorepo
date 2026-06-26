@@ -5,3 +5,7 @@
 	path = controls/sae_2025_ws/src/px4_msgs
 	url = https://github.com/PX4/px4_msgs.git
 	branch = release/1.17
+[submodule "PX4-Autopilot"]
+	path = PX4-Autopilot
+	url = git@github.com:pennaerial/PX4-Autopilot.git
+	branch = release/1.17
