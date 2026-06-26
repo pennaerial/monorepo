@@ -30,7 +30,7 @@ from sim.utils import (
     camel_to_snake,
     load_sim_launch_parameters,
 )
-from uav.utils import DEFAULT_PX4_PATH
+from vehicle_common.px4 import DEFAULT_PX4_PATH
 
 
 def _is_truthy_env(name: str) -> bool:

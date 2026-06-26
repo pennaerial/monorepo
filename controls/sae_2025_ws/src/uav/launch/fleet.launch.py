@@ -18,7 +18,7 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.logging import get_logger
 from launch.substitutions import LaunchConfiguration
 
-from uav.utils import DEFAULT_PX4_PATH
+from vehicle_common.px4 import DEFAULT_PX4_PATH
 from vehicle_common.runtime.fleet_spec import load_fleet_document
 from vehicle_common.runtime.mission_spec import MissionSpec, mission_path_for_name
 

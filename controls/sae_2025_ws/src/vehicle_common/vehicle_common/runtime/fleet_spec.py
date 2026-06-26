@@ -99,9 +99,7 @@ class HardwareBackendModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     kind: Literal["hardware", "real"]
-    # Default left as None so the launch layer resolves it to the in-repo
-    # PX4-Autopilot submodule (uav.utils.DEFAULT_PX4_PATH). An explicit YAML
-    # value still overrides.
+    # None lets the launch layer resolve it (vehicle_common.px4.DEFAULT_PX4_PATH); an explicit YAML value still overrides.
     px4_path: str | None = None
 
     @field_validator("kind")
@@ -114,9 +112,7 @@ class SimBackendModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     kind: Literal["sim"]
-    # Default left as None so the launch layer resolves it to the in-repo
-    # PX4-Autopilot submodule (uav.utils.DEFAULT_PX4_PATH). An explicit YAML
-    # value still overrides.
+    # None lets the launch layer resolve it (vehicle_common.px4.DEFAULT_PX4_PATH); an explicit YAML value still overrides.
     px4_path: str | None = None
     world_name: str
     mission_stage: str | None = None

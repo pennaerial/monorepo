@@ -18,12 +18,8 @@ from launch.logging import get_logger
 from launch.substitutions import LaunchConfiguration
 
 from vehicle_common.runtime.mission_spec import MissionSpec, mission_path_for_name
-from uav.utils import (
-    DEFAULT_PX4_PATH,
-    find_folder_with_heuristic,
-    get_airframe_details,
-    vehicle_id_dict,
-)
+from uav.utils import find_folder_with_heuristic, get_airframe_details, vehicle_id_dict
+from vehicle_common.px4 import DEFAULT_PX4_PATH
 
 
 def _load_launch_parameters(context) -> dict:

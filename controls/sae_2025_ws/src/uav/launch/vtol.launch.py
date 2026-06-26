@@ -3,7 +3,7 @@ from launch_ros.actions import Node
 from launch.actions import ExecuteProcess, TimerAction
 import os
 
-from uav.utils import DEFAULT_PX4_PATH
+from vehicle_common.px4 import DEFAULT_PX4_PATH
 
 
 def generate_launch_description():
