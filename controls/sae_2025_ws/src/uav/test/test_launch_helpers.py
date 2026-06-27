@@ -892,3 +892,95 @@ def test_legacy_backend_override_returns_stage_based_backend_for_uav(
         },
         "scoring": False,
     }
+
+
+@pytest.fixture(scope="module")
+def uav_utils_module():
+    package_root = Path(__file__).resolve().parents[1]
+    if str(package_root) not in sys.path:
+        sys.path.insert(0, str(package_root))
+    return importlib.import_module("uav.utils")
+
+
+def test_get_airframe_details_parses_px4_source(uav_utils_module, tmp_path):
+    # With PX4 present, class comes from the defaults marker and model from the filename.
+    airframes_dir = tmp_path / "ROMFS" / "px4fmu_common" / "init.d-posix" / "airframes"
+    airframes_dir.mkdir(parents=True)
+    (airframes_dir / "4004_gz_standard_vtol").write_text(
+        ". ${R}etc/init.d/rc.vtol_defaults\n"
+    )
+
+    assert uav_utils_module.get_airframe_details(str(tmp_path), 4004) == (
+        uav_utils_module.AirframeClass.VTOL,
+        "gz_standard_vtol",
+    )
+
+
+def test_get_airframe_details_uses_table_without_px4(uav_utils_module):
+    # No PX4 checkout: known IDs resolve their class from the table; unknown IDs stay UNKNOWN.
+    assert uav_utils_module.get_airframe_details("", 4010) == (
+        uav_utils_module.AirframeClass.MULTICOPTER,
+        "",
+    )
+    assert uav_utils_module.get_airframe_details("", 9999) == (
+        uav_utils_module.AirframeClass.UNKNOWN,
+        "gz_ERROR",
+    )
+
+
+def _stub_uav_launch_setup(monkeypatch, stack_launch_module, *, sim):
+    mission_spec = SimpleNamespace(
+        is_uav=True,
+        is_payload=False,
+        target="uav",
+        vision_nodes=(),
+        requires_camera=False,
+    )
+    monkeypatch.setattr(
+        stack_launch_module,
+        "_load_vehicle_config",
+        lambda _context: {"vehicle_name": "uav_0", "sim": sim},
+    )
+    monkeypatch.setattr(
+        stack_launch_module, "_resolve_mission_path", lambda _config: "/tmp/m.yaml"
+    )
+    monkeypatch.setattr(
+        stack_launch_module.MissionSpec,
+        "load",
+        staticmethod(lambda _path: mission_spec),
+    )
+    monkeypatch.setattr(
+        stack_launch_module, "_runtime_executable_for", lambda _spec: "uav_mission"
+    )
+    monkeypatch.setattr(
+        stack_launch_module, "_runtime_package_for", lambda _spec: "uav"
+    )
+    monkeypatch.setattr(
+        stack_launch_module, "_resolve_camera_input_transport", lambda **_kwargs: "raw"
+    )
+    # No PX4 checkout found.
+    monkeypatch.setattr(
+        stack_launch_module, "find_folder_with_heuristic", lambda *_a, **_k: ""
+    )
+    monkeypatch.setattr(
+        stack_launch_module,
+        "_resolve_uav_airframe",
+        lambda _config, _px4_path: (SimpleNamespace(name="MULTICOPTER"), 4010, ""),
+    )
+    monkeypatch.setattr(
+        stack_launch_module, "_build_runtime_parameters", lambda **_kwargs: {}
+    )
+    monkeypatch.setattr(
+        stack_launch_module, "_middleware_action", lambda **_kwargs: "middleware"
+    )
+    monkeypatch.setattr(stack_launch_module, "Node", lambda **kwargs: ("node", kwargs))
+
+
+def test_uav_stack_requires_px4_path_only_for_sitl(monkeypatch, stack_launch_module):
+    # Real UAV (no SITL) launches fine without a PX4 checkout; sim SITL still requires one.
+    _stub_uav_launch_setup(monkeypatch, stack_launch_module, sim=False)
+    assert "middleware" in stack_launch_module.launch_setup(SimpleNamespace())
+
+    _stub_uav_launch_setup(monkeypatch, stack_launch_module, sim=True)
+    with pytest.raises(ValueError, match="PX4 SITL requires a valid px4_path"):
+        stack_launch_module.launch_setup(SimpleNamespace())

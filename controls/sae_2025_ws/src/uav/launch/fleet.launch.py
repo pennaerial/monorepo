@@ -18,6 +18,7 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.logging import get_logger
 from launch.substitutions import LaunchConfiguration
 
+from vehicle_common.px4 import DEFAULT_PX4_PATH
 from vehicle_common.runtime.fleet_spec import load_fleet_document
 from vehicle_common.runtime.mission_spec import MissionSpec, mission_path_for_name
 
@@ -114,7 +115,7 @@ def _backend_config(fleet: dict) -> dict:
     if kind == "hardware":
         return {
             "kind": "hardware",
-            "px4_path": backend.get("px4_path", "~/PX4-Autopilot"),
+            "px4_path": backend.get("px4_path", DEFAULT_PX4_PATH),
         }
     if kind != "sim":
         raise ValueError(
@@ -325,7 +326,7 @@ def _vehicle_stack_configs(fleet: dict) -> tuple[dict, list[dict]]:
                 vehicle.get("camera_mount_offsets", [0.0, 0.0, 0.0])
             ),
             "px4_path": os.path.expanduser(
-                str(backend.get("px4_path", "~/PX4-Autopilot"))
+                str(backend.get("px4_path", DEFAULT_PX4_PATH))
             ),
             "sim_world_name": backend.get("world_name", ""),
             "sim_entity_name": controllable_name or name,
@@ -398,7 +399,7 @@ def launch_setup(context, *args, **kwargs):
                     )
                 ),
                 launch_arguments={
-                    "px4_path": str(backend.get("px4_path", "~/PX4-Autopilot")),
+                    "px4_path": str(backend.get("px4_path", DEFAULT_PX4_PATH)),
                     "backend_json": json.dumps(
                         {
                             key: value

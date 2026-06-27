@@ -3,10 +3,12 @@ from launch_ros.actions import Node
 from launch.actions import ExecuteProcess, TimerAction
 import os
 
+from vehicle_common.px4 import DEFAULT_PX4_PATH
+
 
 def generate_launch_description():
     # Adjust these paths according to your setup
-    px4_path = os.path.expanduser("~/PX4-Autopilot")
+    px4_path = DEFAULT_PX4_PATH
     # qgc_path = os.path.expanduser('~/pennair')  # Folder containing QGroundControl.AppImage
     sae_ws_path = os.path.expanduser("~/penn-air/monorepo/controls/sae_2025_ws")
 

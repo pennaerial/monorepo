@@ -5,6 +5,10 @@
 	path = controls/sae_2025_ws/src/px4_msgs
 	url = https://github.com/PX4/px4_msgs.git
 	branch = release/1.17
+[submodule "controls/sae_2025_ws/src/ros_gz"]
+	path = controls/sae_2025_ws/src/ros_gz
+	url = https://github.com/gazebosim/ros_gz.git
+	branch = humble
 [submodule "PX4-Autopilot"]
 	path = PX4-Autopilot
 	url = https://github.com/pennaerial/PX4-Autopilot.git

@@ -11,6 +11,7 @@
   <depend>std_msgs</depend>
   <depend>geometry_msgs</depend>
   <depend>px4_msgs</depend>
+  <depend>vehicle_common</depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>

@@ -11,7 +11,7 @@ Each competition should have a corresponding ScoringNode subclass that:
 from typing import Optional
 from abc import ABC, abstractmethod
 from rclpy.node import Node
-from uav.utils import camel_to_snake
+from sim.utils import camel_to_snake
 from std_msgs.msg import Float32, String
 
 

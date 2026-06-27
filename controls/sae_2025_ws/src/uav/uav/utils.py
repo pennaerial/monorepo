@@ -19,6 +19,14 @@ vehicle_id_dict = {
     "standard_vtol": 4004,
     "quadtailsitter": 4018,
 }
+# Resolves vehicle_class without a PX4 checkout; intended to eventually replace the ROMFS parse.
+airframe_class_fallback = {
+    4010: AirframeClass.MULTICOPTER,
+    4003: AirframeClass.PLANE,
+    4004: AirframeClass.VTOL,
+    4020: AirframeClass.VTOL,
+    4018: AirframeClass.VTOL,
+}
 """
 Airframe IDs
 All PX4 supported IDs can be found here: https://docs.px4.io/main/en/airframes/airframe_reference
@@ -95,14 +103,24 @@ def get_airframe_details(px4_path, airframe_id):
     # 1. Locate the Airframe File
     # PX4 stores these in ROMFS/px4fmu_common/init.d-posix/airframes
     # Filenames format: "4001_gz_x500" (ID_NAME)
-    airframes_dir = os.path.join(
-        px4_path, "ROMFS", "px4fmu_common", "init.d-posix", "airframes"
+    airframes_dir = (
+        os.path.join(px4_path, "ROMFS", "px4fmu_common", "init.d-posix", "airframes")
+        if px4_path
+        else None
     )
 
     # Find any file starting with the ID
-    matches = glob.glob(os.path.join(airframes_dir, f"{airframe_id}_*"))
+    matches = (
+        glob.glob(os.path.join(airframes_dir, f"{airframe_id}_*"))
+        if airframes_dir
+        else []
+    )
 
     if not matches:
+        if not px4_path:
+            fallback_class = airframe_class_fallback.get(int(airframe_id))
+            if fallback_class is not None:
+                return fallback_class, ""
         print(f"Warning: Airframe ID {airframe_id} not found in {airframes_dir}")
         return AirframeClass.UNKNOWN, "gz_ERROR"
 

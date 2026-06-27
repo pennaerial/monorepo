@@ -618,8 +618,8 @@ def launch_setup(context, *args, **kwargs):
         px4_path = find_folder_with_heuristic(
             "PX4-Autopilot", os.path.expanduser(str(config.get("px4_path", "")))
         )
-        if not px4_path:
-            raise ValueError("UAV vehicle stacks require a valid px4_path.")
+        if not px4_path and launch_px4_sitl:
+            raise ValueError("PX4 SITL requires a valid px4_path.")
         vehicle_class, autostart, model = _resolve_uav_airframe(config, px4_path)
         if requires_camera and model and not vehicle_camera_map.get(model, False):
             raise ValueError(

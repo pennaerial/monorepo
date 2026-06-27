@@ -11,7 +11,7 @@ When launching VTOL in fixed-wing mode, make sure these PX4 parameters are set i
 - `RWTO_TKOFF = 1`
 - `NAV_FORCE_VT = 0`
 
-If you want to make that permanent in sim, add these lines to `~/PX4-Autopilot/ROMFS/px4fmu_common/init.d-posix/airframes/4004_gz_standard_vtol`:
+If you want to make that permanent in sim, add these lines to `PX4-Autopilot/ROMFS/px4fmu_common/init.d-posix/airframes/4004_gz_standard_vtol` (in the in-repo submodule; note this edits the tracked submodule):
 
 ```bash
 param set-default CBRK_VTOLARMING 159753

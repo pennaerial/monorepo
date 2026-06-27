@@ -1,6 +1,5 @@
 backend:
   kind: real
-  px4_path: ~/PX4-Autopilot
 
 defaults:
   auto_launch: true
