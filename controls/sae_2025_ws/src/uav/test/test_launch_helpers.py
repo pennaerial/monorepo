@@ -906,7 +906,9 @@ def test_get_airframe_details_parses_px4_source(uav_utils_module, tmp_path):
     # With PX4 present, class comes from the defaults marker and model from the filename.
     airframes_dir = tmp_path / "ROMFS" / "px4fmu_common" / "init.d-posix" / "airframes"
     airframes_dir.mkdir(parents=True)
-    (airframes_dir / "4004_gz_standard_vtol").write_text(". ${R}etc/init.d/rc.vtol_defaults\n")
+    (airframes_dir / "4004_gz_standard_vtol").write_text(
+        ". ${R}etc/init.d/rc.vtol_defaults\n"
+    )
 
     assert uav_utils_module.get_airframe_details(str(tmp_path), 4004) == (
         uav_utils_module.AirframeClass.VTOL,
@@ -950,7 +952,9 @@ def _stub_uav_launch_setup(monkeypatch, stack_launch_module, *, sim):
     monkeypatch.setattr(
         stack_launch_module, "_runtime_executable_for", lambda _spec: "uav_mission"
     )
-    monkeypatch.setattr(stack_launch_module, "_runtime_package_for", lambda _spec: "uav")
+    monkeypatch.setattr(
+        stack_launch_module, "_runtime_package_for", lambda _spec: "uav"
+    )
     monkeypatch.setattr(
         stack_launch_module, "_resolve_camera_input_transport", lambda **_kwargs: "raw"
     )
