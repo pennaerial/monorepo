@@ -5,7 +5,7 @@ Sim-first onboarding for the UAV framework.
 ## Prerequisites
 - ROS 2 Humble sourced on the machine
 - A built workspace
-- A PX4-Autopilot checkout, usually at `~/PX4-Autopilot`
+- The `PX4-Autopilot` submodule initialized (`git submodule update --init` at the repo root); the launch stack auto-detects this in-repo checkout
 - For sim, Gazebo and `MicroXRCEAgent` available on `PATH`
 - `pydantic>=2,<3` installed in the Python environment that will run `uav`
 
@@ -33,7 +33,7 @@ ros2 launch uav main.launch.py
 Useful overrides on the legacy single-vehicle path:
 - `mission_name:=hover`
 - `vehicle_name:=uav`
-- `px4_path:=~/PX4-Autopilot`
+- `px4_path:=...` (defaults to the in-repo `PX4-Autopilot` submodule; set only to point at a different checkout)
 - `params_file:=$(pwd)/src/uav/launch/launch_params_hardware.yaml`
 
 What success looks like:

@@ -8,9 +8,6 @@ backend:
   # Backend kind. Use `sim` for simulation; `hardware` or `real` for hardware runtime.
   kind: sim
 
-  # PX4 checkout used for any managed UAVs in this fleet.
-  px4_path: ~/PX4-Autopilot
-
   # Canonical world family under `src/sim/sim/simulations/`.
   world_name: sae
 

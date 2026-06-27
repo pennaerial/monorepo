@@ -12,7 +12,6 @@
 
 backend:
   kind: sim
-  px4_path: ~/PX4-Autopilot
   world_name: sae
   mission_stage: base
 

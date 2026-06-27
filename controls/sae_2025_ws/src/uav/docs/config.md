@@ -120,6 +120,6 @@ Fleet YAMLs do not accept these keys:
 
 PX4 autostart IDs live in:
 
-`~/PX4-Autopilot/ROMFS/px4fmu_common/init.d-posix/airframes`
+`PX4-Autopilot/ROMFS/px4fmu_common/init.d-posix/airframes` (in the in-repo submodule)
 
 Use the numeric ID in `px4_airframe_id`.

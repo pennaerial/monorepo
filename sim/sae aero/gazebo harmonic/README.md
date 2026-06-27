@@ -4,7 +4,7 @@ This ReadMe documents the procedure for running the Gazebo simulator with a cust
 
 ## Prerequisites
 - A machine running Ubuntu 22.04 or higher
-- PX4-Autopilot installation: https://docs.px4.io/main/en/dev_setup/dev_env.html
+- PX4-Autopilot: now vendored as a git submodule at the repo root (`git submodule update --init`); below, `{path_to_px4_repo}/PX4-Autopilot` refers to that in-repo `PX4-Autopilot/` directory
 - Gazebo installation: https://gazebosim.org/docs/all/getstarted/
 - ROS2 installation: 
 

@@ -99,7 +99,8 @@ class HardwareBackendModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     kind: Literal["hardware", "real"]
-    px4_path: str | None = "~/PX4-Autopilot"
+    # None lets the launch layer resolve it (vehicle_common.px4.DEFAULT_PX4_PATH); an explicit YAML value still overrides.
+    px4_path: str | None = None
 
     @field_validator("kind")
     @classmethod
@@ -111,7 +112,8 @@ class SimBackendModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     kind: Literal["sim"]
-    px4_path: str | None = "~/PX4-Autopilot"
+    # None lets the launch layer resolve it (vehicle_common.px4.DEFAULT_PX4_PATH); an explicit YAML value still overrides.
+    px4_path: str | None = None
     world_name: str
     mission_stage: str | None = None
     middleware_port: int | None = None

@@ -18,7 +18,7 @@ This guide will walk you through the setup process for the SAE 2025 project usin
 Before you begin, make sure you have the following installed:
 - ROS 2 Humble (follow the installation guide for your OS)
 - Gazebo Harmonic
-- PX4 Autopilot
+- PX4 Autopilot — used to be external install, but now vendored as a git submodule, so there is no separate install; it is pulled by the submodule step below
 - QGroundControl
 
 You can refer to https://freedcamp.com/view/3502859/tasks/panel/task/61666972 for this process.
@@ -41,7 +41,7 @@ sudo apt-get upgrade
     git pull
     ```
 
-2. Clone the necessary submodules:
+2. Clone the necessary submodules (this pulls `PX4-Autopilot` into the repo root):
 
     ```bash
     git submodule update --init --recursive
