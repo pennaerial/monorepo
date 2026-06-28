@@ -108,7 +108,7 @@ jobs:
             sudo ldconfig
             sudo /usr/local/bin/pigpiod
 
-            source /opt/ros/humble/setup.bash
+            source /opt/ros/jazzy/setup.bash
             source install/setup.bash
             ros2 launch uav main.launch.py
             ```

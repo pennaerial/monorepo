@@ -1,6 +1,6 @@
 This image is the base container for ROS workspace CI.
 
-It starts from `ros:humble-ros-base` and bakes in:
+It starts from `ros:jazzy-ros-base` and bakes in:
 
 - build tools used by the workspace CI jobs
 - ROS package managers and test tooling

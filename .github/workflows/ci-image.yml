@@ -62,11 +62,11 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: .github/ci/ros-humble-ci/Dockerfile
+          file: .github/ci/ros-jazzy-ci/Dockerfile
           platforms: ${{ matrix.platform }}
           push: ${{ github.event_name != 'pull_request' }}
           tags: |
-            ${{ env.IMAGE_NAME }}:humble-${{ matrix.arch }}
+            ${{ env.IMAGE_NAME }}:jazzy-${{ matrix.arch }}
             ${{ env.IMAGE_NAME }}:sha-${{ github.sha }}-${{ matrix.arch }}
           cache-from: type=gha,scope=ci-image-${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=ci-image-${{ matrix.arch }}
