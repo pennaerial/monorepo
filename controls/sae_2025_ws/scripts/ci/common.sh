@@ -2,6 +2,9 @@
 
 set -euo pipefail
 
+# Allow system-wide pip installs on PEP 668 distros (Ubuntu 24.04 / Jazzy).
+export PIP_BREAK_SYSTEM_PACKAGES=1
+
 ci_script_dir() {
     cd "$(dirname "${BASH_SOURCE[0]}")" && pwd
 }
