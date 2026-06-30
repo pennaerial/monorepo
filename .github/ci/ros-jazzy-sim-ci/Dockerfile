@@ -54,4 +54,4 @@ RUN git clone --recursive https://github.com/pennaerial/PX4-Autopilot.git /root/
 # --- 4. Ground-station heartbeat dependency --------------------------------
 # scripts/ci/sim_smoke_test.py uses pymavlink to act as a minimal GCS, which
 # clears PX4's "no connection to the GCS" preflight check so the vehicle arms.
-RUN python3 -m pip install --no-cache-dir pymavlink
+RUN python3 -m pip install --no-cache-dir --break-system-packages pymavlink
