@@ -3,9 +3,10 @@ from time import time
 from px4_msgs.msg import VehicleStatus
 from std_srvs.srv import Trigger
 
-from uav.vehicles.AirframeClass import AirframeClass
-from uav.vehicles.Multicopter import Multicopter
 from uav.vehicles.VTOL import VTOL
+from uav.vehicles.Multicopter import Multicopter
+from uav.vehicles.AirframeClass import AirframeClass
+from uav.vehicles.UAV import UAV
 from uav.modes.LandingMode import LandingMode
 from vehicle_common.mode_manager import ModeManager
 from vehicle_common.runtime.mission_spec import MissionSpec
@@ -13,6 +14,7 @@ from vehicle_common.runtime.mission_spec import MissionSpec
 
 class UAVModeManager(ModeManager):
     """Mission manager for MAVLink/PX4 UAV vehicles."""
+    vehicle: UAV
 
     def __init__(
         self,
