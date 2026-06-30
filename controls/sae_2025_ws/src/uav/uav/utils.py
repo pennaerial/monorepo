@@ -119,6 +119,7 @@ def get_airframe_details(px4_path, airframe_id):
 
     if not matches:
         if not px4_path:
+            print(f"AIRFRAME_ID: {airframe_id}")
             fallback_class = airframe_class_fallback.get(int(airframe_id))
             if fallback_class is not None:
                 return fallback_class, ""
