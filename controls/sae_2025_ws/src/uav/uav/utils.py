@@ -21,11 +21,12 @@ vehicle_id_dict = {
 }
 # Resolves vehicle_class without a PX4 checkout; intended to eventually replace the ROMFS parse.
 airframe_class_fallback = {
-    4010: AirframeClass.MULTICOPTER,
     4003: AirframeClass.PLANE,
     4004: AirframeClass.VTOL,
-    4020: AirframeClass.VTOL,
+    4010: AirframeClass.MULTICOPTER,
+    4014: AirframeClass.MULTICOPTER,
     4018: AirframeClass.VTOL,
+    4020: AirframeClass.VTOL,
 }
 """
 Airframe IDs
