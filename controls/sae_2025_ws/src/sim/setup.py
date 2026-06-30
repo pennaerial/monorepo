@@ -58,7 +58,11 @@ setup(
     maintainer_email="board@pennaerial.com",
     description="Simulation framework for UAV projects",
     license="MIT",
-    tests_require=["pytest"],
+    extras_require={
+        "test": [
+            "pytest",
+        ],
+    },
     entry_points={
         "console_scripts": [
             "hoop_course = sim.world_gen.HoopCourse:main",
