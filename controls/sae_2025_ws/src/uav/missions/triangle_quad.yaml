@@ -1,0 +1,20 @@
+modes:
+  start:
+    mode: uav.VerticalTakeoffMode
+    transitions:
+      complete: triangle
+
+  triangle:
+    mode: uav.NavGPSMode
+    params:
+      # Right triangle in NED LOCAL frame: +X north, +Y east, -Z up
+      # All corners at 10 m altitude (z = -10)
+      coordinates:
+        - [[10, 0, -10], 3, LOCAL]   # corner A — 10 m north
+        - [[10, 10, -10], 3, LOCAL]  # corner B — 10 m north, 10 m east
+        - [[0, 0, -10], 3, LOCAL]   # corner C — 10 m east
+    transitions:
+      complete: land
+
+  land:
+    mode: uav.LandingMode
