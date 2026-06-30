@@ -134,6 +134,24 @@ ci_px4_msgs_prefix() {
     echo "/opt/px4_msgs"
 }
 
+ci_px4_prefix() {
+    echo "/root/PX4-Autopilot"
+}
+
+# Build PX4 SITL at the checked-out submodule $1 and stamp the commit baked.
+ci_build_px4() {
+    local px4_path="$1"
+
+    ci_log "Building PX4 SITL from source at $px4_path"
+    (
+        cd "$px4_path"
+        export GZ_VERSION=harmonic
+        bash ./Tools/setup/ubuntu.sh --no-nuttx --no-sim-tools
+        make px4_sitl
+        git rev-parse HEAD > PINNED_COMMIT
+    )
+}
+
 # Build px4_msgs commit $1 (a commit SHA), and echo the exact commit baked so validation can detect submodule drift.
 ci_build_px4_msgs() {
     local commit="$1"

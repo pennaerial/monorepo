@@ -1,0 +1,52 @@
+name: ROS Sim Validate
+
+on:
+  push:
+    branches: [main, master, integration]
+    paths:
+      - ".github/workflows/ros-sim-validate.yml"
+      - "controls/sae_2025_ws/**"
+      - "!controls/sae_2025_ws/src/integration/**"
+  pull_request:
+    branches: [main, master]
+    paths:
+      - ".github/workflows/ros-sim-validate.yml"
+      - ".github/ci/**"
+      - "controls/sae_2025_ws/**"
+      - "!controls/sae_2025_ws/src/integration/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: ros-sim-validate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate_headless_sim:
+    name: Validate Headless Sim
+    runs-on: ubuntu-22.04
+    container:
+      image: ${{ vars.ROS_SIM_CI_IMAGE_AMD64 }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Mark checkout as safe
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE" || true
+
+      - name: Build ROS workspace
+        env:
+          INSTALL_DEPS: "0"
+        run: bash controls/sae_2025_ws/scripts/ci/validate_ros_workspace.sh
+
+      - name: Validate headless sim
+        run: bash controls/sae_2025_ws/scripts/ci/validate_sim_headless.sh
