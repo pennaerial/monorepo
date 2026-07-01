@@ -20,6 +20,7 @@ ci_install_system_packages \
     python3-pytest \
     python3-rosdep \
     ros-"$ROS_DISTRO"-cv-bridge \
+    ros-"$ROS_DISTRO"-generate-parameter-library \
     ros-"$ROS_DISTRO"-gps-msgs \
     ros-"$ROS_DISTRO"-pluginlib \
     ros-"$ROS_DISTRO"-vision-msgs
