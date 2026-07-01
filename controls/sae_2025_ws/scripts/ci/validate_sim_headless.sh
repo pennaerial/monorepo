@@ -15,6 +15,9 @@ WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(ci_workspace_root)}"
 
 cd "$WORKSPACE_ROOT"
 ci_source_ros
+
+# sim_interfaces (needs ros_gz) is used by the world/scoring nodes
+colcon build --packages-select sim_interfaces
 ci_source_workspace "$WORKSPACE_ROOT"
 
 # Prefer the PX4 SITL baked into the sim image; build from source if absent.
