@@ -5,6 +5,8 @@ on:
     branches: [main, master, integration]
     paths:
       - ".github/workflows/ros-sim-validate.yml"
+      - ".gitmodules"
+      - "PX4-Autopilot"
       - "controls/sae_2025_ws/**"
       - "!controls/sae_2025_ws/src/integration/**"
   pull_request:
@@ -12,6 +14,8 @@ on:
     paths:
       - ".github/workflows/ros-sim-validate.yml"
       - ".github/ci/**"
+      - ".gitmodules"
+      - "PX4-Autopilot"
       - "controls/sae_2025_ws/**"
       - "!controls/sae_2025_ws/src/integration/**"
   workflow_dispatch:
