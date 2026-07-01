@@ -16,6 +16,7 @@ nav:
   - Getting Started: getting-started.md
   - Concepts: concepts.md
   - Packages: packages/
+  - Hardware Integration: hardware-integration.md
   - API Reference:
     - Python: reference/
     - C++:
