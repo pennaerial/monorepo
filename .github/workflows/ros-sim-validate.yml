@@ -50,7 +50,7 @@ jobs:
       - name: Build ROS workspace
         env:
           INSTALL_DEPS: "0"
-        run: bash controls/sae_2025_ws/scripts/ci/validate_ros_workspace.sh
+        run: bash controls/sae_2025_ws/scripts/ci/build_ros_workspace.sh
 
       - name: Validate headless sim
         run: bash controls/sae_2025_ws/scripts/ci/validate_sim_headless.sh

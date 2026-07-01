@@ -14,8 +14,6 @@ on:
       - ".github/workflows/ci-image.yml"
       - ".github/ci/**"
       - "controls/sae_2025_ws/**"
-      - "controls/sae_2025_ws/scripts/ci/common.sh"
-      - "controls/sae_2025_ws/scripts/ci/install_ros_ci_deps.sh"
       - "!controls/sae_2025_ws/src/integration/**"
   workflow_dispatch:
 
