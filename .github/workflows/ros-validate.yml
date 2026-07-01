@@ -39,6 +39,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Mark checkout as safe
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE" || true
+
       - name: Checkout ROS workspace submodules
         run: |
           git submodule sync -- \
