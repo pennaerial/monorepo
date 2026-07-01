@@ -64,7 +64,8 @@ trap cleanup EXIT
 
 ci_log "Launching headless sim (log: $LAUNCH_LOG)"
 # setsid puts the launch in its own process group so cleanup can kill it whole.
-setsid ros2 launch uav main.launch.py px4_path:="$PX4_PATH" >"$LAUNCH_LOG" 2>&1 &
+# xvfb-run gives gz's ogre render engine an X display in this headless env.
+setsid xvfb-run -a ros2 launch uav main.launch.py px4_path:="$PX4_PATH" >"$LAUNCH_LOG" 2>&1 &
 LAUNCH_PGID=$(ps -o pgid= "$!" | tr -d ' ')
 
 ci_log "Running sim smoke test"

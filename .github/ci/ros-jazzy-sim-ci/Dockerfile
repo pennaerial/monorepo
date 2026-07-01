@@ -51,7 +51,18 @@ RUN git clone --recursive https://github.com/pennaerial/PX4-Autopilot.git /root/
     && git rev-parse HEAD > /root/PX4-Autopilot/PINNED_COMMIT \
     && rm -rf /var/lib/apt/lists/*
 
-# --- 4. Ground-station heartbeat dependency --------------------------------
-# scripts/ci/sim_smoke_test.py uses pymavlink to act as a minimal GCS, which
-# clears PX4's "no connection to the GCS" preflight check so the vehicle arms.
-RUN python3 -m pip install --no-cache-dir --break-system-packages pymavlink
+# Micro XRCE-DDS Agent (v2.4.3): PX4<->ROS2 px4_msgs/DDS bridge the mission node flies the vehicle through.
+ARG XRCE_AGENT_REF=v2.4.3
+# First pass (superbuild) builds Fast-CDR/Fast-DDS + the agent; second pass runs the now-present install into /usr/local.
+RUN git clone -b ${XRCE_AGENT_REF} --depth 1 \
+        https://github.com/eProsima/Micro-XRCE-DDS-Agent.git /tmp/xrce \
+    && cmake -S /tmp/xrce -B /tmp/xrce/build \
+    && cmake --build /tmp/xrce/build -j"$(nproc)" \
+    && cmake --build /tmp/xrce/build --target install \
+    && ldconfig /usr/local/lib \
+    && rm -rf /tmp/xrce
+
+# xvfb + mesa give gz's ogre camera rendering a headless display+GL; pymavlink backs the smoke-test GCS.
+RUN apt-get update && apt-get install -y --no-install-recommends xvfb libgl1-mesa-dri \
+    && rm -rf /var/lib/apt/lists/* \
+    && python3 -m pip install --no-cache-dir --break-system-packages pymavlink
