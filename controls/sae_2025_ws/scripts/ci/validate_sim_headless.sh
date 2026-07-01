@@ -16,6 +16,9 @@ WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(ci_workspace_root)}"
 cd "$WORKSPACE_ROOT"
 ci_source_ros
 
+# px4_msgs is prebuilt into the image as a separate overlay, not the workspace.
+ci_source_setup "$(ci_px4_msgs_prefix)/setup.sh"
+
 # sim_interfaces (needs ros_gz) is used by the world/scoring nodes
 colcon build --packages-select sim_interfaces
 ci_source_workspace "$WORKSPACE_ROOT"
