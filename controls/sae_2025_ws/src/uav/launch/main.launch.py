@@ -213,7 +213,7 @@ def _single_vehicle_config(context, params: dict) -> tuple[dict, dict | None]:
     auto_launch = _yaml_bool_value(
         params.get("auto_launch", True), name="auto_launch", default=True
     )
-    default_vehicle_name = "uav" if mission_spec.is_uav else "payload_0"
+    default_vehicle_name = "uav_0" if mission_spec.is_uav else "payload_0"
     vehicle_name = _yaml_or_launch_string(
         context, "vehicle_name", params.get("vehicle_name") or default_vehicle_name
     )
