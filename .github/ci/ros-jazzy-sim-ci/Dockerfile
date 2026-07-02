@@ -2,11 +2,8 @@
 # simulation runtime (Gazebo Harmonic + a compiled PX4 SITL) so that per-PR sim
 # validation can `docker pull` a ready-to-run image instead of compiling PX4 on
 # every run.
-#
-# amd64 only: PX4 SITL does not cross-compile sanely under QEMU emulation, and
-# sim CI runs on amd64 runners.
 
-ARG BASE_IMAGE=ghcr.io/pennaerial/sae-ros2-ci:jazzy-amd64
+ARG BASE_IMAGE
 FROM ${BASE_IMAGE}
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -20,7 +17,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         curl gnupg lsb-release \
     && curl -fsSL https://packages.osrfoundation.org/gazebo.gpg \
         -o /usr/share/keyrings/pkgs-osrf-archive-keyring.gpg \
-    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg] http://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main" \
+    && arch="$(dpkg --print-architecture)" \
+    && echo "deb [arch=${arch} signed-by=/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg] http://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main" \
         > /etc/apt/sources.list.d/gazebo-stable.list \
     && apt-get update && apt-get install -y --no-install-recommends \
         gz-harmonic \

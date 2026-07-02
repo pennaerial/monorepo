@@ -72,11 +72,20 @@ jobs:
           cache-to: type=gha,mode=max,scope=ci-image-${{ matrix.arch }}
 
   build_sim_image:
-    name: Build sim CI image
-    # amd64-only and FROM the pushed base, so it only runs once the base exists.
+    name: Build ${{ matrix.arch }} sim CI image
     needs: build_image
     if: github.event_name != 'pull_request'
-    runs-on: ubuntu-22.04
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            platform: linux/amd64
+            runner: ubuntu-22.04
+          - arch: arm64
+            platform: linux/arm64
+            runner: ubuntu-22.04-arm
 
     steps:
       - name: Checkout repository
@@ -97,12 +106,12 @@ jobs:
         with:
           context: .
           file: .github/ci/ros-jazzy-sim-ci/Dockerfile
-          platforms: linux/amd64
+          platforms: ${{ matrix.platform }}
           push: true
           build-args: |
-            BASE_IMAGE=${{ env.IMAGE_NAME }}:jazzy-amd64
+            BASE_IMAGE=${{ env.IMAGE_NAME }}:jazzy-${{ matrix.arch }}
           tags: |
-            ${{ env.IMAGE_NAME }}:jazzy-sim-amd64
-            ${{ env.IMAGE_NAME }}:sim-sha-${{ github.sha }}-amd64
-          cache-from: type=gha,scope=sim-image-amd64
-          cache-to: type=gha,mode=max,scope=sim-image-amd64
+            ${{ env.IMAGE_NAME }}:jazzy-sim-${{ matrix.arch }}
+            ${{ env.IMAGE_NAME }}:sim-sha-${{ github.sha }}-${{ matrix.arch }}
+          cache-from: type=gha,scope=sim-image-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=sim-image-${{ matrix.arch }}
