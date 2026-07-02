@@ -30,10 +30,20 @@ concurrency:
 
 jobs:
   validate_headless_sim:
-    name: Validate Headless Sim
-    runs-on: ubuntu-22.04
+    name: Validate Headless Sim (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-22.04
+            image_var: ROS_SIM_CI_IMAGE_AMD64
+          - arch: arm64
+            runner: ubuntu-22.04-arm
+            image_var: ROS_SIM_CI_IMAGE_ARM64
     container:
-      image: ${{ vars.ROS_SIM_CI_IMAGE_AMD64 }}
+      image: ${{ vars[matrix.image_var] }}
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
