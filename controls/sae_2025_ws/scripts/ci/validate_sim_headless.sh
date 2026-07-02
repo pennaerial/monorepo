@@ -44,8 +44,6 @@ PX4_PATH="$PX4_PREFIX"
 
 # Run Gazebo/PX4 with no GUI and software rendering (handled in sim.launch.py).
 export SAE_SIM_HEADLESS=1
-export PX4_SIM_SPEED_FACTOR=5
-ci_log "PX4_SIM_SPEED_FACTOR=$PX4_SIM_SPEED_FACTOR"
 
 LAUNCH_LOG="$(mktemp)"
 LAUNCH_PGID=""
