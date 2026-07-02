@@ -2,10 +2,17 @@
 This page contains all of our knowledge of setting up drones/planes for our ROS2/PX4 stack. Steps for setting up flight controllers, hardware testing between Pis and FCs, and common flight test failures and how to fix them.
 
 
+## **PX4 Flight Controller Setup**
+
+#### **Power Setup**
+If using power module (HolyBro QAV 250) make sure power readings are calibrated. You don't really need to do this often but it is always good to check. Bad power calibrations can cause random battery failsafes if battery is at a medium to medium high voltage. [QGC Power Setup](https://docs.qgroundcontrol.com/master/en/qgc-user-guide/setup_view/power.html)
+
+
+
 ## **HITL Testing**
 Many problems encountered during flight tests can be prevented by testing each hardware component beforehand. The follow section will cover tests to make sure PX4 is working properly, individual Pi tests and finally Pi + Pixhawk tests.
 
-### **Pi &harr; Pixhawk Middleware**
+#### **Pi &harr; Pixhawk Middleware**
 
 [Reference: PX4 docs](https://docs.px4.io/main/en/companion_computer/pixhawk_rpi)
 
