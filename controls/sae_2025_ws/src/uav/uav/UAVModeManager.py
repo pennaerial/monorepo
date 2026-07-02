@@ -14,6 +14,7 @@ from vehicle_common.runtime.mission_spec import MissionSpec
 
 class UAVModeManager(ModeManager):
     """Mission manager for MAVLink/PX4 UAV vehicles."""
+
     vehicle: UAV
 
     def __init__(
