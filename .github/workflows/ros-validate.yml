@@ -27,10 +27,20 @@ concurrency:
 
 jobs:
   validate_ros2_workspace_ci_image:
-    name: Validate ROS 2 Workspace
-    runs-on: ubuntu-22.04
+    name: Validate ROS 2 Workspace (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-22.04
+            image_var: ROS_CI_IMAGE_AMD64
+          - arch: arm64
+            runner: ubuntu-22.04-arm
+            image_var: ROS_CI_IMAGE_ARM64
     container:
-      image: ${{ vars.ROS_CI_IMAGE_AMD64 }}
+      image: ${{ vars[matrix.image_var] }}
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
