@@ -15,7 +15,6 @@ SRC_DIR="$SCRIPT_DIR/../src"
 
 # Packages copied in a normal deploy — no sim, no Gazebo, no bridges.
 DEPLOY_PACKAGES=(
-	actuator_msgs
 	payload
 	payload_interfaces
 	px4_msgs

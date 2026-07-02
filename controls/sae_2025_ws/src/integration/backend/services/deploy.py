@@ -26,7 +26,6 @@ _ARTIFACT_NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 _SOURCE_BUNDLE_EXTENSIONS = (".tar.gz", ".tgz", ".zip")
 _RELEASE_METADATA_NAME = "RELEASE_METADATA.yaml"
 _LOCAL_SOURCE_BASE_PACKAGES = [
-    "actuator_msgs",
     "payload_interfaces",
     "px4_msgs",
     "uav_interfaces",

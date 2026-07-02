@@ -134,14 +134,7 @@ You might run into the following issues during the build process. Here are solut
     sudo apt-get install vision-msgs
     ```
 
-4. **Missing `actuator_msgs`**: If you encounter issues with `Findactuator_msgs.cmake`, clone the repository into `src`:
-
-    ```bash
-    cd ~/{path_to_monorepo}/controls/sae_2025_ws/src
-    git clone git@github.com:rudislabs/actuator_msgs.git
-    ```
-
-5. **Mac Specific: Gazebo Crashing**: If Gazebo is crashing updating from `PX4-Autopilot` to `1.17`
+4. **Mac Specific: Gazebo Crashing**: If Gazebo is crashing updating from `PX4-Autopilot` to `1.17`
 
     Navigate to the PX4 installation and add `--render-engine=ogre` to `simulation-gazebo` (should be line 97). The result should be:
     ```python

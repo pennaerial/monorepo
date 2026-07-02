@@ -8,7 +8,7 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(ci_workspace_root)}"
 
-VENDORED_PACKAGES=(px4_msgs actuator_msgs)
+VENDORED_PACKAGES=(px4_msgs)
 
 cd "$WORKSPACE_ROOT"
 

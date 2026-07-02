@@ -45,10 +45,8 @@ jobs:
       - name: Checkout ROS workspace submodules
         run: |
           git submodule sync -- \
-            controls/sae_2025_ws/src/actuator_msgs \
             controls/sae_2025_ws/src/px4_msgs
           git submodule update --init --depth=1 -- \
-            controls/sae_2025_ws/src/actuator_msgs \
             controls/sae_2025_ws/src/px4_msgs
 
       - name: Detect CI bootstrap changes
