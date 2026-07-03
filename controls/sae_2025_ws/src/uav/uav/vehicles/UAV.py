@@ -45,7 +45,6 @@ class UAV(Vehicle):
     def __init__(
         self,
         node: Node,
-        takeoff_amount=5.0,
         DEBUG=False,
         camera_offsets=[0, 0, 0],
         vehicle_name: str = "uav",
@@ -90,7 +89,6 @@ class UAV(Vehicle):
         self.roll = None
         self.pitch = None
         self.yaw = None
-        self.takeoff_amount = takeoff_amount
         self.attempted_takeoff = False
 
         # Initialize drone position
