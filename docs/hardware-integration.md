@@ -7,6 +7,14 @@ This page contains all of our knowledge of setting up drones/planes for our ROS2
 #### **Power Setup**
 If using power module (HolyBro QAV 250) make sure power readings are calibrated. You don't really need to do this often but it is always good to check. Bad power calibrations can cause random battery failsafes if battery is at a medium to medium high voltage. [QGC Power Setup](https://docs.qgroundcontrol.com/master/en/qgc-user-guide/setup_view/power.html)
 
+#### **Radio Control**
+
+If running a new test it is always a good idea to have manual override in case something goes wrong.
+Connect Spektrum Radio transmitter/receiver pair to Pixhawk: (using an ORX R820X receiver, orange looking rectangle)
+- Take 3 pin &harr; 3 pin servo wire to aux 3 on receiver and RC IN on pixhawk AND also a jumper wire and connect the top and bottom pins of BIND port on receiver. You need both in order for the receiver to turn on. It should start flashing orange, which means it is in bind mode.
+- Take transmitter (controller) and hold the bind button as you power it on. Keep holding bind button until bind is complete. The light on the receiver should be a steady orange now. Then unplug everything from the receiver. Move the servo wire from AUX 3 to the BIND port (transmitter should still be on) and the steady orange light should come back on.
+- If you go to QGC > Radio and move sticks around you should see the channel inputs moving.
+
 
 
 ## **HITL Testing**
