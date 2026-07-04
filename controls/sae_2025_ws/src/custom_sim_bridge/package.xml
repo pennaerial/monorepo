@@ -15,11 +15,15 @@
   <depend>generate_parameter_library</depend>
   <depend>custom_gz_msgs</depend>
   
-  <build_depend>gz-transport13</build_depend>
-  <build_depend>gz-msgs10</build_depend>
+  <build_depend>gz_transport_vendor</build_depend>
+  <build_depend>gz_msgs_vendor</build_depend>
 
   <test_depend>ament_lint_auto</test_depend>
-  <test_depend>ament_lint_common</test_depend>
+  <!-- ruff owns Python style; declare the relevant lints accordingly -->
+  <test_depend>ament_cmake_cppcheck</test_depend>
+  <test_depend>ament_cmake_lint_cmake</test_depend>
+  <test_depend>ament_cmake_uncrustify</test_depend>
+  <test_depend>ament_cmake_xmllint</test_depend>
 
   <export>
     <build_type>ament_cmake</build_type>

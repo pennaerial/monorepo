@@ -4,7 +4,7 @@ Gazebo Harmonic simulation backend — world generation, multi-vehicle spawning,
 
 ## Extra Dependency
 ```bash
-sudo apt install ros-humble-tf-transformations
+sudo apt install ros-jazzy-tf-transformations
 python3 -m pip install "pydantic>=2,<3"
 ```
 

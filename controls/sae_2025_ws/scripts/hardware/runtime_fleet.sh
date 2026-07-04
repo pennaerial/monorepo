@@ -15,7 +15,7 @@ fi
 
 CURRENT_RELEASE="${CURRENT_RELEASE:-$DEPLOY_ROOT/current}"
 RUNTIME_CONFIG="${RUNTIME_FLEET_CONFIG:-$DEPLOY_ROOT/config/runtime_fleet.yaml}"
-ROS_SETUP="${ROS_SETUP:-/opt/ros/humble/setup.bash}"
+ROS_SETUP="${ROS_SETUP:-/opt/ros/jazzy/setup.bash}"
 
 info() {
     printf '[INFO] %s\n' "$*"

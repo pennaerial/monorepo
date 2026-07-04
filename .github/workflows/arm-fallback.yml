@@ -16,7 +16,7 @@ jobs:
     name: Build Raspberry Pi Artifact (fallback container)
     runs-on: ubuntu-22.04-arm
     container:
-      image: ros:humble-ros-base
+      image: ros:jazzy-ros-base
 
     steps:
       - name: Checkout repository

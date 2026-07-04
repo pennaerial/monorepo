@@ -9,8 +9,8 @@
 
   <buildtool_depend>ament_cmake</buildtool_depend>
   <buildtool_depend>sae_gz_cmake</buildtool_depend>
-  <build_depend>gz-cmake3</build_depend>
-  <depend>gz-msgs10</depend>
+  <build_depend>gz_cmake_vendor</build_depend>
+  <depend>gz_msgs_vendor</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

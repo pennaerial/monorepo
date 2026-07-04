@@ -131,7 +131,7 @@ Keep physical Pi identity in the hostname. Use inventory `vehicle_name` for the 
 
 Notes:
 - run the provisioning script on the Pi itself
-- ROS 2 Humble still needs to exist on the Pi at `/opt/ros/humble`
+- ROS 2 Humble still needs to exist on the Pi at `/opt/ros/jazzy`
 - the default travel-router profile is `pennair_5G` / `pennair123!`, and the default fallback AP PSK is also `pennair123!`; override them with `--travel-router-ssid`, `--travel-router-psk`, and `--fallback-psk` if needed
 - bootstrap-time fallback targeting is still host-based via `--allowed-ap-hosts`, but that list is optional; if omitted, client-mode Pis discover any visible PennAiR fallback AP matching the configured prefix
 - the integration fleet deploy UI is vehicle-based and resolves vehicles to hostnames at deploy time

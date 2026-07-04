@@ -23,6 +23,11 @@ setup(
     maintainer_email="yuzhiliu8@gmail.com",
     description="UDP middleware node bridging isolated ROS2 graphs across a local network",
     license="TODO: License declaration",
+    extras_require={
+        "test": [
+            "pytest",
+        ],
+    },
     entry_points={
         "console_scripts": [
             "bridge_node = udp_bridge.bridge_node:main",

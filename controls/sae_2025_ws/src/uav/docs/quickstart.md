@@ -11,7 +11,7 @@ Sim-first onboarding for the UAV framework.
 
 ## Build And Source
 ```bash
-source /opt/ros/humble/setup.bash
+source /opt/ros/jazzy/setup.bash
 cd /home/ubuntu/monorepo/controls/sae_2025_ws
 colcon build --packages-select sim uav payload
 source install/setup.bash

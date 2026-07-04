@@ -2833,6 +2833,58 @@
         "complete"
       ]
     },
+    "uav.VerticalTakeoffMode": {
+      "class_name": "VerticalTakeoffMode",
+      "class_path": "uav.modes.VerticalTakeoffMode",
+      "description": "Vertical takeoff for any UAV airframe (multicopter or VTOL).",
+      "display_name": "VerticalTakeoffMode",
+      "mission_target": "uav",
+      "mode_id": "uav.VerticalTakeoffMode",
+      "module_path": "uav.modes.VerticalTakeoffMode",
+      "param_fields": [
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 5.0,
+          "default_kind": "value",
+          "name": "takeoff_height",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "str"
+          },
+          "default": "PX4_AUTO",
+          "default_kind": "value",
+          "name": "takeoff_method",
+          "required": false
+        }
+      ],
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "takeoff_height": {
+            "default": 5.0,
+            "title": "Takeoff Height",
+            "type": "number"
+          },
+          "takeoff_method": {
+            "default": "PX4_AUTO",
+            "title": "Takeoff Method",
+            "type": "string"
+          }
+        },
+        "title": "VerticalTakeoffModeParams",
+        "type": "object"
+      },
+      "peer_vehicle_names": [],
+      "required_vision_nodes": [],
+      "requires_camera": false,
+      "transition_labels": [
+        "complete"
+      ]
+    },
     "uav.WaypointMission": {
       "class_name": "WaypointMission",
       "class_path": "uav.modes.WaypointMission",
@@ -2844,21 +2896,13 @@
       "param_fields": [
         {
           "annotation": {
-            "kind": "union",
-            "options": [
-              {
-                "item": {
-                  "item": {
-                    "kind": "float"
-                  },
-                  "kind": "list"
-                },
-                "kind": "list"
+            "item": {
+              "item": {
+                "kind": "float"
               },
-              {
-                "kind": "none"
-              }
-            ]
+              "kind": "list"
+            },
+            "kind": "list"
           },
           "default": null,
           "default_kind": "none",
@@ -2926,22 +2970,15 @@
             "type": "number"
           },
           "waypoints": {
-            "anyOf": [
-              {
-                "items": {
-                  "items": {
-                    "type": "number"
-                  },
-                  "type": "array"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
             "default": null,
-            "title": "Waypoints"
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "title": "Waypoints",
+            "type": "array"
           }
         },
         "title": "WaypointMissionParams",

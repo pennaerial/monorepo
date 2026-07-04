@@ -1794,7 +1794,7 @@ cd "$DEPLOY_ROOT"
 mkdir -p "$DEPLOY_ROOT/state/logs"
 export ROS_LOG_DIR="$DEPLOY_ROOT/state/logs"
 set +u
-source /opt/ros/humble/setup.bash
+source /opt/ros/jazzy/setup.bash
 source "$DEPLOY_ROOT/current/install/setup.bash"
 set -u
 exec ros2 launch uav fleet.launch.py fleet_file:="$DEPLOY_ROOT/config/runtime_fleet.yaml"
@@ -2147,7 +2147,7 @@ PY
         fi
 
         cd "$workspace_dir"
-        source /opt/ros/humble/setup.bash
+        source /opt/ros/jazzy/setup.bash
         source "$current_target/install/setup.bash"
         colcon build \
             --build-base "$build_dir" \

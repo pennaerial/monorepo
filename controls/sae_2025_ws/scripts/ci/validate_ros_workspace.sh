@@ -7,7 +7,8 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 . "$SCRIPT_DIR/common.sh"
 
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(ci_workspace_root)}"
-ROS_DISTRO="${ROS_DISTRO:-humble}"
+ROS_DISTRO="${ROS_DISTRO:-jazzy}"
+# LIVE_PYTEST_TARGETS="${LIVE_PYTEST_TARGETS:-src/uav/test/test_peer_stack_reconnect.py}"
 INSTALL_DEPS="${INSTALL_DEPS:-1}"
 
 # px4_msgs is left off because it is prebuilt into CI image

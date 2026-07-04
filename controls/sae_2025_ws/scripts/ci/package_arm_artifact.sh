@@ -7,7 +7,7 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 . "$SCRIPT_DIR/common.sh"
 
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(ci_workspace_root)}"
-ROS_DISTRO="${ROS_DISTRO:-humble}"
+ROS_DISTRO="${ROS_DISTRO:-jazzy}"
 SHORT_SHA="${SHORT_SHA:-$(git -C "$WORKSPACE_ROOT" rev-parse --short HEAD 2>/dev/null || echo "${GITHUB_SHA:0:7}")}"
 BUILD_TIME="${BUILD_TIME:-$(date -u +%Y%m%d-%H%M%S)}"
 BRANCH_NAME="${BRANCH_NAME:-$(git -C "$WORKSPACE_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "${GITHUB_REF_NAME:-unknown}")}"

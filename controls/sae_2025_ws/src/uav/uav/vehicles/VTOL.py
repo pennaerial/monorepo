@@ -22,7 +22,6 @@ class VTOL(UAV):
     def __init__(
         self,
         node: Node,
-        takeoff_amount=5.0,
         DEBUG=False,
         camera_offsets=[0, 0, 0],
         vehicle_name: str = "uav",
@@ -35,7 +34,6 @@ class VTOL(UAV):
 
         super().__init__(
             node,
-            takeoff_amount,
             DEBUG,
             camera_offsets,
             vehicle_name=vehicle_name,
