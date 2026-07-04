@@ -2841,10 +2841,40 @@
       "mission_target": "uav",
       "mode_id": "uav.VerticalTakeoffMode",
       "module_path": "uav.modes.VerticalTakeoffMode",
-      "param_fields": [],
+      "param_fields": [
+        {
+          "annotation": {
+            "kind": "float"
+          },
+          "default": 5.0,
+          "default_kind": "value",
+          "name": "takeoff_height",
+          "required": false
+        },
+        {
+          "annotation": {
+            "kind": "str"
+          },
+          "default": "PX4_AUTO",
+          "default_kind": "value",
+          "name": "takeoff_method",
+          "required": false
+        }
+      ],
       "params_schema": {
         "additionalProperties": false,
-        "properties": {},
+        "properties": {
+          "takeoff_height": {
+            "default": 5.0,
+            "title": "Takeoff Height",
+            "type": "number"
+          },
+          "takeoff_method": {
+            "default": "PX4_AUTO",
+            "title": "Takeoff Method",
+            "type": "string"
+          }
+        },
         "title": "VerticalTakeoffModeParams",
         "type": "object"
       },
