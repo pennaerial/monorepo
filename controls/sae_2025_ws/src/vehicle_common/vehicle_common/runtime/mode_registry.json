@@ -2833,6 +2833,28 @@
         "complete"
       ]
     },
+    "uav.VerticalTakeoffMode": {
+      "class_name": "VerticalTakeoffMode",
+      "class_path": "uav.modes.VerticalTakeoffMode",
+      "description": "Vertical takeoff for any UAV airframe (multicopter or VTOL).",
+      "display_name": "VerticalTakeoffMode",
+      "mission_target": "uav",
+      "mode_id": "uav.VerticalTakeoffMode",
+      "module_path": "uav.modes.VerticalTakeoffMode",
+      "param_fields": [],
+      "params_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "title": "VerticalTakeoffModeParams",
+        "type": "object"
+      },
+      "peer_vehicle_names": [],
+      "required_vision_nodes": [],
+      "requires_camera": false,
+      "transition_labels": [
+        "complete"
+      ]
+    },
     "uav.WaypointMission": {
       "class_name": "WaypointMission",
       "class_path": "uav.modes.WaypointMission",

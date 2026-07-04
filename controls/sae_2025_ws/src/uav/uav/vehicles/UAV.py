@@ -45,7 +45,6 @@ class UAV(Vehicle):
     def __init__(
         self,
         node: Node,
-        takeoff_amount=5.0,
         DEBUG=False,
         camera_offsets=[0, 0, 0],
         vehicle_name: str = "uav",
@@ -90,7 +89,6 @@ class UAV(Vehicle):
         self.roll = None
         self.pitch = None
         self.yaw = None
-        self.takeoff_amount = takeoff_amount
         self.attempted_takeoff = False
 
         # Initialize drone position
@@ -182,7 +180,7 @@ class UAV(Vehicle):
         )
         self.node.get_logger().info("Switching to offboard mode")
 
-    def takeoff(self):
+    def takeoff(self, takeoff_height=5.0):
         """
         Command the UAV to take off to the specified altitude.
         This uses a NAV_TAKEOFF command; actual behavior depends on PX4 mode.
@@ -192,7 +190,7 @@ class UAV(Vehicle):
             lat = self.global_position.lat
             lon = self.global_position.lon
             alt = self.global_position.alt
-            takeoff_gps = (lat, lon, alt + self.takeoff_amount)
+            takeoff_gps = (lat, lon, alt + takeoff_height)
             self._send_vehicle_command(
                 VehicleCommand.VEHICLE_CMD_NAV_TAKEOFF,
                 params={

@@ -21,11 +21,12 @@ vehicle_id_dict = {
 }
 # Resolves vehicle_class without a PX4 checkout; intended to eventually replace the ROMFS parse.
 airframe_class_fallback = {
-    4010: AirframeClass.MULTICOPTER,
     4003: AirframeClass.PLANE,
     4004: AirframeClass.VTOL,
-    4020: AirframeClass.VTOL,
+    4010: AirframeClass.MULTICOPTER,
+    4014: AirframeClass.MULTICOPTER,
     4018: AirframeClass.VTOL,
+    4020: AirframeClass.VTOL,
 }
 """
 Airframe IDs
@@ -117,10 +118,10 @@ def get_airframe_details(px4_path, airframe_id):
     )
 
     if not matches:
-        if not px4_path:
-            fallback_class = airframe_class_fallback.get(int(airframe_id))
-            if fallback_class is not None:
-                return fallback_class, ""
+        print(f"AIRFRAME_ID: {airframe_id}")
+        fallback_class = airframe_class_fallback.get(int(airframe_id))
+        if fallback_class is not None:
+            return fallback_class, ""
         print(f"Warning: Airframe ID {airframe_id} not found in {airframes_dir}")
         return AirframeClass.UNKNOWN, "gz_ERROR"
 

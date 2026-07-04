@@ -9,7 +9,7 @@
 
   <depend>rclpy</depend>
   <depend>px4_msgs</depend>
-  <exec_depend>payload_controller</exec_depend>
+  <!-- <exec_depend>payload_controller</exec_depend> -->
   <depend>payload_interfaces</depend>
   <depend>sensor_msgs</depend>
   <depend>vehicle_common</depend>
