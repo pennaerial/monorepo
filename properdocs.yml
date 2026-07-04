@@ -13,14 +13,14 @@ theme:
 
 nav:
   - Home: index.md
-  - Getting Started: getting-started.md
+  - Getting Started: getting-started/
   - Concepts: concepts.md
   - Packages: packages/
   - Hardware Integration: hardware-integration.md
   - API Reference:
     - Python: reference/
     - C++:
-      - payload: payload/annotated.md
+      - payload_controller: payload_controller/annotated.md
       - custom_sim_bridge: custom_sim_bridge/annotated.md
       - custom_gz_plugins: custom_gz_plugins/annotated.md
   - Docs Setup: docs-setup.md
@@ -41,8 +41,8 @@ plugins:
   - section-index
   - mkdoxy:
       projects:
-        payload:
-          src-dirs: controls/sae_2025_ws/src/payload/include controls/sae_2025_ws/src/payload/src
+        payload_controller:
+          src-dirs: controls/sae_2025_ws/src/payload_controller/include controls/sae_2025_ws/src/payload_controller/src
           full-doc: true
           doxy-cfg:
             OUTPUT_LANGUAGE: English
