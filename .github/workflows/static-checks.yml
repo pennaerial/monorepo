@@ -41,11 +41,11 @@ jobs:
 
       - name: Check Ruff formatting
         working-directory: controls/sae_2025_ws
-        run: ruff --config .ruff.toml format --check --diff .
+        run: ruff format --check --diff .
 
       - name: Check Ruff lint
         working-directory: controls/sae_2025_ws
-        run: ruff --config .ruff.toml check .
+        run: ruff check .
 
       - name: Run actionlint
         uses: rhysd/actionlint@v1.7.8
