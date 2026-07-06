@@ -1,15 +1,11 @@
-.PHONY: sitl esp32s3
+.PHONY: linux esp32s3 set_cc
 
-sitl:
-	@if [ ! -f build/linux/CMakeCache.txt ]; then \
-		echo "Initializing Linux build directory..."; \
-		idf.py -B build/linux -D SDKCONFIG=sdkconfig.linux --preview set-target linux; \
+linux esp32s3:
+	@if [ ! -f build/$@/CMakeCache.txt ]; then \
+		echo "Initializing $@ build directory..."; \
+		idf.py -B build/$@ -D SDKCONFIG=sdkconfig.$@ $(if $(filter linux,$@),--preview) set-target $@; \
 	fi
-	idf.py -B build/linux build
+	idf.py -B build/$@ -D SDKCONFIG=sdkconfig.$@ build
 
-esp32s3:
-	@if [ ! -f build/esp32s3/CMakeCache.txt ]; then \
-		echo "Initializing ESP32-S3 build directory..."; \
-		idf.py -B build/esp32s3 -D SDKCONFIG=sdkconfig.esp32s3 set-target esp32s3; \
-	fi
-	idf.py -B build/esp32s3 build
+set_cc:
+	ln -sf build/$(TARGET)/compile_commands.json compile_commands.json
