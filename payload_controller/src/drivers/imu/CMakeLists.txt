@@ -3,7 +3,7 @@ set(priv_requires "")
 
 if(IDF_TARGET STREQUAL "linux")
     list(APPEND srcs "imu_sitl.cpp")
-    list(APPEND priv_requires "sim")
+    list(APPEND priv_requires "sitl")
 endif()
 
 idf_component_register(
