@@ -1,29 +1,56 @@
 #include "imu.hpp"
 
-#include <gz/transport/Node.hh>
+
+#include <cstddef>
+#include <gz/msgs/details/imu.pb.h>
 #include <memory>
-#include "sim_runtime.hpp"
+#include <gz/transport/Node.hh>
+#include <gz/msgs/imu.pb.h>
+#include "esp_log.h"
+#include "sitl_runtime.hpp"
+
+static const char* TAG = "IMU_SITL";
 
 namespace imu {
 
     class IMU_SITL : public IMU {
         public:
-            IMU_SITL() : sim_cfg_(sim::get_config()) {
-                gz_node_ = std::make_shared<gz::transport::Node>();
-            }
+            IMU_SITL() : sitl_cfg_(sitl::get_config()) { }
 
             void start() override {
-
+                char topic[128];
+                make_gz_topic(topic, sizeof(topic));
+                ESP_LOGI(TAG, "Subscribing to %s", topic);
+                node_.Subscribe(
+                    topic,
+                    &IMU_SITL::on_imu_msg,
+                    this
+                );
             }
 
+            void make_gz_topic(char* buf, size_t size) {
+                snprintf(
+                    buf,
+                    size,
+                    "/world/%s/model/%s/link/base_link/sensor/imu_sensor/imu",
+                    sitl_cfg_.gz_world,
+                    sitl_cfg_.gz_model
+                );
+            }
+
+            void on_imu_msg(const gz::msgs::IMU& msg) {
+                ESP_LOGI(TAG, "on_imu_msg");
+            }
+
+
         private:
-            std::shared_ptr<gz::transport::Node> gz_node_;
-            const sim::SimConfig sim_cfg_;
+            gz::transport::Node node_;
+            const sitl::SimConfig sitl_cfg_;
 
     };
 
-    std::shared_ptr<IMU> make_imu() {
-        return std::make_shared<imu::IMU_SITL>();
+    std::unique_ptr<IMU> make_imu() {
+        return std::make_unique<imu::IMU_SITL>();
 
     }
 

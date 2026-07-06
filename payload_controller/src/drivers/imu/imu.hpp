@@ -7,10 +7,11 @@ namespace imu {
 
     class IMU {
         public:
+            virtual ~IMU() = default;
             virtual void start() = 0;
     };
 
-    std::shared_ptr<IMU> make_imu();
+    std::unique_ptr<IMU> make_imu();
 }
 
 
