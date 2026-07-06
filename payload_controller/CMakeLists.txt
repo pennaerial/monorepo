@@ -6,6 +6,11 @@ if(IDF_TARGET STREQUAL "linux")
     set(COMPONENTS main)
 endif()
 
+set(EXTRA_COMPONENT_DIRS
+    "${CMAKE_CURRENT_LIST_DIR}/src"
+    "${CMAKE_CURRENT_LIST_DIR}/src/drivers"
+)
+
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(payload_controller)
 
