@@ -1,2 +1,2 @@
-idf_component_register(SRCS "payload_controller.c"
+idf_component_register(SRCS "payload_controller.cpp"
                     INCLUDE_DIRS ".")
