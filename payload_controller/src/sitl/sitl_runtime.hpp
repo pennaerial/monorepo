@@ -6,10 +6,11 @@
 #include <mutex>
 #include "esp_log.h"
 
-namespace sim {
+namespace sitl {
 
     struct SimConfig {
-        std::string gz_model = "payload_0";
+        const char* gz_model = "payload_0";
+        const char* gz_world = "default";
     };
 
     const SimConfig& get_config();
