@@ -1,0 +1,5 @@
+# .gitignore
+sdkconfig
+sdkconfig.old
+sdkconfig.esp32s3
+sdkconfig.linux
