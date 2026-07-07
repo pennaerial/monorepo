@@ -17,8 +17,8 @@ modes:
     mode: uav.NavGPSMode
     params:
       coordinates:
-        - [[30, 30, -10], 2, LOCAL]
-      margin: 30
+        - [[0, 100, -10], 2, LOCAL]
+      margin: 40
     transitions:
       complete: transition_to_mc
 
