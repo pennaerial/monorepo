@@ -19,7 +19,7 @@ namespace imu {
 
             void start() override {
                 char topic[128];
-                make_gz_topic(topic, sizeof(topic));
+                make_imu_topic(topic, sizeof(topic));
                 ESP_LOGI(TAG, "Subscribing to %s", topic);
                 node_.Subscribe(
                     topic,
@@ -28,7 +28,13 @@ namespace imu {
                 );
             }
 
-            void make_gz_topic(char* buf, size_t size) {
+            /**
+             * @brief Writes the imu topic to a C-style char array
+             *
+             * @param[out] buf Buffer that the topic str is written to
+             * @param size size of the buffer. Use sizeof()
+             */
+            void make_imu_topic(char* buf, size_t size) {
                 snprintf(
                     buf,
                     size,
@@ -38,6 +44,11 @@ namespace imu {
                 );
             }
 
+            /**
+             * @brief callback function for imu topic. Runs in a gz background thread not managed by FreeRTOS Linux/POSIX simulator
+             *
+             * @param msg gz IMU message
+             */
             void on_imu_msg(const gz::msgs::IMU& msg) {
                 ESP_LOGI(TAG, "on_imu_msg");
             }
