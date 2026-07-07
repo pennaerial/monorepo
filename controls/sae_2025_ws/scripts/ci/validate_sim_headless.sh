@@ -1,10 +1,5 @@
 #!/usr/bin/env bash
 
-# Headless-sim CI validation: launch the full UAV sim stack with no display,
-# assert the vehicle arms / takes off / lands via sim_smoke_test.py, then tear
-# everything down. Intended as the single entrypoint a sim-validate workflow
-# calls, mirroring how validate_ros_workspace.sh is the entrypoint for unit CI.
-
 set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -44,36 +39,10 @@ PX4_PATH="$PX4_PREFIX"
 
 # Run Gazebo/PX4 with no GUI and software rendering (handled in sim.launch.py).
 export SAE_SIM_HEADLESS=1
+export PX4_PATH
 
-LAUNCH_LOG="$(mktemp)"
-LAUNCH_PGID=""
-
-cleanup() {
-    ci_log "Tearing down sim"
-    # Kill the whole launch process group: ros2 launch spawns gz, PX4, the DDS
-    # agent, and node processes as children.
-    if [[ -n "$LAUNCH_PGID" ]]; then
-        kill -- "-$LAUNCH_PGID" 2>/dev/null || true
-    fi
-    # Safety net for anything that detached from the group.
-    pkill -f "gz sim" 2>/dev/null || true
-    pkill -f "px4_sitl_default/bin/px4" 2>/dev/null || true
-    pkill -f "MicroXRCEAgent" 2>/dev/null || true
-}
-trap cleanup EXIT
-
-ci_log "Launching headless sim (log: $LAUNCH_LOG)"
-# setsid puts the launch in its own process group so cleanup can kill it whole.
+ci_log "Running headless sim launch_testing gate"
 # xvfb-run gives gz's ogre render engine an X display in this headless env.
-setsid xvfb-run -a ros2 launch uav main.launch.py px4_path:="$PX4_PATH" >"$LAUNCH_LOG" 2>&1 &
-LAUNCH_PGID=$(ps -o pgid= "$!" | tr -d ' ')
-
-ci_log "Running sim smoke test"
-if python3 "$SCRIPT_DIR/sim_smoke_test.py"; then
-    ci_log "Sim smoke test PASSED"
-else
-    status=$?
-    ci_log "Sim smoke test FAILED (exit $status). Launch log follows:"
-    cat "$LAUNCH_LOG" >&2
-    exit "$status"
-fi
+# test_sim_headless.py (a launch_testing test) launches uav's main.launch.py
+# and tears down every process it spawned itself
+xvfb-run -a python3 -m pytest -svx "$WORKSPACE_ROOT/src/uav/test/test_sim_headless.py"

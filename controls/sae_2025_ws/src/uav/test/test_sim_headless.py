@@ -1,0 +1,153 @@
+#!/usr/bin/env python3
+"""Headless sim CI gate: launches the basic UAV mission via main.launch.py and
+asserts, over MAVLink, that the vehicle ARMs, goes AIRBORNE, and LANDS again.
+
+Written as a launch_testing test (rather than a bash script driving a bare
+python process) so process teardown -- Gazebo, PX4 SITL, the MicroXRCEAgent
+bridge, and whatever ROS nodes main.launch.py starts -- is handled by the
+LaunchService itself. It tears down every process it started, transitively,
+with no per-process-name pkill list to maintain.
+
+Uses launch_params_ci.yaml rather than the default launch_params.yaml so
+CI stays decoupled from mission-config edits made for real flight tuning.
+
+Guarded by the pytest.importorskip below: pymavlink is only installed in the
+sim CI image (see .github/ci/ros-jazzy-sim-ci/Dockerfile), so this file is
+skipped -- not collected as an error -- when the plain (non-sim) CI runs
+`colcon test` over this same test/ directory.
+"""
+
+import os
+import threading
+import time
+import unittest
+
+from ament_index_python.packages import get_package_share_directory
+import launch
+from launch.actions import IncludeLaunchDescription
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+import launch_testing.actions
+import pytest
+
+mavutil = pytest.importorskip("pymavlink.mavutil")
+
+# PX4 SITL streams MAVLink to UDP 14550 (the port a ground station such as
+# QGroundControl listens on). We bind there and behave as that ground station.
+MAVLINK_ENDPOINT = "udpin:0.0.0.0:14550"
+
+# Whole-mission time budget. Overridable for slower/faster environments.
+TIMEOUT_S = float(os.environ.get("SIM_SMOKE_TIMEOUT", "180"))
+
+
+@pytest.mark.launch_test
+def generate_test_description():
+    px4_path = os.environ["PX4_PATH"]
+    params_file = os.path.join(
+        get_package_share_directory("uav"), "launch", "launch_params_ci.yaml"
+    )
+    main_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(get_package_share_directory("uav"), "launch", "main.launch.py")
+        ),
+        launch_arguments={
+            "px4_path": px4_path,
+            "params_file": params_file,
+        }.items(),
+    )
+    return launch.LaunchDescription(
+        [
+            main_launch,
+            launch_testing.actions.ReadyToTest(),
+        ]
+    )
+
+
+class TestBasicMission(unittest.TestCase):
+    @pytest.mark.live  # requires a running sim peer stack; excluded from CI by `-m "not live"`
+    def test_arms_takes_off_and_lands(self):
+        master = mavutil.mavlink_connection(MAVLINK_ENDPOINT)
+
+        print("waiting for PX4 heartbeat ...", flush=True)
+        self.assertIsNotNone(
+            master.wait_heartbeat(timeout=60), "no PX4 heartbeat within 60s"
+        )
+        print(
+            f"connected: sys {master.target_system} comp {master.target_component}",
+            flush=True,
+        )
+
+        # Send GCS heartbeats continuously for the whole flight
+        stop = threading.Event()
+
+        def heartbeat_loop():
+            while not stop.is_set():
+                master.mav.heartbeat_send(
+                    mavutil.mavlink.MAV_TYPE_GCS,
+                    mavutil.mavlink.MAV_AUTOPILOT_INVALID,
+                    0,
+                    0,
+                    0,
+                )
+                time.sleep(0.5)
+
+        threading.Thread(target=heartbeat_loop, daemon=True).start()
+
+        # Ask PX4 to stream EXTENDED_SYS_STATE so we can read landed_state
+        # (on-ground / in-air) to detect takeoff and landing.
+        master.mav.command_long_send(
+            master.target_system,
+            master.target_component,
+            mavutil.mavlink.MAV_CMD_SET_MESSAGE_INTERVAL,
+            0,
+            mavutil.mavlink.MAVLINK_MSG_ID_EXTENDED_SYS_STATE,
+            200000,
+            0,
+            0,
+            0,
+            0,
+            0,
+        )
+
+        armed = False
+        in_air = False
+        start = time.time()
+
+        try:
+            while time.time() - start < TIMEOUT_S:
+                msg = master.recv_match(
+                    type=["HEARTBEAT", "EXTENDED_SYS_STATE"],
+                    blocking=True,
+                    timeout=1,
+                )
+                if msg is None:
+                    continue
+                elapsed = time.time() - start
+
+                if (
+                    msg.get_type() == "HEARTBEAT"
+                    and msg.type != mavutil.mavlink.MAV_TYPE_GCS
+                ):
+                    is_armed = bool(
+                        msg.base_mode & mavutil.mavlink.MAV_MODE_FLAG_SAFETY_ARMED
+                    )
+                    if is_armed and not armed:
+                        armed = True
+                        print(f"[{elapsed:6.1f}s] ARMED", flush=True)
+
+                elif msg.get_type() == "EXTENDED_SYS_STATE":
+                    state = msg.landed_state
+                    if state == mavutil.mavlink.MAV_LANDED_STATE_IN_AIR and not in_air:
+                        in_air = True
+                        print(f"[{elapsed:6.1f}s] AIRBORNE (takeoff)", flush=True)
+                    elif state == mavutil.mavlink.MAV_LANDED_STATE_ON_GROUND and in_air:
+                        print(
+                            f"[{elapsed:6.1f}s] LANDED -- mission complete",
+                            flush=True,
+                        )
+                        return
+
+            self.fail(
+                f"TIMEOUT after {TIMEOUT_S:.0f}s (armed={armed}, airborne={in_air})"
+            )
+        finally:
+            stop.set()
