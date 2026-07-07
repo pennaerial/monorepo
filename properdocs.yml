@@ -18,11 +18,14 @@ nav:
   - Packages: packages/
   - Hardware Integration: hardware-integration.md
   - API Reference:
-    - Python: reference/
-    - C++:
-      - payload_controller: payload_controller/annotated.md
+    - SAE_2025_WS (Python): reference/
+    - SAE_2025_WS (C++):
+      - payload_controller (ROS node, deprecated): payload_controller_deprecated/annotated.md
       - custom_sim_bridge: custom_sim_bridge/annotated.md
       - custom_gz_plugins: custom_gz_plugins/annotated.md
+    - Payload Controller (C++):
+      - Classes: payload_controller/annotated.md
+      - Modules: payload_controller/modules.md
   - Docs Setup: docs-setup.md
 
 plugins:
@@ -42,6 +45,12 @@ plugins:
   - mkdoxy:
       projects:
         payload_controller:
+          src-dirs: payload_controller/main payload_controller/src
+          full-doc: true
+          doxy-cfg:
+            OUTPUT_LANGUAGE: English
+            EXTRACT_ALL: YES
+        payload_controller_deprecated:
           src-dirs: controls/sae_2025_ws/src/payload_controller/include controls/sae_2025_ws/src/payload_controller/src
           full-doc: true
           doxy-cfg:
