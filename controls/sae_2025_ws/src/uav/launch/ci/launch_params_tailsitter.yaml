@@ -1,16 +1,16 @@
-# launch_params_basic.yaml
+# launch_params_tailsitter.yaml
 
-mission_name: basic
+mission_name: simple_tailsitter
 vehicle_name: ""
 debug: true
 vision_debug: true
 auto_launch: true
 
-airframe: standard_vtol
+airframe: quadtailsitter
 custom_airframe_model: ""
 px4_instance: 0
 
-force_camera: true
+force_camera: false
 
 save_vision_milliseconds: 0
 camera_mount_offsets: [0.0, 0.0, 0.0]

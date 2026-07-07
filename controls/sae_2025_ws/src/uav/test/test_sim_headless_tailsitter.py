@@ -1,20 +1,11 @@
 #!/usr/bin/env python3
-"""Headless sim CI gate: launches the basic UAV mission via main.launch.py and
-asserts, over MAVLink, that the vehicle ARMs, goes AIRBORNE, and LANDS again.
+"""Headless sim CI gate: launches the simple_tailsitter UAV mission via
+main.launch.py and asserts, over MAVLink, that the vehicle ARMs, transitions
+MC -> FW -> MC, goes AIRBORNE, and LANDS again.
 
-Written as a launch_testing test (rather than a bash script driving a bare
-python process) so process teardown -- Gazebo, PX4 SITL, the MicroXRCEAgent
-bridge, and whatever ROS nodes main.launch.py starts -- is handled by the
-LaunchService itself. It tears down every process it started, transitively,
-with no per-process-name pkill list to maintain.
-
-Uses launch_params_basic.yaml rather than the default launch_params.yaml so
-CI stays decoupled from mission-config edits made for real flight tuning.
-
-Guarded by the pytest.importorskip below: pymavlink is only installed in the
-sim CI image (see .github/ci/ros-jazzy-sim-ci/Dockerfile), so this file is
-skipped -- not collected as an error -- when the plain (non-sim) CI runs
-`colcon test` over this same test/ directory.
+See test_sim_headless.py for the launch_testing / teardown rationale and the
+pytest.importorskip cross-CI skip behavior -- this file follows the same
+pattern, just for the standard_vtol airframe and simple_tailsitter mission.
 """
 
 import os
@@ -31,11 +22,8 @@ import pytest
 
 mavutil = pytest.importorskip("pymavlink.mavutil")
 
-# PX4 SITL streams MAVLink to UDP 14550 (the port a ground station such as
-# QGroundControl listens on). We bind there and behave as that ground station.
 MAVLINK_ENDPOINT = "udpin:0.0.0.0:14550"
 
-# Whole-mission time budget. Overridable for slower/faster environments.
 TIMEOUT_S = float(os.environ.get("SIM_SMOKE_TIMEOUT", "180"))
 
 
@@ -43,7 +31,10 @@ TIMEOUT_S = float(os.environ.get("SIM_SMOKE_TIMEOUT", "180"))
 def generate_test_description():
     px4_path = os.environ["PX4_PATH"]
     params_file = os.path.join(
-        get_package_share_directory("uav"), "launch", "ci", "launch_params_basic.yaml"
+        get_package_share_directory("uav"),
+        "launch",
+        "ci",
+        "launch_params_tailsitter.yaml",
     )
     main_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -62,9 +53,9 @@ def generate_test_description():
     )
 
 
-class TestBasicMission(unittest.TestCase):
+class TestTailsitterMission(unittest.TestCase):
     @pytest.mark.live  # requires a running sim peer stack; excluded from CI by `-m "not live"`
-    def test_arms_takes_off_and_lands(self):
+    def test_arms_transitions_and_lands(self):
         master = mavutil.mavlink_connection(MAVLINK_ENDPOINT)
 
         print("waiting for PX4 heartbeat ...", flush=True)
@@ -92,8 +83,7 @@ class TestBasicMission(unittest.TestCase):
 
         threading.Thread(target=heartbeat_loop, daemon=True).start()
 
-        # Ask PX4 to stream EXTENDED_SYS_STATE so we can read landed_state
-        # (on-ground / in-air) to detect takeoff and landing.
+        # Ask PX4 to stream EXTENDED_SYS_STATE so we can read landed_state and vtol_state
         master.mav.command_long_send(
             master.target_system,
             master.target_component,
@@ -110,6 +100,12 @@ class TestBasicMission(unittest.TestCase):
 
         armed = False
         in_air = False
+        expected_vtol_states = [
+            mavutil.mavlink.MAV_VTOL_STATE_TRANSITION_TO_FW,
+            mavutil.mavlink.MAV_VTOL_STATE_FW,
+            mavutil.mavlink.MAV_VTOL_STATE_TRANSITION_TO_MC,
+            mavutil.mavlink.MAV_VTOL_STATE_MC,
+        ]
         start = time.time()
 
         try:
@@ -135,11 +131,24 @@ class TestBasicMission(unittest.TestCase):
                         print(f"[{elapsed:6.1f}s] ARMED", flush=True)
 
                 elif msg.get_type() == "EXTENDED_SYS_STATE":
+                    if (
+                        expected_vtol_states
+                        and msg.vtol_state == expected_vtol_states[0]
+                    ):
+                        reached = expected_vtol_states.pop(0)
+                        print(f"[{elapsed:6.1f}s] VTOL_STATE -> {reached}", flush=True)
+
                     state = msg.landed_state
                     if state == mavutil.mavlink.MAV_LANDED_STATE_IN_AIR and not in_air:
                         in_air = True
                         print(f"[{elapsed:6.1f}s] AIRBORNE (takeoff)", flush=True)
                     elif state == mavutil.mavlink.MAV_LANDED_STATE_ON_GROUND and in_air:
+                        self.assertEqual(
+                            expected_vtol_states,
+                            [],
+                            f"landed before all VTOL transitions completed, "
+                            f"still pending: {expected_vtol_states}",
+                        )
                         print(
                             f"[{elapsed:6.1f}s] LANDED -- mission complete",
                             flush=True,
@@ -147,7 +156,8 @@ class TestBasicMission(unittest.TestCase):
                         return
 
             self.fail(
-                f"TIMEOUT after {TIMEOUT_S:.0f}s (armed={armed}, airborne={in_air})"
+                f"TIMEOUT after {TIMEOUT_S:.0f}s (armed={armed}, airborne={in_air}, "
+                f"pending_vtol_states={expected_vtol_states})"
             )
         finally:
             stop.set()
