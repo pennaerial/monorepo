@@ -43,7 +43,7 @@ TIMEOUT_S = float(os.environ.get("SIM_SMOKE_TIMEOUT", "180"))
 def generate_test_description():
     px4_path = os.environ["PX4_PATH"]
     params_file = os.path.join(
-        get_package_share_directory("uav"), "launch", "launch_params_ci.yaml"
+        get_package_share_directory("uav"), "launch", "ci", "launch_params_ci.yaml"
     )
     main_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(

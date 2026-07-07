@@ -6,7 +6,7 @@ debug: true
 vision_debug: true
 auto_launch: true
 
-airframe: standard_vtol
+airframe: quadcopter
 custom_airframe_model: ""
 px4_instance: 0
 
