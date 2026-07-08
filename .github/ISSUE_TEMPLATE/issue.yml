@@ -1,0 +1,42 @@
+name: Issue
+description: General Purpose Issue for Monorepo
+title: ''
+labels: []
+assignees: []
+body:
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - Minor
+        - Major
+        - Critical
+    validations:
+      required: true
+
+  - type: dropdown
+    id: type
+    attributes:
+      label: Type
+      options:
+        - Bug
+        - Issue
+        - Improvement
+        - Feature
+    validations:
+      required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary notes
+    validations:
+      required: false
+
+  - type: textarea
+    id: next-steps
+    attributes:
+      label: Suggested first steps
+    validations:
+      required: false
