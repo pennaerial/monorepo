@@ -26,8 +26,7 @@ class LandingMode(Mode):
         """
         Periodic logic for landing.
         """
-        # Once AUTO_LAND is active, stop publishing because our position-only TrajectorySetpoint (NaN velocity)
-        # poisons the uORB topic PX4's land detector reads, resetting its ground-contact timer and preventing auto-disarm.
+        # Let PX4 own the setpoint stream in AUTO_LAND so its land detector can auto-disarm.
         if self.vehicle.nav_state != VehicleStatus.NAVIGATION_STATE_AUTO_LAND:
             if self.vehicle.local_position:
                 self.vehicle.publish_position_setpoint(

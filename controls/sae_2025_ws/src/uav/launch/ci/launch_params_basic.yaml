@@ -1,5 +1,3 @@
-# launch_params_basic.yaml
-
 mission_name: basic
 vehicle_name: ""
 debug: true

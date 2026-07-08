@@ -1,5 +1,3 @@
-# launch_params_tailsitter.yaml
-
 mission_name: simple_tailsitter
 vehicle_name: ""
 debug: true

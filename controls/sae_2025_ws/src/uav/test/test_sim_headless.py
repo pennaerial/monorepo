@@ -1,18 +1,5 @@
 #!/usr/bin/env python3
-"""Headless sim CI gate: launches the basic UAV mission via main.launch.py and
-asserts, over MAVLink, that the vehicle ARMs, goes AIRBORNE, and LANDS again.
-
-Written as a launch_testing test (rather than a bash script driving a bare
-python process) so process teardown -- Gazebo, PX4 SITL, the MicroXRCEAgent
-bridge, and whatever ROS nodes main.launch.py starts -- is handled by the
-LaunchService itself. It tears down every process it started, transitively,
-with no per-process-name pkill list to maintain.
-
-Uses launch_params_basic.yaml rather than the default launch_params.yaml so
-CI stays decoupled from mission-config edits made for real flight tuning.
-
-Marked live so plain CI deselects this module with `-m "not live"`.
-"""
+"""Launch the basic sim mission and verify arm, takeoff, and landing."""
 
 import os
 import unittest
@@ -25,13 +12,11 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 import launch_testing.actions
 import pytest
 
+# Live marker prevents colcon test from running this test in non-sim CI
 pytestmark = pytest.mark.live
 
-# PX4 SITL streams MAVLink to UDP 14550 (the port a ground station such as
-# QGroundControl listens on). We bind there and behave as that ground station.
 MAVLINK_ENDPOINT = "udpin:0.0.0.0:14550"
 
-# Whole-mission time budget. Overridable for slower/faster environments.
 TIMEOUT_S = float(os.environ.get("SIM_SMOKE_TIMEOUT", "180"))
 
 

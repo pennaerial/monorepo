@@ -1,11 +1,5 @@
 #!/usr/bin/env python3
-"""Headless sim CI gate: launches the simple_tailsitter UAV mission via
-main.launch.py and asserts, over MAVLink, that the vehicle ARMs, transitions
-MC -> FW -> MC, goes AIRBORNE, and LANDS again.
-
-See test_sim_headless.py for the launch_testing / teardown rationale and live
-test gating pattern.
-"""
+"""Launch the tailsitter sim mission and verify the VTOL transition sequence."""
 
 import os
 import unittest
