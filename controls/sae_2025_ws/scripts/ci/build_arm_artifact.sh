@@ -31,10 +31,10 @@ colcon build \
     --packages-select payload payload_controller \
     --cmake-args -DBUILD_SIM=OFF
 
-ci_log "Building uav package"
-ci_source_workspace "$WORKSPACE_ROOT"
-colcon build --packages-select uav
-
 ci_log "Building tools package"
 ci_source_workspace "$WORKSPACE_ROOT"
 colcon build --packages-select tools
+
+ci_log "Building uav package"
+ci_source_workspace "$WORKSPACE_ROOT"
+colcon build --packages-select uav
