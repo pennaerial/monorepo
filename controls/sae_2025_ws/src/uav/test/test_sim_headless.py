@@ -18,11 +18,10 @@ skipped -- not collected as an error -- when the plain (non-sim) CI runs
 """
 
 import os
-import threading
-import time
 import unittest
 
 from ament_index_python.packages import get_package_share_directory
+from headless_ground_station import HeadlessGroundStation
 import launch
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -65,89 +64,17 @@ def generate_test_description():
 class TestBasicMission(unittest.TestCase):
     @pytest.mark.live  # requires a running sim peer stack; excluded from CI by `-m "not live"`
     def test_arms_takes_off_and_lands(self):
-        master = mavutil.mavlink_connection(MAVLINK_ENDPOINT)
-
-        print("waiting for PX4 heartbeat ...", flush=True)
-        self.assertIsNotNone(
-            master.wait_heartbeat(timeout=60), "no PX4 heartbeat within 60s"
-        )
-        print(
-            f"connected: sys {master.target_system} comp {master.target_component}",
-            flush=True,
-        )
-
-        # Send GCS heartbeats continuously for the whole flight
-        stop = threading.Event()
-
-        def heartbeat_loop():
-            while not stop.is_set():
-                master.mav.heartbeat_send(
-                    mavutil.mavlink.MAV_TYPE_GCS,
-                    mavutil.mavlink.MAV_AUTOPILOT_INVALID,
-                    0,
-                    0,
-                    0,
-                )
-                time.sleep(0.5)
-
-        threading.Thread(target=heartbeat_loop, daemon=True).start()
-
-        # Ask PX4 to stream EXTENDED_SYS_STATE so we can read landed_state
-        # (on-ground / in-air) to detect takeoff and landing.
-        master.mav.command_long_send(
-            master.target_system,
-            master.target_component,
-            mavutil.mavlink.MAV_CMD_SET_MESSAGE_INTERVAL,
-            0,
-            mavutil.mavlink.MAVLINK_MSG_ID_EXTENDED_SYS_STATE,
-            200000,
-            0,
-            0,
-            0,
-            0,
-            0,
-        )
-
-        armed = False
-        in_air = False
-        start = time.time()
-
-        try:
-            while time.time() - start < TIMEOUT_S:
-                msg = master.recv_match(
-                    type=["HEARTBEAT", "EXTENDED_SYS_STATE"],
-                    blocking=True,
-                    timeout=1,
-                )
-                if msg is None:
-                    continue
-                elapsed = time.time() - start
-
-                if (
-                    msg.get_type() == "HEARTBEAT"
-                    and msg.type != mavutil.mavlink.MAV_TYPE_GCS
-                ):
-                    is_armed = bool(
-                        msg.base_mode & mavutil.mavlink.MAV_MODE_FLAG_SAFETY_ARMED
-                    )
-                    if is_armed and not armed:
-                        armed = True
-                        print(f"[{elapsed:6.1f}s] ARMED", flush=True)
-
-                elif msg.get_type() == "EXTENDED_SYS_STATE":
-                    state = msg.landed_state
-                    if state == mavutil.mavlink.MAV_LANDED_STATE_IN_AIR and not in_air:
-                        in_air = True
-                        print(f"[{elapsed:6.1f}s] AIRBORNE (takeoff)", flush=True)
-                    elif state == mavutil.mavlink.MAV_LANDED_STATE_ON_GROUND and in_air:
-                        print(
-                            f"[{elapsed:6.1f}s] LANDED -- mission complete",
-                            flush=True,
-                        )
-                        return
-
-            self.fail(
-                f"TIMEOUT after {TIMEOUT_S:.0f}s (armed={armed}, airborne={in_air})"
+        with HeadlessGroundStation(
+            MAVLINK_ENDPOINT, mavutil_module=mavutil
+        ) as ground_station:
+            self.assertIsNotNone(
+                ground_station.connect(timeout_s=60), "no PX4 heartbeat within 60s"
             )
-        finally:
-            stop.set()
+            ground_station.start_heartbeats()
+            ground_station.request_extended_sys_state()
+            mission_deadline = ground_station.deadline(TIMEOUT_S)
+            try:
+                ground_station.wait_airborne(deadline=mission_deadline)
+                ground_station.wait_landed(deadline=mission_deadline)
+            except TimeoutError as exc:
+                self.fail(str(exc))
