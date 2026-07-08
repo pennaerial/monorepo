@@ -11,10 +11,7 @@ with no per-process-name pkill list to maintain.
 Uses launch_params_basic.yaml rather than the default launch_params.yaml so
 CI stays decoupled from mission-config edits made for real flight tuning.
 
-Guarded by the pytest.importorskip below: pymavlink is only installed in the
-sim CI image (see .github/ci/ros-jazzy-sim-ci/Dockerfile), so this file is
-skipped -- not collected as an error -- when the plain (non-sim) CI runs
-`colcon test` over this same test/ directory.
+Marked live so plain CI deselects this module with `-m "not live"`.
 """
 
 import os
@@ -28,7 +25,7 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 import launch_testing.actions
 import pytest
 
-mavutil = pytest.importorskip("pymavlink.mavutil")
+pytestmark = pytest.mark.live
 
 # PX4 SITL streams MAVLink to UDP 14550 (the port a ground station such as
 # QGroundControl listens on). We bind there and behave as that ground station.
@@ -62,8 +59,9 @@ def generate_test_description():
 
 
 class TestBasicMission(unittest.TestCase):
-    @pytest.mark.live  # requires a running sim peer stack; excluded from CI by `-m "not live"`
     def test_arms_takes_off_and_lands(self):
+        from pymavlink import mavutil
+
         with HeadlessGroundStation(
             MAVLINK_ENDPOINT, mavutil_module=mavutil
         ) as ground_station:

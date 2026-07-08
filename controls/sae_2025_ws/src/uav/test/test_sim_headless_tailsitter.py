@@ -3,9 +3,8 @@
 main.launch.py and asserts, over MAVLink, that the vehicle ARMs, transitions
 MC -> FW -> MC, goes AIRBORNE, and LANDS again.
 
-See test_sim_headless.py for the launch_testing / teardown rationale and the
-pytest.importorskip cross-CI skip behavior -- this file follows the same
-pattern, just for the standard_vtol airframe and simple_tailsitter mission.
+See test_sim_headless.py for the launch_testing / teardown rationale and live
+test gating pattern.
 """
 
 import os
@@ -19,7 +18,8 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 import launch_testing.actions
 import pytest
 
-mavutil = pytest.importorskip("pymavlink.mavutil")
+# Live marker prevents colcon test from running this test in non-sim CI
+pytestmark = pytest.mark.live
 
 MAVLINK_ENDPOINT = "udpin:0.0.0.0:14550"
 
@@ -53,8 +53,9 @@ def generate_test_description():
 
 
 class TestTailsitterMission(unittest.TestCase):
-    @pytest.mark.live  # requires a running sim peer stack; excluded from CI by `-m "not live"`
     def test_arms_transitions_and_lands(self):
+        from pymavlink import mavutil
+
         expected_vtol_states = [
             mavutil.mavlink.MAV_VTOL_STATE_TRANSITION_TO_FW,
             mavutil.mavlink.MAV_VTOL_STATE_FW,
