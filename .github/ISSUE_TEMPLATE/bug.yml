@@ -1,7 +1,7 @@
-name: Issue
-description: General Purpose Issue for Monorepo
-title: ''
-labels: []
+name: Bug Report
+description: Report something that's broken or not working as expected
+title: "[Bug]: "
+labels: ["bug"]
 assignees: []
 body:
   - type: dropdown
@@ -14,26 +14,19 @@ body:
         - Critical
     validations:
       required: true
-
-  - type: dropdown
-    id: type
-    attributes:
-      label: Type
-      options:
-        - Bug
-        - Issue
-        - Improvement
-        - Feature
-    validations:
-      required: true
-
   - type: textarea
     id: summary
     attributes:
-      label: Summary notes
+      label: Summary
+      description: What's happening, and what did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: repro-steps
+    attributes:
+      label: Steps to reproduce
     validations:
       required: false
-
   - type: textarea
     id: next-steps
     attributes:

@@ -1,0 +1,28 @@
+name: 📋 Task
+description: A general piece of work that doesn't fit into the bug or feature category
+title: "[Task]: "
+labels: ["task"]
+assignees: []
+body:
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - Minor
+        - Major
+        - Critical
+    validations:
+      required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary notes
+    validations:
+      required: true
+  - type: textarea
+    id: next-steps
+    attributes:
+      label: Suggested first steps
+    validations:
+      required: false
