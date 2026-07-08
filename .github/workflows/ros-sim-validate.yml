@@ -13,7 +13,6 @@ on:
     branches: [main, master]
     paths:
       - ".github/workflows/ros-sim-validate.yml"
-      - ".github/ci/**"
       - ".gitmodules"
       - "PX4-Autopilot"
       - "controls/sae_2025_ws/**"
@@ -64,6 +63,7 @@ jobs:
 
       - name: Build ROS workspace
         env:
+          # Sim CI image already bakes deps, px4_msgs, and PX4 SITL; image changes are validated by ci-image.
           INSTALL_DEPS: "0"
         run: bash controls/sae_2025_ws/scripts/ci/build_ros_workspace.sh
 

@@ -72,6 +72,7 @@ class TestBasicMission(unittest.TestCase):
             ground_station.request_extended_sys_state()
             mission_deadline = ground_station.deadline(TIMEOUT_S)
             try:
+                ground_station.wait_armed(deadline=mission_deadline)
                 ground_station.wait_airborne(deadline=mission_deadline)
                 ground_station.wait_landed(deadline=mission_deadline)
             except TimeoutError as exc:

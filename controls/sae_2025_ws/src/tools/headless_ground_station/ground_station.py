@@ -182,25 +182,6 @@ class HeadlessGroundStation:
     def pending_vtol_states(self) -> list[int]:
         return list(self._pending_vtol_states)
 
-    def wait_vtol_states(
-        self,
-        expected_states: Sequence[int],
-        timeout_s: float | None = None,
-        *,
-        deadline: Deadline | None = None,
-    ) -> list[int]:
-        self.expect_vtol_states(expected_states)
-        self._wait_for(
-            lambda _msg: not self._pending_vtol_states,
-            timeout_s=timeout_s,
-            deadline=deadline,
-            timeout_message=lambda active_deadline: (
-                f"TIMEOUT after {active_deadline.timeout_s:.0f}s "
-                f"(pending_vtol_states={self._pending_vtol_states})"
-            ),
-        )
-        return self.pending_vtol_states()
-
     def close(self) -> None:
         self.stop_heartbeats()
         if self._master is None:
