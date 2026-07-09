@@ -27,6 +27,7 @@ jobs:
         with:
           version: "0.15.10"
           args: "--version"
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Check Ruff Formatting
         run: ruff format --check --diff .
@@ -34,5 +35,8 @@ jobs:
       - name: Check Ruff lint
         run: ruff check .
 
-      - name: Run actionlint
-        uses: rhysd/actionlint@v1.7.8
+      - name: actionlint Check workflow files
+        run: |
+          bash <(curl https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+          ./actionlint -color
+        shell: bash
