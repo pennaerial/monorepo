@@ -2,7 +2,7 @@
 SET (priv_requires imu encoder)
 
 if(IDF_TARGET STREQUAL "linux")
-    list(APPEND PRIV_REQUIRES_COMPONENTS "sitl")
+    list(APPEND priv_requires "sitl")
 endif()
 
 idf_component_register(SRCS "payload_controller.cpp"
