@@ -7,6 +7,7 @@ from uav.vision_nodes import VisionNode
 import importlib
 import pkgutil
 
+
 class RegisteredMode(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -35,14 +36,14 @@ class RegisteredMode(BaseModel):
     def deserialize_mode_cls(cls, path) -> type[Mode]:
         if isinstance(path, str):
             return deserialize_type(path, Mode)
-        return path # mode type
+        return path  # mode type
 
     @field_validator("targets", mode="before")
     @classmethod
     def deserialize_targets(cls, paths) -> list[type[Vehicle]]:
         if all(isinstance(p, str) for p in paths):
             return [deserialize_type(p, Vehicle) for p in paths]
-        return paths # Vehicle types
+        return paths  # Vehicle types
 
     @field_validator("required_vision_nodes", mode="before")
     @classmethod
@@ -58,6 +59,7 @@ class ModeRegistry(BaseModel):
 
 def serialize_type(cls: type) -> str:
     return f"{cls.__module__}:{cls.__qualname__}"
+
 
 def deserialize_type(path: str, base_cls: type) -> type:
     try:
@@ -76,19 +78,18 @@ def deserialize_type(path: str, base_cls: type) -> type:
 
     return obj
 
+
 def register_mode(
     id: str,
     targets: list[type[Vehicle]],
     required_vision_nodes: list[type[VisionNode]] = [],
     peer_vehicle_names: list[str] = [],
     requires_camera: bool = False,
-    transition_labels: list[str] = []
-    ):
+    transition_labels: list[str] = [],
+):
     def decorator(registered_mode_cls: type[Mode]):
         if id in _mode_registry.modes:
-            raise ValueError(
-                    f"Id {id} already has a registered mode for it"
-            )
+            raise ValueError(f"Id {id} already has a registered mode for it")
         _mode_registry.modes[id] = RegisteredMode(
             id=id,
             targets=targets,
@@ -96,10 +97,12 @@ def register_mode(
             required_vision_nodes=required_vision_nodes,
             peer_vehicle_names=peer_vehicle_names,
             requires_camera=requires_camera,
-            transition_labels=transition_labels
+            transition_labels=transition_labels,
         )
         return registered_mode_cls
+
     return decorator
+
 
 def discover_modes(modules: list[str] = ["uav.modes", "payload.modes"]):
     for module in modules:
@@ -119,7 +122,9 @@ def discover_modes(modules: list[str] = ["uav.modes", "payload.modes"]):
                 print(e)
                 continue
 
+
 _mode_registry = ModeRegistry(modes=dict())
+
 
 def get_registered_mode(id: str) -> RegisteredMode:
     try:
@@ -127,7 +132,4 @@ def get_registered_mode(id: str) -> RegisteredMode:
     except KeyError:
         available = " ".join(_mode_registry.modes.keys())
 
-        raise KeyError(
-            f"Mode '{id}' not found."
-            f"Available Modes are {available}"
-        )
+        raise KeyError(f"Mode '{id}' not found.Available Modes are {available}")
