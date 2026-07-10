@@ -15,15 +15,9 @@ ci_install_system_packages \
     libgflags-dev \
     python3-colcon-common-extensions \
     python3-dev \
-    python3-opencv \
     python3-pip \
     python3-pytest \
-    python3-rosdep \
-    ros-"$ROS_DISTRO"-cv-bridge \
-    ros-"$ROS_DISTRO"-generate-parameter-library \
-    ros-"$ROS_DISTRO"-gps-msgs \
-    ros-"$ROS_DISTRO"-pluginlib \
-    ros-"$ROS_DISTRO"-vision-msgs
+    python3-rosdep
 
 rosdep init 2>/dev/null || true
 rosdep update --rosdistro "$ROS_DISTRO"

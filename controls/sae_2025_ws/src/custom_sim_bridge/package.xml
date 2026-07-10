@@ -13,8 +13,9 @@
   <depend>rclcpp</depend>
   <depend>sim_interfaces</depend>
   <depend>generate_parameter_library</depend>
+  <depend>pluginlib</depend>
   <depend>custom_gz_msgs</depend>
-  
+
   <build_depend>gz_transport_vendor</build_depend>
   <build_depend>gz_msgs_vendor</build_depend>
 
