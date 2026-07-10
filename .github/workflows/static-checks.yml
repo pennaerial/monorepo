@@ -2,17 +2,8 @@ name: Static Checks
 
 on:
   push:
-    branches: [main, master, integration]
-    paths:
-      - ".github/workflows/**"
-      - ".github/ci/**"
-      - "controls/sae_2025_ws/**"
+    branches: [main]
   pull_request:
-    branches: [main, master]
-    paths:
-      - ".github/workflows/**"
-      - ".github/ci/**"
-      - "controls/sae_2025_ws/**"
   workflow_dispatch:
 
 permissions:
@@ -31,21 +22,21 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
       - name: Install Ruff
-        run: python -m pip install ruff==0.15.10
+        uses: astral-sh/ruff-action@v4.0.0
+        with:
+          version: "0.15.10"
+          args: "--version"
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Check Ruff formatting
-        working-directory: controls/sae_2025_ws
+      - name: Check Ruff Formatting
         run: ruff format --check --diff .
 
       - name: Check Ruff lint
-        working-directory: controls/sae_2025_ws
         run: ruff check .
 
-      - name: Run actionlint
-        uses: rhysd/actionlint@v1.7.8
+      - name: actionlint Check workflow files
+        run: |
+          bash <(curl https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+          ./actionlint -color
+        shell: bash
