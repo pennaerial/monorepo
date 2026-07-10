@@ -6,13 +6,14 @@ from vehicle_common.mode_loader import (
     RegisteredMode,
     register_mode,
     get_registered_mode,
-    ModeRegistry
+    ModeRegistry,
 )
 
 
 from vehicle_common import Mode, Vehicle
 from uav.vision_nodes import VisionNode
 import json
+
 
 class MockVehicle(Vehicle):
     pass
@@ -26,19 +27,23 @@ class MockVisionNode(VisionNode):
 class MockMode(Mode):
     pass
 
+
 def test_serialize_types():
     result = serialize_type(MockMode)
     assert result == (f"{MockMode.__module__}:{MockMode.__qualname__}")
+
 
 def test_deserialize_type():
     path = serialize_type(MockMode)
     result = deserialize_type(path, Mode)
     assert result is MockMode
 
+
 def test_deserialize_raises_wrong_base():
     path = serialize_type(MockVehicle)
     with pytest.raises(ValueError):
         deserialize_type(path, VisionNode)
+
 
 def test_registered_mode_creation():
     mode = RegisteredMode(
@@ -52,6 +57,7 @@ def test_registered_mode_creation():
     assert mode.mode_cls is MockMode
     assert mode.targets == [MockVehicle]
     assert mode.required_vision_nodes == [MockVisionNode]
+
 
 def test_get_registered_mode():
     m = get_registered_mode("mock")
@@ -78,13 +84,9 @@ def test_registered_mode_to_json():
 
     assert data["mode_cls"] == serialize_type(MockMode)
 
-    assert data["targets"] == [
-        serialize_type(MockVehicle)
-    ]
+    assert data["targets"] == [serialize_type(MockVehicle)]
 
-    assert data["required_vision_nodes"] == [
-        serialize_type(MockVisionNode)
-    ]
+    assert data["required_vision_nodes"] == [serialize_type(MockVisionNode)]
 
     assert data["peer_vehicle_names"] == []
     assert data["requires_camera"] is False
@@ -120,9 +122,7 @@ def test_registered_mode_json_round_trip():
         transition_labels=["done"],
     )
 
-    loaded = RegisteredMode.model_validate_json(
-        original.model_dump_json()
-    )
+    loaded = RegisteredMode.model_validate_json(original.model_dump_json())
 
     assert loaded.model_dump() == original.model_dump()
 
@@ -149,6 +149,7 @@ def test_registered_mode_from_json_invalid_path():
 
     with pytest.raises((ValueError, ModuleNotFoundError)):
         RegisteredMode.model_validate(data)
+
 
 def test_mode_registry_json_round_trip():
     original_json = """
