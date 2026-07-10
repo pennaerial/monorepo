@@ -10,7 +10,8 @@ from vehicle_common.mode_loader import (
 )
 
 
-from vehicle_common import Mode, Vehicle
+from vehicle_common.mode import Mode
+from vehicle_common.vehicle import Vehicle
 from uav.vision_nodes import VisionNode
 import json
 

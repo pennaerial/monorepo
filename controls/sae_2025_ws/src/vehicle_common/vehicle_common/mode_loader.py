@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, field_validator, field_serializer
 from typing import cast
-from vehicle_common import Mode, Vehicle
+from vehicle_common.mode import Mode
+from vehicle_common.vehicle import Vehicle
 from uav.vision_nodes import VisionNode
 import importlib
 import pkgutil
