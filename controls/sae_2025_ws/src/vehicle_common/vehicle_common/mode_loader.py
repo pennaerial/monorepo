@@ -31,6 +31,9 @@ class RegisteredMode(BaseModel):
     def serialize_vision_nodes(self, value: list[type[VisionNode]]) -> list[str]:
         return [serialize_type(v) for v in value]
 
+    # Each field_validator needs to support both actual types and strings so
+    # manual instantiation and loading from json is valid
+
     @field_validator("mode_cls", mode="before")
     @classmethod
     def deserialize_mode_cls(cls, path) -> type[Mode]:
@@ -50,7 +53,7 @@ class RegisteredMode(BaseModel):
     def deserialize_vision_nodes(cls, paths) -> list[type[VisionNode]]:
         if all(isinstance(p, str) for p in paths):
             return [deserialize_type(p, VisionNode) for p in paths]
-        return paths
+        return paths  # vision_node types
 
 
 class ModeRegistry(BaseModel):
@@ -62,6 +65,24 @@ def serialize_type(cls: type) -> str:
 
 
 def deserialize_type(path: str, base_cls: type) -> type:
+    """Resolve a serialized "module:QualName" path back into a class object.
+
+    Tries to instantiate the class after importing the module. The resolved
+    object must be a subclass of `base_cls`.
+
+    Args:
+        path: Serialized type reference in "module.path:QualName" form,
+            as produced by `serialize_type`.
+        base_cls: The class the resolved type must be a subclass of.
+
+    Returns:
+        The resolved class object.
+
+    Raises:
+        ValueError: If `path` isn't in "module:QualName" form, or the
+            resolved object is not a subclass of `base_cls`.
+    """
+
     try:
         module_path, class_name = path.split(":", 1)
     except ValueError:
@@ -87,6 +108,25 @@ def register_mode(
     requires_camera: bool = False,
     transition_labels: list[str] = [],
 ):
+    """Decorator that registers a Mode in the Mode Registry.
+
+    Args:
+        id: used as main key to store and retrieve RegisteredMode objects
+        targets: Vehicle types this mode is valid for
+        required_vision_nodes: Vision node types that must be running for this mode to be usable.
+        peer_vehicle_names: Names of peer vehicles this mode depends on
+        requires_camera: Whether this mode requires a camera to operate.
+        transition_labels: Labels describing valid transitions into/out
+            of this mode, used by whatever drives mode switching.
+
+    Returns:
+        A decorator that registers the given `Mode` subclass and
+        returns it unchanged.
+
+    Raises:
+        ValueError: If `id` is already exists
+    """
+
     def decorator(registered_mode_cls: type[Mode]):
         if id in _mode_registry.modes:
             raise ValueError(f"Id {id} already has a registered mode for it")
@@ -105,6 +145,16 @@ def register_mode(
 
 
 def discover_modes(modules: list[str] = ["uav.modes", "payload.modes"]):
+    """Import every submodule under the given packages to trigger mode registration.
+
+    Recursively imports the passed in modules. Importing a file with `@register_mode(...)`-decorated
+    classes populates them into the Mode Registry
+
+    Args:
+        modules: Dotted package paths to walk and import submodules from.
+            Defaults to the UAV and payload mode packages.
+    """
+
     for module in modules:
         try:
             pkg = importlib.import_module(module)
