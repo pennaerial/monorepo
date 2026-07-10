@@ -7,6 +7,8 @@
   <maintainer email="yuzhiliu8@gmail.com">yuzhiliu8</maintainer>
   <license>TODO: License declaration</license>
 
+  <depend>python3-opencv</depend>
+
   <test_depend>ament_copyright</test_depend>
   <test_depend>python3-pytest</test_depend>
 

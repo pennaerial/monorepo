@@ -1033,7 +1033,6 @@
 #     repo_src = tmp_path / "src"
 #     repo_src.mkdir(parents=True, exist_ok=True)
 #     for package_name in (
-#         "actuator_msgs",
 #         "payload_interfaces",
 #         "px4_msgs",
 #         "uav_interfaces",
@@ -1093,7 +1092,6 @@
 #     )
 #
 #     assert package_names == [
-#         "actuator_msgs",
 #         "payload_interfaces",
 #         "px4_msgs",
 #         "uav_interfaces",

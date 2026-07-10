@@ -26,21 +26,17 @@ class LandingMode(Mode):
         """
         Periodic logic for landing.
         """
-        # Maintain current position setpoints until AUTO_LAND mode is engaged
-        # This prevents losing offboard connection during the transition
-        # Lock yaw to prevent spinning while hovering before landing
-        if self.vehicle.local_position:
-            self.vehicle.publish_position_setpoint(
-                (
-                    self.vehicle.local_position.x,
-                    self.vehicle.local_position.y,
-                    self.vehicle.local_position.z,
-                ),
-                lock_yaw=True,
-            )
-
-        # Only send land command if not already in AUTO_LAND mode
+        # Let PX4 own the setpoint stream in AUTO_LAND so its land detector can auto-disarm.
         if self.vehicle.nav_state != VehicleStatus.NAVIGATION_STATE_AUTO_LAND:
+            if self.vehicle.local_position:
+                self.vehicle.publish_position_setpoint(
+                    (
+                        self.vehicle.local_position.x,
+                        self.vehicle.local_position.y,
+                        self.vehicle.local_position.z,
+                    ),
+                    lock_yaw=True,
+                )
             self.vehicle.land()
 
     def check_status(self) -> str:

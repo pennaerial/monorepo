@@ -134,6 +134,10 @@ ci_px4_msgs_prefix() {
     echo "/opt/px4_msgs"
 }
 
+ci_px4_prefix() {
+    echo "/root/PX4-Autopilot"
+}
+
 # Build px4_msgs commit $1 (a commit SHA), and echo the exact commit baked so validation can detect submodule drift.
 ci_build_px4_msgs() {
     local commit="$1"

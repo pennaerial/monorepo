@@ -1,0 +1,21 @@
+mission_name: basic
+vehicle_name: ""
+debug: true
+vision_debug: true
+auto_launch: true
+
+airframe: standard_vtol
+custom_airframe_model: ""
+px4_instance: 0
+
+force_camera: true
+
+save_vision_milliseconds: 0
+camera_mount_offsets: [0.0, 0.0, 0.0]
+camera_calibration_file: ""
+camera_preprocess_hook: ""
+
+servo_only: false
+payload_controller: ""
+
+sim: true

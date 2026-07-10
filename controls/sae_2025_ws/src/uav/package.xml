@@ -7,6 +7,8 @@
   <maintainer email="ubuntu@todo.todo">ubuntu</maintainer>
   <license>TODO: License declaration</license>
 
+  <depend>cv_bridge</depend>
+  <depend>python3-opencv</depend>
   <depend>rclpy</depend>
   <depend>px4_msgs</depend>
   <!-- <exec_depend>payload_controller</exec_depend> -->
@@ -18,6 +20,8 @@
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>python3-pytest</test_depend>
+  <test_depend>launch_testing</test_depend>
+  <test_depend>tools</test_depend>
   <depend>uav_interfaces</depend>
   <export>
     <build_type>ament_python</build_type>
