@@ -29,7 +29,9 @@ ci_log "Building payload packages"
 ci_source_workspace "$WORKSPACE_ROOT"
 colcon build \
     --packages-select payload payload_controller \
-    --cmake-args -DBUILD_SIM=OFF
+    --cmake-args \
+        -DPAYLOAD_BUILD_SIM_CONTROLLER=OFF \
+        -DPAYLOAD_BUILD_GPIO_CONTROLLER=ON
 
 ci_log "Building tools package"
 ci_source_workspace "$WORKSPACE_ROOT"
