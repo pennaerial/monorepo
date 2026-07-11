@@ -5,6 +5,10 @@ on:
     branches: [main, master, integration]
     paths:
       - ".github/workflows/ros-validate.yml"
+      - ".github/workflows/ci-image.yml"
+      - ".github/ci/**"
+      - ".gitmodules"
+      - "PX4-Autopilot"
       - "controls/sae_2025_ws/**"
       - "!controls/sae_2025_ws/src/integration/**"
   pull_request:
@@ -13,6 +17,8 @@ on:
       - ".github/workflows/ros-validate.yml"
       - ".github/workflows/ci-image.yml"
       - ".github/ci/**"
+      - ".gitmodules"
+      - "PX4-Autopilot"
       - "controls/sae_2025_ws/**"
       - "!controls/sae_2025_ws/src/integration/**"
   workflow_dispatch:
@@ -27,7 +33,7 @@ concurrency:
 
 jobs:
   validate_ros2_workspace_ci_image:
-    name: Validate ROS 2 Workspace (${{ matrix.arch }})
+    name: Validate ROS 2 Workspace and Sim (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -112,3 +118,6 @@ jobs:
         env:
           INSTALL_DEPS: ${{ steps.bootstrap_mode.outputs.install_deps }}
         run: bash controls/sae_2025_ws/scripts/ci/validate_ros_workspace.sh
+
+      - name: Validate headless sim
+        run: bash controls/sae_2025_ws/scripts/ci/validate_sim_headless.sh
