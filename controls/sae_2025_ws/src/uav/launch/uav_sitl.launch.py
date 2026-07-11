@@ -1,5 +1,3 @@
-from dataclasses import dataclass
-from logging import Logger
 from launch import Action, LaunchDescription, EventHandler, Event
 from launch.actions import (
     DeclareLaunchArgument,
@@ -18,8 +16,10 @@ from enum import StrEnum
 
 logger = get_logger("uav_sitl.launch")
 
+
 class Args(StrEnum):
     """Maps constants to launch argument keyords"""
+
     PX4_PATH = "px4_path"
     MISSION = "mission"
     NS_ID = "ns_id"
@@ -44,16 +44,21 @@ def on_emitted_event(actions: list[Action], event: type[Event]) -> RegisterEvent
         EventHandler(matcher=lambda e: isinstance(e, event), entities=actions)
     )
 
+
 # TODO: Move to launch_utils
 RED = "\033[31m"
 RESET = "\033[0m"
+
 
 class LaunchError(RuntimeError):
     def __init__(self, msg: str):
         super().__init__(f"{RED}{msg}{RESET}")
 
+
 # TODO: Move to a launch_utils file
-def reject_unknown_launch_args(arg_enum: type[StrEnum], launch_configurations: dict, logger: RcutilsLogger):
+def reject_unknown_launch_args(
+    arg_enum: type[StrEnum], launch_configurations: dict, logger: RcutilsLogger
+):
     """Raises an error if any undeclared launch arguments are present.
 
     Args:
@@ -70,6 +75,7 @@ def reject_unknown_launch_args(arg_enum: type[StrEnum], launch_configurations: d
             f"Unknown launch argument(s): {', '.join(sorted(unknown))}\n"
             "Run `ros2 launch <package> <launch_file> --show-args` to see valid arguments."
         )
+
 
 def px4_sitl_action(
     px4_path: str,
@@ -105,10 +111,11 @@ def launch_setup(context):
     vehicle_ns = f"uav_{ns_id}"
 
     try:
-        airframe: PX4Airframe = PX4Airframe.lookup_airframe(config['airframe'])
+        airframe: PX4Airframe = PX4Airframe.lookup_airframe(config["airframe"])
     except KeyError:
-        raise LaunchError(f"Airframe: {config['airframe']} is not valid. Use ros2 launch uav uav_sitl.launch.py --show-args to see list of valid airframes")
-
+        raise LaunchError(
+            f"Airframe: {config['airframe']} is not valid. Use ros2 launch uav uav_sitl.launch.py --show-args to see list of valid airframes"
+        )
 
     px4_path = config["px4_path"]
     print(vehicle_ns)
@@ -120,13 +127,14 @@ def launch_setup(context):
         output="screen",
         name="MicroXRCEAgent",
         condition=IfCondition(config["run_mw"]),
-        log_cmd=True
+        log_cmd=True,
     )
 
     px4_sitl = on_emitted_event(actions=[], event=Event)
 
     actions = [middleware, px4_sitl]
     return actions
+
 
 def generate_launch_description():
     return LaunchDescription(
@@ -139,7 +147,7 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 Args.MISSION,
                 default_value="basic",
-                description="Name of the mission to load. Available missions are found in uav/missions/ \n",  # TODO: print out available
+                description="Name of the mission to load. Available missions are found in uav/missions/",  # TODO: print out available
                 choices=["basic", "triangle"],
             ),
             DeclareLaunchArgument(
@@ -154,7 +162,7 @@ def generate_launch_description():
                     "UAV airframe to load.\n"
                     "\tAvailable airframes: (alias/id/model)\n"
                     + "\n".join(f"\t  • {a}" for a in PX4Airframe.get_flying())
-                )
+                ),
             ),
             DeclareLaunchArgument(
                 Args.WORLD,

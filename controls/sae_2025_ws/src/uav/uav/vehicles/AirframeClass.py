@@ -39,11 +39,10 @@ class AirframeClass(IntEnum):
         )
 
 
-
 @dataclass(frozen=True, slots=True)
 class PX4Airframe:
     id: int
-    alias: str # Optional. If empty there is no alias
+    alias: str  # Optional. If empty there is no alias
     model: str
     airframe_class: AirframeClass
 
