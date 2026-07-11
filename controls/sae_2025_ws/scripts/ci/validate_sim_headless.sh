@@ -23,7 +23,7 @@ PX4_PREFIX="$(ci_px4_prefix)"
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 if [[ ! -f "$PX4_PREFIX/PINNED_COMMIT" ]]; then
     ci_log "ERROR: prebuilt PX4 SITL not found at $PX4_PREFIX."
-    ci_log "Use the sim CI image or rebuild it from .github/ci/ros-jazzy-sim-ci/Dockerfile."
+    ci_log "Use the sim CI image or rebuild it from .github/ci/ros-jazzy-ci/Dockerfile."
     exit 1
 fi
 built_commit="$(cat "$PX4_PREFIX/PINNED_COMMIT")"
