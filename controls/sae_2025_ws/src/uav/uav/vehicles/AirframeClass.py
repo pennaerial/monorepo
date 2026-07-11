@@ -38,6 +38,7 @@ class AirframeClass(IntEnum):
             f"Invalid vehicle_class type '{type(value)}'. Expected one of string, int, or {cls.__name__}."
         )
 
+
 @dataclass(frozen=True, slots=True)
 class PX4Airframe:
     id: int
@@ -51,32 +52,33 @@ class PX4Airframe:
         return AIRFRAME_BY_MODEL[value]
 
 
+# fmt: off
 AIRFRAMES: list[PX4Airframe] = [
-    PX4Airframe(4001, "gz_x500", AirframeClass.MULTICOPTER),
-    PX4Airframe(4002, "gz_x500_depth", AirframeClass.MULTICOPTER),
-    PX4Airframe(4003, "gz_rc_cessna", AirframeClass.PLANE),
-    PX4Airframe(4004, "gz_standard_vtol", AirframeClass.VTOL),
-    PX4Airframe(4005, "gz_x500_vision", AirframeClass.MULTICOPTER),
-    PX4Airframe(4006, "gz_px4vision", AirframeClass.MULTICOPTER),
-    PX4Airframe(4008, "gz_advanced_plane", AirframeClass.PLANE),
-    PX4Airframe(4009, "gz_r1_rover", AirframeClass.OTHER),
-    PX4Airframe(4010, "gz_x500_mono_cam", AirframeClass.MULTICOPTER),
-    PX4Airframe(4011, "gz_lawnmower", AirframeClass.OTHER),
-    PX4Airframe(4013, "gz_x500_lidar_2d", AirframeClass.MULTICOPTER),
-    PX4Airframe(4014, "gz_x500_mono_cam_down", AirframeClass.MULTICOPTER),
-    PX4Airframe(4016, "gz_x500_lidar_down", AirframeClass.MULTICOPTER),
-    PX4Airframe(4017, "gz_x500_lidar_front", AirframeClass.MULTICOPTER),
-    PX4Airframe(4018, "gz_quadtailsitter", AirframeClass.VTOL),
-    PX4Airframe(4019, "gz_x500_gimbal", AirframeClass.MULTICOPTER),
-    PX4Airframe(4020, "gz_tiltrotor", AirframeClass.VTOL),
-    PX4Airframe(4021, "gz_x500_flow", AirframeClass.MULTICOPTER),
-    PX4Airframe(50000, "gz_rover_differential", AirframeClass.OTHER),
-    PX4Airframe(51000, "gz_rover_ackermann", AirframeClass.OTHER),
-    PX4Airframe(52000, "gz_rover_mecanum", AirframeClass.OTHER),
-    PX4Airframe(60002, "gz_uuv_bluerov2_heavy", AirframeClass.OTHER),
-    PX4Airframe(70000, "gz_atmos", AirframeClass.OTHER),
-    PX4Airframe(8011, "gz_omnicopter", AirframeClass.MULTICOPTER),
-]
+    PX4Airframe(4001,  "x500",               AirframeClass.MULTICOPTER),
+    PX4Airframe(4002,  "x500_depth",         AirframeClass.MULTICOPTER),
+    PX4Airframe(4003,  "rc_cessna",          AirframeClass.PLANE),
+    PX4Airframe(4004,  "standard_vtol",      AirframeClass.VTOL),
+    PX4Airframe(4005,  "x500_vision",        AirframeClass.MULTICOPTER),
+    PX4Airframe(4006,  "px4vision",          AirframeClass.MULTICOPTER),
+    PX4Airframe(4008,  "advanced_plane",     AirframeClass.PLANE),
+    PX4Airframe(4009,  "r1_rover",           AirframeClass.OTHER),
+    PX4Airframe(4010,  "x500_mono_cam",      AirframeClass.MULTICOPTER),
+    PX4Airframe(4011,  "lawnmower",          AirframeClass.OTHER),
+    PX4Airframe(4013,  "x500_lidar_2d",      AirframeClass.MULTICOPTER),
+    PX4Airframe(4014,  "x500_mono_cam_down", AirframeClass.MULTICOPTER),
+    PX4Airframe(4016,  "x500_lidar_down",    AirframeClass.MULTICOPTER),
+    PX4Airframe(4017,  "x500_lidar_front",   AirframeClass.MULTICOPTER),
+    PX4Airframe(4018,  "quadtailsitter",     AirframeClass.VTOL),
+    PX4Airframe(4019,  "x500_gimbal",        AirframeClass.MULTICOPTER),
+    PX4Airframe(4020,  "tiltrotor",          AirframeClass.VTOL),
+    PX4Airframe(4021,  "x500_flow",          AirframeClass.MULTICOPTER),
+    PX4Airframe(50000, "rover_differential", AirframeClass.OTHER),
+    PX4Airframe(51000, "rover_ackermann",    AirframeClass.OTHER),
+    PX4Airframe(52000, "rover_mecanum",      AirframeClass.OTHER),
+    PX4Airframe(60002, "uuv_bluerov2_heavy", AirframeClass.OTHER),
+    PX4Airframe(70000, "atmos",              AirframeClass.OTHER),
+    PX4Airframe(8011,  "omnicopter",         AirframeClass.MULTICOPTER),
+] # fmt: on
 
 AIRFRAME_BY_ID: dict[int, PX4Airframe] = {
     airframe.id: airframe for airframe in AIRFRAMES
@@ -85,4 +87,3 @@ AIRFRAME_BY_ID: dict[int, PX4Airframe] = {
 AIRFRAME_BY_MODEL: dict[str, PX4Airframe] = {
     airframe.model: airframe for airframe in AIRFRAMES
 }
-
