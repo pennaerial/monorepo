@@ -1,4 +1,4 @@
-This image is the base container for ROS workspace CI.
+This image is the container for ROS workspace and headless simulation CI.
 
 It starts from `ros:jazzy-ros-base` and bakes in:
 
@@ -7,5 +7,9 @@ It starts from `ros:jazzy-ros-base` and bakes in:
 - OpenCV and ROS vision dependencies
 - `apriltag`
 - `pigpio` built from source
+- prebuilt `px4_msgs`
+- pinned PX4 SITL and Gazebo Harmonic with `ros_gz`
+- Micro XRCE-DDS Agent
+- Xvfb, Mesa, and `pymavlink` for headless simulation
 
-The image is intentionally generic enough to serve both the x86 validation job and the ARM artifact build job.
+The image supports ROS and simulation validation on `amd64` and `arm64` and the ARM artifact build.
