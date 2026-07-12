@@ -1,0 +1,3 @@
+# Only surface diagnostics for this project's own headers (main/, src/),
+# not headers pulled in from ESP-IDF, FreeRTOS, or other dependencies.
+HeaderFilterRegex: '/payload_controller/(main|src)/'

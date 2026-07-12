@@ -1,0 +1,33 @@
+---
+# Base your style on Google's clean modern foundation
+BasedOnStyle: Google
+
+# --- RELAXED ACCESSIBILITY TUNING ---
+
+# Expand the line limit so developers don't have to constantly wrap code
+ColumnLimit: 120
+
+# Let developers group code logically with empty lines without the linter deleting them
+MaxEmptyLinesToKeep: 2
+
+# Keep short blocks on multiple lines for better readability
+AllowShortBlocksOnASingleLine: false
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+
+# --- MODERN READABILITY TUNING ---
+
+# Ensure standard 4-space indentation (highly preferred by most club members)
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+
+# Clean up layout around assignments and control flows
+SpaceBeforeAssignmentOperators: true
+SpaceBeforeParens: ControlStatements
+
+# Sort includes alphabetically automatically to avoid merge conflicts
+SortIncludes: true
+...

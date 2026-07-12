@@ -9,3 +9,4 @@ linux esp32s3:
 
 set_cc:
 	ln -sf build/$(TARGET)/compile_commands.json compile_commands.json
+
