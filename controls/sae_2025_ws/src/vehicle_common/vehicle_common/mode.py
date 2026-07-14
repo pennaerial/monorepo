@@ -1,8 +1,9 @@
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, ClassVar, Generic, Mapping, TypeVar
+from typing import TYPE_CHECKING, ClassVar, Mapping
 
 from vehicle_common.vehicle import Vehicle
 from vehicle_common.runtime.vision_loader import canonical_vision_node_path
+from pydantic import BaseModel
 
 if TYPE_CHECKING:
     from rclpy.node import Node
@@ -12,10 +13,8 @@ else:
     # Node is annotation-only but must exist at runtime for get_type_hints().
     Node = object
 
-VehicleT = TypeVar("VehicleT", bound=Vehicle)
 
-
-class Mode(Generic[VehicleT], ABC):
+class Mode(ABC):
     """
     Base class for UAV operational modes within a ROS 2 node.
     Provides a structured template for implementing autonomous behaviors.
@@ -25,8 +24,21 @@ class Mode(Generic[VehicleT], ABC):
     peer_vehicle_names: ClassVar[tuple[str, ...]] = ()
     requires_camera: ClassVar[bool] = False
     transition_labels: ClassVar[tuple[str, ...]] = ()
+    Params: ClassVar[type[BaseModel]]  # no default — must be set by subclass
 
-    def __init__(self, node: Node, vehicle: VehicleT):
+    # Fails at import time if no nested Params class is defined
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        if "Params" not in cls.__dict__:
+            raise TypeError(f"{cls.__name__} must define its own nested Params class")
+
+        params_cls = cls.__dict__["Params"]
+        if not isinstance(params_cls, type) or not issubclass(params_cls, BaseModel):
+            raise TypeError(
+                f"{cls.__name__}.Params must be a subclass of BaseModel got {params_cls!r}"
+            )
+
+    def __init__(self, node: Node, vehicle: Vehicle):
         """
         Initialize the mode with a reference to the ROS 2 node.
 
@@ -36,7 +48,7 @@ class Mode(Generic[VehicleT], ABC):
         """
         self.node = node
         self.active = False
-        self.vehicle: VehicleT = vehicle
+        self.vehicle = vehicle
         self.pending_requests = {}
 
     @classmethod
