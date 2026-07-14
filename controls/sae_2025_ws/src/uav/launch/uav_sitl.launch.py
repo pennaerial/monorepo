@@ -93,15 +93,13 @@ def px4_sitl_action(
     }
 
     return ExecuteProcess(
-        cmd="./build/px4_sitl_default/bin/px4",
+        cmd=["./build/px4_sitl_default/bin/px4"],
         cwd=px4_path,
         output="screen",
         name=f"{vehicle_ns}_px4_sitl",
         additional_env=env_export,
         log_cmd=True,
     )
-
-    return Action()
 
 
 def launch_setup(context):

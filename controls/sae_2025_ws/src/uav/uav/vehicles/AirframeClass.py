@@ -47,14 +47,15 @@ class PX4Airframe:
     airframe_class: AirframeClass
 
     @classmethod
-    def lookup_airframe(cls, value: int | str) -> PX4Airframe:
+    def lookup_airframe(cls, value: str) -> PX4Airframe:
         """Looks up airframe by either id, alias, or model
         if int --> id
         if str --> checks alias first then falls back to model.
+
         Throws KeyError if fails
         """
-        if isinstance(value, int):
-            return AIRFRAME_BY_ID[value]
+        if value.isdigit():
+            return AIRFRAME_BY_ID[int(value)]
 
         if value in AIRFRAME_BY_ALIAS:
             return AIRFRAME_BY_ALIAS[value]
