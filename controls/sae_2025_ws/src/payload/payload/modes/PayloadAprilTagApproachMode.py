@@ -17,7 +17,7 @@ from uav.vision_nodes.payload_perception_common import (
 )
 
 from vehicle_common.mode import Mode
-from vehicle_common.runtime.plugin_loader import register_plugin
+from vehicle_common.mode_loader import register_mode
 
 
 @dataclass(frozen=True)
@@ -32,7 +32,12 @@ class TagObservation:
     area: float
 
 
-@register_plugin(name="payload.PayloadAprilTagApproachMode", base_cls=Mode)
+@register_mode(
+    id="payload.PayloadAprilTagApproachMode",
+    targets=[Payload],
+    transition_labels=["done", "tag_lost"],
+    requires_camera=True,
+)
 class PayloadAprilTagApproachMode(Mode):
     """Drive the payload toward one AprilTag and terminate once close enough."""
 

@@ -1,4 +1,3 @@
-from numpy import require
 from pydantic import BaseModel, ConfigDict, PrivateAttr
 from vehicle_common.mode import Vehicle
 from vehicle_common.mode_loader import RegisteredMode, get_registered_mode

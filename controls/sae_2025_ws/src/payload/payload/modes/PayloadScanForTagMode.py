@@ -15,12 +15,18 @@ from uav.vision_nodes.payload_perception_common import DEFAULT_TAG_FAMILY
 from uav_interfaces.srv import PayloadAprilTagState
 
 from vehicle_common.mode import Mode
-from vehicle_common.runtime.plugin_loader import register_plugin
+from vehicle_common.mode_loader import register_mode
 
 _TWO_PI = 2.0 * math.pi
 
 
-@register_plugin(name="payload.PayloadScanForTagMode", base_cls=Mode)
+@register_mode(
+    id="payload.PayloadScanForTagMode",
+    targets=[Payload],
+    required_vision_nodes=[PayloadAprilTagNode],
+    transition_labels=["found", "not_found"],
+    requires_camera=True,
+)
 class PayloadScanForTagMode(Mode):
     """
     Spin in place looking for a specific AprilTag.

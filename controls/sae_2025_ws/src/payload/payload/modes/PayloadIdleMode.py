@@ -6,12 +6,14 @@ from rclpy.node import Node
 
 from payload.payload import Payload
 from vehicle_common.mode import Mode
-from vehicle_common.runtime.plugin_loader import register_plugin
+from vehicle_common.mode_loader import register_mode
 
 _FOREVER = 0.0
 
 
-@register_plugin(name="payload.PayloadIdleMode", base_cls=Mode)
+@register_mode(
+    id="payload.PayloadIdleMode", targets=[Payload], transition_labels=["complete"]
+)
 class PayloadIdleMode(Mode):
     mission_target = "payload"
     required_vision_nodes = ()

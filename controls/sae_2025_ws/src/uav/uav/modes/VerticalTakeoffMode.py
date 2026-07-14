@@ -3,7 +3,7 @@ from rclpy.node import Node
 
 from uav.vehicles.UAV import UAV
 from vehicle_common.mode import Mode
-from vehicle_common.runtime.plugin_loader import register_plugin
+from vehicle_common.mode_loader import register_mode
 from enum import StrEnum
 
 
@@ -12,7 +12,9 @@ class TakeoffMethod(StrEnum):
     PX4_AUTO = "PX4_AUTO"  # rely on px4 AUTO_TAKEOFF mode for takeoff
 
 
-@register_plugin(name="uav.VerticalTakeoffMode", base_cls=Mode)
+@register_mode(
+    id="uav.VerticalTakeoffMode", targets=[UAV], transition_labels=["complete"]
+)
 class VerticalTakeoffMode(Mode):
     """Vertical takeoff for any UAV airframe (multicopter or VTOL)."""
 

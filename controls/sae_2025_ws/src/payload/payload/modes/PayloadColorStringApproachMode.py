@@ -30,7 +30,7 @@ from sensor_msgs.msg import CompressedImage, Image
 from payload.payload import Payload
 
 from vehicle_common.mode import Mode
-from vehicle_common.runtime.plugin_loader import register_plugin
+from vehicle_common.mode_loader import register_mode
 
 
 def _vertical_blob_centroid_area(
@@ -88,7 +88,11 @@ def _vertical_blob_centroid_area(
     return (best_cx, best_cy, best_area_i)
 
 
-@register_plugin(name="payload.PayloadColorStringApproachMode", base_cls=Mode)
+@register_mode(
+    id="payload.PayloadColorStringApproachMode",
+    targets=[Payload],
+    requires_camera=True,
+)
 class PayloadColorStringApproachMode(Mode):
     """Drive toward a coloured target using HSV blob detection."""
 

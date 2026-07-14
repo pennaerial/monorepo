@@ -21,7 +21,7 @@ from payload_interfaces.msg import DriveCommand
 from cv_bridge import CvBridge
 
 from vehicle_common.mode import Mode
-from vehicle_common.runtime.plugin_loader import register_plugin
+from vehicle_common.mode_loader import register_mode
 from payload.payload import Payload
 from uav.vision_nodes import PayloadAprilTagNode
 
@@ -30,7 +30,11 @@ _WHITE_LOWER = np.array([0, 0, 200], dtype=np.uint8)
 _WHITE_UPPER = np.array([180, 30, 255], dtype=np.uint8)
 
 
-@register_plugin(name="payload.PayloadRetreatMode", base_cls=Mode)
+@register_mode(
+    id="payload.PayloadRetreatMode",
+    targets=[Payload],
+    required_vision_nodes=[PayloadAprilTagNode],
+)
 class PayloadRetreatMode(Mode):
     """
     Drive the payload to the edge of the DLZ, then turn 180° to face the center.

@@ -9,10 +9,12 @@ from uav.vehicles.UAV import get_nav_state_str
 from uav.vehicles.VTOL import VTOL
 
 from vehicle_common.mode import Mode
-from vehicle_common.runtime.plugin_loader import register_plugin
+from vehicle_common.mode_loader import register_mode
 
 
-@register_plugin(name="uav.vtol.TakeoffMode", base_cls=Mode)
+@register_mode(
+    id="uav.vtol.TakeoffMode", targets=[VTOL], transition_labels=["complete"]
+)
 class TakeoffMode(Mode):
     """
     A VTOL takeoff mode that supports both vertical and runway-style launches.

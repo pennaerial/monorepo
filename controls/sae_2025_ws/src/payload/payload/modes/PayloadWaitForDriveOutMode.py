@@ -35,7 +35,7 @@ from sensor_msgs.msg import CompressedImage, Image
 from payload.payload import Payload
 
 from vehicle_common.mode import Mode
-from vehicle_common.runtime.plugin_loader import register_plugin
+from vehicle_common.mode_loader import register_mode
 
 
 class DriveOutState(Enum):
@@ -46,7 +46,12 @@ class DriveOutState(Enum):
     DONE = 4
 
 
-@register_plugin(name="payload.PayloadWaitForDriveOutMode", base_cls=Mode)
+@register_mode(
+    id="payload.PayloadWaitForDriveOutMode",
+    targets=[Payload],
+    transition_labels=["complete"],
+    requires_camera=True,
+)
 class PayloadWaitForDriveOutMode(Mode):
     """
     Subscribe to the payload camera and detect when the plane has landed on the
