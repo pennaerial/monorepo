@@ -23,10 +23,14 @@ from std_msgs.msg import String
 from payload.payload import Payload
 
 from vehicle_common.mode import Mode
-from vehicle_common.runtime.plugin_loader import register_plugin
+from vehicle_common.mode_loader import register_mode
 
 
-@register_plugin(name="payload.PayloadPeerFleetTestMode", base_cls=Mode)
+@register_mode(
+    id="payload.PayloadPeerFleetTestMode",
+    targets=[Payload],
+    peer_vehicle_names=["payload_0", "payload_1"],
+)
 class PayloadPeerFleetTestMode(Mode):
     """Passive multi-payload communication demo for fleet bring-up."""
 

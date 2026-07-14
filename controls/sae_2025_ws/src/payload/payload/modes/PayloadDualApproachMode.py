@@ -29,7 +29,7 @@ from uav.vision_nodes.payload_perception_common import (
 )
 
 from vehicle_common.mode import Mode
-from vehicle_common.runtime.plugin_loader import register_plugin
+from vehicle_common.mode_loader import register_mode
 
 
 def _color_blob_info(
@@ -60,7 +60,11 @@ def _color_blob_info(
     return (cx, cy, int(a), bh)
 
 
-@register_plugin(name="payload.PayloadDualApproachMode", base_cls=Mode)
+@register_mode(
+    id="payload.PayloadDualApproachMode",
+    targets=[Payload],
+    requires_camera=True,
+)
 class PayloadDualApproachMode(Mode):
     """Approach using AprilTag when visible, HSV colour fallback otherwise."""
 

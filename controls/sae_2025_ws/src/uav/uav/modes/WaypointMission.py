@@ -8,10 +8,10 @@ from typing import List
 from uav.vehicles.UAV import UAV
 
 from vehicle_common.mode import Mode
-from vehicle_common.runtime.plugin_loader import register_plugin
+from vehicle_common.mode_loader import register_mode
 
 
-@register_plugin(name="uav.WaypointMission", base_cls=Mode)
+@register_mode(id="uav.WaypointMission", targets=[UAV])
 class WaypointMission(Mode):
     """
     Simple waypoint mission for testing scoring node.

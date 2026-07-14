@@ -60,7 +60,7 @@ from vehicle_common.cv.dlz_convex_hull import build_dlz_hull_mask
 from payload.payload import Payload
 
 from vehicle_common.mode import Mode
-from vehicle_common.runtime.plugin_loader import register_plugin
+from vehicle_common.mode_loader import register_mode
 
 # Mirrors PayloadColorSquareNode._COLOR_RATIO: when one tape colour has at
 # least this many times more pixels than the other in the line-follow strip,
@@ -68,7 +68,12 @@ from vehicle_common.runtime.plugin_loader import register_plugin
 _COLOR_DOMINANCE_RATIO = 1.5
 
 
-@register_plugin(name="payload.PayloadCornerNavigateMode", base_cls=Mode)
+@register_mode(
+    id="payload.PayloadCornerNavigateMode",
+    targets=[Payload],
+    transition_labels=["complete"],
+    requires_camera=True,
+)
 class PayloadCornerNavigateMode(Mode):
     mission_target = "payload"
     transition_labels = ("complete",)

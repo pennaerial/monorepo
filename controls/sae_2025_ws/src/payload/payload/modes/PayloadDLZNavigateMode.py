@@ -18,7 +18,7 @@ from uav.vision_nodes.payload_perception_common import DEFAULT_TAG_FAMILY
 from uav_interfaces.srv import PayloadAprilTagState
 
 from vehicle_common.mode import Mode
-from vehicle_common.runtime.plugin_loader import register_plugin
+from vehicle_common.mode_loader import register_mode
 
 # Corner-turn vision thresholds (mirrors PayloadCornerNavigateMode defaults)
 _CORNER_CENTER_TOL_PX = 75.0  # lateral error tolerance (px)
@@ -130,7 +130,13 @@ class TagTransitionRule(TypedDict):
     direction: Literal["cw", "ccw"]
 
 
-@register_plugin(name="payload.PayloadDLZNavigateMode", base_cls=Mode)
+@register_mode(
+    id="payload.PayloadDLZNavigateMode",
+    targets=[Payload],
+    required_vision_nodes=[PayloadAprilTagNode],
+    transition_labels=["done"],
+    requires_camera=True,
+)
 class PayloadDLZNavigateMode(Mode):
     """
     Navigate the payload along the alternating-colour square border of the DLZ.

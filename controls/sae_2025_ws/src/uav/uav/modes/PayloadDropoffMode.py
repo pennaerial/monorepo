@@ -9,10 +9,15 @@ from uav.vision_nodes import PayloadTrackingNode
 from uav_interfaces.srv import PayloadTracking
 
 from vehicle_common.mode import Mode
-from vehicle_common.runtime.plugin_loader import register_plugin
+from vehicle_common.mode_loader import register_mode
 
 
-@register_plugin(name="uav.PayloadDropoffMode", base_cls=Mode)
+@register_mode(
+    id="uav.PayloadDropoffMode",
+    targets=[UAV],
+    required_vision_nodes=[PayloadTrackingNode],
+    transition_labels=["complete"],
+)
 class PayloadDropoffMode(Mode):
     """
     A mode for dropping off the payload.
