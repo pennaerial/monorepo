@@ -1,7 +1,7 @@
 from importlib import import_module
 from typing import TYPE_CHECKING
 
-__all__ = ["AirframeClass", "Payload", "Vehicle", "UAV", "VTOL", "Multicopter"]
+__all__ = ["AirframeClass", "UAV", "VTOL", "Multicopter"]
 
 _EXPORTS = {
     "AirframeClass": ".vehicles.AirframeClass",
@@ -15,10 +15,8 @@ _EXPORTS = {
 if TYPE_CHECKING:
     from .vehicles.AirframeClass import AirframeClass
     from .vehicles.Multicopter import Multicopter
-    from .vehicles.Payload import Payload
     from .vehicles.UAV import UAV
     from .vehicles.VTOL import VTOL
-    from .vehicles.Vehicle import Vehicle
 
 
 def __getattr__(name: str):

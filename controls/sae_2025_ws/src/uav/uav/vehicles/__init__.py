@@ -3,20 +3,17 @@ from typing import TYPE_CHECKING
 
 __all__ = [
     "AirframeClass",
-    "Payload",
-    "Vehicle",
+    "PX4Airframe",
     "UAV",
     "VTOL",
     "Multicopter",
 ]
 
 if TYPE_CHECKING:
-    from .AirframeClass import AirframeClass
+    from .AirframeClass import AirframeClass, PX4Airframe
     from .Multicopter import Multicopter
-    from .Payload import Payload
     from .UAV import UAV
     from .VTOL import VTOL
-    from .Vehicle import Vehicle
 
 
 def __getattr__(name: str):
@@ -26,3 +23,18 @@ def __getattr__(name: str):
     value = getattr(module, name)
     globals()[name] = value
     return value
+
+
+# TOOD:  replace eventually with this after fixing integration
+# from .AirframeClass import AirframeClass, PX4Airframe
+# from .Multicopter import Multicopter
+# from .UAV import UAV
+# from .VTOL import VTOL
+#
+# __all__ = [
+#     "AirframeClass",
+#     "PX4Airframe",
+#     "UAV",
+#     "VTOL",
+#     "Multicopter",
+# ]
