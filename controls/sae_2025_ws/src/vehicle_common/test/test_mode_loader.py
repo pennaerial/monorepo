@@ -4,13 +4,13 @@ from vehicle_common.mode_loader import (
     deserialize_type,
     RegisteredMode,
     ModeRegistry,
-    mode_registry
+    mode_registry,
 )
 from mock_classes import MockMode, MockVehicle, MockVisionNode
 
 
 from vehicle_common.mode import Mode
-from uav.vision_nodes import VisionNode
+from vehicle_common.base import VisionNode
 import json
 
 

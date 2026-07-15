@@ -15,6 +15,7 @@ from typing import Optional, Tuple
 
 import cv2
 import numpy as np
+from pydantic import BaseModel
 from rclpy.node import Node
 from sensor_msgs.msg import CompressedImage, Image
 from payload_interfaces.msg import DriveCommand
@@ -49,6 +50,9 @@ class PayloadRetreatMode(Mode):
 
     Publishes DriveCommand to the payload's own namespaced command topic.
     """
+
+    class Params(BaseModel):
+        pass
 
     required_vision_nodes = (PayloadAprilTagNode,)
     transition_labels = ()

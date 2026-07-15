@@ -2,6 +2,7 @@ import time
 from typing import Literal
 
 import numpy as np
+from pydantic import BaseModel
 from px4_msgs.msg import VehicleStatus, VtolVehicleStatus
 from rclpy.node import Node
 
@@ -19,6 +20,9 @@ class TakeoffMode(Mode):
     """
     A VTOL takeoff mode that supports both vertical and runway-style launches.
     """
+
+    class Params(BaseModel):
+        pass
 
     transition_labels = ("complete",)
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional
 
+from pydantic import BaseModel
 from rclpy.node import Node
 from sensor_msgs.msg import CameraInfo, CompressedImage, Image
 from cv_bridge import CvBridge
@@ -40,6 +41,9 @@ class TagObservation:
 )
 class PayloadAprilTagApproachMode(Mode):
     """Drive the payload toward one AprilTag and terminate once close enough."""
+
+    class Params(BaseModel):
+        pass
 
     required_vision_nodes = ()
     requires_camera = True

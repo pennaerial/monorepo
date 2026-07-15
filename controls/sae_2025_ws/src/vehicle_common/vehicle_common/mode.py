@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 if TYPE_CHECKING:
     from rclpy.node import Node
-    from uav.vision_nodes import VisionNode
+    from vehicle_common.base import VisionNode
 else:
     # Avoid forcing ROS imports on pure-Python consumers (mission/fleet spec loading, integration backend)
     # Node is annotation-only but must exist at runtime for get_type_hints().

@@ -1,4 +1,5 @@
 import numpy as np
+from pydantic import BaseModel
 from rclpy.node import Node
 
 from uav.vehicles.UAV import UAV
@@ -19,6 +20,9 @@ class PayloadPickupMode(Mode):
     """
     A mode for picking up a payload.
     """
+
+    class Params(BaseModel):
+        pass
 
     required_vision_nodes = (PayloadTrackingNode,)
     transition_labels = ("complete",)

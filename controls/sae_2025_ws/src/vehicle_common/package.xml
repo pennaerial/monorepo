@@ -8,6 +8,7 @@
   <license>TODO: License declaration</license>
 
   <depend>python3-opencv</depend>
+  <depend>uav_interfaces</depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>python3-pytest</test_depend>

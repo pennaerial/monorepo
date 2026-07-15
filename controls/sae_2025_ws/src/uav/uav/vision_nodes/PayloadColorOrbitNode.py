@@ -6,7 +6,7 @@ import rclpy
 from rclpy.executors import ExternalShutdownException
 
 from uav.utils import green, pink
-from .VisionNode import VisionNode
+from vehicle_common.base import VisionNode
 from uav.vision_nodes.payload_perception_common import (
     AprilTagDetectorCache,
     DEFAULT_TAG_FAMILY,

@@ -6,6 +6,7 @@ from typing import Optional
 import cv2
 import numpy as np
 from cv_bridge import CvBridge
+from pydantic import BaseModel
 from rclpy.node import Node
 from sensor_msgs.msg import CompressedImage, Image
 
@@ -36,6 +37,9 @@ class PayloadScanForTagMode(Mode):
         "not_found" — completed a full 360° without seeing the tag; caller
                       should reposition and try again
     """
+
+    class Params(BaseModel):
+        pass
 
     required_vision_nodes = (PayloadAprilTagNode,)
     transition_labels = ("found", "not_found")

@@ -17,7 +17,7 @@ from sensor_msgs.msg import CompressedImage
 
 from uav_interfaces.srv import PayloadDriveOutState
 
-from .VisionNode import VisionNode
+from vehicle_common.base import VisionNode
 from .payload_perception_common import detect_payload_unreeled
 
 

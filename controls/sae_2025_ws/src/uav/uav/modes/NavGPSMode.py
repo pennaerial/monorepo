@@ -1,6 +1,8 @@
 from typing import Literal
 from rclpy.node import Node
 
+from pydantic import BaseModel
+
 from uav.vehicles.UAV import UAV
 from vehicle_common.mode import Mode
 from vehicle_common.mode_loader import register_mode
@@ -11,6 +13,9 @@ class NavGPSMode(Mode):
     """
     A mode for navigating to a GPS coordinate
     """
+
+    class Params(BaseModel):
+        pass
 
     transition_labels = ("complete",)
 

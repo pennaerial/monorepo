@@ -8,7 +8,7 @@ import yaml
 from mock_classes import MockMode, MockVehicle, MockVisionNode, MockVerticalTakeoffMode
 
 
-mock_mode_yaml  = """
+mock_mode_yaml = """
 mode: mock
 params: {}
 transitions: {}
@@ -18,12 +18,11 @@ transitions: {}
 def test_mode_validate():
     mode_dict = yaml.safe_load(mock_mode_yaml)
     runtime_mode = RuntimeMode.model_validate(mode_dict)
-    assert(runtime_mode.mode == "mock")
-    assert(runtime_mode.transitions == {})
-    assert(runtime_mode.params == {})
-    assert(runtime_mode._validated_params == MockMode.Params())
-    assert(runtime_mode._registered == mode_registry.get_registered_mode("mock"))
-
+    assert runtime_mode.mode == "mock"
+    assert runtime_mode.transitions == {}
+    assert runtime_mode.params == {}
+    assert runtime_mode._validated_params == MockMode.Params()
+    assert runtime_mode._registered == mode_registry.get_registered_mode("mock")
 
 
 mock_mission_yaml = """
@@ -49,7 +48,9 @@ def test_runtime_mission_parses_modes():
     takeoff = mission.modes["takeoff"]
     assert takeoff.mode == "mock.VerticalTakeoffMode"
     assert takeoff.transitions == {"complete": "loiter"}
-    assert takeoff._registered == mode_registry.get_registered_mode("mock.VerticalTakeoffMode")
+    assert takeoff._registered == mode_registry.get_registered_mode(
+        "mock.VerticalTakeoffMode"
+    )
     assert takeoff._validated_params == MockVerticalTakeoffMode.Params(
         takeoff_height=10.0, takeoff_method="OFFBOARD"
     )
@@ -64,8 +65,6 @@ def test_runtime_mission_parses_modes():
     assert mission._requires_camera is True
 
 
-
-
 mock_mission_yaml_2 = """
 modes:
   takeoff:
@@ -78,12 +77,11 @@ modes:
     transitions: {}
 """
 
+
 def test_runtime_mission_vision_nodes_empty_when_not_shared_by_all_modes():
     mission = RuntimeMission.model_validate(yaml.safe_load(mock_mission_yaml_2))
     # "mock" has no vision node requirement, so the intersection collapses to empty
     assert mission._vision_nodes == set()
-
-
 
 
 mission_3 = """
@@ -94,6 +92,7 @@ modes:
     transitions: {}
 """
 
+
 def test_runtime_mission_requires_camera_false_if_no_mode_requires_it():
     mission = RuntimeMission.model_validate(yaml.safe_load(mission_3))
     assert mission._requires_camera is False
@@ -102,6 +101,7 @@ def test_runtime_mission_requires_camera_false_if_no_mode_requires_it():
 def test_runtime_mission_forbids_extra_fields():
     with pytest.raises(ValidationError):
         RuntimeMission.model_validate({"modes": {}, "unexpected": "field"})
+
 
 def test_runtime_mode_forbids_extra_fields():
     with pytest.raises(ValidationError):
@@ -136,7 +136,7 @@ def test_runtime_mission_invalid_params_raises():
     with pytest.raises(ValidationError):
         RuntimeMission.model_validate(yaml.safe_load(bad_params))
 
+
 def test_runtime_mission_requires_at_least_one_mode():
     with pytest.raises(TypeError):
         RuntimeMission.model_validate({"modes": {}})
-

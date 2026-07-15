@@ -1,4 +1,5 @@
 from typing import Optional, Tuple
+from pydantic import BaseModel
 from rclpy.node import Node
 from uav.vehicles.UAV import UAV
 from vehicle_common.mode import Mode
@@ -10,6 +11,9 @@ class ServoDropoffMode(Mode):
     """
     A mode for dropping off the payload.
     """
+
+    class Params(BaseModel):
+        pass
 
     transition_labels = ("complete",)
 

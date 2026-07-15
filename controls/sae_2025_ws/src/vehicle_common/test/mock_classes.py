@@ -1,11 +1,12 @@
 from pydantic import BaseModel
 from vehicle_common.vehicle import Vehicle
 from vehicle_common.mode import Mode
-from uav.vision_nodes import VisionNode
+from vehicle_common.base import VisionNode
 
 from vehicle_common.mode_loader import (
     register_mode,
 )
+
 
 class MockVehicle(Vehicle):
     pass
@@ -39,6 +40,7 @@ class MockVerticalTakeoffMode(Mode):
         takeoff_height: float = 5.0
         takeoff_method: str = "PX4_AUTO"
 
+
 @register_mode(
     id="mock.loiter",
     targets=[MockVehicle],
@@ -52,4 +54,3 @@ class MockLoiterMode(Mode):
 
     class Params(BaseModel):
         pass
-

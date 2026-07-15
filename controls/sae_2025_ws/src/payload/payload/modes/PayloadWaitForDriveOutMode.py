@@ -29,6 +29,7 @@ from typing import Optional, List
 import cv2
 import numpy as np
 from cv_bridge import CvBridge
+from pydantic import BaseModel
 from rclpy.node import Node
 from sensor_msgs.msg import CompressedImage, Image
 
@@ -61,6 +62,9 @@ class PayloadWaitForDriveOutMode(Mode):
 
     Both conditions must hold continuously for wait_seconds before proceeding.
     """
+
+    class Params(BaseModel):
+        pass
 
     required_vision_nodes = ()
     requires_camera = True
