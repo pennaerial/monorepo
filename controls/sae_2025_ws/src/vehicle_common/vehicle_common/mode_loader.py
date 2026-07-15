@@ -1,4 +1,5 @@
 from __future__ import annotations
+from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, field_validator, field_serializer
 from typing import cast
@@ -7,6 +8,46 @@ from vehicle_common.vehicle import Vehicle
 from uav.vision_nodes import VisionNode
 import importlib
 import pkgutil
+
+
+def serialize_type(cls: type) -> str:
+    return f"{cls.__module__}:{cls.__qualname__}"
+
+
+def deserialize_type(path: str, base_cls: type) -> type:
+    """Resolve a serialized "module:QualName" path back into a class object.
+
+    Tries to instantiate the class after importing the module. The resolved
+    object must be a subclass of `base_cls`.
+
+    Args:
+        path: Serialized type reference in "module.path:QualName" form,
+            as produced by `serialize_type`.
+        base_cls: The class the resolved type must be a subclass of.
+
+    Returns:
+        The resolved class object.
+
+    Raises:
+        ValueError: If `path` isn't in "module:QualName" form, or the
+            resolved object is not a subclass of `base_cls`.
+    """
+
+    try:
+        module_path, class_name = path.split(":", 1)
+    except ValueError:
+        raise ValueError(f"Invalid type path '{path}'. Expected 'module:ClassName'")
+
+    module = importlib.import_module(module_path)
+    obj = module
+    for part in class_name.split("."):
+        obj = getattr(obj, part)
+
+    obj = cast(type, obj)
+    if not issubclass(obj, base_cls):
+        raise ValueError(f"{path} must be a {base_cls.__name__}")
+
+    return obj
 
 
 class RegisteredMode(BaseModel):
@@ -60,46 +101,45 @@ class RegisteredMode(BaseModel):
 class ModeRegistry(BaseModel):
     modes: dict[str, RegisteredMode]
 
+    def get_registered_mode(self, id: str) -> RegisteredMode:
+        try:
+            return self.modes[id]
+        except KeyError:
+            available = " ".join(self.modes.keys())
+            raise KeyError(f"Mode '{id}' not found.Available Modes are {available}")
 
-def serialize_type(cls: type) -> str:
-    return f"{cls.__module__}:{cls.__qualname__}"
+    def write_json(self, path: Path) -> None:
+        path.write_text(self.model_dump_json(indent=2))
+
+    def discover_modes(self, modules: list[str] = ["uav.modes", "payload.modes"]):
+        """Import every submodule under the given packages to trigger mode registration.
+
+        Recursively imports the passed in modules. Importing a file with `@register_mode(...)`-decorated
+        classes populates them into the Mode Registry
+
+        Args:
+            modules: Dotted package paths to walk and import submodules from.
+                Defaults to the UAV and payload mode packages.
+        """
+
+        for module in modules:
+            try:
+                pkg = importlib.import_module(module)
+            except ImportError as e:
+                print(e)
+                continue
+
+            if not hasattr(pkg, "__path__"):
+                continue
+
+            for _, name, _ in pkgutil.walk_packages(pkg.__path__, prefix=module + "."):
+                try:
+                    importlib.import_module(name)
+                except Exception as e:
+                    print(e)
 
 
-def deserialize_type(path: str, base_cls: type) -> type:
-    """Resolve a serialized "module:QualName" path back into a class object.
-
-    Tries to instantiate the class after importing the module. The resolved
-    object must be a subclass of `base_cls`.
-
-    Args:
-        path: Serialized type reference in "module.path:QualName" form,
-            as produced by `serialize_type`.
-        base_cls: The class the resolved type must be a subclass of.
-
-    Returns:
-        The resolved class object.
-
-    Raises:
-        ValueError: If `path` isn't in "module:QualName" form, or the
-            resolved object is not a subclass of `base_cls`.
-    """
-
-    try:
-        module_path, class_name = path.split(":", 1)
-    except ValueError:
-        raise ValueError(f"Invalid type path '{path}'. Expected 'module:ClassName'")
-
-    module = importlib.import_module(module_path)
-    obj = module
-    for part in class_name.split("."):
-        obj = getattr(obj, part)
-
-    obj = cast(type, obj)
-    if not issubclass(obj, base_cls):
-        raise ValueError(f"{path} must be a {base_cls.__name__}")
-
-    return obj
-
+mode_registry = ModeRegistry(modes=dict())
 
 def register_mode(
     id: str,
@@ -129,9 +169,9 @@ def register_mode(
     """
 
     def decorator(registered_mode_cls: type[Mode]):
-        if id in _mode_registry.modes:
+        if id in mode_registry.modes:
             raise ValueError(f"Id {id} already has a registered mode for it")
-        _mode_registry.modes[id] = RegisteredMode(
+        mode_registry.modes[id] = RegisteredMode(
             id=id,
             targets=targets,
             mode_cls=registered_mode_cls,
@@ -145,42 +185,3 @@ def register_mode(
     return decorator
 
 
-def discover_modes(modules: list[str] = ["uav.modes", "payload.modes"]):
-    """Import every submodule under the given packages to trigger mode registration.
-
-    Recursively imports the passed in modules. Importing a file with `@register_mode(...)`-decorated
-    classes populates them into the Mode Registry
-
-    Args:
-        modules: Dotted package paths to walk and import submodules from.
-            Defaults to the UAV and payload mode packages.
-    """
-
-    for module in modules:
-        try:
-            pkg = importlib.import_module(module)
-        except ImportError as e:
-            print(e)
-            continue
-
-        if not hasattr(pkg, "__path__"):
-            continue
-
-        for _, name, _ in pkgutil.walk_packages(pkg.__path__, prefix=module + "."):
-            try:
-                importlib.import_module(name)
-            except Exception as e:
-                print(e)
-                continue
-
-
-_mode_registry = ModeRegistry(modes=dict())
-
-
-def get_registered_mode(id: str) -> RegisteredMode:
-    try:
-        return _mode_registry.modes[id]
-    except KeyError:
-        available = " ".join(_mode_registry.modes.keys())
-
-        raise KeyError(f"Mode '{id}' not found.Available Modes are {available}")
