@@ -1,11 +1,11 @@
 from pydantic import BaseModel, ConfigDict, PrivateAttr
 from vehicle_common.mode import Vehicle
-from vehicle_common.mode_loader import RegisteredMode, get_registered_mode
+from vehicle_common.mode_loader import RegisteredMode, mode_registry
 from typing import Any
 
 
 class RuntimeMode(BaseModel):
-    model_config = ConfigDict(extra='forbid')
+    model_config = ConfigDict(extra="forbid")
 
     mode: str
     transitions: dict[str, str] = {}
@@ -14,13 +14,13 @@ class RuntimeMode(BaseModel):
     _registered: RegisteredMode = PrivateAttr()
 
     def model_post_init(self, context: Any, /) -> None:
-        self._registered = get_registered_mode(self.id)
+        self._registered = mode_registry.get_registered_mode(self.mode)
         mode_cls = self._registered.mode_cls
         self._validated_params = mode_cls.Params.model_validate(self.params)
 
 
 class RuntimeMission(BaseModel):
-    model_config = ConfigDict(extra='forbid')
+    model_config = ConfigDict(extra="forbid")
 
     modes: dict[str, RuntimeMode]
 
@@ -45,4 +45,3 @@ class RuntimeMission(BaseModel):
         self._vision_nodes = set.intersection(*vision_sets)
         self._peer_vehicle_names = set.intersection(*peer_vehicle_sets)
         self._requires_camera = requires_camera
-
