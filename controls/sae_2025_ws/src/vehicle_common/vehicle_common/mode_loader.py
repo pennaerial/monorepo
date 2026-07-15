@@ -1,14 +1,22 @@
 from __future__ import annotations
 from pathlib import Path
+from typing import cast
+import importlib
+import pkgutil
+import json
+import logging
 
 from pydantic import BaseModel, ConfigDict, field_validator, field_serializer
-from typing import cast
+from ament_index_python.packages import get_package_share_directory
+
+
 from vehicle_common.mode import Mode
 from vehicle_common.vehicle import Vehicle
 from vehicle_common.base import VisionNode  # don't want to depend on uav package
-import importlib
-import pkgutil
 
+VEHICLE_PACKAGES = ["uav", "payload"]
+
+logger = logging.getLogger(__name__)
 
 def serialize_type(cls: type) -> str:
     return f"{cls.__module__}:{cls.__qualname__}"
@@ -137,6 +145,35 @@ class ModeRegistry(BaseModel):
                     importlib.import_module(name)
                 except Exception as e:
                     print(e)
+
+    def init_from_json(self):
+        merged_modes: dict[str, RegisteredMode] = {}
+
+        for pkg in VEHICLE_PACKAGES:
+            share_dir = get_package_share_directory(pkg)
+            registry_path = Path(share_dir) / "mode_registry.json"
+            try:
+                with open(registry_path, "r") as file:
+                    data = json.load(file)
+            except FileNotFoundError:
+                logger.warning(
+                    f"No mode_registry.json found for package {pkg} at {registry_path}."
+                    f"Falling back to discovery..."
+                    )
+                self.discover_modes([f"{pkg}.modes"])
+                continue
+
+            pkg_registry = ModeRegistry.model_validate(data)
+            for id, mode in pkg_registry.modes.items():
+                if id in merged_modes:
+                    logger.warning(
+                        "Mode id '%s' from package '%s' collides with an "
+                        "already-registered mode; keeping the first "
+                        "registration and discarding this one.",
+                        id, pkg,
+                    )
+                    continue
+                merged_modes[id] = mode
 
 
 mode_registry = ModeRegistry(modes=dict())
