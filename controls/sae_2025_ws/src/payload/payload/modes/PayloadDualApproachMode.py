@@ -18,6 +18,7 @@ from typing import Optional, Tuple
 import cv2
 import numpy as np
 from cv_bridge import CvBridge
+from pydantic import BaseModel
 from rclpy.node import Node
 from sensor_msgs.msg import CameraInfo, CompressedImage, Image
 
@@ -67,6 +68,9 @@ def _color_blob_info(
 )
 class PayloadDualApproachMode(Mode):
     """Approach using AprilTag when visible, HSV colour fallback otherwise."""
+
+    class Params(BaseModel):
+        pass
 
     required_vision_nodes = ()
     requires_camera = True

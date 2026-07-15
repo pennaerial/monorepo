@@ -14,7 +14,7 @@ def load_vision_class(class_path: str):
 
     vision_class = getattr(module, class_name)
 
-    from uav.vision_nodes.VisionNode import VisionNode
+    from vehicle_common.base import VisionNode
 
     if not isinstance(vision_class, type) or not issubclass(vision_class, VisionNode):
         raise TypeError(

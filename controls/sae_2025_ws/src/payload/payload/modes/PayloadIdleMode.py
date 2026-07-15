@@ -2,6 +2,7 @@
 infra-level testing (UDP bridge, heartbeats, sensors) without running any
 mission logic."""
 
+from pydantic import BaseModel
 from rclpy.node import Node
 
 from payload.payload import Payload
@@ -15,6 +16,9 @@ _FOREVER = 0.0
     id="payload.PayloadIdleMode", targets=[Payload], transition_labels=["complete"]
 )
 class PayloadIdleMode(Mode):
+    class Params(BaseModel):
+        pass
+
     mission_target = "payload"
     required_vision_nodes = ()
     requires_camera = False

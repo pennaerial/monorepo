@@ -1,3 +1,4 @@
+from pydantic import BaseModel
 from px4_msgs.msg import VehicleStatus
 from rclpy.node import Node
 
@@ -17,6 +18,9 @@ class TakeoffMethod(StrEnum):
 )
 class VerticalTakeoffMode(Mode):
     """Vertical takeoff for any UAV airframe (multicopter or VTOL)."""
+
+    class Params(BaseModel):
+        pass
 
     transition_labels = ("complete",)
 

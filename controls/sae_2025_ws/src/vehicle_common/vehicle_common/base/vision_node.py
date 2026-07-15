@@ -1,5 +1,6 @@
 import os
 import uuid
+import re
 
 import cv2
 import numpy as np
@@ -9,8 +10,13 @@ from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from sensor_msgs.msg import CameraInfo, CompressedImage, Image
 from std_srvs.srv import Trigger
-from uav.utils import camel_to_snake
 from uav_interfaces.srv import CameraData
+
+
+def camel_to_snake(name):
+    # Convert CamelCase to snake_case.
+    s1 = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", name)
+    return re.sub("([a-z0-9])([A-Z])", r"\1_\2", s1).lower()
 
 
 class VisionNode(Node):

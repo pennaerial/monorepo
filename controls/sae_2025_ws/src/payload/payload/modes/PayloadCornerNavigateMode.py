@@ -53,6 +53,7 @@ from typing import Optional, Tuple
 import cv2
 import numpy as np
 from cv_bridge import CvBridge
+from pydantic import BaseModel
 from rclpy.node import Node
 from sensor_msgs.msg import CompressedImage, Image
 
@@ -75,6 +76,9 @@ _COLOR_DOMINANCE_RATIO = 1.5
     requires_camera=True,
 )
 class PayloadCornerNavigateMode(Mode):
+    class Params(BaseModel):
+        pass
+
     mission_target = "payload"
     transition_labels = ("complete",)
     requires_camera = True

@@ -9,7 +9,7 @@ from cv_bridge import CvBridge
 from rclpy.executors import ExternalShutdownException
 from sensor_msgs.msg import CameraInfo, CompressedImage
 
-from .VisionNode import VisionNode
+from vehicle_common.base import VisionNode
 from uav.vision_nodes.payload_perception_common import (
     AprilTagDetectorCache,
     DEFAULT_TAG_FAMILY,

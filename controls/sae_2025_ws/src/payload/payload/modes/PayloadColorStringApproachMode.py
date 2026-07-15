@@ -24,6 +24,7 @@ from typing import Optional, Tuple
 import cv2
 import numpy as np
 from cv_bridge import CvBridge
+from pydantic import BaseModel
 from rclpy.node import Node
 from sensor_msgs.msg import CompressedImage, Image
 
@@ -95,6 +96,9 @@ def _vertical_blob_centroid_area(
 )
 class PayloadColorStringApproachMode(Mode):
     """Drive toward a coloured target using HSV blob detection."""
+
+    class Params(BaseModel):
+        pass
 
     required_vision_nodes = ()
     requires_camera = True

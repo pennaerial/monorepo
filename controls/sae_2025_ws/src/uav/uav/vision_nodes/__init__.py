@@ -1,6 +1,4 @@
-from .VisionNode import (
-    VisionNode as VisionNode,
-)  # make sure to import the parent class FIRST (to avoid circular imports)
+from vehicle_common.base import VisionNode as VisionNode
 from .PayloadAprilTagNode import PayloadAprilTagNode as PayloadAprilTagNode
 from .PayloadColorOrbitNode import PayloadColorOrbitNode as PayloadColorOrbitNode
 from .PayloadColorSquareNode import PayloadColorSquareNode as PayloadColorSquareNode

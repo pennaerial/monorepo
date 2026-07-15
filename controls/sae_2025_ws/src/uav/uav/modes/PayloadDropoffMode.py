@@ -1,6 +1,7 @@
 from typing import Optional, Tuple
 
 import numpy as np
+from pydantic import BaseModel
 from px4_msgs.msg import VehicleStatus
 from rclpy.node import Node
 
@@ -22,6 +23,9 @@ class PayloadDropoffMode(Mode):
     """
     A mode for dropping off the payload.
     """
+
+    class Params(BaseModel):
+        pass
 
     required_vision_nodes = (PayloadTrackingNode,)
     transition_labels = ("complete",)

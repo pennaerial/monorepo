@@ -1,4 +1,5 @@
 import numpy as np
+from pydantic import BaseModel
 from rclpy.node import Node
 from typing import Literal
 
@@ -16,6 +17,9 @@ class TransitionMode(Mode):
     """
     A VTOL-only mode for transitioning between multicopter and fixed-wing flight.
     """
+
+    class Params(BaseModel):
+        pass
 
     transition_labels = ("complete",)
 

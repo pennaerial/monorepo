@@ -1,5 +1,6 @@
 from rclpy.node import Node
 from px4_msgs.msg import VehicleStatus
+from pydantic import BaseModel
 
 from uav.vehicles.UAV import UAV
 from vehicle_common.mode import Mode
@@ -11,6 +12,9 @@ class LandingMode(Mode):
     """
     A mode for landing vertically.
     """
+
+    class Params(BaseModel):
+        pass
 
     def __init__(self, node: Node, vehicle: UAV):
         """

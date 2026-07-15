@@ -5,6 +5,8 @@ import math
 import time
 from typing import List
 
+from pydantic import BaseModel
+
 from uav.vehicles.UAV import UAV
 
 from vehicle_common.mode import Mode
@@ -17,6 +19,9 @@ class WaypointMission(Mode):
     Simple waypoint mission for testing scoring node.
     Flies through a series of waypoints defined in YAML.
     """
+
+    class Params(BaseModel):
+        pass
 
     def __init__(
         self,

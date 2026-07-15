@@ -8,6 +8,7 @@ from typing_extensions import TypedDict
 import cv2
 import numpy as np
 from cv_bridge import CvBridge
+from pydantic import BaseModel
 from rclpy.node import Node
 from sensor_msgs.msg import CompressedImage, Image
 
@@ -172,6 +173,9 @@ class PayloadDLZNavigateMode(Mode):
         "0|4|5,2" = (tag 0 OR 4 OR 5 visible) AND (tag 2 visible).
         Test keys in YAML order — put more-specific rules first.
     """
+
+    class Params(BaseModel):
+        pass
 
     required_vision_nodes = (PayloadAprilTagNode,)
     transition_labels = ("done",)

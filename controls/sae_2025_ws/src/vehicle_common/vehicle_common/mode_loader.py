@@ -5,7 +5,7 @@ from pydantic import BaseModel, ConfigDict, field_validator, field_serializer
 from typing import cast
 from vehicle_common.mode import Mode
 from vehicle_common.vehicle import Vehicle
-from uav.vision_nodes import VisionNode
+from vehicle_common.base import VisionNode  # don't want to depend on uav package
 import importlib
 import pkgutil
 
@@ -141,6 +141,7 @@ class ModeRegistry(BaseModel):
 
 mode_registry = ModeRegistry(modes=dict())
 
+
 def register_mode(
     id: str,
     targets: list[type[Vehicle]],
@@ -183,5 +184,3 @@ def register_mode(
         return registered_mode_cls
 
     return decorator
-
-

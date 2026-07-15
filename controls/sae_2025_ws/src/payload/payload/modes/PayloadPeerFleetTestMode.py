@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 from typing import Mapping
 
+from pydantic import BaseModel
 from rclpy.node import Node
 from std_msgs.msg import String
 
@@ -33,6 +34,9 @@ from vehicle_common.mode_loader import register_mode
 )
 class PayloadPeerFleetTestMode(Mode):
     """Passive multi-payload communication demo for fleet bring-up."""
+
+    class Params(BaseModel):
+        pass
 
     required_vision_nodes = ()
     peer_vehicle_names = ("payload_0", "payload_1")
