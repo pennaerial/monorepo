@@ -1,32 +1,17 @@
 import pytest
-
 from vehicle_common.mode_loader import (
     serialize_type,
     deserialize_type,
     RegisteredMode,
-    register_mode,
-    get_registered_mode,
     ModeRegistry,
+    mode_registry
 )
+from mock_classes import MockMode, MockVehicle, MockVisionNode
 
 
 from vehicle_common.mode import Mode
-from vehicle_common.vehicle import Vehicle
 from uav.vision_nodes import VisionNode
 import json
-
-
-class MockVehicle(Vehicle):
-    pass
-
-
-class MockVisionNode(VisionNode):
-    pass
-
-
-@register_mode(id="mock", targets=[MockVehicle])
-class MockMode(Mode):
-    pass
 
 
 def test_serialize_types():
@@ -61,7 +46,7 @@ def test_registered_mode_creation():
 
 
 def test_get_registered_mode():
-    m = get_registered_mode("mock")
+    m = mode_registry.get_registered_mode("mock")
     assert m.id == "mock"
     assert m.mode_cls == MockMode
     assert m.required_vision_nodes == []
@@ -124,6 +109,11 @@ def test_registered_mode_json_round_trip():
     )
 
     loaded = RegisteredMode.model_validate_json(original.model_dump_json())
+    print(loaded.model_dump())
+    print()
+    print()
+    print()
+    print(original.model_dump())
 
     assert loaded.model_dump() == original.model_dump()
 
@@ -158,9 +148,9 @@ def test_mode_registry_json_round_trip():
         "modes": {
             "mock": {
                 "id": "mock",
-                "mode_cls": "test_mode_loader:MockMode",
+                "mode_cls": "mock_classes:MockMode",
                 "targets": [
-                    "test_mode_loader:MockVehicle"
+                    "mock_classes:MockVehicle"
                 ],
                 "required_vision_nodes": [],
                 "peer_vehicle_names": [],
