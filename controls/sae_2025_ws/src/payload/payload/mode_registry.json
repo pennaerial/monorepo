@@ -1,0 +1,68 @@
+{
+  "modes": {
+    "payload.PayloadColorStringApproachMode": {
+      "id": "payload.PayloadColorStringApproachMode",
+      "mode_cls": "payload.modes.PayloadColorStringApproachMode:PayloadColorStringApproachMode",
+      "targets": [
+        "payload.payload:Payload"
+      ],
+      "required_vision_nodes": [],
+      "peer_vehicle_names": [],
+      "requires_camera": true,
+      "transition_labels": []
+    },
+    "payload.PayloadCornerNavigateMode": {
+      "id": "payload.PayloadCornerNavigateMode",
+      "mode_cls": "payload.modes.PayloadCornerNavigateMode:PayloadCornerNavigateMode",
+      "targets": [
+        "payload.payload:Payload"
+      ],
+      "required_vision_nodes": [],
+      "peer_vehicle_names": [],
+      "requires_camera": true,
+      "transition_labels": [
+        "complete"
+      ]
+    },
+    "payload.PayloadIdleMode": {
+      "id": "payload.PayloadIdleMode",
+      "mode_cls": "payload.modes.PayloadIdleMode:PayloadIdleMode",
+      "targets": [
+        "payload.payload:Payload"
+      ],
+      "required_vision_nodes": [],
+      "peer_vehicle_names": [],
+      "requires_camera": false,
+      "transition_labels": [
+        "complete"
+      ]
+    },
+    "payload.PayloadPeerFleetTestMode": {
+      "id": "payload.PayloadPeerFleetTestMode",
+      "mode_cls": "payload.modes.PayloadPeerFleetTestMode:PayloadPeerFleetTestMode",
+      "targets": [
+        "payload.payload:Payload"
+      ],
+      "required_vision_nodes": [],
+      "peer_vehicle_names": [
+        "payload_0",
+        "payload_1"
+      ],
+      "requires_camera": false,
+      "transition_labels": []
+    },
+    "payload.PayloadWaitForDriveOutMode": {
+      "id": "payload.PayloadWaitForDriveOutMode",
+      "mode_cls": "payload.modes.PayloadWaitForDriveOutMode:PayloadWaitForDriveOutMode",
+      "targets": [
+        "payload.payload:Payload"
+      ],
+      "required_vision_nodes": [],
+      "peer_vehicle_names": [],
+      "requires_camera": true,
+      "transition_labels": [
+        "complete"
+      ]
+    }
+  }
+}

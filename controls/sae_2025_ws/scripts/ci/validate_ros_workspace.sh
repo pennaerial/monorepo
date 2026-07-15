@@ -19,13 +19,6 @@ ci_log "Compiling Python sources"
 mapfile -t python_files < <(ci_py_files)
 python3 -m py_compile "${python_files[@]}"
 
-ci_log "Checking committed mode schema registry"
-ci_source_workspace "$WORKSPACE_ROOT"
-SCHEMA_REGISTRY_PATH="$WORKSPACE_ROOT/src/vehicle_common/vehicle_common/runtime/mode_registry.json"
-PYTHONPATH="$WORKSPACE_ROOT/src/uav:${PYTHONPATH:-}" \
-    python3 -m vehicle_common.runtime.schema_generator \
-    --check \
-    --output "$SCHEMA_REGISTRY_PATH"
 
 ci_log "Running colcon test"
 ci_source_workspace "$WORKSPACE_ROOT"

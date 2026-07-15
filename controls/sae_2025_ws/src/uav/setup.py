@@ -1,26 +1,25 @@
 from glob import glob
 import os
-import sys
 
 from setuptools import find_packages, setup
-from setuptools.command.build_py import build_py
-from pathlib import Path
-
-from vehicle_common.mode_loader import mode_registry
-
-UAV_MODE_REGISTRY_PATH = Path(__file__).parent / "uav" / "uav_mode_registry.json"
 
 
-class BuildUAVModeRegistry(build_py):
-    def run(self):
-        print("RUNNING UAV CUSTOM BUILD STEP")
-        try:
-            mode_registry.discover_modes(["uav.modes"])
-            mode_registry.write_json(UAV_MODE_REGISTRY_PATH)
-        except Exception as e:
-            sys.exit(f"uav mode registry build failed: {e}")
-        build_py.run(self)  # continue normal build
+# Keeping these comments in case we want to micro optimize with static jsons at build time
+# UAV_MODE_REGISTRY_PATH = Path(__file__).parent / "uav" / "mode_registry.json"
 
+
+# class BuildUAVModeRegistry(build_py):
+#     def run(self):
+#         print("RUNNING UAV CUSTOM BUILD STEP")
+#         try:
+#             # plain instance, not the imported single that uses json
+#             mode_registry = ModeRegistry(modes=dict())
+#             mode_registry.discover_modes(["uav.modes"])
+#             mode_registry.write_json(UAV_MODE_REGISTRY_PATH)
+#         except Exception as e:
+#             sys.exit(f"uav mode registry build failed: {e}")
+#         build_py.run(self)  # continue normal build
+#
 
 package_name = "uav"
 
@@ -28,9 +27,9 @@ setup(
     name=package_name,
     version="0.0.0",
     packages=find_packages(exclude=["test"]),
-    cmdclass={"build_py": BuildUAVModeRegistry},  # define our custom build step here
+    # cmdclass={"build_py": BuildUAVModeRegistry},  # define our custom build step here
     package_data={
-        package_name: ["missions/*.yaml", "fleets/*.yaml", "uav_mode_registry.json"]
+        package_name: ["missions/*.yaml", "fleets/*.yaml", "mode_registry.json"]
     },
     data_files=[
         ("share/ament_index/resource_index/packages", ["resource/" + package_name]),
@@ -59,10 +58,10 @@ setup(
             os.path.join("share", package_name, "fleets"),
             glob(os.path.join("fleets", "*.yaml")),
         ),
-        (
-            os.path.join("share", package_name),
-            [str(UAV_MODE_REGISTRY_PATH)],
-        ),
+        # (
+        #     os.path.join("share", package_name),
+        #     [str(UAV_MODE_REGISTRY_PATH)],
+        # ),
     ],
     install_requires=["setuptools", "apriltag", "pydantic>=2,<3"],
     zip_safe=True,
