@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, ClassVar, Mapping
+from typing import TYPE_CHECKING, ClassVar, Generic, Mapping, TypeVar
 
 from vehicle_common.vehicle import Vehicle
 from vehicle_common.runtime.vision_loader import canonical_vision_node_path
@@ -13,8 +13,10 @@ else:
     # Node is annotation-only but must exist at runtime for get_type_hints().
     Node = object
 
+VehicleT = TypeVar("VehicleT", bound=Vehicle)
 
-class Mode(ABC):
+
+class Mode(Generic[VehicleT], ABC):
     """
     Base class for UAV operational modes within a ROS 2 node.
     Provides a structured template for implementing autonomous behaviors.
@@ -38,7 +40,7 @@ class Mode(ABC):
                 f"{cls.__name__}.Params must be a subclass of BaseModel got {params_cls!r}"
             )
 
-    def __init__(self, node: Node, vehicle: Vehicle):
+    def __init__(self, node: Node, vehicle: VehicleT):
         """
         Initialize the mode with a reference to the ROS 2 node.
 
@@ -48,7 +50,7 @@ class Mode(ABC):
         """
         self.node = node
         self.active = False
-        self.vehicle = vehicle
+        self.vehicle: VehicleT = vehicle
         self.pending_requests = {}
 
     @classmethod

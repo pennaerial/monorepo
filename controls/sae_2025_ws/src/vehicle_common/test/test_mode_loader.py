@@ -14,6 +14,7 @@ import json
 
 mode_registry = ModeRegistry.get()
 
+
 def test_serialize_types():
     result = serialize_type(MockMode)
     assert result == (f"{MockMode.__module__}:{MockMode.__qualname__}")
