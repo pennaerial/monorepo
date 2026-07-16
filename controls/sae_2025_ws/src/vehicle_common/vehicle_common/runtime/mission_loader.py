@@ -1,8 +1,7 @@
 from pydantic import BaseModel, ConfigDict, PrivateAttr
-from vehicle_common.mode import Mode, Vehicle
-from vehicle_common.mode_loader import RegisteredMode, mode_registry
+from vehicle_common.mode import Vehicle
+from vehicle_common.mode_loader import RegisteredMode, ModeRegistry
 from typing import Any
-from rclpy.node import Node
 
 
 class RuntimeMode(BaseModel):
@@ -15,6 +14,7 @@ class RuntimeMode(BaseModel):
     _registered: RegisteredMode = PrivateAttr()
 
     def model_post_init(self, context: Any, /) -> None:
+        mode_registry = ModeRegistry.get()
         self._registered = mode_registry.get_registered_mode(self.mode)
         mode_cls = self._registered.mode_cls
         self._validated_params = mode_cls.Params.model_validate(self.params)

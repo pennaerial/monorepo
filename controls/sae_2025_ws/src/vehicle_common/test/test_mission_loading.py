@@ -2,11 +2,13 @@ import pytest
 from pydantic import ValidationError
 
 from vehicle_common.runtime.mission_loader import RuntimeMode, RuntimeMission
-from vehicle_common.mode_loader import mode_registry
+from vehicle_common.mode_loader import ModeRegistry
 import yaml
 
 from mock_classes import MockMode, MockVehicle, MockVisionNode, MockVerticalTakeoffMode
 
+
+mode_registry = ModeRegistry.get()
 
 mock_mode_yaml = """
 mode: mock

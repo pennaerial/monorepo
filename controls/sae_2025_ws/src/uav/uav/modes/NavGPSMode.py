@@ -9,7 +9,7 @@ from vehicle_common.mode_loader import register_mode
 
 
 @register_mode(id="uav.NavGPSMode", targets=[UAV], transition_labels=["complete"])
-class NavGPSMode(Mode):
+class NavGPSMode(Mode[UAV]):
     """
     A mode for navigating to a GPS coordinate
     """
