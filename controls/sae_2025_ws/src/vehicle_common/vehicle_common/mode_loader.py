@@ -1,22 +1,16 @@
 from __future__ import annotations
 from pathlib import Path
-from typing import cast
+from typing import cast, ClassVar
 import importlib
 import pkgutil
-import json
-import logging
 
 from pydantic import BaseModel, ConfigDict, field_validator, field_serializer
-from ament_index_python.packages import get_package_share_directory
 
 
 from vehicle_common.mode import Mode
 from vehicle_common.vehicle import Vehicle
 from vehicle_common.base import VisionNode  # don't want to depend on uav package
 
-VEHICLE_PACKAGES = ["uav", "payload"]
-
-logger = logging.getLogger(__name__)
 
 def serialize_type(cls: type) -> str:
     return f"{cls.__module__}:{cls.__qualname__}"
@@ -109,6 +103,16 @@ class RegisteredMode(BaseModel):
 class ModeRegistry(BaseModel):
     modes: dict[str, RegisteredMode]
 
+    _pending: ClassVar[list[RegisteredMode]] = []
+    _instance: ClassVar[ModeRegistry | None] = None
+
+    @classmethod
+    def get(cls) -> ModeRegistry:
+        if cls._instance is None:
+            cls._instance = ModeRegistry(modes=dict())
+            cls._instance.discover_modes()
+        return cls._instance
+
     def get_registered_mode(self, id: str) -> RegisteredMode:
         try:
             return self.modes[id]
@@ -123,7 +127,7 @@ class ModeRegistry(BaseModel):
         """Import every submodule under the given packages to trigger mode registration.
 
         Recursively imports the passed in modules. Importing a file with `@register_mode(...)`-decorated
-        classes populates them into the Mode Registry
+        classes populates them into the _pending list, which this then commits into `self.modes`.
 
         Args:
             modules: Dotted package paths to walk and import submodules from.
@@ -146,37 +150,10 @@ class ModeRegistry(BaseModel):
                 except Exception as e:
                     print(e)
 
-    def init_from_json(self):
-        merged_modes: dict[str, RegisteredMode] = {}
-
-        for pkg in VEHICLE_PACKAGES:
-            share_dir = get_package_share_directory(pkg)
-            registry_path = Path(share_dir) / "mode_registry.json"
-            try:
-                with open(registry_path, "r") as file:
-                    data = json.load(file)
-            except FileNotFoundError:
-                logger.warning(
-                    f"No mode_registry.json found for package {pkg} at {registry_path}."
-                    f"Falling back to discovery..."
-                    )
-                self.discover_modes([f"{pkg}.modes"])
-                continue
-
-            pkg_registry = ModeRegistry.model_validate(data)
-            for id, mode in pkg_registry.modes.items():
-                if id in merged_modes:
-                    logger.warning(
-                        "Mode id '%s' from package '%s' collides with an "
-                        "already-registered mode; keeping the first "
-                        "registration and discarding this one.",
-                        id, pkg,
-                    )
-                    continue
-                merged_modes[id] = mode
-
-
-mode_registry = ModeRegistry(modes=dict())
+        for reg in ModeRegistry._pending:
+            if reg.id in self.modes:
+                raise ValueError(f"Id {reg.id} already has a registered mode for it")
+            self.modes[reg.id] = reg
 
 
 def register_mode(
@@ -187,7 +164,10 @@ def register_mode(
     requires_camera: bool = False,
     transition_labels: list[str] = [],
 ):
-    """Decorator that registers a Mode in the Mode Registry.
+    """Class decorator that registers a Mode in the Mode Registry.
+    Class decorators can only run once, so the registered mode is put into a global
+    pending list in ModeRegistry. A ModeRegistry instance only picks it up once its
+    own discover_modes() runs.
 
     Args:
         id: used as main key to store and retrieve RegisteredMode objects
@@ -201,22 +181,19 @@ def register_mode(
     Returns:
         A decorator that registers the given `Mode` subclass and
         returns it unchanged.
-
-    Raises:
-        ValueError: If `id` is already exists
     """
 
     def decorator(registered_mode_cls: type[Mode]):
-        if id in mode_registry.modes:
-            raise ValueError(f"Id {id} already has a registered mode for it")
-        mode_registry.modes[id] = RegisteredMode(
-            id=id,
-            targets=targets,
-            mode_cls=registered_mode_cls,
-            required_vision_nodes=required_vision_nodes,
-            peer_vehicle_names=peer_vehicle_names,
-            requires_camera=requires_camera,
-            transition_labels=transition_labels,
+        ModeRegistry._pending.append(
+            RegisteredMode(
+                id=id,
+                targets=targets,
+                mode_cls=registered_mode_cls,
+                required_vision_nodes=required_vision_nodes,
+                peer_vehicle_names=peer_vehicle_names,
+                requires_camera=requires_camera,
+                transition_labels=transition_labels,
+            )
         )
         return registered_mode_cls
 

@@ -31,7 +31,7 @@ from vehicle_common.runtime.vision_loader import (
     canonical_vision_node_path,
     load_vision_class,
 )
-from vehicle_common.runtime.plugin_loader import load_plugin_cls
+from vehicle_common.mode_loader import ModeRegistry
 
 
 @dataclass(frozen=True)
@@ -64,7 +64,7 @@ class ModeManager(Node):
     ) -> None:
         super().__init__(node_name)
         self.vehicle: Vehicle | None = None
-        self.modes: dict[str, Mode[Any]] = {}
+        self.modes: dict[str, Mode] = {}
         self.transitions: dict[str, dict[str, str]] = {}
         self.active_mode: str | None = None
         self.last_update_time = time()
@@ -354,10 +354,9 @@ class ModeManager(Node):
     # Should move this out, this is a helper function, can use composition
     # with outside module instead of inheritance
     def initialize_mode(self, mode_id: str, params: dict) -> Mode:
-        # mode_entry = mode_entry_for_mode_id(mode_id)
-        # mode_class = load_mode_class(mode_entry.class_path)
-        mode_class = load_plugin_cls(Mode, mode_id)
-        peer_vehicle_names = self._mode_peer_names(mode_class)
+        registered_mode = ModeRegistry.get().get_registered_mode(mode_id)
+        mode_class = registered_mode.mode_cls
+        peer_vehicle_names = registered_mode.peer_vehicle_names
         signature = inspect.signature(mode_class.__init__)
         type_hints = get_type_hints(mode_class.__init__)
         args = {}
@@ -394,7 +393,7 @@ class ModeManager(Node):
             mode_class=mode_class,
             args=args,
             mode_id=mode_id,
-            peer_vehicle_names=peer_vehicle_names,
+            peer_vehicle_names=tuple(peer_vehicle_names),
         )
 
     def _validate_vehicle_annotation(self, mode_path: str, annotation) -> None:
