@@ -4,7 +4,6 @@ from vehicle_common.mode_loader import (
     deserialize_type,
     RegisteredMode,
     ModeRegistry,
-    mode_registry,
 )
 from mock_classes import MockMode, MockVehicle, MockVisionNode
 
@@ -13,6 +12,7 @@ from vehicle_common.mode import Mode
 from vehicle_common.base import VisionNode
 import json
 
+mode_registry = ModeRegistry.get()
 
 def test_serialize_types():
     result = serialize_type(MockMode)
