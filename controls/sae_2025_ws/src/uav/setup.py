@@ -28,9 +28,7 @@ setup(
     version="0.0.0",
     packages=find_packages(exclude=["test"]),
     # cmdclass={"build_py": BuildUAVModeRegistry},  # define our custom build step here
-    package_data={
-        package_name: ["missions/*.yaml", "fleets/*.yaml", "mode_registry.json"]
-    },
+    package_data={package_name: ["missions/*.yaml", "fleets/*.yaml"]},
     data_files=[
         ("share/ament_index/resource_index/packages", ["resource/" + package_name]),
         ("share/" + package_name, ["package.xml"]),
