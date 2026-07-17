@@ -152,9 +152,7 @@ def clean_text(text):
     ansi_escape = re.compile(r"\x1b\[[0-9;]*m")
     return ansi_escape.sub("", text).strip()
 
+
 def get_available_missions() -> list[str]:
     path = Path(get_package_share_directory("uav")) / "missions"
-    return [
-        mission.stem
-        for mission in path.glob("*.yaml")
-    ]
+    return [mission.stem for mission in path.glob("*.yaml")]

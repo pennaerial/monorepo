@@ -5,14 +5,14 @@ from pathlib import Path
 
 from ament_index_python.packages import get_package_share_directory
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.actions import IncludeLaunchDescription, RegisterEventHandler
-from launch import Action, EventHandler, Event
+from launch.actions import IncludeLaunchDescription
 
 PA_LAUNCH_DEBUG = os.getenv("PA_LAUNCH_DEBUG", "0").lower() == "1"
 
 RED = "\033[31m"
 CYAN = "\033[36m"
 RESET = "\033[0m"
+
 
 class PennairFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
@@ -23,6 +23,7 @@ class PennairFormatter(logging.Formatter):
 
         return msg
 
+
 def get_logger(name: str) -> logging.Logger:
     logger = logging.getLogger(name)
     handler = logging.StreamHandler()
@@ -30,16 +31,13 @@ def get_logger(name: str) -> logging.Logger:
     if not logger.handlers:
         handler = logging.StreamHandler()
         handler.setFormatter(
-            PennairFormatter(
-                "[PENNAIR] [%(levelname)s] [%(name)s] %(message)s"
-            )
+            PennairFormatter("[PENNAIR] [%(levelname)s] [%(name)s] %(message)s")
         )
         logger.addHandler(handler)
         logger.propagate = False
     logger.setLevel(logging.DEBUG if PA_LAUNCH_DEBUG else logging.INFO)
 
     return logger
-
 
 
 class LaunchError(Exception):
@@ -68,24 +66,8 @@ def check_unknown_launch_args(
 
 def include_launch(pkg: str, launch_file: str) -> IncludeLaunchDescription:
     path = Path(get_package_share_directory(pkg)) / "launch" / launch_file
-    return IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(str(path))
-    )
+    return IncludeLaunchDescription(PythonLaunchDescriptionSource(str(path)))
 
-def on_emitted_event(actions: list[Action], event: type[Event]) -> RegisterEventHandler:
-    """Wraps a sequences of actions around an EventHandler so that the actions will
-    fire after the specified Event type has been emitted
-
-    Args:
-        actions: list of actions
-        event: Event type to listen for
-
-    Returns:
-        The RegisterEventHandler listener object
-    """
-    return RegisterEventHandler(
-        EventHandler(matcher=lambda e: isinstance(e, event), entities=actions)
-    )
 
 def format_bullet_list(title: str, options: list[str]) -> str:
     """Formats a list of strings as a bullet list in the description section of a declared launch arguments
@@ -93,7 +75,4 @@ def format_bullet_list(title: str, options: list[str]) -> str:
     yourself
     """
 
-    return (
-        f"{title}\n"
-        + "\n".join(f"\t  • {option}" for option in options)
-    )
+    return f"{title}\n" + "\n".join(f"\t  • {option}" for option in options)
