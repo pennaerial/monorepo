@@ -1,7 +1,6 @@
 from enum import StrEnum
 
-from launch import Action, LaunchDescription, Event
-from launch.conditions import IfCondition
+from launch import Action, LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
     OpaqueFunction,
@@ -15,13 +14,16 @@ from vehicle_common.launch_utils import (
     get_logger,
     LaunchError,
     check_unknown_launch_args,
-    on_emitted_event,
     include_launch,
-    format_bullet_list
+    format_bullet_list,
 )
 
 
 logger = get_logger("uav_sitl.launch")
+
+
+def as_bool(value: str) -> bool:
+    return value.lower() == "true"
 
 
 class Args(StrEnum):
@@ -64,40 +66,58 @@ def px4_sitl_action(
 
 def launch_setup(context):
     config = context.launch_configurations  # dict containing declared launch arguments
-    check_unknown_launch_args(Args, config, logger)
-    ns_id = config["ns_id"]
+    check_unknown_launch_args(Args, config, logger)  # warn for unknown args
+
+    mission: str = config[Args.MISSION]  # validate mission
+    if mission not in get_available_missions():
+        raise LaunchError(
+            f"Mission: {mission} is not valid. Use --show-args to see list of valid missions"
+        )
+
+    ns_id = int(config[Args.NS_ID])
     vehicle_ns = f"uav_{ns_id}"
 
     try:
-        airframe: PX4Airframe = PX4Airframe.lookup_airframe(config["airframe"])
+        airframe: PX4Airframe = PX4Airframe.lookup_airframe(config[Args.AIRFRAME])
     except KeyError:
         raise LaunchError(
-            f"Airframe: {config['airframe']} is not valid. Use ros2 launch uav uav_sitl.launch.py --show-args to see list of valid airframes"
+            f"Airframe: {config[Args.AIRFRAME]} is not valid. Use --show-args to see list of valid airframes"
         )
 
-    logger.debug(f"Using PX4Airframe: {airframe}")
+    px4_path = config[Args.PX4_PATH]
+    sim_world = config[Args.WORLD]
+    standalone: bool = as_bool(config[Args.STANDALONE])
+    run_mw: bool = standalone or as_bool(config[Args.RUN_MW])
+    launch_sim: bool = standalone or as_bool(config[Args.LAUNCH_SIM])
 
-    px4_path = config["px4_path"]
-    print(vehicle_ns)
-    print(px4_path)
-    # print(airframe)
+    # PRINTING HEADER
+    logger.debug("LAUNCH PARAMS")
+    logger.debug(f"Mission:             {mission}")
+    logger.debug(f"Vehicle Namespace:   {vehicle_ns}")
+    logger.debug(f"PX4 Airframe:        {airframe}")
+    logger.debug(f"PX4 Path:            {px4_path}")
+    logger.debug(f"Sim World:           {sim_world}")
+    logger.debug(f"Standalone Mode:     {standalone}")
+    logger.debug(f"Middleware:          {run_mw}")
+    logger.debug(f"Launch Sim:          {launch_sim}")
+
+    actions = []
 
     middleware = ExecuteProcess(
         cmd=["MicroXRCEAgent", "udp4", "-p", "8888"],
         output="screen",
         name="MicroXRCEAgent",
-        condition=IfCondition(config["run_mw"]),
-        log_cmd=True,
     )
+    if run_mw:
+        actions.append(middleware)
 
+    px4_sitl = px4_sitl_action(px4_path, airframe.id, vehicle_ns, sim_world)
+    actions.append(px4_sitl)
 
-    px4_sitl = on_emitted_event(actions=[], event=Event)
-    # sim_launch = include_launch("sim", "sim.launch.py")
+    include_sim_launch = include_launch("sim", "sim.launch.py")
+    if launch_sim:
+        actions.append(include_sim_launch)
 
-    actions = [
-        middleware,
-        px4_sitl,
-    ]
     return actions
 
 
@@ -114,7 +134,7 @@ def generate_launch_description():
                 default_value="basic",
                 description=format_bullet_list(
                     "Name of the mission to load.\n\tAvailable missions:",
-                    get_available_missions()
+                    get_available_missions(),
                 ),
             ),
             DeclareLaunchArgument(
@@ -127,8 +147,8 @@ def generate_launch_description():
                 default_value="quadcopter",
                 description=format_bullet_list(
                     "UAV airframe to load.\n\tAvailable airframes: (alias/id/model)",
-                    PX4Airframe.get_flying()
-                )
+                    PX4Airframe.get_flying(),
+                ),
             ),
             DeclareLaunchArgument(
                 Args.WORLD,
