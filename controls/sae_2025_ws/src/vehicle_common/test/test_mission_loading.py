@@ -5,7 +5,12 @@ from vehicle_common.runtime.mission_loader import RuntimeMode, RuntimeMission
 from vehicle_common.mode_loader import ModeRegistry
 import yaml
 
-from mock_classes import MockMode, MockVehicle, MockVisionNode, MockVerticalTakeoffMode
+from mock_classes import (
+    MockParams,
+    MockVehicle,
+    MockVerticalTakeoffParams,
+    MockVisionNode,
+)
 
 
 mode_registry = ModeRegistry.get()
@@ -23,7 +28,7 @@ def test_mode_validate():
     assert runtime_mode.mode == "mock"
     assert runtime_mode.transitions == {}
     assert runtime_mode.params == {}
-    assert runtime_mode._validated_params == MockMode.Params()
+    assert runtime_mode._validated_params == MockParams()
     assert runtime_mode._registered == mode_registry.get_registered_mode("mock")
 
 
@@ -53,7 +58,7 @@ def test_runtime_mission_parses_modes():
     assert takeoff._registered == mode_registry.get_registered_mode(
         "mock.VerticalTakeoffMode"
     )
-    assert takeoff._validated_params == MockVerticalTakeoffMode.Params(
+    assert takeoff._validated_params == MockVerticalTakeoffParams(
         takeoff_height=10.0, takeoff_method="OFFBOARD"
     )
 
