@@ -1,5 +1,6 @@
 from pydantic import BaseModel, ConfigDict, PrivateAttr
-from vehicle_common.mode import Vehicle
+from vehicle_common.vehicle import Vehicle
+from vehicle_common.base import VisionNode
 from vehicle_common.mode_loader import RegisteredMode, ModeRegistry
 from typing import Any
 
@@ -29,7 +30,7 @@ class RuntimeMission(BaseModel):
     modes: dict[str, RuntimeMode]
 
     _targets: set[type[Vehicle]] = PrivateAttr()
-    _vision_nodes: set[str] = PrivateAttr()
+    _vision_nodes: set[type[VisionNode]] = PrivateAttr()
     _peer_vehicle_names: set[str] = PrivateAttr()
     _requires_camera: bool = PrivateAttr()
 

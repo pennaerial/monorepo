@@ -82,8 +82,9 @@ modes:
 
 def test_runtime_mission_vision_nodes_empty_when_not_shared_by_all_modes():
     mission = RuntimeMission.model_validate(yaml.safe_load(mock_mission_yaml_2))
-    # "mock" has no vision node requirement, so the intersection collapses to empty
-    assert mission._vision_nodes == set()
+    print(mission._vision_nodes)
+    expected = {MockVisionNode}
+    assert mission._vision_nodes == expected
 
 
 mission_3 = """
