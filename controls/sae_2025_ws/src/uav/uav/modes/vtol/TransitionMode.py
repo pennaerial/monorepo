@@ -4,6 +4,7 @@ from rclpy.node import Node
 from typing import Literal, override
 
 from uav.vehicles.VTOL import VTOL
+from uav.vehicles.UAV import UAV
 
 from vehicle_common.mode import Mode
 
@@ -15,7 +16,7 @@ class TransitionParams(BaseModel):
 
 
 @register_mode(
-    id="uav.vtol.TransitionMode", targets=[VTOL], transition_labels=["complete"]
+    id="uav.vtol.TransitionMode", targets=[UAV], transition_labels=["complete"]
 )
 class TransitionMode(Mode):
     """
