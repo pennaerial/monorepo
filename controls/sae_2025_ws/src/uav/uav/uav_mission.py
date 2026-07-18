@@ -6,17 +6,18 @@ from rclpy.node import Node
 
 from uav.vehicles.AirframeClass import AirframeClass
 from uav.UAVModeManager import UAVModeManager
-from vehicle_common.runtime.mission_spec import MissionSpec, mission_path_for_name
+from vehicle_common.runtime.mission_spec import get_mission_path
+from vehicle_common.runtime.mission_loader import RuntimeMission
 
 
 class UAVMissionBootstrap(Node):
     def __init__(self) -> None:
         super().__init__("uav_mission_bootstrap")
-        self.declare_parameter("mode_map", mission_path_for_name("basic"))
+        self.declare_parameter("mode_map", get_mission_path("basic", "uav"))
         self.declare_parameter("auto_launch", True)
         self.declare_parameter("debug", False)
         self.declare_parameter("servo_only", False)
-        self.declare_parameter("vehicle_name", "uav")
+        self.declare_parameter("vehicle_name", "uav_0")
         self.declare_parameter("vehicle_class", AirframeClass.MULTICOPTER.name)
         self.declare_parameter("camera_mount_offsets", [0.0, 0.0, 0.0])
         self.declare_parameter("peer_heartbeat_hz", 10.0)
@@ -50,14 +51,10 @@ class UAVMissionBootstrap(Node):
         if not mission_path:
             raise ValueError("uav_mission requires a non-empty 'mode_map'.")
 
-        mission_spec = MissionSpec.load(mission_path)
-        if not mission_spec.is_uav:
-            raise ValueError(
-                f"uav_mission requires a UAV mission spec, received target '{mission_spec.target}'."
-            )
+        runtime_mission = RuntimeMission.load_from_path(mission_path)
 
         return {
-            "mission_spec": mission_spec,
+            "mission_spec": runtime_mission,
             "auto_launch": self._bool_parameter("auto_launch"),
             "debug": bool(self.get_parameter("debug").value),
             "servo_only": bool(self.get_parameter("servo_only").value),

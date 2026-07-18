@@ -17,9 +17,7 @@ class NavGPSParams(BaseModel):
     margin: The margin of error for the GPS coordinate.
     """
 
-    coordinates: list[
-        tuple[tuple[float, float, float], float, Literal["GPS", "LOCAL"]]
-    ]
+    coordinates: list[tuple[tuple[float, float, float], float, Literal["GPS", "LOCAL"]]]
     margin: float = 1
 
 

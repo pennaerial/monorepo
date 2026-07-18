@@ -37,7 +37,9 @@ class PayloadDropoffMode(Mode):
     transition_labels = ("complete",)
 
     @override
-    def initialize(self, node: Node, vehicle: UAV, params: PayloadDropoffParams) -> None:
+    def initialize(
+        self, node: Node, vehicle: UAV, params: PayloadDropoffParams
+    ) -> None:
         self.node = node
         self.vehicle = vehicle
         self.p = params
