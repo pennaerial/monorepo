@@ -46,6 +46,6 @@ class RuntimeMission(BaseModel):
             requires_camera |= m._registered.requires_camera
 
         self._targets = set.intersection(*target_sets)
-        self._vision_nodes = set.intersection(*vision_sets)
-        self._peer_vehicle_names = set.intersection(*peer_vehicle_sets)
+        self._vision_nodes = set.union(*vision_sets)
+        self._peer_vehicle_names = set.union(*peer_vehicle_sets)
         self._requires_camera = requires_camera
