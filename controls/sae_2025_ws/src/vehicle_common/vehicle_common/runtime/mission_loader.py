@@ -1,10 +1,12 @@
 from typing import Any
 from pathlib import Path
 
+from rclpy.node import Node
 from pydantic import BaseModel, ConfigDict, PrivateAttr
 import yaml
 
 from vehicle_common.vehicle import Vehicle
+from vehicle_common.mode import Mode
 from vehicle_common.base import VisionNode
 from vehicle_common.mode_loader import RegisteredMode, ModeRegistry
 
@@ -22,10 +24,12 @@ class RuntimeMode(BaseModel):
         mode_registry = ModeRegistry.get()
         self._registered = mode_registry.get_registered_mode(self.mode)
         mode_cls = self._registered.mode_cls
-        self._validated_params = mode_cls.Params.model_validate(self.params)
+        self._validated_params = mode_cls.get_params_cls().model_validate(self.params)
 
-    # def instantiate_mode(self, node: Node, vehicle: Vehicle) -> Mode:
-    #     return self._registered.mode_cls(node, vehicle, self._validated_params)
+    def instantiate_mode(self, node: Node, vehicle: Vehicle) -> Mode:
+        mode = self._registered.mode_cls()
+        mode.initialize(node, vehicle, self._validated_params)
+        return mode
 
 
 class RuntimeMission(BaseModel):
