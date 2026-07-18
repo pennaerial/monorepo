@@ -13,10 +13,8 @@ else:
     # Node is annotation-only but must exist at runtime for get_type_hints().
     Node = object
 
-VehicleT = TypeVar("VehicleT", bound=Vehicle)
 
-
-class Mode(Generic[VehicleT], ABC):
+class Mode[VehicleT: Vehicle, ParamsT: BaseModel](ABC):
     """
     Base class for UAV operational modes within a ROS 2 node.
     Provides a structured template for implementing autonomous behaviors.
@@ -52,6 +50,16 @@ class Mode(Generic[VehicleT], ABC):
         self.active = False
         self.vehicle: VehicleT = vehicle
         self.pending_requests = {}
+
+    @abstractmethod
+    def initialize(self, node: Node, vehicle: VehicleT, params: ParamsT):
+        """Abstract method for initializing a mode
+
+        Args:
+            node: The ROS 2 node that gets passed into the mode
+            vehicle: The vehicle instance that the current mode has control over
+            params: A validated pydantic params model that the mode class has defined
+        """
 
     @classmethod
     def required_vision_node_paths(cls) -> tuple[str, ...]:
