@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import os
 import importlib
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -35,8 +36,6 @@ class MissionDocumentModel(BaseModel):
 
 
 def _mission_roots() -> list[Path]:
-    # Lazy import: ament_index_python ships only with ROS, so importing it at
-    # module top level would force ROS onto pure-Python consumers
     from ament_index_python.packages import (
         PackageNotFoundError,
         get_package_share_directory,
@@ -60,28 +59,19 @@ def mission_root() -> Path:
     return _mission_roots()[0]
 
 
-def mission_path_for_name(mission_name: str) -> str:
-    for root in _mission_roots():
-        candidate = root / f"{mission_name}.yaml"
-        if candidate.exists():
-            return str(candidate)
-    return str(_mission_roots()[0] / f"{mission_name}.yaml")
+def get_mission_path(mission_name: str, package: str) -> str:
+    # Lazy import: ament_index_python ships only with ROS, so importing it at
+    # module top level would force ROS onto pure-Python consumers
+    from ament_index_python.packages import (
+        get_package_share_directory,
+    )
 
+    # gets path in package's install directory where missions are installed to
+    mission_path = Path(get_package_share_directory(package)) / "package" / f"{mission_name}.yaml"
+    if not os.path.isfile(mission_path):
+        raise FileNotFoundError(f"Mission {mission_name} was not found at {mission_path}")
 
-def load_mode_class(class_path: str) -> type["Mode[Any]"]:
-    class_name = class_path.rsplit(".", 1)[-1]
-    try:
-        module = importlib.import_module(class_path)
-    except ModuleNotFoundError as exc:
-        if exc.name != class_path:
-            raise
-        module = importlib.import_module(class_path.rsplit(".", 1)[0])
-
-    mode_class = getattr(module, class_name)
-
-    if not isinstance(mode_class, type) or not issubclass(mode_class, Mode):
-        raise TypeError(f"Mode path '{class_path}' did not resolve to a Mode subclass.")
-    return mode_class
+    return str(mission_path)
 
 
 @dataclass(frozen=True)
