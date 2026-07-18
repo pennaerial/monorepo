@@ -3,7 +3,7 @@ from rclpy.node import Node
 from px4_msgs.msg import TrajectorySetpoint
 import math
 import time
-from typing import List
+from typing import List, override
 
 from pydantic import BaseModel
 
@@ -13,6 +13,14 @@ from vehicle_common.mode import Mode
 from vehicle_common.mode_loader import register_mode
 
 
+class WaypointMissionParams(BaseModel):
+    waypoints: List[List[float]] = None
+    waypoint_tolerance: float = 0.5
+    speed: float = 1.0
+    loiter_time: float = 1.0
+    altitude: float = 2.0
+
+
 @register_mode(id="uav.WaypointMission", targets=[UAV])
 class WaypointMission(Mode):
     """
@@ -20,28 +28,17 @@ class WaypointMission(Mode):
     Flies through a series of waypoints defined in YAML.
     """
 
-    class Params(BaseModel):
-        pass
-
-    def __init__(
-        self,
-        node: Node,
-        vehicle: UAV,
-        waypoints: List[List[float]] = None,
-        waypoint_tolerance: float = 0.5,
-        speed: float = 1.0,
-        loiter_time: float = 1.0,
-        altitude: float = 2.0,
-    ):
-        super().__init__(node, vehicle)
+    @override
+    def initialize(
+        self, node: Node, vehicle: UAV, params: WaypointMissionParams
+    ) -> None:
+        self.node = node
+        self.vehicle = vehicle
+        self.p = params
 
         # Mission parameters
-        self.waypoints = waypoints or []
+        self.waypoints = params.waypoints or []
         self.current_waypoint = 0
-        self.waypoint_tolerance = waypoint_tolerance
-        self.speed = speed
-        self.loiter_time = loiter_time
-        self.altitude = altitude
         self.mission_active = False
         self.waypoint_start_time = None
 
@@ -93,13 +90,13 @@ class WaypointMission(Mode):
         )
 
         # Check if we've reached the current waypoint
-        if distance < self.waypoint_tolerance:
+        if distance < self.p.waypoint_tolerance:
             if self.waypoint_start_time is None:
                 self.waypoint_start_time = time.time()
                 self.node.get_logger().info(
                     f"Reached waypoint {self.current_waypoint}: {target}"
                 )
-            elif time.time() - self.waypoint_start_time >= self.loiter_time:
+            elif time.time() - self.waypoint_start_time >= self.p.loiter_time:
                 self.node.get_logger().info(
                     f"Completed waypoint {self.current_waypoint}"
                 )
@@ -150,6 +147,11 @@ class WaypointMission(Mode):
         self.vehicle.arm()
         self.node.get_logger().info("Arming vehicle...")
 
+    @classmethod
+    @override
+    def get_params_cls(cls) -> type[BaseModel]:
+        return WaypointMissionParams
+
 
 def main(args=None):
     rclpy.init(args=args)
@@ -182,7 +184,8 @@ def main(args=None):
         [0, 0, 0],  # Land
     ]
 
-    WaypointMission(node, uav, waypoints=test_waypoints)
+    mode = WaypointMission()
+    mode.initialize(node, uav, WaypointMissionParams(waypoints=test_waypoints))
 
     try:
         rclpy.spin(node)

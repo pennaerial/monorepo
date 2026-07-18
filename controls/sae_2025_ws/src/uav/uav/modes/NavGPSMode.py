@@ -1,4 +1,6 @@
-from typing import Literal
+from __future__ import annotations
+
+from typing import Literal, override
 from rclpy.node import Node
 
 from pydantic import BaseModel
@@ -8,43 +10,34 @@ from vehicle_common.mode import Mode
 from vehicle_common.mode_loader import register_mode
 
 
+class NavGPSParams(BaseModel):
+    """
+    coordinates: The coordinates to navigate to (x/y/z or lon/lat/alt, wait time, GPS/LOCAL).
+        Local are NED coordinates, relative to the starting position (https://docs.px4.io/main/en/ros2/user_guide.html#ros-2-px4-frame-conventions).
+    margin: The margin of error for the GPS coordinate.
+    """
+
+    coordinates: list[
+        tuple[tuple[float, float, float], float, Literal["GPS", "LOCAL"]]
+    ]
+    margin: float = 1
+
+
 @register_mode(id="uav.NavGPSMode", targets=[UAV], transition_labels=["complete"])
-class NavGPSMode(Mode[UAV]):
+class NavGPSMode(Mode[UAV, NavGPSParams]):
     """
     A mode for navigating to a GPS coordinate
     """
 
-    class Params(BaseModel):
-        pass
-
-    transition_labels = ("complete",)
-
     # TODO: Create "RELATIVE" navigation system, which initializes direction vectors once in the beginning
     # and converts all coordinates to that frame. +X should point to forward, +Y should point to the right, -Z should point up
 
-    def __init__(
-        self,
-        node: Node,
-        vehicle: UAV,
-        coordinates: list[
-            tuple[tuple[float, float, float], float, Literal["GPS", "LOCAL"]]
-        ],
-        margin: float = 1,
-    ):
-        """
-        Initialize the NavigateToGPSMode.
-
-        Args:
-            node (Node): ROS 2 node managing the UAV.
-            vehicle (UAV): The UAV instance to control.
-            coordinates (list[tuple[tuple[float, float, float], float, Literal["GPS", "LOCAL"]]]): The coordinates to navigate to (x/y/z or lon/lat/alt, wait time, GPS/LOCAL).
-                                                                               Local are NED coordinates, relative to the starting position (https://docs.px4.io/main/en/ros2/user_guide.html#ros-2-px4-frame-conventions).
-            margin (float): The margin of error for the GPS coordinate.
-        """
-        super().__init__(node, vehicle)
-        self.coordinates = coordinates
+    @override
+    def initialize(self, node: Node, vehicle: UAV, params: NavGPSParams) -> None:
+        self.node = node
+        self.vehicle = vehicle
+        self.p = params
         self.goal = None
-        self.margin = margin
         self.index = -1
         self.coordinate_system = None
         self.target = None
@@ -59,7 +52,7 @@ class NavGPSMode(Mode[UAV]):
             dist = self.vehicle.distance_to_waypoint(self.coordinate_system, self.goal)
 
         # Determine if we're waiting at a waypoint (lock yaw to prevent spinning)
-        at_waypoint = self.index != -1 and dist < self.margin
+        at_waypoint = self.index != -1 and dist < self.p.margin
         waiting = at_waypoint and self.wait_time > 0
 
         # Always publish setpoints to maintain offboard connection (PX4 requires continuous stream)
@@ -114,23 +107,23 @@ class NavGPSMode(Mode[UAV]):
                     f"Yaw: {yaw:.2f} | Vel: ({vel[0]:.2f}, {vel[1]:.2f}, {vel[2]:.2f})"
                 )
 
-        if self.goal is None or dist < self.margin:
+        if self.goal is None or dist < self.p.margin:
             if self.index == -1 or self.wait_time <= 0:
                 self.index += 1
-                if self.index >= len(self.coordinates):
+                if self.index >= len(self.p.coordinates):
                     self.log("All waypoints completed")
                     return
-                self.goal, self.wait_time, self.coordinate_system = self.coordinates[
+                self.goal, self.wait_time, self.coordinate_system = self.p.coordinates[
                     self.index
                 ]
                 self.target = self.get_local_target()
                 self.log(
-                    f"Moving to waypoint {self.index + 1}/{len(self.coordinates)}: {self.goal} (wait time: {self.wait_time}s)"
+                    f"Moving to waypoint {self.index + 1}/{len(self.p.coordinates)}: {self.goal} (wait time: {self.wait_time}s)"
                 )
             else:
                 # Waiting at waypoint
                 self.log(
-                    f"Waiting at waypoint {self.index + 1}/{len(self.coordinates)} - {self.wait_time:.1f}s remaining"
+                    f"Waiting at waypoint {self.index + 1}/{len(self.p.coordinates)} - {self.wait_time:.1f}s remaining"
                 )
                 self.wait_time -= time_delta
 
@@ -158,7 +151,12 @@ class NavGPSMode(Mode[UAV]):
         Returns:
             str: The status of the mode.
         """
-        if self.index >= len(self.coordinates):
+        if self.index >= len(self.p.coordinates):
             return "complete"
         else:
             return "continue"
+
+    @classmethod
+    @override
+    def get_params_cls(cls) -> type[BaseModel]:
+        return NavGPSParams

@@ -1,4 +1,4 @@
-from typing import Optional, Tuple
+from typing import Optional, Tuple, override
 
 import numpy as np
 from pydantic import BaseModel
@@ -13,6 +13,15 @@ from vehicle_common.mode import Mode
 from vehicle_common.mode_loader import register_mode
 
 
+class PayloadDropoffParams(BaseModel):
+    """
+    offsets: Should denote the position of dropoff relative to the center of zone, in meters
+        In NED frame: x is forward, y is right, and z is down.
+    """
+
+    offsets: Optional[Tuple[float, float, float]] = (0.0, 0.0, 0.0)
+
+
 @register_mode(
     id="uav.PayloadDropoffMode",
     targets=[UAV],
@@ -24,33 +33,17 @@ class PayloadDropoffMode(Mode):
     A mode for dropping off the payload.
     """
 
-    class Params(BaseModel):
-        pass
-
     required_vision_nodes = (PayloadTrackingNode,)
     transition_labels = ("complete",)
 
-    def __init__(
-        self,
-        node: Node,
-        vehicle: UAV,
-        offsets: Optional[Tuple[float, float, float]] = (0.0, 0.0, 0.0),
-    ):
-        """
-        Initialize the LowerPayload.
-
-        Args:
-            node (Node): ROS 2 node managing the UAV.
-            vehicle (UAV): The UAV instance to control.
-            offsets (Optional[Tuple[float, float, float]]):
-                Should denote the position of dropoff relative to the center of zone, in meters
-                In NED frame: x is forward, y is right, and z is down.
-        """
-        super().__init__(node, vehicle)
+    @override
+    def initialize(self, node: Node, vehicle: UAV, params: PayloadDropoffParams) -> None:
+        self.node = node
+        self.vehicle = vehicle
+        self.p = params
 
         self.response = None
         self.done = False
-        self.offsets = offsets
         self.camera_offsets = self.vehicle.camera_offsets
         self.mode = (
             0  # 0 for uav centering, 1 for landing, 2 for retracting, 3 for taking off
@@ -98,9 +91,9 @@ class PayloadDropoffMode(Mode):
         ]
 
         offsets = (
-            tuple(x / request.altitude for x in self.offsets)
+            tuple(x / request.altitude for x in self.p.offsets)
             if request.altitude > 1
-            else self.offsets
+            else self.p.offsets
         )
         camera_offsets = (
             tuple(x / request.altitude for x in self.camera_offsets)
@@ -139,3 +132,8 @@ class PayloadDropoffMode(Mode):
         if self.done:
             return "complete"
         return "continue"
+
+    @classmethod
+    @override
+    def get_params_cls(cls) -> type[BaseModel]:
+        return PayloadDropoffParams
