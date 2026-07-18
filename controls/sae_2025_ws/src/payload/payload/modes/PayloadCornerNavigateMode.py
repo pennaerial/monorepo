@@ -48,7 +48,7 @@ LINE_FOLLOW
 from __future__ import annotations
 
 import math
-from typing import Optional, Tuple
+from typing import Optional, Tuple, override
 
 import cv2
 import numpy as np
@@ -69,6 +69,42 @@ from vehicle_common.mode_loader import register_mode
 _COLOR_DOMINANCE_RATIO = 1.5
 
 
+class PayloadCornerNavigateParams(BaseModel):
+    direction: str = "ccw"
+    # HSV color ranges — ccw=color A, cw=color B
+    ccw_lower_hsv: list[int] = (0, 80, 80)
+    ccw_upper_hsv: list[int] = (10, 255, 255)
+    cw_lower_hsv: list[int] = (85, 120, 60)
+    cw_upper_hsv: list[int] = (140, 255, 255)
+    # DRIVE_OUT
+    drive_out_speed_mps: float = 0.12
+    detect_frames: int = 3
+    max_drive_out_s: float = 30.0
+    drive_out_strip_frac: float = 0.30
+    drive_out_min_pixels: int = 150
+    compressed_image: bool = False
+    # TURN_TO_CENTER
+    align_angular_speed: float = 0.4
+    center_tol_px: float = 30.0
+    center_min_pixels: int = 150
+    center_stable_frames: int = 3
+    max_turn_to_center_rad: float = 2.0 * math.pi
+    # LINE_FOLLOW
+    line_follow_speed_mps: float = 0.10
+    line_follow_strip_frac: float = 0.40
+    line_follow_min_pixels: int = 50
+    k_lat: float = 0.003
+    k_d: float = 0.001
+    max_angular: float = 0.5
+    # TAPE_ALIGN — rotate until diagonal black-tape centroid is centered
+    tape_align_lower_hsv: list[int] = (0, 0, 0)
+    tape_align_upper_hsv: list[int] = (180, 255, 60)
+    tape_align_angular_speed: float = 0.6
+    tape_align_center_tol_px: float = 20.0
+    tape_align_min_pixels: int = 100
+    tape_align_stable_frames: int = 3
+
+
 @register_mode(
     id="payload.PayloadCornerNavigateMode",
     targets=[Payload],
@@ -76,96 +112,39 @@ _COLOR_DOMINANCE_RATIO = 1.5
     requires_camera=True,
 )
 class PayloadCornerNavigateMode(Mode):
-    class Params(BaseModel):
-        pass
-
     mission_target = "payload"
     transition_labels = ("complete",)
     requires_camera = True
 
-    def __init__(
-        self,
-        node: Node,
-        vehicle: Payload,
-        direction: str = "ccw",
-        # HSV color ranges — ccw=color A, cw=color B
-        ccw_lower_hsv: list[int] = (0, 80, 80),
-        ccw_upper_hsv: list[int] = (10, 255, 255),
-        cw_lower_hsv: list[int] = (85, 120, 60),
-        cw_upper_hsv: list[int] = (140, 255, 255),
-        # DRIVE_OUT
-        drive_out_speed_mps: float = 0.12,
-        detect_frames: int = 3,
-        max_drive_out_s: float = 30.0,
-        drive_out_strip_frac: float = 0.30,
-        drive_out_min_pixels: int = 150,
-        compressed_image: bool = False,
-        # TURN_TO_CENTER
-        align_angular_speed: float = 0.4,
-        center_tol_px: float = 30.0,
-        center_min_pixels: int = 150,
-        center_stable_frames: int = 3,
-        max_turn_to_center_rad: float = 2.0 * math.pi,
-        # LINE_FOLLOW
-        line_follow_speed_mps: float = 0.10,
-        line_follow_strip_frac: float = 0.40,
-        line_follow_min_pixels: int = 50,
-        k_lat: float = 0.003,
-        k_d: float = 0.001,
-        max_angular: float = 0.5,
-        # TAPE_ALIGN — rotate until diagonal black-tape centroid is centered
-        tape_align_lower_hsv: list[int] = (0, 0, 0),
-        tape_align_upper_hsv: list[int] = (180, 255, 60),
-        tape_align_angular_speed: float = 0.6,
-        tape_align_center_tol_px: float = 20.0,
-        tape_align_min_pixels: int = 100,
-        tape_align_stable_frames: int = 3,
-    ):
-        super().__init__(node, vehicle)
-        direction = str(direction).lower().strip()
+    @override
+    def initialize(
+        self, node: Node, vehicle: Payload, params: PayloadCornerNavigateParams
+    ) -> None:
+        self.node = node
+        self.vehicle = vehicle
+        self.p = params
+        direction = str(params.direction).lower().strip()
         if direction not in ("cw", "ccw"):
             raise ValueError(f"direction must be 'cw' or 'ccw', got {direction!r}")
         self.direction = direction
 
-        self._lower_a = np.array(ccw_lower_hsv, dtype=np.uint8)
-        self._upper_a = np.array(ccw_upper_hsv, dtype=np.uint8)
-        self._lower_b = np.array(cw_lower_hsv, dtype=np.uint8)
-        self._upper_b = np.array(cw_upper_hsv, dtype=np.uint8)
+        self._lower_a = np.array(params.ccw_lower_hsv, dtype=np.uint8)
+        self._upper_a = np.array(params.ccw_upper_hsv, dtype=np.uint8)
+        self._lower_b = np.array(params.cw_lower_hsv, dtype=np.uint8)
+        self._upper_b = np.array(params.cw_upper_hsv, dtype=np.uint8)
 
-        self.drive_out_speed_mps = float(drive_out_speed_mps)
-        self.detect_frames = int(detect_frames)
-        self.max_drive_out_s = float(max_drive_out_s)
-        self.drive_out_strip_frac = float(drive_out_strip_frac)
-        if not (0.0 < self.drive_out_strip_frac <= 1.0):
+        if not (0.0 < params.drive_out_strip_frac <= 1.0):
             raise ValueError(
-                f"drive_out_strip_frac must be in (0, 1], got {drive_out_strip_frac!r}"
+                f"drive_out_strip_frac must be in (0, 1], got {params.drive_out_strip_frac!r}"
             )
-        self.drive_out_min_pixels = int(drive_out_min_pixels)
-        self.compressed_image = bool(compressed_image)
 
-        self.align_angular_speed = float(align_angular_speed)
-        self.center_tol_px = float(center_tol_px)
-        self.center_min_pixels = int(center_min_pixels)
-        self.center_stable_frames = int(center_stable_frames)
-        self.max_turn_to_center_rad = float(max_turn_to_center_rad)
-
-        self.line_follow_speed_mps = float(line_follow_speed_mps)
-        self.line_follow_strip_frac = float(line_follow_strip_frac)
-        if not (0.0 < self.line_follow_strip_frac <= 1.0):
+        if not (0.0 < params.line_follow_strip_frac <= 1.0):
             raise ValueError(
-                f"line_follow_strip_frac must be in (0, 1], got {line_follow_strip_frac!r}"
+                f"line_follow_strip_frac must be in (0, 1], got {params.line_follow_strip_frac!r}"
             )
-        self.line_follow_min_pixels = int(line_follow_min_pixels)
-        self.k_lat = float(k_lat)
-        self.k_d = float(k_d)
-        self.max_angular = float(max_angular)
 
-        self._lower_black = np.array(tape_align_lower_hsv, dtype=np.uint8)
-        self._upper_black = np.array(tape_align_upper_hsv, dtype=np.uint8)
-        self.tape_align_angular_speed = float(tape_align_angular_speed)
-        self.tape_align_center_tol_px = float(tape_align_center_tol_px)
-        self.tape_align_min_pixels = int(tape_align_min_pixels)
-        self.tape_align_stable_frames = int(tape_align_stable_frames)
+        self._lower_black = np.array(params.tape_align_lower_hsv, dtype=np.uint8)
+        self._upper_black = np.array(params.tape_align_upper_hsv, dtype=np.uint8)
 
         self._bridge = CvBridge()
         self._image_sub = None
@@ -218,7 +197,7 @@ class PayloadCornerNavigateMode(Mode):
         self._boundary_cleared: bool = True
 
         cam_topic = self.vehicle.namespaced_path("camera")
-        if self.compressed_image:
+        if self.p.compressed_image:
             self._image_sub = self.node.create_subscription(
                 CompressedImage, f"{cam_topic}/compressed", self._image_cb, 1
             )
@@ -235,8 +214,8 @@ class PayloadCornerNavigateMode(Mode):
 
         self.log(
             f"PayloadCornerNavigateMode: enter direction={self.direction} "
-            f"drive_out_speed={self.drive_out_speed_mps:.2f}m/s "
-            f"strip_frac={self.drive_out_strip_frac:.2f} "
+            f"drive_out_speed={self.p.drive_out_speed_mps:.2f}m/s "
+            f"strip_frac={self.p.drive_out_strip_frac:.2f} "
             f"camera={cam_topic} vision_debug={getattr(self.node, 'vision_debug', False)}"
         )
 
@@ -284,7 +263,7 @@ class PayloadCornerNavigateMode(Mode):
         if self._image is None:
             return None
         try:
-            if self.compressed_image:
+            if self.p.compressed_image:
                 buf = np.frombuffer(self._image.data, dtype=np.uint8)
                 return cv2.imdecode(buf, cv2.IMREAD_COLOR)
             return self._bridge.imgmsg_to_cv2(self._image, desired_encoding="bgr8")
@@ -362,7 +341,7 @@ class PayloadCornerNavigateMode(Mode):
         only clips the corner of the FOV is ignored."""
         h, w = bgr.shape[:2]
         roi_full = self._dlz_roi_mask(bgr)
-        strip_start = int(h * (1.0 - self.drive_out_strip_frac))
+        strip_start = int(h * (1.0 - self.p.drive_out_strip_frac))
         col_start = w // 3
         col_end = w - (w // 3)
         strip = bgr[strip_start:, col_start:col_end]
@@ -374,7 +353,7 @@ class PayloadCornerNavigateMode(Mode):
             self._upper_a,
             roi_strip,
             keep_primary=True,
-            primary_min_area_px=self.drive_out_min_pixels,
+            primary_min_area_px=self.p.drive_out_min_pixels,
         )
         mask_b = self._threshold_with_roi(
             hsv,
@@ -382,7 +361,7 @@ class PayloadCornerNavigateMode(Mode):
             self._upper_b,
             roi_strip,
             keep_primary=True,
-            primary_min_area_px=self.drive_out_min_pixels,
+            primary_min_area_px=self.p.drive_out_min_pixels,
         )
         return int(np.count_nonzero(mask_a)), int(np.count_nonzero(mask_b))
 
@@ -439,7 +418,7 @@ class PayloadCornerNavigateMode(Mode):
         Returns ``(0, 0.0)`` if the colour is not found in the strip."""
         h, w = bgr.shape[:2]
         roi_full = self._dlz_roi_mask(bgr)
-        strip_start = int(h * (1.0 - self.line_follow_strip_frac))
+        strip_start = int(h * (1.0 - self.p.line_follow_strip_frac))
         strip = bgr[strip_start:, :]
         roi_strip = roi_full[strip_start:, :]
         hsv = cv2.cvtColor(strip, cv2.COLOR_BGR2HSV)
@@ -450,7 +429,7 @@ class PayloadCornerNavigateMode(Mode):
                 self._upper_a,
                 roi_strip,
                 keep_primary=True,
-                primary_min_area_px=self.line_follow_min_pixels,
+                primary_min_area_px=self.p.line_follow_min_pixels,
             )
         elif color == "B":
             mask = self._threshold_with_roi(
@@ -459,7 +438,7 @@ class PayloadCornerNavigateMode(Mode):
                 self._upper_b,
                 roi_strip,
                 keep_primary=True,
-                primary_min_area_px=self.line_follow_min_pixels,
+                primary_min_area_px=self.p.line_follow_min_pixels,
             )
         else:
             return 0, 0.0
@@ -477,7 +456,7 @@ class PayloadCornerNavigateMode(Mode):
 
     def _update_drive_out(self, time_delta: float) -> None:
         self._drive_out_elapsed += time_delta
-        if self._drive_out_elapsed >= self.max_drive_out_s:
+        if self._drive_out_elapsed >= self.p.max_drive_out_s:
             self.vehicle.stop()
             self._terminate = True
             self.log(
@@ -489,12 +468,12 @@ class PayloadCornerNavigateMode(Mode):
         bgr = self._decode_image()
         if bgr is None:
             # No camera frame yet — keep driving forward.
-            self.vehicle.drive(self.drive_out_speed_mps, 0.0)
+            self.vehicle.drive(self.p.drive_out_speed_mps, 0.0)
             return
 
         count_a, count_b = self._lower_strip_color_counts(bgr)
         color_seen = (
-            count_a >= self.drive_out_min_pixels or count_b >= self.drive_out_min_pixels
+            count_a >= self.p.drive_out_min_pixels or count_b >= self.p.drive_out_min_pixels
         )
 
         if self._do_substate == "seeking_tape":
@@ -505,7 +484,7 @@ class PayloadCornerNavigateMode(Mode):
                     self._first_color = "A"
                 else:
                     self._first_color = "B"
-                if self._enter_streak >= self.detect_frames:
+                if self._enter_streak >= self.p.detect_frames:
                     self._do_substate = "crossing_tape"
                     self._exit_streak = 0
                     self.log(
@@ -517,13 +496,13 @@ class PayloadCornerNavigateMode(Mode):
                 self._enter_streak = 0
                 self._first_color = None
             self._annotate_drive_out(bgr, count_a, count_b)
-            self.vehicle.drive(self.drive_out_speed_mps, 0.0)
+            self.vehicle.drive(self.p.drive_out_speed_mps, 0.0)
             return
 
         # crossing_tape: drive until colour disappears, then stop on the far side.
         if not color_seen:
             self._exit_streak += 1
-            if self._exit_streak >= self.detect_frames:
+            if self._exit_streak >= self.p.detect_frames:
                 self.vehicle.stop()
                 self._annotate_drive_out(bgr, count_a, count_b)
                 self._phase = "turn_to_center"
@@ -544,7 +523,7 @@ class PayloadCornerNavigateMode(Mode):
                 self._first_color = "B"
 
         self._annotate_drive_out(bgr, count_a, count_b)
-        self.vehicle.drive(self.drive_out_speed_mps, 0.0)
+        self.vehicle.drive(self.p.drive_out_speed_mps, 0.0)
 
     # ------------------------------------------------------------------
     # Phase: TURN_TO_CENTER
@@ -572,7 +551,7 @@ class PayloadCornerNavigateMode(Mode):
             self._upper_a,
             roi_crop,
             keep_primary=True,
-            primary_min_area_px=self.center_min_pixels,
+            primary_min_area_px=self.p.center_min_pixels,
         )
         mask_b = self._threshold_with_roi(
             hsv,
@@ -580,7 +559,7 @@ class PayloadCornerNavigateMode(Mode):
             self._upper_b,
             roi_crop,
             keep_primary=True,
-            primary_min_area_px=self.center_min_pixels,
+            primary_min_area_px=self.p.center_min_pixels,
         )
         count_a = int(np.count_nonzero(mask_a))
         count_b = int(np.count_nonzero(mask_b))
@@ -628,9 +607,9 @@ class PayloadCornerNavigateMode(Mode):
 
     def _update_turn_to_center(self, time_delta: float) -> None:
         search_angular = (
-            self.align_angular_speed
+            self.p.align_angular_speed
             if self.direction == "ccw"
-            else -self.align_angular_speed
+            else -self.p.align_angular_speed
         )
 
         bgr = self._decode_image()
@@ -645,12 +624,12 @@ class PayloadCornerNavigateMode(Mode):
             status, self._center_stable, angular, locked = self._centroid_align_step(
                 count=total,
                 lateral_px=lateral_error_px,
-                min_pixels=self.center_min_pixels,
-                center_tol_px=self.center_tol_px,
+                min_pixels=self.p.center_min_pixels,
+                center_tol_px=self.p.center_tol_px,
                 stable_count=self._center_stable,
-                stable_frames=self.center_stable_frames,
+                stable_frames=self.p.center_stable_frames,
                 search_angular=search_angular,
-                turn_angular_speed=self.align_angular_speed,
+                turn_angular_speed=self.p.align_angular_speed,
             )
             if locked:
                 self.vehicle.stop()
@@ -689,7 +668,7 @@ class PayloadCornerNavigateMode(Mode):
 
         self._turn_to_center_rad += abs(angular) * time_delta
 
-        if self._turn_to_center_rad >= self.max_turn_to_center_rad:
+        if self._turn_to_center_rad >= self.p.max_turn_to_center_rad:
             self.vehicle.stop()
             self._terminate = True
             self.log(
@@ -728,11 +707,11 @@ class PayloadCornerNavigateMode(Mode):
         # time the other colour appears it's a real new boundary, not residual
         # pixels from the old one.
         if not self._boundary_cleared:
-            if other_count < self.line_follow_min_pixels:
+            if other_count < self.p.line_follow_min_pixels:
                 self._boundary_cleared = True
         elif not self._corner_color_seen:
             transitioned = (
-                other_count >= self.line_follow_min_pixels
+                other_count >= self.p.line_follow_min_pixels
                 and other_count > cur_count * _COLOR_DOMINANCE_RATIO
             )
 
@@ -768,7 +747,7 @@ class PayloadCornerNavigateMode(Mode):
         # Stop condition: corner has been detected and the colour we are
         # following has dropped below the visibility threshold (we've driven
         # past the end of our side's segment into the corner).
-        if self._corner_color_seen and cur_count < self.line_follow_min_pixels:
+        if self._corner_color_seen and cur_count < self.p.line_follow_min_pixels:
             self.vehicle.stop()
             self._annotate_line_follow(
                 bgr,
@@ -791,17 +770,17 @@ class PayloadCornerNavigateMode(Mode):
 
         # Steer purely on the current colour's centroid so the other colour
         # cannot pull the centroid off the side we're following.
-        if cur_count >= self.line_follow_min_pixels:
+        if cur_count >= self.p.line_follow_min_pixels:
             d_term = (
-                self.k_d
+                self.p.k_d
                 * (cur_lateral_px - self._prev_lateral_px)
                 / max(time_delta, 1e-3)
             )
             angular = float(
                 np.clip(
-                    -(self.k_lat * cur_lateral_px + d_term),
-                    -self.max_angular,
-                    self.max_angular,
+                    -(self.p.k_lat * cur_lateral_px + d_term),
+                    -self.p.max_angular,
+                    self.p.max_angular,
                 )
             )
             self._prev_lateral_px = cur_lateral_px
@@ -820,7 +799,7 @@ class PayloadCornerNavigateMode(Mode):
             transitioned_this_tick,
             angular,
         )
-        self.vehicle.drive(self.line_follow_speed_mps, angular)
+        self.vehicle.drive(self.p.line_follow_speed_mps, angular)
 
     # ------------------------------------------------------------------
     # Phase: TAPE_ALIGN
@@ -833,7 +812,7 @@ class PayloadCornerNavigateMode(Mode):
         tape is right of center."""
         h, w = bgr.shape[:2]
         roi_full = self._dlz_roi_mask(bgr)
-        strip_start = int(h * (1.0 - self.line_follow_strip_frac))
+        strip_start = int(h * (1.0 - self.p.line_follow_strip_frac))
         strip = bgr[strip_start:, :]
         roi_strip = roi_full[strip_start:, :]
         hsv = cv2.cvtColor(strip, cv2.COLOR_BGR2HSV)
@@ -861,12 +840,12 @@ class PayloadCornerNavigateMode(Mode):
         status, self._tape_align_stable, angular, locked = self._centroid_align_step(
             count=count,
             lateral_px=lateral_px,
-            min_pixels=self.tape_align_min_pixels,
-            center_tol_px=self.tape_align_center_tol_px,
+            min_pixels=self.p.tape_align_min_pixels,
+            center_tol_px=self.p.tape_align_center_tol_px,
             stable_count=self._tape_align_stable,
-            stable_frames=self.tape_align_stable_frames,
-            search_angular=self.tape_align_angular_speed,
-            turn_angular_speed=self.tape_align_angular_speed,
+            stable_frames=self.p.tape_align_stable_frames,
+            search_angular=self.p.tape_align_angular_speed,
+            turn_angular_speed=self.p.tape_align_angular_speed,
         )
 
         if locked:
@@ -963,7 +942,7 @@ class PayloadCornerNavigateMode(Mode):
         h, w = bgr.shape[:2]
         roi_full = self._dlz_roi_mask(bgr)
         self._darken_outside_roi(debug, roi_full)
-        y0 = int(h * (1.0 - self.drive_out_strip_frac))
+        y0 = int(h * (1.0 - self.p.drive_out_strip_frac))
         x0 = w // 3
         x1 = w - (w // 3)
         # Recompute the same masks the logic used so the contours exactly
@@ -977,7 +956,7 @@ class PayloadCornerNavigateMode(Mode):
             self._upper_a,
             roi_strip,
             keep_primary=True,
-            primary_min_area_px=self.drive_out_min_pixels,
+            primary_min_area_px=self.p.drive_out_min_pixels,
         )
         mask_b = self._threshold_with_roi(
             hsv,
@@ -985,7 +964,7 @@ class PayloadCornerNavigateMode(Mode):
             self._upper_b,
             roi_strip,
             keep_primary=True,
-            primary_min_area_px=self.drive_out_min_pixels,
+            primary_min_area_px=self.p.drive_out_min_pixels,
         )
         cv2.rectangle(debug, (x0, y0), (x1 - 1, h - 1), self._DBG_CROP, 1)
         self._draw_shifted_contours(debug, mask_a, x0, y0, self._DBG_COLOR_A, 2)
@@ -1000,13 +979,13 @@ class PayloadCornerNavigateMode(Mode):
         )
         self._put_label(
             debug,
-            f"A={count_a}px B={count_b}px  min={self.drive_out_min_pixels}",
+            f"A={count_a}px B={count_b}px  min={self.p.drive_out_min_pixels}",
             44,
         )
         self._put_label(
             debug,
-            f"enter={self._enter_streak}/{self.detect_frames} "
-            f"exit={self._exit_streak}/{self.detect_frames} "
+            f"enter={self._enter_streak}/{self.p.detect_frames} "
+            f"exit={self._exit_streak}/{self.p.detect_frames} "
             f"first={self._first_color} t={self._drive_out_elapsed:.1f}s",
             62,
         )
@@ -1051,8 +1030,8 @@ class PayloadCornerNavigateMode(Mode):
 
         # Symmetric tolerance band around the crop center, matching the
         # search/turn/lock logic used by TURN_TO_CENTER.
-        tol_left = int(crop_cx - self.center_tol_px)
-        tol_right = int(crop_cx + self.center_tol_px)
+        tol_left = int(crop_cx - self.p.center_tol_px)
+        tol_right = int(crop_cx + self.p.center_tol_px)
         overlay = debug.copy()
         cv2.rectangle(
             overlay,
@@ -1066,9 +1045,9 @@ class PayloadCornerNavigateMode(Mode):
         cv2.line(debug, (tol_right, row_start), (tol_right, row_end), self._DBG_TOL, 1)
 
         # Combined centroid line (green if in tolerance, orange otherwise).
-        if total >= self.center_min_pixels:
+        if total >= self.p.center_min_pixels:
             centroid_x = int(crop_cx + lateral_error_px)
-            in_tol = abs(lateral_error_px) <= self.center_tol_px
+            in_tol = abs(lateral_error_px) <= self.p.center_tol_px
             color = (0, 255, 0) if in_tol else (0, 140, 255)
             cv2.line(debug, (centroid_x, row_start), (centroid_x, row_end), color, 2)
 
@@ -1083,12 +1062,12 @@ class PayloadCornerNavigateMode(Mode):
         self._put_label(
             debug,
             f"total={total}px lat={lateral_error_px:+.1f}px "
-            f"tol=+/-{self.center_tol_px:.0f} min={self.center_min_pixels} dom={dominant}",
+            f"tol=+/-{self.p.center_tol_px:.0f} min={self.p.center_min_pixels} dom={dominant}",
             44,
         )
         self._put_label(
             debug,
-            f"stable={self._center_stable}/{self.center_stable_frames} "
+            f"stable={self._center_stable}/{self.p.center_stable_frames} "
             f"turned={math.degrees(self._turn_to_center_rad):.1f}deg",
             62,
         )
@@ -1112,7 +1091,7 @@ class PayloadCornerNavigateMode(Mode):
         h, w = bgr.shape[:2]
         roi_full = self._dlz_roi_mask(bgr)
         self._darken_outside_roi(debug, roi_full)
-        y0 = int(h * (1.0 - self.line_follow_strip_frac))
+        y0 = int(h * (1.0 - self.p.line_follow_strip_frac))
         strip = bgr[y0:, :]
         roi_strip = roi_full[y0:, :]
         hsv = cv2.cvtColor(strip, cv2.COLOR_BGR2HSV)
@@ -1122,7 +1101,7 @@ class PayloadCornerNavigateMode(Mode):
             self._upper_a,
             roi_strip,
             keep_primary=True,
-            primary_min_area_px=self.line_follow_min_pixels,
+            primary_min_area_px=self.p.line_follow_min_pixels,
         )
         mask_b = self._threshold_with_roi(
             hsv,
@@ -1130,7 +1109,7 @@ class PayloadCornerNavigateMode(Mode):
             self._upper_b,
             roi_strip,
             keep_primary=True,
-            primary_min_area_px=self.line_follow_min_pixels,
+            primary_min_area_px=self.p.line_follow_min_pixels,
         )
         mask_current = mask_a if current == "A" else mask_b
         mask_other = mask_b if current == "A" else mask_a
@@ -1147,7 +1126,7 @@ class PayloadCornerNavigateMode(Mode):
             self._DBG_CENTER,
             1,
         )
-        if cur_count >= self.line_follow_min_pixels:
+        if cur_count >= self.p.line_follow_min_pixels:
             cur_centroid_x = int(strip_center_x + cur_lateral_px)
             cv2.line(
                 debug,
@@ -1156,7 +1135,7 @@ class PayloadCornerNavigateMode(Mode):
                 self._DBG_OK,
                 2,
             )
-        if other_count >= self.line_follow_min_pixels:
+        if other_count >= self.p.line_follow_min_pixels:
             other_centroid_x = int(strip_center_x + other_lateral_px)
             cv2.line(
                 debug,
@@ -1183,8 +1162,8 @@ class PayloadCornerNavigateMode(Mode):
         )
         self._put_label(
             debug,
-            f"min={self.line_follow_min_pixels} "
-            f"ang={angular:+.2f}rad/s v={self.line_follow_speed_mps:.2f}m/s",
+            f"min={self.p.line_follow_min_pixels} "
+            f"ang={angular:+.2f}rad/s v={self.p.line_follow_speed_mps:.2f}m/s",
             62,
         )
         self._publish_annotated(debug)
@@ -1204,7 +1183,7 @@ class PayloadCornerNavigateMode(Mode):
         self._darken_outside_roi(debug, roi_full)
         # Exactly match _black_centroid_metrics: bottom line_follow_strip_frac,
         # full width, same HSV thresholds, same center computation.
-        y0 = int(h * (1.0 - self.line_follow_strip_frac))
+        y0 = int(h * (1.0 - self.p.line_follow_strip_frac))
         strip = bgr[y0:, :]
         roi_strip = roi_full[y0:, :]
         hsv = cv2.cvtColor(strip, cv2.COLOR_BGR2HSV)
@@ -1219,8 +1198,8 @@ class PayloadCornerNavigateMode(Mode):
         # Use float / 2.0 to match _black_centroid_metrics exactly.
         strip_center_x = strip.shape[1] / 2.0
         # Tolerance band (green vertical lines).
-        tol_left = int(strip_center_x - self.tape_align_center_tol_px)
-        tol_right = int(strip_center_x + self.tape_align_center_tol_px)
+        tol_left = int(strip_center_x - self.p.tape_align_center_tol_px)
+        tol_right = int(strip_center_x + self.p.tape_align_center_tol_px)
         cv2.line(debug, (tol_left, y0), (tol_left, h - 1), self._DBG_TOL, 1)
         cv2.line(debug, (tol_right, y0), (tol_right, h - 1), self._DBG_TOL, 1)
         # Strip-center reference (white).
@@ -1235,9 +1214,9 @@ class PayloadCornerNavigateMode(Mode):
         # Reconstruct the centroid position the same way the algorithm does:
         # centroid_x_in_strip = xs.mean(), lateral_px = centroid_x_in_strip - strip_center_x
         # so centroid_x_in_strip = strip_center_x + lateral_px, drawn at x offset 0.
-        if count >= self.tape_align_min_pixels:
+        if count >= self.p.tape_align_min_pixels:
             centroid_x = int(strip_center_x + lateral_px)
-            in_tol = abs(lateral_px) <= self.tape_align_center_tol_px
+            in_tol = abs(lateral_px) <= self.p.tape_align_center_tol_px
             color = self._DBG_OK if in_tol else self._DBG_WARN
             cv2.line(debug, (centroid_x, y0), (centroid_x, h - 1), color, 2)
         self._put_label(
@@ -1251,13 +1230,18 @@ class PayloadCornerNavigateMode(Mode):
         self._put_label(
             debug,
             f"black={count}px lat={lateral_px:+.1f}px "
-            f"tol=+/-{self.tape_align_center_tol_px:.0f} "
-            f"min={self.tape_align_min_pixels}",
+            f"tol=+/-{self.p.tape_align_center_tol_px:.0f} "
+            f"min={self.p.tape_align_min_pixels}",
             44,
         )
         self._put_label(
             debug,
-            f"stable={self._tape_align_stable}/{self.tape_align_stable_frames}",
+            f"stable={self._tape_align_stable}/{self.p.tape_align_stable_frames}",
             62,
         )
         self._publish_annotated(debug)
+
+    @classmethod
+    @override
+    def get_params_cls(cls) -> type[BaseModel]:
+        return PayloadCornerNavigateParams

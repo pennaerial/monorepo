@@ -19,7 +19,7 @@ Terminates when the blob area exceeds ``stop_area`` pixels.
 
 from __future__ import annotations
 
-from typing import Optional, Tuple
+from typing import Optional, Tuple, override
 
 import cv2
 import numpy as np
@@ -89,6 +89,22 @@ def _vertical_blob_centroid_area(
     return (best_cx, best_cy, best_area_i)
 
 
+class PayloadColorStringApproachParams(BaseModel):
+    lower_hsv: list[int] = (0, 0, 30)
+    upper_hsv: list[int] = (179, 40, 120)
+    forward_speed: float = 0.08
+    angular_gain: float = 0.003
+    centering_threshold_px: int = 15
+    drive_angular_scale: float = 0.3
+    min_detect_pixels: int = 50
+    stop_area: int = 5000
+    lost_timeout_s: float = 3.0
+    compressed: bool = False
+    vertical_blob_min_hw_ratio: float = 2.0
+    top_centroid_frac: float = 0.3
+    use_global_hsv_centroid: bool = False
+
+
 @register_mode(
     id="payload.PayloadColorStringApproachMode",
     targets=[Payload],
@@ -97,50 +113,25 @@ def _vertical_blob_centroid_area(
 class PayloadColorStringApproachMode(Mode):
     """Drive toward a coloured target using HSV blob detection."""
 
-    class Params(BaseModel):
-        pass
-
     required_vision_nodes = ()
     requires_camera = True
     transition_labels = ()
 
-    def __init__(
-        self,
-        node: Node,
-        vehicle: Payload,
-        lower_hsv: list[int] = (0, 0, 30),
-        upper_hsv: list[int] = (179, 40, 120),
-        forward_speed: float = 0.08,
-        angular_gain: float = 0.003,
-        centering_threshold_px: int = 15,
-        drive_angular_scale: float = 0.3,
-        min_detect_pixels: int = 50,
-        stop_area: int = 5000,
-        lost_timeout_s: float = 3.0,
-        compressed: bool = False,
-        vertical_blob_min_hw_ratio: float = 2.0,
-        top_centroid_frac: float = 0.3,
-        use_global_hsv_centroid: bool = False,
-    ):
-        super().__init__(node, vehicle)
+    @override
+    def initialize(
+        self, node: Node, vehicle: Payload, params: PayloadColorStringApproachParams
+    ) -> None:
+        self.node = node
+        self.vehicle = vehicle
+        self.p = params
 
-        self._lower_hsv = np.array(lower_hsv, dtype=np.uint8)
-        self._upper_hsv = np.array(upper_hsv, dtype=np.uint8)
-        self.forward_speed = float(forward_speed)
-        self.angular_gain = float(angular_gain)
-        self.centering_threshold_px = int(centering_threshold_px)
-        self.drive_angular_scale = float(drive_angular_scale)
-        self.min_detect_pixels = int(min_detect_pixels)
-        self.stop_area = int(stop_area)
-        self.lost_timeout_s = float(lost_timeout_s)
-        self.vertical_blob_min_hw_ratio = float(vertical_blob_min_hw_ratio)
-        self.top_centroid_frac = float(top_centroid_frac)
-        self.use_global_hsv_centroid = bool(use_global_hsv_centroid)
+        self._lower_hsv = np.array(params.lower_hsv, dtype=np.uint8)
+        self._upper_hsv = np.array(params.upper_hsv, dtype=np.uint8)
 
         self._bridge = CvBridge()
         self._latest_image: Optional[Image | CompressedImage] = None
 
-        if bool(compressed):
+        if bool(params.compressed):
             self.node.create_subscription(
                 CompressedImage,
                 f"{vehicle.image_topic}/compressed",
@@ -206,12 +197,12 @@ class PayloadColorStringApproachMode(Mode):
         self._image_width = 0.0
         self._last_seen_time = None
         self._last_log_time = 0.0
-        if self.use_global_hsv_centroid:
+        if self.p.use_global_hsv_centroid:
             self.log("PayloadColorStringApproachMode: started — global HSV centroid")
         else:
             self.log(
                 "PayloadColorStringApproachMode: started — vertical blob "
-                f"(min h/w≥{self.vertical_blob_min_hw_ratio})"
+                f"(min h/w≥{self.p.vertical_blob_min_hw_ratio})"
             )
 
     def on_update(self, time_delta: float) -> None:
@@ -237,7 +228,7 @@ class PayloadColorStringApproachMode(Mode):
         mask = cv2.inRange(hsv, self._lower_hsv, self._upper_hsv)
 
         cy: Optional[float] = None
-        if self.use_global_hsv_centroid:
+        if self.p.use_global_hsv_centroid:
             M = cv2.moments(mask)
             area = int(M["m00"] / 255) if M["m00"] > 0 else 0
             cx: Optional[float] = (M["m10"] / M["m00"]) if M["m00"] > 0 else None
@@ -246,9 +237,9 @@ class PayloadColorStringApproachMode(Mode):
         else:
             blob = _vertical_blob_centroid_area(
                 mask,
-                self.vertical_blob_min_hw_ratio,
-                float(self.min_detect_pixels),
-                self.top_centroid_frac,
+                self.p.vertical_blob_min_hw_ratio,
+                float(self.p.min_detect_pixels),
+                self.p.top_centroid_frac,
             )
             if blob is None:
                 cx = None
@@ -258,10 +249,10 @@ class PayloadColorStringApproachMode(Mode):
 
         self._publish_debug(bgr, mask, cx, cy)
 
-        if cx is None or area < self.min_detect_pixels:
+        if cx is None or area < self.p.min_detect_pixels:
             if (
                 self._last_seen_time is not None
-                and (now - self._last_seen_time) > self.lost_timeout_s
+                and (now - self._last_seen_time) > self.p.lost_timeout_s
             ):
                 self.vehicle.stop()
                 self._last_seen_time = None
@@ -272,7 +263,7 @@ class PayloadColorStringApproachMode(Mode):
 
         self._last_seen_time = now
 
-        if area >= self.stop_area:
+        if area >= self.p.stop_area:
             self._stopping = True
             self.log(
                 f"PayloadColorStringApproachMode: stop_area hit (area={area}), driving one more frame"
@@ -280,9 +271,9 @@ class PayloadColorStringApproachMode(Mode):
 
         image_center = self._image_width / 2.0
         lateral_error = cx - image_center
-        angular = -self.angular_gain * lateral_error
+        angular = -self.p.angular_gain * lateral_error
 
-        centered = abs(lateral_error) <= self.centering_threshold_px
+        centered = abs(lateral_error) <= self.p.centering_threshold_px
 
         if not centered:
             # Phase 1: rotate in place to centre the target
@@ -292,8 +283,8 @@ class PayloadColorStringApproachMode(Mode):
         else:
             # Phase 2: drive forward with reduced angular correction
             self._aligned = True
-            drive_angular = angular * self.drive_angular_scale
-            self.vehicle.drive(self.forward_speed, drive_angular)
+            drive_angular = angular * self.p.drive_angular_scale
+            self.vehicle.drive(self.p.forward_speed, drive_angular)
             phase = "DRIVE"
 
         if now - self._last_log_time >= 1.0:
@@ -308,3 +299,8 @@ class PayloadColorStringApproachMode(Mode):
 
     def on_exit(self) -> None:
         self.vehicle.stop()
+
+    @classmethod
+    @override
+    def get_params_cls(cls) -> type[BaseModel]:
+        return PayloadColorStringApproachParams

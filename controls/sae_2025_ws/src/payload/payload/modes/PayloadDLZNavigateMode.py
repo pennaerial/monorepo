@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from typing import Literal, Optional, Tuple
+from typing import Literal, Optional, Tuple, override
 
 from typing_extensions import TypedDict
 
@@ -131,6 +131,36 @@ class TagTransitionRule(TypedDict):
     direction: Literal["cw", "ccw"]
 
 
+class PayloadDLZNavigateParams(BaseModel):
+    direction: Literal["cw", "ccw"] = "ccw"
+    target_transitions: int = 1
+    turn_angular_speed: float = 0.5
+    corner_angular_speed: float = 0.3
+    line_follow_speed_mps: float = 0.10
+    k_lat: float = 0.003
+    k_d_lat: float = 0.002
+    k_ang: float = 0.4
+    max_angular: float = 0.5
+    # Scan / lookup params
+    tag_transition_table: dict[str, TagTransitionRule] | None = None
+    detect_frames: int = 5
+    scan_duration_s: float = 1.0
+    start_phase: Literal["wait_for_plane", "scan_tags", "line_follow"] = (
+        "wait_for_plane"
+    )
+    tag_size_m: float = 0.0508
+    tag_family: str = DEFAULT_TAG_FAMILY
+    compressed_image: bool = False
+    # HSV bounds — same semantics as PayloadCornerNavigateMode. Defaults
+    # match that mode (ccw=red, cw=blue) so calibrations can be shared.
+    ccw_lower_hsv: list[int] = (0, 80, 80)
+    ccw_upper_hsv: list[int] = (10, 255, 255)
+    cw_lower_hsv: list[int] = (85, 120, 60)
+    cw_upper_hsv: list[int] = (140, 255, 255)
+    cw_lower_hsv2: list[int] = (255, 255, 255)
+    cw_upper_hsv2: list[int] = (255, 255, 255)
+
+
 @register_mode(
     id="payload.PayloadDLZNavigateMode",
     targets=[Payload],
@@ -174,50 +204,21 @@ class PayloadDLZNavigateMode(Mode):
         Test keys in YAML order — put more-specific rules first.
     """
 
-    class Params(BaseModel):
-        pass
-
     required_vision_nodes = (PayloadAprilTagNode,)
     transition_labels = ("done",)
     requires_camera = True
 
-    def __init__(
-        self,
-        node: Node,
-        vehicle: Payload,
-        direction: Literal["cw", "ccw"] = "ccw",
-        target_transitions: int = 1,
-        turn_angular_speed: float = 0.5,
-        corner_angular_speed: float = 0.3,
-        line_follow_speed_mps: float = 0.10,
-        k_lat: float = 0.003,
-        k_d_lat: float = 0.002,
-        k_ang: float = 0.4,
-        max_angular: float = 0.5,
-        # Scan / lookup params
-        tag_transition_table: dict[str, TagTransitionRule] | None = None,
-        detect_frames: int = 5,
-        scan_duration_s: float = 1.0,
-        start_phase: Literal[
-            "wait_for_plane", "scan_tags", "line_follow"
-        ] = "wait_for_plane",
-        tag_size_m: float = 0.0508,
-        tag_family: str = DEFAULT_TAG_FAMILY,
-        compressed_image: bool = False,
-        # HSV bounds — same semantics as PayloadCornerNavigateMode. Defaults
-        # match that mode (ccw=red, cw=blue) so calibrations can be shared.
-        ccw_lower_hsv: list[int] = (0, 80, 80),
-        ccw_upper_hsv: list[int] = (10, 255, 255),
-        cw_lower_hsv: list[int] = (85, 120, 60),
-        cw_upper_hsv: list[int] = (140, 255, 255),
-        cw_lower_hsv2: list[int] = (255, 255, 255),
-        cw_upper_hsv2: list[int] = (255, 255, 255),
-    ):
-        super().__init__(node, vehicle)
-        direction = str(direction).lower().strip()
+    @override
+    def initialize(
+        self, node: Node, vehicle: Payload, params: PayloadDLZNavigateParams
+    ) -> None:
+        self.node = node
+        self.vehicle = vehicle
+        self.p = params
+        direction = str(params.direction).lower().strip()
         if direction not in ("cw", "ccw"):
             raise ValueError(f"direction must be 'cw' or 'ccw', got {direction!r}")
-        start_phase = str(start_phase).lower().strip()
+        start_phase = str(params.start_phase).lower().strip()
         if start_phase not in _VALID_START_PHASES:
             raise ValueError(
                 f"start_phase must be one of {_VALID_START_PHASES}, got {start_phase!r}"
@@ -225,31 +226,21 @@ class PayloadDLZNavigateMode(Mode):
 
         # Fallback defaults (overwritten by table lookup at runtime)
         self._default_direction = direction
-        self._default_target_transitions = int(target_transitions)
+        self._default_target_transitions = int(params.target_transitions)
 
-        self.turn_angular_speed = float(turn_angular_speed)
-        self.corner_angular_speed = float(corner_angular_speed)
-        self.line_follow_speed_mps = float(line_follow_speed_mps)
-        self.k_lat = float(k_lat)
-        self.k_d_lat = float(k_d_lat)
-        self.k_ang = float(k_ang)
-        self.max_angular = float(max_angular)
-
-        self.tag_transition_table = dict(tag_transition_table or {})
-        self.detect_frames = int(detect_frames)
-        self.scan_duration_s = float(scan_duration_s)
+        self.tag_transition_table = dict(params.tag_transition_table or {})
         self.start_phase = start_phase
-        self.tag_size_m = float(tag_size_m)
-        self.tag_family = str(tag_family) if tag_family else DEFAULT_TAG_FAMILY
-        self.compressed_image = bool(compressed_image)
+        self.tag_family = (
+            str(params.tag_family) if params.tag_family else DEFAULT_TAG_FAMILY
+        )
 
         # A = cw-start colour, B = ccw-start colour (see module docstring).
-        self._lower_a = np.array(cw_lower_hsv, dtype=np.uint8)
-        self._upper_a = np.array(cw_upper_hsv, dtype=np.uint8)
-        self._lower_a2 = np.array(cw_lower_hsv2, dtype=np.uint8)
-        self._upper_a2 = np.array(cw_upper_hsv2, dtype=np.uint8)
-        self._lower_b = np.array(ccw_lower_hsv, dtype=np.uint8)
-        self._upper_b = np.array(ccw_upper_hsv, dtype=np.uint8)
+        self._lower_a = np.array(params.cw_lower_hsv, dtype=np.uint8)
+        self._upper_a = np.array(params.cw_upper_hsv, dtype=np.uint8)
+        self._lower_a2 = np.array(params.cw_lower_hsv2, dtype=np.uint8)
+        self._upper_a2 = np.array(params.cw_upper_hsv2, dtype=np.uint8)
+        self._lower_b = np.array(params.ccw_lower_hsv, dtype=np.uint8)
+        self._upper_b = np.array(params.ccw_upper_hsv, dtype=np.uint8)
 
         self._bridge = CvBridge()
         self._image_sub = None
@@ -265,9 +256,9 @@ class PayloadDLZNavigateMode(Mode):
         CW direction → turn left (positive). CCW direction → turn right (negative).
         """
         return (
-            self.turn_angular_speed
+            self.p.turn_angular_speed
             if self.direction == "cw"
-            else -self.turn_angular_speed
+            else -self.p.turn_angular_speed
         )
 
     def _corner_transition(self, prev: str, curr: str) -> bool:
@@ -279,7 +270,7 @@ class PayloadDLZNavigateMode(Mode):
 
     def _request_apriltag_state(self) -> Optional[PayloadAprilTagState.Response]:
         req = PayloadAprilTagState.Request()
-        req.tag_size_m = self.tag_size_m
+        req.tag_size_m = self.p.tag_size_m
         req.tag_family = self.tag_family
         return self.send_request(PayloadAprilTagNode, req)
 
@@ -294,7 +285,7 @@ class PayloadDLZNavigateMode(Mode):
         if self._image is None:
             return None
         try:
-            if self.compressed_image:
+            if self.p.compressed_image:
                 buf = np.frombuffer(self._image.data, dtype=np.uint8)
                 return cv2.imdecode(buf, cv2.IMREAD_COLOR)
             return self._bridge.imgmsg_to_cv2(self._image, desired_encoding="bgr8")
@@ -420,7 +411,7 @@ class PayloadDLZNavigateMode(Mode):
 
         # Camera subscription for inline colour detection
         cam_topic = self.vehicle.namespaced_path("camera")
-        if self.compressed_image:
+        if self.p.compressed_image:
             self._image_sub = self.node.create_subscription(
                 CompressedImage, f"{cam_topic}/compressed", self._image_cb, 1
             )
@@ -487,9 +478,9 @@ class PayloadDLZNavigateMode(Mode):
             self._consecutive_tag_frames += 1
             self.log(
                 f"PayloadDLZNavigateMode: WAIT_FOR_PLANE — tags={tag_ids}  "
-                f"consecutive={self._consecutive_tag_frames}/{self.detect_frames}"
+                f"consecutive={self._consecutive_tag_frames}/{self.p.detect_frames}"
             )
-            if self._consecutive_tag_frames >= self.detect_frames:
+            if self._consecutive_tag_frames >= self.p.detect_frames:
                 self._phase = "scan_tags"
                 self._scan_elapsed = 0.0
                 self._seen_tag_ids = set()
@@ -516,7 +507,7 @@ class PayloadDLZNavigateMode(Mode):
             for tag_id in response.all_tag_ids:
                 self._seen_tag_ids.add(int(tag_id))
 
-        if self._scan_elapsed < self.scan_duration_s:
+        if self._scan_elapsed < self.p.scan_duration_s:
             return
 
         # Scan complete — look up table
@@ -868,11 +859,11 @@ class PayloadDLZNavigateMode(Mode):
 
             angular = float(
                 np.clip(
-                    -self.k_lat * lateral_error_px
-                    - self.k_d_lat * d_lateral
-                    + self.k_ang * boundary_angle,
-                    -self.max_angular,
-                    self.max_angular,
+                    -self.p.k_lat * lateral_error_px
+                    - self.p.k_d_lat * d_lateral
+                    + self.p.k_ang * boundary_angle,
+                    -self.p.max_angular,
+                    self.p.max_angular,
                 )
             )
         else:
@@ -893,7 +884,7 @@ class PayloadDLZNavigateMode(Mode):
             transitioned,
             is_corner,
         )
-        self.vehicle.drive(self.line_follow_speed_mps, angular)
+        self.vehicle.drive(self.p.line_follow_speed_mps, angular)
 
     def _corner_single_color_metrics(
         self, bgr: np.ndarray, color: str
@@ -931,7 +922,7 @@ class PayloadDLZNavigateMode(Mode):
 
         # Corner turns:
         #   CCW travel → turn left (+), CW travel → turn right (-)
-        speed = self.corner_angular_speed
+        speed = self.p.corner_angular_speed
         angular = speed if self.direction == "ccw" else -speed
         self._corner_turned += abs(angular) * time_delta
 
@@ -1172,7 +1163,7 @@ class PayloadDLZNavigateMode(Mode):
             err_label = (
                 f"lat={lateral_error_px:.1f}px  "
                 f"ang={math.degrees(boundary_angle):.1f}deg  "
-                f"cmd={angular:+.2f}rad/s  v={self.line_follow_speed_mps:.2f}m/s"
+                f"cmd={angular:+.2f}rad/s  v={self.p.line_follow_speed_mps:.2f}m/s"
             )
         else:
             err_label = "boundary=none"
@@ -1186,3 +1177,8 @@ class PayloadDLZNavigateMode(Mode):
             1,
         )
         self._publish_annotated(debug)
+
+    @classmethod
+    @override
+    def get_params_cls(cls) -> type[BaseModel]:
+        return PayloadDLZNavigateParams
