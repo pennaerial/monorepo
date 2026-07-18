@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, ClassVar, Generic, Mapping, TypeVar
+from typing import TYPE_CHECKING, ClassVar, Mapping
 
 from vehicle_common.vehicle import Vehicle
 from vehicle_common.runtime.vision_loader import canonical_vision_node_path
