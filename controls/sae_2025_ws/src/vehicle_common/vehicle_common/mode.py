@@ -24,32 +24,10 @@ class Mode[VehicleT: Vehicle, ParamsT: BaseModel](ABC):
     peer_vehicle_names: ClassVar[tuple[str, ...]] = ()
     requires_camera: ClassVar[bool] = False
     transition_labels: ClassVar[tuple[str, ...]] = ()
-    Params: ClassVar[type[BaseModel]]  # no default — must be set by subclass
 
-    # Fails at import time if no nested Params class is defined
-    def __init_subclass__(cls, **kwargs):
-        super().__init_subclass__(**kwargs)
-        if "Params" not in cls.__dict__:
-            raise TypeError(f"{cls.__name__} must define its own nested Params class")
-
-        params_cls = cls.__dict__["Params"]
-        if not isinstance(params_cls, type) or not issubclass(params_cls, BaseModel):
-            raise TypeError(
-                f"{cls.__name__}.Params must be a subclass of BaseModel got {params_cls!r}"
-            )
-
-    def __init__(self, node: Node, vehicle: VehicleT):
-        """
-        Initialize the mode with a reference to the ROS 2 node.
-
-        Args:
-            node (Node): The ROS 2 node instance managing this mode.
-            vehicle (Vehicle): The controlled entity.
-        """
-        self.node = node
-        self.active = False
-        self.vehicle: VehicleT = vehicle
-        self.pending_requests = {}
+    # self attributes
+    active = False
+    pending_requests = {}
 
     @abstractmethod
     def initialize(self, node: Node, vehicle: VehicleT, params: ParamsT):
@@ -60,6 +38,10 @@ class Mode[VehicleT: Vehicle, ParamsT: BaseModel](ABC):
             vehicle: The vehicle instance that the current mode has control over
             params: A validated pydantic params model that the mode class has defined
         """
+
+    @abstractmethod
+    def get_params_cls(self) -> type[BaseModel]:
+        """Get the Pydantic params model defined for this Mode subclass. Used for validating and instantiating the mode"""
 
     @classmethod
     def required_vision_node_paths(cls) -> tuple[str, ...]:
