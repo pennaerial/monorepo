@@ -1,3 +1,5 @@
+from typing import override
+
 from rclpy.node import Node
 from px4_msgs.msg import VehicleStatus
 from pydantic import BaseModel
@@ -7,24 +9,21 @@ from vehicle_common.mode import Mode
 from vehicle_common.mode_loader import register_mode
 
 
+class LandingParams(BaseModel):
+    pass
+
+
 @register_mode(id="uav.LandingMode", targets=[UAV])
 class LandingMode(Mode):
     """
     A mode for landing vertically.
     """
 
-    class Params(BaseModel):
-        pass
-
-    def __init__(self, node: Node, vehicle: UAV):
-        """
-        Initialize the LandingMode
-
-        Args:
-            node (Node): ROS 2 node managing the UAV.
-            vehicle (UAV): The UAV instance to control.
-        """
-        super().__init__(node, vehicle)
+    @override
+    def initialize(self, node: Node, vehicle: UAV, params: LandingParams) -> None:
+        self.node = node
+        self.vehicle = vehicle
+        self.p = params
 
     def on_update(self, time_delta: float) -> None:
         """
@@ -60,3 +59,8 @@ class LandingMode(Mode):
         ):
             return "terminate"  # Mission complete - shut down
         return "continue"
+
+    @classmethod
+    @override
+    def get_params_cls(cls) -> type[BaseModel]:
+        return LandingParams

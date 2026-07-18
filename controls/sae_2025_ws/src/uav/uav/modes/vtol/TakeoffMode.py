@@ -1,54 +1,48 @@
 import time
-from typing import Literal
+from typing import Literal, override
 
 import numpy as np
 from pydantic import BaseModel
 from px4_msgs.msg import VehicleStatus, VtolVehicleStatus
 from rclpy.node import Node
 
-from uav.vehicles.UAV import get_nav_state_str
+from uav.vehicles.UAV import get_nav_state_str, UAV
 from uav.vehicles.VTOL import VTOL
 
 from vehicle_common.mode import Mode
 from vehicle_common.mode_loader import register_mode
 
 
+class TakeoffParams(BaseModel):
+    takeoff_type: Literal["vertical", "horizontal"] = "vertical"
+    fw_tko_pitch: float = float("nan")
+    yaw: float = float("nan")
+    latitude: float = float("nan")
+    longitude: float = float("nan")
+    altitude: float = float("nan")
+
+
 @register_mode(
-    id="uav.vtol.TakeoffMode", targets=[VTOL], transition_labels=["complete"]
+    id="uav.vtol.TakeoffMode", targets=[UAV], transition_labels=["complete"]
 )
 class TakeoffMode(Mode):
     """
     A VTOL takeoff mode that supports both vertical and runway-style launches.
     """
 
-    class Params(BaseModel):
-        pass
-
     transition_labels = ("complete",)
 
-    def __init__(
-        self,
-        node: Node,
-        vehicle: VTOL,
-        takeoff_type: Literal["vertical", "horizontal"] = "vertical",
-        fw_tko_pitch: float = float("nan"),
-        yaw: float = float("nan"),
-        latitude: float = float("nan"),
-        longitude: float = float("nan"),
-        altitude: float = float("nan"),
-    ):
-        super().__init__(node, vehicle)
-        self.takeoff_type = takeoff_type.lower()
+    @override
+    def initialize(self, node: Node, vehicle: VTOL, params: TakeoffParams) -> None:
+        self.node = node
+        self.vehicle = vehicle
+        self.p = params
+        self.takeoff_type = params.takeoff_type.lower()
         self.takeoff_commanded = False
         self.takeoff_elapsed_time = (
             0.0  # PX4-Autopilot on ARM has a race condition when changing vehicle state
         )
         self.fw_takeoff_phase = 0
-        self.fw_tko_pitch = fw_tko_pitch
-        self.yaw = yaw
-        self.latitude = latitude
-        self.longitude = longitude
-        self.altitude = altitude
 
     def on_update(self, time_delta: float) -> None:
         self.takeoff_elapsed_time += time_delta
@@ -129,14 +123,14 @@ class TakeoffMode(Mode):
             self.node.get_logger().info(f"Current GPS: {lat}, {lon}, {alt}")
 
             if (
-                np.isnan(self.latitude)
-                or np.isnan(self.longitude)
-                or np.isnan(self.altitude)
+                np.isnan(self.p.latitude)
+                or np.isnan(self.p.longitude)
+                or np.isnan(self.p.altitude)
             ):
                 self.node.get_logger().info("Takeoff Destination GPS: Auto Calculated")
             else:
                 self.node.get_logger().info(
-                    f"Takeoff Destination GPS: {self.latitude}, {self.longitude}, {self.altitude}"
+                    f"Takeoff Destination GPS: {self.p.latitude}, {self.p.longitude}, {self.p.altitude}"
                 )
 
             self.vehicle.disarm(force=True)
@@ -146,11 +140,11 @@ class TakeoffMode(Mode):
             time.sleep(0.5)
 
             self.vehicle.fixed_wing_takeoff(
-                self.fw_tko_pitch,
-                self.yaw,
-                self.latitude,
-                self.longitude,
-                self.altitude,
+                self.p.fw_tko_pitch,
+                self.p.yaw,
+                self.p.latitude,
+                self.p.longitude,
+                self.p.altitude,
             )
             self.node.get_logger().info(
                 "FW takeoff Step 2b: takeoff command sent while disarmed."
@@ -185,3 +179,8 @@ class TakeoffMode(Mode):
             self.log("Takeoff complete, in offboard mode.")
             return "complete"
         return "continue"
+
+    @classmethod
+    @override
+    def get_params_cls(cls) -> type[BaseModel]:
+        return TakeoffParams

@@ -1,3 +1,5 @@
+from typing import override
+
 from pydantic import BaseModel
 from px4_msgs.msg import VehicleStatus
 from rclpy.node import Node
@@ -13,42 +15,42 @@ class TakeoffMethod(StrEnum):
     PX4_AUTO = "PX4_AUTO"  # rely on px4 AUTO_TAKEOFF mode for takeoff
 
 
+class VerticalTakeoffParams(BaseModel):
+    takeoff_height: float = 5.0
+    takeoff_method: str = "PX4_AUTO"
+
+
 @register_mode(
     id="uav.VerticalTakeoffMode", targets=[UAV], transition_labels=["complete"]
 )
 class VerticalTakeoffMode(Mode):
     """Vertical takeoff for any UAV airframe (multicopter or VTOL)."""
 
-    class Params(BaseModel):
-        pass
-
     transition_labels = ("complete",)
 
-    def __init__(
-        self,
-        node: Node,
-        vehicle: UAV,
-        takeoff_height: float = 5.0,
-        takeoff_method: str = "PX4_AUTO",
+    @override
+    def initialize(
+        self, node: Node, vehicle: UAV, params: VerticalTakeoffParams
     ) -> None:
-        super().__init__(node, vehicle)
+        self.node = node
+        self.vehicle = vehicle
+        self.p = params
         self.logger = self.node.get_logger()
         self.elapsed = 0.0
-        self.tko_height = takeoff_height
 
         valid = ", ".join(m.value for m in TakeoffMethod)
         try:
-            self.tko_method = TakeoffMethod(takeoff_method)
+            self.tko_method = TakeoffMethod(params.takeoff_method)
         except ValueError:
             self.logger.error(
-                f"takeoff_method: {takeoff_method} is not valid. Valid options are: {valid}"
+                f"takeoff_method: {params.takeoff_method} is not valid. Valid options are: {valid}"
             )
 
         # px4_auto uses only
         self.sent_px4_tko_command = False
 
         # used by offboard tko only
-        self.tko_waypoint_ned = (0, 0, -abs(self.tko_height))
+        self.tko_waypoint_ned = (0, 0, -abs(params.takeoff_height))
         self.last_arm_attempt_t = 0.0
         self.last_offboard_attempt_t = 0.0
 
@@ -79,7 +81,7 @@ class VerticalTakeoffMode(Mode):
         if not self.sent_px4_tko_command:
             self.elapsed = 0.0
             self.logger.info("Commanding vertical takeoff.", throttle_duration_sec=1.0)
-            self.vehicle.takeoff(self.tko_height)
+            self.vehicle.takeoff(self.p.takeoff_height)
             self.sent_px4_tko_command = True
             return
 
@@ -136,3 +138,8 @@ class VerticalTakeoffMode(Mode):
                 return "complete"
 
         return "continue"
+
+    @classmethod
+    @override
+    def get_params_cls(cls) -> type[BaseModel]:
+        return VerticalTakeoffParams

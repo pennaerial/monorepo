@@ -1,3 +1,5 @@
+from typing import override
+
 import numpy as np
 from pydantic import BaseModel
 from rclpy.node import Node
@@ -8,6 +10,10 @@ from uav_interfaces.srv import PayloadTracking
 
 from vehicle_common.mode import Mode
 from vehicle_common.mode_loader import register_mode
+
+
+class PayloadPickupParams(BaseModel):
+    color: str = "green"
 
 
 @register_mode(
@@ -21,27 +27,18 @@ class PayloadPickupMode(Mode):
     A mode for picking up a payload.
     """
 
-    class Params(BaseModel):
-        pass
-
     required_vision_nodes = (PayloadTrackingNode,)
     transition_labels = ("complete",)
 
-    def __init__(self, node: Node, vehicle: UAV, color: str = "green"):
-        """
-        Initialize the LowerPayload.
-
-        Args:
-            node (Node): ROS 2 node managing the UAV.
-            vehicle (UAV): The UAV instance to control.
-            color (str): The color of the payload to track.
-        """
-        super().__init__(node, vehicle)
+    @override
+    def initialize(self, node: Node, vehicle: UAV, params: PayloadPickupParams) -> None:
+        self.node = node
+        self.vehicle = vehicle
+        self.p = params
 
         self.response = None
         self.altitude_constant = 3
         self.done = False
-        self.color = color
         self.goal_pos = None
 
     def on_update(self, time_delta: float) -> None:
@@ -56,7 +53,7 @@ class PayloadPickupMode(Mode):
         request = PayloadTracking.Request()
         request.altitude = -self.vehicle.get_local_position()[2]
         request.yaw = float(self.vehicle.yaw)
-        request.payload_color = self.color
+        request.payload_color = self.p.color
         response = self.send_request(PayloadTrackingNode, request)
 
         # If no payload pose is received, exit early
@@ -115,3 +112,8 @@ class PayloadPickupMode(Mode):
         if self.done:
             return "complete"
         return "continue"
+
+    @classmethod
+    @override
+    def get_params_cls(cls) -> type[BaseModel]:
+        return PayloadPickupParams
