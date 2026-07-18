@@ -1,3 +1,5 @@
+from typing import override
+
 from pydantic import BaseModel
 from vehicle_common.vehicle import Vehicle
 from vehicle_common.mode import Mode
@@ -16,10 +18,21 @@ class MockVisionNode(VisionNode):
     pass
 
 
+class MockParams(BaseModel):
+    pass
+
+
 @register_mode(id="mock", targets=[MockVehicle])
 class MockMode(Mode):
-    class Params(BaseModel):
-        pass
+    @classmethod
+    @override
+    def get_params_cls(cls) -> type[BaseModel]:
+        return MockParams
+
+
+class MockVerticalTakeoffParams(BaseModel):
+    takeoff_height: float = 5.0
+    takeoff_method: str = "PX4_AUTO"
 
 
 @register_mode(
@@ -36,9 +49,14 @@ class MockVerticalTakeoffMode(Mode):
 
     transition_labels = ("complete",)
 
-    class Params(BaseModel):
-        takeoff_height: float = 5.0
-        takeoff_method: str = "PX4_AUTO"
+    @classmethod
+    @override
+    def get_params_cls(cls) -> type[BaseModel]:
+        return MockVerticalTakeoffParams
+
+
+class MockLoiterParams(BaseModel):
+    pass
 
 
 @register_mode(
@@ -52,5 +70,7 @@ class MockLoiterMode(Mode):
     but not requiring a camera, so RuntimeMission's intersection/union aggregation
     across modes can be exercised."""
 
-    class Params(BaseModel):
-        pass
+    @classmethod
+    @override
+    def get_params_cls(cls) -> type[BaseModel]:
+        return MockLoiterParams
