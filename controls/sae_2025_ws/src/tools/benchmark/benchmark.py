@@ -69,7 +69,9 @@ def process_labels(proc):
     full_cmd = " ".join(cmdline) if cmdline else name
     full_label = f"{full_cmd} [pid {proc.pid}]"
     tokens = cmdline or [name]
-    readable_cmd = " ".join(os.path.basename(tok) if tok.startswith("/") else tok for tok in tokens)
+    readable_cmd = " ".join(
+        os.path.basename(tok) if tok.startswith("/") else tok for tok in tokens
+    )
     return full_label, readable_cmd or name
 
 
@@ -141,8 +143,14 @@ class ProcTracker:
         avg_mem = self.mem_sum / self.samples if self.samples else 0
         avg_threads = self.threads_sum / self.samples if self.samples else 0
         avg_fds = self.fds_sum / self.samples if self.samples else None
-        avg_read = sum(self.io_read_bps) / len(self.io_read_bps) if self.io_read_bps else None
-        avg_write = sum(self.io_write_bps) / len(self.io_write_bps) if self.io_write_bps else None
+        avg_read = (
+            sum(self.io_read_bps) / len(self.io_read_bps) if self.io_read_bps else None
+        )
+        avg_write = (
+            sum(self.io_write_bps) / len(self.io_write_bps)
+            if self.io_write_bps
+            else None
+        )
         cpu_per_thread = avg_cpu / avg_threads if avg_threads else 0
         return {
             "label": self.label,
@@ -212,9 +220,13 @@ def print_report(trackers, top_n):
     print("-" * WIDTH)
     print("\nLikely bottleneck signals:")
     top_cpu = rows[0]
-    print(f"  * Highest avg CPU : {truncate(top_cpu['cmd'], 60)} ({top_cpu['avg_cpu']:.1f}%)")
+    print(
+        f"  * Highest avg CPU : {truncate(top_cpu['cmd'], 60)} ({top_cpu['avg_cpu']:.1f}%)"
+    )
     top_mem = max(rows, key=lambda r: r["avg_mem_mb"])
-    print(f"  * Highest avg RAM : {truncate(top_mem['cmd'], 60)} ({top_mem['avg_mem_mb']:.1f}MB)")
+    print(
+        f"  * Highest avg RAM : {truncate(top_mem['cmd'], 60)} ({top_mem['avg_mem_mb']:.1f}MB)"
+    )
     spiky = max(rows, key=lambda r: r["max_cpu"] - r["avg_cpu"])
     if spiky["max_cpu"] - spiky["avg_cpu"] > 20:
         print(
@@ -222,10 +234,14 @@ def print_report(trackers, top_n):
             f"(avg {spiky['avg_cpu']:.1f}% vs max {spiky['max_cpu']:.1f}%) -> possible stalls/callbacks"
         )
     threadiest = max(rows, key=lambda r: r["avg_threads"])
-    print(f"  * Most threads    : {truncate(threadiest['cmd'], 60)} ({threadiest['avg_threads']:.1f} avg)")
+    print(
+        f"  * Most threads    : {truncate(threadiest['cmd'], 60)} ({threadiest['avg_threads']:.1f} avg)"
+    )
     io_rows = [r for r in rows if r["avg_write_bps"] is not None]
     if io_rows:
-        top_io = max(io_rows, key=lambda r: (r["avg_write_bps"] or 0) + (r["avg_read_bps"] or 0))
+        top_io = max(
+            io_rows, key=lambda r: (r["avg_write_bps"] or 0) + (r["avg_read_bps"] or 0)
+        )
         print(
             f"  * Heaviest IO     : {truncate(top_io['cmd'], 60)} "
             f"(R {fmt_bps(top_io['avg_read_bps'])}, W {fmt_bps(top_io['avg_write_bps'])})"
@@ -245,12 +261,39 @@ def write_csv(trackers, path):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Poll psutil for ROS processes and report resource usage.")
-    parser.add_argument("--interval", type=float, default=1.0, help="Seconds between polls (default: 1.0)")
-    parser.add_argument("--duration", type=float, default=None, help="Total seconds to run (default: run until Ctrl+C)")
-    parser.add_argument("--filter", type=str, default="ros", help="Comma-separated substrings to match in name/cmdline (default: 'ros')")
-    parser.add_argument("--top", type=int, default=20, help="Number of processes to show in the report (default: 20)")
-    parser.add_argument("--csv", type=str, default=None, help="Optional path to dump the final summary as CSV")
+    parser = argparse.ArgumentParser(
+        description="Poll psutil for ROS processes and report resource usage."
+    )
+    parser.add_argument(
+        "--interval",
+        type=float,
+        default=1.0,
+        help="Seconds between polls (default: 1.0)",
+    )
+    parser.add_argument(
+        "--duration",
+        type=float,
+        default=None,
+        help="Total seconds to run (default: run until Ctrl+C)",
+    )
+    parser.add_argument(
+        "--filter",
+        type=str,
+        default="ros",
+        help="Comma-separated substrings to match in name/cmdline (default: 'ros')",
+    )
+    parser.add_argument(
+        "--top",
+        type=int,
+        default=20,
+        help="Number of processes to show in the report (default: 20)",
+    )
+    parser.add_argument(
+        "--csv",
+        type=str,
+        default=None,
+        help="Optional path to dump the final summary as CSV",
+    )
     args = parser.parse_args()
 
     terms = [t.strip().lower() for t in args.filter.split(",") if t.strip()]
@@ -271,6 +314,7 @@ def main():
         while not stop["flag"]:
             poll_count += 1
             seen_pids = set()
+            new_pids = set()
             for proc in psutil.process_iter(["pid", "name"]):
                 if proc.pid not in trackers:
                     if matches_filter(proc, terms):
@@ -279,15 +323,24 @@ def main():
                         except (psutil.NoSuchProcess, psutil.AccessDenied):
                             continue
                         trackers[proc.pid] = ProcTracker(proc)
+                        new_pids.add(proc.pid)
                 if proc.pid in trackers:
                     seen_pids.add(proc.pid)
 
             for pid in seen_pids:
+                if pid in new_pids:
+                    # Skip this cycle: cpu_percent() was just primed above, so
+                    # polling it now would measure CPU% over a near-zero
+                    # interval, which is noisy/meaningless (psutil footgun).
+                    # Wait a full poll interval before taking its first sample.
+                    continue
                 trackers[pid].poll()
 
             live_count = sum(1 for t in trackers.values() if t.samples > 0)
             elapsed = time.time() - start
-            sys.stdout.write(f"\r[{elapsed:6.1f}s] polling... tracking {live_count} process(es), {poll_count} sample(s)   ")
+            sys.stdout.write(
+                f"\r[{elapsed:6.1f}s] polling... tracking {live_count} process(es), {poll_count} sample(s)   "
+            )
             sys.stdout.flush()
 
             if args.duration is not None and elapsed >= args.duration:
