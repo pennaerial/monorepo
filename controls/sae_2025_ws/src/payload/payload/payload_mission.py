@@ -5,13 +5,14 @@ from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 
 from .PayloadModeManager import PayloadModeManager
-from vehicle_common.runtime.mission_spec import MissionSpec, mission_path_for_name
+from vehicle_common.runtime.mission_spec import get_mission_path
+from vehicle_common.runtime.mission_loader import RuntimeMission
 
 
 class PayloadMissionBootstrap(Node):
     def __init__(self) -> None:
         super().__init__("payload_mission_bootstrap")
-        self.declare_parameter("mode_map", mission_path_for_name("basic"))
+        self.declare_parameter("mode_map", get_mission_path("basic", "payload"))
         self.declare_parameter("auto_launch", True)
         self.declare_parameter("vehicle_name", "")
         self.declare_parameter("vision_debug", False)
@@ -43,14 +44,10 @@ class PayloadMissionBootstrap(Node):
         if not vehicle_name:
             raise ValueError("payload_mission requires a non-empty 'vehicle_name'.")
 
-        mission_spec = MissionSpec.load(mission_path)
-        if not mission_spec.is_payload:
-            raise ValueError(
-                f"payload_mission requires a payload mission spec, received target '{mission_spec.target}'."
-            )
+        runtime_mission = RuntimeMission.load_from_path(mission_path)
 
         return {
-            "mission_spec": mission_spec,
+            "mission_spec": runtime_mission,
             "auto_launch": self._bool_parameter("auto_launch"),
             "vehicle_name": vehicle_name,
             "vision_debug": self._bool_parameter("vision_debug"),

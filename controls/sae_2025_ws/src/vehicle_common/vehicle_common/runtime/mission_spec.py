@@ -2,23 +2,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import os
-import importlib
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-import yaml
 from pydantic import BaseModel, ConfigDict, Field
-
-from .mode_paths import normalize_public_mode_id
-from vehicle_common.mode import Mode
 
 
 VALID_MISSION_TARGETS = {"uav", "payload"}
-_TOP_LEVEL_KEYS = {"modes"}
-_MODE_KEYS = {"mode", "params", "transitions"}
-
-if TYPE_CHECKING:
-    from vehicle_common.mode import Mode
 
 
 class MissionModeDocumentModel(BaseModel):
@@ -67,9 +57,13 @@ def get_mission_path(mission_name: str, package: str) -> str:
     )
 
     # gets path in package's install directory where missions are installed to
-    mission_path = Path(get_package_share_directory(package)) / "missions" / f"{mission_name}.yaml"
+    mission_path = (
+        Path(get_package_share_directory(package)) / "missions" / f"{mission_name}.yaml"
+    )
     if not os.path.isfile(mission_path):
-        raise FileNotFoundError(f"Mission {mission_name} was not found at {mission_path}")
+        raise FileNotFoundError(
+            f"Mission {mission_name} was not found at {mission_path}"
+        )
 
     return str(mission_path)
 
@@ -87,4 +81,3 @@ class ModeSpec:
     @property
     def class_path(self) -> str:
         return self.mode_id
-

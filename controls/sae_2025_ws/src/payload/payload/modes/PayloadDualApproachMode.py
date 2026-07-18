@@ -361,7 +361,9 @@ class PayloadDualApproachMode(Mode):
             self._last_seen_time = now
             distance = float(tag.tvec_z)
             lateral_error_px = float(tag.center_x - image_center)
-            linear = min(self.p.tag_forward_gain * distance, self.p.tag_max_forward_speed)
+            linear = min(
+                self.p.tag_forward_gain * distance, self.p.tag_max_forward_speed
+            )
             angular = (-self.p.tag_angular_gain * lateral_error_px) - (
                 self.p.tag_yaw_gain * tag.yaw_error
             )

@@ -28,7 +28,9 @@ class PayloadIdleMode(Mode):
     transition_labels = ("complete",)
 
     @override
-    def initialize(self, node: Node, vehicle: Payload, params: PayloadIdleParams) -> None:
+    def initialize(
+        self, node: Node, vehicle: Payload, params: PayloadIdleParams
+    ) -> None:
         self.node = node
         self.vehicle = vehicle
         self.p = params

@@ -22,9 +22,7 @@ class TakeoffParams(BaseModel):
     altitude: float = float("nan")
 
 
-@register_mode(
-    id="uav.vtol.TakeoffMode", targets=[UAV], transition_labels=["complete"]
-)
+@register_mode(id="uav.vtol.TakeoffMode", targets=[UAV], transition_labels=["complete"])
 class TakeoffMode(Mode):
     """
     A VTOL takeoff mode that supports both vertical and runway-style launches.

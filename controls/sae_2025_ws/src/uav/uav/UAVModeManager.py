@@ -9,7 +9,8 @@ from uav.vehicles.AirframeClass import AirframeClass
 from uav.vehicles.UAV import UAV
 from uav.modes.LandingMode import LandingMode
 from vehicle_common.mode_manager import ModeManager
-from vehicle_common.runtime.mission_spec import MissionSpec
+from vehicle_common.runtime.mission_loader import RuntimeMission
+from vehicle_common.runtime.vision_loader import canonical_vision_node_path
 
 
 class UAVModeManager(ModeManager):
@@ -20,7 +21,7 @@ class UAVModeManager(ModeManager):
     def __init__(
         self,
         *,
-        mission_spec: MissionSpec,
+        mission_spec: RuntimeMission,
         debug: bool = False,
         servo_only: bool = False,
         vehicle_name: str = "uav",
@@ -38,9 +39,10 @@ class UAVModeManager(ModeManager):
             peer_heartbeat_hz=peer_heartbeat_hz,
             peer_stale_timeout_s=peer_stale_timeout_s,
         )
-        if not mission_spec.is_uav:
+        if UAV not in mission_spec._targets:
             raise ValueError(
-                f"UAVModeManager requires a UAV mission spec, received target '{mission_spec.target}'."
+                "UAVModeManager requires a UAV mission spec, received targets "
+                f"{sorted(t.__name__ for t in mission_spec._targets)}."
             )
 
         camera_offsets = list(camera_offsets or [0.0, 0.0, 0.0])
@@ -69,10 +71,10 @@ class UAVModeManager(ModeManager):
             self.vehicle = Multicopter(self, **vehicle_kwargs)
 
         self.get_logger().info("Mission Node has started.")
-        self.setup_vision(list(mission_spec.vision_nodes))
-        self.configure_peer_vehicle_names(
-            getattr(mission_spec, "peer_vehicle_names", ())
+        self.setup_vision(
+            [canonical_vision_node_path(vc) for vc in mission_spec._vision_nodes]
         )
+        self.configure_peer_vehicle_names(mission_spec._peer_vehicle_names)
         self.setup_modes(mission_spec)
 
     def _auto_launch_ready(self) -> bool:

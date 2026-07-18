@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 from contextlib import contextmanager
 from dataclasses import dataclass
-import inspect
 import os
 from pathlib import Path
 from time import time
-from typing import Any, Callable, Iterator, cast, get_type_hints
+from typing import Any, Callable, Iterator, cast
 
+from pydantic import BaseModel
 from rclpy.node import Node
 from std_srvs.srv import Trigger
 
@@ -20,7 +20,6 @@ from vehicle_common.runtime.comm_policy import (
 from vehicle_common.runtime.managed_comms import ModeCommBuilder
 from vehicle_common.runtime.managed_registry import ManagedCommRegistry
 from vehicle_common.runtime.mode_paths import canonical_mode_path
-from vehicle_common.runtime.mission_spec import MissionSpec
 from vehicle_common.runtime.peer_connections import (
     PeerConnectionTracker,
     declared_remote_peer_names,
@@ -32,6 +31,7 @@ from vehicle_common.runtime.vision_loader import (
     load_vision_class,
 )
 from vehicle_common.mode_loader import ModeRegistry
+from vehicle_common.runtime.mission_loader import RuntimeMission
 
 
 @dataclass(frozen=True)
@@ -95,7 +95,7 @@ class ModeManager(Node):
         if self.auto_launch:
             self._auto_launch_timer = self.create_timer(0.1, self._maybe_auto_launch)
 
-    def get_active_mode(self) -> Mode[Any]:
+    def get_active_mode(self) -> Mode:
         return self.modes[cast(str, self.active_mode)]
 
     def _now_seconds(self) -> float:
@@ -236,7 +236,7 @@ class ModeManager(Node):
     def _mode_peer_names(self, mode_or_class: object) -> tuple[str, ...]:
         return declared_remote_peer_names(mode_or_class, self._runtime_vehicle_name)
 
-    def _mode_connection_status(self, mode: Mode[Any]) -> dict[str, bool]:
+    def _mode_connection_status(self, mode: Mode) -> dict[str, bool]:
         return relevant_connection_status(
             self._peer_connections.status(),
             peer_vehicle_names=self._mode_peer_names(mode),
@@ -280,11 +280,11 @@ class ModeManager(Node):
     def _instantiate_mode(
         self,
         *,
-        mode_class: type[Mode[Any]],
-        args: dict[str, Any],
+        mode_class: type[Mode[Any, Any]],
+        params: BaseModel,
         mode_id: str,
         peer_vehicle_names: tuple[str, ...],
-    ) -> Mode[Any]:
+    ) -> Mode[Any, Any]:
         mode_instance = mode_class.__new__(mode_class)
         if not isinstance(mode_instance, mode_class):
             raise TypeError(
@@ -298,7 +298,7 @@ class ModeManager(Node):
         )
         try:
             with self._use_comm_builder(builder):
-                mode_class.__init__(mode_instance, **args)
+                mode_class.initialize(mode_instance, self, self.vehicle, params)
         except Exception:
             self._managed_registry.destroy_for_owner(
                 mode_instance, lifetime="persistent"
@@ -353,67 +353,24 @@ class ModeManager(Node):
 
     # Should move this out, this is a helper function, can use composition
     # with outside module instead of inheritance
-    def initialize_mode(self, mode_id: str, params: dict) -> Mode:
+    def initialize_mode(self, mode_id: str, params: BaseModel) -> Mode:
         registered_mode = ModeRegistry.get().get_registered_mode(mode_id)
-        mode_class = registered_mode.mode_cls
-        peer_vehicle_names = registered_mode.peer_vehicle_names
-        signature = inspect.signature(mode_class.__init__)
-        type_hints = get_type_hints(mode_class.__init__)
-        args = {}
-        consumed_params = set()
-
-        for name, param in signature.parameters.items():
-            if name == "self":
-                continue
-            if name == "node":
-                args[name] = self
-                continue
-            if name == "vehicle":
-                self._validate_vehicle_annotation(mode_id, type_hints.get(name))
-                args[name] = self.vehicle
-                continue
-            if name in params:
-                args[name] = params[name]
-                consumed_params.add(name)
-                continue
-            if param.default != inspect.Parameter.empty:
-                args[name] = param.default
-                continue
-            raise ValueError(
-                f"Missing required parameter '{name}' for mode '{mode_id}'"
-            )
-
-        unexpected_params = sorted(set(params) - consumed_params)
-        if unexpected_params:
-            raise ValueError(
-                f"Mode '{mode_id}' received unexpected parameter(s): {', '.join(unexpected_params)}"
-            )
-
         return self._instantiate_mode(
-            mode_class=mode_class,
-            args=args,
+            mode_class=registered_mode.mode_cls,
+            params=params,
             mode_id=mode_id,
-            peer_vehicle_names=tuple(peer_vehicle_names),
+            peer_vehicle_names=tuple(registered_mode.peer_vehicle_names),
         )
 
-    def _validate_vehicle_annotation(self, mode_path: str, annotation) -> None:
-        if annotation in (None, inspect.Parameter.empty, Vehicle, Any):
-            return
-        if isinstance(annotation, type) and isinstance(self.vehicle, annotation):
-            return
-        actual = type(self.vehicle).__name__
-        expected = getattr(annotation, "__name__", str(annotation))
-        raise TypeError(
-            f"Mode '{mode_path}' expects vehicle type '{expected}', got '{actual}'."
-        )
-
-    def setup_modes(self, mission_spec: MissionSpec) -> None:
-        for mode_name, mode_info in mission_spec.modes.items():
-            mode = self.initialize_mode(mode_info.mode_id, mode_info.params)
+    def setup_modes(self, runtime_mission: RuntimeMission) -> None:
+        for mode_name, runtime_mode in runtime_mission.modes.items():
+            mode = self.initialize_mode(
+                runtime_mode.mode, runtime_mode._validated_params
+            )
             self.add_mode(mode_name, mode)
-            self.transitions[mode_name] = mode_info.transitions
+            self.transitions[mode_name] = runtime_mode.transitions
 
-    def add_mode(self, mode_name: str, mode_instance: Mode[Any]) -> None:
+    def add_mode(self, mode_name: str, mode_instance: Mode) -> None:
         self.modes[mode_name] = mode_instance
         self.get_logger().info(f"Mode {mode_name} registered.")
 

@@ -3,7 +3,8 @@ from time import time
 
 from payload.payload import Payload
 from vehicle_common.mode_manager import ModeManager
-from vehicle_common.runtime.mission_spec import MissionSpec
+from vehicle_common.runtime.mission_loader import RuntimeMission
+from vehicle_common.runtime.vision_loader import canonical_vision_node_path
 
 
 class PayloadModeManager(ModeManager):
@@ -12,7 +13,7 @@ class PayloadModeManager(ModeManager):
     def __init__(
         self,
         *,
-        mission_spec: MissionSpec,
+        mission_spec: RuntimeMission,
         vehicle_name: str,
         auto_launch: bool = True,
         vision_debug: bool = False,
@@ -28,16 +29,17 @@ class PayloadModeManager(ModeManager):
             peer_stale_timeout_s=peer_stale_timeout_s,
         )
         self.vision_debug = bool(vision_debug)
-        if not mission_spec.is_payload:
+        if Payload not in mission_spec._targets:
             raise ValueError(
-                f"PayloadModeManager requires a payload mission spec, received target '{mission_spec.target}'."
+                "PayloadModeManager requires a payload mission spec, received targets "
+                f"{sorted(t.__name__ for t in mission_spec._targets)}."
             )
 
         self.vehicle = Payload(self, str(vehicle_name))
-        self.setup_vision(list(mission_spec.vision_nodes))
-        self.configure_peer_vehicle_names(
-            getattr(mission_spec, "peer_vehicle_names", ())
+        self.setup_vision(
+            [canonical_vision_node_path(vc) for vc in mission_spec._vision_nodes]
         )
+        self.configure_peer_vehicle_names(mission_spec._peer_vehicle_names)
         self.setup_modes(mission_spec)
         self.timer = None
 

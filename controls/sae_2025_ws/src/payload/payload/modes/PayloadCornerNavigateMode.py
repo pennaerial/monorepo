@@ -473,7 +473,8 @@ class PayloadCornerNavigateMode(Mode):
 
         count_a, count_b = self._lower_strip_color_counts(bgr)
         color_seen = (
-            count_a >= self.p.drive_out_min_pixels or count_b >= self.p.drive_out_min_pixels
+            count_a >= self.p.drive_out_min_pixels
+            or count_b >= self.p.drive_out_min_pixels
         )
 
         if self._do_substate == "seeking_tape":

@@ -47,7 +47,9 @@ class PayloadWaitForDriveOutParams(BaseModel):
     # Stillness detection (optical flow)
     stillness_threshold: float = 2.0
     stillness_window: int = 15
-    stillness_flow_crop_frac: float = 0.4  # top fraction to discard (0.4 = use bottom 60%)
+    stillness_flow_crop_frac: float = (
+        0.4  # top fraction to discard (0.4 = use bottom 60%)
+    )
     # Obstruction retreat (still but no orange)
     obstruction_retreat_linear: float = -0.05
     obstruction_retreat_speed: float = 1.5

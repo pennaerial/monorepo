@@ -18,8 +18,10 @@ from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 from uav.vehicles.AirframeClass import AirframeClass
-from vehicle_common.runtime.mission_spec import MissionSpec, mission_path_for_name
-from vehicle_common.runtime.vision_loader import load_vision_class
+from uav.vehicles.UAV import UAV
+from vehicle_common.base import VisionNode
+from vehicle_common.runtime.mission_spec import get_mission_path
+from vehicle_common.runtime.mission_loader import RuntimeMission
 from uav.utils import (
     camel_to_snake,
     find_folder_with_heuristic,
@@ -46,20 +48,12 @@ def _vehicle_namespace_for(vehicle_name: str) -> str:
     return clean_name
 
 
-def _runtime_executable_for(mission_spec: MissionSpec) -> str:
-    if mission_spec.is_uav:
-        return "uav_mission"
-    if mission_spec.is_payload:
-        return "payload_mission"
-    raise ValueError(f"Unsupported mission target '{mission_spec.target}'.")
+def _runtime_executable_for(is_uav: bool) -> str:
+    return "uav_mission" if is_uav else "payload_mission"
 
 
-def _runtime_package_for(mission_spec: MissionSpec) -> str:
-    if mission_spec.is_uav:
-        return "uav"
-    if mission_spec.is_payload:
-        return "payload"
-    raise ValueError(f"Unsupported mission target '{mission_spec.target}'.")
+def _runtime_package_for(is_uav: bool) -> str:
+    return "uav" if is_uav else "payload"
 
 
 def _resolve_mission_path(config: dict) -> str:
@@ -68,7 +62,14 @@ def _resolve_mission_path(config: dict) -> str:
         return mission_path
     mission_name = str(config.get("mission_name", "")).strip()
     if mission_name:
-        return mission_path_for_name(mission_name)
+        for package in ("uav", "payload"):
+            try:
+                return get_mission_path(mission_name, package)
+            except FileNotFoundError:
+                continue
+        raise ValueError(
+            f"Mission '{mission_name}' was not found in the uav or payload packages."
+        )
     raise ValueError("Vehicle stack requires either mission_name or mission_path.")
 
 
@@ -121,7 +122,7 @@ def _resolve_force_camera(config: dict, *, logger=None) -> bool:
 
 def _resolve_camera_input_transport(
     *,
-    mission_spec: MissionSpec,
+    is_uav: bool,
     sim: bool,
     configured_transport: str,
     rotate_degrees: float,
@@ -129,7 +130,7 @@ def _resolve_camera_input_transport(
     logger=None,
 ) -> str:
     transport = str(configured_transport).strip() or ("raw" if sim else "compressed")
-    if not mission_spec.is_payload or sim:
+    if is_uav or sim:
         return transport
 
     preprocess_active = abs(float(rotate_degrees)) > 1e-9 or bool(
@@ -172,8 +173,8 @@ def _resolve_uav_airframe(
 
 
 def _camera_contract_for(
-    mission_spec: MissionSpec,
     *,
+    is_uav: bool,
     vehicle_name: str,
     input_transport: str | None = None,
     rotate_degrees: float | None = None,
@@ -193,7 +194,7 @@ def _camera_contract_for(
         "rotate_degrees": 0.0 if rotate_degrees is None else rotate_degrees,
         "preprocess_hook": "" if preprocess_hook is None else preprocess_hook,
         "camera_info_url": "" if camera_info_url is None else camera_info_url,
-        "mission_target": mission_spec.target,
+        "mission_target": "uav" if is_uav else "payload",
     }
 
 
@@ -268,9 +269,9 @@ def _sim_camera_bridge_actions(
 
 def _build_camera_actions(
     *,
-    mission_spec: MissionSpec,
+    is_uav: bool,
     camera_contract: dict[str, object],
-    vision_nodes: list[str],
+    vision_nodes: list[type[VisionNode]],
     sim: bool,
     sim_world_name: str,
     sim_entity_name: str,
@@ -305,7 +306,7 @@ def _build_camera_actions(
             "-p",
             "output_encoding:=bgr8",
         ]
-        if mission_spec.is_payload and str(camera_contract["camera_info_url"]).strip():
+        if not is_uav and str(camera_contract["camera_info_url"]).strip():
             v4l2_cmd.extend(
                 ["-p", f"camera_info_url:={camera_contract['camera_info_url']}"]
             )
@@ -313,21 +314,21 @@ def _build_camera_actions(
             [
                 "--remap",
                 (
-                    f"image_raw:={camera_contract['input_raw_topic']}"
-                    if mission_spec.is_payload
-                    else f"image_raw:={camera_contract['image_topic']}"
+                    f"image_raw:={camera_contract['image_topic']}"
+                    if is_uav
+                    else f"image_raw:={camera_contract['input_raw_topic']}"
                 ),
                 "--remap",
                 (
-                    f"image_raw/compressed:={camera_contract['input_compressed_topic']}"
-                    if mission_spec.is_payload
-                    else f"image_raw/compressed:={camera_contract['image_topic']}/compressed"
+                    f"image_raw/compressed:={camera_contract['image_topic']}/compressed"
+                    if is_uav
+                    else f"image_raw/compressed:={camera_contract['input_compressed_topic']}"
                 ),
                 "--remap",
                 (
-                    f"camera_info:={camera_contract['input_camera_info_topic']}"
-                    if mission_spec.is_payload
-                    else f"camera_info:={camera_contract['camera_info_topic']}"
+                    f"camera_info:={camera_contract['camera_info_topic']}"
+                    if is_uav
+                    else f"camera_info:={camera_contract['input_camera_info_topic']}"
                 ),
             ]
         )
@@ -348,7 +349,7 @@ def _build_camera_actions(
         "debug": vision_debug,
         "save_vision_milliseconds": save_vision_milliseconds,
     }
-    if mission_spec.is_payload:
+    if not is_uav:
         camera_parameters.update(
             {
                 "input_transport": camera_contract["input_transport"],
@@ -373,13 +374,12 @@ def _build_camera_actions(
 
     preferred_image_transport = (
         "compressed"
-        if mission_spec.is_payload
+        if not is_uav
         and str(camera_contract["input_transport"]).strip().lower() == "compressed"
         else "raw"
     )
 
-    for vision_node in vision_nodes:
-        vision_class = load_vision_class(vision_node)
+    for vision_class in vision_nodes:
         executable = camel_to_snake(vision_class.__name__)
         actions.append(
             Node(
@@ -398,9 +398,9 @@ def _build_camera_actions(
                         "debug": debug_vision_node,
                         "sim": sim,
                         "save_vision": save_vision,
-                        "enable_failsafe_service": mission_spec.is_uav,
+                        "enable_failsafe_service": is_uav,
                         "failsafe_service_name": "mode_manager/failsafe"
-                        if mission_spec.is_uav
+                        if is_uav
                         else "",
                     }
                 ],
@@ -413,7 +413,7 @@ def _build_camera_actions(
 def _build_runtime_parameters(
     *,
     mission_path: str,
-    mission_spec: MissionSpec,
+    is_uav: bool,
     vehicle_name: str,
     auto_launch: bool,
     debug: bool,
@@ -423,7 +423,7 @@ def _build_runtime_parameters(
     camera_mount_offsets: list[float],
 ) -> dict:
     parameters = {"mode_map": mission_path, "auto_launch": bool(auto_launch)}
-    if mission_spec.is_payload:
+    if not is_uav:
         parameters["vehicle_name"] = vehicle_name
         parameters["vision_debug"] = bool(vision_debug)
         return parameters
@@ -559,18 +559,20 @@ def launch_setup(context, *args, **kwargs):
     config = _load_vehicle_config(context)
 
     mission_path = _resolve_mission_path(config)
-    mission_spec = MissionSpec.load(mission_path)
-    runtime_executable = _runtime_executable_for(mission_spec)
-    runtime_package = _runtime_package_for(mission_spec)
+    runtime_mission = RuntimeMission.load_from_path(mission_path)
+    is_uav = UAV in runtime_mission._targets
+    mission_target = "uav" if is_uav else "payload"
+    runtime_executable = _runtime_executable_for(is_uav)
+    runtime_package = _runtime_package_for(is_uav)
 
     vehicle_name = str(config.get("vehicle_name", "")).strip()
     if not vehicle_name:
         raise ValueError("Vehicle stack requires a non-empty vehicle_name.")
     declared_kind = str(config.get("kind", "")).strip()
-    if declared_kind and declared_kind != mission_spec.target:
+    if declared_kind and declared_kind != mission_target:
         raise ValueError(
             f"Vehicle '{vehicle_name}' declared kind '{declared_kind}' "
-            f"but mission target is '{mission_spec.target}'."
+            f"but mission target is '{mission_target}'."
         )
 
     sim = _resolve_bool(config, "sim", False)
@@ -579,13 +581,9 @@ def launch_setup(context, *args, **kwargs):
     vision_debug = _resolve_bool(config, "vision_debug", False)
     debug_vision_node = _resolve_bool(config, "debug_vision_node", False)
     servo_only = _resolve_bool(config, "servo_only", False)
-    launch_middleware = _resolve_bool(config, "launch_middleware", mission_spec.is_uav)
-    launch_px4_sitl = _resolve_bool(
-        config, "launch_px4_sitl", sim and mission_spec.is_uav
-    )
-    launch_payload_backend = _resolve_bool(
-        config, "launch_payload_backend", mission_spec.is_payload
-    )
+    launch_middleware = _resolve_bool(config, "launch_middleware", is_uav)
+    launch_px4_sitl = _resolve_bool(config, "launch_px4_sitl", sim and is_uav)
+    launch_payload_backend = _resolve_bool(config, "launch_payload_backend", not is_uav)
 
     sim_entity_name = str(config.get("sim_entity_name", "")).strip() or vehicle_name
     sim_world_name = str(config.get("sim_world_name", "")).strip()
@@ -596,7 +594,7 @@ def launch_setup(context, *args, **kwargs):
     camera_calibration_file = str(config.get("camera_calibration_file", "")).strip()
     camera_preprocess_hook = str(config.get("camera_preprocess_hook", "")).strip()
     camera_input_transport = _resolve_camera_input_transport(
-        mission_spec=mission_spec,
+        is_uav=is_uav,
         sim=sim,
         configured_transport=str(
             config.get("camera_input_transport", "raw" if sim else "compressed")
@@ -606,15 +604,15 @@ def launch_setup(context, *args, **kwargs):
         logger=logger,
     )
 
-    requires_camera = bool(
-        getattr(mission_spec, "requires_camera", False)
-    ) or _resolve_force_camera(config, logger=logger)
+    requires_camera = bool(runtime_mission._requires_camera) or _resolve_force_camera(
+        config, logger=logger
+    )
 
     px4_path = ""
     vehicle_class: AirframeClass | None = None
     autostart: int | None = None
     model = str(config.get("model", "")).strip()
-    if mission_spec.is_uav:
+    if is_uav:
         px4_path = find_folder_with_heuristic(
             "PX4-Autopilot", os.path.expanduser(str(config.get("px4_path", "")))
         )
@@ -634,7 +632,7 @@ def launch_setup(context, *args, **kwargs):
     camera_mount_offsets = list(config.get("camera_mount_offsets", [0.0, 0.0, 0.0]))
     camera_contract = (
         _camera_contract_for(
-            mission_spec,
+            is_uav=is_uav,
             vehicle_name=vehicle_name,
             input_transport=camera_input_transport,
             rotate_degrees=camera_rotate_degrees,
@@ -644,7 +642,7 @@ def launch_setup(context, *args, **kwargs):
                     vehicle_name,
                     camera_calibration_file=camera_calibration_file,
                 )
-                if mission_spec.is_payload and not sim
+                if not is_uav and not sim
                 else ""
             ),
         )
@@ -653,7 +651,7 @@ def launch_setup(context, *args, **kwargs):
     )
     if (
         camera_contract is not None
-        and mission_spec.is_payload
+        and not is_uav
         and not sim
         and not str(camera_contract["camera_info_url"]).strip()
     ):
@@ -667,9 +665,9 @@ def launch_setup(context, *args, **kwargs):
         if camera_contract is None:
             raise ValueError(f"Vehicle '{vehicle_name}' requires a camera contract.")
         camera_actions = _build_camera_actions(
-            mission_spec=mission_spec,
+            is_uav=is_uav,
             camera_contract=camera_contract,
-            vision_nodes=list(mission_spec.vision_nodes),
+            vision_nodes=list(runtime_mission._vision_nodes),
             sim=sim,
             sim_world_name=sim_world_name,
             sim_entity_name=sim_entity_name,
@@ -686,7 +684,7 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             _build_runtime_parameters(
                 mission_path=mission_path,
-                mission_spec=mission_spec,
+                is_uav=is_uav,
                 vehicle_name=vehicle_name,
                 auto_launch=auto_launch,
                 debug=debug,
@@ -717,7 +715,7 @@ def launch_setup(context, *args, **kwargs):
     udp_peer_ttl = float(config.get("udp_peer_ttl") or 3.0)
 
     actions = []
-    if mission_spec.is_payload and launch_payload_backend:
+    if not is_uav and launch_payload_backend:
         default_controller = "SimController" if sim else "GPIOController"
         controller_override = str(config.get("payload_controller", "")).strip()
         actions.append(
@@ -730,7 +728,7 @@ def launch_setup(context, *args, **kwargs):
 
     actions.extend(camera_actions)
 
-    if mission_spec.is_payload and not sim and udp_port:
+    if not is_uav and not sim and udp_port:
         logger.info(
             f"Launching UDP bridge for '{vehicle_name}' on port {udp_port} "
             f"(peers: {[p for p in udp_all_ports if p != udp_port]})."
@@ -746,10 +744,10 @@ def launch_setup(context, *args, **kwargs):
             )
         )
 
-    if mission_spec.is_uav and launch_middleware:
+    if is_uav and launch_middleware:
         actions.append(_middleware_action(sim=sim, config=config))
 
-    if mission_spec.is_uav and launch_px4_sitl:
+    if is_uav and launch_px4_sitl:
         if autostart is None:
             raise ValueError(
                 f"Vehicle '{vehicle_name}' cannot launch PX4 SITL without a valid UAV airframe."

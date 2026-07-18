@@ -17,8 +17,10 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.logging import get_logger
 from launch.substitutions import LaunchConfiguration
 
-from vehicle_common.runtime.mission_spec import MissionSpec, mission_path_for_name
+from vehicle_common.runtime.mission_spec import get_mission_path
+from vehicle_common.runtime.mission_loader import RuntimeMission
 from uav.utils import find_folder_with_heuristic, get_airframe_details, vehicle_id_dict
+from uav.vehicles.UAV import UAV
 from vehicle_common.px4 import DEFAULT_PX4_PATH
 
 
@@ -95,6 +97,17 @@ def _resolve_airframe_id(airframe_value) -> int:
             raise ValueError(f"Unknown airframe name: {airframe_value}") from exc
 
 
+def _resolve_mission_path(mission_name: str) -> str:
+    for package in ("uav", "payload"):
+        try:
+            return get_mission_path(mission_name, package)
+        except FileNotFoundError:
+            continue
+    raise FileNotFoundError(
+        f"Mission '{mission_name}' was not found in the uav or payload packages."
+    )
+
+
 def resolve_stage_world(**kwargs):
     from sim.orchestration import resolve_stage_world as _resolve_stage_world
 
@@ -141,7 +154,7 @@ def _inject_single_uav_controllable(
 
 def _legacy_backend_override(
     *,
-    mission_spec: MissionSpec,
+    is_uav: bool,
     sim_params: dict,
     vehicle_name: str,
     model: str,
@@ -157,7 +170,7 @@ def _legacy_backend_override(
     world_params = deepcopy(resolved_world["world"]["params"])
     world_overrides = {}
 
-    if mission_spec.is_uav:
+    if is_uav:
         vehicle_pose = sim_stage_params["world"]["params"].get("vehicle_pose")
         if vehicle_pose is None:
             legacy_uav = world_params.get("controllables", {}).get(vehicle_name)
@@ -185,7 +198,7 @@ def _legacy_backend_override(
         for name, spec in dict(world_params.get("controllables", {})).items()
         if isinstance(spec, dict) and str(spec.get("kind", "")).strip() == "payload"
     )
-    if mission_spec.is_payload and vehicle_name not in available_payloads:
+    if not is_uav and vehicle_name not in available_payloads:
         raise ValueError(
             f"Configured vehicle_name '{vehicle_name}' was not found in the selected sim world. "
             f"Available payloads: {available_payloads}"
@@ -206,14 +219,16 @@ def _single_vehicle_config(context, params: dict) -> tuple[dict, dict | None]:
     mission_name = _yaml_or_launch_string(
         context, "mission_name", params.get("mission_name", "basic")
     )
-    mission_path = mission_path_for_name(mission_name)
-    mission_spec = MissionSpec.load(mission_path)
+    mission_path = _resolve_mission_path(mission_name)
+    runtime_mission = RuntimeMission.load_from_path(mission_path)
+    print(runtime_mission._targets)
+    is_uav = UAV in runtime_mission._targets
 
     sim = bool(params.get("sim", False))
     auto_launch = _yaml_bool_value(
         params.get("auto_launch", True), name="auto_launch", default=True
     )
-    default_vehicle_name = "uav_0" if mission_spec.is_uav else "payload_0"
+    default_vehicle_name = "uav_0" if is_uav else "payload_0"
     vehicle_name = _yaml_or_launch_string(
         context, "vehicle_name", params.get("vehicle_name") or default_vehicle_name
     )
@@ -227,7 +242,7 @@ def _single_vehicle_config(context, params: dict) -> tuple[dict, dict | None]:
     model = str(params.get("custom_airframe_model", "")).strip()
     vehicle_class_name = None
     airframe_id = None
-    if mission_spec.is_uav:
+    if is_uav:
         airframe_id = _resolve_airframe_id(params.get("airframe", "quadcopter"))
         vehicle_class, airframe_model = get_airframe_details(px4_path, airframe_id)
         vehicle_class_name = vehicle_class.name
@@ -235,7 +250,7 @@ def _single_vehicle_config(context, params: dict) -> tuple[dict, dict | None]:
             model = airframe_model
 
     vehicle_config = {
-        "kind": mission_spec.target,
+        "kind": "uav" if is_uav else "payload",
         "vehicle_name": vehicle_name,
         "mission_name": mission_name,
         "mission_path": mission_path,
@@ -264,9 +279,9 @@ def _single_vehicle_config(context, params: dict) -> tuple[dict, dict | None]:
         "px4_path": px4_path,
         "px4_instance": int(params.get("px4_instance", 0)),
         "force_camera": _resolve_force_camera(params, logger=logger),
-        "launch_middleware": mission_spec.is_uav,
-        "launch_px4_sitl": bool(sim and mission_spec.is_uav),
-        "launch_payload_backend": mission_spec.is_payload,
+        "launch_middleware": is_uav,
+        "launch_px4_sitl": bool(sim and is_uav),
+        "launch_payload_backend": not is_uav,
         "sim_entity_name": vehicle_name,
         # udp_port: None = auto-compute (payload_N → 5000+N), 0 = disabled, >0 = explicit
         "udp_port": params.get("udp_port"),
@@ -292,7 +307,7 @@ def _single_vehicle_config(context, params: dict) -> tuple[dict, dict | None]:
 
     sim_params = load_sim_launch_parameters()
     backend, world_name = _legacy_backend_override(
-        mission_spec=mission_spec,
+        is_uav=is_uav,
         sim_params=sim_params,
         vehicle_name=vehicle_name,
         model=model,
