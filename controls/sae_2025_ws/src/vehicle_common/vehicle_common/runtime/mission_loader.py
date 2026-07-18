@@ -1,8 +1,12 @@
+from typing import Any
+from pathlib import Path
+
 from pydantic import BaseModel, ConfigDict, PrivateAttr
+import yaml
+
 from vehicle_common.vehicle import Vehicle
 from vehicle_common.base import VisionNode
 from vehicle_common.mode_loader import RegisteredMode, ModeRegistry
-from typing import Any
 
 
 class RuntimeMode(BaseModel):
@@ -50,3 +54,8 @@ class RuntimeMission(BaseModel):
         self._vision_nodes = set.union(*vision_sets)
         self._peer_vehicle_names = set.union(*peer_vehicle_sets)
         self._requires_camera = requires_camera
+
+    @classmethod
+    def load_from_path(cls, path: Path | str):
+        with open(path, "r") as f:
+            return cls.model_validate(yaml.safe_load(f))
