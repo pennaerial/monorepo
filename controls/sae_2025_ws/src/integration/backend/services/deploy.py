@@ -17,10 +17,9 @@ from pathlib import Path
 import yaml
 
 from ..context import AppContext, TargetContext
-from ..mission_compat import load_mission_spec_compat
+from ..mission_compat import load_mission_spec_compat, MissionSpecCompat
 from ..models import RuntimeNetworkPolicyOverride
 from vehicle_common.runtime.fleet_spec import load_fleet_document
-from vehicle_common.runtime.mission_spec import MissionSpec
 
 _ARTIFACT_NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 _SOURCE_BUNDLE_EXTENSIONS = (".tar.gz", ".tgz", ".zip")
@@ -1254,7 +1253,7 @@ def _vehicle_from_fleet(fleet: dict, vehicle_name: str) -> dict:
 
 def _mission_source_for(
     ctx: AppContext, vehicle: dict
-) -> tuple[str, Path, MissionSpec]:
+) -> tuple[str, Path, MissionSpecCompat]:
     mission_path = str(vehicle.get("mission_path", "")).strip()
     if mission_path:
         local_path = _resolve_local_path(ctx, mission_path)
