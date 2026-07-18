@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 
 # aliases for faster development
+
+# BUILDING
 alias cb='colcon build'
 alias cbp='colcon build --packages-select'
 alias cbpsi='colcon build --symlink-install --packages-select'
+
+
+
+# TESTING
+alias ct='colcon test --event-handlers console_cohesion+'
+alias ctp='colcon test --event-handlers console_cohesion+ --packages-select'
