@@ -11,7 +11,7 @@ Designed for a white DLZ on a green/grass background. No AprilTag library requir
 """
 
 import math
-from typing import Optional, Tuple
+from typing import Optional, Tuple, override
 
 import cv2
 import numpy as np
@@ -29,6 +29,20 @@ from uav.vision_nodes import PayloadAprilTagNode
 # HSV range for white (high value, low saturation)
 _WHITE_LOWER = np.array([0, 0, 200], dtype=np.uint8)
 _WHITE_UPPER = np.array([180, 30, 255], dtype=np.uint8)
+
+
+class PayloadRetreatParams(BaseModel):
+    forward_speed_mps: float = 0.12
+    edge_threshold: float = 0.30
+    edge_stable_frames: int = 5
+    edge_min_pixels: int = 10
+    edge_invalid_max_frames: int = 30
+    turn_angular_speed: float = 0.5
+    turn_direction: int = 1
+    turn_angular: float = math.pi
+    turn_speed: float = 1.85
+    compressed_image: bool = False
+    camera_debug: bool = False
 
 
 @register_mode(
@@ -51,40 +65,17 @@ class PayloadRetreatMode(Mode):
     Publishes DriveCommand to the payload's own namespaced command topic.
     """
 
-    class Params(BaseModel):
-        pass
-
     required_vision_nodes = (PayloadAprilTagNode,)
     transition_labels = ()
 
-    def __init__(
-        self,
-        node: Node,
-        vehicle: Payload,
-        forward_speed_mps: float = 0.12,
-        edge_threshold: float = 0.30,
-        edge_stable_frames: int = 5,
-        edge_min_pixels: int = 10,
-        edge_invalid_max_frames: int = 30,
-        turn_angular_speed: float = 0.5,
-        turn_direction: int = 1,
-        turn_angular: float = math.pi,
-        turn_speed: float = 1.85,
-        compressed_image: bool = False,
-        camera_debug: bool = False,
-    ):
-        super().__init__(node, vehicle)
-        self.forward_speed_mps = float(forward_speed_mps)
-        self.edge_threshold = float(edge_threshold)
-        self.edge_stable_frames = int(edge_stable_frames)
-        self.edge_min_pixels = int(edge_min_pixels)
-        self.edge_invalid_max_frames = int(edge_invalid_max_frames)
-        self.turn_angular_speed = float(turn_angular_speed)
-        self.turn_direction = 1 if int(turn_direction) >= 0 else -1
-        self.turn_angular = float(turn_angular)
-        self.turn_speed = float(turn_speed)
-        self.compressed_image = bool(compressed_image)
-        self.camera_debug = bool(camera_debug)
+    @override
+    def initialize(
+        self, node: Node, vehicle: Payload, params: PayloadRetreatParams
+    ) -> None:
+        self.node = node
+        self.vehicle = vehicle
+        self.p = params
+        self.turn_direction = 1 if int(params.turn_direction) >= 0 else -1
 
         self._bridge = CvBridge()
 
@@ -115,7 +106,7 @@ class PayloadRetreatMode(Mode):
         cam_topic = self.vehicle.namespaced_path("camera")
         drive_topic = self.vehicle.namespaced_path("cmd_drive")
 
-        if self.compressed_image:
+        if self.p.compressed_image:
             self._image_sub = self.node.create_subscription(
                 CompressedImage, cam_topic, self._image_cb, 1
             )
@@ -130,7 +121,7 @@ class PayloadRetreatMode(Mode):
 
     def on_exit(self) -> None:
         self._publish_drive(0.0, 0.0)
-        if self.camera_debug:
+        if self.p.camera_debug:
             cv2.destroyWindow("PayloadRetreatMode")
         self.node.destroy_subscription(self._image_sub)
         self.node.destroy_publisher(self._drive_pub)
@@ -140,7 +131,7 @@ class PayloadRetreatMode(Mode):
             return
 
         try:
-            if self.compressed_image:
+            if self.p.compressed_image:
                 buf = np.frombuffer(self._image.data, dtype=np.uint8)
                 bgr = cv2.imdecode(buf, cv2.IMREAD_COLOR)
             else:
@@ -161,46 +152,46 @@ class PayloadRetreatMode(Mode):
                 f"white={white_ratio * 100:.1f}%  count={white_count}"
             )
 
-            if white_count < self.edge_min_pixels:
+            if white_count < self.p.edge_min_pixels:
                 self._edge_invalid_count += 1
-                if self._edge_invalid_count >= self.edge_invalid_max_frames:
+                if self._edge_invalid_count >= self.p.edge_invalid_max_frames:
                     self.log("PayloadRetreatMode: too many invalid frames — stopping")
                     self._publish_drive(0.0, 0.0)
                     return
-                self._publish_drive(self.forward_speed_mps, 0.0)
+                self._publish_drive(self.p.forward_speed_mps, 0.0)
                 return
 
             self._edge_invalid_count = 0
 
-            at_edge = white_ratio < self.edge_threshold
+            at_edge = white_ratio < self.p.edge_threshold
             if at_edge:
                 self._edge_stable_count += 1
-                if self._edge_stable_count >= self.edge_stable_frames:
+                if self._edge_stable_count >= self.p.edge_stable_frames:
                     self._publish_drive(0.0, 0.0)
                     self._phase = "turn_180"
                     self.log(
                         f"PayloadRetreatMode: edge confirmed (white={white_ratio * 100:.1f}%) — starting 180° turn"
                     )
-                    if self.camera_debug:
+                    if self.p.camera_debug:
                         self._draw_debug(bgr, white_ratio, white_count, at_edge=True)
                     return
             else:
                 self._edge_stable_count = 0
 
-            if self.camera_debug:
+            if self.p.camera_debug:
                 self._draw_debug(bgr, white_ratio, white_count, at_edge=False)
-            self._publish_drive(self.forward_speed_mps, 0.0)
+            self._publish_drive(self.p.forward_speed_mps, 0.0)
             return
 
         # ---- Phase 2: turn 180° in place, dead reckoning ----
         if self._phase == "turn_180":
             if self._turn_future is None:
-                angular = self.turn_angular * self.turn_direction
+                angular = self.p.turn_angular * self.turn_direction
                 self._turn_future = self.vehicle.dead_reckon(
-                    0.0, angular, self.turn_speed, timeout_sec=5.0
+                    0.0, angular, self.p.turn_speed, timeout_sec=5.0
                 )
                 self.log(
-                    f"PayloadRetreatMode: sent dead_reckon for {math.degrees(self.turn_angular):.0f}° turn at {self.turn_speed} rad/s"
+                    f"PayloadRetreatMode: sent dead_reckon for {math.degrees(self.p.turn_angular):.0f}° turn at {self.p.turn_speed} rad/s"
                 )
                 return
             if self._turn_future.done():
@@ -261,7 +252,7 @@ class PayloadRetreatMode(Mode):
         label = "AT EDGE" if at_edge else "driving"
         cv2.putText(
             vis,
-            f"{label}  white={white_ratio * 100:.1f}%  stable={self._edge_stable_count}/{self.edge_stable_frames}",
+            f"{label}  white={white_ratio * 100:.1f}%  stable={self._edge_stable_count}/{self.p.edge_stable_frames}",
             (8, 30),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.6,
@@ -297,3 +288,8 @@ class PayloadRetreatMode(Mode):
         self._drive_pub.publish(
             DriveCommand(linear=float(linear), angular=float(angular))
         )
+
+    @classmethod
+    @override
+    def get_params_cls(cls) -> type[BaseModel]:
+        return PayloadRetreatParams

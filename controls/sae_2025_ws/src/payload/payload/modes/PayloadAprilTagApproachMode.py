@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, override
 
 from pydantic import BaseModel
 from rclpy.node import Node
@@ -33,6 +33,20 @@ class TagObservation:
     area: float
 
 
+class PayloadAprilTagApproachParams(BaseModel):
+    tag_id: Optional[int] = None
+    tag_size_m: float = 0.0508
+    tag_family: str = DEFAULT_TAG_FAMILY
+    max_forward_speed: float = 0.2
+    forward_gain: float = 0.5
+    angular_gain: float = 0.003
+    yaw_gain: float = 0.0
+    stop_distance_m: float = 0.2
+    tag_lost_coast_s: float = 0.5
+    compressed: bool = False
+    completion_state: str = "done"
+
+
 @register_mode(
     id="payload.PayloadAprilTagApproachMode",
     targets=[Payload],
@@ -42,40 +56,21 @@ class TagObservation:
 class PayloadAprilTagApproachMode(Mode):
     """Drive the payload toward one AprilTag and terminate once close enough."""
 
-    class Params(BaseModel):
-        pass
-
     required_vision_nodes = ()
     requires_camera = True
     transition_labels = ("done", "tag_lost")
 
-    def __init__(
-        self,
-        node: Node,
-        vehicle: Payload,
-        tag_id: Optional[int] = None,
-        tag_size_m: float = 0.0508,
-        tag_family: str = DEFAULT_TAG_FAMILY,
-        max_forward_speed: float = 0.2,
-        forward_gain: float = 0.5,
-        angular_gain: float = 0.003,
-        yaw_gain: float = 0.0,
-        stop_distance_m: float = 0.2,
-        tag_lost_coast_s: float = 0.5,
-        compressed: bool = False,
-        completion_state: str = "done",
-    ):
-        super().__init__(node, vehicle)
-        self._completion_state = completion_state
-        self.tag_id = None if tag_id is None else int(tag_id)
-        self.tag_size_m = float(tag_size_m)
-        self.tag_family = str(tag_family) if tag_family else DEFAULT_TAG_FAMILY
-        self.max_forward_speed = float(max_forward_speed)
-        self.forward_gain = float(forward_gain)
-        self.angular_gain = float(angular_gain)
-        self.yaw_gain = float(yaw_gain)
-        self.stop_distance_m = float(stop_distance_m)
-        self.tag_lost_coast_s = float(tag_lost_coast_s)
+    @override
+    def initialize(
+        self, node: Node, vehicle: Payload, params: PayloadAprilTagApproachParams
+    ) -> None:
+        self.node = node
+        self.vehicle = vehicle
+        self.p = params
+        self.tag_id = None if params.tag_id is None else int(params.tag_id)
+        self.tag_family = (
+            str(params.tag_family) if params.tag_family else DEFAULT_TAG_FAMILY
+        )
 
         self._bridge = CvBridge()
         self._latest_image: Optional[Image | CompressedImage] = None
@@ -83,7 +78,7 @@ class PayloadAprilTagApproachMode(Mode):
         self._detector_cache = AprilTagDetectorCache()
         self._detector = self._detector_cache.get(self.tag_family)
 
-        if bool(compressed):
+        if bool(params.compressed):
             self.node.create_subscription(
                 CompressedImage,
                 f"{vehicle.image_topic}/compressed",
@@ -151,7 +146,7 @@ class PayloadAprilTagApproachMode(Mode):
             self._latest_camera_info,
             self._detector,
             self._detector_cache.backend,
-            self.tag_size_m,
+            self.p.tag_size_m,
         )
         return {
             obs.tag_id: TagObservation(
@@ -176,7 +171,7 @@ class PayloadAprilTagApproachMode(Mode):
     def _handle_tag_timeout(self, now: float) -> bool:
         if self._last_tag_time is None:
             return False
-        if now - self._last_tag_time <= self.tag_lost_coast_s:
+        if now - self._last_tag_time <= self.p.tag_lost_coast_s:
             return False
         self._publish_drive(0.0, 0.0)
         self._tag_lost = True
@@ -245,7 +240,7 @@ class PayloadAprilTagApproachMode(Mode):
         self._last_tag_time = now
 
         distance = float(target.tvec_z)
-        if distance <= self.stop_distance_m:
+        if distance <= self.p.stop_distance_m:
             self.vehicle.set_servo(0.0)
             self.vehicle.stop()
             self._done = True
@@ -256,9 +251,9 @@ class PayloadAprilTagApproachMode(Mode):
 
         image_width = self._image_width if self._image_width > 0.0 else 640.0
         lateral_error_px = float(target.center_x - (image_width / 2.0))
-        linear = min(self.forward_gain * distance, self.max_forward_speed)
-        angular = (-self.angular_gain * lateral_error_px) - (
-            self.yaw_gain * target.yaw_error
+        linear = min(self.p.forward_gain * distance, self.p.max_forward_speed)
+        angular = (-self.p.angular_gain * lateral_error_px) - (
+            self.p.yaw_gain * target.yaw_error
         )
 
         if now - self._last_drive_log_time >= 1.0:
@@ -272,10 +267,15 @@ class PayloadAprilTagApproachMode(Mode):
 
     def check_status(self) -> str:
         if self._done:
-            return self._completion_state
+            return self.p.completion_state
         if self._tag_lost:
             return "tag_lost"
         return "continue"
 
     def on_exit(self) -> None:
         self.vehicle.stop()
+
+    @classmethod
+    @override
+    def get_params_cls(cls) -> type[BaseModel]:
+        return PayloadAprilTagApproachParams

@@ -13,7 +13,7 @@ seconds the payload stops.
 
 from __future__ import annotations
 
-from typing import Optional, Tuple
+from typing import Optional, Tuple, override
 
 import cv2
 import numpy as np
@@ -61,6 +61,32 @@ def _color_blob_info(
     return (cx, cy, int(a), bh)
 
 
+class PayloadDualApproachParams(BaseModel):
+    # --- AprilTag params ---
+    tag_id: Optional[int] = 0
+    tag_size_m: float = 0.0508
+    tag_family: str = DEFAULT_TAG_FAMILY
+    tag_forward_gain: float = 0.5
+    tag_max_forward_speed: float = 0.2
+    tag_angular_gain: float = 0.003
+    tag_yaw_gain: float = 0.6
+    # --- Colour params ---
+    lower_hsv: list[int] = (20, 100, 100)
+    upper_hsv: list[int] = (35, 255, 255)
+    color_forward_speed: float = 0.015
+    color_angular_gain: float = 0.003
+    color_centering_threshold_px: int = 15
+    color_drive_angular_scale: float = 0.0
+    color_min_detect_pixels: int = 50
+    # --- Termination / lost ---
+    prime_height_px: int = 100
+    stop_height_px: int = 300
+    post_prime_lost_frames: int = 5
+    lost_timeout_s: float = 5.0
+    # --- Common ---
+    compressed_image: bool = False
+
+
 @register_mode(
     id="payload.PayloadDualApproachMode",
     targets=[Payload],
@@ -69,70 +95,30 @@ def _color_blob_info(
 class PayloadDualApproachMode(Mode):
     """Approach using AprilTag when visible, HSV colour fallback otherwise."""
 
-    class Params(BaseModel):
-        pass
-
     required_vision_nodes = ()
     requires_camera = True
     transition_labels = ()
 
-    def __init__(
-        self,
-        node: Node,
-        vehicle: Payload,
-        # --- AprilTag params ---
-        tag_id: Optional[int] = 0,
-        tag_size_m: float = 0.0508,
-        tag_family: str = DEFAULT_TAG_FAMILY,
-        tag_forward_gain: float = 0.5,
-        tag_max_forward_speed: float = 0.2,
-        tag_angular_gain: float = 0.003,
-        tag_yaw_gain: float = 0.6,
-        # --- Colour params ---
-        lower_hsv: list[int] = (20, 100, 100),
-        upper_hsv: list[int] = (35, 255, 255),
-        color_forward_speed: float = 0.015,
-        color_angular_gain: float = 0.003,
-        color_centering_threshold_px: int = 15,
-        color_drive_angular_scale: float = 0.0,
-        color_min_detect_pixels: int = 50,
-        # --- Termination / lost ---
-        prime_height_px: int = 100,
-        stop_height_px: int = 300,
-        post_prime_lost_frames: int = 5,
-        lost_timeout_s: float = 5.0,
-        # --- Common ---
-        compressed_image: bool = False,
-    ):
-        super().__init__(node, vehicle)
+    @override
+    def initialize(
+        self, node: Node, vehicle: Payload, params: PayloadDualApproachParams
+    ) -> None:
+        self.node = node
+        self.vehicle = vehicle
+        self.p = params
 
         # AprilTag
-        self.tag_id = None if tag_id is None else int(tag_id)
-        self.tag_size_m = float(tag_size_m)
-        self.tag_family = str(tag_family) if tag_family else DEFAULT_TAG_FAMILY
-        self.tag_forward_gain = float(tag_forward_gain)
-        self.tag_max_forward_speed = float(tag_max_forward_speed)
-        self.tag_angular_gain = float(tag_angular_gain)
-        self.tag_yaw_gain = float(tag_yaw_gain)
+        self.tag_id = None if params.tag_id is None else int(params.tag_id)
+        self.tag_family = (
+            str(params.tag_family) if params.tag_family else DEFAULT_TAG_FAMILY
+        )
 
         # Colour
-        self._lower_hsv = np.array(lower_hsv, dtype=np.uint8)
-        self._upper_hsv = np.array(upper_hsv, dtype=np.uint8)
-        self.color_forward_speed = float(color_forward_speed)
-        self.color_angular_gain = float(color_angular_gain)
-        self.color_centering_threshold_px = int(color_centering_threshold_px)
-        self.color_drive_angular_scale = float(color_drive_angular_scale)
-        self.color_min_detect_pixels = int(color_min_detect_pixels)
-
-        # Termination
-        self.prime_height_px = int(prime_height_px)
-        self.stop_height_px = int(stop_height_px)
-        self.post_prime_lost_frames = int(post_prime_lost_frames)
-        self.lost_timeout_s = float(lost_timeout_s)
+        self._lower_hsv = np.array(params.lower_hsv, dtype=np.uint8)
+        self._upper_hsv = np.array(params.upper_hsv, dtype=np.uint8)
 
         # Internals
         self._bridge = CvBridge()
-        self._compressed_image = bool(compressed_image)
         self._detector_cache = AprilTagDetectorCache()
         self._detector = self._detector_cache.get(self.tag_family)
 
@@ -140,7 +126,7 @@ class PayloadDualApproachMode(Mode):
         self._latest_camera_info: Optional[CameraInfo] = None
 
         cam_topic = vehicle.namespaced_path("camera")
-        if self._compressed_image:
+        if params.compressed_image:
             self.node.create_subscription(
                 CompressedImage,
                 f"{cam_topic}/compressed",
@@ -183,7 +169,7 @@ class PayloadDualApproachMode(Mode):
         msg = self._latest_image
         if msg is None:
             return None
-        if self._compressed_image:
+        if self.p.compressed_image:
             buf = np.frombuffer(msg.data, dtype=np.uint8)
             return cv2.imdecode(buf, cv2.IMREAD_COLOR)
         return self._bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
@@ -266,7 +252,7 @@ class PayloadDualApproachMode(Mode):
             self._latest_camera_info,
             self._detector,
             self._detector_cache.backend,
-            self.tag_size_m,
+            self.p.tag_size_m,
         )
         obs_map = {obs.tag_id: obs for obs in observations}
         if self.tag_id is not None:
@@ -283,7 +269,7 @@ class PayloadDualApproachMode(Mode):
         """Return (mask, cx, cy, area, bbox_height_px)."""
         hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
         mask = cv2.inRange(hsv, self._lower_hsv, self._upper_hsv)
-        result = _color_blob_info(mask, float(self.color_min_detect_pixels))
+        result = _color_blob_info(mask, float(self.p.color_min_detect_pixels))
         if result is None:
             return mask, None, None, 0, 0
         cx, cy, area, bh = result
@@ -323,7 +309,7 @@ class PayloadDualApproachMode(Mode):
         # Hoisted so the prime gate and the colour controller below share them.
         if color_cx is not None:
             lateral_error = color_cx - image_center
-            centered = abs(lateral_error) <= self.color_centering_threshold_px
+            centered = abs(lateral_error) <= self.p.color_centering_threshold_px
         else:
             lateral_error = 0.0
             centered = False
@@ -331,11 +317,11 @@ class PayloadDualApproachMode(Mode):
         # Arm only when close AND centered: in that state the controller drives
         # straight (color_drive_angular_scale = 0), so trajectory is
         # deterministic and any later contour loss is genuine overshoot.
-        if not self._primed and color_height >= self.prime_height_px and centered:
+        if not self._primed and color_height >= self.p.prime_height_px and centered:
             self._primed = True
             self.log(
                 f"PayloadDualApproachMode: primed "
-                f"(height={color_height}px >= {self.prime_height_px}px, centered)"
+                f"(height={color_height}px >= {self.p.prime_height_px}px, centered)"
             )
 
         # Only tick the lost-frames counter when we were actually driving
@@ -350,9 +336,9 @@ class PayloadDualApproachMode(Mode):
 
         stop_reason: Optional[str] = None
         if self._primed:
-            if color_height >= self.stop_height_px:
+            if color_height >= self.p.stop_height_px:
                 stop_reason = f"stop_height hit (height={color_height}px)"
-            elif self._lost_frames_after_prime >= self.post_prime_lost_frames:
+            elif self._lost_frames_after_prime >= self.p.post_prime_lost_frames:
                 stop_reason = (
                     f"overshoot ({self._lost_frames_after_prime} "
                     f"lost frames after prime)"
@@ -375,9 +361,9 @@ class PayloadDualApproachMode(Mode):
             self._last_seen_time = now
             distance = float(tag.tvec_z)
             lateral_error_px = float(tag.center_x - image_center)
-            linear = min(self.tag_forward_gain * distance, self.tag_max_forward_speed)
-            angular = (-self.tag_angular_gain * lateral_error_px) - (
-                self.tag_yaw_gain * tag.yaw_error
+            linear = min(self.p.tag_forward_gain * distance, self.p.tag_max_forward_speed)
+            angular = (-self.p.tag_angular_gain * lateral_error_px) - (
+                self.p.tag_yaw_gain * tag.yaw_error
             )
             self.vehicle.drive(linear, angular)
             self._last_phase = "TAG"
@@ -391,16 +377,16 @@ class PayloadDualApproachMode(Mode):
             return
 
         # --- fallback to colour ---
-        if color_cx is not None and color_area >= self.color_min_detect_pixels:
+        if color_cx is not None and color_area >= self.p.color_min_detect_pixels:
             self._last_seen_time = now
-            angular = -self.color_angular_gain * lateral_error
+            angular = -self.p.color_angular_gain * lateral_error
 
             if not centered:
                 self.vehicle.drive(0.0, angular)
                 phase = "COLOR_ALIGN"
             else:
-                drive_angular = angular * self.color_drive_angular_scale
-                self.vehicle.drive(self.color_forward_speed, drive_angular)
+                drive_angular = angular * self.p.color_drive_angular_scale
+                self.vehicle.drive(self.p.color_forward_speed, drive_angular)
                 phase = "COLOR_DRIVE"
 
             self._last_phase = phase
@@ -420,7 +406,7 @@ class PayloadDualApproachMode(Mode):
         self._publish_debug(bgr, mask, "LOST", None, color_cx, color_cy, color_height)
         if (
             self._last_seen_time is not None
-            and (now - self._last_seen_time) > self.lost_timeout_s
+            and (now - self._last_seen_time) > self.p.lost_timeout_s
         ):
             self.vehicle.stop()
             self._last_seen_time = None
@@ -433,3 +419,8 @@ class PayloadDualApproachMode(Mode):
 
     def on_exit(self) -> None:
         self.vehicle.stop()
+
+    @classmethod
+    @override
+    def get_params_cls(cls) -> type[BaseModel]:
+        return PayloadDualApproachParams

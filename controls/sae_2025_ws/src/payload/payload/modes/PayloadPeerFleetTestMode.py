@@ -15,7 +15,7 @@ operator verifies peer discovery, disconnect handling, and reconnect behavior.
 from __future__ import annotations
 
 import json
-from typing import Mapping
+from typing import Mapping, override
 
 from pydantic import BaseModel
 from rclpy.node import Node
@@ -27,6 +27,12 @@ from vehicle_common.mode import Mode
 from vehicle_common.mode_loader import register_mode
 
 
+class PayloadPeerFleetTestParams(BaseModel):
+    publish_period_s: float = 1.0
+    local_topic: str = "peer_test/state"
+    shared_topic: str = "/shared/peer_test/broadcast"
+
+
 @register_mode(
     id="payload.PayloadPeerFleetTestMode",
     targets=[Payload],
@@ -35,26 +41,22 @@ from vehicle_common.mode_loader import register_mode
 class PayloadPeerFleetTestMode(Mode):
     """Passive multi-payload communication demo for fleet bring-up."""
 
-    class Params(BaseModel):
-        pass
-
     required_vision_nodes = ()
     peer_vehicle_names = ("payload_0", "payload_1")
     requires_camera = False
     transition_labels = ()
 
-    def __init__(
-        self,
-        node: Node,
-        vehicle: Payload,
-        publish_period_s: float = 1.0,
-        local_topic: str = "peer_test/state",
-        shared_topic: str = "/shared/peer_test/broadcast",
+    @override
+    def initialize(
+        self, node: Node, vehicle: Payload, params: PayloadPeerFleetTestParams
     ) -> None:
-        super().__init__(node, vehicle)
-        self.publish_period_s = float(publish_period_s)
-        self._local_topic = vehicle.namespaced_path(local_topic)
-        self._shared_topic = str(shared_topic).strip() or "/shared/peer_test/broadcast"
+        self.node = node
+        self.vehicle = vehicle
+        self.p = params
+        self._local_topic = vehicle.namespaced_path(params.local_topic)
+        self._shared_topic = (
+            str(params.shared_topic).strip() or "/shared/peer_test/broadcast"
+        )
         self._peer_names = tuple(
             sorted(
                 peer_name
@@ -78,7 +80,7 @@ class PayloadPeerFleetTestMode(Mode):
         self._peer_subscriptions = {
             peer_name: self.node.create_subscription(
                 String,
-                vehicle.namespaced_path(local_topic, namespace=f"/{peer_name}"),
+                vehicle.namespaced_path(params.local_topic, namespace=f"/{peer_name}"),
                 lambda message, peer_name=peer_name: self._on_peer_message(
                     peer_name, message
                 ),
@@ -153,7 +155,7 @@ class PayloadPeerFleetTestMode(Mode):
     ) -> None:
         if (
             self._last_publish_time
-            and now - self._last_publish_time < self.publish_period_s
+            and now - self._last_publish_time < self.p.publish_period_s
         ):
             return
 
@@ -224,3 +226,8 @@ class PayloadPeerFleetTestMode(Mode):
 
     def check_status(self) -> str:
         return "continue"
+
+    @classmethod
+    @override
+    def get_params_cls(cls) -> type[BaseModel]:
+        return PayloadPeerFleetTestParams
