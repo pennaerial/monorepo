@@ -70,8 +70,9 @@ def include_launch(pkg: str, launch_file: str) -> IncludeLaunchDescription:
 
 
 def format_bullet_list(title: str, options: list[str]) -> str:
-    """Formats a list of strings as a bullet list in the description section of a declared launch arguments
-    Because ROS launch matches strings for the choices argumnet, you must leave choices empty and validate
+    """Formats a list of strings as a bullet list in the description section of a declared launch arguments.
+
+    Because ROS launch matches strings for the choices argument, you must leave choices empty and validate
     yourself
     """
 
