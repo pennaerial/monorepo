@@ -59,12 +59,12 @@ def px4_sitl_action(
         cwd=px4_path,
         output="screen",
         name=f"{vehicle_ns}_px4_sitl",
-        additional_env=env_export,
+        additional_env=env_export, # type: ignore (dict[str, str] works instead of SomeSubstitutionsType)
         log_cmd=True,
     )
 
 
-def launch_setup(context):
+def launch_setup(context) -> list[Action]:
     config = context.launch_configurations  # dict containing declared launch arguments
     check_unknown_launch_args(Args, config, logger)  # warn for unknown args
 
