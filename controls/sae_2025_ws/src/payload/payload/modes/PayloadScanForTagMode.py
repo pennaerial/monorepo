@@ -42,9 +42,11 @@ class PayloadScanForTagMode(Mode):
     Spin in place looking for a specific AprilTag.
 
     Returns:
-        "found"     — target tag is visible; stop and hand off to approach mode
-        "not_found" — completed a full 360° without seeing the tag; caller
-                      should reposition and try again
+        The transition label:
+
+        - "found": target tag is visible; stop and hand off to approach mode.
+        - "not_found": completed a full 360° without seeing the tag; caller
+          should reposition and try again.
     """
 
     required_vision_nodes = (PayloadAprilTagNode,)

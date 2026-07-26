@@ -82,6 +82,7 @@ class PayloadWaitForDriveOutMode(Mode):
     """
     Subscribe to the payload camera and detect when the plane has landed on the
     DLZ. Confirmation requires BOTH:
+
       1. Orange HSV coverage >= orange_pixel_threshold  (DLZ visible)
       2. Frame optical-flow magnitude < stillness_threshold  (payload not moving)
 

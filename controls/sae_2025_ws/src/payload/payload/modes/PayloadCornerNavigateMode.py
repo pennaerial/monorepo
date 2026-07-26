@@ -13,6 +13,7 @@ DRIVE_OUT
     physically under the payload, not when it first appears far ahead.
 
     Two sub-states with hysteresis:
+
         seeking_tape  – no colour ever seen yet. Drive forward until colour A
                         OR colour B pixel count crosses drive_out_min_pixels
                         for detect_frames consecutive frames; record the
@@ -39,8 +40,10 @@ LINE_FOLLOW
     same 1.5× dominance rule as PayloadColorSquareNode) and stops on the
     first transition that matches the corner signature for the current
     direction:
+
         direction="ccw" : B→A = corner  (red→blue with default YAML)
         direction="cw"  : A→B = corner  (blue→red with default YAML)
+
     _prev_color is seeded from TURN_TO_CENTER's last dominant observation,
     falling back to the colour caught during DRIVE_OUT.
 """

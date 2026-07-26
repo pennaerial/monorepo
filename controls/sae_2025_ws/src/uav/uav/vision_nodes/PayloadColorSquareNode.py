@@ -43,11 +43,13 @@ def _detect_tape_following(
     strip and return steering metrics.
 
     Returns:
-        boundary_detected: True if tape is visible
-        lateral_error_px:  tape centre x minus frame centre x (positive = tape
-                           is to the right, steer right to re-centre)
-        boundary_angle:    tilt of the tape's centre line in the frame (radians
-                           from vertical; positive = leans right at the bottom)
+        A (boundary_detected, lateral_error_px, boundary_angle) tuple:
+
+        - boundary_detected: True if tape is visible.
+        - lateral_error_px: Tape centre x minus frame centre x (positive =
+          tape is to the right, steer right to re-centre).
+        - boundary_angle: Tilt of the tape's centre line in the frame
+          (radians from vertical; positive = leans right at the bottom).
     """
     strip_height, strip_width = orange_mask.shape[:2]
     frame_cx = strip_width / 2.0
