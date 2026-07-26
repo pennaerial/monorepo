@@ -10,6 +10,7 @@ body:
       label: Priority
       options:
         - Minor
+        - Medium
         - Major
         - Critical
     validations:
