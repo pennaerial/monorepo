@@ -182,7 +182,7 @@ def build_node_arguments(node_class: type, params: Dict[str, Any]) -> Dict[str, 
 
     return args
 
-
+# why does this exist when we have symlink-install?
 def find_package_resource(
     relative_path: Union[str, Path],
     package_name: str = "sim",
@@ -336,3 +336,15 @@ def camel_to_snake(name: str) -> str:
     s1 = re.sub(r"(.)([A-Z][a-z]+)", r"\1_\2", name)
     s2 = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", s1)
     return s2.lower()
+
+def get_available_worlds(path: str | Path) -> list[str]:
+    """Returns a list of the basenames of all of the sdf files in the given path
+
+    Args:
+        path: Path to search
+
+    Returns:
+        List of available world names
+    """
+    path = Path(path)
+    return sorted([f.stem for f in path.iterdir() if f.is_file() and f.suffix == ".sdf"])
