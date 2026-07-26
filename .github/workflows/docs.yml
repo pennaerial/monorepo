@@ -44,6 +44,7 @@ jobs:
 
       - name: Build docs
         run: |
+          source dev_env.sh # env var paths necessary for configuring docs build paths
           cd sphinx
           uv run make html
 
