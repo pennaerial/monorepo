@@ -20,22 +20,22 @@ html_static_path = ["assets"]  # path for extra static html elements, like favic
 html_logo = "assets/penn-air-full-logo.png"
 html_favicon = "assets/pennair-preview-150x150.png"
 html_theme_options = {
-    "globaltoc_expand_depth": 1, # Auto-expand the first level of every toctree branch on every page,
+    "globaltoc_expand_depth": 1,  # Auto-expand the first level of every toctree branch on every page,
     "nav_socials": [
         {
             "name": "GitHub",
             "url": "https://github.com/pennaerial/monorepo",
             "icon": "simple-icons:github",
         }
-    ]
+    ],
 }
 
 # -- General configuration ----------------------------------------------------
 extensions = [
     "autoapi.extension",
     "sphinx.ext.napoleon",  # for parsing Google and NumPy style docstrings
-    "myst_parser", # allows markdown doc writing
-    "breathe", # creates sphinx directives from doxygen xml
+    "myst_parser",  # allows markdown doc writing
+    "breathe",  # creates sphinx directives from doxygen xml
 ]
 add_module_names = False  # object names don't show full header path so its not too verbose. E.g., uav.modes.LandingMode vs LandingMode
 
