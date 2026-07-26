@@ -59,7 +59,7 @@ def px4_sitl_action(
         cwd=px4_path,
         output="screen",
         name=f"{vehicle_ns}_px4_sitl",
-        additional_env=env_export, # type: ignore (dict[str, str] works instead of SomeSubstitutionsType)
+        additional_env=env_export,  # type: ignore (dict[str, str] works instead of SomeSubstitutionsType)
         log_cmd=True,
     )
 

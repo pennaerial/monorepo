@@ -77,9 +77,11 @@ def format_bullet_list(title: str, options: list[str]) -> str:
 
     return f"{title}\n" + "\n".join(f"\t  • {option}" for option in options)
 
+
 # data
 def is_truthy(s: str) -> bool:
     return s.strip().lower() in {"1", "true", "t"}
+
 
 def prepend_env_path(var_name: str, new_path: str) -> str:
     """Safely prepends a path to an existing PATH environment variable"""
@@ -89,4 +91,3 @@ def prepend_env_path(var_name: str, new_path: str) -> str:
         return new_path
     else:
         return f"{new_path}:{existing}"
-

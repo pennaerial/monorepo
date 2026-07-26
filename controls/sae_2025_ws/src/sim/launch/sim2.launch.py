@@ -14,7 +14,7 @@ from vehicle_common.launch_utils import (
     LaunchError,
     is_truthy,
     format_bullet_list,
-    prepend_env_path
+    prepend_env_path,
 )
 
 from sim.utils import get_available_worlds
@@ -36,15 +36,31 @@ if not PENNAIR_PX4_PATH:
 
 GZ_SIM_RESOURCE_PATH = Path(PENNAIR_GZ_MODELS_PATH) / "models"
 # Prepends value to existing value, bc we don't want to overwrite any user-set paths
-GZ_SIM_RESOURCE_PATH = prepend_env_path("GZ_SIM_RESOURCE_PATH", str(GZ_SIM_RESOURCE_PATH))
+GZ_SIM_RESOURCE_PATH = prepend_env_path(
+    "GZ_SIM_RESOURCE_PATH", str(GZ_SIM_RESOURCE_PATH)
+)
 
-GZ_SIM_SERVER_CONFIG_PATH = Path(PENNAIR_GZ_MODELS_PATH) / "server.config" # no need to prepend because points to file
+GZ_SIM_SERVER_CONFIG_PATH = (
+    Path(PENNAIR_GZ_MODELS_PATH) / "server.config"
+)  # no need to prepend because points to file
 
 # .so plugins include: libOpticalFlowSystem.so, libGstCameraSystem.so, etc.
-GZ_SIM_SYSTEM_PLUGIN_PATH = Path(PENNAIR_PX4_PATH) / "build" / "px4_sitl_default" / "src" / "modules" / "simulation" / "gz_plugins" # noqa: F401
-GZ_SIM_SYSTEM_PLUGIN_PATH = prepend_env_path("GZ_SIM_SYSTEM_PLUGIN_PATH", str(GZ_SIM_SYSTEM_PLUGIN_PATH)) # noqa: F401
+GZ_SIM_SYSTEM_PLUGIN_PATH = (
+    Path(PENNAIR_PX4_PATH)
+    / "build"
+    / "px4_sitl_default"
+    / "src"
+    / "modules"
+    / "simulation"
+    / "gz_plugins"
+)  # noqa: F401
+GZ_SIM_SYSTEM_PLUGIN_PATH = prepend_env_path(
+    "GZ_SIM_SYSTEM_PLUGIN_PATH", str(GZ_SIM_SYSTEM_PLUGIN_PATH)
+)  # noqa: F401
 
-GZ_WORLDS_PATH = Path(PENNAIR_GZ_MODELS_PATH) / "worlds" # not a default GZ_SIM* env var, so no need to prepend
+GZ_WORLDS_PATH = (
+    Path(PENNAIR_GZ_MODELS_PATH) / "worlds"
+)  # not a default GZ_SIM* env var, so no need to prepend
 
 logger.debug(f"ENV VAR DETECTED: PENNAIR_GZ_MODELS_PATH={PENNAIR_GZ_MODELS_PATH}")
 logger.debug(f"ENV VAR DETECTED: PENNAIR_PX4_PATH={PENNAIR_PX4_PATH}")
@@ -75,7 +91,7 @@ def launch_setup(context) -> list[Action]:
     world: str = config[Args.WORLD]
 
     gz_env = {
-        "GZ_SIM_RESOURCE_PATH":  GZ_SIM_RESOURCE_PATH,
+        "GZ_SIM_RESOURCE_PATH": GZ_SIM_RESOURCE_PATH,
         "GZ_SIM_SERVER_CONFIG_PATH": GZ_SIM_SERVER_CONFIG_PATH,
         "GZ_SIM_SYSTEM_PLUGIN_PATH": GZ_SIM_SYSTEM_PLUGIN_PATH,
     }
@@ -113,7 +129,7 @@ def generate_launch_description():
                 Args.HEADLESS,
                 default_value="false",
                 description="If true, runs gz server in headless mode (no GUI)",
-                choices=["true", "false", "t", "f", "0", "1"]
+                choices=["true", "false", "t", "f", "0", "1"],
             ),
             OpaqueFunction(function=launch_setup),
         ]

@@ -14,5 +14,5 @@ __all__ = [
     "check_unknown_launch_args",
     "format_bullet_list",
     "is_truthy",
-    "prepend_env_path"
+    "prepend_env_path",
 ]
