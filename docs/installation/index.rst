@@ -6,7 +6,8 @@ setup, and for macOS, you must run Monorepo from a UTM virtual machine running U
 
 .. toctree::
    :maxdepth: 2
+   :caption: Installation Guides
 
-   Ubuntu 24.04 (Windows) <ubuntu>
+   Ubuntu 24.04 (dual-boot) <ubuntu>
    macOS <macos_utm>
 
