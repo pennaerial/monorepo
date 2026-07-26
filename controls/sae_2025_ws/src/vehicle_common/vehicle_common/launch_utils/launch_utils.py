@@ -7,7 +7,7 @@ from ament_index_python.packages import get_package_share_directory
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.actions import IncludeLaunchDescription
 
-PA_LAUNCH_DEBUG = os.getenv("PA_LAUNCH_DEBUG", "0").lower() == "1"
+PENNAIR_LAUNCH_DEBUG = os.getenv("PENNAIR_LAUNCH_DEBUG", "0").lower() == "1"
 
 RED = "\033[31m"
 CYAN = "\033[36m"
@@ -35,7 +35,7 @@ def get_logger(name: str) -> logging.Logger:
         )
         logger.addHandler(handler)
         logger.propagate = False
-    logger.setLevel(logging.DEBUG if PA_LAUNCH_DEBUG else logging.INFO)
+    logger.setLevel(logging.DEBUG if PENNAIR_LAUNCH_DEBUG else logging.INFO)
 
     return logger
 
@@ -76,3 +76,17 @@ def format_bullet_list(title: str, options: list[str]) -> str:
     """
 
     return f"{title}\n" + "\n".join(f"\t  • {option}" for option in options)
+
+# data
+def is_truthy(s: str) -> bool:
+    return s.strip().lower() in {"1", "true", "t"}
+
+def prepend_env_path(var_name: str, new_path: str) -> str:
+    """Safely prepends a path to an existing PATH environment variable"""
+
+    existing = os.environ.get(var_name, "")
+    if not existing:
+        return new_path
+    else:
+        return f"{new_path}:{existing}"
+
