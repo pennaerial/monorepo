@@ -2,13 +2,23 @@
 
 # You can set these variables from the command line, and also
 # from the environment, for the first two.
-SPHINXOPTS    ?=
-SPHINXBUILD   ?= sphinx-build
-SOURCEDIR     = ../docs
-CONFDIR       = .
-BUILDDIR      = build
-PYTHON        ?= python3
-SERVEPORT     ?= 8000
+SPHINXOPTS      ?=
+SPHINXBUILD     ?= sphinx-build
+SOURCEDIR       = ../docs
+CONFDIR         = .
+BUILDDIR        = build
+PYTHON          ?= python3
+SERVEPORT       ?= 8000
+
+# Opt-in: keep AutoAPI's generated .rst files (under docs/autoapi/) around
+# after the build instead of deleting them, and skip regenerating them next
+# time if the underlying source files haven't changed. Off by default since
+# kept files are real files left sitting in docs/. Enable with:
+#   make html AUTOAPI_KEEP_FILES=1
+AUTOAPI_KEEP_FILES ?=
+ifeq ($(AUTOAPI_KEEP_FILES),1)
+SPHINXOPTS += -D autoapi_keep_files=1
+endif
 
 # Put it first so that "make" without argument is like "make help".
 help:
@@ -16,10 +26,13 @@ help:
 
 .PHONY: help Makefile serve
 
+doxygen:
+	./generate-doxygen.sh
+
+html: doxygen
+	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" -c "$(CONFDIR)" $(SPHINXOPTS) $(O)
+
 serve: html
+	./generate-doxygen.sh
 	$(PYTHON) -m http.server $(SERVEPORT) --directory "$(BUILDDIR)/html"
 
-# Catch-all target: route all unknown targets to Sphinx using the new
-# "make mode" option.
-%: Makefile
-	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" -c "$(CONFDIR)" $(SPHINXOPTS) $(O)
