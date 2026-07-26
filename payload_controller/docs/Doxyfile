@@ -1,0 +1,30 @@
+# Doxyfile for payload_controller (ESP-IDF firmware, not the ROS2 package of
+# the same name under controls/sae_2025_ws/src/payload_controller).
+#
+# Only generates XML (GENERATE_HTML=NO) - this feeds Breathe/Sphinx, which is
+# the actual doc site; Doxygen's own HTML output isn't needed alongside it.
+# Run from this directory: `doxygen Doxyfile`. Output goes to ./doxygen/xml,
+# which is what sphinx/conf.py's breathe_projects should point at.
+
+PROJECT_NAME           = "Payload Controller"
+PROJECT_BRIEF          = "ESP32 payload controller firmware"
+OUTPUT_DIRECTORY       = $(PENNAIR_PAYLOAD_CONTROLLER_PATH)/docs/doxygen
+
+INPUT                  = $(PENNAIR_PAYLOAD_CONTROLLER_PATH)/main $(PENNAIR_PAYLOAD_CONTROLLER_PATH)/src
+RECURSIVE              = YES
+FILE_PATTERNS          = *.c *.cpp *.h *.hpp
+EXCLUDE_PATTERNS       = */build/* */managed_components/*
+
+# Document everything, including code without doc comments, so the API
+# reference isn't missing members just because they lack a docstring yet.
+EXTRACT_ALL             = YES
+EXTRACT_PRIVATE         = YES
+EXTRACT_STATIC          = YES
+
+GENERATE_HTML           = NO
+GENERATE_LATEX          = NO
+GENERATE_XML            = YES
+XML_OUTPUT              = xml
+
+QUIET                   = YES
+WARN_IF_UNDOCUMENTED    = NO

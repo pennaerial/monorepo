@@ -1,8 +1,29 @@
-Welcome to my_project's documentation!
+Welcome to PennAiR Monorepo!
 =======================================
 
 .. toctree::
+   :hidden:
    :maxdepth: 2
-   :caption: Contents:
+   :caption: GETTING STARTED
 
-Nothing here yet — this is just the scaffold.
+   Installation <installation/index>
+
+.. toctree::
+   :hidden:
+   :maxdepth: 2
+   :caption: PAYLOAD CONTROLLER
+
+   C++ API Reference <pc_api/index>
+
+.. toctree::
+   :hidden:
+   :maxdepth: 2
+   :caption: ROS API REFERENCE
+
+   SAE 2025 WS (Python) <autoapi/index>
+
+
+
+
+Monorepo description here
+
