@@ -188,14 +188,17 @@ class PayloadDLZNavigateMode(Mode):
     TURN_ONTO_TAPE
         Rotate in place until the combined red/blue tape is centred in the
         detection strip (vision-based; safety timeout at 2π rad):
+
           direction="cw"  → turn left  (positive angular)
           direction="ccw" → turn right (negative angular)
 
     LINE_FOLLOW
         Follow the combined red/blue tape strip. Detect colour transitions (A↔B)
         to count segments and execute corner turns:
+
           direction="cw"  : B→A transition = corner → turn right 90°
           direction="ccw" : A→B transition = corner → turn left  90°
+
         Stop after target_transitions total colour changes.
 
     tag_transition_table key format
