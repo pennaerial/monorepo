@@ -1,8 +1,11 @@
+import os
 from typing import Any
 from pathlib import Path
 
 from rclpy.node import Node
 from pydantic import BaseModel, ConfigDict, PrivateAttr
+from ament_index_python.packages import get_package_share_directory
+
 import yaml
 
 from vehicle_common.vehicle import Vehicle
@@ -63,3 +66,16 @@ class RuntimeMission(BaseModel):
     def load_from_path(cls, path: Path | str):
         with open(path, "r") as f:
             return cls.model_validate(yaml.safe_load(f))
+
+
+def get_mission_path(mission_name: str, package: str) -> str:
+    # gets path in package's install directory where missions are installed to
+    mission_path = (
+        Path(get_package_share_directory(package)) / "missions" / f"{mission_name}.yaml"
+    )
+    if not os.path.isfile(mission_path):
+        raise FileNotFoundError(
+            f"Mission {mission_name} was not found at {mission_path}"
+        )
+
+    return str(mission_path)
