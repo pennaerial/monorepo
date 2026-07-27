@@ -176,12 +176,6 @@ class Mode[VehicleT: Vehicle, ParamsT: BaseModel](ABC):
         if self.active:
             self.on_disconnect(time_delta, connection_status)
 
-    def shared_state(self) -> dict:
-        """
-        Return persistent ModeManager-owned state for this mode class.
-        """
-        return self.node.shared_state_for(self)
-
     def log(self, message: str) -> None:
         """
         Log a message using the ROS 2 node's logger.

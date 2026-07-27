@@ -19,7 +19,6 @@ from vehicle_common.runtime.comm_policy import (
 )
 from vehicle_common.runtime.managed_comms import ModeCommBuilder
 from vehicle_common.runtime.managed_registry import ManagedCommRegistry
-from vehicle_common.runtime.mode_paths import canonical_mode_path
 from vehicle_common.runtime.peer_connections import (
     PeerConnectionTracker,
     declared_remote_peer_names,
@@ -137,10 +136,6 @@ class ModeManager(Node):
             self.get_logger().warn(
                 f"Failed to clear mission-start marker {marker_path}: {exc}"
             )
-
-    def shared_state_for(self, mode_or_class: object) -> dict[str, Any]:
-        key = canonical_mode_path(mode_or_class)
-        return self._shared_mode_state.setdefault(key, {})
 
     def _comm_debug_snapshot(self) -> dict[str, Any]:
         return {
