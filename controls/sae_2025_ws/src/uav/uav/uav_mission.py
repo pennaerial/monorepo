@@ -6,8 +6,7 @@ from rclpy.node import Node
 
 from uav.vehicles.AirframeClass import AirframeClass
 from uav.UAVModeManager import UAVModeManager
-from vehicle_common.runtime.mission_spec import get_mission_path
-from vehicle_common.runtime.mission_loader import RuntimeMission
+from vehicle_common.runtime.mission_loader import RuntimeMission, get_mission_path
 
 
 class UAVMissionBootstrap(Node):

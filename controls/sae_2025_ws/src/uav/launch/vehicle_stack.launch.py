@@ -20,8 +20,7 @@ from launch_ros.actions import Node
 from uav.vehicles.AirframeClass import AirframeClass
 from uav.vehicles.UAV import UAV
 from vehicle_common.base import VisionNode
-from vehicle_common.runtime.mission_spec import get_mission_path
-from vehicle_common.runtime.mission_loader import RuntimeMission
+from vehicle_common.runtime.mission_loader import RuntimeMission, get_mission_path
 from uav.utils import (
     camel_to_snake,
     find_folder_with_heuristic,
