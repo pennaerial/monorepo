@@ -28,37 +28,44 @@ html_theme_options = {
             "icon": "simple-icons:github",
         }
     ],
+    "accent_color": "indigo",
 }
+
+SKIP_AUTOAPI_BUILD = (
+    os.environ.get("SKIP_AUTOAPI_BUILD") == "1"
+)  # if on, skips autoapi build for faster local iteration on handwritten docs
 
 # -- General configuration ----------------------------------------------------
 extensions = [
-    "autoapi.extension",
     "sphinx.ext.napoleon",  # for parsing Google and NumPy style docstrings
     "myst_parser",  # allows markdown doc writing
     "breathe",  # creates sphinx directives from doxygen xml
 ]
+if not SKIP_AUTOAPI_BUILD:
+    extensions.append("autoapi.extension")
 add_module_names = False  # object names don't show full header path so its not too verbose. E.g., uav.modes.LandingMode vs LandingMode
 
 # =============================================================================
 #                       SPHINX AUTOAPI CONFIGURATION
 # =============================================================================
-autoapi_dirs = [  # python only
-    "../controls/sae_2025_ws/src/uav/uav",
-    "../controls/sae_2025_ws/src/payload/payload",
-    "../controls/sae_2025_ws/src/sim/sim",
-    "../controls/sae_2025_ws/src/vehicle_common/vehicle_common",
-]
-# Custom templates dir (only overrides python/module.rst). Used to customize names (favoring displaying short names over full module path names)
-autoapi_template_dir = "../sphinx/_templates/autoapi"
-autoapi_options = [
-    "members",
-    "undoc-members",
-    "private-members",
-    "show-inheritance",
-    "show-module-summary",
-    "special-members",
-    # "imported-members", # comment out to remove duplicated re-exported classes at module level
-]
+if not SKIP_AUTOAPI_BUILD:
+    autoapi_dirs = [  # python only
+        "../controls/sae_2025_ws/src/uav/uav",
+        "../controls/sae_2025_ws/src/payload/payload",
+        "../controls/sae_2025_ws/src/sim/sim",
+        "../controls/sae_2025_ws/src/vehicle_common/vehicle_common",
+    ]
+    # Custom templates dir (only overrides python/module.rst). Used to customize names (favoring displaying short names over full module path names)
+    autoapi_template_dir = "../sphinx/_templates/autoapi"
+    autoapi_options = [
+        "members",
+        "undoc-members",
+        "private-members",
+        "show-inheritance",
+        "show-module-summary",
+        "special-members",
+        # "imported-members", # comment out to remove duplicated re-exported classes at module level
+    ]
 
 
 # =============================================================================

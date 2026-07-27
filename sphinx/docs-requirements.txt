@@ -3,3 +3,4 @@ shibuya
 sphinx-autoapi
 myst-parser
 breathe
+sphinx-autobuild
