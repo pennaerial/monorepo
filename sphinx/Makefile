@@ -4,10 +4,10 @@
 # from the environment, for the first two.
 SPHINXOPTS      ?=
 SPHINXBUILD     ?= sphinx-build
+SPHINXAUTOBUILD ?= sphinx-autobuild
 SOURCEDIR       = ../docs
 CONFDIR         = .
 BUILDDIR        = build
-PYTHON          ?= python3
 SERVEPORT       ?= 8000
 
 # Opt-in: keep AutoAPI's generated .rst files (under docs/autoapi/) around
@@ -32,7 +32,9 @@ doxygen:
 html: doxygen
 	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" -c "$(CONFDIR)" $(SPHINXOPTS) $(O)
 
-serve: html
-	./generate-doxygen.sh
-	$(PYTHON) -m http.server $(SERVEPORT) --directory "$(BUILDDIR)/html"
+serve: doxygen
+	@$(SPHINXAUTOBUILD) "$(SOURCEDIR)" "$(BUILDDIR)/html" -c "$(CONFDIR)" \
+		--port $(SERVEPORT) \
+		--ignore "$(SOURCEDIR)/autoapi" \
+		$(SPHINXOPTS) $(O)
 

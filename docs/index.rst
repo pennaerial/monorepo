@@ -1,5 +1,16 @@
-Welcome to PennAiR Monorepo!
-=======================================
+:layout: landing
+
+PennAiR Monorepo
+==================
+
+.. rst-class:: lead
+
+    Monorepo description here
+
+.. container:: buttons
+
+   :doc:`Get Started <installation/index>`
+   `GitHub <https://github.com/pennaerial/monorepo>`_
 
 .. toctree::
    :hidden:
@@ -11,19 +22,17 @@ Welcome to PennAiR Monorepo!
 .. toctree::
    :hidden:
    :maxdepth: 2
-   :caption: PAYLOAD CONTROLLER
+   :caption: SAE 2025 WORKSPACE
 
-   C++ API Reference <pc_api/index>
+   Python API Reference <autoapi/index>
 
 .. toctree::
    :hidden:
    :maxdepth: 2
-   :caption: ROS API REFERENCE
+   :caption: PAYLOAD CONTROLLER
 
-   SAE 2025 WS (Python) <autoapi/index>
-
-
+   C++ API Reference <pc_api/index>
 
 
-Monorepo description here
+
 
