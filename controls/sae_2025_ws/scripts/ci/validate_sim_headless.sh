@@ -15,7 +15,7 @@ ci_source_ros
 ci_source_setup "$(ci_px4_msgs_prefix)/setup.sh"
 
 # sim_interfaces (needs ros_gz) is used by the world/scoring nodes
-colcon build --packages-select sim_interfaces
+colcon build --packages-skip px4_msgs
 ci_source_workspace "$WORKSPACE_ROOT"
 
 # Use the PX4 SITL baked into the CI image.
