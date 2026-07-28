@@ -27,6 +27,9 @@ FALLBACK_AP_PREFIX="${FALLBACK_AP_PREFIX:-pennair-ap}"
 FALLBACK_PSK="${FALLBACK_PSK:-pennair123!}"
 LOCAL_AP_SSID="${LOCAL_AP_SSID:-}"
 INSTALL_WIFI_FAILOVER="${INSTALL_WIFI_FAILOVER:-1}"
+INSTALL_PI_AGENT="${INSTALL_PI_AGENT:-1}"
+PI_AGENT_PORT="${PI_AGENT_PORT:-8090}"
+NODE_MAJOR_VERSION="${NODE_MAJOR_VERSION:-20}"
 
 usage() {
     cat <<EOF
@@ -36,10 +39,13 @@ Provision a PennAiR hardware Pi for dashboard-managed deploys.
 
 This script is intended to run on the Pi itself. It configures:
   - hostname / mDNS identity
-  - openssh-server and avahi-daemon
+  - openssh-server and avahi-daemon (kept for manual operator debugging; the
+    dashboard itself no longer requires SSH -- see pi-agent below)
   - deploy user creation and sudo membership
   - authorized_keys installation
   - optional passwordless sudo for the deploy user
+  - Node.js and the pi-agent daemon as a systemd service (the dashboard's
+    orchestrator talks to this instead of SSH)
   - the existing hardware bootstrap path
 
 Options:
@@ -63,6 +69,9 @@ Options:
   --fallback-ap-prefix PREF  Prefix for Pi-hosted fallback AP SSIDs
   --local-ap-ssid SSID       Override the local Pi-hosted fallback AP SSID
   --no-wifi-failover         Skip NetworkManager failover setup during bootstrap
+  --no-pi-agent              Skip installing Node.js and the pi-agent daemon
+  --pi-agent-port PORT       Port for the pi-agent daemon (default: $PI_AGENT_PORT)
+  --node-major-version N     Node.js major version to install via NodeSource (default: $NODE_MAJOR_VERSION)
   --no-nopasswd-sudo         Do not install a passwordless sudoers drop-in
   --no-bootstrap             Skip hardware bootstrap after provisioning
   --start                    Start the runtime service during bootstrap
@@ -210,6 +219,76 @@ EOF
     run_root install -m 0644 "$tmpfile" "$service_path"
     rm -f "$tmpfile"
     run_root systemctl restart avahi-daemon
+}
+
+install_nodejs() {
+    if command -v node >/dev/null 2>&1; then
+        local existing_major
+        existing_major="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
+        if [[ "$existing_major" -ge "$NODE_MAJOR_VERSION" ]]; then
+            deploy_info "Node.js $(node -v) already installed"
+            return 0
+        fi
+    fi
+
+    deploy_info "Installing Node.js $NODE_MAJOR_VERSION via NodeSource"
+    deploy_apt_update run_root
+    run_root apt-get install -y ca-certificates curl gnupg
+    curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJOR_VERSION}.x" | run_root bash -
+    run_root apt-get install -y nodejs
+}
+
+PI_AGENT_DIR="$SCRIPT_DIR/../../integration/packages/pi-agent"
+PI_AGENT_INTEGRATION_ROOT="$SCRIPT_DIR/../../integration"
+
+install_pi_agent() {
+    local user_name="$1"
+
+    if [[ ! -d "$PI_AGENT_INTEGRATION_ROOT" ]]; then
+        deploy_warn "Integration workspace not found at $PI_AGENT_INTEGRATION_ROOT -- skipping pi-agent install. Make sure the monorepo is checked out on this Pi before provisioning."
+        return 1
+    fi
+
+    deploy_info "Installing pi-agent dependencies and building"
+    # Scoped to the pi-agent workspace so this doesn't also pull in the much
+    # heavier web/mobile (Vite, Expo, React Native) dependency trees onto
+    # constrained Pi hardware -- they aren't needed here. Run as the deploy
+    # user (not root) so the resulting node_modules/dist are owned by the
+    # user the systemd service will actually run as.
+    (cd "$PI_AGENT_INTEGRATION_ROOT" && deploy_run_as_user "$user_name" npm ci --workspace=@pennair/pi-agent)
+    (cd "$PI_AGENT_INTEGRATION_ROOT" && deploy_run_as_user "$user_name" npm run build --workspace=@pennair/pi-agent)
+}
+
+install_pi_agent_service() {
+    local user_name="$1"
+    local unit_path="/etc/systemd/system/pennair-pi-agent.service"
+    local tmpfile
+    tmpfile="$(mktemp)"
+
+    cat > "$tmpfile" <<EOF
+[Unit]
+Description=PennAiR pi-agent (dashboard device-ops daemon)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=$user_name
+WorkingDirectory=$PI_AGENT_DIR
+Environment=PORT=$PI_AGENT_PORT
+ExecStart=/usr/bin/node dist/index.js
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    deploy_info "Installing pi-agent systemd service (port $PI_AGENT_PORT)"
+    run_root install -m 0644 "$tmpfile" "$unit_path"
+    rm -f "$tmpfile"
+    run_root systemctl daemon-reload
+    run_root systemctl enable --now pennair-pi-agent.service
 }
 
 configure_hostname() {
@@ -415,6 +494,18 @@ while [[ $# -gt 0 ]]; do
             INSTALL_WIFI_FAILOVER=0
             shift
             ;;
+        --no-pi-agent)
+            INSTALL_PI_AGENT=0
+            shift
+            ;;
+        --pi-agent-port)
+            PI_AGENT_PORT="$2"
+            shift 2
+            ;;
+        --node-major-version)
+            NODE_MAJOR_VERSION="$2"
+            shift 2
+            ;;
         --no-nopasswd-sudo)
             ENABLE_NOPASSWD_SUDO=0
             shift
@@ -464,6 +555,17 @@ if [[ "$ENABLE_NOPASSWD_SUDO" == "1" ]]; then
     configure_nopasswd_sudo "$DEPLOY_USER"
 fi
 
+PI_AGENT_INSTALLED=0
+if [[ "$INSTALL_PI_AGENT" == "1" ]]; then
+    install_nodejs
+    if install_pi_agent "$DEPLOY_USER"; then
+        install_pi_agent_service "$DEPLOY_USER"
+        PI_AGENT_INSTALLED=1
+    fi
+else
+    deploy_info "Skipping pi-agent install (--no-pi-agent)"
+fi
+
 if [[ "$RUN_BOOTSTRAP" == "1" ]]; then
     run_bootstrap "$DEPLOY_USER" "$DEPLOY_ROOT"
 else
@@ -476,8 +578,14 @@ printf 'Hostname: %s.local\n' "$HOSTNAME_VALUE"
 printf 'Deploy user: %s\n' "$DEPLOY_USER"
 printf 'Deploy root: %s\n' "$DEPLOY_ROOT"
 printf 'SSH target: %s@%s.local\n' "$DEPLOY_USER" "$HOSTNAME_VALUE"
+if [[ "$PI_AGENT_INSTALLED" == "1" ]]; then
+    printf 'pi-agent: running on port %s (systemctl status pennair-pi-agent)\n' "$PI_AGENT_PORT"
+else
+    printf 'pi-agent: not installed\n'
+fi
 printf '\n'
 printf 'Next steps:\n'
-printf '  1. Add %s.local to the integration inventory.\n' "$HOSTNAME_VALUE"
-printf '  2. Use target_id %s in inventory for a clean hostname-to-target mapping.\n' "$HOSTNAME_VALUE"
-printf '  3. Set fleet_file, vehicle_name, and overlay_yaml in the dashboard.\n'
+printf '  1. Confirm the orchestrator can reach %s.local:%s/health.\n' "$HOSTNAME_VALUE" "$PI_AGENT_PORT"
+printf '  2. Add %s.local to the integration inventory.\n' "$HOSTNAME_VALUE"
+printf '  3. Use target_id %s in inventory for a clean hostname-to-target mapping.\n' "$HOSTNAME_VALUE"
+printf '  4. Set fleet_file, vehicle_name, and overlay_yaml in the dashboard.\n'

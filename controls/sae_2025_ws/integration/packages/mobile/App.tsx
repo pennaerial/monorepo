@@ -1,10 +1,10 @@
-import { SafeAreaView, Text } from "react-native";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import { WifiScreen } from "./WifiScreen.js";
 
 export default function App() {
   return (
-    <SafeAreaView>
-      <Text>PennAiR Fleet Ops</Text>
-      <Text>Phase 0 scaffold — wifi control lands in Phase 1.</Text>
-    </SafeAreaView>
+    <SafeAreaProvider>
+      <WifiScreen />
+    </SafeAreaProvider>
   );
 }

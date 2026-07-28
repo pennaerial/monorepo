@@ -1,9 +1,27 @@
 import Fastify from "fastify";
+import { wifiConnect, wifiHotspot, wifiScan, wifiStatus } from "./wifi.js";
 
 export function buildServer() {
   const app = Fastify();
 
   app.get("/health", async () => ({ status: "ok" }));
+
+  app.get("/api/wifi/status", async () => wifiStatus());
+  app.get("/api/wifi/scan", async () => wifiScan());
+
+  app.post<{ Body: { ssid: string; password?: string } }>(
+    "/api/wifi/connect",
+    async (request, reply) => {
+      const { ssid, password } = request.body;
+      if (!ssid) {
+        reply.code(400);
+        return { success: false, error: "ssid is required" };
+      }
+      return wifiConnect(ssid, password ?? "");
+    },
+  );
+
+  app.post("/api/wifi/hotspot", async () => wifiHotspot());
 
   return app;
 }

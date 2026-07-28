@@ -8,5 +8,5 @@
     "noEmit": true,
     "composite": false
   },
-  "include": ["App.tsx"]
+  "include": ["*.tsx"]
 }

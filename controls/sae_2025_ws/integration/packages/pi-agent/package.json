@@ -12,6 +12,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@pennair/integration-core": "*",
     "fastify": "^5.1.0"
   }
 }
