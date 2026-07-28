@@ -6,7 +6,8 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "build": "tsc --build",
+    "build": "tsc --build tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
     "start": "node dist/index.js",
     "test": "vitest run"
   },

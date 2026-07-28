@@ -8,8 +8,10 @@
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "lint": "eslint .",
+    "pretest": "npm run build --workspaces --if-present",
     "test": "vitest run",
-    "typecheck": "tsc --build"
+    "pretypecheck": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present"
   },
   "devDependencies": {
     "@eslint/js": "^9.15.0",
