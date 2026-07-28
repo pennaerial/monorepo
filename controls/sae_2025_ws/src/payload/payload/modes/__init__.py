@@ -6,8 +6,6 @@ __all__ = [
     "PayloadCornerNavigateMode",
     "PayloadDLZNavigateMode",
     "PayloadDualApproachMode",
-    "PayloadIdleMode",
-    "PayloadPeerFleetTestMode",
     "PayloadRetreatMode",
     "PayloadScanForTagMode",
     "PayloadWaitForDriveOutMode",
