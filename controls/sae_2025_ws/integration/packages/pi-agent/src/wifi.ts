@@ -38,9 +38,33 @@ export const runCommand: CommandRunner = async (command, args, timeoutMs) => {
   }
 };
 
-/** Splits on runs of 2+ spaces, matching nmcli's fixed-width column output. */
-function splitColumns(line: string): string[] {
-  return line.trim().split(/\s{2,}/);
+/** Real delay -- the default, unless a test injects a no-op one. */
+export const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Parses one line of `nmcli -t` (terse) output: colon-separated fields,
+ * where a literal `:` or `\` inside a value is backslash-escaped. Terse mode
+ * is nmcli's own recommended machine-readable format -- unlike the
+ * fixed-width tabular output, it can't be desynced by an SSID containing
+ * spaces or a blank/hidden SSID.
+ */
+function parseTerseLine(line: string): string[] {
+  const fields: string[] = [];
+  let current = "";
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === "\\" && i + 1 < line.length) {
+      current += line[i + 1];
+      i++;
+    } else if (ch === ":") {
+      fields.push(current);
+      current = "";
+    } else {
+      current += ch;
+    }
+  }
+  fields.push(current);
+  return fields;
 }
 
 async function policyStatus(run: CommandRunner): Promise<Record<string, unknown>> {
@@ -67,9 +91,19 @@ async function policyStatus(run: CommandRunner): Promise<Record<string, unknown>
   }
 }
 
+function stringField(policy: Record<string, unknown>, key: string): string | undefined {
+  const value = policy[key];
+  return typeof value === "string" && value ? value : undefined;
+}
+
+function boolField(policy: Record<string, unknown>, key: string): boolean | undefined {
+  const value = policy[key];
+  return typeof value === "boolean" ? value : undefined;
+}
+
 export async function wifiStatus(run: CommandRunner = runCommand): Promise<WifiStatus> {
   const policy = await policyStatus(run);
-  const result = await run("nmcli", ["-f", "NAME,TYPE,DEVICE,STATE", "con", "show", "--active"], 15_000);
+  const result = await run("nmcli", ["-t", "-f", "NAME,TYPE,DEVICE,STATE", "con", "show", "--active"], 15_000);
   if (result.code !== 0) {
     return { success: false, connections: [], error: result.stderr };
   }
@@ -77,9 +111,8 @@ export async function wifiStatus(run: CommandRunner = runCommand): Promise<WifiS
   const connections: WifiConnection[] = result.stdout
     .trim()
     .split("\n")
-    .slice(1) // header row
     .filter((line) => line.trim())
-    .map(splitColumns)
+    .map(parseTerseLine)
     .filter((parts) => parts.length >= 4)
     .map(([name, type, device, state]) => ({ name, type, device, state }));
 
@@ -88,10 +121,18 @@ export async function wifiStatus(run: CommandRunner = runCommand): Promise<WifiS
 
   return {
     success: true,
-    isHotspot: typeof policy.is_hotspot === "boolean" ? policy.is_hotspot : legacyHotspot,
-    currentWifi: (policy.current_wifi as string | undefined) ?? wifiConnection?.name,
-    currentMode: policy.current_mode as string | undefined,
-    effectiveRole: policy.effective_role as string | undefined,
+    isHotspot: boolField(policy, "is_hotspot") ?? legacyHotspot,
+    currentWifi: stringField(policy, "current_wifi") ?? wifiConnection?.name,
+    currentMode: stringField(policy, "current_mode"),
+    effectiveRole: stringField(policy, "effective_role"),
+    policySource: stringField(policy, "policy_source"),
+    runtimeActive: boolField(policy, "runtime_active"),
+    missionStarted: boolField(policy, "mission_started"),
+    travelRouterLocked: boolField(policy, "travel_router_locked"),
+    switchingDisabled: boolField(policy, "switching_disabled"),
+    localApProfile: stringField(policy, "local_ap_profile"),
+    travelRouterProfile: stringField(policy, "travel_router_profile"),
+    allowedApHosts: Array.isArray(policy.allowed_ap_hosts) ? (policy.allowed_ap_hosts as string[]) : [],
     connections,
   };
 }
@@ -99,7 +140,7 @@ export async function wifiStatus(run: CommandRunner = runCommand): Promise<WifiS
 export async function wifiScan(run: CommandRunner = runCommand): Promise<WifiScanResult> {
   const result = await run(
     "nmcli",
-    ["-f", "SSID,SIGNAL,SECURITY", "dev", "wifi", "list", "--rescan", "yes"],
+    ["-t", "-f", "SSID,SIGNAL,SECURITY", "dev", "wifi", "list", "--rescan", "yes"],
     20_000,
   );
   if (result.code !== 0) {
@@ -107,9 +148,9 @@ export async function wifiScan(run: CommandRunner = runCommand): Promise<WifiSca
   }
 
   const strongestBySsid = new Map<string, WifiNetwork>();
-  for (const line of result.stdout.trim().split("\n").slice(1)) {
+  for (const line of result.stdout.trim().split("\n")) {
     if (!line.trim()) continue;
-    const parts = splitColumns(line);
+    const parts = parseTerseLine(line);
     if (parts.length < 3) continue;
     const [ssid, signalRaw, security] = parts;
     if (!ssid) continue;
@@ -130,11 +171,13 @@ export async function wifiConnect(
   ssid: string,
   password: string,
   run: CommandRunner = runCommand,
+  wait: (ms: number) => Promise<void> = delay,
 ): Promise<{ success: boolean; output?: string; error?: string }> {
   const policy = await policyStatus(run);
-  const hotspotName = (policy.local_ap_profile as string | undefined) ?? HOTSPOT_NAME;
+  const hotspotName = stringField(policy, "local_ap_profile") ?? HOTSPOT_NAME;
 
   await run("nmcli", ["con", "down", hotspotName], 15_000);
+  await wait(2000);
 
   const connectArgs = ["dev", "wifi", "connect", ssid];
   if (password) {
@@ -152,11 +195,13 @@ export async function wifiConnect(
 
 export async function wifiHotspot(
   run: CommandRunner = runCommand,
+  wait: (ms: number) => Promise<void> = delay,
 ): Promise<{ success: boolean; output?: string; error?: string }> {
   const policy = await policyStatus(run);
-  const hotspotName = (policy.local_ap_profile as string | undefined) ?? HOTSPOT_NAME;
+  const hotspotName = stringField(policy, "local_ap_profile") ?? HOTSPOT_NAME;
 
   await run("nmcli", ["dev", "disconnect", "wlan0"], 15_000);
+  await wait(1000);
   const result = await run("nmcli", ["con", "up", hotspotName], 15_000);
 
   if (result.code !== 0) {

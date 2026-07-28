@@ -22,6 +22,14 @@ export interface WifiStatus {
   currentWifi?: string;
   currentMode?: string;
   effectiveRole?: string;
+  policySource?: string;
+  runtimeActive?: boolean;
+  missionStarted?: boolean;
+  travelRouterLocked?: boolean;
+  switchingDisabled?: boolean;
+  localApProfile?: string;
+  travelRouterProfile?: string;
+  allowedApHosts?: string[];
   connections: WifiConnection[];
   error?: string;
 }

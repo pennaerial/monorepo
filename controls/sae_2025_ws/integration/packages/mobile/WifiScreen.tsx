@@ -77,6 +77,9 @@ export function WifiScreen() {
             <Text>Success: {String(status.success)}</Text>
             <Text>Current wifi: {status.currentWifi ?? "(none)"}</Text>
             <Text>Is hotspot: {String(status.isHotspot ?? false)}</Text>
+            <Text>Effective role: {status.effectiveRole ?? "(unknown)"}</Text>
+            <Text>Travel router locked: {String(status.travelRouterLocked ?? false)}</Text>
+            <Text>Allowed AP hosts: {status.allowedApHosts?.join(", ") || "(none)"}</Text>
             {status.error && <Text>Error: {status.error}</Text>}
           </View>
         )}

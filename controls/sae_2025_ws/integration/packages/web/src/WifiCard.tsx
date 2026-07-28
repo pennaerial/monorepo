@@ -105,6 +105,12 @@ export function WifiCard() {
           <dd>{status.currentWifi ?? "(none)"}</dd>
           <dt>Is hotspot</dt>
           <dd>{String(status.isHotspot ?? false)}</dd>
+          <dt>Effective role</dt>
+          <dd>{status.effectiveRole ?? "(unknown)"}</dd>
+          <dt>Travel router locked</dt>
+          <dd>{String(status.travelRouterLocked ?? false)}</dd>
+          <dt>Allowed AP hosts</dt>
+          <dd>{status.allowedApHosts?.join(", ") || "(none)"}</dd>
           {status.error && (
             <>
               <dt>Error</dt>
