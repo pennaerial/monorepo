@@ -28,8 +28,11 @@ describe("missionStatus", () => {
     expect(status).toEqual({ success: true, running: true, state: "running", pid: "12345" });
   });
 
-  it("reports stopped for inactive/failed/activating/deactivating states", async () => {
-    for (const state of ["inactive", "failed", "activating", "deactivating"]) {
+  it("reports stopped for any non-active, non-empty state (matches the old bash case statement's catch-all)", async () => {
+    // Not just the enumerated inactive/failed/activating/deactivating --
+    // systemd can report other states too (e.g. "reloading"), and the old
+    // dashboard's `case ... *) echo STOPPED ;;` mapped all of them to stopped.
+    for (const state of ["inactive", "failed", "activating", "deactivating", "reloading", "some-future-state"]) {
       const run = fakeRunner({
         "sudo -n systemctl is-active pennair-autonomy.service": ok(`${state}\n`),
       });
@@ -38,7 +41,7 @@ describe("missionStatus", () => {
     }
   });
 
-  it("reports an error state on an unexpected systemctl response", async () => {
+  it("reports an error state when systemctl produces no output at all (e.g. a sudo password prompt)", async () => {
     const run = fakeRunner({
       "sudo -n systemctl is-active pennair-autonomy.service": fail("sudo: a password is required"),
     });

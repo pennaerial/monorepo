@@ -3,6 +3,7 @@ import websocketPlugin from "@fastify/websocket";
 import { wifiConnect, wifiHotspot, wifiScan, wifiStatus } from "./wifi.js";
 import { missionStatus, prepareMission, stopMission } from "./mission.js";
 import { streamMissionLogs } from "./logs.js";
+import { attachHeartbeat } from "./heartbeat.js";
 
 export function buildServer() {
   const app = Fastify();
@@ -33,6 +34,7 @@ export function buildServer() {
 
   app.register(async (instance) => {
     instance.get("/ws/mission/logs", { websocket: true }, (socket) => {
+      attachHeartbeat(socket);
       streamMissionLogs(socket);
     });
   });

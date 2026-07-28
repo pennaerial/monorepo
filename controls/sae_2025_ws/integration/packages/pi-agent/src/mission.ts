@@ -22,15 +22,22 @@ export async function missionStatus(run: CommandRunner = runCommand): Promise<La
     return { success: true, running: true, state: "running", pid: pidResult.stdout.trim() || "0" };
   }
 
-  if (["inactive", "failed", "activating", "deactivating"].includes(state)) {
+  if (state) {
+    // Any other real, non-empty state (inactive/failed/activating/deactivating/
+    // reloading/etc.) means the unit exists and just isn't running -- matches
+    // the old dashboard's bash `case` statement, which mapped every non-"active"
+    // state to STOPPED via its `*)` catch-all, not just an enumerated list.
     return { success: true, running: false, state: "stopped" };
   }
 
+  // Empty stdout means systemctl didn't actually report a state at all (e.g.
+  // "sudo: a password is required" went to stderr with nothing on stdout) --
+  // that's a real failure to query status, not a legitimate stopped state.
   return {
     success: false,
     running: false,
     state: "error",
-    error: active.stderr || `Unexpected systemctl state: ${state || "(empty)"}`,
+    error: active.stderr || "systemctl produced no output",
   };
 }
 

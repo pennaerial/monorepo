@@ -4,6 +4,7 @@ import WebSocket from "ws";
 import { discoverPis } from "@pennair/integration-core";
 import { PiAgentClient } from "./pi-agent-client.js";
 import { startMission, triggerFailsafe } from "./mission.js";
+import { attachHeartbeat } from "./heartbeat.js";
 
 function piAgentPort(): number {
   return Number(process.env.PI_AGENT_PORT ?? 8090);
@@ -135,6 +136,7 @@ export function buildServer() {
           return;
         }
 
+        attachHeartbeat(clientSocket);
         const upstream = new WebSocket(`ws://${hostname}:${piAgentPort()}/ws/mission/logs`);
 
         upstream.on("message", (data) => {

@@ -8,6 +8,7 @@ export const realSpawn: Spawner = (command, args) => spawn(command, args);
 
 export interface LogSocket {
   send(data: string): void;
+  close(): void;
   on(event: "close", listener: () => void): void;
 }
 
@@ -28,6 +29,7 @@ export function streamMissionLogs(socket: LogSocket, spawnImpl: Spawner = realSp
     "-o",
     "short-iso",
   ]);
+  let stoppedIntentionally = false;
 
   journalctl.stdout.on("data", (chunk: Buffer) => {
     socket.send(chunk.toString("utf-8"));
@@ -38,14 +40,26 @@ export function streamMissionLogs(socket: LogSocket, spawnImpl: Spawner = realSp
   });
 
   const cleanup = () => {
+    stoppedIntentionally = true;
     if (!journalctl.killed) {
       journalctl.kill();
     }
   };
 
   socket.on("close", cleanup);
+
   journalctl.on("error", (error) => {
     socket.send(`[journalctl error] ${error.message}`);
     cleanup();
+  });
+
+  // journalctl -f is meant to run forever; if it exits on its own (sudoers
+  // misconfigured, the unit rotated away, journalctl itself crashing) the
+  // client would otherwise be left with an open socket and no more data and
+  // no signal the stream ended -- tell it explicitly and close the socket.
+  journalctl.on("exit", (code, signal) => {
+    if (stoppedIntentionally) return;
+    socket.send(`[journalctl exited unexpectedly] code=${code} signal=${signal}`);
+    socket.close();
   });
 }
