@@ -6,6 +6,7 @@ on:
     paths:
       - ".github/workflows/arm-artifact.yml"
       - "controls/sae_2025_ws/**"
+      - "!controls/sae_2025_ws/integration/**"
   workflow_dispatch:
 
 permissions:

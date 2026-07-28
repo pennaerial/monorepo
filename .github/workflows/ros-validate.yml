@@ -10,6 +10,7 @@ on:
       - ".gitmodules"
       - "PX4-Autopilot"
       - "controls/sae_2025_ws/**"
+      - "!controls/sae_2025_ws/integration/**"
   pull_request:
     branches: [main, master]
     paths:
@@ -19,6 +20,7 @@ on:
       - ".gitmodules"
       - "PX4-Autopilot"
       - "controls/sae_2025_ws/**"
+      - "!controls/sae_2025_ws/integration/**"
   workflow_dispatch:
 
 permissions:

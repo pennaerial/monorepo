@@ -1,0 +1,55 @@
+name: Integration TypeScript
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - ".github/workflows/integration-ts.yml"
+      - "controls/sae_2025_ws/integration/**"
+  pull_request:
+    branches: [main, master]
+    paths:
+      - ".github/workflows/integration-ts.yml"
+      - "controls/sae_2025_ws/integration/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: integration-ts-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build_lint_test:
+    name: Build, Lint, Typecheck, Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: controls/sae_2025_ws/integration
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: controls/sae_2025_ws/integration/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test

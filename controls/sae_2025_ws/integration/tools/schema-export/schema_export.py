@@ -24,7 +24,6 @@ actually being ported.
 
 from __future__ import annotations
 
-import json
 import sys
 
 
@@ -41,7 +40,7 @@ def main() -> int:
         return 1
 
     registry = ModeRegistry.get()
-    print(json.dumps(json.loads(registry.model_dump_json()), indent=2))
+    print(registry.model_dump_json(indent=2))
     return 0
 
 
