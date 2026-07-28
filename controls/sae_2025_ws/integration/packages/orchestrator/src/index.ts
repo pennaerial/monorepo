@@ -1,6 +1,9 @@
 import Fastify from "fastify";
+import websocketPlugin from "@fastify/websocket";
+import WebSocket from "ws";
 import { discoverPis } from "@pennair/integration-core";
 import { PiAgentClient } from "./pi-agent-client.js";
+import { startMission, triggerFailsafe } from "./mission.js";
 
 function piAgentPort(): number {
   return Number(process.env.PI_AGENT_PORT ?? 8090);
@@ -12,6 +15,7 @@ function piAgentClientFor(hostname: string): PiAgentClient {
 
 export function buildServer() {
   const app = Fastify();
+  app.register(websocketPlugin);
 
   app.get("/health", async () => ({ status: "ok" }));
 
@@ -66,6 +70,85 @@ export function buildServer() {
       return { success: false, error: "hostname is required" };
     }
     return piAgentClientFor(hostname).wifiHotspot();
+  });
+
+  // Process lifecycle -- relayed to pi-agent, which runs systemctl locally.
+  app.get<{ Querystring: { hostname?: string } }>("/api/mission/status", async (request, reply) => {
+    const { hostname } = request.query;
+    if (!hostname) {
+      reply.code(400);
+      return { success: false, running: false, state: "error", error: "hostname is required" };
+    }
+    return piAgentClientFor(hostname).missionStatus();
+  });
+
+  app.post<{ Body: { hostname?: string } }>("/api/mission/prepare", async (request, reply) => {
+    const { hostname } = request.body;
+    if (!hostname) {
+      reply.code(400);
+      return { success: false, error: "hostname is required" };
+    }
+    return piAgentClientFor(hostname).prepareMission();
+  });
+
+  app.post<{ Body: { hostname?: string } }>("/api/mission/stop", async (request, reply) => {
+    const { hostname } = request.body;
+    if (!hostname) {
+      reply.code(400);
+      return { success: false, error: "hostname is required" };
+    }
+    return piAgentClientFor(hostname).stopMission();
+  });
+
+  // In-graph mission RPC -- the orchestrator is itself a ROS2 participant
+  // (see ros/trigger-service-client.ts), so these reach the vehicle's
+  // mode_manager node directly over the network, not through pi-agent.
+  app.post<{ Body: { vehicleName?: string } }>("/api/mission/start", async (request, reply) => {
+    const { vehicleName } = request.body;
+    if (!vehicleName) {
+      reply.code(400);
+      return { success: false, error: "vehicleName is required" };
+    }
+    return startMission(vehicleName);
+  });
+
+  app.post<{ Body: { vehicleName?: string } }>("/api/mission/failsafe", async (request, reply) => {
+    const { vehicleName } = request.body;
+    if (!vehicleName) {
+      reply.code(400);
+      return { success: false, error: "vehicleName is required" };
+    }
+    return triggerFailsafe(vehicleName);
+  });
+
+  // Real-time log relay: client <-> orchestrator <-> pi-agent, all real
+  // WebSocket streaming, no polling anywhere in the chain.
+  app.register(async (instance) => {
+    instance.get<{ Querystring: { hostname?: string } }>(
+      "/ws/mission/logs",
+      { websocket: true },
+      (clientSocket, request) => {
+        const { hostname } = request.query;
+        if (!hostname) {
+          clientSocket.send(JSON.stringify({ type: "error", message: "hostname is required" }));
+          clientSocket.close();
+          return;
+        }
+
+        const upstream = new WebSocket(`ws://${hostname}:${piAgentPort()}/ws/mission/logs`);
+
+        upstream.on("message", (data) => {
+          clientSocket.send(data.toString());
+        });
+        upstream.on("error", (error) => {
+          clientSocket.send(JSON.stringify({ type: "error", message: error.message }));
+          clientSocket.close();
+        });
+        upstream.on("close", () => clientSocket.close());
+
+        clientSocket.on("close", () => upstream.close());
+      },
+    );
   });
 
   return app;

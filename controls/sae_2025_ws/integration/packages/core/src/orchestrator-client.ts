@@ -1,4 +1,4 @@
-import type { WifiScanResult, WifiStatus } from "./types.js";
+import type { LaunchStatus, WifiScanResult, WifiStatus } from "./types.js";
 
 export interface OrchestratorClientOptions {
   /** e.g. "http://localhost:8080" -- the one thing web/mobile clients talk to. */
@@ -61,6 +61,35 @@ export class OrchestratorClient {
 
   async wifiHotspot(hostname: string): Promise<SimpleResult> {
     return this.postJson<SimpleResult>("/api/wifi/hotspot", { hostname });
+  }
+
+  async missionStatus(hostname: string): Promise<LaunchStatus> {
+    return this.getJson<LaunchStatus>(
+      `/api/mission/status?hostname=${encodeURIComponent(hostname)}`,
+      { success: false, running: false, state: "offline", error: "orchestrator unreachable" },
+    );
+  }
+
+  async prepareMission(hostname: string): Promise<SimpleResult> {
+    return this.postJson<SimpleResult>("/api/mission/prepare", { hostname });
+  }
+
+  async stopMission(hostname: string): Promise<SimpleResult> {
+    return this.postJson<SimpleResult>("/api/mission/stop", { hostname });
+  }
+
+  async startMission(vehicleName: string): Promise<SimpleResult> {
+    return this.postJson<SimpleResult>("/api/mission/start", { vehicleName });
+  }
+
+  async triggerFailsafe(vehicleName: string): Promise<SimpleResult> {
+    return this.postJson<SimpleResult>("/api/mission/failsafe", { vehicleName });
+  }
+
+  /** WebSocket URL for streaming mission logs for the given Pi -- connect with a plain WebSocket. */
+  missionLogsUrl(hostname: string): string {
+    const wsBase = this.baseUrl.replace(/^http/, "ws");
+    return `${wsBase}/ws/mission/logs?hostname=${encodeURIComponent(hostname)}`;
   }
 
   private async getJson<T>(path: string, onUnreachable: T): Promise<T> {

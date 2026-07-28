@@ -1,4 +1,4 @@
-import type { WifiScanResult, WifiStatus } from "@pennair/integration-core";
+import type { LaunchStatus, WifiScanResult, WifiStatus } from "@pennair/integration-core";
 
 export interface PiAgentClientOptions {
   hostname: string;
@@ -24,6 +24,9 @@ const WIFI_STATUS_TIMEOUT_MS = 35_000; // policyStatus(15s) + con show(15s)
 const WIFI_SCAN_TIMEOUT_MS = 25_000; // dev wifi list(20s)
 const WIFI_CONNECT_TIMEOUT_MS = 80_000; // policyStatus(15s) + con down(15s) + connect(30s) + rollback con up(15s)
 const WIFI_HOTSPOT_TIMEOUT_MS = 50_000; // policyStatus(15s) + disconnect(15s) + con up(15s)
+const MISSION_STATUS_TIMEOUT_MS = 20_000; // is-active(8s) + show MainPID(8s)
+const MISSION_PREPARE_TIMEOUT_MS = 30_000; // systemctl restart(25s)
+const MISSION_STOP_TIMEOUT_MS = 25_000; // systemctl stop(20s)
 
 /** Thin HTTP client the orchestrator uses to reach one Pi's pi-agent daemon. */
 export class PiAgentClient {
@@ -72,6 +75,22 @@ export class PiAgentClient {
 
   async wifiHotspot(): Promise<SimpleResult> {
     return this.postJson<SimpleResult>("/api/wifi/hotspot", {}, WIFI_HOTSPOT_TIMEOUT_MS);
+  }
+
+  async missionStatus(): Promise<LaunchStatus> {
+    return this.getJson<LaunchStatus>(
+      "/api/mission/status",
+      { success: false, running: false, state: "offline", error: "unreachable" },
+      MISSION_STATUS_TIMEOUT_MS,
+    );
+  }
+
+  async prepareMission(): Promise<SimpleResult> {
+    return this.postJson<SimpleResult>("/api/mission/prepare", {}, MISSION_PREPARE_TIMEOUT_MS);
+  }
+
+  async stopMission(): Promise<SimpleResult> {
+    return this.postJson<SimpleResult>("/api/mission/stop", {}, MISSION_STOP_TIMEOUT_MS);
   }
 
   private async getJson<T>(path: string, onUnreachable: T, timeoutMs: number): Promise<T> {

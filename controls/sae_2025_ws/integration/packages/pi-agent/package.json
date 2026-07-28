@@ -12,6 +12,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@fastify/websocket": "^11.0.2",
     "@pennair/integration-core": "*",
     "fastify": "^5.1.0"
   }

@@ -1,8 +1,12 @@
 import Fastify from "fastify";
+import websocketPlugin from "@fastify/websocket";
 import { wifiConnect, wifiHotspot, wifiScan, wifiStatus } from "./wifi.js";
+import { missionStatus, prepareMission, stopMission } from "./mission.js";
+import { streamMissionLogs } from "./logs.js";
 
 export function buildServer() {
   const app = Fastify();
+  app.register(websocketPlugin);
 
   app.get("/health", async () => ({ status: "ok" }));
 
@@ -22,6 +26,16 @@ export function buildServer() {
   );
 
   app.post("/api/wifi/hotspot", async () => wifiHotspot());
+
+  app.get("/api/mission/status", async () => missionStatus());
+  app.post("/api/mission/prepare", async () => prepareMission());
+  app.post("/api/mission/stop", async () => stopMission());
+
+  app.register(async (instance) => {
+    instance.get("/ws/mission/logs", { websocket: true }, (socket) => {
+      streamMissionLogs(socket);
+    });
+  });
 
   return app;
 }

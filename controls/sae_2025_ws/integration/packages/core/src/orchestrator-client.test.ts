@@ -58,4 +58,39 @@ describe("OrchestratorClient", () => {
 
     await client.discoverPis();
   });
+
+  it("startMission posts vehicleName as JSON", async () => {
+    const fetchImpl = vi.fn(async (url: string | URL, init?: RequestInit) => {
+      expect(url.toString()).toBe("http://localhost:8080/api/mission/start");
+      expect(JSON.parse(init?.body as string)).toEqual({ vehicleName: "air-01" });
+      return jsonResponse({ success: true, output: "Mission runtime running" });
+    });
+    const client = new OrchestratorClient({ baseUrl: "http://localhost:8080", fetchImpl: fetchImpl as unknown as typeof fetch });
+
+    expect(await client.startMission("air-01")).toEqual({ success: true, output: "Mission runtime running" });
+  });
+
+  it("triggerFailsafe posts vehicleName as JSON", async () => {
+    const fetchImpl = vi.fn(async (url: string | URL) => {
+      expect(url.toString()).toBe("http://localhost:8080/api/mission/failsafe");
+      return jsonResponse({ success: true, output: "failsafe triggered" });
+    });
+    const client = new OrchestratorClient({ baseUrl: "http://localhost:8080", fetchImpl: fetchImpl as unknown as typeof fetch });
+
+    expect(await client.triggerFailsafe("air-01")).toEqual({ success: true, output: "failsafe triggered" });
+  });
+
+  it("missionLogsUrl converts http(s) to ws(s) and passes hostname as a query param", () => {
+    const client = new OrchestratorClient({ baseUrl: "http://localhost:8080" });
+    expect(client.missionLogsUrl("air-01.local")).toBe(
+      "ws://localhost:8080/ws/mission/logs?hostname=air-01.local",
+    );
+  });
+
+  it("missionLogsUrl handles an https baseUrl", () => {
+    const client = new OrchestratorClient({ baseUrl: "https://ops.example.com" });
+    expect(client.missionLogsUrl("air-01.local")).toBe(
+      "wss://ops.example.com/ws/mission/logs?hostname=air-01.local",
+    );
+  });
 });

@@ -56,6 +56,14 @@ export type MissionPhase =
 
 export type LaunchState = "running" | "stopped" | "not_prepared" | "error" | "offline";
 
+export interface LaunchStatus {
+  success: boolean;
+  running: boolean;
+  state: LaunchState;
+  pid?: string;
+  error?: string;
+}
+
 export interface MissionRuntimeState {
   phase: MissionPhase;
   launchState: LaunchState;

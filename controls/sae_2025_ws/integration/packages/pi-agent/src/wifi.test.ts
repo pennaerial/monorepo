@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { CommandRunner, ExecResult } from "./wifi.js";
+import type { CommandRunner, ExecResult } from "./exec.js";
 import { wifiConnect, wifiHotspot, wifiScan, wifiStatus } from "./wifi.js";
 
 const noWait = async () => {};

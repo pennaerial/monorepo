@@ -28,4 +28,14 @@ describe("PiAgentClient against a real local pi-agent instance", () => {
     const client = new PiAgentClient({ hostname: "127.0.0.1", port: 1 });
     expect(await client.isHealthy()).toBe(false);
   });
+
+  it("relays missionStatus to the real pi-agent (no systemctl on this dev machine, so a graceful error is the correct real response)", async () => {
+    const client = new PiAgentClient({ hostname: "127.0.0.1", port });
+    const status = await client.missionStatus();
+    // As with wifi: not asserting success:true, there's no real systemd here.
+    // What matters is the request actually reached pi-agent's real handler
+    // and got a real (non-hung, non-crashed) response back.
+    expect(status).toHaveProperty("success");
+    expect(status).toHaveProperty("state");
+  });
 });

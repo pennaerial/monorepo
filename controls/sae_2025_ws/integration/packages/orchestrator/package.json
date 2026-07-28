@@ -12,10 +12,16 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@fastify/websocket": "^11.0.2",
     "@pennair/integration-core": "*",
-    "fastify": "^5.1.0"
+    "fastify": "^5.1.0",
+    "ws": "^8.18.0"
+  },
+  "optionalDependencies": {
+    "rclnodejs": "^2.1.1"
   },
   "devDependencies": {
-    "@pennair/pi-agent": "*"
+    "@pennair/pi-agent": "*",
+    "@types/ws": "^8.5.13"
   }
 }

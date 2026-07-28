@@ -1,33 +1,16 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { OrchestratorClient, type WifiNetwork, type WifiStatus } from "@pennair/integration-core";
 
 const ORCHESTRATOR_URL = import.meta.env.VITE_ORCHESTRATOR_URL ?? "http://localhost:8080";
 const client = new OrchestratorClient({ baseUrl: ORCHESTRATOR_URL });
 
-export function WifiCard() {
-  const [pis, setPis] = useState<string[]>([]);
-  const [hostname, setHostname] = useState("");
+export function WifiCard({ hostname }: { hostname: string }) {
   const [status, setStatus] = useState<WifiStatus | null>(null);
   const [networks, setNetworks] = useState<WifiNetwork[]>([]);
   const [ssid, setSsid] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-
-  useEffect(() => {
-    client.discoverPis().then((discovered) => {
-      const hostnames = discovered.map((pi) => pi.hostname);
-      setPis(hostnames);
-      if (hostnames.length > 0 && !hostname) {
-        setHostname(hostnames[0]);
-      }
-    });
-    // Intentionally run once on mount; discovery is re-triggered by the button below.
-  }, []);
-
-  async function refreshDiscovery() {
-    setPis((await client.discoverPis()).map((pi) => pi.hostname));
-  }
 
   async function refreshStatus() {
     if (!hostname) return;
@@ -66,24 +49,6 @@ export function WifiCard() {
   return (
     <section>
       <h2>Wifi</h2>
-
-      <label>
-        Pi hostname
-        <input
-          list="discovered-pis"
-          value={hostname}
-          onChange={(e) => setHostname(e.target.value)}
-          placeholder="air-01.local"
-        />
-        <datalist id="discovered-pis">
-          {pis.map((h) => (
-            <option key={h} value={h} />
-          ))}
-        </datalist>
-      </label>
-      <button onClick={refreshDiscovery} disabled={busy}>
-        Rediscover
-      </button>
 
       <div>
         <button onClick={refreshStatus} disabled={busy || !hostname}>
