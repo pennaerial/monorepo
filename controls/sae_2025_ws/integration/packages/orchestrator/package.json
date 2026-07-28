@@ -1,0 +1,20 @@
+{
+  "name": "@pennair/orchestrator",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc --build",
+    "start": "node dist/index.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@pennair/integration-core": "*",
+    "fastify": "^5.1.0"
+  },
+  "devDependencies": {
+    "@pennair/pi-agent": "*"
+  }
+}
