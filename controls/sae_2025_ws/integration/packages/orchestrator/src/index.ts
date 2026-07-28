@@ -1,10 +1,19 @@
+import { createWriteStream } from "node:fs";
+import { mkdir, stat } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import { pipeline } from "node:stream/promises";
 import Fastify from "fastify";
 import websocketPlugin from "@fastify/websocket";
+import multipartPlugin from "@fastify/multipart";
 import WebSocket from "ws";
 import { discoverPis } from "@pennair/integration-core";
 import { PiAgentClient } from "./pi-agent-client.js";
 import { startMission, triggerFailsafe } from "./mission.js";
 import { attachHeartbeat } from "./heartbeat.js";
+import { BuildSourceStore } from "./build-source-store.js";
+import { listBuilds } from "./github-builds.js";
+import { resolveFleetCatalog } from "./fleet-catalog.js";
 
 function piAgentPort(): number {
   return Number(process.env.PI_AGENT_PORT ?? 8090);
@@ -14,9 +23,35 @@ function piAgentClientFor(hostname: string): PiAgentClient {
   return new PiAgentClient({ hostname, port: piAgentPort() });
 }
 
+function orchestratorStateDir(): string {
+  return process.env.ORCHESTRATOR_STATE_DIR ?? join(homedir(), ".pennair-orchestrator");
+}
+
+function githubRepo(): string {
+  return process.env.GITHUB_REPO ?? "";
+}
+
+function githubToken(): string | undefined {
+  return process.env.GITHUB_TOKEN || undefined;
+}
+
+function truthyQueryParam(value: unknown): boolean {
+  return value === "true" || value === "1";
+}
+
 export function buildServer() {
   const app = Fastify();
   app.register(websocketPlugin);
+  app.register(multipartPlugin, {
+    limits: { fileSize: 2 * 1024 * 1024 * 1024 }, // 2GB -- ROS2 build artifacts can be large
+  });
+
+  const buildSourceStore = new BuildSourceStore(join(orchestratorStateDir(), "build-source.json"));
+  let storeLoaded: Promise<void> | null = null;
+  function ensureStoreLoaded(): Promise<void> {
+    if (!storeLoaded) storeLoaded = buildSourceStore.load();
+    return storeLoaded;
+  }
 
   app.get("/health", async () => ({ status: "ok" }));
 
@@ -120,6 +155,174 @@ export function buildServer() {
       return { success: false, error: "vehicleName is required" };
     }
     return triggerFailsafe(vehicleName);
+  });
+
+  // -- Build source selection & GitHub build listing -----------------------
+  app.get<{
+    Querystring: {
+      artifactPage?: string;
+      artifactPageSize?: string;
+      q?: string;
+      sha?: string;
+      commitSubject?: string;
+      branch?: string;
+      includeFallback?: string;
+    };
+  }>("/api/deploy/builds", async (request) => {
+    const query = request.query;
+    return listBuilds({
+      githubRepo: githubRepo(),
+      githubToken: githubToken(),
+      artifactPage: query.artifactPage ? Number(query.artifactPage) : undefined,
+      artifactPageSize: query.artifactPageSize ? Number(query.artifactPageSize) : undefined,
+      q: query.q,
+      sha: query.sha,
+      commitSubject: query.commitSubject,
+      branch: query.branch,
+      includeFallback: truthyQueryParam(query.includeFallback),
+    });
+  });
+
+  app.get("/api/deploy/source", async () => {
+    await ensureStoreLoaded();
+    return buildSourceStore.get();
+  });
+
+  app.post<{ Body: Record<string, unknown> }>("/api/deploy/source/github", async (request) => {
+    await ensureStoreLoaded();
+    const body = request.body;
+    await buildSourceStore.setGithub({
+      githubSource: body.githubSource as "release" | "actions",
+      tag: body.tag as string | undefined,
+      artifactId: body.artifactId as string | undefined,
+      runId: body.runId as string | undefined,
+      sha: body.sha as string | undefined,
+      commitSubject: body.commitSubject as string | undefined,
+      name: body.name as string | undefined,
+      date: body.date as string | undefined,
+      downloadUrl: body.downloadUrl as string | undefined,
+      sizeMb: body.sizeMb as number | undefined,
+      branch: body.branch as string | undefined,
+      artifactName: body.artifactName as string | undefined,
+      workflowName: body.workflowName as string | undefined,
+      workflowEvent: body.workflowEvent as string | undefined,
+      workflowConclusion: body.workflowConclusion as string | undefined,
+    });
+    return buildSourceStore.get();
+  });
+
+  app.post<{ Body: { codebaseRoot?: string } }>("/api/deploy/source/local-codebase", async (request, reply) => {
+    await ensureStoreLoaded();
+    const { codebaseRoot } = request.body;
+    if (!codebaseRoot) {
+      reply.code(400);
+      return { success: false, error: "codebaseRoot is required" };
+    }
+    await buildSourceStore.setLocalCodebase(codebaseRoot);
+    return buildSourceStore.get();
+  });
+
+  app.post<{ Body: { fleetFile?: string } }>("/api/deploy/source/fleet-file", async (request, reply) => {
+    await ensureStoreLoaded();
+    const { fleetFile } = request.body;
+    if (!fleetFile) {
+      reply.code(400);
+      return { success: false, error: "fleetFile is required" };
+    }
+    await buildSourceStore.setFleetFile(fleetFile);
+    return buildSourceStore.get();
+  });
+
+  app.post("/api/deploy/source/clear", async () => {
+    await ensureStoreLoaded();
+    await buildSourceStore.clear();
+    return buildSourceStore.get();
+  });
+
+  // Local artifact: the operator uploads a build tarball to the orchestrator
+  // itself (not to a specific Pi yet) so it becomes the selected build
+  // source, the same two-step flow as the old dashboard (select a source,
+  // then deploy it to whichever Pi later).
+  app.post("/api/deploy/source/local-artifact", async (request, reply) => {
+    await ensureStoreLoaded();
+    const artifactDir = join(orchestratorStateDir(), "local-artifacts");
+    await mkdir(artifactDir, { recursive: true });
+
+    let savedPath: string | undefined;
+    let artifactName: string | undefined;
+    for await (const part of request.parts()) {
+      if (part.type === "file") {
+        artifactName = part.filename;
+        savedPath = join(artifactDir, part.filename);
+        await pipeline(part.file, createWriteStream(savedPath));
+      }
+    }
+
+    if (!savedPath || !artifactName) {
+      reply.code(400);
+      return { success: false, error: "No file uploaded" };
+    }
+
+    const stats = await stat(savedPath);
+    await buildSourceStore.setLocalArtifact(artifactName, savedPath, stats.size);
+    return buildSourceStore.get();
+  });
+
+  app.get("/api/deploy/fleet-catalog", async () => {
+    await ensureStoreLoaded();
+    return resolveFleetCatalog({
+      record: buildSourceStore.get(),
+      cacheRoot: join(orchestratorStateDir(), "fleet-catalog-cache"),
+      githubToken: githubToken(),
+    });
+  });
+
+  // -- Per-Pi deploy relay ---------------------------------------------------
+  app.get<{ Querystring: { hostname?: string } }>("/api/deploy/current", async (request, reply) => {
+    const { hostname } = request.query;
+    if (!hostname) {
+      reply.code(400);
+      return { installed: false, error: "hostname is required" };
+    }
+    return piAgentClientFor(hostname).currentBuild();
+  });
+
+  app.post<{ Body: { hostname?: string } }>("/api/deploy/rollback", async (request, reply) => {
+    const { hostname } = request.body;
+    if (!hostname) {
+      reply.code(400);
+      return { success: false, error: "hostname is required" };
+    }
+    return piAgentClientFor(hostname).rollbackDeploy();
+  });
+
+  app.post("/api/deploy/upload", async (request, reply) => {
+    await ensureStoreLoaded();
+    let hostname: string | undefined;
+    let sourceType: string | undefined;
+    let sourceLabel: string | undefined;
+    let vehicleName: string | undefined;
+    let fleetFile: string | undefined;
+
+    for await (const part of request.parts()) {
+      if (part.type === "file") {
+        if (!hostname) {
+          reply.code(400);
+          return { success: false, error: "hostname is required" };
+        }
+        const client = piAgentClientFor(hostname);
+        return client.uploadDeploy(part.filename, part.file, { sourceType, sourceLabel, vehicleName, fleetFile });
+      }
+      const value = String(part.value ?? "");
+      if (part.fieldname === "hostname") hostname = value || undefined;
+      else if (part.fieldname === "sourceType") sourceType = value || undefined;
+      else if (part.fieldname === "sourceLabel") sourceLabel = value || undefined;
+      else if (part.fieldname === "vehicleName") vehicleName = value || undefined;
+      else if (part.fieldname === "fleetFile") fleetFile = value || undefined;
+    }
+
+    reply.code(400);
+    return { success: false, error: "No file uploaded" };
   });
 
   // Real-time log relay: client <-> orchestrator <-> pi-agent, all real

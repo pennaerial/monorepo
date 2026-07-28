@@ -1,3 +1,5 @@
+import { randomBytes } from "node:crypto";
+import { Readable } from "node:stream";
 import type { LaunchStatus, WifiScanResult, WifiStatus } from "@pennair/integration-core";
 
 export interface PiAgentClientOptions {
@@ -27,6 +29,58 @@ const WIFI_HOTSPOT_TIMEOUT_MS = 50_000; // policyStatus(15s) + disconnect(15s) +
 const MISSION_STATUS_TIMEOUT_MS = 20_000; // is-active(8s) + show MainPID(8s)
 const MISSION_PREPARE_TIMEOUT_MS = 30_000; // systemctl restart(25s)
 const MISSION_STOP_TIMEOUT_MS = 25_000; // systemctl stop(20s)
+const DEPLOY_CURRENT_TIMEOUT_MS = 10_000;
+const DEPLOY_ROLLBACK_TIMEOUT_MS = 30_000; // matches pi-agent's own activate/health-check-rollback window (8s poll) plus margin
+// Large and variable by design -- artifact size isn't bounded, so this can't
+// be sized off a fixed pi-agent-side exec duration the way the other
+// timeouts above are. 10 minutes comfortably covers a multi-hundred-MB
+// transfer even on a slow travel-router link.
+const DEPLOY_UPLOAD_TIMEOUT_MS = 600_000;
+
+export interface DeployUploadFields {
+  sourceType?: string;
+  sourceLabel?: string;
+  vehicleName?: string;
+  fleetFile?: string;
+}
+
+export interface DeployUploadResult {
+  success: boolean;
+  error?: string;
+  releaseId?: string;
+}
+
+export interface CurrentBuildResult {
+  installed: boolean;
+  releaseId?: string;
+  extractedAt?: string;
+  sourceType?: string;
+  sourceLabel?: string;
+  error?: string;
+}
+
+/** Builds a multipart/form-data body as an async byte stream, so the incoming client upload can be relayed to pi-agent without ever buffering the whole artifact in memory. */
+async function* multipartBody(
+  fields: DeployUploadFields,
+  filename: string,
+  fileStream: AsyncIterable<Buffer>,
+  boundary: string,
+): AsyncGenerator<Buffer> {
+  const encoder = new TextEncoder();
+  for (const [key, value] of Object.entries(fields)) {
+    if (value === undefined) continue;
+    yield Buffer.from(encoder.encode(`--${boundary}\r\nContent-Disposition: form-data; name="${key}"\r\n\r\n${value}\r\n`));
+  }
+  yield Buffer.from(
+    encoder.encode(
+      `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${filename}"\r\nContent-Type: application/octet-stream\r\n\r\n`,
+    ),
+  );
+  for await (const chunk of fileStream) {
+    yield chunk;
+  }
+  yield Buffer.from(encoder.encode(`\r\n--${boundary}--\r\n`));
+}
 
 /** Thin HTTP client the orchestrator uses to reach one Pi's pi-agent daemon. */
 export class PiAgentClient {
@@ -91,6 +145,39 @@ export class PiAgentClient {
 
   async stopMission(): Promise<SimpleResult> {
     return this.postJson<SimpleResult>("/api/mission/stop", {}, MISSION_STOP_TIMEOUT_MS);
+  }
+
+  async currentBuild(): Promise<CurrentBuildResult> {
+    return this.getJson<CurrentBuildResult>(
+      "/api/deploy/current",
+      { installed: false, error: "unreachable" },
+      DEPLOY_CURRENT_TIMEOUT_MS,
+    );
+  }
+
+  async rollbackDeploy(): Promise<SimpleResult> {
+    return this.postJson<SimpleResult>("/api/deploy/rollback", {}, DEPLOY_ROLLBACK_TIMEOUT_MS);
+  }
+
+  async uploadDeploy(
+    filename: string,
+    fileStream: AsyncIterable<Buffer>,
+    fields: DeployUploadFields,
+  ): Promise<DeployUploadResult> {
+    const boundary = `----pennair-relay-${randomBytes(8).toString("hex")}`;
+    try {
+      const response = await this.fetchImpl(`${this.baseUrl}/api/deploy/upload`, {
+        method: "POST",
+        headers: { "Content-Type": `multipart/form-data; boundary=${boundary}` },
+        body: Readable.from(multipartBody(fields, filename, fileStream, boundary)) as unknown as ReadableStream,
+        // Node's fetch (undici) requires this when the body is a stream.
+        duplex: "half",
+        signal: AbortSignal.timeout(DEPLOY_UPLOAD_TIMEOUT_MS),
+      } as RequestInit);
+      return (await response.json()) as DeployUploadResult;
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
   }
 
   private async getJson<T>(path: string, onUnreachable: T, timeoutMs: number): Promise<T> {
