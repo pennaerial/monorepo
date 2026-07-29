@@ -34,6 +34,8 @@ interface SimpleResult {
 // no default overall-request timeout once connected, only a connect-timeout.
 const DEFAULT_TIMEOUT_MS = 90_000;
 
+const ORCHESTRATOR_UNREACHABLE_ERROR = "orchestrator unreachable";
+
 /**
  * The only client web/mobile need -- talks to the orchestrator, never to a
  * Pi's pi-agent directly. The orchestrator does its own discovery and relays
@@ -64,14 +66,14 @@ export class OrchestratorClient {
   async wifiStatus(hostname: string): Promise<WifiStatus> {
     return this.getJson<WifiStatus>(
       `/api/wifi/status?hostname=${encodeURIComponent(hostname)}`,
-      { success: false, connections: [], error: "orchestrator unreachable" },
+      { success: false, connections: [], error: ORCHESTRATOR_UNREACHABLE_ERROR },
     );
   }
 
   async wifiScan(hostname: string): Promise<WifiScanResult> {
     return this.getJson<WifiScanResult>(
       `/api/wifi/scan?hostname=${encodeURIComponent(hostname)}`,
-      { success: false, networks: [], error: "orchestrator unreachable" },
+      { success: false, networks: [], error: ORCHESTRATOR_UNREACHABLE_ERROR },
     );
   }
 
@@ -86,7 +88,7 @@ export class OrchestratorClient {
   async missionStatus(hostname: string): Promise<LaunchStatus> {
     return this.getJson<LaunchStatus>(
       `/api/mission/status?hostname=${encodeURIComponent(hostname)}`,
-      { success: false, running: false, state: "offline", error: "orchestrator unreachable" },
+      { success: false, running: false, state: "offline", error: ORCHESTRATOR_UNREACHABLE_ERROR },
     );
   }
 
@@ -115,21 +117,21 @@ export class OrchestratorClient {
   async schema(hostname: string): Promise<SchemaExportResult> {
     return this.getJson<SchemaExportResult>(
       `/api/schema?hostname=${encodeURIComponent(hostname)}`,
-      { success: false, error: "orchestrator unreachable" },
+      { success: false, error: ORCHESTRATOR_UNREACHABLE_ERROR },
     );
   }
 
   async missionNames(hostname: string): Promise<MissionNamesResult> {
     return this.getJson<MissionNamesResult>(
       `/api/mission/mission-names?hostname=${encodeURIComponent(hostname)}`,
-      { success: false, missions: [], error: "orchestrator unreachable" },
+      { success: false, missions: [], error: ORCHESTRATOR_UNREACHABLE_ERROR },
     );
   }
 
   async readMissionFile(hostname: string, name: string): Promise<FileResult> {
     return this.getJson<FileResult>(
       `/api/mission/mission-file?hostname=${encodeURIComponent(hostname)}&name=${encodeURIComponent(name)}`,
-      { success: false, error: "orchestrator unreachable" },
+      { success: false, error: ORCHESTRATOR_UNREACHABLE_ERROR },
     );
   }
 
@@ -140,7 +142,7 @@ export class OrchestratorClient {
   async readFleetFile(hostname: string, name: string): Promise<FileResult> {
     return this.getJson<FileResult>(
       `/api/fleet/fleet-file?hostname=${encodeURIComponent(hostname)}&name=${encodeURIComponent(name)}`,
-      { success: false, error: "orchestrator unreachable" },
+      { success: false, error: ORCHESTRATOR_UNREACHABLE_ERROR },
     );
   }
 
@@ -153,7 +155,7 @@ export class OrchestratorClient {
       success: false,
       devices: [],
       summary: { totalDevices: 0, connectedDevices: 0, buildInstalledDevices: 0, runningDevices: 0, readyDevices: 0 },
-      error: "orchestrator unreachable",
+      error: ORCHESTRATOR_UNREACHABLE_ERROR,
     });
   }
 
@@ -183,7 +185,7 @@ export class OrchestratorClient {
       });
       return (await response.json()) as T;
     } catch {
-      return { success: false, error: "orchestrator unreachable" } as T;
+      return { success: false, error: ORCHESTRATOR_UNREACHABLE_ERROR } as T;
     }
   }
 }

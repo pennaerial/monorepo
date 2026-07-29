@@ -1,6 +1,9 @@
 import { dedentBlock, indentBlock, parseInlineYamlValue, stripYamlComment } from "./yaml-text.js";
 import type { MissionMode, ParsedMissionDocument, TransitionEntry } from "./types.js";
 
+// Depth of a mode's params/transitions content: 2 (mode name) + 4 (field key) spaces.
+const MODE_FIELD_CONTENT_INDENT = 6;
+
 /**
  * Strips the `uav.modes.` prefix and collapses a repeated trailing segment
  * (`foo.Bar.Bar` -> `foo.Bar`) -- a convention from the old flat
@@ -123,7 +126,7 @@ export function parseMissionDocument(text: string | undefined | null): ParsedMis
           if (/^\s{4}[A-Za-z0-9_.-]+\s*:\s*/.test(nested)) break;
           section.push(nested);
         }
-        paramsRaw = dedentBlock(section.join("\n"), 6);
+        paramsRaw = dedentBlock(section.join("\n"), MODE_FIELD_CONTENT_INDENT);
         continue;
       }
       if (transitionsLine < 0 && /^\s{4}transitions:\s*/.test(line)) {
@@ -136,7 +139,7 @@ export function parseMissionDocument(text: string | undefined | null): ParsedMis
           if (/^\s{4}[A-Za-z0-9_.-]+\s*:\s*/.test(nested)) break;
           section.push(nested);
         }
-        transitionsRaw = dedentBlock(section.join("\n"), 6);
+        transitionsRaw = dedentBlock(section.join("\n"), MODE_FIELD_CONTENT_INDENT);
       }
     }
 
@@ -180,7 +183,7 @@ export function renderMissionDocument(doc: ParsedMissionDocument | undefined | n
 
     if (mode.paramsRaw && `${mode.paramsRaw}`.trim()) {
       lines.push("    params:");
-      lines.push(...indentBlock(mode.paramsRaw.trimEnd(), 6).split("\n"));
+      lines.push(...indentBlock(mode.paramsRaw.trimEnd(), MODE_FIELD_CONTENT_INDENT).split("\n"));
     } else if (mode.hasParams) {
       lines.push("    params: {}");
     }
