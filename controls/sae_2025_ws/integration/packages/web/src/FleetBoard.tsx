@@ -14,18 +14,31 @@ function statusPill(ready: boolean, connected: boolean): string {
 export function FleetBoard({ onSelectHostname }: { onSelectHostname?: (hostname: string) => void }) {
   const [board, setBoard] = useState<FleetBoardResult | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  // De-dupes overlapping polls (a slow fan-out could otherwise still be
-  // in flight when the next interval tick fires) and discards a stale
-  // response that resolves after a newer one already landed.
+  // Discards a stale response that resolves after a newer one already
+  // landed (requestIdRef) -- but that alone doesn't stop overlapping
+  // network calls: a single stuck/degraded Pi can make one fan-out take up
+  // to ~21s (discovery + the 20s missionStatus timeout) against a 5s poll
+  // interval, so inFlightRef additionally skips starting a new poll while
+  // one is still running, rather than piling up several concurrent fetches
+  // (and full re-discoveries) all hammering the same struggling Pi.
   const requestIdRef = useRef(0);
+  const inFlightRef = useRef(false);
 
   async function refresh() {
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
     const requestId = ++requestIdRef.current;
     setRefreshing(true);
-    const result = await client.fleetBoard();
-    if (requestId === requestIdRef.current) {
-      setBoard(result);
-      setRefreshing(false);
+    try {
+      const result = await client.fleetBoard();
+      if (requestId === requestIdRef.current) {
+        setBoard(result);
+      }
+    } finally {
+      inFlightRef.current = false;
+      if (requestId === requestIdRef.current) {
+        setRefreshing(false);
+      }
     }
   }
 

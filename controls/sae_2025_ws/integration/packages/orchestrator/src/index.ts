@@ -57,7 +57,12 @@ export function buildServer() {
   app.get("/health", async () => ({ status: "ok" }));
 
   function discoveryParams() {
-    const prefixes = (process.env.DISCOVERY_PREFIXES ?? "air,payload").split(",");
+    // Trimmed + deduped: a stray space or a copy-paste duplicate in the env
+    // var (e.g. "air, air") would otherwise make discoverPis() probe and
+    // return the same hostname twice, double-counting one physical Pi in
+    // every fleet-board summary bucket and giving React a duplicate list key.
+    const rawPrefixes = (process.env.DISCOVERY_PREFIXES ?? "air,payload").split(",").map((p) => p.trim());
+    const prefixes = [...new Set(rawPrefixes.filter(Boolean))];
     const suffixMax = Number(process.env.DISCOVERY_SUFFIX_MAX ?? 20);
     const timeoutMs = Number(process.env.DISCOVERY_TIMEOUT_MS ?? 1000);
     const suffixes = Array.from({ length: suffixMax }, (_, i) => i + 1);

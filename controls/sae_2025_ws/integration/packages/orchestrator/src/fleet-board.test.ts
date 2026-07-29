@@ -119,4 +119,28 @@ describe("fetchFleetBoard", () => {
     expect(result.devices[0].ready).toBe(false);
     expect(result.devices[0].notes).toEqual(["No installed build"]);
   });
+
+  it("forwards fetchImpl into the default per-Pi client when piAgentClientFor isn't supplied", async () => {
+    // Regression test: the default `clientFor` used to construct a bare
+    // `new PiAgentClient({ hostname, port })` with no fetchImpl, so a caller
+    // supplying only fetchImpl (discovery gets faked) would silently fall
+    // through to the real global fetch for the per-Pi probes.
+    const fetchImpl = (async (url: Parameters<typeof fetch>[0]) => {
+      const u = String(url);
+      if (u === "http://air-01.local:8090/health") return jsonResponse({ status: "ok" });
+      if (u.startsWith("http://air-01.local:8090/api/mission/status")) {
+        return jsonResponse({ success: true, running: false, state: "stopped" });
+      }
+      if (u.startsWith("http://air-01.local:8090/api/deploy/current")) {
+        return jsonResponse({ success: true, installed: true, info: "Build 42", releaseId: "rel-1" });
+      }
+      throw new Error(`unexpected fetch ${u}`);
+    }) as typeof fetch;
+
+    // No piAgentClientFor supplied -- exercises the default clientFor path.
+    const result = await fetchFleetBoard({ prefixes: ["air"], suffixes: [1], port: 8090, discoveryTimeoutMs: 1000, fetchImpl });
+
+    expect(result.devices).toHaveLength(1);
+    expect(result.devices[0]).toMatchObject({ connected: true, buildInstalled: true, releaseId: "rel-1" });
+  });
 });

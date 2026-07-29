@@ -40,7 +40,13 @@ export async function fetchFleetBoard(options: FetchFleetBoardOptions): Promise<
     fetchImpl: options.fetchImpl,
   });
 
-  const clientFor = options.piAgentClientFor ?? ((hostname: string) => new PiAgentClient({ hostname, port: options.port }));
+  // Forward fetchImpl into the default client too -- a caller supplying
+  // only fetchImpl (without also supplying piAgentClientFor) would
+  // otherwise get discovery faked but the per-Pi probes silently falling
+  // through to the real global fetch.
+  const clientFor =
+    options.piAgentClientFor ??
+    ((hostname: string) => new PiAgentClient({ hostname, port: options.port, fetchImpl: options.fetchImpl }));
 
   const devices: FleetBoardDevice[] = await Promise.all(
     pis.map(async (pi) => {

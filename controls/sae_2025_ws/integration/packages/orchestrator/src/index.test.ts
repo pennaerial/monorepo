@@ -89,6 +89,26 @@ describe("orchestrator discovery endpoint", () => {
     delete process.env.DISCOVERY_SUFFIX_MAX;
     delete process.env.PI_AGENT_PORT;
   });
+
+  it("trims whitespace and de-dupes a repeated/malformed DISCOVERY_PREFIXES value, avoiding a double-counted Pi", async () => {
+    const fetchMock = vi.fn(async (url: string | URL) => {
+      const reachable = url.toString() === "http://air-01.local:8090/health";
+      return { ok: reachable } as Response;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    process.env.DISCOVERY_PREFIXES = "air, air,  ,air";
+    process.env.DISCOVERY_SUFFIX_MAX = "1";
+    process.env.PI_AGENT_PORT = "8090";
+
+    const orchestrator = buildOrchestratorServer();
+    const response = await orchestrator.inject({ method: "GET", url: "/api/discovery" });
+
+    expect(response.json()).toEqual({ pis: [{ hostname: "air-01.local" }] });
+
+    delete process.env.DISCOVERY_PREFIXES;
+    delete process.env.DISCOVERY_SUFFIX_MAX;
+    delete process.env.PI_AGENT_PORT;
+  });
 });
 
 describe("orchestrator fleet board endpoint", () => {
