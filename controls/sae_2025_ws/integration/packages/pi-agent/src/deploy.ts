@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { mkdir, readdir, readFile, rm, writeFile, chmod } from "node:fs/promises";
 import { basename } from "node:path";
 import * as tar from "tar";
@@ -7,6 +8,22 @@ import { delay, runCommand, type CommandRunner } from "./exec.js";
 
 const SERVICE_NAME = process.env.MISSION_SERVICE_NAME ?? "pennair-autonomy.service";
 const PI_USER = process.env.PI_USER ?? "penn";
+
+// A single Pi only ever has one pi-agent process managing one deploy root, so
+// a plain in-process mutex (not file-based locking) is enough to serialize
+// deploys/rollbacks -- without it, concurrent requests race on the
+// current/previous symlink swap and on release-directory pruning (each call
+// computes its own view of "previous" and "what to prune" independently),
+// which can dangle `current` or delete a release another call just deployed.
+let deployMutex: Promise<unknown> = Promise.resolve();
+function withDeployLock<T>(task: () => Promise<T>): Promise<T> {
+  const result = deployMutex.then(task, task);
+  deployMutex = result.then(
+    () => undefined,
+    () => undefined,
+  );
+  return result;
+}
 
 interface SimpleResult {
   success: boolean;
@@ -28,25 +45,29 @@ function releaseTimestamp(now: () => number = Date.now): string {
   return new Date(now()).toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "").replace("T", "-");
 }
 
-/**
- * Extracts an uploaded artifact tarball into a new timestamped release
- * directory, atomically swaps the `current` symlink to point at it (keeping
- * the previous target as `previous` for rollback), and prunes any older
- * release directories. Mirrors the old dashboard's `_extract_release_on_pi`,
- * just as local fs/child_process operations instead of an SSH bash heredoc.
- */
-export async function extractRelease(
+async function extractReleaseUnlocked(
   artifactPath: string,
   artifactName: string,
-  paths: DeployPaths = deployPaths(),
-  now: () => number = Date.now,
+  paths: DeployPaths,
+  now: () => number,
 ): Promise<ExtractResult> {
   const releaseSlug = artifactName.replace(/\.tar\.gz$/, "").replace(/\.tgz$/, "");
-  const releaseId = `${releaseTimestamp(now)}-${releaseSlug}`;
+  // A random suffix guarantees a fresh release directory even when two
+  // deploys land in the same clock tick with the same artifact filename --
+  // without it, they'd collide on releaseId and silently merge into one
+  // directory, and `previous` could end up pointing at the same release as
+  // `current` (rollback would then "succeed" while doing nothing).
+  const releaseId = `${releaseTimestamp(now)}-${releaseSlug}-${randomBytes(3).toString("hex")}`;
   const releaseDir = `${paths.releasesDir}/${releaseId}`;
 
   await mkdir(releaseDir, { recursive: true });
-  await tar.x({ file: artifactPath, cwd: releaseDir });
+  try {
+    await tar.x({ file: artifactPath, cwd: releaseDir });
+  } catch (error) {
+    await rm(releaseDir, { recursive: true, force: true });
+    await rm(artifactPath, { force: true });
+    throw error;
+  }
   await rm(artifactPath, { force: true });
 
   if (!(await pathExists(`${releaseDir}/install`))) {
@@ -75,6 +96,23 @@ export async function extractRelease(
   return { releaseId, releaseDir, previousTarget };
 }
 
+/**
+ * Extracts an uploaded artifact tarball into a new timestamped release
+ * directory, atomically swaps the `current` symlink to point at it (keeping
+ * the previous target as `previous` for rollback), and prunes any older
+ * release directories. Mirrors the old dashboard's `_extract_release_on_pi`,
+ * just as local fs/child_process operations instead of an SSH bash heredoc.
+ * Serialized against concurrent deploys/rollbacks via `withDeployLock`.
+ */
+export function extractRelease(
+  artifactPath: string,
+  artifactName: string,
+  paths: DeployPaths = deployPaths(),
+  now: () => number = Date.now,
+): Promise<ExtractResult> {
+  return withDeployLock(() => extractReleaseUnlocked(artifactPath, artifactName, paths, now));
+}
+
 // ---------------------------------------------------------------------------
 // Systemd unit + runner script
 // ---------------------------------------------------------------------------
@@ -82,7 +120,7 @@ export async function extractRelease(
 function runnerScriptText(paths: DeployPaths): string {
   return `#!/usr/bin/env bash
 set -euo pipefail
-DEPLOY_ROOT=${paths.deployRoot}
+export DEPLOY_ROOT=${paths.deployRoot}
 cd "$DEPLOY_ROOT"
 mkdir -p "$DEPLOY_ROOT/state/logs"
 export ROS_LOG_DIR="$DEPLOY_ROOT/state/logs"
@@ -94,16 +132,30 @@ exec ros2 launch uav fleet.launch.py fleet_file:="$DEPLOY_ROOT/config/runtime_fl
 `;
 }
 
+// `provision-pi.sh`/`bootstrap-pi.sh` installs the same-named unit at
+// provisioning time with a pigpiod ordering dependency and
+// RUNTIME_FLEET_CONFIG/PENNAIR_MISSION_STARTED_MARKER_PATH env vars (see
+// `controls/sae_2025_ws/scripts/hardware/bootstrap-pi.sh`'s
+// `install_systemd_unit`, and `mode_manager.py`'s marker-path lookup, which
+// falls back to a throwaway /tmp path without that env var). Every deploy
+// re-installs this same unit, so it must keep matching that shape -- setting
+// these at the *unit* level (not just in the runner script) also means
+// they're present in the process environment from the very start, so they
+// reach the exec'd `ros2 launch` process even though the runner script's own
+// internal shell variables mostly aren't exported.
 function systemdUnitText(paths: DeployPaths): string {
   return `[Unit]
 Description=PennAiR autonomy runtime
-After=network-online.target
-Wants=network-online.target
+After=network-online.target pigpiod.service
+Wants=network-online.target pigpiod.service
 
 [Service]
 Type=simple
 User=${PI_USER}
 WorkingDirectory=${paths.deployRoot}
+Environment=DEPLOY_ROOT=${paths.deployRoot}
+Environment=RUNTIME_FLEET_CONFIG=${paths.runtimeFleet}
+Environment=PENNAIR_MISSION_STARTED_MARKER_PATH=${paths.deployRoot}/state/mission-started
 ExecStart=${paths.runnerScript}
 Restart=on-failure
 RestartSec=2
@@ -206,22 +258,13 @@ async function revertToPrevious(
   return { success: false, error: errorMessage };
 }
 
-/**
- * Restarts the runtime service and polls for up to 8 seconds that it's
- * actually stably running (active+running, with a main PID that doesn't
- * change and a restart count that doesn't increment) before declaring
- * success -- an unstable/failed activation automatically rolls back to
- * `previousTarget` if one is available. Mirrors the old dashboard's
- * `_activate_release` bash loop, just as real TS control flow instead of a
- * bash heredoc polling `systemctl show` in a `while` loop.
- */
-export async function activateRelease(
+async function activateReleaseUnlocked(
   releaseDir: string,
   previousTarget: string,
-  run: CommandRunner = runCommand,
-  wait: (ms: number) => Promise<void> = delay,
-  now: () => number = Date.now,
-  paths: DeployPaths = deployPaths(),
+  run: CommandRunner,
+  wait: (ms: number) => Promise<void>,
+  now: () => number,
+  paths: DeployPaths,
 ): Promise<SimpleResult> {
   const restart = await run("sudo", ["-n", "systemctl", "restart", SERVICE_NAME], 15_000);
   if (restart.code !== 0) {
@@ -265,17 +308,31 @@ export async function activateRelease(
 }
 
 /**
- * A deliberate, operator-triggered "go back to the previous release" action
- * -- distinct from activateRelease's automatic rollback-on-failure. Swaps
- * current/previous symlinks (so a second rollback undoes the first, same as
- * the old dashboard's `rollback_build`), then reactivates through the same
- * health-check path.
+ * Restarts the runtime service and polls for up to 8 seconds that it's
+ * actually stably running (active+running, with a main PID that doesn't
+ * change and a restart count that doesn't increment) before declaring
+ * success -- an unstable/failed activation automatically rolls back to
+ * `previousTarget` if one is available. Mirrors the old dashboard's
+ * `_activate_release` bash loop, just as real TS control flow instead of a
+ * bash heredoc polling `systemctl show` in a `while` loop. Serialized against
+ * concurrent deploys/rollbacks via `withDeployLock`.
  */
-export async function rollbackRelease(
+export function activateRelease(
+  releaseDir: string,
+  previousTarget: string,
   run: CommandRunner = runCommand,
   wait: (ms: number) => Promise<void> = delay,
   now: () => number = Date.now,
   paths: DeployPaths = deployPaths(),
+): Promise<SimpleResult> {
+  return withDeployLock(() => activateReleaseUnlocked(releaseDir, previousTarget, run, wait, now, paths));
+}
+
+async function rollbackReleaseUnlocked(
+  run: CommandRunner,
+  wait: (ms: number) => Promise<void>,
+  now: () => number,
+  paths: DeployPaths,
 ): Promise<SimpleResult> {
   if (!(await pathExists(paths.previousLink))) {
     return { success: false, error: "No previous release to roll back to" };
@@ -292,7 +349,24 @@ export async function rollbackRelease(
     await symlinkForce(currentTarget, paths.previousLink);
   }
 
-  return activateRelease(previousTarget, currentTarget, run, wait, now, paths);
+  return activateReleaseUnlocked(previousTarget, currentTarget, run, wait, now, paths);
+}
+
+/**
+ * A deliberate, operator-triggered "go back to the previous release" action
+ * -- distinct from activateRelease's automatic rollback-on-failure. Swaps
+ * current/previous symlinks (so a second rollback undoes the first, same as
+ * the old dashboard's `rollback_build`), then reactivates through the same
+ * health-check path. Serialized against concurrent deploys/rollbacks via
+ * `withDeployLock`.
+ */
+export function rollbackRelease(
+  run: CommandRunner = runCommand,
+  wait: (ms: number) => Promise<void> = delay,
+  now: () => number = Date.now,
+  paths: DeployPaths = deployPaths(),
+): Promise<SimpleResult> {
+  return withDeployLock(() => rollbackReleaseUnlocked(run, wait, now, paths));
 }
 
 // ---------------------------------------------------------------------------
@@ -381,37 +455,46 @@ export interface DeployArtifactResult extends SimpleResult {
   releaseId?: string;
 }
 
-export async function deployArtifact(
+/**
+ * The whole extract -> install service -> write metadata -> activate
+ * sequence runs under a single lock acquisition (not one per sub-step), so a
+ * concurrent deploy or rollback can't interleave between, say, this call's
+ * extraction and its own activation/rollback -- which could otherwise revert
+ * a different, concurrently-deployed release out from under it.
+ */
+export function deployArtifact(
   options: DeployArtifactOptions,
   run: CommandRunner = runCommand,
   wait: (ms: number) => Promise<void> = delay,
   now: () => number = Date.now,
   paths: DeployPaths = deployPaths(),
 ): Promise<DeployArtifactResult> {
-  const { releaseId, releaseDir, previousTarget } = await extractRelease(
-    options.artifactPath,
-    options.artifactName,
-    paths,
-    now,
-  );
+  return withDeployLock(async () => {
+    const { releaseId, releaseDir, previousTarget } = await extractReleaseUnlocked(
+      options.artifactPath,
+      options.artifactName,
+      paths,
+      now,
+    );
 
-  const serviceResult = await ensureRuntimeService(run, paths);
-  if (!serviceResult.success) {
-    // Extraction already succeeded at this point -- report which release it
-    // was, even though it never got activated, rather than dropping that
-    // diagnostic detail just because this particular stage failed.
-    return { ...serviceResult, releaseId };
-  }
+    const serviceResult = await ensureRuntimeService(run, paths);
+    if (!serviceResult.success) {
+      // Extraction already succeeded at this point -- report which release it
+      // was, even though it never got activated, rather than dropping that
+      // diagnostic detail just because this particular stage failed.
+      return { ...serviceResult, releaseId };
+    }
 
-  await writeReleaseMetadata(releaseDir, {
-    releaseId,
-    sourceType: options.sourceType,
-    sourceLabel: options.sourceLabel,
-    vehicleName: options.vehicleName,
-    fleetFile: options.fleetFile,
-    deployedAtUtc: new Date(now()).toISOString(),
+    await writeReleaseMetadata(releaseDir, {
+      releaseId,
+      sourceType: options.sourceType,
+      sourceLabel: options.sourceLabel,
+      vehicleName: options.vehicleName,
+      fleetFile: options.fleetFile,
+      deployedAtUtc: new Date(now()).toISOString(),
+    });
+
+    const activation = await activateReleaseUnlocked(releaseDir, previousTarget, run, wait, now, paths);
+    return { ...activation, releaseId };
   });
-
-  const activation = await activateRelease(releaseDir, previousTarget, run, wait, now, paths);
-  return { ...activation, releaseId };
 }

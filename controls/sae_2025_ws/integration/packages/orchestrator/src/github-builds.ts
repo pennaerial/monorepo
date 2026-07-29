@@ -159,6 +159,39 @@ async function collectReleases(repo: string, headers: Record<string, string>, fe
   return releases;
 }
 
+// A filtered query has no native GitHub-side filter to page against, so it
+// has to walk multiple raw pages looking for matches -- bounded so a plain
+// search-box query can't walk a whole artifact history and exhaust the rate
+// limit on one request.
+const MAX_FILTERED_ARTIFACT_PAGES = 20;
+
+async function fetchArtifactPage(
+  repo: string,
+  headers: Record<string, string>,
+  fetchImpl: typeof fetch,
+  artifactPageSize: number,
+  page: number,
+): Promise<Record<string, unknown>[]> {
+  const response = await fetchImpl(
+    `https://api.github.com/repos/${repo}/actions/artifacts?per_page=${artifactPageSize}&page=${page}`,
+    { headers },
+  );
+  if (!response.ok) {
+    throw Object.assign(new Error(`GitHub artifacts request failed: ${response.status}`), { response });
+  }
+  const payload = (await response.json()) as { artifacts?: Record<string, unknown>[] };
+  return payload.artifacts ?? [];
+}
+
+/**
+ * Unfiltered: returns exactly the requested page's raw rows (one GitHub
+ * request), matching normal page-cursor semantics -- a client asking for page
+ * 2 gets page 2, not page 1 concatenated with page 2.
+ *
+ * Filtered: there's no GitHub-side filter to page against, so this walks
+ * pages from the start looking for matches, capped at
+ * MAX_FILTERED_ARTIFACT_PAGES raw pages.
+ */
 async function collectArtifacts(
   repo: string,
   headers: Record<string, string>,
@@ -166,23 +199,19 @@ async function collectArtifacts(
   artifactPageSize: number,
   artifactPage: number,
   filtersActive: boolean,
-) {
-  const rows: Record<string, unknown>[] = [];
-  for (let page = 1; ; page++) {
-    const response = await fetchImpl(
-      `https://api.github.com/repos/${repo}/actions/artifacts?per_page=${artifactPageSize}&page=${page}`,
-      { headers },
-    );
-    if (!response.ok) {
-      throw Object.assign(new Error(`GitHub artifacts request failed: ${response.status}`), { response });
-    }
-    const payload = (await response.json()) as { artifacts?: Record<string, unknown>[] };
-    const pageRows = payload.artifacts ?? [];
-    rows.push(...pageRows);
-    if (pageRows.length === 0 || pageRows.length < artifactPageSize) break;
-    if (!filtersActive && page >= artifactPage) break;
+): Promise<{ rows: Record<string, unknown>[]; hasMore: boolean }> {
+  if (!filtersActive) {
+    const rows = await fetchArtifactPage(repo, headers, fetchImpl, artifactPageSize, artifactPage);
+    return { rows, hasMore: rows.length >= artifactPageSize };
   }
-  return rows;
+
+  const rows: Record<string, unknown>[] = [];
+  for (let page = 1; page <= MAX_FILTERED_ARTIFACT_PAGES; page++) {
+    const pageRows = await fetchArtifactPage(repo, headers, fetchImpl, artifactPageSize, page);
+    rows.push(...pageRows);
+    if (pageRows.length < artifactPageSize) return { rows, hasMore: false };
+  }
+  return { rows, hasMore: true };
 }
 
 async function commitSubjectFor(
@@ -288,10 +317,11 @@ export async function listBuilds(options: ListBuildsOptions): Promise<ListBuilds
   const headers = githubHeaders(options.githubToken);
 
   try {
-    const [rawReleases, rawArtifacts] = await Promise.all([
+    const [rawReleases, artifactPageResult] = await Promise.all([
       collectReleases(options.githubRepo, headers, fetchImpl),
       collectArtifacts(options.githubRepo, headers, fetchImpl, artifactPageSize, artifactPage, filtersActive),
     ]);
+    const { rows: rawArtifacts, hasMore: artifactHasMore } = artifactPageResult;
 
     const releaseRows = rawReleases.filter((r) => String(r.tag_name ?? "").startsWith("build-"));
     const deployableArtifactRows = rawArtifacts.filter(
@@ -374,7 +404,7 @@ export async function listBuilds(options: ListBuildsOptions): Promise<ListBuilds
       artifacts: artifactBuilds,
       artifactPage: filtersActive ? 1 : artifactPage,
       artifactPageSize,
-      artifactHasMore: filtersActive ? false : deployableArtifactRows.length >= artifactPageSize,
+      artifactHasMore,
       error: commitLookupState.message,
     };
     buildListCache.set(key, { at: now(), payload: result });

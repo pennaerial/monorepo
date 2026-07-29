@@ -55,7 +55,9 @@ describe("deploy.ts (real filesystem, faked systemctl)", () => {
 
       const result = await extractRelease(artifactPath, "build.tar.gz", paths, now);
 
-      expect(result.releaseId).toBe("20260115-103000-build");
+      // A random suffix is appended so same-second, same-filename deploys
+      // never collide on releaseId (see deploy-concurrency.test.ts).
+      expect(result.releaseId).toMatch(/^20260115-103000-build-[0-9a-f]{6}$/);
       expect(await pathExists(`${result.releaseDir}/install/marker.txt`)).toBe(true);
       expect(await resolveSymlinkTarget(paths.currentLink)).toBe(result.releaseDir);
       expect(await pathExists(artifactPath)).toBe(false); // artifact cleaned up after extraction

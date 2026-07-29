@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile } from "node:fs/promises";
+import { access, mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { createWriteStream } from "node:fs";
 import { pipeline } from "node:stream/promises";
 import { Readable } from "node:stream";
@@ -32,12 +32,17 @@ export interface ResolveFleetCatalogOptions {
 
 async function pathExists(path: string): Promise<boolean> {
   try {
-    await readFile(path);
+    await access(path);
     return true;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "EISDIR") return true;
+  } catch {
     return false;
   }
+}
+
+/** size+mtime fingerprint, cheap to compute, good enough to detect a re-upload replacing the file at the same path. */
+async function archiveFingerprint(path: string): Promise<string> {
+  const stats = await stat(path);
+  return `${stats.size}-${stats.mtimeMs}`;
 }
 
 function isFleetYamlMember(memberName: string): boolean {
@@ -174,10 +179,22 @@ export async function resolveFleetCatalog(options: ResolveFleetCatalogOptions): 
     if (!(await pathExists(artifactPath))) {
       return { catalog: {}, source: artifactPath, error: "Selected local artifact no longer exists." };
     }
-    const extractDir = join(options.cacheRoot, catalogCacheKey(record), "extract");
+    const catalogDir = join(options.cacheRoot, catalogCacheKey(record));
+    const extractDir = join(catalogDir, "extract");
+    const fingerprintPath = join(catalogDir, "source.fingerprint");
     try {
-      if (!(await pathExists(extractDir))) {
+      // The cache key is the saved artifact's path, which stays the same
+      // across repeat uploads of a same-named file (a very normal workflow
+      // when iterating locally) -- an existing extractDir alone isn't proof
+      // it still matches the *current* file on disk, so re-extract whenever
+      // the file's size/mtime has changed since the cached extraction.
+      const currentFingerprint = await archiveFingerprint(artifactPath);
+      const previousFingerprint = await readFile(fingerprintPath, "utf-8").catch(() => null);
+      if (previousFingerprint !== currentFingerprint) {
+        await rm(extractDir, { recursive: true, force: true });
         await extractFleetYamlFromTarGz(artifactPath, extractDir);
+        await mkdir(catalogDir, { recursive: true });
+        await writeFile(fingerprintPath, currentFingerprint, "utf-8");
       }
       const paths = await catalogYamlPaths(extractDir);
       return { catalog: fleetCatalogLookupFromPaths(paths), source: artifactPath, error: null };

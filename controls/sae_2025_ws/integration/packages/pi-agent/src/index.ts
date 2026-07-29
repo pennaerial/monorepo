@@ -1,5 +1,5 @@
 import { createWriteStream } from "node:fs";
-import { mkdir } from "node:fs/promises";
+import { mkdir, rm } from "node:fs/promises";
 import { pipeline } from "node:stream/promises";
 import Fastify from "fastify";
 import websocketPlugin from "@fastify/websocket";
@@ -54,17 +54,26 @@ export function buildServer() {
     let vehicleName: string | undefined;
     let fleetFile: string | undefined;
 
-    for await (const part of request.parts()) {
-      if (part.type === "file") {
-        artifactPath = `${paths.incomingDir}/${part.filename}`;
-        await pipeline(part.file, createWriteStream(artifactPath));
-      } else {
-        const value = String(part.value ?? "");
-        if (part.fieldname === "sourceType") sourceType = value;
-        else if (part.fieldname === "sourceLabel") sourceLabel = value;
-        else if (part.fieldname === "vehicleName") vehicleName = value || undefined;
-        else if (part.fieldname === "fleetFile") fleetFile = value || undefined;
+    try {
+      for await (const part of request.parts()) {
+        if (part.type === "file") {
+          artifactPath = `${paths.incomingDir}/${part.filename}`;
+          await pipeline(part.file, createWriteStream(artifactPath));
+        } else {
+          const value = String(part.value ?? "");
+          if (part.fieldname === "sourceType") sourceType = value;
+          else if (part.fieldname === "sourceLabel") sourceLabel = value;
+          else if (part.fieldname === "vehicleName") vehicleName = value || undefined;
+          else if (part.fieldname === "fleetFile") fleetFile = value || undefined;
+        }
       }
+    } catch (error) {
+      // A disconnect/network error mid-upload leaves a partial file behind
+      // unless we clean it up here -- nothing downstream (extractRelease's
+      // own cleanup) ever runs for an artifact that never finished uploading.
+      if (artifactPath) await rm(artifactPath, { force: true }).catch(() => undefined);
+      reply.code(400);
+      return { success: false, error: `Upload failed: ${(error as Error).message}` };
     }
 
     if (!artifactPath) {
@@ -73,14 +82,20 @@ export function buildServer() {
     }
 
     const filename = artifactPath.split("/").pop() ?? "artifact.tar.gz";
-    return deployArtifact({
-      artifactPath,
-      artifactName: filename,
-      sourceType: sourceType || "unknown",
-      sourceLabel: sourceLabel || filename,
-      vehicleName,
-      fleetFile,
-    });
+    try {
+      return await deployArtifact({
+        artifactPath,
+        artifactName: filename,
+        sourceType: sourceType || "unknown",
+        sourceLabel: sourceLabel || filename,
+        vehicleName,
+        fleetFile,
+      });
+    } catch (error) {
+      await rm(artifactPath, { force: true }).catch(() => undefined);
+      reply.code(500);
+      return { success: false, error: (error as Error).message };
+    }
   });
 
   app.register(async (instance) => {
