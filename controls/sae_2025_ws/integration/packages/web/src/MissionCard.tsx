@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { OrchestratorClient, type LaunchStatus } from "@pennair/integration-core";
-
-const ORCHESTRATOR_URL = import.meta.env.VITE_ORCHESTRATOR_URL ?? "http://localhost:8080";
-const client = new OrchestratorClient({ baseUrl: ORCHESTRATOR_URL });
+import type { LaunchStatus } from "@pennair/integration-core";
+import { client } from "./orchestratorClient.js";
 
 export function MissionCard({ hostname }: { hostname: string }) {
   const [vehicleName, setVehicleName] = useState("");

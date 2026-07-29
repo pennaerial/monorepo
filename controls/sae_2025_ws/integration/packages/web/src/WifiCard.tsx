@@ -1,8 +1,6 @@
 import { useState } from "react";
-import { OrchestratorClient, type WifiNetwork, type WifiStatus } from "@pennair/integration-core";
-
-const ORCHESTRATOR_URL = import.meta.env.VITE_ORCHESTRATOR_URL ?? "http://localhost:8080";
-const client = new OrchestratorClient({ baseUrl: ORCHESTRATOR_URL });
+import type { WifiNetwork, WifiStatus } from "@pennair/integration-core";
+import { client } from "./orchestratorClient.js";
 
 export function WifiCard({ hostname }: { hostname: string }) {
   const [status, setStatus] = useState<WifiStatus | null>(null);

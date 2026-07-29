@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import {
-  OrchestratorClient,
   normalizeFleetEditorDocument,
   normalizeIntegrationFleetDocument,
   parseFleetEditorDocument,
@@ -14,9 +13,7 @@ import {
   type SchemaField,
 } from "@pennair/integration-core";
 import { SchemaValueInput } from "./SchemaValueInput.js";
-
-const ORCHESTRATOR_URL = import.meta.env.VITE_ORCHESTRATOR_URL ?? "http://localhost:8080";
-const client = new OrchestratorClient({ baseUrl: ORCHESTRATOR_URL });
+import { client } from "./orchestratorClient.js";
 
 function FleetFieldInput({
   field,

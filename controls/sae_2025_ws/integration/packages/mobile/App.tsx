@@ -1,12 +1,9 @@
 import { useEffect, useState } from "react";
 import { Button, ScrollView, Text, TextInput } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
-import { OrchestratorClient } from "@pennair/integration-core";
 import { WifiScreen } from "./WifiScreen.js";
 import { MissionScreen } from "./MissionScreen.js";
-
-const ORCHESTRATOR_URL = process.env.EXPO_PUBLIC_ORCHESTRATOR_URL ?? "http://localhost:8080";
-const client = new OrchestratorClient({ baseUrl: ORCHESTRATOR_URL });
+import { client } from "./orchestratorClient.js";
 
 function Dashboard() {
   const [pis, setPis] = useState<string[]>([]);

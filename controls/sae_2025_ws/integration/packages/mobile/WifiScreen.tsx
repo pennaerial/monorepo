@@ -1,11 +1,7 @@
 import { useState } from "react";
 import { Button, Text, TextInput, View } from "react-native";
-import { OrchestratorClient, type WifiNetwork, type WifiStatus } from "@pennair/integration-core";
-
-// Same idea as the web env var, just React Native's convention instead of
-// Vite's -- see WifiCard.tsx in packages/web for the shared OrchestratorClient logic.
-const ORCHESTRATOR_URL = process.env.EXPO_PUBLIC_ORCHESTRATOR_URL ?? "http://localhost:8080";
-const client = new OrchestratorClient({ baseUrl: ORCHESTRATOR_URL });
+import type { WifiNetwork, WifiStatus } from "@pennair/integration-core";
+import { client } from "./orchestratorClient.js";
 
 export function WifiScreen({ hostname }: { hostname: string }) {
   const [status, setStatus] = useState<WifiStatus | null>(null);

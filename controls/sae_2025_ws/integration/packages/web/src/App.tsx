@@ -1,13 +1,10 @@
 import { useEffect, useState } from "react";
-import { OrchestratorClient } from "@pennair/integration-core";
+import { client } from "./orchestratorClient.js";
 import { WifiCard } from "./WifiCard.js";
 import { MissionCard } from "./MissionCard.js";
 import { MissionEditor } from "./MissionEditor.js";
 import { FleetEditor } from "./FleetEditor.js";
 import { FleetBoard } from "./FleetBoard.js";
-
-const ORCHESTRATOR_URL = import.meta.env.VITE_ORCHESTRATOR_URL ?? "http://localhost:8080";
-const client = new OrchestratorClient({ baseUrl: ORCHESTRATOR_URL });
 
 export function App() {
   const [pis, setPis] = useState<string[]>([]);

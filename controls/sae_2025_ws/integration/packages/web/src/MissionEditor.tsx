@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import {
-  OrchestratorClient,
   defaultParamsRawForMode,
   effectiveSchemaFieldValue,
   fieldHelpText,
@@ -18,9 +17,7 @@ import {
   type SchemaField,
 } from "@pennair/integration-core";
 import { SchemaValueInput } from "./SchemaValueInput.js";
-
-const ORCHESTRATOR_URL = import.meta.env.VITE_ORCHESTRATOR_URL ?? "http://localhost:8080";
-const client = new OrchestratorClient({ baseUrl: ORCHESTRATOR_URL });
+import { client } from "./orchestratorClient.js";
 
 /** "start" is the mission entrypoint mode name by convention (mirrors the old dashboard's reserved-name rule) -- renaming or removing it would break the mission. */
 const RESERVED_MODE_NAME = "start";
