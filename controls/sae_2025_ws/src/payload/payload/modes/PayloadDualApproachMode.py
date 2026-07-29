@@ -421,8 +421,3 @@ class PayloadDualApproachMode(Mode):
 
     def on_exit(self) -> None:
         self.vehicle.stop()
-
-    @classmethod
-    @override
-    def get_params_cls(cls) -> type[BaseModel]:
-        return PayloadDualApproachParams

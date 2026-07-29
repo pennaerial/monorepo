@@ -21,7 +21,12 @@ class NavGPSParams(BaseModel):
     margin: float = 1
 
 
-@register_mode(id="uav.NavGPSMode", targets=[UAV], transition_labels=["complete"])
+@register_mode(
+    id="uav.NavGPSMode",
+    params_cls=NavGPSParams,
+    targets=[UAV],
+    transition_labels=["complete"]
+)
 class NavGPSMode(Mode[UAV, NavGPSParams]):
     """
     A mode for navigating to a GPS coordinate
@@ -153,8 +158,3 @@ class NavGPSMode(Mode[UAV, NavGPSParams]):
             return "complete"
         else:
             return "continue"
-
-    @classmethod
-    @override
-    def get_params_cls(cls) -> type[BaseModel]:
-        return NavGPSParams

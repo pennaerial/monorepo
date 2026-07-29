@@ -6,7 +6,6 @@ import pkgutil
 
 from pydantic import BaseModel, ConfigDict, field_validator, field_serializer
 
-
 from vehicle_common.mode import Mode
 from vehicle_common.vehicle import Vehicle
 from vehicle_common.base import VisionNode  # don't want to depend on uav package
@@ -57,14 +56,20 @@ class RegisteredMode(BaseModel):
 
     id: str
     mode_cls: type[Mode]
+    params_cls: type[BaseModel] = BaseModel
     targets: list[type[Vehicle]] = []
     required_vision_nodes: list[type[VisionNode]] = []
     peer_vehicle_names: list[str] = []
     requires_camera: bool = False
     transition_labels: list[str] = []
 
+    # define field serializers if we want future static inspection w/ JSONs
     @field_serializer("mode_cls")
     def serialize_mode_cls(self, value: type[Mode]) -> str:
+        return serialize_type(value)
+
+    @field_serializer("params_cls")
+    def serialize_params_cls(self, value: type[BaseModel]) -> str:
         return serialize_type(value)
 
     @field_serializer("targets")
@@ -77,7 +82,6 @@ class RegisteredMode(BaseModel):
 
     # Each field_validator needs to support both actual types and strings so
     # manual instantiation and loading from json is valid
-
     @field_validator("mode_cls", mode="before")
     @classmethod
     def deserialize_mode_cls(cls, path) -> type[Mode]:
@@ -159,6 +163,7 @@ class ModeRegistry(BaseModel):
 def register_mode(
     id: str,
     targets: list[type[Vehicle]],
+    params_cls: type[BaseModel] = BaseModel,
     required_vision_nodes: list[type[VisionNode]] = [],
     peer_vehicle_names: list[str] = [],
     requires_camera: bool = False,
@@ -189,6 +194,7 @@ def register_mode(
                 id=id,
                 targets=targets,
                 mode_cls=registered_mode_cls,
+                params_cls=params_cls,
                 required_vision_nodes=required_vision_nodes,
                 peer_vehicle_names=peer_vehicle_names,
                 requires_camera=requires_camera,

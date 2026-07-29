@@ -110,6 +110,7 @@ class PayloadCornerNavigateParams(BaseModel):
 
 @register_mode(
     id="payload.PayloadCornerNavigateMode",
+    params_cls=PayloadCornerNavigateParams,
     targets=[Payload],
     transition_labels=["complete"],
     requires_camera=True,
@@ -1244,8 +1245,3 @@ class PayloadCornerNavigateMode(Mode):
             62,
         )
         self._publish_annotated(debug)
-
-    @classmethod
-    @override
-    def get_params_cls(cls) -> type[BaseModel]:
-        return PayloadCornerNavigateParams

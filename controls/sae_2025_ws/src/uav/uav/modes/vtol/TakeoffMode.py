@@ -22,7 +22,12 @@ class TakeoffParams(BaseModel):
     altitude: float = float("nan")
 
 
-@register_mode(id="uav.vtol.TakeoffMode", targets=[UAV], transition_labels=["complete"])
+@register_mode(
+    id="uav.vtol.TakeoffMode",
+    params_cls=TakeoffParams,
+    targets=[UAV],
+    transition_labels=["complete"]
+)
 class TakeoffMode(Mode):
     """
     A VTOL takeoff mode that supports both vertical and runway-style launches.
@@ -177,8 +182,3 @@ class TakeoffMode(Mode):
             self.log("Takeoff complete, in offboard mode.")
             return "complete"
         return "continue"
-
-    @classmethod
-    @override
-    def get_params_cls(cls) -> type[BaseModel]:
-        return TakeoffParams

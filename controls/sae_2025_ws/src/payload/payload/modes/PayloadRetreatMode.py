@@ -26,6 +26,8 @@ from vehicle_common.mode_loader import register_mode
 from payload.payload import Payload
 from uav.vision_nodes import PayloadAprilTagNode
 
+from controls.sae_2025_ws.src.payload.payload.modes.PayloadWaitForDriveOutMode import PayloadWaitForDriveOutParams
+
 # HSV range for white (high value, low saturation)
 _WHITE_LOWER = np.array([0, 0, 200], dtype=np.uint8)
 _WHITE_UPPER = np.array([180, 30, 255], dtype=np.uint8)
@@ -47,6 +49,7 @@ class PayloadRetreatParams(BaseModel):
 
 @register_mode(
     id="payload.PayloadRetreatMode",
+    params_cls=PayloadWaitForDriveOutParams,
     targets=[Payload],
     required_vision_nodes=[PayloadAprilTagNode],
 )
@@ -288,8 +291,3 @@ class PayloadRetreatMode(Mode):
         self._drive_pub.publish(
             DriveCommand(linear=float(linear), angular=float(angular))
         )
-
-    @classmethod
-    @override
-    def get_params_cls(cls) -> type[BaseModel]:
-        return PayloadRetreatParams

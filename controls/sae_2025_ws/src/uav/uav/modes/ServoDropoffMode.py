@@ -18,7 +18,12 @@ class ServoDropoffParams(BaseModel):
     camera_offsets: Optional[Tuple[float, float, float]] = (0.0, 0.0, 0.0)
 
 
-@register_mode(id="uav.ServoDropoffMode", targets=[UAV], transition_labels=["complete"])
+@register_mode(
+    id="uav.ServoDropoffMode",
+    params_cls=ServoDropoffParams,
+    targets=[UAV],
+    transition_labels=["complete"]
+)
 class ServoDropoffMode(Mode):
     """
     A mode for dropping off the payload.
@@ -63,8 +68,3 @@ class ServoDropoffMode(Mode):
         if self.done:
             return "complete"
         return "continue"
-
-    @classmethod
-    @override
-    def get_params_cls(cls) -> type[BaseModel]:
-        return ServoDropoffParams

@@ -21,7 +21,11 @@ class WaypointMissionParams(BaseModel):
     altitude: float = 2.0
 
 
-@register_mode(id="uav.WaypointMission", targets=[UAV])
+@register_mode(
+    id="uav.WaypointMission",
+    params_cls=WaypointMissionParams,
+    targets=[UAV]
+)
 class WaypointMission(Mode):
     """
     Simple waypoint mission for testing scoring node.
@@ -146,12 +150,6 @@ class WaypointMission(Mode):
         """Arm the vehicle."""
         self.vehicle.arm()
         self.node.get_logger().info("Arming vehicle...")
-
-    @classmethod
-    @override
-    def get_params_cls(cls) -> type[BaseModel]:
-        return WaypointMissionParams
-
 
 def main(args=None):
     rclpy.init(args=args)

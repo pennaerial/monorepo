@@ -24,6 +24,7 @@ class PayloadDropoffParams(BaseModel):
 
 @register_mode(
     id="uav.PayloadDropoffMode",
+    params_cls=PayloadDropoffParams,
     targets=[UAV],
     required_vision_nodes=[PayloadTrackingNode],
     transition_labels=["complete"],
@@ -134,8 +135,3 @@ class PayloadDropoffMode(Mode):
         if self.done:
             return "complete"
         return "continue"
-
-    @classmethod
-    @override
-    def get_params_cls(cls) -> type[BaseModel]:
-        return PayloadDropoffParams

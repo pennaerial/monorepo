@@ -74,6 +74,7 @@ class DriveOutState(Enum):
 
 @register_mode(
     id="payload.PayloadWaitForDriveOutMode",
+    params_cls=PayloadWaitForDriveOutParams,
     targets=[Payload],
     transition_labels=["complete"],
     requires_camera=True,
@@ -373,8 +374,3 @@ class PayloadWaitForDriveOutMode(Mode):
 
     def on_exit(self) -> None:
         pass
-
-    @classmethod
-    @override
-    def get_params_cls(cls) -> type[BaseModel]:
-        return PayloadWaitForDriveOutParams

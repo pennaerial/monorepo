@@ -1,18 +1,11 @@
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, ClassVar, Mapping
+from typing import ClassVar, Mapping
+
+from rclpy.node import Node
+from pydantic import BaseModel
 
 from vehicle_common.vehicle import Vehicle
 from vehicle_common.runtime.vision_loader import canonical_vision_node_path
-from pydantic import BaseModel
-
-if TYPE_CHECKING:
-    from rclpy.node import Node
-    from vehicle_common.base import VisionNode
-else:
-    # Avoid forcing ROS imports on pure-Python consumers (mission/fleet spec loading, integration backend)
-    # Node is annotation-only but must exist at runtime for get_type_hints().
-    Node = object
-
 
 class Mode[VehicleT: Vehicle, ParamsT: BaseModel](ABC):
     """
@@ -30,7 +23,7 @@ class Mode[VehicleT: Vehicle, ParamsT: BaseModel](ABC):
     pending_requests = {}
 
     @abstractmethod
-    def initialize(self, node: Node, vehicle: VehicleT, params: ParamsT):
+    def initialize(self, node: Node, vehicle: VehicleT, params: ParamsT) -> None:
         """Abstract method for initializing a mode
 
         Args:
@@ -38,10 +31,6 @@ class Mode[VehicleT: Vehicle, ParamsT: BaseModel](ABC):
             vehicle: The vehicle instance that the current mode has control over
             params: A validated pydantic params model that the mode class has defined
         """
-
-    @abstractmethod
-    def get_params_cls(self) -> type[BaseModel]:
-        """Get the Pydantic params model defined for this Mode subclass. Used for validating and instantiating the mode"""
 
     @classmethod
     def required_vision_node_paths(cls) -> tuple[str, ...]:

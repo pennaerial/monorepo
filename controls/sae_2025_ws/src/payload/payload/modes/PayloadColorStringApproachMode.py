@@ -107,6 +107,7 @@ class PayloadColorStringApproachParams(BaseModel):
 
 @register_mode(
     id="payload.PayloadColorStringApproachMode",
+    params_cls=PayloadColorStringApproachParams,
     targets=[Payload],
     requires_camera=True,
 )
@@ -299,8 +300,3 @@ class PayloadColorStringApproachMode(Mode):
 
     def on_exit(self) -> None:
         self.vehicle.stop()
-
-    @classmethod
-    @override
-    def get_params_cls(cls) -> type[BaseModel]:
-        return PayloadColorStringApproachParams

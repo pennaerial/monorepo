@@ -21,7 +21,10 @@ class VerticalTakeoffParams(BaseModel):
 
 
 @register_mode(
-    id="uav.VerticalTakeoffMode", targets=[UAV], transition_labels=["complete"]
+    id="uav.VerticalTakeoffMode",
+    params_cls=VerticalTakeoffParams,
+    targets=[UAV],
+    transition_labels=["complete"]
 )
 class VerticalTakeoffMode(Mode):
     """Vertical takeoff for any UAV airframe (multicopter or VTOL)."""
@@ -138,8 +141,3 @@ class VerticalTakeoffMode(Mode):
                 return "complete"
 
         return "continue"
-
-    @classmethod
-    @override
-    def get_params_cls(cls) -> type[BaseModel]:
-        return VerticalTakeoffParams

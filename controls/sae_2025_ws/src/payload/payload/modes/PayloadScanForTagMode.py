@@ -32,6 +32,7 @@ class PayloadScanForTagParams(BaseModel):
 
 @register_mode(
     id="payload.PayloadScanForTagMode",
+    params_cls=PayloadScanForTagParams,
     targets=[Payload],
     required_vision_nodes=[PayloadAprilTagNode],
     transition_labels=["found", "not_found"],
@@ -210,8 +211,3 @@ class PayloadScanForTagMode(Mode):
         if self._annotated_pub is not None:
             self.node.destroy_publisher(self._annotated_pub)
             self._annotated_pub = None
-
-    @classmethod
-    @override
-    def get_params_cls(cls) -> type[BaseModel]:
-        return PayloadScanForTagParams

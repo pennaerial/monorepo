@@ -49,6 +49,7 @@ class PayloadAprilTagApproachParams(BaseModel):
 
 @register_mode(
     id="payload.PayloadAprilTagApproachMode",
+    params_cls=PayloadAprilTagApproachParams,
     targets=[Payload],
     transition_labels=["done", "tag_lost"],
     requires_camera=True,
@@ -274,8 +275,3 @@ class PayloadAprilTagApproachMode(Mode):
 
     def on_exit(self) -> None:
         self.vehicle.stop()
-
-    @classmethod
-    @override
-    def get_params_cls(cls) -> type[BaseModel]:
-        return PayloadAprilTagApproachParams

@@ -18,6 +18,7 @@ class PayloadPickupParams(BaseModel):
 
 @register_mode(
     id="uav.PayloadPickupMode",
+    params_cls=PayloadPickupParams,
     targets=[UAV],
     required_vision_nodes=[PayloadTrackingNode],
     transition_labels=["complete"],
@@ -112,8 +113,3 @@ class PayloadPickupMode(Mode):
         if self.done:
             return "complete"
         return "continue"
-
-    @classmethod
-    @override
-    def get_params_cls(cls) -> type[BaseModel]:
-        return PayloadPickupParams
