@@ -283,3 +283,112 @@ describe("orchestrator deploy relay to a real local pi-agent instance", () => {
     await orchestrator.close();
   });
 });
+
+describe("orchestrator mission/fleet-file/schema relay to a real local pi-agent instance", () => {
+  let scratchRoot: string;
+  let piAgent: ReturnType<typeof buildPiAgentServer>;
+  let piAgentPort: number;
+  const originalPiAgentPortEnv = process.env.PI_AGENT_PORT;
+  const originalDeployRoot = process.env.DEPLOY_ROOT;
+
+  beforeAll(async () => {
+    scratchRoot = await mkdtemp(join(tmpdir(), "orchestrator-mission-fleet-relay-test-"));
+    process.env.DEPLOY_ROOT = scratchRoot;
+
+    const releaseDir = join(scratchRoot, "releases", "20260101-000000-test");
+    await mkdir(join(releaseDir, "install", "uav", "share", "uav", "missions"), { recursive: true });
+    await mkdir(join(releaseDir, "install", "uav", "share", "uav", "fleets"), { recursive: true });
+    await writeFile(
+      join(releaseDir, "install", "uav", "share", "uav", "missions", "patrol.yaml"),
+      "modes:\n  start:\n    mode: uav.LandingMode\n",
+      "utf-8",
+    );
+    await writeFile(
+      join(releaseDir, "install", "uav", "share", "uav", "fleets", "example_fleet.yaml"),
+      "backend:\n  kind: hardware\nvehicles: []\n",
+      "utf-8",
+    );
+    const { symlink } = await import("node:fs/promises");
+    await symlink(releaseDir, join(scratchRoot, "current"));
+
+    piAgent = buildPiAgentServer();
+    await piAgent.listen({ port: 0, host: "127.0.0.1" });
+    const address = piAgent.server.address();
+    if (typeof address === "string" || address === null) {
+      throw new Error("expected pi-agent to listen on a TCP port");
+    }
+    piAgentPort = address.port;
+    process.env.PI_AGENT_PORT = String(piAgentPort);
+  });
+
+  afterAll(async () => {
+    await piAgent.close();
+    process.env.PI_AGENT_PORT = originalPiAgentPortEnv;
+    process.env.DEPLOY_ROOT = originalDeployRoot;
+    await rm(scratchRoot, { recursive: true, force: true });
+  });
+
+  it("relays /api/mission/mission-names to the real pi-agent", async () => {
+    const orchestrator = buildOrchestratorServer();
+    const response = await orchestrator.inject({ method: "GET", url: "/api/mission/mission-names?hostname=127.0.0.1" });
+    expect(response.json()).toEqual({ success: true, missions: ["patrol"] });
+  });
+
+  it("returns 400 when hostname is missing from mission-names", async () => {
+    const orchestrator = buildOrchestratorServer();
+    const response = await orchestrator.inject({ method: "GET", url: "/api/mission/mission-names" });
+    expect(response.statusCode).toBe(400);
+  });
+
+  it("relays mission file read/write round trips through to the real pi-agent", async () => {
+    const orchestrator = buildOrchestratorServer();
+    const read = await orchestrator.inject({
+      method: "GET",
+      url: "/api/mission/mission-file?hostname=127.0.0.1&name=patrol",
+    });
+    expect(read.json().content).toContain("uav.LandingMode");
+
+    const write = await orchestrator.inject({
+      method: "POST",
+      url: "/api/mission/mission-file",
+      payload: { hostname: "127.0.0.1", name: "patrol", content: "modes:\n  start:\n    mode: uav.NavGPSMode\n" },
+    });
+    expect(write.json()).toEqual({ success: true });
+
+    const reread = await orchestrator.inject({
+      method: "GET",
+      url: "/api/mission/mission-file?hostname=127.0.0.1&name=patrol",
+    });
+    expect(reread.json().content).toContain("uav.NavGPSMode");
+  });
+
+  it("relays fleet file read/write round trips through to the real pi-agent", async () => {
+    const orchestrator = buildOrchestratorServer();
+    const read = await orchestrator.inject({
+      method: "GET",
+      url: "/api/fleet/fleet-file?hostname=127.0.0.1&name=example_fleet",
+    });
+    expect(read.json().content).toContain("hardware");
+
+    const write = await orchestrator.inject({
+      method: "POST",
+      url: "/api/fleet/fleet-file",
+      payload: { hostname: "127.0.0.1", name: "example_fleet", content: "backend:\n  kind: hardware\nvehicles:\n  - name: air-01\n" },
+    });
+    expect(write.json()).toEqual({ success: true });
+
+    const reread = await orchestrator.inject({
+      method: "GET",
+      url: "/api/fleet/fleet-file?hostname=127.0.0.1&name=example_fleet",
+    });
+    expect(reread.json().content).toContain("air-01");
+  });
+
+  it("relays /api/schema, which genuinely fails without a real ROS2 environment on this dev machine", async () => {
+    const orchestrator = buildOrchestratorServer();
+    const response = await orchestrator.inject({ method: "GET", url: "/api/schema?hostname=127.0.0.1" });
+    const body = response.json();
+    expect(body.success).toBe(false);
+    expect(body.error).toBeTruthy();
+  });
+});

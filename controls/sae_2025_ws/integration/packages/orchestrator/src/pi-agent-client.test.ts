@@ -102,3 +102,88 @@ describe("PiAgentClient deploy relay, against a real local pi-agent instance wit
     expect(existsSync(`${scratchRoot}/current/install/marker.txt`)).toBe(true);
   });
 });
+
+describe("PiAgentClient schema/mission-file/fleet-file relay, against a real local pi-agent instance with a fake deployed release", () => {
+  let scratchRoot: string;
+  let piAgent: ReturnType<typeof buildPiAgentServer>;
+  let port: number;
+  const originalDeployRoot = process.env.DEPLOY_ROOT;
+
+  beforeAll(async () => {
+    scratchRoot = await mkdtemp(join(tmpdir(), "pi-agent-client-schema-test-"));
+    process.env.DEPLOY_ROOT = scratchRoot;
+
+    const releaseDir = join(scratchRoot, "releases", "20260101-000000-test");
+    await mkdir(join(releaseDir, "install", "uav", "share", "uav", "missions"), { recursive: true });
+    await mkdir(join(releaseDir, "install", "uav", "share", "uav", "fleets"), { recursive: true });
+    await writeFile(
+      join(releaseDir, "install", "uav", "share", "uav", "missions", "patrol.yaml"),
+      "modes:\n  start:\n    mode: uav.LandingMode\n",
+      "utf-8",
+    );
+    await writeFile(
+      join(releaseDir, "install", "uav", "share", "uav", "fleets", "example_fleet.yaml"),
+      "backend:\n  kind: hardware\nvehicles: []\n",
+      "utf-8",
+    );
+    const { symlink } = await import("node:fs/promises");
+    await symlink(releaseDir, join(scratchRoot, "current"));
+
+    piAgent = buildPiAgentServer();
+    await piAgent.listen({ port: 0, host: "127.0.0.1" });
+    const address = piAgent.server.address();
+    if (typeof address === "string" || address === null) {
+      throw new Error("expected pi-agent to listen on a TCP port");
+    }
+    port = address.port;
+  });
+
+  afterAll(async () => {
+    await piAgent.close();
+    process.env.DEPLOY_ROOT = originalDeployRoot;
+    await rm(scratchRoot, { recursive: true, force: true });
+  });
+
+  it("relays missionNames to the real pi-agent, listing the fake release's mission files", async () => {
+    const client = new PiAgentClient({ hostname: "127.0.0.1", port });
+    const result = await client.missionNames();
+    expect(result).toEqual({ success: true, missions: ["patrol"] });
+  });
+
+  it("relays mission file read/write round-trip through to the real pi-agent", async () => {
+    const client = new PiAgentClient({ hostname: "127.0.0.1", port });
+    const read = await client.readMissionFile("patrol");
+    expect(read.success).toBe(true);
+    expect(read.content).toContain("uav.LandingMode");
+
+    const write = await client.writeMissionFile("patrol", "modes:\n  start:\n    mode: uav.NavGPSMode\n");
+    expect(write).toEqual({ success: true });
+
+    const reread = await client.readMissionFile("patrol");
+    expect(reread.content).toContain("uav.NavGPSMode");
+  });
+
+  it("relays fleet file read/write round-trip through to the real pi-agent", async () => {
+    const client = new PiAgentClient({ hostname: "127.0.0.1", port });
+    const read = await client.readFleetFile("example_fleet");
+    expect(read.success).toBe(true);
+    expect(read.content).toContain("hardware");
+
+    const write = await client.writeFleetFile("example_fleet", "backend:\n  kind: hardware\nvehicles:\n  - name: air-01\n");
+    expect(write).toEqual({ success: true });
+
+    const reread = await client.readFleetFile("example_fleet");
+    expect(reread.content).toContain("air-01");
+  });
+
+  it("relays schema, which genuinely fails without a real ROS2 environment on this dev machine", async () => {
+    const client = new PiAgentClient({ hostname: "127.0.0.1", port });
+    const result = await client.schema();
+    // No real ROS2/vehicle_common environment here -- what matters is the
+    // request actually reached pi-agent's real handler (which itself tried
+    // to spawn `bash -c "... python3 schema_export.py ..."`) and got back a
+    // real, graceful { success: false } rather than hanging or a raw crash.
+    expect(result.success).toBe(false);
+    expect(result.error).toBeTruthy();
+  });
+});

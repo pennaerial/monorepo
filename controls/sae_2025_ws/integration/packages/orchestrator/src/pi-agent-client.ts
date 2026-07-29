@@ -36,6 +36,9 @@ const DEPLOY_ROLLBACK_TIMEOUT_MS = 30_000; // matches pi-agent's own activate/he
 // timeouts above are. 10 minutes comfortably covers a multi-hundred-MB
 // transfer even on a slow travel-router link.
 const DEPLOY_UPLOAD_TIMEOUT_MS = 600_000;
+const SCHEMA_EXPORT_TIMEOUT_MS = 35_000; // pi-agent's own schema_export.py subprocess timeout (30s) plus margin
+const MISSION_NAMES_TIMEOUT_MS = 10_000;
+const FILE_READ_WRITE_TIMEOUT_MS = 10_000; // local fs read/write on the Pi, not a slow exec
 
 export interface DeployUploadFields {
   sourceType?: string;
@@ -56,6 +59,24 @@ export interface CurrentBuildResult {
   extractedAt?: string;
   sourceType?: string;
   sourceLabel?: string;
+  error?: string;
+}
+
+export interface SchemaExportResult {
+  success: boolean;
+  schema?: unknown;
+  error?: string;
+}
+
+export interface MissionNamesResult {
+  success: boolean;
+  missions: string[];
+  error?: string;
+}
+
+export interface FileResult {
+  success: boolean;
+  content?: string;
   error?: string;
 }
 
@@ -157,6 +178,42 @@ export class PiAgentClient {
 
   async rollbackDeploy(): Promise<SimpleResult> {
     return this.postJson<SimpleResult>("/api/deploy/rollback", {}, DEPLOY_ROLLBACK_TIMEOUT_MS);
+  }
+
+  async schema(): Promise<SchemaExportResult> {
+    return this.getJson<SchemaExportResult>("/api/schema", { success: false, error: "unreachable" }, SCHEMA_EXPORT_TIMEOUT_MS);
+  }
+
+  async missionNames(): Promise<MissionNamesResult> {
+    return this.getJson<MissionNamesResult>(
+      "/api/mission/mission-names",
+      { success: false, missions: [], error: "unreachable" },
+      MISSION_NAMES_TIMEOUT_MS,
+    );
+  }
+
+  async readMissionFile(name: string): Promise<FileResult> {
+    return this.getJson<FileResult>(
+      `/api/mission/mission-file?name=${encodeURIComponent(name)}`,
+      { success: false, error: "unreachable" },
+      FILE_READ_WRITE_TIMEOUT_MS,
+    );
+  }
+
+  async writeMissionFile(name: string, content: string): Promise<FileResult> {
+    return this.postJson<FileResult>("/api/mission/mission-file", { name, content }, FILE_READ_WRITE_TIMEOUT_MS);
+  }
+
+  async readFleetFile(name: string): Promise<FileResult> {
+    return this.getJson<FileResult>(
+      `/api/fleet/fleet-file?name=${encodeURIComponent(name)}`,
+      { success: false, error: "unreachable" },
+      FILE_READ_WRITE_TIMEOUT_MS,
+    );
+  }
+
+  async writeFleetFile(name: string, content: string): Promise<FileResult> {
+    return this.postJson<FileResult>("/api/fleet/fleet-file", { name, content }, FILE_READ_WRITE_TIMEOUT_MS);
   }
 
   async uploadDeploy(

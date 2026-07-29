@@ -325,6 +325,70 @@ export function buildServer() {
     return { success: false, error: "No file uploaded" };
   });
 
+  // -- Mission/fleet YAML editors -- relayed to pi-agent, which reads/writes
+  // files inside the currently-deployed release on that specific Pi (and
+  // runs schema_export.py there, since the Pi is guaranteed to have a real
+  // ROS2 + vehicle_common environment, unlike the orchestrator).
+  app.get<{ Querystring: { hostname?: string } }>("/api/schema", async (request, reply) => {
+    const { hostname } = request.query;
+    if (!hostname) {
+      reply.code(400);
+      return { success: false, error: "hostname is required" };
+    }
+    return piAgentClientFor(hostname).schema();
+  });
+
+  app.get<{ Querystring: { hostname?: string } }>("/api/mission/mission-names", async (request, reply) => {
+    const { hostname } = request.query;
+    if (!hostname) {
+      reply.code(400);
+      return { success: false, missions: [], error: "hostname is required" };
+    }
+    return piAgentClientFor(hostname).missionNames();
+  });
+
+  app.get<{ Querystring: { hostname?: string; name?: string } }>("/api/mission/mission-file", async (request, reply) => {
+    const { hostname, name } = request.query;
+    if (!hostname || !name) {
+      reply.code(400);
+      return { success: false, error: "hostname and name are required" };
+    }
+    return piAgentClientFor(hostname).readMissionFile(name);
+  });
+
+  app.post<{ Body: { hostname?: string; name?: string; content?: string } }>(
+    "/api/mission/mission-file",
+    async (request, reply) => {
+      const { hostname, name, content } = request.body;
+      if (!hostname || !name) {
+        reply.code(400);
+        return { success: false, error: "hostname and name are required" };
+      }
+      return piAgentClientFor(hostname).writeMissionFile(name, content ?? "");
+    },
+  );
+
+  app.get<{ Querystring: { hostname?: string; name?: string } }>("/api/fleet/fleet-file", async (request, reply) => {
+    const { hostname, name } = request.query;
+    if (!hostname || !name) {
+      reply.code(400);
+      return { success: false, error: "hostname and name are required" };
+    }
+    return piAgentClientFor(hostname).readFleetFile(name);
+  });
+
+  app.post<{ Body: { hostname?: string; name?: string; content?: string } }>(
+    "/api/fleet/fleet-file",
+    async (request, reply) => {
+      const { hostname, name, content } = request.body;
+      if (!hostname || !name) {
+        reply.code(400);
+        return { success: false, error: "hostname and name are required" };
+      }
+      return piAgentClientFor(hostname).writeFleetFile(name, content ?? "");
+    },
+  );
+
   // Real-time log relay: client <-> orchestrator <-> pi-agent, all real
   // WebSocket streaming, no polling anywhere in the chain.
   app.register(async (instance) => {

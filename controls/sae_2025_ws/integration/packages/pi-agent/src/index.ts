@@ -10,6 +10,8 @@ import { streamMissionLogs } from "./logs.js";
 import { attachHeartbeat } from "./heartbeat.js";
 import { currentBuild, deployArtifact, rollbackRelease } from "./deploy.js";
 import { deployPaths } from "./deploy-paths.js";
+import { exportSchema } from "./schema-export.js";
+import { missionNames, readFleetFile, readMissionFile, writeFleetFile, writeMissionFile } from "./mission-fleet-files.js";
 
 export function buildServer() {
   const app = Fastify();
@@ -96,6 +98,46 @@ export function buildServer() {
       reply.code(500);
       return { success: false, error: (error as Error).message };
     }
+  });
+
+  app.get("/api/schema", async () => exportSchema());
+
+  app.get("/api/mission/mission-names", async () => missionNames());
+
+  app.get<{ Querystring: { name?: string } }>("/api/mission/mission-file", async (request, reply) => {
+    const { name } = request.query;
+    if (!name) {
+      reply.code(400);
+      return { success: false, error: "name is required" };
+    }
+    return readMissionFile(name);
+  });
+
+  app.post<{ Body: { name?: string; content?: string } }>("/api/mission/mission-file", async (request, reply) => {
+    const { name, content } = request.body;
+    if (!name) {
+      reply.code(400);
+      return { success: false, error: "name is required" };
+    }
+    return writeMissionFile(name, content ?? "");
+  });
+
+  app.get<{ Querystring: { name?: string } }>("/api/fleet/fleet-file", async (request, reply) => {
+    const { name } = request.query;
+    if (!name) {
+      reply.code(400);
+      return { success: false, error: "name is required" };
+    }
+    return readFleetFile(name);
+  });
+
+  app.post<{ Body: { name?: string; content?: string } }>("/api/fleet/fleet-file", async (request, reply) => {
+    const { name, content } = request.body;
+    if (!name) {
+      reply.code(400);
+      return { success: false, error: "name is required" };
+    }
+    return writeFleetFile(name, content ?? "");
   });
 
   app.register(async (instance) => {
