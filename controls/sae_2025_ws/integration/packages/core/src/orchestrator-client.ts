@@ -1,5 +1,6 @@
 import type {
   FileResult,
+  FleetBoardResult,
   LaunchStatus,
   MissionNamesResult,
   SchemaExportResult,
@@ -133,6 +134,15 @@ export class OrchestratorClient {
 
   async writeFleetFile(hostname: string, name: string, content: string): Promise<FileResult> {
     return this.postJson<FileResult>("/api/fleet/fleet-file", { hostname, name, content });
+  }
+
+  async fleetBoard(): Promise<FleetBoardResult> {
+    return this.getJson<FleetBoardResult>("/api/fleet/board", {
+      success: false,
+      devices: [],
+      summary: { totalDevices: 0, connectedDevices: 0, buildInstalledDevices: 0, runningDevices: 0, readyDevices: 0 },
+      error: "orchestrator unreachable",
+    });
   }
 
   private async getJson<T>(path: string, onUnreachable: T): Promise<T> {

@@ -4,6 +4,7 @@ import { WifiCard } from "./WifiCard.js";
 import { MissionCard } from "./MissionCard.js";
 import { MissionEditor } from "./MissionEditor.js";
 import { FleetEditor } from "./FleetEditor.js";
+import { FleetBoard } from "./FleetBoard.js";
 
 const ORCHESTRATOR_URL = import.meta.env.VITE_ORCHESTRATOR_URL ?? "http://localhost:8080";
 const client = new OrchestratorClient({ baseUrl: ORCHESTRATOR_URL });
@@ -46,6 +47,8 @@ export function App() {
         </datalist>
       </label>
       <button onClick={refreshDiscovery}>Rediscover</button>
+
+      <FleetBoard onSelectHostname={setHostname} />
 
       <WifiCard hostname={hostname} />
       <MissionCard hostname={hostname} />

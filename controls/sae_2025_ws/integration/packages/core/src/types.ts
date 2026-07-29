@@ -198,6 +198,37 @@ export interface MissionCatalogEntry {
   target: "uav" | "payload" | "";
 }
 
+// ---------------------------------------------------------------------------
+// Fleet board (Phase 5)
+// ---------------------------------------------------------------------------
+
+export interface FleetBoardDevice {
+  hostname: string;
+  connected: boolean;
+  buildInstalled: boolean;
+  releaseId?: string;
+  buildInfo?: string;
+  runtimeState: LaunchState;
+  runtimeRunning: boolean;
+  ready: boolean;
+  notes: string[];
+}
+
+export interface FleetBoardSummary {
+  totalDevices: number;
+  connectedDevices: number;
+  buildInstalledDevices: number;
+  runningDevices: number;
+  readyDevices: number;
+}
+
+export interface FleetBoardResult {
+  success: boolean;
+  devices: FleetBoardDevice[];
+  summary: FleetBoardSummary;
+  error?: string;
+}
+
 export interface SchemaExportResult {
   success: boolean;
   schema?: {

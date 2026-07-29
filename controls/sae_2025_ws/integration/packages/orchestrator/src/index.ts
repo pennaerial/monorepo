@@ -14,6 +14,7 @@ import { attachHeartbeat } from "./heartbeat.js";
 import { BuildSourceStore } from "./build-source-store.js";
 import { listBuilds } from "./github-builds.js";
 import { resolveFleetCatalog } from "./fleet-catalog.js";
+import { fetchFleetBoard } from "./fleet-board.js";
 
 function piAgentPort(): number {
   return Number(process.env.PI_AGENT_PORT ?? 8090);
@@ -55,11 +56,16 @@ export function buildServer() {
 
   app.get("/health", async () => ({ status: "ok" }));
 
-  app.get("/api/discovery", async () => {
+  function discoveryParams() {
     const prefixes = (process.env.DISCOVERY_PREFIXES ?? "air,payload").split(",");
     const suffixMax = Number(process.env.DISCOVERY_SUFFIX_MAX ?? 20);
     const timeoutMs = Number(process.env.DISCOVERY_TIMEOUT_MS ?? 1000);
     const suffixes = Array.from({ length: suffixMax }, (_, i) => i + 1);
+    return { prefixes, suffixes, timeoutMs };
+  }
+
+  app.get("/api/discovery", async () => {
+    const { prefixes, suffixes, timeoutMs } = discoveryParams();
     const pis = await discoverPis({
       prefixes,
       suffixes,
@@ -67,6 +73,13 @@ export function buildServer() {
       timeoutMs,
     });
     return { pis };
+  });
+
+  // Fleet board: fans discovery out into a per-Pi health/mission/build probe
+  // and rolls the results into a fleet-wide readiness summary.
+  app.get("/api/fleet/board", async () => {
+    const { prefixes, suffixes, timeoutMs } = discoveryParams();
+    return fetchFleetBoard({ prefixes, suffixes, port: piAgentPort(), discoveryTimeoutMs: timeoutMs });
   });
 
   app.get<{ Querystring: { hostname?: string } }>("/api/wifi/status", async (request, reply) => {

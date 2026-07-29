@@ -53,12 +53,16 @@ export interface DeployUploadResult {
   releaseId?: string;
 }
 
+// Matches pi-agent's real /api/deploy/current response (deploy.ts's
+// CurrentBuildStatus) -- this previously declared extractedAt/sourceType/
+// sourceLabel fields that don't exist on the wire and dropped the real
+// `info` field entirely, a mismatch that went unnoticed because nothing
+// read `info` from a currentBuild() call until the fleet board needed it.
 export interface CurrentBuildResult {
+  success: boolean;
   installed: boolean;
+  info?: string;
   releaseId?: string;
-  extractedAt?: string;
-  sourceType?: string;
-  sourceLabel?: string;
   error?: string;
 }
 
@@ -171,7 +175,7 @@ export class PiAgentClient {
   async currentBuild(): Promise<CurrentBuildResult> {
     return this.getJson<CurrentBuildResult>(
       "/api/deploy/current",
-      { installed: false, error: "unreachable" },
+      { success: false, installed: false, error: "unreachable" },
       DEPLOY_CURRENT_TIMEOUT_MS,
     );
   }

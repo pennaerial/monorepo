@@ -160,4 +160,30 @@ describe("OrchestratorClient", () => {
 
     expect(await client.writeFleetFile("air-01.local", "example_fleet", "vehicles: []")).toEqual({ success: true });
   });
+
+  it("fleetBoard fetches the board summary", async () => {
+    const board = {
+      success: true,
+      devices: [{ hostname: "air-01.local", connected: true, buildInstalled: true, runtimeState: "stopped", runtimeRunning: false, ready: true, notes: [] }],
+      summary: { totalDevices: 1, connectedDevices: 1, buildInstalledDevices: 1, runningDevices: 0, readyDevices: 1 },
+    };
+    const fetchImpl = vi.fn(async (url: string | URL) => {
+      expect(url.toString()).toBe("http://localhost:8080/api/fleet/board");
+      return jsonResponse(board);
+    });
+    const client = new OrchestratorClient({ baseUrl: "http://localhost:8080", fetchImpl: fetchImpl as unknown as typeof fetch });
+
+    expect(await client.fleetBoard()).toEqual(board);
+  });
+
+  it("fleetBoard returns an empty board if the orchestrator is unreachable", async () => {
+    const fetchImpl = vi.fn(async () => {
+      throw new Error("network error");
+    });
+    const client = new OrchestratorClient({ baseUrl: "http://localhost:8080", fetchImpl: fetchImpl as unknown as typeof fetch });
+
+    const result = await client.fleetBoard();
+    expect(result.success).toBe(false);
+    expect(result.devices).toEqual([]);
+  });
 });

@@ -91,6 +91,58 @@ describe("orchestrator discovery endpoint", () => {
   });
 });
 
+describe("orchestrator fleet board endpoint", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("discovers a Pi and fans out into a board response with a readiness summary", async () => {
+    const fetchMock = vi.fn(async (url: string | URL) => {
+      const u = url.toString();
+      if (u === "http://air-01.local:8090/health") {
+        return new Response(JSON.stringify({ status: "ok" }), { status: 200 });
+      }
+      if (u.startsWith("http://air-01.local:8090/api/mission/status")) {
+        return new Response(JSON.stringify({ success: true, running: false, state: "stopped" }), { status: 200 });
+      }
+      if (u.startsWith("http://air-01.local:8090/api/deploy/current")) {
+        return new Response(JSON.stringify({ success: true, installed: true, info: "Build 42", releaseId: "rel-1" }), {
+          status: 200,
+        });
+      }
+      throw new Error(`unexpected fetch ${u}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    process.env.DISCOVERY_PREFIXES = "air";
+    process.env.DISCOVERY_SUFFIX_MAX = "1";
+    process.env.PI_AGENT_PORT = "8090";
+
+    const orchestrator = buildOrchestratorServer();
+    const response = await orchestrator.inject({ method: "GET", url: "/api/fleet/board" });
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(body.devices).toEqual([
+      {
+        hostname: "air-01.local",
+        connected: true,
+        buildInstalled: true,
+        releaseId: "rel-1",
+        buildInfo: "Build 42",
+        runtimeState: "stopped",
+        runtimeRunning: false,
+        ready: true,
+        notes: [],
+      },
+    ]);
+    expect(body.summary.readyDevices).toBe(1);
+
+    delete process.env.DISCOVERY_PREFIXES;
+    delete process.env.DISCOVERY_SUFFIX_MAX;
+    delete process.env.PI_AGENT_PORT;
+  });
+});
+
 describe("orchestrator build-source selection endpoints", () => {
   let stateDir: string;
   const originalStateDir = process.env.ORCHESTRATOR_STATE_DIR;
