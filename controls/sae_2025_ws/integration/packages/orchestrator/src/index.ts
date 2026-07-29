@@ -80,8 +80,6 @@ export function buildServer() {
     return { pis };
   });
 
-  // Fleet board: fans discovery out into a per-Pi health/mission/build probe
-  // and rolls the results into a fleet-wide readiness summary.
   app.get("/api/fleet/board", async () => {
     const { prefixes, suffixes, timeoutMs } = discoveryParams();
     return fetchFleetBoard({ prefixes, suffixes, port: piAgentPort(), discoveryTimeoutMs: timeoutMs });

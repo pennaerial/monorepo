@@ -74,36 +74,27 @@ export class BuildSourceStore {
     return { ...this.current, summary: summarize(this.current) };
   }
 
-  async setGithub(record: Omit<BuildSourceRecord, "kind" | "fleetFile" | "updatedAt">): Promise<void> {
-    this.current = {
-      ...record,
-      kind: "github",
-      fleetFile: this.current.fleetFile,
-      updatedAt: new Date().toISOString(),
-    };
+  /** Replaces the record with a new build source, preserving the fleet-file selection across the switch. */
+  private async replaceCurrent(record: Omit<BuildSourceRecord, "fleetFile" | "updatedAt">): Promise<void> {
+    this.current = { ...record, fleetFile: this.current.fleetFile, updatedAt: new Date().toISOString() };
     await this.save();
   }
 
+  async setGithub(record: Omit<BuildSourceRecord, "kind" | "fleetFile" | "updatedAt">): Promise<void> {
+    await this.replaceCurrent({ ...record, kind: "github" });
+  }
+
   async setLocalArtifact(artifactName: string, localArtifactPath: string, sizeBytes: number): Promise<void> {
-    this.current = {
+    await this.replaceCurrent({
       kind: "local_artifact",
       artifactName,
       localArtifactPath,
       localArtifactSizeBytes: sizeBytes,
-      fleetFile: this.current.fleetFile,
-      updatedAt: new Date().toISOString(),
-    };
-    await this.save();
+    });
   }
 
   async setLocalCodebase(codebaseRoot: string): Promise<void> {
-    this.current = {
-      kind: "local_codebase",
-      codebaseRoot,
-      fleetFile: this.current.fleetFile,
-      updatedAt: new Date().toISOString(),
-    };
-    await this.save();
+    await this.replaceCurrent({ kind: "local_codebase", codebaseRoot });
   }
 
   async setFleetFile(fleetFile: string): Promise<void> {
