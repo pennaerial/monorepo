@@ -4,9 +4,9 @@ import { basename } from "node:path";
 import * as tar from "tar";
 import { deployPaths, type DeployPaths } from "./deploy-paths.js";
 import { pathExists, resolveSymlinkTarget, symlinkForce } from "./deploy-fs.js";
-import { delay, runCommand, type CommandRunner } from "./exec.js";
+import { delay, runCommand, type CommandRunner, type SimpleResult } from "./exec.js";
+import { SERVICE_NAME } from "./service-name.js";
 
-const SERVICE_NAME = process.env.MISSION_SERVICE_NAME ?? "pennair-autonomy.service";
 const PI_USER = process.env.PI_USER ?? "penn";
 
 // A single Pi only ever has one pi-agent process managing one deploy root, so
@@ -23,12 +23,6 @@ function withDeployLock<T>(task: () => Promise<T>): Promise<T> {
     () => undefined,
   );
   return result;
-}
-
-interface SimpleResult {
-  success: boolean;
-  output?: string;
-  error?: string;
 }
 
 // ---------------------------------------------------------------------------

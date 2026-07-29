@@ -1,13 +1,6 @@
 import type { LaunchStatus } from "@pennair/integration-core";
-import { runCommand, type CommandRunner } from "./exec.js";
-
-const SERVICE_NAME = process.env.MISSION_SERVICE_NAME ?? "pennair-autonomy.service";
-
-interface SimpleResult {
-  success: boolean;
-  output?: string;
-  error?: string;
-}
+import { runCommand, type CommandRunner, type SimpleResult } from "./exec.js";
+import { SERVICE_NAME } from "./service-name.js";
 
 export async function missionStatus(run: CommandRunner = runCommand): Promise<LaunchStatus> {
   const active = await run("sudo", ["-n", "systemctl", "is-active", SERVICE_NAME], 8_000);

@@ -9,6 +9,14 @@ export interface ExecResult {
   stderr: string;
 }
 
+/** Common shape for operations that either succeed with optional output or
+ *  fail with an error message -- shared by deploy.ts, mission.ts, wifi.ts. */
+export interface SimpleResult {
+  success: boolean;
+  output?: string;
+  error?: string;
+}
+
 export type CommandRunner = (command: string, args: string[], timeoutMs: number) => Promise<ExecResult>;
 
 /** Real command runner -- the default, unless a test injects a fake one. */

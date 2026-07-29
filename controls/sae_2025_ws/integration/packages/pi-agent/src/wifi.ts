@@ -1,5 +1,5 @@
 import type { WifiConnection, WifiNetwork, WifiScanResult, WifiStatus } from "@pennair/integration-core";
-import { delay, runCommand, type CommandRunner } from "./exec.js";
+import { delay, runCommand, type CommandRunner, type SimpleResult } from "./exec.js";
 
 const HOTSPOT_NAME = process.env.HOTSPOT_NAME ?? "penn-desktop";
 
@@ -134,7 +134,7 @@ export async function wifiConnect(
   password: string,
   run: CommandRunner = runCommand,
   wait: (ms: number) => Promise<void> = delay,
-): Promise<{ success: boolean; output?: string; error?: string }> {
+): Promise<SimpleResult> {
   const policy = await policyStatus(run);
   const hotspotName = stringField(policy, "local_ap_profile") ?? HOTSPOT_NAME;
 
@@ -158,7 +158,7 @@ export async function wifiConnect(
 export async function wifiHotspot(
   run: CommandRunner = runCommand,
   wait: (ms: number) => Promise<void> = delay,
-): Promise<{ success: boolean; output?: string; error?: string }> {
+): Promise<SimpleResult> {
   const policy = await policyStatus(run);
   const hotspotName = stringField(policy, "local_ap_profile") ?? HOTSPOT_NAME;
 

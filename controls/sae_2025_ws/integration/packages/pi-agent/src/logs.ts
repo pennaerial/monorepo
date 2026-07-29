@@ -1,6 +1,5 @@
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
-
-const SERVICE_NAME = process.env.MISSION_SERVICE_NAME ?? "pennair-autonomy.service";
+import { SERVICE_NAME } from "./service-name.js";
 
 export type Spawner = (command: string, args: string[]) => ChildProcessWithoutNullStreams;
 
