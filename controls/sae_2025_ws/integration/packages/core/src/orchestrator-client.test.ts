@@ -186,4 +186,19 @@ describe("OrchestratorClient", () => {
     expect(result.success).toBe(false);
     expect(result.devices).toEqual([]);
   });
+
+  it("passes an abort signal on every request, so a wedged orchestrator can't hang a call forever", async () => {
+    // Regression test: getJson/postJson used to issue fetch with no signal
+    // at all -- a wedged orchestrator (TCP accepted, response never sent)
+    // would hang every OrchestratorClient method forever, since fetch has no
+    // default overall-request timeout once connected.
+    const fetchImpl = vi.fn(async (_url: string | URL, init?: RequestInit) => {
+      expect(init?.signal).toBeInstanceOf(AbortSignal);
+      return jsonResponse({ pis: [] });
+    });
+    const client = new OrchestratorClient({ baseUrl: "http://localhost:8080", fetchImpl: fetchImpl as unknown as typeof fetch });
+
+    await client.discoverPis();
+    expect(fetchImpl).toHaveBeenCalled();
+  });
 });

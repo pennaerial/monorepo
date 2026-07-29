@@ -120,6 +120,44 @@ describe("fetchFleetBoard", () => {
     expect(result.devices[0].notes).toEqual(["No installed build"]);
   });
 
+  it("dedupes a hostname that discovery returns more than once, rather than double-counting it", async () => {
+    // A duplicated prefix (e.g. misconfigured DISCOVERY_PREFIXES) makes
+    // discoverPis's own candidate cross-product probe and return the same
+    // hostname twice -- fetchFleetBoard must not fan out (or count) it twice.
+    let probeCount = 0;
+    const fetchImpl = (async (url: Parameters<typeof fetch>[0]) => {
+      const u = String(url);
+      if (u === "http://air-01.local:8090/health") {
+        probeCount += 1;
+        return jsonResponse({ status: "ok" });
+      }
+      if (u.startsWith("http://air-01.local:8090/api/mission/status")) {
+        return jsonResponse({ success: true, running: false, state: "stopped" });
+      }
+      if (u.startsWith("http://air-01.local:8090/api/deploy/current")) {
+        return jsonResponse({ success: true, installed: true });
+      }
+      throw new Error(`unexpected fetch ${u}`);
+    }) as typeof fetch;
+
+    const result = await fetchFleetBoard({
+      prefixes: ["air", "air"], // duplicated on purpose
+      suffixes: [1],
+      port: 8090,
+      discoveryTimeoutMs: 1000,
+      fetchImpl,
+      piAgentClientFor: (hostname) => new PiAgentClient({ hostname, port: 8090, fetchImpl }),
+    });
+
+    expect(result.devices).toHaveLength(1);
+    expect(result.summary.totalDevices).toBe(1);
+    // 2 discovery /health probes (one per duplicated candidate -- discovery
+    // itself isn't deduped) + 1 more from fetchFleetBoard's own isHealthy()
+    // fan-out for the single deduped device -- not 2 fan-out calls, which
+    // would mean the board fanned out to the same Pi twice.
+    expect(probeCount).toBe(3);
+  });
+
   it("forwards fetchImpl into the default per-Pi client when piAgentClientFor isn't supplied", async () => {
     // Regression test: the default `clientFor` used to construct a bare
     // `new PiAgentClient({ hostname, port })` with no fetchImpl, so a caller

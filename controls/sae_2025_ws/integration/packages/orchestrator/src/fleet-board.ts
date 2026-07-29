@@ -32,12 +32,22 @@ export interface FetchFleetBoardOptions {
  * silently dropped.
  */
 export async function fetchFleetBoard(options: FetchFleetBoardOptions): Promise<FleetBoardResult> {
-  const pis = await discoverPis({
+  const discovered = await discoverPis({
     prefixes: options.prefixes,
     suffixes: options.suffixes,
     port: options.port,
     timeoutMs: options.discoveryTimeoutMs,
     fetchImpl: options.fetchImpl,
+  });
+  // Defense in depth against a duplicate hostname reaching the board (e.g. a
+  // misconfigured DISCOVERY_PREFIXES) -- summarizeFleetBoard has no
+  // uniqueness safeguard of its own (it just counts whatever it's given), so
+  // dedupe at the source, which also avoids probing the same Pi twice.
+  const seen = new Set<string>();
+  const pis = discovered.filter((pi) => {
+    if (seen.has(pi.hostname)) return false;
+    seen.add(pi.hostname);
+    return true;
   });
 
   // Forward fetchImpl into the default client too -- a caller supplying

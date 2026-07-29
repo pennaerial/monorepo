@@ -24,6 +24,16 @@ interface SimpleResult {
   error?: string;
 }
 
+// Sized to exceed the orchestrator's own largest per-operation relay timeout
+// to pi-agent (wifi connect, 80s -- see pi-agent-client.ts's
+// WIFI_CONNECT_TIMEOUT_MS) plus margin, so the orchestrator's own timeout
+// fires first and returns a graceful {success:false,...} JSON body rather
+// than this client severing the connection first. Without an explicit
+// timeout here, a wedged orchestrator (accepts the TCP connection but never
+// responds) would hang every OrchestratorClient method forever -- fetch has
+// no default overall-request timeout once connected, only a connect-timeout.
+const DEFAULT_TIMEOUT_MS = 90_000;
+
 /**
  * The only client web/mobile need -- talks to the orchestrator, never to a
  * Pi's pi-agent directly. The orchestrator does its own discovery and relays
@@ -40,7 +50,9 @@ export class OrchestratorClient {
 
   async discoverPis(): Promise<DiscoveredPiSummary[]> {
     try {
-      const response = await this.fetchImpl(`${this.baseUrl}/api/discovery`);
+      const response = await this.fetchImpl(`${this.baseUrl}/api/discovery`, {
+        signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+      });
       if (!response.ok) return [];
       const body = (await response.json()) as { pis: DiscoveredPiSummary[] };
       return body.pis;
@@ -145,9 +157,11 @@ export class OrchestratorClient {
     });
   }
 
-  private async getJson<T>(path: string, onUnreachable: T): Promise<T> {
+  private async getJson<T>(path: string, onUnreachable: T, timeoutMs: number = DEFAULT_TIMEOUT_MS): Promise<T> {
     try {
-      const response = await this.fetchImpl(`${this.baseUrl}${path}`);
+      const response = await this.fetchImpl(`${this.baseUrl}${path}`, {
+        signal: AbortSignal.timeout(timeoutMs),
+      });
       if (!response.ok) return onUnreachable;
       return (await response.json()) as T;
     } catch {
@@ -158,12 +172,14 @@ export class OrchestratorClient {
   private async postJson<T extends { success: boolean; error?: string }>(
     path: string,
     body: unknown,
+    timeoutMs: number = DEFAULT_TIMEOUT_MS,
   ): Promise<T> {
     try {
       const response = await this.fetchImpl(`${this.baseUrl}${path}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
+        signal: AbortSignal.timeout(timeoutMs),
       });
       return (await response.json()) as T;
     } catch {
