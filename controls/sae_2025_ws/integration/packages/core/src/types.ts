@@ -80,3 +80,118 @@ export interface BuildSource {
   fleetFile?: string;
   updatedAt?: string;
 }
+
+// ---------------------------------------------------------------------------
+// Mission/fleet YAML editor types (Phase 4)
+// ---------------------------------------------------------------------------
+
+export type SchemaFieldType =
+  | "boolean"
+  | "bool"
+  | "integer"
+  | "number"
+  | "int"
+  | "float"
+  | "tuple"
+  | "array"
+  | "object"
+  | "union"
+  | "list"
+  | "dict"
+  | "string";
+
+export interface SchemaField {
+  name: string;
+  schemaType?: SchemaFieldType;
+  choices?: string[];
+  default?: unknown;
+  defaultKind?: "missing" | "present";
+  description?: string;
+  annotation?: string;
+  required?: boolean;
+  nullable?: boolean;
+}
+
+export type SchemaFieldInputKind = "select" | "boolean" | "number" | "tuple" | "block" | "text";
+
+export interface ModeMetadata {
+  name: string;
+  mode: string;
+  classPath?: string;
+  target?: "uav" | "payload" | "";
+  description?: string;
+  requiredVisionNodes?: string[];
+  transitionLabels?: string[];
+  params: SchemaField[];
+}
+
+/** Flat lookup of mode registry entries, keyed by both the public mode id and the class path (mirrors `normalizeModeRegistry`). */
+export type ModeRegistryByTarget = Record<string, ModeMetadata[]>;
+
+export interface TransitionEntry {
+  key: string;
+  value: string;
+}
+
+export interface MissionMode {
+  name: string;
+  mode: string;
+  paramsRaw: string;
+  transitionsRaw: string;
+  transitions: TransitionEntry[];
+  target: "uav" | "payload" | "";
+  hasParams: boolean;
+  hasTransitions: boolean;
+}
+
+export interface ParsedMissionDocument {
+  rawText: string;
+  modes: MissionMode[];
+  selectedTarget: "uav" | "payload" | "";
+  warnings: string[];
+}
+
+export interface FleetBackend {
+  kind?: string;
+  px4_path?: string;
+  [key: string]: unknown;
+}
+
+export interface FleetVehicle {
+  name?: string;
+  kind?: string;
+  mission?: string;
+  px4_airframe_id?: unknown;
+  px4_namespace?: unknown;
+  [key: string]: unknown;
+}
+
+export interface FleetEditorDocument {
+  backend: FleetBackend;
+  defaults: Record<string, unknown>;
+  vehicles: FleetVehicle[];
+}
+
+export interface ParsedFleetDocument {
+  rawText: string;
+  doc: FleetEditorDocument | null;
+  error: string;
+}
+
+export type ObjectPathSegment = string | number;
+
+export interface FleetSchemaSection {
+  name: string;
+  label?: string;
+  fields: SchemaField[];
+}
+
+export interface FleetSchema {
+  sections: FleetSchemaSection[];
+  backendKinds?: string[];
+}
+
+export interface MissionCatalogEntry {
+  name: string;
+  target: "uav" | "payload" | "";
+}
