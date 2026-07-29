@@ -93,4 +93,71 @@ describe("OrchestratorClient", () => {
       "wss://ops.example.com/ws/mission/logs?hostname=air-01.local",
     );
   });
+
+  it("schema passes the hostname through as a query param", async () => {
+    const fetchImpl = vi.fn(async (url: string | URL) => {
+      expect(url.toString()).toBe("http://localhost:8080/api/schema?hostname=air-01.local");
+      return jsonResponse({ success: true, schema: { modes: {}, fleet: { sections: [] }, missions: [], availableFleets: [] } });
+    });
+    const client = new OrchestratorClient({ baseUrl: "http://localhost:8080", fetchImpl: fetchImpl as unknown as typeof fetch });
+
+    const result = await client.schema("air-01.local");
+    expect(result.success).toBe(true);
+  });
+
+  it("missionNames passes the hostname through as a query param", async () => {
+    const fetchImpl = vi.fn(async (url: string | URL) => {
+      expect(url.toString()).toBe("http://localhost:8080/api/mission/mission-names?hostname=air-01.local");
+      return jsonResponse({ success: true, missions: ["patrol"] });
+    });
+    const client = new OrchestratorClient({ baseUrl: "http://localhost:8080", fetchImpl: fetchImpl as unknown as typeof fetch });
+
+    expect(await client.missionNames("air-01.local")).toEqual({ success: true, missions: ["patrol"] });
+  });
+
+  it("readMissionFile passes hostname and name through as query params", async () => {
+    const fetchImpl = vi.fn(async (url: string | URL) => {
+      expect(url.toString()).toBe("http://localhost:8080/api/mission/mission-file?hostname=air-01.local&name=patrol");
+      return jsonResponse({ success: true, content: "modes: {}" });
+    });
+    const client = new OrchestratorClient({ baseUrl: "http://localhost:8080", fetchImpl: fetchImpl as unknown as typeof fetch });
+
+    expect(await client.readMissionFile("air-01.local", "patrol")).toEqual({ success: true, content: "modes: {}" });
+  });
+
+  it("writeMissionFile posts hostname/name/content as JSON", async () => {
+    const fetchImpl = vi.fn(async (url: string | URL, init?: RequestInit) => {
+      expect(url.toString()).toBe("http://localhost:8080/api/mission/mission-file");
+      expect(JSON.parse(init?.body as string)).toEqual({ hostname: "air-01.local", name: "patrol", content: "modes: {}" });
+      return jsonResponse({ success: true });
+    });
+    const client = new OrchestratorClient({ baseUrl: "http://localhost:8080", fetchImpl: fetchImpl as unknown as typeof fetch });
+
+    expect(await client.writeMissionFile("air-01.local", "patrol", "modes: {}")).toEqual({ success: true });
+  });
+
+  it("readFleetFile passes hostname and name through as query params", async () => {
+    const fetchImpl = vi.fn(async (url: string | URL) => {
+      expect(url.toString()).toBe("http://localhost:8080/api/fleet/fleet-file?hostname=air-01.local&name=example_fleet");
+      return jsonResponse({ success: true, content: "vehicles: []" });
+    });
+    const client = new OrchestratorClient({ baseUrl: "http://localhost:8080", fetchImpl: fetchImpl as unknown as typeof fetch });
+
+    expect(await client.readFleetFile("air-01.local", "example_fleet")).toEqual({ success: true, content: "vehicles: []" });
+  });
+
+  it("writeFleetFile posts hostname/name/content as JSON", async () => {
+    const fetchImpl = vi.fn(async (url: string | URL, init?: RequestInit) => {
+      expect(url.toString()).toBe("http://localhost:8080/api/fleet/fleet-file");
+      expect(JSON.parse(init?.body as string)).toEqual({
+        hostname: "air-01.local",
+        name: "example_fleet",
+        content: "vehicles: []",
+      });
+      return jsonResponse({ success: true });
+    });
+    const client = new OrchestratorClient({ baseUrl: "http://localhost:8080", fetchImpl: fetchImpl as unknown as typeof fetch });
+
+    expect(await client.writeFleetFile("air-01.local", "example_fleet", "vehicles: []")).toEqual({ success: true });
+  });
 });

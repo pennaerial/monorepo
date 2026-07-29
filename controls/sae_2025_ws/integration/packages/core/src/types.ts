@@ -195,3 +195,26 @@ export interface MissionCatalogEntry {
   name: string;
   target: "uav" | "payload" | "";
 }
+
+export interface SchemaExportResult {
+  success: boolean;
+  schema?: {
+    modes: ModeRegistryByTarget;
+    fleet: FleetSchema;
+    missions: MissionCatalogEntry[];
+    availableFleets: string[];
+  };
+  error?: string;
+}
+
+export interface MissionNamesResult {
+  success: boolean;
+  missions: string[];
+  error?: string;
+}
+
+export interface FileResult {
+  success: boolean;
+  content?: string;
+  error?: string;
+}

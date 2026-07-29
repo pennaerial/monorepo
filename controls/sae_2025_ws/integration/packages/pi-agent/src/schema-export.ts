@@ -38,11 +38,17 @@ export async function exportSchema(
     return { success: false, error: "No build deployed" };
   }
 
+  // Semicolons, not && -- sourcing ROS2/the release overlay is best-effort
+  // (2>/dev/null is deliberately silencing a missing-file error from
+  // `source` itself, not just python's stderr). Chaining with && meant a
+  // missing setup.bash short-circuited the whole command before python3
+  // ever ran, with no output at all -- always run the script regardless, so
+  // a real missing-vehicle_common failure surfaces its own clear stderr.
   const command = [
     "source /opt/ros/jazzy/setup.bash 2>/dev/null",
     `source "${releaseRoot}/install/setup.bash" 2>/dev/null`,
     `python3 "${scriptPath}" --root "${releaseRoot}"`,
-  ].join(" && ");
+  ].join("; ");
 
   const result = await run("bash", ["-c", command], SCHEMA_EXPORT_TIMEOUT_MS);
   if (result.code !== 0) {

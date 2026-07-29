@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { OrchestratorClient } from "@pennair/integration-core";
 import { WifiCard } from "./WifiCard.js";
 import { MissionCard } from "./MissionCard.js";
+import { MissionEditor } from "./MissionEditor.js";
+import { FleetEditor } from "./FleetEditor.js";
 
 const ORCHESTRATOR_URL = import.meta.env.VITE_ORCHESTRATOR_URL ?? "http://localhost:8080";
 const client = new OrchestratorClient({ baseUrl: ORCHESTRATOR_URL });
@@ -47,6 +49,8 @@ export function App() {
 
       <WifiCard hostname={hostname} />
       <MissionCard hostname={hostname} />
+      <MissionEditor hostname={hostname} />
+      <FleetEditor hostname={hostname} />
     </main>
   );
 }

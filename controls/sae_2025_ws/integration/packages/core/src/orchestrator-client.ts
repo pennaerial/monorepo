@@ -1,4 +1,11 @@
-import type { LaunchStatus, WifiScanResult, WifiStatus } from "./types.js";
+import type {
+  FileResult,
+  LaunchStatus,
+  MissionNamesResult,
+  SchemaExportResult,
+  WifiScanResult,
+  WifiStatus,
+} from "./types.js";
 
 export interface OrchestratorClientOptions {
   /** e.g. "http://localhost:8080" -- the one thing web/mobile clients talk to. */
@@ -90,6 +97,42 @@ export class OrchestratorClient {
   missionLogsUrl(hostname: string): string {
     const wsBase = this.baseUrl.replace(/^http/, "ws");
     return `${wsBase}/ws/mission/logs?hostname=${encodeURIComponent(hostname)}`;
+  }
+
+  async schema(hostname: string): Promise<SchemaExportResult> {
+    return this.getJson<SchemaExportResult>(
+      `/api/schema?hostname=${encodeURIComponent(hostname)}`,
+      { success: false, error: "orchestrator unreachable" },
+    );
+  }
+
+  async missionNames(hostname: string): Promise<MissionNamesResult> {
+    return this.getJson<MissionNamesResult>(
+      `/api/mission/mission-names?hostname=${encodeURIComponent(hostname)}`,
+      { success: false, missions: [], error: "orchestrator unreachable" },
+    );
+  }
+
+  async readMissionFile(hostname: string, name: string): Promise<FileResult> {
+    return this.getJson<FileResult>(
+      `/api/mission/mission-file?hostname=${encodeURIComponent(hostname)}&name=${encodeURIComponent(name)}`,
+      { success: false, error: "orchestrator unreachable" },
+    );
+  }
+
+  async writeMissionFile(hostname: string, name: string, content: string): Promise<FileResult> {
+    return this.postJson<FileResult>("/api/mission/mission-file", { hostname, name, content });
+  }
+
+  async readFleetFile(hostname: string, name: string): Promise<FileResult> {
+    return this.getJson<FileResult>(
+      `/api/fleet/fleet-file?hostname=${encodeURIComponent(hostname)}&name=${encodeURIComponent(name)}`,
+      { success: false, error: "orchestrator unreachable" },
+    );
+  }
+
+  async writeFleetFile(hostname: string, name: string, content: string): Promise<FileResult> {
+    return this.postJson<FileResult>("/api/fleet/fleet-file", { hostname, name, content });
   }
 
   private async getJson<T>(path: string, onUnreachable: T): Promise<T> {
