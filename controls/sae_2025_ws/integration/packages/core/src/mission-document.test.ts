@@ -141,6 +141,32 @@ describe("parseMissionDocument / renderMissionDocument", () => {
     const doc = parseMissionDocument("start_mode: takeoff\n");
     expect(renderMissionDocument(doc)).toBe("start_mode: takeoff\n");
   });
+
+  it("does not inject params: {} for a mode that never had a params key, mirroring hasTransitions", () => {
+    const doc = parseMissionDocument(`modes:
+  land:
+    mode: uav.LandingMode
+`);
+    expect(doc.modes[0].hasParams).toBe(false);
+    const rendered = renderMissionDocument(updateMissionDocumentMode(doc, "land", (mode) => ({ ...mode })));
+    expect(rendered).not.toContain("params");
+  });
+
+  it("still emits a params representation for a mode that explicitly had an empty params key", () => {
+    const doc = parseMissionDocument(`modes:
+  land:
+    mode: uav.LandingMode
+    params: {}
+`);
+    expect(doc.modes[0].hasParams).toBe(true);
+    // paramsRaw captures the literal "{}" text, which renders through the
+    // nested-block path (valid, equivalent YAML, just different formatting
+    // from the compact inline form) -- what matters here is hasParams:true
+    // still causes *some* params key to survive, unlike the hasParams:false
+    // case above where none should appear at all.
+    const rendered = renderMissionDocument(updateMissionDocumentMode(doc, "land", (mode) => ({ ...mode })));
+    expect(rendered).toMatch(/params:/);
+  });
 });
 
 describe("updateMissionDocumentMode", () => {

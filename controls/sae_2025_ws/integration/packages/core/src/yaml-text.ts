@@ -187,7 +187,13 @@ export function getYamlBlockValue(content: string | undefined | null, key: strin
 }
 
 export function setYamlBlockValue(content: string | undefined | null, key: string, rawValue: unknown): string {
-  const lines = normalizeYamlFragment(content).split("\n").filter(Boolean);
+  // Must stay index-consistent with splitTopLevelYamlEntries's own split (no
+  // filtering blank lines out) -- entry.start/end are computed against that
+  // unfiltered array, so splicing into a filtered copy desyncs the indices
+  // and corrupts/duplicates keys whenever the fragment has a blank interior
+  // line (e.g. a multi-line params block with a blank line between items).
+  const normalized = normalizeYamlFragment(content);
+  const lines = normalized ? normalized.split("\n") : [];
   const entries = splitTopLevelYamlEntries(content);
   const existing = entries.find((item) => item.key === key);
   const nextLines = [...lines];
@@ -198,7 +204,13 @@ export function setYamlBlockValue(content: string | undefined | null, key: strin
 
   const trimmed = `${rawValue ?? ""}`.trim();
   if (trimmed) {
-    const replacement = trimmed.includes("\n") ? [`${key}:`, ...indentBlock(trimmed, 2).split("\n")] : [`${key}: ${trimmed}`];
+    // A single-item YAML block sequence ("- [[5, 10, -10], 1, LOCAL]", as
+    // getYamlBlockValue returns it verbatim, leading "- " included) has no
+    // embedded newline but still can't follow "key: " on the same line --
+    // "key: - foo" isn't valid YAML (a block-sequence indicator can't share
+    // a line with its mapping key). Needs the nested-block form too.
+    const needsOwnLine = trimmed.includes("\n") || /^-(\s|$)/.test(trimmed);
+    const replacement = needsOwnLine ? [`${key}:`, ...indentBlock(trimmed, 2).split("\n")] : [`${key}: ${trimmed}`];
     const insertAt = existing ? existing.start : nextLines.length;
     nextLines.splice(insertAt, 0, ...replacement);
   }

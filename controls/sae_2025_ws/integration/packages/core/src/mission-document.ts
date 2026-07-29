@@ -62,11 +62,19 @@ export function parseMissionDocument(text: string | undefined | null): ParsedMis
   if (modesLineIndex < 0) {
     return {
       rawText,
+      preamble: "",
       modes: [],
       selectedTarget: "",
       warnings: ["Mission YAML does not contain a top-level modes mapping."],
     };
   }
+
+  // Anything before the `modes:` key (header comments, other top-level
+  // keys) -- rendered with zero modes falls back to rawText untouched, but
+  // once modes exist, render rebuilds the document from `doc.modes` alone,
+  // so this has to be captured now and re-prepended on render or it's lost
+  // the moment a single field is edited.
+  const preamble = lines.slice(0, modesLineIndex).join("\n");
 
   const modeStarts: { name: string; line: number }[] = [];
   for (let index = modesLineIndex + 1; index < lines.length; index += 1) {
@@ -80,6 +88,7 @@ export function parseMissionDocument(text: string | undefined | null): ParsedMis
   if (modeStarts.length === 0) {
     return {
       rawText,
+      preamble,
       modes: [],
       selectedTarget: "",
       warnings: ["Mission YAML has a modes block but no mode entries."],
@@ -150,6 +159,7 @@ export function parseMissionDocument(text: string | undefined | null): ParsedMis
 
   return {
     rawText,
+    preamble,
     modes,
     selectedTarget: inferredTargets.length === 1 ? inferredTargets[0] : "",
     warnings: inferredTargets.length > 1 ? [`Mission modes mix targets: ${inferredTargets.join(", ")}`] : [],
@@ -159,7 +169,11 @@ export function parseMissionDocument(text: string | undefined | null): ParsedMis
 export function renderMissionDocument(doc: ParsedMissionDocument | undefined | null): string {
   if (!doc?.modes?.length) return doc?.rawText || "";
 
-  const lines: string[] = ["modes:"];
+  const lines: string[] = [];
+  if (doc.preamble && doc.preamble.trim()) {
+    lines.push(doc.preamble, "");
+  }
+  lines.push("modes:");
   doc.modes.forEach((mode, index) => {
     lines.push(`  ${mode.name}:`);
     lines.push(`    mode: ${mode.mode || ""}`);
@@ -167,7 +181,7 @@ export function renderMissionDocument(doc: ParsedMissionDocument | undefined | n
     if (mode.paramsRaw && `${mode.paramsRaw}`.trim()) {
       lines.push("    params:");
       lines.push(...indentBlock(mode.paramsRaw.trimEnd(), 6).split("\n"));
-    } else {
+    } else if (mode.hasParams) {
       lines.push("    params: {}");
     }
 

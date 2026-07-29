@@ -58,6 +58,8 @@ export function MissionEditor({ hostname }: { hostname: string }) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [modeNameError, setModeNameError] = useState("");
+  const [savedRawText, setSavedRawText] = useState("");
 
   useEffect(() => {
     if (!hostname) return;
@@ -68,10 +70,15 @@ export function MissionEditor({ hostname }: { hostname: string }) {
   }, [hostname]);
 
   async function loadMission(name: string) {
+    if (doc && doc.rawText !== savedRawText) {
+      if (!window.confirm("You have unsaved changes to this mission. Discard them?")) return;
+    }
     setSelectedMission(name);
     setSelectedModeName("");
+    setModeNameError("");
     if (!name) {
       setDoc(null);
+      setSavedRawText("");
       return;
     }
     setLoading(true);
@@ -79,9 +86,11 @@ export function MissionEditor({ hostname }: { hostname: string }) {
     setLoading(false);
     if (result.success && result.content !== undefined) {
       setDoc(parseMissionDocument(result.content));
+      setSavedRawText(result.content);
       setMessage("");
     } else {
       setDoc(null);
+      setSavedRawText("");
       setMessage(result.error ?? "Failed to load mission");
     }
   }
@@ -92,6 +101,7 @@ export function MissionEditor({ hostname }: { hostname: string }) {
     const result = await client.writeMissionFile(hostname, selectedMission, doc.rawText);
     setSaving(false);
     setMessage(result.error ?? "Saved");
+    if (!result.error) setSavedRawText(doc.rawText);
   }
 
   function updateMode(modeName: string, updater: (mode: MissionMode) => MissionMode) {
@@ -128,6 +138,30 @@ export function MissionEditor({ hostname }: { hostname: string }) {
   function applyModeDefaults(mode: MissionMode, metadata: ModeMetadata | undefined) {
     if (!metadata) return;
     updateMode(mode.name, (m) => ({ ...m, paramsRaw: defaultParamsRawForMode(metadata) }));
+  }
+
+  /**
+   * updateMissionDocumentMode matches *every* mode with the given name, so
+   * renaming into a name that collides with another mode (or into the
+   * reserved "start" entrypoint name) would silently merge two modes into
+   * one on the next edit, and removeMode's filter would then remove both at
+   * once -- reject the rename instead of applying it.
+   */
+  function renameSelectedMode(currentName: string, nextName: string) {
+    if (!doc) return;
+    if (nextName !== currentName) {
+      if (nextName === RESERVED_MODE_NAME) {
+        setModeNameError(`"${RESERVED_MODE_NAME}" is reserved for the mission entrypoint`);
+        return;
+      }
+      if (doc.modes.some((mode) => mode.name === nextName)) {
+        setModeNameError(`A mode named "${nextName}" already exists`);
+        return;
+      }
+    }
+    setModeNameError("");
+    updateMode(currentName, (mode) => ({ ...mode, name: nextName }));
+    setSelectedModeName(nextName);
   }
 
   const selectedMode = doc?.modes.find((mode) => mode.name === selectedModeName) ?? null;
@@ -167,7 +201,14 @@ export function MissionEditor({ hostname }: { hostname: string }) {
           <ul className="mode-list">
             {doc.modes.map((mode) => (
               <li key={mode.name}>
-                <button onClick={() => setSelectedModeName(mode.name)}>{mode.name === selectedModeName ? `> ${mode.name}` : mode.name}</button>
+                <button
+                  onClick={() => {
+                    setSelectedModeName(mode.name);
+                    setModeNameError("");
+                  }}
+                >
+                  {mode.name === selectedModeName ? `> ${mode.name}` : mode.name}
+                </button>
                 <button onClick={() => removeMode(mode.name)} disabled={mode.name === RESERVED_MODE_NAME}>
                   Remove
                 </button>
@@ -182,13 +223,10 @@ export function MissionEditor({ hostname }: { hostname: string }) {
                 <input
                   value={selectedMode.name}
                   disabled={selectedMode.name === RESERVED_MODE_NAME}
-                  onChange={(e) => {
-                    const newName = e.target.value;
-                    updateMode(selectedMode.name, (mode) => ({ ...mode, name: newName }));
-                    setSelectedModeName(newName);
-                  }}
+                  onChange={(e) => renameSelectedMode(selectedMode.name, e.target.value)}
                 />
               </label>
+              {modeNameError && <p className="error">{modeNameError}</p>}
               <label>
                 Mode class
                 <input

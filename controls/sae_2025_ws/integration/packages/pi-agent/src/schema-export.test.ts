@@ -53,9 +53,12 @@ describe("exportSchema", () => {
     const result = await exportSchema(run, paths, "/path/to/schema_export.py");
     expect(result.success).toBe(true);
     expect(result.schema).toEqual({ modes: {}, fleet: { sections: [] }, missions: [] });
+    // Single-quoted, not double-quoted -- shellQuote uses single quotes so
+    // that shell metacharacters in a client-controlled release path (see
+    // schema-export.command-injection.test.ts) are inert.
     expect(capturedCommand).toContain("source /opt/ros/jazzy/setup.bash");
-    expect(capturedCommand).toContain(`source "${releaseDir}/install/setup.bash"`);
-    expect(capturedCommand).toContain(`python3 "/path/to/schema_export.py" --root "${releaseDir}"`);
+    expect(capturedCommand).toContain(`source '${releaseDir}/install/setup.bash'`);
+    expect(capturedCommand).toContain(`python3 '/path/to/schema_export.py' --root '${releaseDir}'`);
   });
 
   it("surfaces a graceful error when the script exits non-zero", async () => {

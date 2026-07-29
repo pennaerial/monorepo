@@ -98,6 +98,15 @@ def _schema_field(
                 schema_type = "enum"
                 annotation = "enum"
                 choices = list(variant["enum"])
+            elif "prefixItems" in variant:
+                # An Optional[tuple[...]] field (e.g. FleetDefaultsModel's
+                # camera_mount_offsets: tuple[float, float, float] | None)
+                # wraps the tuple schema inside anyOf alongside {type: null}
+                # -- prefixItems only ever appears on the top-level schema
+                # for a non-Optional tuple, so without this check every
+                # Optional tuple field is misclassified as a plain "list".
+                schema_type = "tuple"
+                annotation = "tuple"
             elif "$ref" in variant:
                 annotation = variant["$ref"].rsplit("/", 1)[-1]
             else:

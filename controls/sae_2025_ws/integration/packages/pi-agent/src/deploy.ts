@@ -45,13 +45,28 @@ function releaseTimestamp(now: () => number = Date.now): string {
   return new Date(now()).toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "").replace("T", "-");
 }
 
+/**
+ * Defense in depth: `artifactName` is the client-supplied upload filename,
+ * which ends up as part of a filesystem path (the release directory name)
+ * that later gets interpolated into shell commands elsewhere (e.g.
+ * schema-export.ts, which shell-quotes it properly at the point of use, but
+ * a release slug restricted to safe characters at the source removes the
+ * hazard from propagating into systemd unit content, JSON metadata, and log
+ * output too, not just the one place that was actually exploitable).
+ */
+function sanitizeReleaseSlug(artifactName: string): string {
+  const stripped = artifactName.replace(/\.tar\.gz$/, "").replace(/\.tgz$/, "");
+  const safe = stripped.replace(/[^A-Za-z0-9._-]/g, "_");
+  return safe || "release";
+}
+
 async function extractReleaseUnlocked(
   artifactPath: string,
   artifactName: string,
   paths: DeployPaths,
   now: () => number,
 ): Promise<ExtractResult> {
-  const releaseSlug = artifactName.replace(/\.tar\.gz$/, "").replace(/\.tgz$/, "");
+  const releaseSlug = sanitizeReleaseSlug(artifactName);
   // A random suffix guarantees a fresh release directory even when two
   // deploys land in the same clock tick with the same artifact filename --
   // without it, they'd collide on releaseId and silently merge into one

@@ -146,6 +146,8 @@ export interface MissionMode {
 
 export interface ParsedMissionDocument {
   rawText: string;
+  /** Raw text of any top-level content before the `modes:` key (header comments, other keys) -- preserved verbatim on render instead of being discarded. */
+  preamble: string;
   modes: MissionMode[];
   selectedTarget: "uav" | "payload" | "";
   warnings: string[];

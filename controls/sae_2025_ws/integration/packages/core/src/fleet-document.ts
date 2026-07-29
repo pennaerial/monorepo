@@ -101,7 +101,12 @@ export function normalizeIntegrationFleetDocument(
     const missionName = `${
       normalizedVehicle.mission || missionNameFromPathString(normalizedVehicle.mission_path as string) || ""
     }`.trim();
-    const inferredKind = `${missionTargetByName[missionName] || normalizedVehicle.kind || ""}`.trim();
+    // An already-explicit kind (chosen directly via FleetEditor's "kind"
+    // field) must win over inferring it from the mission -- otherwise
+    // changing/re-saving with a mission whose registry target disagrees
+    // silently overrides the user's own choice and, as a side effect, wipes
+    // px4_airframe_id/px4_namespace below with no warning.
+    const inferredKind = `${normalizedVehicle.kind || missionTargetByName[missionName] || ""}`.trim();
 
     delete normalizedVehicle.controllable;
     delete normalizedVehicle.mission_path;

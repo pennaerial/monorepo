@@ -22,6 +22,20 @@ export interface SchemaExportResult {
 }
 
 /**
+ * POSIX single-quote shell escaping. releaseRoot is derived from the
+ * uploaded artifact's filename (see deploy.ts's releaseSlug), which is
+ * client-controlled -- interpolating it into a `bash -c` string without this
+ * is a shell injection vector (a filename containing `"`/`$()`/backticks
+ * could execute arbitrary commands on the Pi the next time /api/schema is
+ * called). Single quotes disable all shell interpreting; only an embedded
+ * single quote itself needs escaping, via the standard close-quote,
+ * escaped-quote, reopen-quote technique.
+ */
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
+/**
  * Runs `schema_export.py` against the currently-deployed release, sourcing
  * ROS2 + the release's own colcon overlay first -- the Pi is guaranteed to
  * have a working ROS2 + vehicle_common environment (that's what it's
@@ -46,8 +60,8 @@ export async function exportSchema(
   // a real missing-vehicle_common failure surfaces its own clear stderr.
   const command = [
     "source /opt/ros/jazzy/setup.bash 2>/dev/null",
-    `source "${releaseRoot}/install/setup.bash" 2>/dev/null`,
-    `python3 "${scriptPath}" --root "${releaseRoot}"`,
+    `source ${shellQuote(`${releaseRoot}/install/setup.bash`)} 2>/dev/null`,
+    `python3 ${shellQuote(scriptPath)} --root ${shellQuote(releaseRoot)}`,
   ].join("; ");
 
   const result = await run("bash", ["-c", command], SCHEMA_EXPORT_TIMEOUT_MS);

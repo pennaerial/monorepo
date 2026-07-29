@@ -55,6 +55,27 @@ class SchemaFieldTests(unittest.TestCase):
         self.assertEqual(field["schemaType"], "int")
         self.assertTrue(field["nullable"])
 
+    def test_optional_tuple_field_is_still_classified_as_tuple_not_list(self) -> None:
+        # FleetDefaultsModel.camera_mount_offsets: tuple[float, float, float]
+        # | None -- pydantic wraps the tuple schema inside anyOf alongside
+        # {type: null}, so prefixItems lives on the anyOf variant, not the
+        # top-level property schema. Regression test: this used to fall
+        # through to the plain `type` branch and get classified as "list".
+        field = schema_export._schema_field(
+            "camera_mount_offsets",
+            {
+                "anyOf": [
+                    {"maxItems": 3, "minItems": 3, "prefixItems": [{"type": "number"}] * 3, "type": "array"},
+                    {"type": "null"},
+                ],
+                "default": None,
+            },
+            required=False,
+        )
+        self.assertEqual(field["schemaType"], "tuple")
+        self.assertEqual(field["annotation"], "tuple")
+        self.assertTrue(field["nullable"])
+
     def test_multi_variant_union_becomes_union_type(self) -> None:
         field = schema_export._schema_field(
             "backend",
