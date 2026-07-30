@@ -24,14 +24,13 @@ from typing import Optional, Tuple, override
 import cv2
 import numpy as np
 from cv_bridge import CvBridge
-from pydantic import BaseModel
 from rclpy.node import Node
 from sensor_msgs.msg import CompressedImage, Image
 
 from payload.payload import Payload
 
 from vehicle_common.mode import Mode
-from vehicle_common.mode_loader import register_mode
+from vehicle_common.mode_loader import ParamsBase, register_mode
 
 
 def _vertical_blob_centroid_area(
@@ -89,7 +88,7 @@ def _vertical_blob_centroid_area(
     return (best_cx, best_cy, best_area_i)
 
 
-class PayloadColorStringApproachParams(BaseModel):
+class PayloadColorStringApproachParams(ParamsBase):
     lower_hsv: list[int] = (0, 0, 30)
     upper_hsv: list[int] = (179, 40, 120)
     forward_speed: float = 0.08

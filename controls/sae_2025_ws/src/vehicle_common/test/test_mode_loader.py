@@ -1,11 +1,11 @@
 import pytest
-from pydantic import BaseModel
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 from vehicle_common.mode_loader import (
     serialize_type,
     deserialize_type,
     RegisteredMode,
     ModeRegistry,
+    ParamsBase,
 )
 from mock_classes import MockMode, MockParams, MockVehicle, MockVisionNode, NoParamsMock
 
@@ -58,7 +58,7 @@ def test_registered_mode_creation_no_params_mode():
 
     assert mode.id == "no_params_test"
     assert mode.mode_cls is NoParamsMock
-    assert mode.params_cls is BaseModel
+    assert mode.params_cls is ParamsBase
     assert mode.targets == [MockVehicle]
     assert mode.required_vision_nodes == []
 
@@ -110,8 +110,13 @@ def test_registered_mode_from_json():
 
     json_str = mode.model_dump_json()
 
-    with pytest.raises(ValidationError):
-        RegisteredMode.model_validate_json(json_str)
+    loaded = RegisteredMode.model_validate_json(json_str)
+
+    assert loaded.id == mode.id
+    assert loaded.mode_cls is MockMode
+    assert loaded.params_cls is MockParams
+    assert loaded.targets == [MockVehicle]
+    assert loaded.required_vision_nodes == [MockVisionNode]
 
 
 def test_registered_mode_json_round_trip():
@@ -126,8 +131,9 @@ def test_registered_mode_json_round_trip():
         transition_labels=["done"],
     )
 
-    with pytest.raises(ValidationError):
-        RegisteredMode.model_validate_json(original.model_dump_json())
+    loaded = RegisteredMode.model_validate_json(original.model_dump_json())
+
+    assert loaded.model_dump() == original.model_dump()
 
 
 def test_registered_mode_from_json_invalid_mode_type():
@@ -152,6 +158,19 @@ def test_registered_mode_from_json_invalid_path():
 
     with pytest.raises((ValueError, ModuleNotFoundError)):
         RegisteredMode.model_validate(data)
+
+
+def test_registered_mode_rejects_non_paramsbase_params_cls():
+    with pytest.raises(ValidationError):
+        RegisteredMode.model_validate(
+            {
+                "id": "bad_params_cls",
+                "mode_cls": MockMode,
+                "params_cls": BaseModel,
+                "targets": [MockVehicle],
+                "required_vision_nodes": [],
+            }
+        )
 
 
 def test_mode_registry_json_round_trip():
@@ -185,7 +204,7 @@ def test_mode_registry_json_round_trip():
     output_json = registry.model_dump_json(indent=4)
     output = json.loads(output_json)
     expected = json.loads(original_json)
-    expected["modes"]["mock"]["params_cls"] = "pydantic.main:BaseModel"
+    expected["modes"]["mock"]["params_cls"] = "vehicle_common.mode_loader:ParamsBase"
 
     # Compare parsed JSON, not raw strings
     assert output == expected

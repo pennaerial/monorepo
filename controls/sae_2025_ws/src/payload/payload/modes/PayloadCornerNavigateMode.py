@@ -56,7 +56,6 @@ from typing import Optional, Tuple, override
 import cv2
 import numpy as np
 from cv_bridge import CvBridge
-from pydantic import BaseModel
 from rclpy.node import Node
 from sensor_msgs.msg import CompressedImage, Image
 
@@ -64,7 +63,7 @@ from vehicle_common.cv.dlz_convex_hull import build_dlz_hull_mask
 from payload.payload import Payload
 
 from vehicle_common.mode import Mode
-from vehicle_common.mode_loader import register_mode
+from vehicle_common.mode_loader import ParamsBase, register_mode
 
 # Mirrors PayloadColorSquareNode._COLOR_RATIO: when one tape colour has at
 # least this many times more pixels than the other in the line-follow strip,
@@ -72,7 +71,7 @@ from vehicle_common.mode_loader import register_mode
 _COLOR_DOMINANCE_RATIO = 1.5
 
 
-class PayloadCornerNavigateParams(BaseModel):
+class PayloadCornerNavigateParams(ParamsBase):
     direction: str = "ccw"
     # HSV color ranges — ccw=color A, cw=color B
     ccw_lower_hsv: list[int] = (0, 80, 80)

@@ -1,12 +1,11 @@
 from typing import Optional, Tuple, override
-from pydantic import BaseModel
 from rclpy.node import Node
 from uav.vehicles.UAV import UAV
 from vehicle_common.mode import Mode
-from vehicle_common.mode_loader import register_mode
+from vehicle_common.mode_loader import ParamsBase, register_mode
 
 
-class ServoDropoffParams(BaseModel):
+class ServoDropoffParams(ParamsBase):
     """
     offsets: Should denote the position of dropoff relative to the center of zone, in meters
         In NED frame: x is forward, y is right, and z is down.
@@ -22,7 +21,7 @@ class ServoDropoffParams(BaseModel):
     id="uav.ServoDropoffMode",
     params_cls=ServoDropoffParams,
     targets=[UAV],
-    transition_labels=["complete"]
+    transition_labels=["complete"],
 )
 class ServoDropoffMode(Mode):
     """

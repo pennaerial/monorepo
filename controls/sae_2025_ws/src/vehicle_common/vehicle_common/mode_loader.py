@@ -11,6 +11,12 @@ from vehicle_common.vehicle import Vehicle
 from vehicle_common.base import VisionNode  # don't want to depend on uav package
 
 
+class ParamsBase(BaseModel):
+    """Wrapper around BaseModel that every Mode's Params Type should inherit from"""
+
+    # doing this allows a default "Empty" instantiation since BaseModel() cannot be instantiated.
+
+
 def serialize_type(cls: type) -> str:
     return f"{cls.__module__}:{cls.__qualname__}"
 
@@ -56,7 +62,7 @@ class RegisteredMode(BaseModel):
 
     id: str
     mode_cls: type[Mode]
-    params_cls: type[BaseModel] = BaseModel
+    params_cls: type[ParamsBase] = ParamsBase
     targets: list[type[Vehicle]] = []
     required_vision_nodes: list[type[VisionNode]] = []
     peer_vehicle_names: list[str] = []
@@ -69,7 +75,7 @@ class RegisteredMode(BaseModel):
         return serialize_type(value)
 
     @field_serializer("params_cls")
-    def serialize_params_cls(self, value: type[BaseModel]) -> str:
+    def serialize_params_cls(self, value: type[ParamsBase]) -> str:
         return serialize_type(value)
 
     @field_serializer("targets")
@@ -88,6 +94,15 @@ class RegisteredMode(BaseModel):
         if isinstance(path, str):
             return deserialize_type(path, Mode)
         return path  # mode type
+
+    @field_validator("params_cls", mode="before")
+    @classmethod
+    def deserialize_params_cls(cls, path) -> type[ParamsBase]:
+        if isinstance(path, str):
+            return deserialize_type(path, ParamsBase)
+        if not isinstance(path, type) or not issubclass(path, ParamsBase):
+            raise ValueError(f"{path} must be a {ParamsBase.__name__}")
+        return path
 
     @field_validator("targets", mode="before")
     @classmethod
@@ -163,7 +178,7 @@ class ModeRegistry(BaseModel):
 def register_mode(
     id: str,
     targets: list[type[Vehicle]],
-    params_cls: type[BaseModel] = BaseModel,
+    params_cls: type[ParamsBase] = ParamsBase,
     required_vision_nodes: list[type[VisionNode]] = [],
     peer_vehicle_names: list[str] = [],
     requires_camera: bool = False,

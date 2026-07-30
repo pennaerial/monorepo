@@ -8,13 +8,12 @@ from typing_extensions import TypedDict
 import cv2
 import numpy as np
 from cv_bridge import CvBridge
-from pydantic import BaseModel
 from rclpy.node import Node
 from sensor_msgs.msg import CompressedImage, Image
 
 from vehicle_common.cv.dlz_convex_hull import build_dlz_hull_mask
 from vehicle_common.mode import Mode
-from vehicle_common.mode_loader import register_mode
+from vehicle_common.mode_loader import ParamsBase, register_mode
 from payload.payload import Payload
 from uav.vision_nodes import PayloadAprilTagNode
 from uav.vision_nodes.payload_perception_common import DEFAULT_TAG_FAMILY
@@ -131,7 +130,7 @@ class TagTransitionRule(TypedDict):
     direction: Literal["cw", "ccw"]
 
 
-class PayloadDLZNavigateParams(BaseModel):
+class PayloadDLZNavigateParams(ParamsBase):
     direction: Literal["cw", "ccw"] = "ccw"
     target_transitions: int = 1
     turn_angular_speed: float = 0.5

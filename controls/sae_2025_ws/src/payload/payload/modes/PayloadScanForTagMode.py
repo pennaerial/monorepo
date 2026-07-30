@@ -6,7 +6,6 @@ from typing import Optional, override
 import cv2
 import numpy as np
 from cv_bridge import CvBridge
-from pydantic import BaseModel
 from rclpy.node import Node
 from sensor_msgs.msg import CompressedImage, Image
 
@@ -16,12 +15,12 @@ from uav.vision_nodes.payload_perception_common import DEFAULT_TAG_FAMILY
 from uav_interfaces.srv import PayloadAprilTagState
 
 from vehicle_common.mode import Mode
-from vehicle_common.mode_loader import register_mode
+from vehicle_common.mode_loader import ParamsBase, register_mode
 
 _TWO_PI = 2.0 * math.pi
 
 
-class PayloadScanForTagParams(BaseModel):
+class PayloadScanForTagParams(ParamsBase):
     tag_id: int = 0
     tag_size_m: float = 0.0508
     tag_family: str = DEFAULT_TAG_FAMILY

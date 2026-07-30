@@ -2,11 +2,10 @@ from typing import override
 
 from rclpy.node import Node
 from px4_msgs.msg import VehicleStatus
-from pydantic import BaseModel
 
 from uav.vehicles.UAV import UAV
 from vehicle_common.mode import Mode
-from vehicle_common.mode_loader import register_mode
+from vehicle_common.mode_loader import ParamsBase, register_mode
 
 
 @register_mode(id="uav.LandingMode", targets=[UAV])
@@ -16,7 +15,7 @@ class LandingMode(Mode):
     """
 
     @override
-    def initialize(self, node: Node, vehicle: UAV, params: BaseModel) -> None:
+    def initialize(self, node: Node, vehicle: UAV, params: ParamsBase) -> None:
         self.node = node
         self.vehicle = vehicle
         self.p = params

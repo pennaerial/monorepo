@@ -18,7 +18,6 @@ from typing import Optional, Tuple, override
 import cv2
 import numpy as np
 from cv_bridge import CvBridge
-from pydantic import BaseModel
 from rclpy.node import Node
 from sensor_msgs.msg import CameraInfo, CompressedImage, Image
 
@@ -30,7 +29,7 @@ from uav.vision_nodes.payload_perception_common import (
 )
 
 from vehicle_common.mode import Mode
-from vehicle_common.mode_loader import register_mode
+from vehicle_common.mode_loader import ParamsBase, register_mode
 
 
 def _color_blob_info(
@@ -61,7 +60,7 @@ def _color_blob_info(
     return (cx, cy, int(a), bh)
 
 
-class PayloadDualApproachParams(BaseModel):
+class PayloadDualApproachParams(ParamsBase):
     # --- AprilTag params ---
     tag_id: Optional[int] = 0
     tag_size_m: float = 0.0508
@@ -89,6 +88,7 @@ class PayloadDualApproachParams(BaseModel):
 
 @register_mode(
     id="payload.PayloadDualApproachMode",
+    params_cls=PayloadDualApproachParams,
     targets=[Payload],
     requires_camera=True,
 )

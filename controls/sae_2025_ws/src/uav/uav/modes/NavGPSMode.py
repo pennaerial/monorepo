@@ -3,14 +3,12 @@ from __future__ import annotations
 from typing import Literal, override
 from rclpy.node import Node
 
-from pydantic import BaseModel
-
 from uav.vehicles.UAV import UAV
 from vehicle_common.mode import Mode
-from vehicle_common.mode_loader import register_mode
+from vehicle_common.mode_loader import ParamsBase, register_mode
 
 
-class NavGPSParams(BaseModel):
+class NavGPSParams(ParamsBase):
     """
     coordinates: The coordinates to navigate to (x/y/z or lon/lat/alt, wait time, GPS/LOCAL).
         Local are NED coordinates, relative to the starting position (https://docs.px4.io/main/en/ros2/user_guide.html#ros-2-px4-frame-conventions).
@@ -25,7 +23,7 @@ class NavGPSParams(BaseModel):
     id="uav.NavGPSMode",
     params_cls=NavGPSParams,
     targets=[UAV],
-    transition_labels=["complete"]
+    transition_labels=["complete"],
 )
 class NavGPSMode(Mode[UAV, NavGPSParams]):
     """
