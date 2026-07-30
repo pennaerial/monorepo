@@ -5,15 +5,13 @@ import math
 import time
 from typing import List, override
 
-from pydantic import BaseModel
-
 from uav.vehicles.UAV import UAV
 
 from vehicle_common.mode import Mode
-from vehicle_common.mode_loader import register_mode
+from vehicle_common.mode_loader import ParamsBase, register_mode
 
 
-class WaypointMissionParams(BaseModel):
+class WaypointMissionParams(ParamsBase):
     waypoints: List[List[float]] = None
     waypoint_tolerance: float = 0.5
     speed: float = 1.0
@@ -21,7 +19,9 @@ class WaypointMissionParams(BaseModel):
     altitude: float = 2.0
 
 
-@register_mode(id="uav.WaypointMission", targets=[UAV])
+@register_mode(
+    id="uav.WaypointMission", params_cls=WaypointMissionParams, targets=[UAV]
+)
 class WaypointMission(Mode):
     """
     Simple waypoint mission for testing scoring node.
@@ -146,11 +146,6 @@ class WaypointMission(Mode):
         """Arm the vehicle."""
         self.vehicle.arm()
         self.node.get_logger().info("Arming vehicle...")
-
-    @classmethod
-    @override
-    def get_params_cls(cls) -> type[BaseModel]:
-        return WaypointMissionParams
 
 
 def main(args=None):

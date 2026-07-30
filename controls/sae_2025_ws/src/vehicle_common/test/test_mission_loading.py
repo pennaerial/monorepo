@@ -1,10 +1,9 @@
 import pytest
 from pydantic import ValidationError
-
-from vehicle_common.runtime.mission_loader import RuntimeMode, RuntimeMission
-from vehicle_common.mode_loader import ModeRegistry
 import yaml
 
+from vehicle_common.runtime.mission_loader import RuntimeMode, RuntimeMission
+from vehicle_common.mode_loader import ModeRegistry, ParamsBase
 from mock_classes import (
     MockParams,
     MockVehicle,
@@ -85,7 +84,7 @@ modes:
 """
 
 
-def test_runtime_mission_vision_nodes_empty_when_not_shared_by_all_modes():
+def test_vision_nodes_union_across_modes():
     mission = RuntimeMission.model_validate(yaml.safe_load(mock_mission_yaml_2))
     print(mission._vision_nodes)
     expected = {MockVisionNode}
@@ -101,9 +100,25 @@ modes:
 """
 
 
-def test_runtime_mission_requires_camera_false_if_no_mode_requires_it():
+def test_requires_camera_false_without_camera_modes():
     mission = RuntimeMission.model_validate(yaml.safe_load(mission_3))
     assert mission._requires_camera is False
+
+
+mission_no_params_field = """
+modes:
+  no_params_mode:
+    mode: no_params
+"""
+
+
+def test_missing_params_defaults_to_empty():
+    mission = RuntimeMission.model_validate(yaml.safe_load(mission_no_params_field))
+    runtime_mode = mission.modes["no_params_mode"]
+
+    assert runtime_mode.params == {}
+    assert runtime_mode._validated_params == ParamsBase()
+    assert runtime_mode.transitions == {}
 
 
 def test_runtime_mission_forbids_extra_fields():
@@ -143,6 +158,18 @@ modes:
 def test_runtime_mission_invalid_params_raises():
     with pytest.raises(ValidationError):
         RuntimeMission.model_validate(yaml.safe_load(bad_params))
+
+
+missing_required_params = """
+modes:
+  required:
+    mode: mock.required_params
+"""
+
+
+def test_missing_params_fails_with_required_model():
+    with pytest.raises(ValidationError):
+        RuntimeMission.model_validate(yaml.safe_load(missing_required_params))
 
 
 def test_runtime_mission_requires_at_least_one_mode():

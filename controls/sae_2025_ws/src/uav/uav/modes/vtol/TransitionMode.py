@@ -1,5 +1,4 @@
 import numpy as np
-from pydantic import BaseModel
 from rclpy.node import Node
 from typing import Literal, override
 
@@ -8,15 +7,18 @@ from uav.vehicles.UAV import UAV
 
 from vehicle_common.mode import Mode
 
-from vehicle_common.mode_loader import register_mode
+from vehicle_common.mode_loader import ParamsBase, register_mode
 
 
-class TransitionParams(BaseModel):
+class TransitionParams(ParamsBase):
     to_mode: Literal["MC", "FW"]
 
 
 @register_mode(
-    id="uav.vtol.TransitionMode", targets=[UAV], transition_labels=["complete"]
+    id="uav.vtol.TransitionMode",
+    params_cls=TransitionParams,
+    targets=[UAV],
+    transition_labels=["complete"],
 )
 class TransitionMode(Mode):
     """
@@ -114,8 +116,3 @@ class TransitionMode(Mode):
             return "continue"
         self.log(f"Transition to {self.p.to_mode} complete")
         return "complete"
-
-    @classmethod
-    @override
-    def get_params_cls(cls) -> type[BaseModel]:
-        return TransitionParams

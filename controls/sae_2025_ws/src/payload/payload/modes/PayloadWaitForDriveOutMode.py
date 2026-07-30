@@ -29,17 +29,16 @@ from typing import Optional, List, override
 import cv2
 import numpy as np
 from cv_bridge import CvBridge
-from pydantic import BaseModel
 from rclpy.node import Node
 from sensor_msgs.msg import CompressedImage, Image
 
 from payload.payload import Payload
 
 from vehicle_common.mode import Mode
-from vehicle_common.mode_loader import register_mode
+from vehicle_common.mode_loader import ParamsBase, register_mode
 
 
-class PayloadWaitForDriveOutParams(BaseModel):
+class PayloadWaitForDriveOutParams(ParamsBase):
     # DLZ color detection
     dlz_color_lower_hsv: List[int] = (5, 120, 120)
     dlz_color_upper_hsv: List[int] = (20, 255, 255)
@@ -74,6 +73,7 @@ class DriveOutState(Enum):
 
 @register_mode(
     id="payload.PayloadWaitForDriveOutMode",
+    params_cls=PayloadWaitForDriveOutParams,
     targets=[Payload],
     transition_labels=["complete"],
     requires_camera=True,
@@ -373,8 +373,3 @@ class PayloadWaitForDriveOutMode(Mode):
 
     def on_exit(self) -> None:
         pass
-
-    @classmethod
-    @override
-    def get_params_cls(cls) -> type[BaseModel]:
-        return PayloadWaitForDriveOutParams

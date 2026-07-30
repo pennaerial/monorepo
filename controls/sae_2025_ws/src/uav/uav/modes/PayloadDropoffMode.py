@@ -1,7 +1,6 @@
 from typing import Optional, Tuple, override
 
 import numpy as np
-from pydantic import BaseModel
 from px4_msgs.msg import VehicleStatus
 from rclpy.node import Node
 
@@ -10,10 +9,10 @@ from uav.vision_nodes import PayloadTrackingNode
 from uav_interfaces.srv import PayloadTracking
 
 from vehicle_common.mode import Mode
-from vehicle_common.mode_loader import register_mode
+from vehicle_common.mode_loader import ParamsBase, register_mode
 
 
-class PayloadDropoffParams(BaseModel):
+class PayloadDropoffParams(ParamsBase):
     """
     offsets: Should denote the position of dropoff relative to the center of zone, in meters
         In NED frame: x is forward, y is right, and z is down.
@@ -24,6 +23,7 @@ class PayloadDropoffParams(BaseModel):
 
 @register_mode(
     id="uav.PayloadDropoffMode",
+    params_cls=PayloadDropoffParams,
     targets=[UAV],
     required_vision_nodes=[PayloadTrackingNode],
     transition_labels=["complete"],
@@ -134,8 +134,3 @@ class PayloadDropoffMode(Mode):
         if self.done:
             return "complete"
         return "continue"
-
-    @classmethod
-    @override
-    def get_params_cls(cls) -> type[BaseModel]:
-        return PayloadDropoffParams

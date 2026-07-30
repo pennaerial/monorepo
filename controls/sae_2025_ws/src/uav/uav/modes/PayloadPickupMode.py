@@ -1,7 +1,6 @@
 from typing import override
 
 import numpy as np
-from pydantic import BaseModel
 from rclpy.node import Node
 
 from uav.vehicles.UAV import UAV
@@ -9,15 +8,16 @@ from uav.vision_nodes import PayloadTrackingNode
 from uav_interfaces.srv import PayloadTracking
 
 from vehicle_common.mode import Mode
-from vehicle_common.mode_loader import register_mode
+from vehicle_common.mode_loader import ParamsBase, register_mode
 
 
-class PayloadPickupParams(BaseModel):
+class PayloadPickupParams(ParamsBase):
     color: str = "green"
 
 
 @register_mode(
     id="uav.PayloadPickupMode",
+    params_cls=PayloadPickupParams,
     targets=[UAV],
     required_vision_nodes=[PayloadTrackingNode],
     transition_labels=["complete"],
@@ -112,8 +112,3 @@ class PayloadPickupMode(Mode):
         if self.done:
             return "complete"
         return "continue"
-
-    @classmethod
-    @override
-    def get_params_cls(cls) -> type[BaseModel]:
-        return PayloadPickupParams

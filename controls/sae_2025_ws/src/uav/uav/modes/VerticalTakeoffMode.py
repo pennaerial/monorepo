@@ -1,12 +1,11 @@
 from typing import override
 
-from pydantic import BaseModel
 from px4_msgs.msg import VehicleStatus
 from rclpy.node import Node
 
 from uav.vehicles.UAV import UAV
 from vehicle_common.mode import Mode
-from vehicle_common.mode_loader import register_mode
+from vehicle_common.mode_loader import ParamsBase, register_mode
 from enum import StrEnum
 
 
@@ -15,13 +14,16 @@ class TakeoffMethod(StrEnum):
     PX4_AUTO = "PX4_AUTO"  # rely on px4 AUTO_TAKEOFF mode for takeoff
 
 
-class VerticalTakeoffParams(BaseModel):
+class VerticalTakeoffParams(ParamsBase):
     takeoff_height: float = 5.0
     takeoff_method: str = "PX4_AUTO"
 
 
 @register_mode(
-    id="uav.VerticalTakeoffMode", targets=[UAV], transition_labels=["complete"]
+    id="uav.VerticalTakeoffMode",
+    params_cls=VerticalTakeoffParams,
+    targets=[UAV],
+    transition_labels=["complete"],
 )
 class VerticalTakeoffMode(Mode):
     """Vertical takeoff for any UAV airframe (multicopter or VTOL)."""
@@ -138,8 +140,3 @@ class VerticalTakeoffMode(Mode):
                 return "complete"
 
         return "continue"
-
-    @classmethod
-    @override
-    def get_params_cls(cls) -> type[BaseModel]:
-        return VerticalTakeoffParams

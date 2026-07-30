@@ -15,14 +15,13 @@ from typing import Optional, Tuple, override
 
 import cv2
 import numpy as np
-from pydantic import BaseModel
 from rclpy.node import Node
 from sensor_msgs.msg import CompressedImage, Image
 from payload_interfaces.msg import DriveCommand
 from cv_bridge import CvBridge
 
 from vehicle_common.mode import Mode
-from vehicle_common.mode_loader import register_mode
+from vehicle_common.mode_loader import ParamsBase, register_mode
 from payload.payload import Payload
 from uav.vision_nodes import PayloadAprilTagNode
 
@@ -31,7 +30,7 @@ _WHITE_LOWER = np.array([0, 0, 200], dtype=np.uint8)
 _WHITE_UPPER = np.array([180, 30, 255], dtype=np.uint8)
 
 
-class PayloadRetreatParams(BaseModel):
+class PayloadRetreatParams(ParamsBase):
     forward_speed_mps: float = 0.12
     edge_threshold: float = 0.30
     edge_stable_frames: int = 5
@@ -47,6 +46,7 @@ class PayloadRetreatParams(BaseModel):
 
 @register_mode(
     id="payload.PayloadRetreatMode",
+    params_cls=PayloadRetreatParams,
     targets=[Payload],
     required_vision_nodes=[PayloadAprilTagNode],
 )
@@ -288,8 +288,3 @@ class PayloadRetreatMode(Mode):
         self._drive_pub.publish(
             DriveCommand(linear=float(linear), angular=float(angular))
         )
-
-    @classmethod
-    @override
-    def get_params_cls(cls) -> type[BaseModel]:
-        return PayloadRetreatParams

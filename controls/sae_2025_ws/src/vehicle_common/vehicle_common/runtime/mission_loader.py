@@ -26,8 +26,7 @@ class RuntimeMode(BaseModel):
     def model_post_init(self, context: Any, /) -> None:
         mode_registry = ModeRegistry.get()
         self._registered = mode_registry.get_registered_mode(self.mode)
-        mode_cls = self._registered.mode_cls
-        self._validated_params = mode_cls.get_params_cls().model_validate(self.params)
+        self._validated_params = self._registered.params_cls.model_validate(self.params)
 
     def instantiate_mode(self, node: Node, vehicle: Vehicle) -> Mode:
         mode = self._registered.mode_cls()

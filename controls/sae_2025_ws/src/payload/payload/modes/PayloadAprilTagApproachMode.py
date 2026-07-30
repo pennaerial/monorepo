@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional, override
 
-from pydantic import BaseModel
 from rclpy.node import Node
 from sensor_msgs.msg import CameraInfo, CompressedImage, Image
 from cv_bridge import CvBridge
@@ -18,7 +17,7 @@ from uav.vision_nodes.payload_perception_common import (
 )
 
 from vehicle_common.mode import Mode
-from vehicle_common.mode_loader import register_mode
+from vehicle_common.mode_loader import ParamsBase, register_mode
 
 
 @dataclass(frozen=True)
@@ -33,7 +32,7 @@ class TagObservation:
     area: float
 
 
-class PayloadAprilTagApproachParams(BaseModel):
+class PayloadAprilTagApproachParams(ParamsBase):
     tag_id: Optional[int] = None
     tag_size_m: float = 0.0508
     tag_family: str = DEFAULT_TAG_FAMILY
@@ -49,6 +48,7 @@ class PayloadAprilTagApproachParams(BaseModel):
 
 @register_mode(
     id="payload.PayloadAprilTagApproachMode",
+    params_cls=PayloadAprilTagApproachParams,
     targets=[Payload],
     transition_labels=["done", "tag_lost"],
     requires_camera=True,
@@ -274,8 +274,3 @@ class PayloadAprilTagApproachMode(Mode):
 
     def on_exit(self) -> None:
         self.vehicle.stop()
-
-    @classmethod
-    @override
-    def get_params_cls(cls) -> type[BaseModel]:
-        return PayloadAprilTagApproachParams
