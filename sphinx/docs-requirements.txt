@@ -4,3 +4,4 @@ sphinx-autoapi
 myst-parser
 breathe
 sphinx-autobuild
+sphinx-design
