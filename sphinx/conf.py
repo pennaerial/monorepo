@@ -40,6 +40,7 @@ extensions = [
     "sphinx.ext.napoleon",  # for parsing Google and NumPy style docstrings
     "myst_parser",  # allows markdown doc writing
     "breathe",  # creates sphinx directives from doxygen xml
+    "sphinx_design",
 ]
 if not SKIP_AUTOAPI_BUILD:
     extensions.append("autoapi.extension")
