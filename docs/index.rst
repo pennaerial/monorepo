@@ -40,7 +40,7 @@ Quick Links:
    :maxdepth: 2
    :caption: GETTING STARTED
 
-   Installation <installation/index>
+   installation/index
    docs-contribution
 
 .. toctree::
