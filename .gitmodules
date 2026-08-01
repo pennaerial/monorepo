@@ -5,7 +5,7 @@
 [submodule "PX4-Autopilot"]
 	path = PX4-Autopilot
 	url = https://github.com/pennaerial/PX4-Autopilot.git
-	branch = release/1.17
+	branch = pennair-main
 [submodule "gz-models"]
 	path = gz-models
 	url = https://github.com/pennaerial/gz-models.git
