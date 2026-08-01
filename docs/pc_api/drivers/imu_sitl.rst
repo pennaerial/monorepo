@@ -1,4 +1,4 @@
-IMU SITL API
+IMU SITL
 ===================
 
 .. doxygenfile:: imu_sitl.cpp
