@@ -5,3 +5,7 @@ myst-parser
 breathe
 sphinx-autobuild
 sphinx-design
+sphinx-new-tab-link
+sphinx-copybutton
+sphinx-tabs
+sphinx-iconify

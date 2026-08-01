@@ -1,2 +1,2 @@
-macOS Installation Guide
-========================
+macOS Installation
+===================

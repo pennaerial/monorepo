@@ -1,2 +1,2 @@
-Ubuntu (Windows) Installation Guide
-====================================
+Ubuntu Installation
+====================
