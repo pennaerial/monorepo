@@ -1,4 +1,4 @@
-Payload Controller XRCE DDS Middleware Client API
+PC XRCE DDS Client
 ===================================================
 
 .. doxygenfile:: pc_xrce_dds_client.hpp
