@@ -1,7 +1,7 @@
 name: Nightly
 on:
   schedule:
-    - cron: '0 0 * * *'
+    - cron: '0 5 * * *'
   workflow_dispatch:
 permissions:
   contents: write
@@ -16,4 +16,4 @@ jobs:
           submodules: recursive
           fetch-depth: 0
       - name: Run submodule bump script
-        run: bash ../ci/update-submodules.sh
+        run: bash ./scripts/update_submodules.sh
