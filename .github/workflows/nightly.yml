@@ -15,5 +15,5 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 0
-      - name: Run submodule bump script
-        run: bash ./scripts/update_submodules.sh
+      - name: Update Submodules
+        run: bash ../ci/update_submodules.sh
