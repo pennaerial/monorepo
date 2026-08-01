@@ -9,3 +9,6 @@
 [submodule "gz-models"]
 	path = gz-models
 	url = https://github.com/pennaerial/gz-models.git
+[submodule "Dependencies"]
+	path = Dependencies
+	url = https://github.com/pennaerial/Dependencies.git
