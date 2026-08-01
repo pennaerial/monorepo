@@ -4,3 +4,9 @@ export MONOREPO_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 export PENNAIR_GZ_MODELS_PATH="${MONOREPO_ROOT}/gz-models"
 export PENNAIR_PX4_PATH="${MONOREPO_ROOT}/PX4-Autopilot"
 export PENNAIR_PAYLOAD_CONTROLLER_PATH="${MONOREPO_ROOT}/payload_controller"
+export PENNAIR_DEPENDENCIES_ROOT="${MONOREPO_ROOT}/Dependencies"
+
+# Can access the executable by using $XRCE_DDS_GEN_PATH/scripts/microxrceddsgen
+export XRCE_DDS_GEN_PATH="$PENNAIR_DEPENDENCIES_ROOT/Micro-XRCE-DDS-Gen"
+export XRCE_DDS_CLIENT_PATH="$PENNAIR_DEPENDENCIES_ROOT/Micro-XRCE-DDS-Client"
+export XRCE_DDS_MICROCDR_PATH="$PENNAIR_DEPENDENCIES_ROOT/Micro-CDR"
