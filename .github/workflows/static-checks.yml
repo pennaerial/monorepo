@@ -22,20 +22,33 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Filter paths # if no filter paths have been changed, check passes after this step
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            python:
+              - '**/*.py'
+              - 'pyproject.toml'
+            workflows:
+              - '.github/workflows/**'
+
       - name: Install Ruff
+        if: ${{ steps.filter.outputs.python == 'true' }}
         uses: astral-sh/ruff-action@v4.0.0
         with:
           version: "0.15.10"
           args: "--version"
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Check Ruff Formatting
-        run: ruff format --check --diff .
+      - name: Ruff format & lint
+        if: ${{ steps.filter.outputs.python == 'true' }}
+        run: |
+          ruff format --check --diff .
+          ruff check .
 
-      - name: Check Ruff lint
-        run: ruff check .
-
-      - name: actionlint Check workflow files
+      - name: Check workflow files
+        if: ${{ steps.filter.outputs.workflows == 'true' }}
         run: |
           bash <(curl https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
           ./actionlint -color
