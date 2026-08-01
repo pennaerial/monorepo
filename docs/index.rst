@@ -41,6 +41,7 @@ Quick Links:
    :caption: GETTING STARTED
 
    Installation <installation/index>
+   docs-contribution
 
 .. toctree::
    :hidden:
