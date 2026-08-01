@@ -1,3 +1,5 @@
+# macOS Installation
+
 **Note**: the following has not been fully tested yet. Please @frankie on Slack if there are any issues with the installation or setup.
 
 ## Setting Up
