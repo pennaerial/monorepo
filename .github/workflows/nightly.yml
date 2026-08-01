@@ -16,4 +16,4 @@ jobs:
           submodules: recursive
           fetch-depth: 0
       - name: Update Submodules
-        run: bash ../ci/update_submodules.sh
+        run: bash ci/update_submodules.sh
