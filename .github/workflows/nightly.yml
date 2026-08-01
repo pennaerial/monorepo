@@ -1,0 +1,19 @@
+name: Nightly
+on:
+  schedule:
+    - cron: '0 5 * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  nightly:
+    name: Nightly
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+      - name: Update Submodules
+        run: bash ci/update_submodules.sh

@@ -4,7 +4,7 @@ Drivers
 
 .. toctree::
    :maxdepth: 2
-   :caption: Driver Submodules
+   :caption: Driver Modules
 
-   imu <imu>
+   imu
 

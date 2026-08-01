@@ -7,24 +7,15 @@ idf_component_register(
     INCLUDE_DIRS "."
 )
 
-foreach(_var XRCE_DDS_CLIENT_PATH XRCE_DDS_MICROCDR_PATH)
+foreach(_var PENNAIR_XRCE_DDS_CLIENT_PATH PENNAIR_XRCE_DDS_MICROCDR_PATH)
     if(NOT DEFINED ENV{${_var}})
-        message(FATAL_ERROR
-            "$ENV{${_var}} is not set. source Dependencies/monorepo-deps-env.sh "
-            "before building payload_controller.")
+        message(FATAL_ERROR "$ENV{${_var}} is not set")
+    else()
+        message(STATUS "${_var} resolved to: $ENV{${_var}}")
     endif()
 endforeach()
 
-# Micro-CDR and Micro-XRCE-DDS-Client are built via ExternalProject_Add (each
-# its own separate `cmake` configure+build), not add_subdirectory(). They
-# were tried in-tree first, but ESP-IDF's ambient per-directory build state
-# (its `linux` target's libc header shims + -pedantic -Werror, its implicit
-# link against __idf_* component libs) kept leaking into them since
-# add_subdirectory() shares the same CMake directory-scope tree. A separate
-# process has none of that ambient state, so we forward only what these
-# libraries actually need: the exact compiler/flags/toolchain ESP-IDF is
-# already using for this target (so e.g. esp32s3's -mlongcalls stays
-# consistent with the rest of the firmware image), nothing more.
+# Micro-CDR and Micro-XRCE-DDS-Client are built via ExternalProject_Add
 include(ExternalProject)
 
 set(xrce_deps_build_dir "${CMAKE_CURRENT_BINARY_DIR}/xrce_deps")
@@ -50,28 +41,14 @@ if(IDF_TARGET STREQUAL "linux")
         -DCMAKE_EXE_LINKER_FLAGS:STRING=${CMAKE_EXE_LINKER_FLAGS}
     )
 endif()
-# For other targets (e.g. esp32s3), don't forward CMAKE_C_FLAGS/CXX_FLAGS/
-# EXE_LINKER_FLAGS at all: forwarding CMAKE_TOOLCHAIN_FILE above is enough on
-# its own — that toolchain file unconditionally appends a GCC `@file`
-# response-file reference (e.g. -mlongcalls, -specs=picolibc.specs) to
-# whatever CMAKE_*_FLAGS already holds whenever it's reprocessed, pointing at
-# the same shared, already-fully-populated build/<target>/toolchain/cflags
-# path regardless of which build reprocesses it. Also forwarding our own
-# copy of those same flags applies them twice on one command line, which GCC
-# rejects outright for -specs ("attempt to rename spec... already defined").
 
 ExternalProject_Add(microcdr_project
     PREFIX      ${xrce_deps_build_dir}/microcdr
-    SOURCE_DIR  "$ENV{XRCE_DDS_MICROCDR_PATH}"
+    SOURCE_DIR  "$ENV{PENNAIR_XRCE_DDS_MICROCDR_PATH}"
     CMAKE_CACHE_ARGS
         ${xrce_common_cache_args}
         -DUCDR_SUPERBUILD:BOOL=OFF
         -DUCDR_PIC:BOOL=OFF
-        # Unlike the Client's equivalent (which defaults OFF), Micro-CDR
-        # defaults this ON, which installs into a versioned subdirectory
-        # (e.g. microcdr-2.0.1/lib/...) instead of flat lib/ — force it off
-        # so both land at the flat path BUILD_BYPRODUCTS/IMPORTED_LOCATION
-        # below expect.
         -DUCDR_ISOLATED_INSTALL:BOOL=OFF
     BUILD_BYPRODUCTS ${xrce_deps_install_dir}/lib/libmicrocdr.a
     LOG_CONFIGURE true
@@ -90,18 +67,12 @@ set(client_profile_args
 )
 
 if(IDF_TARGET STREQUAL "linux")
-    # Host build: ESP-IDF's `linux` toolchain doesn't override
-    # CMAKE_SYSTEM_NAME, so the Client sees a real "Linux" system and its
-    # native POSIX/termios serial backend just works.
     list(APPEND client_profile_args
         -DUCLIENT_PROFILE_SERIAL:BOOL=ON
         -DUCLIENT_PROFILE_CUSTOM_TRANSPORT:BOOL=OFF
     )
 else()
-    # esp32s3: ESP-IDF's toolchain sets CMAKE_SYSTEM_NAME to "Generic", which
-    # the Client doesn't recognize as a POSIX-like platform, so its serial
-    # profile wouldn't have a working backend. Use the custom-transport
-    # profile instead, with UART glue supplied from pc_xrce_dds_client.cpp.
+    # Use the custom-transport profile with UART config supplied from pc_xrce_dds_client.cpp.
     list(APPEND client_profile_args
         -DUCLIENT_PROFILE_SERIAL:BOOL=OFF
         -DUCLIENT_PROFILE_CUSTOM_TRANSPORT:BOOL=ON
@@ -110,7 +81,7 @@ endif()
 
 ExternalProject_Add(xrce_dds_client_project
     PREFIX      ${xrce_deps_build_dir}/client
-    SOURCE_DIR  "$ENV{XRCE_DDS_CLIENT_PATH}"
+    SOURCE_DIR  "$ENV{PENNAIR_XRCE_DDS_CLIENT_PATH}"
     CMAKE_CACHE_ARGS
         ${xrce_common_cache_args}
         -DUCLIENT_SUPERBUILD:BOOL=OFF

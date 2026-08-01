@@ -1,4 +1,4 @@
-IMU Driver API
+IMU Interface
 ===============
 
 IMU sensor abstraction layer.
@@ -11,7 +11,7 @@ IMU Implementations:
 .. toctree::
    :maxdepth: 2
 
-   imu_sitl <imu_sitl>
+   imu_sitl
 
 
 .. doxygenfile:: imu.hpp

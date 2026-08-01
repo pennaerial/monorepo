@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 
-export MONOREPO_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-export PENNAIR_GZ_MODELS_PATH="${MONOREPO_ROOT}/gz-models"
-export PENNAIR_PX4_PATH="${MONOREPO_ROOT}/PX4-Autopilot"
-export PENNAIR_PAYLOAD_CONTROLLER_PATH="${MONOREPO_ROOT}/payload_controller"
+export PENNAIR_MONOREPO_PATH="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)" # current dir of dev_env.sh
+export PENNAIR_GZ_MODELS_PATH="${PENNAIR_MONOREPO_PATH}/gz-models"
+export PENNAIR_PX4_PATH="${PENNAIR_MONOREPO_PATH}/PX4-Autopilot"
+export PENNAIR_PAYLOAD_CONTROLLER_PATH="${PENNAIR_MONOREPO_PATH}/payload_controller"
+export PENNAIR_DEPENDENCIES_PATH="${PENNAIR_MONOREPO_PATH}/Dependencies"
+
+# Can access the executable by using $PENNAIR_XRCE_DDS_GEN_PATH/scripts/microxrceddsgen
+export PENNAIR_XRCE_DDS_GEN_PATH="$PENNAIR_DEPENDENCIES_PATH/Micro-XRCE-DDS-Gen"
+export PENNAIR_XRCE_DDS_CLIENT_PATH="$PENNAIR_DEPENDENCIES_PATH/Micro-XRCE-DDS-Client"
+export PENNAIR_XRCE_DDS_MICROCDR_PATH="$PENNAIR_DEPENDENCIES_PATH/Micro-CDR"

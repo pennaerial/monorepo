@@ -41,6 +41,10 @@ extensions = [
     "myst_parser",  # allows markdown doc writing
     "breathe",  # creates sphinx directives from doxygen xml
     "sphinx_design",
+    "sphinx_new_tab_link",
+    "sphinx_copybutton",
+    "sphinx_tabs.tabs",
+    "sphinx_iconify",
 ]
 if not SKIP_AUTOAPI_BUILD:
     extensions.append("autoapi.extension")
