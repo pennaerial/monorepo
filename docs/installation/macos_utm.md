@@ -28,3 +28,4 @@
 ## Next Steps
 - Please please change the password using `passwd` and following the instructions
 - Set up GitHub authentication to push to the `monorepo` (recommended: [SSH authentication](https://docs.github.com/en/authentication/connecting-to-github-with-ssh))
+- Look at the [Ubuntu Guide](./ubuntu.rst) for further instructions
