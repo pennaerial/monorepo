@@ -9,6 +9,7 @@ apt-get update
 #### install uv
 echo "Installing uv..."
 curl -LsSf https://astral.sh/uv/install.sh | sh
+export PATH="$HOME/.local/bin:$PATH"
 
 #### install rosdeps
 sudo rosdep init || true # || true guards against already initialized rosdep
@@ -23,5 +24,5 @@ rm -rf /var/lib/apt/lists/*
 
 #### install python dependencies into system using uv
 echo "Installing pyproject dependencies globally..."
-uv pip install --system --no-cache -r ${PENNAIR_MONOREPO_PATH}/pyproject.toml
+uv pip install --system --break-system-packages --no-cache -r ${PENNAIR_MONOREPO_PATH}/pyproject.toml
 
