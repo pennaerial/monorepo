@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 export PENNAIR_MONOREPO_PATH="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)" # current dir of dev_env.sh
+export PENNAIR_SAE_WS_PATH=$"${PENNAIR_MONOREPO_PATH}/controls/sae_2025_ws"
 export PENNAIR_GZ_MODELS_PATH="${PENNAIR_MONOREPO_PATH}/gz-models"
 export PENNAIR_PX4_PATH="${PENNAIR_MONOREPO_PATH}/PX4-Autopilot"
 export PENNAIR_PAYLOAD_CONTROLLER_PATH="${PENNAIR_MONOREPO_PATH}/payload_controller"

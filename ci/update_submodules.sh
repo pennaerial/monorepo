@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -euo pipefail
 # this script makes sure all submodules are correctly up-to-date
 # There are managed submodules, which are pennair-owned and directly tested to be stable with monorepo.
 # These managed submodules should always stay up-to-date with their 'main' branches.
@@ -14,15 +15,10 @@
 git submodule sync --recursive
 git submodule update --init --recursive
 
-export SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/ci.conf" # imports all defined constants from ci.conf
 
-ci_conf="${SCRIPT_DIR}/ci.conf"
-if [[ -f "${ci_conf}" ]]; then
-    source "${ci_conf}" # imports all defined constants from ci.conf
-else
-    echo "Error: Configuration file not found at ${ci_conf}" >&2
-    exit 1
-fi
+
 # Print out submodules
 for submodule in "${MANAGED_SUBMODULES[@]}"; do
     echo "${submodule}"
