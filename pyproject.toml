@@ -1,5 +1,6 @@
 [project]
 name = "monorepo"
+version = "0.1.0"
 dependencies = [ # these should be packages that AREN'T already installed system wide via apt by rosdep to avoid conflicts
     "pydantic>=2.0,<3",
     "apriltag",
