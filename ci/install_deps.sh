@@ -27,6 +27,6 @@ uv pip install --system --break-system-packages --no-cache -r ${PENNAIR_MONOREPO
 #### install PX4 dependencies (include gz, but no nuttx hardware compiler)
 bash ${PENNAIR_PX4_PATH}/Tools/setup/ubuntu.sh --no-nuttx  # RUNS_IN_DOCKER=true set in Dockerfile
 
-#### clean up any apt package caches
+#### clean up any apt package caches to reduce image size
 apt-get clean
 rm -rf /var/lib/apt/lists/*
