@@ -12,4 +12,7 @@ cd ${PENNAIR_PX4_PATH}
 make px4_sitl
 
 #### clean build of SAE 2025 workspace, build only 3rd party ROS packages
+set +u # allow unbound variables to setup.bash passes
+source /opt/ros/${ROS_DISTRO}/setup.bash
+set -u
 bash ${PENNAIR_SAE_WS_PATH}/scripts/ci/build_ros.sh --build-mode clean --third
