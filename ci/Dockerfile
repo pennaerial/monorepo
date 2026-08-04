@@ -29,7 +29,7 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /root
 ARG BRANCH=main
-ARG CACHEBUST_CHECKOUT=1 # checkout most up-to-date main branch and skip layer cache
+ARG CACHEBUST_CHECKOUT=1
 RUN git clone https://github.com/pennaerial/monorepo.git -b $BRANCH
 
 # update all monorepo submodules (managed go to up-to-date default branch  and 3rd party go to pinned tag)
