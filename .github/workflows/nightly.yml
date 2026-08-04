@@ -37,6 +37,7 @@ jobs:
           {
             echo "labels<<EOF"
             echo "org.opencontainers.image.revision=$(jq -r '.main_sha' version.json)"
+            echo "pennaerial.combined_tag=$combined_tag"
             jq -r '.managed_submodules | to_entries[] | "pennaerial.submodule.\(.key | split("/") | last)=\(.value)"' version.json
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
@@ -51,8 +52,23 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Check if image is already up to date # if image is up to date, then skip build step
+        id: check
+        run: |
+          existing_tag=$(docker buildx imagetools inspect "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest" --format '{{json .Image.Config.Labels}}' 2>/dev/null | jq -r '."pennaerial.combined_tag" // empty' || echo "")
+
+          echo "Existing tag: $existing_tag"
+          echo "New tag:      ${{ steps.image_metadata.outputs.combined_tag }}"
+
+          if [ "$existing_tag" == "${{ steps.image_metadata.outputs.combined_tag }}" ]; then
+            echo "up_to_date=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "up_to_date=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Build and push
+        id: build
+        if: steps.check.outputs.up_to_date != 'true'
         uses: docker/build-push-action@v6
         with:
           context: ci
@@ -65,3 +81,48 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.image_metadata.outputs.combined_tag }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
           labels: ${{ steps.image_metadata.outputs.labels }}
+
+      - name: Commit submodule bumps
+        if: steps.build.outcome == 'success'
+        working-directory: ci
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          source ../dev_env.sh
+          source ci.conf
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          changed_paths=()
+          for submodule_path in "${MANAGED_SUBMODULES[@]}"; do
+            sha=$(jq -r --arg path "$submodule_path" '.managed_submodules[$path]' version.json)
+            echo "Checking out $submodule_path to $sha"
+            git -C "$submodule_path" fetch --depth 1 origin "$sha"
+            git -C "$submodule_path" checkout "$sha"
+
+            if ! git diff --quiet -- "$submodule_path"; then
+              changed_paths+=("$submodule_path")
+            fi
+          done
+
+          if [ "${#changed_paths[@]}" -eq 0 ]; then
+            echo "No submodule changes to commit."
+            exit 0
+          fi
+
+          echo "Changed submodules: ${changed_paths[*]}"
+
+          branch="nightly/bump-submodules-${{ steps.image_metadata.outputs.combined_tag }}"
+          git checkout -b "$branch"
+          git add "${changed_paths[@]}"
+          git commit -m "[NIGHTLY]: bump managed submodules ${{ steps.image_metadata.outputs.combined_tag }}"
+          git push origin "$branch"
+
+          gh pr create \
+            --base main \
+            --head "$branch" \
+            --title "[NIGHTLY]: bump managed submodules ${{ steps.image_metadata.outputs.combined_tag }}" \
+            --body "Automated nightly submodule bump. Changed: ${changed_paths[*]}"
+
+          gh pr merge "$branch" --auto --squash
