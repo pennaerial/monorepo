@@ -15,8 +15,8 @@ echo "main branch tag: $main_sha"
 # --remote checks out latest commit on submodule's configured branch in monorepo
 declare -A managed_submodule_shas
 for submodule_path in "${MANAGED_SUBMODULES[@]}"; do
-  git submodule update --init --remote -- "$submodule_path"
-  sha=$(git -C "$submodule_path" rev-parse HEAD)
+  url=$(git -C "$submodule_path" remote get-url origin)
+  sha=$(git ls-remote "$url" HEAD | awk '{print $1}')
   managed_submodule_shas["$submodule_path"]="$sha"
   echo "$submodule_path sha: $sha"
 done
