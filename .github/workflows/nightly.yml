@@ -3,17 +3,65 @@ on:
   schedule:
     - cron: '0 5 * * *'
   workflow_dispatch:
+
 permissions:
   contents: write
+  packages: write
+
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
 jobs:
   nightly:
     name: Nightly
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: Sparse Checkout
         uses: actions/checkout@v4
         with:
-          submodules: recursive
-          fetch-depth: 0
-      - name: Update Submodules
-        run: bash ci/update_submodules.sh
+          fetch-depth: 1
+          submodules: false
+
+      - name: Compute image metadata
+        id: image_metadata
+        working-directory: ci
+        run: |
+          source ../dev_env.sh && bash compute_image_metadata.sh
+
+          # write the version.json results out to $GITHUB_OUTPUT
+          combined_tag=$(jq -r '.combined_tag' version.json)
+          echo "combined_tag=$combined_tag" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "labels<<EOF"
+            echo "org.opencontainers.image.revision=$(jq -r '.main_sha' version.json)"
+            jq -r '.managed_submodules | to_entries[] | "pennaerial.submodule.\(.key | split("/") | last)=\(.value)"' version.json
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ci
+          file: ci/Dockerfile
+          push: true
+          build-args: |
+            BRANCH=main
+            CACHEBUST_CHECKOUT=${{ steps.image_metadata.outputs.combined_tag }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.image_metadata.outputs.combined_tag }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          labels: ${{ steps.image_metadata.outputs.labels }}
