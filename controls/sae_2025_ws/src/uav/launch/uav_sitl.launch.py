@@ -1,7 +1,9 @@
 import os
 from enum import StrEnum
 
+from pydantic import ValidationError
 from launch import Action, LaunchDescription
+from launch_ros.actions import Node
 from launch.actions import (
     DeclareLaunchArgument,
     OpaqueFunction,
@@ -10,7 +12,7 @@ from launch.actions import (
 
 from uav.vehicles.AirframeClass import PX4Airframe
 from uav.utils import get_available_missions
-from vehicle_common.runtime.mission_loader import RuntimeMission
+from vehicle_common.runtime.mission_loader import RuntimeMission, get_mission_path
 from vehicle_common.launch_utils import (
     get_logger,
     LaunchError,
@@ -73,20 +75,22 @@ def launch_setup(context) -> list[Action]:
 
     mission: str = config[Args.MISSION]  # validate mission
     if mission not in get_available_missions():
-        raise LaunchError(
-            f"Mission: {mission} is not valid. Use --show-args to see list of valid missions"
-        )
+        raise LaunchError( f"Mission: {mission} is not valid. Use --show-args to see list of valid missions") # fmt: skip
 
-    ns_id = int(config[Args.NS_ID])
-    vehicle_ns = f"uav_{ns_id}"
+    mission_path = get_mission_path(mission, "uav")
+    try:
+        _ = RuntimeMission.load_from_path(mission_path) # run this step only for mission validation
+    except ValidationError as e:
+        logger.info(f"PYDANTIC RUNTIME MISSION VALIDATION ERROR: {e}")
+        raise LaunchError(f"Make sure {mission} is a valid mission file")
 
     try:
         airframe: PX4Airframe = PX4Airframe.lookup_airframe(config[Args.AIRFRAME])
     except KeyError:
-        raise LaunchError(
-            f"Airframe: {config[Args.AIRFRAME]} is not valid. Use --show-args to see list of valid airframes"
-        )
+        raise LaunchError(f"Airframe: {config[Args.AIRFRAME]} is not valid. Use --show-args to see list of valid airframes") # fmt: skip
 
+    ns_id = int(config[Args.NS_ID])
+    vehicle_ns = f"uav_{ns_id}"
     sim_world = config[Args.WORLD]
     standalone: bool = as_bool(config[Args.STANDALONE])
     run_mw: bool = standalone or as_bool(config[Args.RUN_MW])
@@ -103,23 +107,38 @@ def launch_setup(context) -> list[Action]:
     logger.debug(f"Middleware:          {run_mw}")
     logger.debug(f"Launch Sim:          {launch_sim}")
 
+
+    ## create actions
     actions = []
+
+    mode_manager = Node(
+        executable="uav_mission",
+        package="uav",
+        name=f"{vehicle_ns}.mode_manager",
+        namespace=vehicle_ns,
+        parameters=[{
+            "mode_map": mission_path,
+            "vehicle_name": vehicle_ns,
+            "vehicle_class": airframe.airframe_class.name,
+            "auto_launch": True,
+        }],
+        output="screen"
+    )
 
     middleware = ExecuteProcess(
         cmd=["MicroXRCEAgent", "udp4", "-p", "8888"],
         output="screen",
         name="MicroXRCEAgent",
     )
-    if run_mw:
-        actions.append(middleware)
 
     px4_sitl = px4_sitl_action(airframe.id, vehicle_ns, sim_world)
-    actions.append(px4_sitl)
-
     include_sim_launch = include_launch("sim", "sim.launch.py")
-    if launch_sim:
-        actions.append(include_sim_launch)
 
+
+    actions.append(mode_manager)
+    actions.extend([middleware] if run_mw else [])
+    actions.append(px4_sitl)
+    actions.extend([include_sim_launch] if launch_sim else [])
     return actions
 
 
