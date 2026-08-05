@@ -24,10 +24,12 @@ from vehicle_common.launch_utils import (
 
 logger = get_logger("uav_sitl.launch")
 
-### env vars
+### env vars. TODO: Make a PENNAIR env python module. Can automatically search for all envs with 'PENNAIR_' prefix
 PENNAIR_PX4_PATH = os.environ.get("PENNAIR_PX4_PATH", "")
 if not PENNAIR_PX4_PATH:
-    raise LaunchError("PENNAIR_PX4_PATH is not set. Please source dev_env.sh or manually set it")
+    raise LaunchError(
+        "PENNAIR_PX4_PATH is not set. Please source dev_env.sh or manually set it"
+    )
 
 
 def as_bool(value: str) -> bool:
@@ -50,9 +52,11 @@ def px4_sitl_action(
     autostart_id: int,
     vehicle_ns: str,  # e.g. uav_0
     world: str,
+    sim_model: str = "x500",  # TOOD: Make uav_sitl know whether or not to auto spawn a model
 ) -> Action:
     env_export = {
-        "PX4_GZ_MODEL_NAME": vehicle_ns,
+        # "PX4_GZ_MODEL_NAME": vehicle_ns,
+        "PX4_SIM_MODEL": sim_model,
         "PX4_GZ_WORLD": world,
         "PX4_GZ_STANDALONE": "1",
         "PX4_SYS_AUTOSTART": str(autostart_id),
@@ -75,11 +79,13 @@ def launch_setup(context) -> list[Action]:
 
     mission: str = config[Args.MISSION]  # validate mission
     if mission not in get_available_missions():
-        raise LaunchError( f"Mission: {mission} is not valid. Use --show-args to see list of valid missions") # fmt: skip
+        raise LaunchError( f"Mission: {mission} is not valid. Use --show-args to see list of valid missions")  # fmt: skip
 
     mission_path = get_mission_path(mission, "uav")
     try:
-        _ = RuntimeMission.load_from_path(mission_path) # run this step only for mission validation
+        _ = RuntimeMission.load_from_path(
+            mission_path
+        )  # run this step only for mission validation
     except ValidationError as e:
         logger.info(f"PYDANTIC RUNTIME MISSION VALIDATION ERROR: {e}")
         raise LaunchError(f"Make sure {mission} is a valid mission file")
@@ -87,11 +93,11 @@ def launch_setup(context) -> list[Action]:
     try:
         airframe: PX4Airframe = PX4Airframe.lookup_airframe(config[Args.AIRFRAME])
     except KeyError:
-        raise LaunchError(f"Airframe: {config[Args.AIRFRAME]} is not valid. Use --show-args to see list of valid airframes") # fmt: skip
+        raise LaunchError(f"Airframe: {config[Args.AIRFRAME]} is not valid. Use --show-args to see list of valid airframes")  # fmt: skip
 
     ns_id = int(config[Args.NS_ID])
     vehicle_ns = f"uav_{ns_id}"
-    sim_world = config[Args.WORLD]
+    world = config[Args.WORLD]
     standalone: bool = as_bool(config[Args.STANDALONE])
     run_mw: bool = standalone or as_bool(config[Args.RUN_MW])
     launch_sim: bool = standalone or as_bool(config[Args.LAUNCH_SIM])
@@ -102,11 +108,10 @@ def launch_setup(context) -> list[Action]:
     logger.debug(f"Mission:             {mission}")
     logger.debug(f"Vehicle Namespace:   {vehicle_ns}")
     logger.debug(f"PX4 Airframe:        {airframe}")
-    logger.debug(f"Sim World:           {sim_world}")
+    logger.debug(f"Sim World:           {world}")
     logger.debug(f"Standalone Mode:     {standalone}")
     logger.debug(f"Middleware:          {run_mw}")
     logger.debug(f"Launch Sim:          {launch_sim}")
-
 
     ## create actions
     actions = []
@@ -114,15 +119,17 @@ def launch_setup(context) -> list[Action]:
     mode_manager = Node(
         executable="uav_mission",
         package="uav",
-        name=f"{vehicle_ns}.mode_manager",
+        name="mode_manager",
         namespace=vehicle_ns,
-        parameters=[{
-            "mode_map": mission_path,
-            "vehicle_name": vehicle_ns,
-            "vehicle_class": airframe.airframe_class.name,
-            "auto_launch": True,
-        }],
-        output="screen"
+        parameters=[
+            {
+                "mode_map": mission_path,
+                "vehicle_name": vehicle_ns,
+                "vehicle_class": airframe.airframe_class.name,
+                "auto_launch": True,
+            }
+        ],
+        output="screen",
     )
 
     middleware = ExecuteProcess(
@@ -131,9 +138,15 @@ def launch_setup(context) -> list[Action]:
         name="MicroXRCEAgent",
     )
 
-    px4_sitl = px4_sitl_action(airframe.id, vehicle_ns, sim_world)
-    include_sim_launch = include_launch("sim", "sim.launch.py")
-
+    px4_sitl = px4_sitl_action(airframe.id, vehicle_ns, world, sim_model=airframe.model)
+    include_sim_launch = include_launch(
+        "sim",
+        "sim2.launch.py",
+        launch_arguments={
+            "world": world,
+            "headless": "false",
+        },
+    )
 
     actions.append(mode_manager)
     actions.extend([middleware] if run_mw else [])
