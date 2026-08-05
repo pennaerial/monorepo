@@ -1,3 +1,4 @@
+import os
 from enum import StrEnum
 
 from launch import Action, LaunchDescription
@@ -9,7 +10,7 @@ from launch.actions import (
 
 from uav.vehicles.AirframeClass import PX4Airframe
 from uav.utils import get_available_missions
-from vehicle_common.px4 import get_px4_submodule_path
+from vehicle_common.runtime.mission_loader import RuntimeMission
 from vehicle_common.launch_utils import (
     get_logger,
     LaunchError,
@@ -21,6 +22,11 @@ from vehicle_common.launch_utils import (
 
 logger = get_logger("uav_sitl.launch")
 
+### env vars
+PENNAIR_PX4_PATH = os.environ.get("PENNAIR_PX4_PATH", "")
+if not PENNAIR_PX4_PATH:
+    raise LaunchError("PENNAIR_PX4_PATH is not set. Please source dev_env.sh or manually set it")
+
 
 def as_bool(value: str) -> bool:
     return value.lower() == "true"
@@ -29,7 +35,6 @@ def as_bool(value: str) -> bool:
 class Args(StrEnum):
     """Maps constants to launch argument keyords"""
 
-    PX4_PATH = "px4_path"
     MISSION = "mission"
     NS_ID = "ns_id"
     AIRFRAME = "airframe"
@@ -40,12 +45,10 @@ class Args(StrEnum):
 
 
 def px4_sitl_action(
-    px4_path: str,
     autostart_id: int,
     vehicle_ns: str,  # e.g. uav_0
     world: str,
 ) -> Action:
-
     env_export = {
         "PX4_GZ_MODEL_NAME": vehicle_ns,
         "PX4_GZ_WORLD": world,
@@ -56,7 +59,7 @@ def px4_sitl_action(
 
     return ExecuteProcess(
         cmd=["./build/px4_sitl_default/bin/px4"],
-        cwd=px4_path,
+        cwd=PENNAIR_PX4_PATH,
         output="screen",
         name=f"{vehicle_ns}_px4_sitl",
         additional_env=env_export,  # type: ignore (dict[str, str] works instead of SomeSubstitutionsType)
@@ -84,18 +87,17 @@ def launch_setup(context) -> list[Action]:
             f"Airframe: {config[Args.AIRFRAME]} is not valid. Use --show-args to see list of valid airframes"
         )
 
-    px4_path = config[Args.PX4_PATH]
     sim_world = config[Args.WORLD]
     standalone: bool = as_bool(config[Args.STANDALONE])
     run_mw: bool = standalone or as_bool(config[Args.RUN_MW])
     launch_sim: bool = standalone or as_bool(config[Args.LAUNCH_SIM])
 
     # PRINTING HEADER
+    logger.debug(f"ENV VAR DETECTED: PENNAIR_PX4_PATH={PENNAIR_PX4_PATH}")
     logger.debug("LAUNCH PARAMS")
     logger.debug(f"Mission:             {mission}")
     logger.debug(f"Vehicle Namespace:   {vehicle_ns}")
     logger.debug(f"PX4 Airframe:        {airframe}")
-    logger.debug(f"PX4 Path:            {px4_path}")
     logger.debug(f"Sim World:           {sim_world}")
     logger.debug(f"Standalone Mode:     {standalone}")
     logger.debug(f"Middleware:          {run_mw}")
@@ -111,7 +113,7 @@ def launch_setup(context) -> list[Action]:
     if run_mw:
         actions.append(middleware)
 
-    px4_sitl = px4_sitl_action(px4_path, airframe.id, vehicle_ns, sim_world)
+    px4_sitl = px4_sitl_action(airframe.id, vehicle_ns, sim_world)
     actions.append(px4_sitl)
 
     include_sim_launch = include_launch("sim", "sim.launch.py")
@@ -124,11 +126,6 @@ def launch_setup(context) -> list[Action]:
 def generate_launch_description():
     return LaunchDescription(
         [
-            DeclareLaunchArgument(
-                Args.PX4_PATH,
-                default_value=get_px4_submodule_path(),
-                description="Path to PX4-Autopilot installation. Defaults to PX4-Autopilot submodule path",
-            ),
             DeclareLaunchArgument(
                 Args.MISSION,
                 default_value="basic",
