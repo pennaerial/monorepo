@@ -7,8 +7,31 @@ alias cb='colcon build'
 alias cbp='colcon build --packages-select'
 alias cbpsi='colcon build --symlink-install --packages-select'
 
-
-
 # TESTING
+#
 alias ct='colcon test --event-handlers console_cohesion+'
-alias ctp='colcon test --event-handlers console_cohesion+ --packages-select'
+
+# 1. runs colcon tests on selected packages
+# 2. merges xml test results into build/merged_results.xml
+# 3. Views merged_result.xml with xunit-viewer
+ctp() {
+    local pkgs=("$@")
+    colcon test --packages-select "${pkgs[@]}"
+
+    local paths=()
+    for pkg in "${pkgs[@]}"; do
+	    local pytest_xml="build/${pkg}/pytest.xml"
+	    local gtest_glob="build/${pkg}/test_results/${pkg}/*.gtest.xml"
+
+	    [[ -f "$pytest_xml" ]] && paths+=("$pytest_xml")
+	    compgen -G "$gtest_glob" >/dev/null 2>&1 && paths+=("$gtest_glob")
+	done
+
+	if [[ ${#paths[@]} -eq 0 ]]; then
+		echo "ctp: no test result files found for: ${pkgs[*]}" >&2
+		return 1
+	fi
+
+	junitparser merge --glob "${paths[@]}" build/merged_results.xml
+    xunit-viewer -r build/merged_results.xml --console -C false -o build/merged_results.html
+}
