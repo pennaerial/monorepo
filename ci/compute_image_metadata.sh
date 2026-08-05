@@ -16,9 +16,19 @@ echo "main branch tag: $main_sha"
 declare -A managed_submodule_shas
 for submodule_path in "${MANAGED_SUBMODULES[@]}"; do
   url=$(git -C "$submodule_path" remote get-url origin)
-  sha=$(git ls-remote "$url" HEAD | awk '{print $1}')
-  managed_submodule_shas["$submodule_path"]="$sha"
-  echo "$submodule_path sha: $sha"
+
+  current_sha=$(git -C "$submodule_path" rev-parse HEAD)
+  latest_sha=$(git ls-remote "$url" HEAD | awk '{print $1}')
+
+  managed_submodule_shas["$submodule_path"]="$latest_sha"
+
+  if [[ "$current_sha" != "$latest_sha" ]]; then
+    marker=" (OUTDATED)"
+  else
+    marker=""
+  fi
+
+  echo "$submodule_path sha: $latest_sha$marker"
 done
 
 

@@ -22,7 +22,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
-          submodules: false
+          submodules: true
 
       - name: Compute image metadata
         id: image_metadata
