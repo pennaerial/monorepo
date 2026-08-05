@@ -11,6 +11,14 @@ echo "Installing uv..."
 curl -LsSf https://astral.sh/uv/install.sh | sh
 export PATH="$HOME/.local/bin:$PATH"
 
+#### install Node.js LTS
+echo "Installing Node.js LTS..."
+curl -fsSL https://deb.nodesource.com/setup_lts.x | bash -
+apt-get install -y --no-install-recommends nodejs
+
+#### install PX4 dependencies (include gz, but no nuttx hardware compiler)
+bash ${PENNAIR_PX4_PATH}/Tools/setup/ubuntu.sh --no-nuttx  # RUNS_IN_DOCKER=true set in Dockerfile
+
 #### install rosdeps
 sudo rosdep init || true # || true guards against already initialized rosdep
 rosdep update --rosdistro "$ROS_DISTRO"
@@ -24,8 +32,10 @@ apt-get install -y --no-install-recommends "${APT_PACKAGES[@]}"
 echo "Installing pyproject dependencies globally..."
 uv pip install --system --break-system-packages --no-cache -r ${PENNAIR_MONOREPO_PATH}/pyproject.toml
 
-#### install PX4 dependencies (include gz, but no nuttx hardware compiler)
-bash ${PENNAIR_PX4_PATH}/Tools/setup/ubuntu.sh --no-nuttx  # RUNS_IN_DOCKER=true set in Dockerfile
+#### install global npm packages
+echo "Installing global npm packages..."
+npm install -g "${GLOBAL_NPM[@]}"
+
 
 #### clean up any apt package caches to reduce image size
 apt-get clean
