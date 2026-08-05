@@ -15,8 +15,8 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  nightly:
-    name: Nightly
+  nightly_image:
+    name: Nightly Image
     runs-on: ubuntu-latest
     steps:
       - name: Sparse Checkout
@@ -53,7 +53,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Check if image is already up to date # if image is up to date, then skip build step
+      - name: Check if image is already up to date # if image is up to date, then skip build step. Needs both docker buildx and ghcr login
         id: check
         run: |
           existing_tag=$(docker buildx imagetools inspect "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest" --format '{{json .Image.Config.Labels}}' 2>/dev/null | jq -r '."pennaerial.combined_tag" // empty' || echo "")
@@ -127,3 +127,18 @@ jobs:
             --body "Automated nightly submodule bump. Changed: ${changed_paths[*]}"
 
           gh pr merge "$branch" --auto --squash
+
+  package_cleanup:
+    name: Clean Up GHCR Packages
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        package: [monorepo, sae-ros2-ci]
+    steps:
+      - name: Delete untagged versions of ${{ matrix.package }}
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name: ${{ matrix.package }}
+          package-type: 'container'
+          min-versions-to-keep: 5
+          delete-only-untagged-versions: true
