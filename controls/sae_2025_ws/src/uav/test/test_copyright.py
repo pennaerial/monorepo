@@ -25,3 +25,7 @@ import pytest
 def test_copyright():
     rc = main(argv=[".", "test"])
     assert rc == 0, "Found errors"
+
+
+def test_stub():
+    assert(True)
