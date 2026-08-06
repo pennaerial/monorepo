@@ -21,8 +21,9 @@ TIMEOUT_S = float(os.environ.get("SIM_SMOKE_TIMEOUT", "180"))
 
 
 @pytest.mark.launch_test
+@pytest.mark.sim_test
 def generate_test_description():
-    px4_path = os.environ["PX4_PATH"]
+    px4_path = os.environ["PENNAIR_PX4_PATH"]
     params_file = os.path.join(
         get_package_share_directory("uav"), "launch", "ci", "launch_params_basic.yaml"
     )
