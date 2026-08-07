@@ -3,9 +3,7 @@
 # Hardcoded 8 ft × 8 ft: half_8ft = 1.2192 m, inner square half = 3 ft = 0.9144 m.
 import sys
 
-sys.path.insert(
-    0, "/home/ubuntu/monorepo/controls/sae_2025_ws/src/sim/sim/world_gen/models/dlz"
-)
+sys.path.insert(0, "/home/ubuntu/monorepo/controls/sae_2025_ws/src/sim/sim/world_gen/models/dlz")
 import os
 
 os.chdir("/home/ubuntu/monorepo/controls/sae_2025_ws/src/sim/sim/world_gen/models/dlz")

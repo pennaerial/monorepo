@@ -66,9 +66,7 @@ def _resolve_mission_path(config: dict) -> str:
                 return get_mission_path(mission_name, package)
             except FileNotFoundError:
                 continue
-        raise ValueError(
-            f"Mission '{mission_name}' was not found in the uav or payload packages."
-        )
+        raise ValueError(f"Mission '{mission_name}' was not found in the uav or payload packages.")
     raise ValueError("Vehicle stack requires either mission_name or mission_path.")
 
 
@@ -104,8 +102,7 @@ def _resolve_force_camera(config: dict, *, logger=None) -> bool:
         if has_use_camera:
             _warn_logger(
                 logger,
-                "Vehicle stack field 'use_camera' is deprecated and ignored because "
-                "'force_camera' is also set.",
+                "Vehicle stack field 'use_camera' is deprecated and ignored because 'force_camera' is also set.",
             )
         return force_camera
 
@@ -132,9 +129,7 @@ def _resolve_camera_input_transport(
     if is_uav or sim:
         return transport
 
-    preprocess_active = abs(float(rotate_degrees)) > 1e-9 or bool(
-        str(preprocess_hook).strip()
-    )
+    preprocess_active = abs(float(rotate_degrees)) > 1e-9 or bool(str(preprocess_hook).strip())
     if transport.lower() != "compressed" or not preprocess_active:
         return transport
 
@@ -160,9 +155,7 @@ def _resolve_airframe_id(config: dict) -> int:
             raise ValueError(f"Unknown airframe name: {airframe_value}") from exc
 
 
-def _resolve_uav_airframe(
-    config: dict, px4_path: str
-) -> tuple[AirframeClass, int, str]:
+def _resolve_uav_airframe(config: dict, px4_path: str) -> tuple[AirframeClass, int, str]:
     airframe_id = _resolve_airframe_id(config)
     vehicle_class, model_name = get_airframe_details(px4_path, airframe_id)
     if not isinstance(vehicle_class, AirframeClass):
@@ -197,18 +190,13 @@ def _camera_contract_for(
     }
 
 
-def _payload_camera_info_url_for(
-    vehicle_name: str, *, camera_calibration_file: str = ""
-) -> str:
-    calibration_dir = (
-        Path(get_package_share_directory("uav")) / "config" / "camera_calibrations"
-    )
+def _payload_camera_info_url_for(vehicle_name: str, *, camera_calibration_file: str = "") -> str:
+    calibration_dir = Path(get_package_share_directory("uav")) / "config" / "camera_calibrations"
     requested_file = str(camera_calibration_file).strip()
     if requested_file:
         if Path(requested_file).name != requested_file:
             raise ValueError(
-                "camera_calibration_file must be a filename inside the packaged "
-                "uav camera_calibrations directory."
+                "camera_calibration_file must be a filename inside the packaged uav camera_calibrations directory."
             )
         candidate = calibration_dir / requested_file
         if candidate.exists():
@@ -236,12 +224,14 @@ def _sim_camera_bridge_actions(
     sim_entity_name: str,
     mission_target: str,
 ) -> list:
-    gz_image_topic = f"/world/{world_name}/model/{sim_entity_name}/link/camera_link/sensor/camera/image"
-    gz_camera_info_topic = f"/world/{world_name}/model/{sim_entity_name}/link/camera_link/sensor/camera/camera_info"
-    image_target = "camera_source" if mission_target == "payload" else "camera"
-    camera_info_target = (
-        "camera_info_source" if mission_target == "payload" else "camera_info"
+    gz_image_topic = (
+        f"/world/{world_name}/model/{sim_entity_name}/link/camera_link/sensor/camera/image"
     )
+    gz_camera_info_topic = (
+        f"/world/{world_name}/model/{sim_entity_name}/link/camera_link/sensor/camera/camera_info"
+    )
+    image_target = "camera_source" if mission_target == "payload" else "camera"
+    camera_info_target = "camera_info_source" if mission_target == "payload" else "camera_info"
     return [
         Node(
             package="ros_gz_bridge",
@@ -255,9 +245,7 @@ def _sim_camera_bridge_actions(
         Node(
             package="ros_gz_bridge",
             executable="parameter_bridge",
-            arguments=[
-                f"{gz_camera_info_topic}@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo"
-            ],
+            arguments=[f"{gz_camera_info_topic}@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo"],
             remappings=[(gz_camera_info_topic, camera_info_target)],
             output="screen",
             name=f"{vehicle_name}_camera_info_bridge",
@@ -306,9 +294,7 @@ def _build_camera_actions(
             "output_encoding:=bgr8",
         ]
         if not is_uav and str(camera_contract["camera_info_url"]).strip():
-            v4l2_cmd.extend(
-                ["-p", f"camera_info_url:={camera_contract['camera_info_url']}"]
-            )
+            v4l2_cmd.extend(["-p", f"camera_info_url:={camera_contract['camera_info_url']}"])
         v4l2_cmd.extend(
             [
                 "--remap",
@@ -373,8 +359,7 @@ def _build_camera_actions(
 
     preferred_image_transport = (
         "compressed"
-        if not is_uav
-        and str(camera_contract["input_transport"]).strip().lower() == "compressed"
+        if not is_uav and str(camera_contract["input_transport"]).strip().lower() == "compressed"
         else "raw"
     )
 
@@ -391,16 +376,13 @@ def _build_camera_actions(
                     {
                         "vehicle_name": camera_contract["vehicle_name"],
                         "camera_service_name": "",
-                        "use_camera_service": vision_class.__name__
-                        != "PayloadAprilTagNode",
+                        "use_camera_service": vision_class.__name__ != "PayloadAprilTagNode",
                         "preferred_image_transport": preferred_image_transport,
                         "debug": debug_vision_node,
                         "sim": sim,
                         "save_vision": save_vision,
                         "enable_failsafe_service": is_uav,
-                        "failsafe_service_name": "mode_manager/failsafe"
-                        if is_uav
-                        else "",
+                        "failsafe_service_name": "mode_manager/failsafe" if is_uav else "",
                     }
                 ],
             )
@@ -570,8 +552,7 @@ def launch_setup(context, *args, **kwargs):
     declared_kind = str(config.get("kind", "")).strip()
     if declared_kind and declared_kind != mission_target:
         raise ValueError(
-            f"Vehicle '{vehicle_name}' declared kind '{declared_kind}' "
-            f"but mission target is '{mission_target}'."
+            f"Vehicle '{vehicle_name}' declared kind '{declared_kind}' but mission target is '{mission_target}'."
         )
 
     sim = _resolve_bool(config, "sim", False)
@@ -587,9 +568,7 @@ def launch_setup(context, *args, **kwargs):
     sim_entity_name = str(config.get("sim_entity_name", "")).strip() or vehicle_name
     sim_world_name = str(config.get("sim_world_name", "")).strip()
     save_vision_milliseconds = int(config.get("save_vision_milliseconds", 0))
-    camera_rotate_degrees = float(
-        config.get("camera_rotate_degrees", 0.0 if sim else 180.0)
-    )
+    camera_rotate_degrees = float(config.get("camera_rotate_degrees", 0.0 if sim else 180.0))
     camera_calibration_file = str(config.get("camera_calibration_file", "")).strip()
     camera_preprocess_hook = str(config.get("camera_preprocess_hook", "")).strip()
     camera_input_transport = _resolve_camera_input_transport(
@@ -624,8 +603,7 @@ def launch_setup(context, *args, **kwargs):
             )
     if launch_px4_sitl and (not sim or not sim_world_name or autostart is None):
         raise ValueError(
-            f"Vehicle '{vehicle_name}' cannot launch PX4 SITL "
-            "without sim_world_name and a valid UAV airframe."
+            f"Vehicle '{vehicle_name}' cannot launch PX4 SITL without sim_world_name and a valid UAV airframe."
         )
 
     camera_mount_offsets = list(config.get("camera_mount_offsets", [0.0, 0.0, 0.0]))
@@ -689,17 +667,13 @@ def launch_setup(context, *args, **kwargs):
                 debug=debug,
                 vision_debug=vision_debug,
                 servo_only=servo_only,
-                vehicle_class_name=(
-                    vehicle_class.name if vehicle_class is not None else None
-                ),
+                vehicle_class_name=(vehicle_class.name if vehicle_class is not None else None),
                 camera_mount_offsets=camera_mount_offsets,
             )
         ],
     )
 
-    raw_udp_port = config.get(
-        "udp_port"
-    )  # None = auto-compute, 0 = disabled, >0 = explicit
+    raw_udp_port = config.get("udp_port")  # None = auto-compute, 0 = disabled, >0 = explicit
     if raw_udp_port is None:
         m = re.search(r"_(\d+)$", vehicle_name)
         udp_port = (5000 + int(m.group(1))) if m else 0
@@ -707,8 +681,7 @@ def launch_setup(context, *args, **kwargs):
         udp_port = int(raw_udp_port)
     udp_all_ports = list(config.get("udp_all_ports") or [5000, 5001, 5002, 5003])
     udp_topics = list(
-        config.get("udp_topics")
-        or ["heartbeat:payload_interfaces/msg/PayloadHeartbeat"]
+        config.get("udp_topics") or ["heartbeat:payload_interfaces/msg/PayloadHeartbeat"]
     )
     udp_broadcast_ip = str(config.get("udp_broadcast_ip") or "10.42.0.255").strip()
     udp_peer_ttl = float(config.get("udp_peer_ttl") or 3.0)

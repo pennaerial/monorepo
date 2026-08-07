@@ -45,9 +45,7 @@ class PayloadTrackingNode(VisionNode):
         )
 
         # Measurement matrix [x, y]
-        self.kalman.measurementMatrix = np.array(
-            [[1, 0, 0, 0], [0, 1, 0, 0]], dtype=np.float32
-        )
+        self.kalman.measurementMatrix = np.array([[1, 0, 0, 0], [0, 1, 0, 0]], dtype=np.float32)
 
         # Tune these covariances idk
         self.kalman.processNoiseCov = np.eye(4, dtype=np.float32) * 1e-2

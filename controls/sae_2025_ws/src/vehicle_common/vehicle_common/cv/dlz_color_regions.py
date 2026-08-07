@@ -178,9 +178,7 @@ def detect_focused_dlz_paper_masks(
                 continue
 
             component = np.where(cc_labels == cc, 255, 0).astype(np.uint8)
-            contours, _ = cv2.findContours(
-                component, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
-            )
+            contours, _ = cv2.findContours(component, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             if not contours:
                 continue
 

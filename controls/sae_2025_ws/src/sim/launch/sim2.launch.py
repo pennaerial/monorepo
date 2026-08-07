@@ -30,15 +30,11 @@ if not PENNAIR_GZ_MODELS_PATH:
 
 PENNAIR_PX4_PATH = os.environ.get("PENNAIR_PX4_PATH", "")
 if not PENNAIR_PX4_PATH:
-    raise LaunchError(
-        "PENNAIR_PX4_PATH is not set. Please source dev_env.sh or manually set it"
-    )
+    raise LaunchError("PENNAIR_PX4_PATH is not set. Please source dev_env.sh or manually set it")
 
 GZ_SIM_RESOURCE_PATH = Path(PENNAIR_GZ_MODELS_PATH) / "models"
 # Prepends value to existing value, bc we don't want to overwrite any user-set paths
-GZ_SIM_RESOURCE_PATH = prepend_env_path(
-    "GZ_SIM_RESOURCE_PATH", str(GZ_SIM_RESOURCE_PATH)
-)
+GZ_SIM_RESOURCE_PATH = prepend_env_path("GZ_SIM_RESOURCE_PATH", str(GZ_SIM_RESOURCE_PATH))
 
 GZ_SIM_SERVER_CONFIG_PATH = (
     Path(PENNAIR_GZ_MODELS_PATH) / "server.config"

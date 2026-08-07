@@ -168,14 +168,10 @@ class PayloadAprilTagNode(VisionNode):
         solved_ids = {obs.tag_id for obs in observations}
 
         # Image center crosshair
-        cv2.drawMarker(
-            vis, (int(img_cx), int(img_cy)), (255, 255, 255), cv2.MARKER_CROSS, 20, 1
-        )
+        cv2.drawMarker(vis, (int(img_cx), int(img_cy)), (255, 255, 255), cv2.MARKER_CROSS, 20, 1)
 
         # Primary tag for HUD = largest area among all_observations
-        primary = (
-            max(all_observations, key=lambda o: o.area) if all_observations else None
-        )
+        primary = max(all_observations, key=lambda o: o.area) if all_observations else None
 
         for det in _iter_detections(gray, detector, self._detector_cache.backend):
             tag_id = int(getattr(det, "tag_id", -1))
@@ -186,9 +182,7 @@ class PayloadAprilTagNode(VisionNode):
 
             # Tag border
             for i in range(4):
-                cv2.line(
-                    vis, tuple(corners[i]), tuple(corners[(i + 1) % 4]), border_color, 2
-                )
+                cv2.line(vis, tuple(corners[i]), tuple(corners[(i + 1) % 4]), border_color, 2)
 
             # Corner pixel labels
             for px, py in corners:
@@ -347,15 +341,11 @@ class PayloadAprilTagNode(VisionNode):
 
         if self._debug_pub is not None:
             try:
-                msg = self._debug_bridge.cv2_to_compressed_imgmsg(
-                    vis, dst_format="jpeg"
-                )
+                msg = self._debug_bridge.cv2_to_compressed_imgmsg(vis, dst_format="jpeg")
                 msg.header.stamp = self.get_clock().now().to_msg()
                 self._debug_pub.publish(msg)
             except Exception as exc:
-                self.get_logger().warn(
-                    f"PayloadAprilTagNode: debug publish failed: {exc}"
-                )
+                self.get_logger().warn(f"PayloadAprilTagNode: debug publish failed: {exc}")
 
 
 def main() -> None:

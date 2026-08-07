@@ -243,13 +243,9 @@ def _estimate_camera_pose_in_vtol(
 
     tx, ty, tz, rr, rp, ry = VTOL_TAG_POSES[int(tag_id)]
     rotation_v_t = _rpy_to_rot(rr, rp, ry)
-    transform_v_t = _make_transform(
-        rotation_v_t, np.array([tx, ty, tz], dtype=np.float64)
-    )
+    transform_v_t = _make_transform(rotation_v_t, np.array([tx, ty, tz], dtype=np.float64))
     rotation_c_t, _ = cv2.Rodrigues(np.asarray(rvec, dtype=np.float64).reshape(3, 1))
-    transform_c_t = _make_transform(
-        rotation_c_t, np.asarray(tvec, dtype=np.float64).reshape(3, 1)
-    )
+    transform_c_t = _make_transform(rotation_c_t, np.asarray(tvec, dtype=np.float64).reshape(3, 1))
     transform_v_c = transform_v_t @ _invert_transform(transform_c_t)
     position_v = transform_v_c[:3, 3]
     yaw_v = _yaw_from_rotation(transform_v_c[:3, :3])
@@ -291,9 +287,7 @@ def _solve_detection_pose(
     tvec_flat = np.asarray(tvec, dtype=np.float64).reshape(-1)
     if len(tvec_flat) < 3:
         return None
-    if min_forward_distance_m is not None and float(tvec_flat[2]) <= float(
-        min_forward_distance_m
-    ):
+    if min_forward_distance_m is not None and float(tvec_flat[2]) <= float(min_forward_distance_m):
         return None
 
     return (
@@ -429,9 +423,7 @@ def detect_payload_unreeled(
     if debug:
         vis = image.copy()
         h_full = vis.shape[0]
-        cv2.rectangle(
-            vis, (0, int(h_full * 0.75)), (vis.shape[1], h_full), (0, 255, 255), 2
-        )
+        cv2.rectangle(vis, (0, int(h_full * 0.75)), (vis.shape[1], h_full), (0, 255, 255), 2)
         vis[int(h_full * 0.75) : h_full, :][white_mask > 0] = (255, 100, 0)
         cv2.putText(
             vis,
@@ -508,12 +500,8 @@ Examples:
         camera_info = _make_camera_info(bgr)
         gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
 
-        all_obs = detect_payload_apriltags(
-            gray, camera_info, detector, cache.backend, tag_size_m
-        )
-        solved_obs = solve_payload_apriltags(
-            gray, camera_info, detector, cache.backend, tag_size_m
-        )
+        all_obs = detect_payload_apriltags(gray, camera_info, detector, cache.backend, tag_size_m)
+        solved_obs = solve_payload_apriltags(gray, camera_info, detector, cache.backend, tag_size_m)
 
         print(f"detected={len(all_obs)}  solved={len(solved_obs)}")
         for o in all_obs:

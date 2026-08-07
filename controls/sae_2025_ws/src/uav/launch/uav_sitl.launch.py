@@ -27,9 +27,7 @@ logger = get_logger("uav_sitl.launch")
 ### env vars. TODO: Make a PENNAIR env python module. Can automatically search for all envs with 'PENNAIR_' prefix
 PENNAIR_PX4_PATH = os.environ.get("PENNAIR_PX4_PATH", "")
 if not PENNAIR_PX4_PATH:
-    raise LaunchError(
-        "PENNAIR_PX4_PATH is not set. Please source dev_env.sh or manually set it"
-    )
+    raise LaunchError("PENNAIR_PX4_PATH is not set. Please source dev_env.sh or manually set it")
 
 
 def as_bool(value: str) -> bool:
@@ -83,9 +81,7 @@ def launch_setup(context) -> list[Action]:
 
     mission_path = get_mission_path(mission, "uav")
     try:
-        _ = RuntimeMission.load_from_path(
-            mission_path
-        )  # run this step only for mission validation
+        _ = RuntimeMission.load_from_path(mission_path)  # run this step only for mission validation
     except ValidationError as e:
         logger.info(f"PYDANTIC RUNTIME MISSION VALIDATION ERROR: {e}")
         raise LaunchError(f"Make sure {mission} is a valid mission file")

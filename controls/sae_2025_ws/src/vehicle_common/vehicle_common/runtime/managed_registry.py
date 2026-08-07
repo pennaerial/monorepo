@@ -40,9 +40,7 @@ class ManagedCommSpec:
             scope=self.scope,
             lifetime=self.lifetime,
             owner_label=self.owner_label,
-            interface_name=getattr(
-                self.interface_type, "__name__", str(self.interface_type)
-            ),
+            interface_name=getattr(self.interface_type, "__name__", str(self.interface_type)),
             name=self.name,
             peers=self.peers,
         )
@@ -122,10 +120,7 @@ class ManagedCommRegistry:
         return bool(self._raw_destroy_publisher(publisher))
 
     def destroy_subscription(self, subscription) -> bool:
-        if (
-            isinstance(subscription, ManagedEntity)
-            and subscription.spec.kind == "subscription"
-        ):
+        if isinstance(subscription, ManagedEntity) and subscription.spec.kind == "subscription":
             return self._destroy_managed_entity(subscription)
         return bool(self._raw_destroy_subscription(subscription))
 
@@ -201,8 +196,7 @@ class ManagedCommRegistry:
             return True
         connection_status = self._connection_status()
         return all(
-            bool(connection_status.get(peer_name, False))
-            for peer_name in wrapper.spec.peers
+            bool(connection_status.get(peer_name, False)) for peer_name in wrapper.spec.peers
         )
 
     def _ensure_managed_underlying(self, wrapper: ManagedEntity) -> None:

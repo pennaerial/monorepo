@@ -19,9 +19,7 @@ class WaypointMissionParams(ParamsBase):
     altitude: float = 2.0
 
 
-@register_mode(
-    id="uav.WaypointMission", params_cls=WaypointMissionParams, targets=[UAV]
-)
+@register_mode(id="uav.WaypointMission", params_cls=WaypointMissionParams, targets=[UAV])
 class WaypointMission(Mode):
     """
     Simple waypoint mission for testing scoring node.
@@ -29,9 +27,7 @@ class WaypointMission(Mode):
     """
 
     @override
-    def initialize(
-        self, node: Node, vehicle: UAV, params: WaypointMissionParams
-    ) -> None:
+    def initialize(self, node: Node, vehicle: UAV, params: WaypointMissionParams) -> None:
         self.node = node
         self.vehicle = vehicle
         self.p = params
@@ -84,22 +80,16 @@ class WaypointMission(Mode):
             self.vehicle.local_position.z,
         )
         distance = math.sqrt(
-            (current_x - target_x) ** 2
-            + (current_y - target_y) ** 2
-            + (current_z - target_z) ** 2
+            (current_x - target_x) ** 2 + (current_y - target_y) ** 2 + (current_z - target_z) ** 2
         )
 
         # Check if we've reached the current waypoint
         if distance < self.p.waypoint_tolerance:
             if self.waypoint_start_time is None:
                 self.waypoint_start_time = time.time()
-                self.node.get_logger().info(
-                    f"Reached waypoint {self.current_waypoint}: {target}"
-                )
+                self.node.get_logger().info(f"Reached waypoint {self.current_waypoint}: {target}")
             elif time.time() - self.waypoint_start_time >= self.p.loiter_time:
-                self.node.get_logger().info(
-                    f"Completed waypoint {self.current_waypoint}"
-                )
+                self.node.get_logger().info(f"Completed waypoint {self.current_waypoint}")
                 self.current_waypoint += 1
                 self.waypoint_start_time = None
         else:

@@ -167,17 +167,11 @@ class VTOL(UAV):
         # During transitions, maintain the current state (don't change vehicle_type)
         # VEHICLE_VTOL_STATE_TRANSITION_TO_FW = 1 (still in MC mode)
         # VEHICLE_VTOL_STATE_TRANSITION_TO_MC = 2 (still in FW mode)
-        elif (
-            msg.vehicle_vtol_state
-            == VtolVehicleStatus.VEHICLE_VTOL_STATE_TRANSITION_TO_FW
-        ):
+        elif msg.vehicle_vtol_state == VtolVehicleStatus.VEHICLE_VTOL_STATE_TRANSITION_TO_FW:
             # Transitioning to FW, but still in MC mode
             if self.vehicle_type is None:
                 self.vehicle_type = "MC"
-        elif (
-            msg.vehicle_vtol_state
-            == VtolVehicleStatus.VEHICLE_VTOL_STATE_TRANSITION_TO_MC
-        ):
+        elif msg.vehicle_vtol_state == VtolVehicleStatus.VEHICLE_VTOL_STATE_TRANSITION_TO_MC:
             # Transitioning to MC, but still in FW mode
             if self.vehicle_type is None:
                 self.vehicle_type = "FW"

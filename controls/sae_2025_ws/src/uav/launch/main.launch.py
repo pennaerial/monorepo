@@ -69,8 +69,7 @@ def _resolve_force_camera(params: dict, *, logger=None) -> bool:
         if has_use_camera:
             _warn_logger(
                 logger,
-                "Launch parameter 'use_camera' is deprecated and ignored because "
-                "'force_camera' is also set.",
+                "Launch parameter 'use_camera' is deprecated and ignored because 'force_camera' is also set.",
             )
         return force_camera
 
@@ -79,9 +78,7 @@ def _resolve_force_camera(params: dict, *, logger=None) -> bool:
             logger,
             "Launch parameter 'use_camera' is deprecated; use 'force_camera' instead.",
         )
-        return _yaml_bool_value(
-            params.get("use_camera"), name="use_camera", default=False
-        )
+        return _yaml_bool_value(params.get("use_camera"), name="use_camera", default=False)
 
     return False
 
@@ -136,9 +133,7 @@ def _inject_single_uav_controllable(
     vehicle_pose: list[float],
 ) -> None:
     if len(vehicle_pose) != 6:
-        raise ValueError(
-            f"vehicle_pose must contain exactly 6 values. Received: {vehicle_pose}"
-        )
+        raise ValueError(f"vehicle_pose must contain exactly 6 values. Received: {vehicle_pose}")
     sim_model_name = model[3:] if model.startswith("gz_") else model
     world_params.setdefault("controllables", {})
     world_params["controllables"][vehicle_name] = {
@@ -179,9 +174,7 @@ def _legacy_backend_override(
             rpy = list(legacy_uav.get("rpy", [0.0, 0.0, 0.0]))
             vehicle_pose = position[:3] + rpy[:3]
         if px4_airframe_id is None:
-            raise ValueError(
-                "Single-vehicle UAV sim launch requires a PX4 airframe ID."
-            )
+            raise ValueError("Single-vehicle UAV sim launch requires a PX4 airframe ID.")
         injected_params = {}
         _inject_single_uav_controllable(
             world_params=injected_params,
@@ -263,16 +256,10 @@ def _single_vehicle_config(context, params: dict) -> tuple[dict, dict | None]:
         "camera_input_transport": str(
             params.get("camera_input_transport", "raw" if sim else "compressed")
         ).strip(),
-        "camera_rotate_degrees": float(
-            params.get("camera_rotate_degrees", 0.0 if sim else 180.0)
-        ),
-        "camera_calibration_file": str(
-            params.get("camera_calibration_file", "")
-        ).strip(),
+        "camera_rotate_degrees": float(params.get("camera_rotate_degrees", 0.0 if sim else 180.0)),
+        "camera_calibration_file": str(params.get("camera_calibration_file", "")).strip(),
         "camera_preprocess_hook": str(params.get("camera_preprocess_hook", "")).strip(),
-        "camera_mount_offsets": list(
-            params.get("camera_mount_offsets", [0.0, 0.0, 0.0])
-        ),
+        "camera_mount_offsets": list(params.get("camera_mount_offsets", [0.0, 0.0, 0.0])),
         "airframe": params.get("airframe", "quadcopter"),
         "model": model,
         "px4_path": px4_path,
@@ -286,12 +273,9 @@ def _single_vehicle_config(context, params: dict) -> tuple[dict, dict | None]:
         "udp_port": params.get("udp_port"),
         "udp_all_ports": list(params.get("udp_all_ports") or [5000, 5001, 5002, 5003]),
         "udp_topics": list(
-            params.get("udp_topics")
-            or ["heartbeat:payload_interfaces/msg/PayloadHeartbeat"]
+            params.get("udp_topics") or ["heartbeat:payload_interfaces/msg/PayloadHeartbeat"]
         ),
-        "udp_broadcast_ip": str(
-            params.get("udp_broadcast_ip") or "10.42.0.255"
-        ).strip(),
+        "udp_broadcast_ip": str(params.get("udp_broadcast_ip") or "10.42.0.255").strip(),
         "udp_peer_ttl": float(params.get("udp_peer_ttl") or 3.0),
     }
     if vehicle_class_name is not None:
@@ -325,9 +309,7 @@ def launch_setup(context, *args, **kwargs):
         actions.append(
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
-                    os.path.join(
-                        get_package_share_directory("sim"), "launch", "sim.launch.py"
-                    )
+                    os.path.join(get_package_share_directory("sim"), "launch", "sim.launch.py")
                 ),
                 launch_arguments={
                     "px4_path": vehicle_config["px4_path"],

@@ -34,9 +34,7 @@ def declared_remote_peer_names(
         raw_peer_names = getattr(peer_vehicle_names, "peer_vehicle_names", ())
     else:
         raw_peer_names = (
-            peer_vehicle_names
-            if isinstance(peer_vehicle_names, (tuple, list, set))
-            else ()
+            peer_vehicle_names if isinstance(peer_vehicle_names, (tuple, list, set)) else ()
         )
     return tuple(
         peer_name
@@ -112,9 +110,7 @@ class PeerConnectionTracker:
     def _heartbeat_topic_for(self, vehicle_name: str) -> str:
         return f"/{vehicle_name}/{HEARTBEAT_TOPIC_SUFFIX}"
 
-    def configure(
-        self, peer_vehicle_names: tuple[str, ...] | list[str] | set[str]
-    ) -> None:
+    def configure(self, peer_vehicle_names: tuple[str, ...] | list[str] | set[str]) -> None:
         normalized_peer_names = [
             peer_name
             for peer_name in normalize_peer_vehicle_names(peer_vehicle_names)
@@ -138,9 +134,7 @@ class PeerConnectionTracker:
             self._heartbeat_subscriptions[peer_name] = self._raw_create_subscription(
                 Empty,
                 self._heartbeat_topic_for(peer_name),
-                lambda _msg, peer_name=peer_name: self._peer_heartbeat_callback(
-                    peer_name
-                ),
+                lambda _msg, peer_name=peer_name: self._peer_heartbeat_callback(peer_name),
                 1,
             )
 

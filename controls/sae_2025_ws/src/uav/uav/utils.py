@@ -112,11 +112,7 @@ def get_airframe_details(px4_path, airframe_id):
     )
 
     # Find any file starting with the ID
-    matches = (
-        glob.glob(os.path.join(airframes_dir, f"{airframe_id}_*"))
-        if airframes_dir
-        else []
-    )
+    matches = glob.glob(os.path.join(airframes_dir, f"{airframe_id}_*")) if airframes_dir else []
 
     if not matches:
         print(f"AIRFRAME_ID: {airframe_id}")

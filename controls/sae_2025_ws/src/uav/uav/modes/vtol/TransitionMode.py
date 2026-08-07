@@ -50,9 +50,7 @@ class TransitionMode(Mode):
 
         if self.vehicle.vehicle_type != self.p.to_mode:
             if not self.transition_commanded:
-                self.log(
-                    f"Transitioning from {self.vehicle.vehicle_type} to {self.p.to_mode}"
-                )
+                self.log(f"Transitioning from {self.vehicle.vehicle_type} to {self.p.to_mode}")
                 self.vehicle.vtol_transition_to(self.p.to_mode)
                 self.transition_commanded = True
 
@@ -61,10 +59,8 @@ class TransitionMode(Mode):
                     if self.vehicle.yaw is not None:
                         ahead_dist = 10.0
                         target_pos = (
-                            self.vehicle.local_position.x
-                            + np.cos(self.vehicle.yaw) * ahead_dist,
-                            self.vehicle.local_position.y
-                            + np.sin(self.vehicle.yaw) * ahead_dist,
+                            self.vehicle.local_position.x + np.cos(self.vehicle.yaw) * ahead_dist,
+                            self.vehicle.local_position.y + np.sin(self.vehicle.yaw) * ahead_dist,
                             self.vehicle.local_position.z,
                         )
                         self.vehicle.publish_position_setpoint(target_pos)
@@ -92,10 +88,8 @@ class TransitionMode(Mode):
                 if self.p.to_mode == "FW" and self.vehicle.yaw is not None:
                     ahead_dist = 10.0
                     target_pos = (
-                        self.vehicle.local_position.x
-                        + np.cos(self.vehicle.yaw) * ahead_dist,
-                        self.vehicle.local_position.y
-                        + np.sin(self.vehicle.yaw) * ahead_dist,
+                        self.vehicle.local_position.x + np.cos(self.vehicle.yaw) * ahead_dist,
+                        self.vehicle.local_position.y + np.sin(self.vehicle.yaw) * ahead_dist,
                         self.vehicle.local_position.z,
                     )
                     self.vehicle.publish_position_setpoint(target_pos)

@@ -13,9 +13,7 @@ def detect_contour(frame: np.ndarray, bounds) -> np.ndarray | None:
     area_ratios = []
 
     for contour in contours:
-        if (
-            cv2.contourArea(contour) > 30
-        ):  # Only consider contours with significant area
+        if cv2.contourArea(contour) > 30:  # Only consider contours with significant area
             M = cv2.moments(contour)
             if M["m00"] != 0:  # Prevent division by zero
                 cx = int(M["m10"] / M["m00"])
@@ -23,20 +21,14 @@ def detect_contour(frame: np.ndarray, bounds) -> np.ndarray | None:
                 rect = cv2.minAreaRect(contour)
                 (center_x, center_y), (width, height), angle = rect
 
-                if (
-                    width > 0
-                    and height > 0
-                    and cv2.contourArea(contour) / (width * height) > 0.57
-                ):
+                if width > 0 and height > 0 and cv2.contourArea(contour) / (width * height) > 0.57:
                     valid_contours.append(contour)
                     centers.append((cx, cy))
                     area_ratios.append(cv2.contourArea(contour) / (width * height))
 
     if valid_contours:
         total = list(zip(area_ratios, valid_contours, centers))
-        total.sort(
-            key=lambda x: x[0], reverse=True
-        )  # Sort by area ratio, highest first
+        total.sort(key=lambda x: x[0], reverse=True)  # Sort by area ratio, highest first
         _, best_contour, _ = total[0]  # Choose the best contour based on area ratio
         return best_contour
     return None

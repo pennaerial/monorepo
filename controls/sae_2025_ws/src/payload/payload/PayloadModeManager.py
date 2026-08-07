@@ -36,9 +36,7 @@ class PayloadModeManager(ModeManager):
             )
 
         self.vehicle = Payload(self, str(vehicle_name))
-        self.setup_vision(
-            [canonical_vision_node_path(vc) for vc in mission_spec._vision_nodes]
-        )
+        self.setup_vision([canonical_vision_node_path(vc) for vc in mission_spec._vision_nodes])
         self.configure_peer_vehicle_names(mission_spec._peer_vehicle_names)
         self.setup_modes(mission_spec)
         self.timer = None

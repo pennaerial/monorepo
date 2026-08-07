@@ -36,9 +36,7 @@ class Mode[VehicleT: Vehicle, ParamsT: BaseModel](ABC):
 
     @classmethod
     def required_vision_node_paths(cls) -> tuple[str, ...]:
-        return tuple(
-            canonical_vision_node_path(node) for node in cls.required_vision_nodes
-        )
+        return tuple(canonical_vision_node_path(node) for node in cls.required_vision_nodes)
 
     @classmethod
     def declared_transition_labels(cls) -> tuple[str, ...]:
@@ -97,9 +95,7 @@ class Mode[VehicleT: Vehicle, ParamsT: BaseModel](ABC):
         """
         pass
 
-    def on_disconnect(
-        self, time_delta: float, connection_status: Mapping[str, bool]
-    ) -> None:
+    def on_disconnect(self, time_delta: float, connection_status: Mapping[str, bool]) -> None:
         """
         Periodic logic executed while one or more required peers are disconnected.
 
@@ -154,9 +150,7 @@ class Mode[VehicleT: Vehicle, ParamsT: BaseModel](ABC):
         if self.active:
             self.on_update(time_delta)
 
-    def disconnect(
-        self, time_delta: float, connection_status: Mapping[str, bool]
-    ) -> None:
+    def disconnect(self, time_delta: float, connection_status: Mapping[str, bool]) -> None:
         """
         Update the mode's disconnected behavior if it is active.
 

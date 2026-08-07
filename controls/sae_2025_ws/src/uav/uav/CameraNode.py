@@ -75,9 +75,7 @@ class Camera(Node):
             str(self.get_parameter("input_transport").value).strip()
         )
         self.rotate_degrees = self._float_parameter("rotate_degrees")
-        self.preprocess_hook_name = str(
-            self.get_parameter("preprocess_hook").value
-        ).strip()
+        self.preprocess_hook_name = str(self.get_parameter("preprocess_hook").value).strip()
         self.preprocess_hook = self._load_preprocess_hook(self.preprocess_hook_name)
         self._preprocess_active = (
             abs(self.rotate_degrees) > 1e-9 or self.preprocess_hook is not None
@@ -157,9 +155,7 @@ class Camera(Node):
         self.compressed_publisher = (
             None
             if self._compressed_passthrough
-            else self.create_publisher(
-                CompressedImage, self.compressed_topic, queue_size
-            )
+            else self.create_publisher(CompressedImage, self.compressed_topic, queue_size)
         )
         self.camera_info_publisher = (
             None
@@ -221,9 +217,7 @@ class Camera(Node):
         if explicit_namespace is not None:
             return self._normalize_namespace(explicit_namespace)
 
-        configured_namespace = str(
-            self.get_parameter("vehicle_namespace").value
-        ).strip()
+        configured_namespace = str(self.get_parameter("vehicle_namespace").value).strip()
         if configured_namespace:
             return self._normalize_namespace(configured_namespace)
 
@@ -301,9 +295,7 @@ class Camera(Node):
         module = importlib.import_module(module_path)
         hook = getattr(module, attr_name)
         if not callable(hook):
-            raise TypeError(
-                f"Configured preprocess_hook '{hook_path}' is not callable."
-            )
+            raise TypeError(f"Configured preprocess_hook '{hook_path}' is not callable.")
         return cast(PreprocessHook, hook)
 
     def _rotate_frame(self, frame: np.ndarray) -> np.ndarray:
@@ -375,10 +367,7 @@ class Camera(Node):
         return image
 
     def _raw_subscribers_present(self) -> bool:
-        return (
-            self.raw_publisher is not None
-            and self.raw_publisher.get_subscription_count() > 0
-        )
+        return self.raw_publisher is not None and self.raw_publisher.get_subscription_count() > 0
 
     def _compressed_subscribers_present(self) -> bool:
         return (
@@ -410,9 +399,7 @@ class Camera(Node):
             self._preprocess_active
             or self.display
             or (self.save_vision_milliseconds > 0)
-            or (
-                self.input_transport == "raw" and self._compressed_subscribers_present()
-            )
+            or (self.input_transport == "raw" and self._compressed_subscribers_present())
         )
         frame = self._to_bgr_from_raw(msg) if needs_frame else None
         processed_frame = (
@@ -452,9 +439,7 @@ class Camera(Node):
             self._preprocess_active
             or self.display
             or (self.save_vision_milliseconds > 0)
-            or (
-                self.input_transport == "compressed" and self._raw_subscribers_present()
-            )
+            or (self.input_transport == "compressed" and self._raw_subscribers_present())
         )
         frame = self._to_bgr_from_compressed(msg) if needs_frame else None
         processed_frame = (
@@ -492,9 +477,7 @@ class Camera(Node):
         if self.camera_info_publisher is not None:
             self.camera_info_publisher.publish(msg)
 
-    def service_callback(
-        self, request: CameraData.Request, response: CameraData.Response
-    ):
+    def service_callback(self, request: CameraData.Request, response: CameraData.Response):
         self.get_logger().debug("Received request for camera data.")
 
         if request.cam_image_raw or request.cam_image_compressed:
@@ -522,15 +505,9 @@ class Camera(Node):
         self.get_logger().debug("Sending camera data.")
         return response
 
-    def _select_service_image(
-        self, requested_transport: str
-    ) -> Image | CompressedImage | None:
+    def _select_service_image(self, requested_transport: str) -> Image | CompressedImage | None:
         if self.input_transport == "both":
-            return (
-                self.raw_image
-                if requested_transport == "raw"
-                else self.compressed_image
-            )
+            return self.raw_image if requested_transport == "raw" else self.compressed_image
 
         if requested_transport == "raw":
             preferred_transports = (

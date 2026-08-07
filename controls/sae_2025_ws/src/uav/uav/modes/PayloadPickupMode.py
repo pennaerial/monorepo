@@ -80,9 +80,7 @@ class PayloadPickupMode(Mode):
             if request.altitude > 1
             else self.vehicle.camera_offsets
         )
-        direction = [
-            x + y for x, y in zip(direction, self.vehicle.uav_to_local(camera_offsets))
-        ]
+        direction = [x + y for x, y in zip(direction, self.vehicle.uav_to_local(camera_offsets))]
 
         # Determine the direction vector based on altitude and payload pose
         if request.altitude < 1:

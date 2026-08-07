@@ -25,8 +25,6 @@ setup(
         ],
     },
     entry_points={
-        "console_scripts": [
-            "test_plugin_loader = vehicle_common.runtime.plugin_loader:main"
-        ],
+        "console_scripts": ["test_plugin_loader = vehicle_common.runtime.plugin_loader:main"],
     },
 )

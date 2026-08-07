@@ -46,9 +46,7 @@ class PayloadWaitForDriveOutParams(ParamsBase):
     # Stillness detection (optical flow)
     stillness_threshold: float = 2.0
     stillness_window: int = 15
-    stillness_flow_crop_frac: float = (
-        0.4  # top fraction to discard (0.4 = use bottom 60%)
-    )
+    stillness_flow_crop_frac: float = 0.4  # top fraction to discard (0.4 = use bottom 60%)
     # Obstruction retreat (still but no orange)
     obstruction_retreat_linear: float = -0.05
     obstruction_retreat_speed: float = 1.5
@@ -111,9 +109,7 @@ class PayloadWaitForDriveOutMode(Mode):
         if params.debug:
             self.debug_pub = self.node.create_publisher(
                 CompressedImage,
-                vehicle.namespaced_path(
-                    "vision/payload_wait_drive_out/debug/compressed"
-                ),
+                vehicle.namespaced_path("vision/payload_wait_drive_out/debug/compressed"),
                 1,
             )
 
@@ -207,23 +203,17 @@ class PayloadWaitForDriveOutMode(Mode):
 
         now = self._now()
         if orange_found:
-            elapsed = (
-                (now - self._clear_since) if self._clear_since is not None else 0.0
-            )
+            elapsed = (now - self._clear_since) if self._clear_since is not None else 0.0
             state_label = f"DLZ {elapsed:.1f}/{self.p.dlz_color_wait_seconds:.1f}s"
             label_color = (0, 255, 0)
         elif is_still:
-            state_label = (
-                f"OBSTRUCTED {self._obstruction_count}/{self.p.obstruction_frames}"
-            )
+            state_label = f"OBSTRUCTED {self._obstruction_count}/{self.p.obstruction_frames}"
             label_color = (0, 140, 255)
         else:
             state_label = "IN-FLIGHT"
             label_color = (128, 128, 128)
 
-        cv2.putText(
-            vis, state_label, (8, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, label_color, 2
-        )
+        cv2.putText(vis, state_label, (8, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, label_color, 2)
         cv2.putText(
             vis,
             f"dlz={coverage:.2f} thresh={self.p.dlz_color_pixel_threshold:.2f}",
@@ -282,13 +272,9 @@ class PayloadWaitForDriveOutMode(Mode):
                 self._obstruction_count = 0
                 if self._clear_since is None:
                     self._clear_since = now
-                    self.log(
-                        f"DLZ in view — starting {self.p.dlz_color_wait_seconds}s timer"
-                    )
+                    self.log(f"DLZ in view — starting {self.p.dlz_color_wait_seconds}s timer")
                 elapsed = now - self._clear_since
-                self.log(
-                    f"DLZ confirmed for {elapsed:.1f}/{self.p.dlz_color_wait_seconds:.1f}s"
-                )
+                self.log(f"DLZ confirmed for {elapsed:.1f}/{self.p.dlz_color_wait_seconds:.1f}s")
                 self._publish_debug(bgr, True, coverage, orange_mask, None)
                 if elapsed >= self.p.dlz_color_wait_seconds:
                     self.log("landing confirmed — moving to reverse")
@@ -296,9 +282,7 @@ class PayloadWaitForDriveOutMode(Mode):
             else:
                 # Orange absent — reset DLZ timer, reset optical flow so readings are fresh
                 if self._clear_since is not None:
-                    self.log(
-                        "orange lost — resetting DLZ timer, resetting optical flow"
-                    )
+                    self.log("orange lost — resetting DLZ timer, resetting optical flow")
                     self._prev_gray = None
                     self._flow_deltas.clear()
                 self._clear_since = None
@@ -329,9 +313,7 @@ class PayloadWaitForDriveOutMode(Mode):
                 )
             elif self._dr_future.done():
                 result = self._dr_future.result()
-                self.log(
-                    f"obstruction retreat done success={result.success} — resuming DLZ watch"
-                )
+                self.log(f"obstruction retreat done success={result.success} — resuming DLZ watch")
                 self._dr_future = None
                 # Reset optical-flow so motion from the retreat doesn't linger
                 self._prev_gray = None

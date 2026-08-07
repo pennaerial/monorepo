@@ -72,9 +72,7 @@ class WorldNode(Node, ABC):
         self.entities = entities or {}
         self.controllables = controllables or {}
 
-        self.get_logger().info(
-            f"Initializing world node for competition: {competition_name}"
-        )
+        self.get_logger().info(f"Initializing world node for competition: {competition_name}")
         self.setup_gazebo_models(self.get_logger())
         self.trigger_srv = self.create_service(
             Trigger, f"/{self.get_name()}/trigger_world_gen", self.trigger_world_gen_req
@@ -140,9 +138,7 @@ class WorldNode(Node, ABC):
         out_path = Path(self.output_path).expanduser().resolve()
 
         if not in_path.exists():
-            raise FileNotFoundError(
-                f"Input SDF not found: {in_path}\nCWD: {Path.cwd().resolve()}"
-            )
+            raise FileNotFoundError(f"Input SDF not found: {in_path}\nCWD: {Path.cwd().resolve()}")
         try:
             out_path.parent.mkdir(parents=True, exist_ok=True)
         except OSError as e:
@@ -189,8 +185,7 @@ class WorldNode(Node, ABC):
     def spawn_entity_object(self, entity: Entity) -> bool:
         if not self.spawn_entity_client.service_is_ready():
             self.get_logger().error(
-                f"Cannot spawn entity '{entity.name}': "
-                f"/world/{self.competition_name}/create is not ready"
+                f"Cannot spawn entity '{entity.name}': /world/{self.competition_name}/create is not ready"
             )
             return False
 
@@ -261,9 +256,7 @@ class WorldNode(Node, ABC):
             return response
         response.success = self.generate_world()
         response.message = (
-            "World generation successful"
-            if response.success
-            else "World generation failed"
+            "World generation successful" if response.success else "World generation failed"
         )
         return response
 
@@ -305,9 +298,7 @@ class WorldNode(Node, ABC):
                     for model in world.findall(xpath):
                         if model.get("name") == "ground_plane":
                             ground_plane_model = model
-                            self.get_logger().info(
-                                f"Found <model name='ground_plane'> at {xpath}"
-                            )
+                            self.get_logger().info(f"Found <model name='ground_plane'> at {xpath}")
                             found = True
                             break
                     if found:
@@ -370,9 +361,7 @@ class WorldNode(Node, ABC):
                                                 f"Successfully updated <mu> and <mu2> in ground_plane friction to {value}"
                                             )
                     except Exception as e:
-                        self.get_logger().warn(
-                            f"Couldn't update <mu>/<mu2> in ground_plane: {e}"
-                        )
+                        self.get_logger().warn(f"Couldn't update <mu>/<mu2> in ground_plane: {e}")
                 else:
                     self.get_logger().warn(
                         "No <model name='ground_plane'> found to update <mu>/<mu2>"

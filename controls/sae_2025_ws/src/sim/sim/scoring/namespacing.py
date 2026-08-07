@@ -43,8 +43,7 @@ def resolve_scoring_vehicle_name(
     if explicit_vehicle_name:
         if not uav_names:
             raise ValueError(
-                "scoring.params.vehicle_name was provided, but no UAV controllable "
-                "was found in the resolved sim world."
+                "scoring.params.vehicle_name was provided, but no UAV controllable was found in the resolved sim world."
             )
         if explicit_vehicle_name not in uav_names:
             raise ValueError(
@@ -59,11 +58,9 @@ def resolve_scoring_vehicle_name(
 
     if not uav_names:
         raise ValueError(
-            "scoring.params.vehicle_name is required because no UAV controllable "
-            "was found in the resolved sim world."
+            "scoring.params.vehicle_name is required because no UAV controllable was found in the resolved sim world."
         )
 
     raise ValueError(
-        "scoring.params.vehicle_name is required when multiple UAV controllables "
-        f"are present. Known UAVs: {uav_names}."
+        f"scoring.params.vehicle_name is required when multiple UAV controllables are present. Known UAVs: {uav_names}."
     )

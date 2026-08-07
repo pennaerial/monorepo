@@ -44,9 +44,7 @@ class ScoringNode(Node, ABC):
             String, f"/scoring/{competition_name}/status", 10
         )
 
-        self.get_logger().info(
-            f"Initialized scoring node for competition: {competition_name}"
-        )
+        self.get_logger().info(f"Initialized scoring node for competition: {competition_name}")
 
     @abstractmethod
     def update_scoring(self) -> None:

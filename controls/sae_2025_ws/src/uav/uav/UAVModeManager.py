@@ -71,9 +71,7 @@ class UAVModeManager(ModeManager):
             self.vehicle = Multicopter(self, **vehicle_kwargs)
 
         self.get_logger().info("Mission Node has started.")
-        self.setup_vision(
-            [canonical_vision_node_path(vc) for vc in mission_spec._vision_nodes]
-        )
+        self.setup_vision([canonical_vision_node_path(vc) for vc in mission_spec._vision_nodes])
         self.configure_peer_vehicle_names(mission_spec._peer_vehicle_names)
         self.setup_modes(mission_spec)
 
@@ -93,9 +91,7 @@ class UAVModeManager(ModeManager):
         self.get_logger().info("Failsafe triggered via service call")
         if self.vehicle is not None and hasattr(self.vehicle, "failsafe_trigger"):
             self.vehicle.failsafe_trigger = True
-            self.vehicle.failsafe = (
-                self.vehicle.failsafe_px4 or self.vehicle.failsafe_trigger
-            )
+            self.vehicle.failsafe = self.vehicle.failsafe_px4 or self.vehicle.failsafe_trigger
         response.success = True
         response.message = "Failsafe triggered."
         return response
@@ -129,9 +125,7 @@ class UAVModeManager(ModeManager):
             self.vehicle.set_origin()
 
         if self.vehicle.arm_state != VehicleStatus.ARMING_STATE_ARMED:
-            self.get_logger().info(
-                f"UAV is not armed. Current arm state: {self.vehicle.arm_state}"
-            )
+            self.get_logger().info(f"UAV is not armed. Current arm state: {self.vehicle.arm_state}")
             if (
                 self.active_mode is not None
                 and isinstance(self.get_active_mode(), LandingMode)
@@ -168,9 +162,7 @@ class UAVModeManager(ModeManager):
 
     def handle_mode_state(self, state: str) -> None:
         if state == "error":
-            self.get_logger().error(
-                f"Error in mode {self.active_mode}. Switching to failsafe."
-            )
+            self.get_logger().error(f"Error in mode {self.active_mode}. Switching to failsafe.")
             if self.vehicle is not None:
                 self.vehicle.failsafe = True
             return

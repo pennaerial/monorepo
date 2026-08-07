@@ -69,9 +69,7 @@ class PayloadRetreatMode(Mode):
     transition_labels = ()
 
     @override
-    def initialize(
-        self, node: Node, vehicle: Payload, params: PayloadRetreatParams
-    ) -> None:
+    def initialize(self, node: Node, vehicle: Payload, params: PayloadRetreatParams) -> None:
         self.node = node
         self.vehicle = vehicle
         self.p = params
@@ -111,13 +109,9 @@ class PayloadRetreatMode(Mode):
                 CompressedImage, cam_topic, self._image_cb, 1
             )
         else:
-            self._image_sub = self.node.create_subscription(
-                Image, cam_topic, self._image_cb, 1
-            )
+            self._image_sub = self.node.create_subscription(Image, cam_topic, self._image_cb, 1)
         self._drive_pub = self.node.create_publisher(DriveCommand, drive_topic, 10)
-        self.log(
-            f"PayloadRetreatMode: subscribed to {cam_topic}, publishing to {drive_topic}"
-        )
+        self.log(f"PayloadRetreatMode: subscribed to {cam_topic}, publishing to {drive_topic}")
 
     def on_exit(self) -> None:
         self._publish_drive(0.0, 0.0)
@@ -137,9 +131,7 @@ class PayloadRetreatMode(Mode):
             else:
                 bgr = self._bridge.imgmsg_to_cv2(self._image, desired_encoding="bgr8")
         except Exception as exc:
-            self.node.get_logger().warn(
-                f"PayloadRetreatMode: image decode failed: {exc}"
-            )
+            self.node.get_logger().warn(f"PayloadRetreatMode: image decode failed: {exc}")
             return
 
         if bgr is None:
@@ -148,9 +140,7 @@ class PayloadRetreatMode(Mode):
         # ---- Phase 1: drive forward until we reach the DLZ edge ----
         if self._phase == "drive_to_edge":
             white_ratio, white_count = self._edge_metrics(bgr)
-            self.node.get_logger().info(
-                f"white={white_ratio * 100:.1f}%  count={white_count}"
-            )
+            self.node.get_logger().info(f"white={white_ratio * 100:.1f}%  count={white_count}")
 
             if white_count < self.p.edge_min_pixels:
                 self._edge_invalid_count += 1
@@ -285,6 +275,4 @@ class PayloadRetreatMode(Mode):
     def _publish_drive(self, linear: float, angular: float) -> None:
         if self._drive_pub is None:
             return
-        self._drive_pub.publish(
-            DriveCommand(linear=float(linear), angular=float(angular))
-        )
+        self._drive_pub.publish(DriveCommand(linear=float(linear), angular=float(angular)))

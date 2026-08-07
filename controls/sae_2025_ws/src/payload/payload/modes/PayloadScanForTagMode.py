@@ -54,15 +54,11 @@ class PayloadScanForTagMode(Mode):
     requires_camera = True
 
     @override
-    def initialize(
-        self, node: Node, vehicle: Payload, params: PayloadScanForTagParams
-    ) -> None:
+    def initialize(self, node: Node, vehicle: Payload, params: PayloadScanForTagParams) -> None:
         self.node = node
         self.vehicle = vehicle
         self.p = params
-        self.tag_family = (
-            str(params.tag_family) if params.tag_family else DEFAULT_TAG_FAMILY
-        )
+        self.tag_family = str(params.tag_family) if params.tag_family else DEFAULT_TAG_FAMILY
         self._bridge = CvBridge()
 
     def on_enter(self) -> None:
@@ -87,14 +83,10 @@ class PayloadScanForTagMode(Mode):
                     CompressedImage, f"{cam_topic}/compressed", self._image_cb, 1
                 )
             else:
-                self._image_sub = self.node.create_subscription(
-                    Image, cam_topic, self._image_cb, 1
-                )
+                self._image_sub = self.node.create_subscription(Image, cam_topic, self._image_cb, 1)
 
             annotated_topic = self.vehicle.namespaced_path("annotated_image/compressed")
-            self._annotated_pub = self.node.create_publisher(
-                CompressedImage, annotated_topic, 1
-            )
+            self._annotated_pub = self.node.create_publisher(CompressedImage, annotated_topic, 1)
 
         self.log(
             f"PayloadScanForTagMode: scanning for tag {self.p.tag_id} "
@@ -187,9 +179,7 @@ class PayloadScanForTagMode(Mode):
         # Check if full rotation complete before spinning more
         if self._angle_swept >= _TWO_PI:
             self.vehicle.stop()
-            self.log(
-                f"PayloadScanForTagMode: 360° complete, tag {self.p.tag_id} not found"
-            )
+            self.log(f"PayloadScanForTagMode: 360° complete, tag {self.p.tag_id} not found")
             if self.p.loop:
                 self._angle_swept = 0.0
             else:

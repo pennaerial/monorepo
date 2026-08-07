@@ -138,14 +138,11 @@ class VisionNode(Node):
             else bool(self.get_parameter("enable_failsafe_service").value)
         )
         resolved_failsafe_service = (
-            failsafe_service_name
-            or str(self.get_parameter("failsafe_service_name").value).strip()
+            failsafe_service_name or str(self.get_parameter("failsafe_service_name").value).strip()
         )
         self.failsafe_trigger_client = None
         if resolved_enable_failsafe and resolved_failsafe_service:
-            self.failsafe_trigger_client = self.create_client(
-                Trigger, resolved_failsafe_service
-            )
+            self.failsafe_trigger_client = self.create_client(Trigger, resolved_failsafe_service)
 
     @staticmethod
     def _normalize_namespace(namespace: str | None) -> str | None:
@@ -159,9 +156,7 @@ class VisionNode(Node):
     def _resolve_namespace(self, explicit_namespace: str | None) -> str | None:
         if explicit_namespace is not None:
             return self._normalize_namespace(explicit_namespace)
-        configured_namespace = str(
-            self.get_parameter("vehicle_namespace").value
-        ).strip()
+        configured_namespace = str(self.get_parameter("vehicle_namespace").value).strip()
         if configured_namespace:
             return self._normalize_namespace(configured_namespace)
         vehicle_name = str(self.get_parameter("vehicle_name").value).strip()
@@ -185,14 +180,10 @@ class VisionNode(Node):
 
     def _resolve_vision_service_name(self, explicit: str | None) -> str:
         if explicit:
-            return self._require_relative_transport_path(
-                explicit, label="vision_service_name"
-            )
+            return self._require_relative_transport_path(explicit, label="vision_service_name")
         configured = str(self.get_parameter("vision_service_name").value).strip()
         if configured:
-            return self._require_relative_transport_path(
-                configured, label="vision_service_name"
-            )
+            return self._require_relative_transport_path(configured, label="vision_service_name")
         return self.service_name()
 
     @staticmethod
@@ -271,16 +262,11 @@ class VisionNode(Node):
     def _refresh_camera_cache_from_service(self) -> None:
         if self.client is None:
             return
-        if (
-            self._camera_request_future is not None
-            and not self._camera_request_future.done()
-        ):
+        if self._camera_request_future is not None and not self._camera_request_future.done():
             return
         if not self.client.wait_for_service(timeout_sec=0.0):
             if not self._camera_wait_warned:
-                self.get_logger().warn(
-                    f"Waiting for camera service {self.camera_service_name}."
-                )
+                self.get_logger().warn(f"Waiting for camera service {self.camera_service_name}.")
                 self._camera_wait_warned = True
             return
 
@@ -326,10 +312,7 @@ class VisionNode(Node):
             return
         image_msg, transport = self._select_camera_response_image(response)
         if image_msg is not None and transport is not None:
-            if (
-                transport != self.preferred_image_transport
-                and not self._camera_fallback_warned
-            ):
+            if transport != self.preferred_image_transport and not self._camera_fallback_warned:
                 self.get_logger().warn(
                     f"Camera service returned {transport} instead of preferred {self.preferred_image_transport}.",
                     throttle_duration_sec=5.0,

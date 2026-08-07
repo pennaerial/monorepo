@@ -102,9 +102,7 @@ class Payload(Vehicle):
         self._udp_heartbeat_pub.publish(msg)
 
     def drive(self, linear: float, angular: float) -> None:
-        self.drive_publisher.publish(
-            DriveCommand(linear=float(linear), angular=float(angular))
-        )
+        self.drive_publisher.publish(DriveCommand(linear=float(linear), angular=float(angular)))
 
     def stop(self) -> None:
         self.drive(0.0, 0.0)
@@ -112,9 +110,7 @@ class Payload(Vehicle):
     def set_servo(self, degree: float) -> None:
         self.servo_publisher.publish(ServoCommand(degree=float(degree)))
 
-    def dead_reckon(
-        self, linear: float, angular: float, speed: float, timeout_sec: float = 30.0
-    ):
+    def dead_reckon(self, linear: float, angular: float, speed: float, timeout_sec: float = 30.0):
         request = DeadReckon.Request()
         request.linear = float(linear)
         request.angular = float(angular)

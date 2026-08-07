@@ -144,9 +144,7 @@ class PayloadDLZNavigateParams(ParamsBase):
     tag_transition_table: dict[str, TagTransitionRule] | None = None
     detect_frames: int = 5
     scan_duration_s: float = 1.0
-    start_phase: Literal["wait_for_plane", "scan_tags", "line_follow"] = (
-        "wait_for_plane"
-    )
+    start_phase: Literal["wait_for_plane", "scan_tags", "line_follow"] = "wait_for_plane"
     tag_size_m: float = 0.0508
     tag_family: str = DEFAULT_TAG_FAMILY
     compressed_image: bool = False
@@ -212,9 +210,7 @@ class PayloadDLZNavigateMode(Mode):
     requires_camera = True
 
     @override
-    def initialize(
-        self, node: Node, vehicle: Payload, params: PayloadDLZNavigateParams
-    ) -> None:
+    def initialize(self, node: Node, vehicle: Payload, params: PayloadDLZNavigateParams) -> None:
         self.node = node
         self.vehicle = vehicle
         self.p = params
@@ -233,9 +229,7 @@ class PayloadDLZNavigateMode(Mode):
 
         self.tag_transition_table = dict(params.tag_transition_table or {})
         self.start_phase = start_phase
-        self.tag_family = (
-            str(params.tag_family) if params.tag_family else DEFAULT_TAG_FAMILY
-        )
+        self.tag_family = str(params.tag_family) if params.tag_family else DEFAULT_TAG_FAMILY
 
         # A = cw-start colour, B = ccw-start colour (see module docstring).
         self._lower_a = np.array(params.cw_lower_hsv, dtype=np.uint8)
@@ -258,11 +252,7 @@ class PayloadDLZNavigateMode(Mode):
         """Signed angular speed for the initial tape-alignment turn.
         CW direction → turn left (positive). CCW direction → turn right (negative).
         """
-        return (
-            self.p.turn_angular_speed
-            if self.direction == "cw"
-            else -self.p.turn_angular_speed
-        )
+        return self.p.turn_angular_speed if self.direction == "cw" else -self.p.turn_angular_speed
 
     def _corner_transition(self, prev: str, curr: str) -> bool:
         """True when the A↔B transition is a corner for the current travel direction."""
@@ -293,9 +283,7 @@ class PayloadDLZNavigateMode(Mode):
                 return cv2.imdecode(buf, cv2.IMREAD_COLOR)
             return self._bridge.imgmsg_to_cv2(self._image, desired_encoding="bgr8")
         except Exception as exc:
-            self.node.get_logger().warn(
-                f"PayloadDLZNavigateMode: image decode failed: {exc}"
-            )
+            self.node.get_logger().warn(f"PayloadDLZNavigateMode: image decode failed: {exc}")
             return None
 
     def _dlz_roi_mask(self, bgr: np.ndarray) -> np.ndarray:
@@ -339,9 +327,7 @@ class PayloadDLZNavigateMode(Mode):
         orange_mask = self._threshold_color_mask(hsv, roi_strip, color="A")
         blue_mask = self._threshold_color_mask(hsv, roi_strip, color="B")
         current_color = _detect_current_color(orange_mask, blue_mask)
-        detected, lateral_error_px, boundary_angle = _detect_tape_following(
-            orange_mask, blue_mask
-        )
+        detected, lateral_error_px, boundary_angle = _detect_tape_following(orange_mask, blue_mask)
         return (
             current_color,
             detected,
@@ -361,9 +347,7 @@ class PayloadDLZNavigateMode(Mode):
             msg.header.stamp = self.node.get_clock().now().to_msg()
             self._annotated_pub.publish(msg)
         except Exception as exc:
-            self.node.get_logger().warn(
-                f"PayloadDLZNavigateMode: annotated publish failed: {exc}"
-            )
+            self.node.get_logger().warn(f"PayloadDLZNavigateMode: annotated publish failed: {exc}")
 
     def _match_table(self, seen_ids: set[int]) -> Optional[dict]:
         """
@@ -373,10 +357,7 @@ class PayloadDLZNavigateMode(Mode):
         """
         for key, entry in self.tag_transition_table.items():
             groups = str(key).split(",")
-            if all(
-                any(int(t.strip()) in seen_ids for t in group.split("|"))
-                for group in groups
-            ):
+            if all(any(int(t.strip()) in seen_ids for t in group.split("|")) for group in groups):
                 return entry
         return None
 
@@ -419,15 +400,11 @@ class PayloadDLZNavigateMode(Mode):
                 CompressedImage, f"{cam_topic}/compressed", self._image_cb, 1
             )
         else:
-            self._image_sub = self.node.create_subscription(
-                Image, cam_topic, self._image_cb, 1
-            )
+            self._image_sub = self.node.create_subscription(Image, cam_topic, self._image_cb, 1)
 
         if getattr(self.node, "vision_debug", False):
             annotated_topic = self.vehicle.namespaced_path("annotated_image/compressed")
-            self._annotated_pub = self.node.create_publisher(
-                CompressedImage, annotated_topic, 1
-            )
+            self._annotated_pub = self.node.create_publisher(CompressedImage, annotated_topic, 1)
 
         self.log(
             f"PayloadDLZNavigateMode: enter  start_phase={self.start_phase}  "
@@ -488,13 +465,10 @@ class PayloadDLZNavigateMode(Mode):
                 self._scan_elapsed = 0.0
                 self._seen_tag_ids = set()
                 self.log(
-                    f"PayloadDLZNavigateMode: plane detected ({self._consecutive_tag_frames} frames) "
-                    f"→ SCAN_TAGS"
+                    f"PayloadDLZNavigateMode: plane detected ({self._consecutive_tag_frames} frames) → SCAN_TAGS"
                 )
         else:
-            self.log(
-                "PayloadDLZNavigateMode: WAIT_FOR_PLANE — no tags visible, resetting counter"
-            )
+            self.log("PayloadDLZNavigateMode: WAIT_FOR_PLANE — no tags visible, resetting counter")
             self._consecutive_tag_frames = 0
 
     # ------------------------------------------------------------------
@@ -514,9 +488,7 @@ class PayloadDLZNavigateMode(Mode):
             return
 
         # Scan complete — look up table
-        self.log(
-            f"PayloadDLZNavigateMode: SCAN_TAGS complete  seen={sorted(self._seen_tag_ids)}"
-        )
+        self.log(f"PayloadDLZNavigateMode: SCAN_TAGS complete  seen={sorted(self._seen_tag_ids)}")
         entry = self._match_table(self._seen_tag_ids)
         if entry is not None:
             self.direction = str(entry["direction"]).lower().strip()
@@ -537,15 +509,11 @@ class PayloadDLZNavigateMode(Mode):
 
         if self.target_transitions == 0:
             self._done = True
-            self.log(
-                "PayloadDLZNavigateMode: target_transitions=0 → already at dock → done"
-            )
+            self.log("PayloadDLZNavigateMode: target_transitions=0 → already at dock → done")
             return
 
         # start_phase=="scan_tags" means we're already on the tape → skip the alignment turn
-        next_phase = (
-            "line_follow" if self.start_phase == "scan_tags" else "turn_onto_tape"
-        )
+        next_phase = "line_follow" if self.start_phase == "scan_tags" else "turn_onto_tape"
         self._phase = next_phase
         self.log(f"PayloadDLZNavigateMode: → {next_phase.upper()}")
 
@@ -746,8 +714,7 @@ class PayloadDLZNavigateMode(Mode):
         )
         cv2.putText(
             debug,
-            f"{expected_color}={count}px lat={lateral_error_px:+.1f}px "
-            f"tol=+/-{_TURN_CENTER_TOL_PX:.0f}",
+            f"{expected_color}={count}px lat={lateral_error_px:+.1f}px tol=+/-{_TURN_CENTER_TOL_PX:.0f}",
             (8, 44),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.5,
@@ -931,8 +898,8 @@ class PayloadDLZNavigateMode(Mode):
 
         bgr = self._decode_image()
         if bgr is not None:
-            total, lateral_error_px, mask, row_start, col_start = (
-                self._corner_single_color_metrics(bgr, self._corner_target_color)
+            total, lateral_error_px, mask, row_start, col_start = self._corner_single_color_metrics(
+                bgr, self._corner_target_color
             )
             # Stop condition depends on travel direction (lenient):
             #   cw  → accept when centroid on the LEFT side of the crop
@@ -961,17 +928,14 @@ class PayloadDLZNavigateMode(Mode):
             else:
                 self._corner_stable = 0
 
-            self._annotate_corner_turn(
-                bgr, mask, row_start, col_start, total, lateral_error_px
-            )
+            self._annotate_corner_turn(bgr, mask, row_start, col_start, total, lateral_error_px)
 
         # Safety timeout
         if self._corner_turned >= _CORNER_MAX_RAD:
             self.vehicle.drive(0.0, 0.0)
             self._lf_phase = "following"
             self.log(
-                f"PayloadDLZNavigateMode: corner turn TIMEOUT "
-                f"({math.degrees(self._corner_turned):.1f}°) → FOLLOWING"
+                f"PayloadDLZNavigateMode: corner turn TIMEOUT ({math.degrees(self._corner_turned):.1f}°) → FOLLOWING"
             )
             return
 
@@ -1065,8 +1029,7 @@ class PayloadDLZNavigateMode(Mode):
         )
         cv2.putText(
             debug,
-            f"total={total}px lat={lateral_error_px:+.1f}px "
-            f"tol=+/-{_CORNER_CENTER_TOL_PX:.0f}",
+            f"total={total}px lat={lateral_error_px:+.1f}px tol=+/-{_CORNER_CENTER_TOL_PX:.0f}",
             (8, 44),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.5,
@@ -1075,8 +1038,7 @@ class PayloadDLZNavigateMode(Mode):
         )
         cv2.putText(
             debug,
-            f"stable={self._corner_stable}/{_CORNER_STABLE_FRAMES} "
-            f"turned={math.degrees(self._corner_turned):.1f}deg",
+            f"stable={self._corner_stable}/{_CORNER_STABLE_FRAMES} turned={math.degrees(self._corner_turned):.1f}deg",
             (8, 62),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.5,
@@ -1119,9 +1081,7 @@ class PayloadDLZNavigateMode(Mode):
         shifted_orange = [c + np.array([[[0, strip_start]]]) for c in orange_contours]
         cv2.drawContours(debug, shifted_orange, -1, (255, 255, 255), 2)
 
-        blue_contours, _ = cv2.findContours(
-            blue_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
-        )
+        blue_contours, _ = cv2.findContours(blue_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         shifted_blue = [c + np.array([[[0, strip_start]]]) for c in blue_contours]
         cv2.drawContours(debug, shifted_blue, -1, (255, 255, 255), 2)
 

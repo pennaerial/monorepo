@@ -57,11 +57,8 @@ class UAVMissionBootstrap(Node):
             "auto_launch": self._bool_parameter("auto_launch"),
             "debug": bool(self.get_parameter("debug").value),
             "servo_only": bool(self.get_parameter("servo_only").value),
-            "vehicle_name": str(self.get_parameter("vehicle_name").value).strip()
-            or "uav",
-            "vehicle_class": AirframeClass.parse(
-                self.get_parameter("vehicle_class").value
-            ),
+            "vehicle_name": str(self.get_parameter("vehicle_name").value).strip() or "uav",
+            "vehicle_class": AirframeClass.parse(self.get_parameter("vehicle_class").value),
             "camera_offsets": list(self.get_parameter("camera_mount_offsets").value),
             "peer_heartbeat_hz": self._float_parameter("peer_heartbeat_hz"),
             "peer_stale_timeout_s": self._float_parameter("peer_stale_timeout_s"),

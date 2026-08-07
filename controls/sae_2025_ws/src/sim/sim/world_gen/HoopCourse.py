@@ -83,11 +83,7 @@ class AscentCourse(CourseStyle):
             # Height transition from UAV's start_height to DLZ altitude
             frac = (i + 1) / self.num_hoops
             z_interp = self.start_height + frac * (z_dlz - self.start_height)
-            z_noise = (
-                self.rng.uniform(-0.3, 0.3)
-                * (z_dlz - self.start_height)
-                / self.num_hoops
-            )
+            z_noise = self.rng.uniform(-0.3, 0.3) * (z_dlz - self.start_height) / self.num_hoops
 
             new_x = x_uav + dir_x * along
             new_y = y_uav + dir_y * along
@@ -144,11 +140,7 @@ class DescentCourse(CourseStyle):
             z_interp = self.start_height + frac * (
                 z_dlz - self.start_height
             )  # dz negative if descending
-            z_noise = (
-                self.rng.uniform(-0.3, 0.3)
-                * abs(z_dlz - self.start_height)
-                / self.num_hoops
-            )
+            z_noise = self.rng.uniform(-0.3, 0.3) * abs(z_dlz - self.start_height) / self.num_hoops
 
             new_x = x_uav + dir_x * along
             new_y = y_uav + dir_y * along
@@ -206,9 +198,7 @@ class SlalomCourse(CourseStyle):
             alt = 1 if i % 2 == 0 else -1
 
             # Move forward along direction vector
-            along_dist = zone_len * (
-                i + self.rng.uniform(0.2, 0.8)
-            )  # slight randomness
+            along_dist = zone_len * (i + self.rng.uniform(0.2, 0.8))  # slight randomness
             offset = alt * self.width * 0.5 * self.rng.uniform(0.5, 1.0)
 
             # Compute new hoop position
@@ -348,33 +338,15 @@ class BezierCourse(CourseStyle):
             mt = 1.0 - t
             mt2 = mt * mt
             t2 = t * t
-            x = (
-                (mt2 * mt) * P0x
-                + 3 * (mt2) * t * P1x
-                + 3 * mt * t2 * P2x
-                + (t2 * t) * P3x
-            )
-            y = (
-                (mt2 * mt) * P0y
-                + 3 * (mt2) * t * P1y
-                + 3 * mt * t2 * P2y
-                + (t2 * t) * P3y
-            )
+            x = (mt2 * mt) * P0x + 3 * (mt2) * t * P1x + 3 * mt * t2 * P2x + (t2 * t) * P3x
+            y = (mt2 * mt) * P0y + 3 * (mt2) * t * P1y + 3 * mt * t2 * P2y + (t2 * t) * P3y
             return x, y
 
         # Helper: derivative for tangent direction
         def bezier_xy_deriv(t: float) -> Tuple[float, float]:
             mt = 1.0 - t
-            x = (
-                3 * mt * mt * (P1x - P0x)
-                + 6 * mt * t * (P2x - P1x)
-                + 3 * t * t * (P3x - P2x)
-            )
-            y = (
-                3 * mt * mt * (P1y - P0y)
-                + 6 * mt * t * (P2y - P1y)
-                + 3 * t * t * (P3y - P2y)
-            )
+            x = 3 * mt * mt * (P1x - P0x) + 6 * mt * t * (P2x - P1x) + 3 * t * t * (P3x - P2x)
+            y = 3 * mt * mt * (P1y - P0y) + 6 * mt * t * (P2y - P1y) + 3 * t * t * (P3y - P2y)
             return x, y
 
         # Place hoops along t in (0, 1)
@@ -451,9 +423,7 @@ class HoopCourseNode(WorldNode):
         self.height = height
         self.physics = physics
         self.hoops: List[Entity] = []
-        self.instantiate_static_world(
-            template_world_path=template_world, physics=physics
-        )
+        self.instantiate_static_world(template_world_path=template_world, physics=physics)
 
         # Create service for providing hoop positions
         self.srv = self.create_service(HoopList, "list_hoops", self.hoop_list_req)
@@ -638,9 +608,7 @@ class HoopCourseNode(WorldNode):
             for idx, dlz_ent in enumerate(self.dlz_entities, start=1):
                 success = self.spawn_entity_object(dlz_ent) and success
 
-            self.get_logger().info(
-                f"Generated {len(self.hoops)} hoops for {self.course} course"
-            )
+            self.get_logger().info(f"Generated {len(self.hoops)} hoops for {self.course} course")
         except Exception as e:
             self.get_logger().error(f"Failed to generate world: {e}")
             return False

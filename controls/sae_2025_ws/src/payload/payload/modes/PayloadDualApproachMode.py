@@ -100,18 +100,14 @@ class PayloadDualApproachMode(Mode):
     transition_labels = ()
 
     @override
-    def initialize(
-        self, node: Node, vehicle: Payload, params: PayloadDualApproachParams
-    ) -> None:
+    def initialize(self, node: Node, vehicle: Payload, params: PayloadDualApproachParams) -> None:
         self.node = node
         self.vehicle = vehicle
         self.p = params
 
         # AprilTag
         self.tag_id = None if params.tag_id is None else int(params.tag_id)
-        self.tag_family = (
-            str(params.tag_family) if params.tag_family else DEFAULT_TAG_FAMILY
-        )
+        self.tag_family = str(params.tag_family) if params.tag_family else DEFAULT_TAG_FAMILY
 
         # Colour
         self._lower_hsv = np.array(params.lower_hsv, dtype=np.uint8)
@@ -225,17 +221,11 @@ class PayloadDualApproachMode(Mode):
             )
 
         # Image centre line
-        center_x = (
-            int(self._image_width / 2.0)
-            if self._image_width > 0
-            else debug.shape[1] // 2
-        )
+        center_x = int(self._image_width / 2.0) if self._image_width > 0 else debug.shape[1] // 2
         cv2.line(debug, (center_x, 0), (center_x, debug.shape[0]), (255, 0, 0), 1)
 
         # Active source label
-        cv2.putText(
-            debug, source, (5, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2
-        )
+        cv2.putText(debug, source, (5, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
         msg = self._bridge.cv2_to_compressed_imgmsg(debug, dst_format="jpeg")
         msg.header.stamp = self.node.get_clock().now().to_msg()
         self._debug_pub.publish(msg)
@@ -320,8 +310,7 @@ class PayloadDualApproachMode(Mode):
         if not self._primed and color_height >= self.p.prime_height_px and centered:
             self._primed = True
             self.log(
-                f"PayloadDualApproachMode: primed "
-                f"(height={color_height}px >= {self.p.prime_height_px}px, centered)"
+                f"PayloadDualApproachMode: primed (height={color_height}px >= {self.p.prime_height_px}px, centered)"
             )
 
         # Only tick the lost-frames counter when we were actually driving
@@ -339,19 +328,14 @@ class PayloadDualApproachMode(Mode):
             if color_height >= self.p.stop_height_px:
                 stop_reason = f"stop_height hit (height={color_height}px)"
             elif self._lost_frames_after_prime >= self.p.post_prime_lost_frames:
-                stop_reason = (
-                    f"overshoot ({self._lost_frames_after_prime} "
-                    f"lost frames after prime)"
-                )
+                stop_reason = f"overshoot ({self._lost_frames_after_prime} lost frames after prime)"
 
         if stop_reason is not None:
             self.vehicle.set_servo(0.0)
             self.vehicle.stop()
             self._done = True
             self.log(f"PayloadDualApproachMode: {stop_reason} — servo set to 0, done")
-            self._publish_debug(
-                bgr, mask, "STOP", None, color_cx, color_cy, color_height
-            )
+            self._publish_debug(bgr, mask, "STOP", None, color_cx, color_cy, color_height)
             return
 
         # --- try apriltag first (priority) ---
@@ -361,9 +345,7 @@ class PayloadDualApproachMode(Mode):
             self._last_seen_time = now
             distance = float(tag.tvec_z)
             lateral_error_px = float(tag.center_x - image_center)
-            linear = min(
-                self.p.tag_forward_gain * distance, self.p.tag_max_forward_speed
-            )
+            linear = min(self.p.tag_forward_gain * distance, self.p.tag_max_forward_speed)
             angular = (-self.p.tag_angular_gain * lateral_error_px) - (
                 self.p.tag_yaw_gain * tag.yaw_error
             )
@@ -373,8 +355,7 @@ class PayloadDualApproachMode(Mode):
             if now - self._last_log_time >= 1.0:
                 self._last_log_time = now
                 self.log(
-                    f"PayloadDualApproachMode: TAG dist={distance:.3f}m "
-                    f"linear={linear:.2f} angular={angular:.2f}"
+                    f"PayloadDualApproachMode: TAG dist={distance:.3f}m linear={linear:.2f} angular={angular:.2f}"
                 )
             return
 
@@ -392,9 +373,7 @@ class PayloadDualApproachMode(Mode):
                 phase = "COLOR_DRIVE"
 
             self._last_phase = phase
-            self._publish_debug(
-                bgr, mask, phase, None, color_cx, color_cy, color_height
-            )
+            self._publish_debug(bgr, mask, phase, None, color_cx, color_cy, color_height)
             if now - self._last_log_time >= 1.0:
                 self._last_log_time = now
                 self.log(

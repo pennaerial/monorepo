@@ -48,9 +48,7 @@ class TestBasicMission(unittest.TestCase):
     def test_arms_takes_off_and_lands(self):
         from pymavlink import mavutil
 
-        with HeadlessGroundStation(
-            MAVLINK_ENDPOINT, mavutil_module=mavutil
-        ) as ground_station:
+        with HeadlessGroundStation(MAVLINK_ENDPOINT, mavutil_module=mavutil) as ground_station:
             self.assertIsNotNone(
                 ground_station.connect(timeout_s=60), "no PX4 heartbeat within 60s"
             )

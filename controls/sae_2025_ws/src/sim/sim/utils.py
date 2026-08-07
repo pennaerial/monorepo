@@ -91,9 +91,7 @@ def load_sim_parameters(
     return load_yaml_to_dict(config_path), config_path
 
 
-def convert_parameter_value(
-    param_value: Any, param_annotation: Any, param_name: str
-) -> Any:
+def convert_parameter_value(param_value: Any, param_annotation: Any, param_name: str) -> Any:
     """
     Convert a parameter value to match its type annotation.
 
@@ -125,8 +123,7 @@ def convert_parameter_value(
         converted = ast.literal_eval(param_value)
     except (ValueError, SyntaxError) as e:
         raise ValueError(
-            f"Parameter '{param_name}' must be a valid literal. "
-            f"Received: {param_value}. Error: {e}"
+            f"Parameter '{param_name}' must be a valid literal. Received: {param_value}. Error: {e}"
         )
 
     # Convert lists to tuples if annotation expects a tuple
@@ -168,8 +165,7 @@ def build_node_arguments(node_class: type, params: Dict[str, Any]) -> Dict[str, 
             param_value = param.default
         else:
             raise ValueError(
-                f"Missing required parameter '{name}'. "
-                f"Available parameters: {list(params.keys())}"
+                f"Missing required parameter '{name}'. Available parameters: {list(params.keys())}"
             )
 
         # Convert parameter value to match annotation
@@ -244,19 +240,11 @@ def find_package_resource(
         package_share = Path(get_package_share_directory(package_name))
         installed_path = (package_share / relative_path).resolve()
 
-        if (
-            resource_type == "file"
-            and installed_path.exists()
-            and installed_path.is_file()
-        ):
+        if resource_type == "file" and installed_path.exists() and installed_path.is_file():
             if logger:
                 logger.info(f"Using installed {resource_type}: {installed_path}")
             return installed_path
-        elif (
-            resource_type == "directory"
-            and installed_path.exists()
-            and installed_path.is_dir()
-        ):
+        elif resource_type == "directory" and installed_path.exists() and installed_path.is_dir():
             if logger:
                 logger.info(f"Using installed {resource_type}: {installed_path}")
             return installed_path
@@ -265,9 +253,7 @@ def find_package_resource(
             logger.debug(f"Could not get package share directory: {e}")
 
     # If not found, raise error
-    all_paths = source_paths + [
-        installed_path if "installed_path" in locals() else "N/A"
-    ]
+    all_paths = source_paths + [installed_path if "installed_path" in locals() else "N/A"]
     resource_name = relative_path.name if relative_path.name else str(relative_path)
     raise FileNotFoundError(
         f"{resource_type.capitalize()} '{resource_name}' not found. "
@@ -284,8 +270,7 @@ def template_world_reference_candidates(
 
     if len(template_path.parts) != 1:
         raise ValueError(
-            "template_world must be a bare filename like 'template.sdf' "
-            "or an absolute path."
+            "template_world must be a bare filename like 'template.sdf' or an absolute path."
         )
 
     return [Path("worlds") / template_path.name]
@@ -303,9 +288,7 @@ def copy_models_to_gazebo(src_models_dir: Path, dst_models_dir: Path) -> None:
         OSError: If copy operations fail
     """
     if not src_models_dir.exists():
-        raise FileNotFoundError(
-            f"Source models directory does not exist: {src_models_dir}"
-        )
+        raise FileNotFoundError(f"Source models directory does not exist: {src_models_dir}")
 
     if not src_models_dir.is_dir():
         raise ValueError(f"Source path is not a directory: {src_models_dir}")
@@ -328,9 +311,7 @@ def copy_models_to_gazebo(src_models_dir: Path, dst_models_dir: Path) -> None:
             elif src_item.is_file():
                 shutil.copy2(src_item, dst_item)
     except (OSError, shutil.Error) as e:
-        raise OSError(
-            f"Failed to copy models from {src_models_dir} to {dst_models_dir}: {e}"
-        )
+        raise OSError(f"Failed to copy models from {src_models_dir} to {dst_models_dir}: {e}")
 
 
 def camel_to_snake(name: str) -> str:
@@ -349,6 +330,4 @@ def get_available_worlds(path: str | Path) -> list[str]:
         List of available world names
     """
     path = Path(path)
-    return sorted(
-        [f.stem for f in path.iterdir() if f.is_file() and f.suffix == ".sdf"]
-    )
+    return sorted([f.stem for f in path.iterdir() if f.is_file() and f.suffix == ".sdf"])

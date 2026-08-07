@@ -120,9 +120,7 @@ class PayloadCornerNavigateMode(Mode):
     requires_camera = True
 
     @override
-    def initialize(
-        self, node: Node, vehicle: Payload, params: PayloadCornerNavigateParams
-    ) -> None:
+    def initialize(self, node: Node, vehicle: Payload, params: PayloadCornerNavigateParams) -> None:
         self.node = node
         self.vehicle = vehicle
         self.p = params
@@ -205,15 +203,11 @@ class PayloadCornerNavigateMode(Mode):
                 CompressedImage, f"{cam_topic}/compressed", self._image_cb, 1
             )
         else:
-            self._image_sub = self.node.create_subscription(
-                Image, cam_topic, self._image_cb, 1
-            )
+            self._image_sub = self.node.create_subscription(Image, cam_topic, self._image_cb, 1)
 
         if getattr(self.node, "vision_debug", False):
             annotated_topic = self.vehicle.namespaced_path("annotated_image/compressed")
-            self._annotated_pub = self.node.create_publisher(
-                CompressedImage, annotated_topic, 1
-            )
+            self._annotated_pub = self.node.create_publisher(CompressedImage, annotated_topic, 1)
 
         self.log(
             f"PayloadCornerNavigateMode: enter direction={self.direction} "
@@ -271,9 +265,7 @@ class PayloadCornerNavigateMode(Mode):
                 return cv2.imdecode(buf, cv2.IMREAD_COLOR)
             return self._bridge.imgmsg_to_cv2(self._image, desired_encoding="bgr8")
         except Exception as exc:
-            self.node.get_logger().warn(
-                f"PayloadCornerNavigateMode: image decode failed: {exc}"
-            )
+            self.node.get_logger().warn(f"PayloadCornerNavigateMode: image decode failed: {exc}")
             return None
 
     def _primary_contour_mask(
@@ -368,9 +360,7 @@ class PayloadCornerNavigateMode(Mode):
         )
         return int(np.count_nonzero(mask_a)), int(np.count_nonzero(mask_b))
 
-    def _middle_third_color_metrics(
-        self, bgr: np.ndarray
-    ) -> Tuple[int, float, Optional[str]]:
+    def _middle_third_color_metrics(self, bgr: np.ndarray) -> Tuple[int, float, Optional[str]]:
         """Look at the middle horizontal third of the frame (full height) and
         return ``(total_color_pixels, lateral_error_px, dominant_color)``:
 
@@ -409,9 +399,7 @@ class PayloadCornerNavigateMode(Mode):
             dominant = None
         return total, centroid_x - crop_center_x, dominant
 
-    def _single_color_strip_metrics(
-        self, bgr: np.ndarray, color: str
-    ) -> Tuple[int, float]:
+    def _single_color_strip_metrics(self, bgr: np.ndarray, color: str) -> Tuple[int, float]:
         """Return ``(pixel_count, lateral_error_px)`` for a single colour
         (``"A"`` or ``"B"``) within the bottom
         ``line_follow_strip_frac`` of the frame, full width.
@@ -476,8 +464,7 @@ class PayloadCornerNavigateMode(Mode):
 
         count_a, count_b = self._lower_strip_color_counts(bgr)
         color_seen = (
-            count_a >= self.p.drive_out_min_pixels
-            or count_b >= self.p.drive_out_min_pixels
+            count_a >= self.p.drive_out_min_pixels or count_b >= self.p.drive_out_min_pixels
         )
 
         if self._do_substate == "seeking_tape":
@@ -611,9 +598,7 @@ class PayloadCornerNavigateMode(Mode):
 
     def _update_turn_to_center(self, time_delta: float) -> None:
         search_angular = (
-            self.p.align_angular_speed
-            if self.direction == "ccw"
-            else -self.p.align_angular_speed
+            self.p.align_angular_speed if self.direction == "ccw" else -self.p.align_angular_speed
         )
 
         bgr = self._decode_image()
@@ -637,9 +622,7 @@ class PayloadCornerNavigateMode(Mode):
             )
             if locked:
                 self.vehicle.stop()
-                self._prev_color = (
-                    self._latest_dominant or dominant or self._first_color or "A"
-                )
+                self._prev_color = self._latest_dominant or dominant or self._first_color or "A"
                 self._annotate_turn_to_center(
                     bgr,
                     mask_a,
@@ -744,9 +727,7 @@ class PayloadCornerNavigateMode(Mode):
                     self._prev_color = other
                     current, other = other, current
                     cur_count, cur_lateral_px = other_count, other_lateral_px
-                    other_count, other_lateral_px = self._single_color_strip_metrics(
-                        bgr, other
-                    )
+                    other_count, other_lateral_px = self._single_color_strip_metrics(bgr, other)
 
         # Stop condition: corner has been detected and the colour we are
         # following has dropped below the visibility threshold (we've driven
@@ -767,19 +748,14 @@ class PayloadCornerNavigateMode(Mode):
             self._phase = "tape_align"
             self._tape_align_stable = 0
             self.log(
-                f"PayloadCornerNavigateMode: current colour {current} lost "
-                f"after corner detected → TAPE_ALIGN"
+                f"PayloadCornerNavigateMode: current colour {current} lost after corner detected → TAPE_ALIGN"
             )
             return
 
         # Steer purely on the current colour's centroid so the other colour
         # cannot pull the centroid off the side we're following.
         if cur_count >= self.p.line_follow_min_pixels:
-            d_term = (
-                self.p.k_d
-                * (cur_lateral_px - self._prev_lateral_px)
-                / max(time_delta, 1e-3)
-            )
+            d_term = self.p.k_d * (cur_lateral_px - self._prev_lateral_px) / max(time_delta, 1e-3)
             angular = float(
                 np.clip(
                     -(self.p.k_lat * cur_lateral_px + d_term),
@@ -856,8 +832,7 @@ class PayloadCornerNavigateMode(Mode):
             self.vehicle.stop()
             self._annotate_tape_align(bgr, count, lateral_px, status)
             self.log(
-                f"PayloadCornerNavigateMode: TAPE_ALIGN centered "
-                f"(lat={lateral_px:.1f}px, px={count}) → done"
+                f"PayloadCornerNavigateMode: TAPE_ALIGN centered (lat={lateral_px:.1f}px, px={count}) → done"
             )
             self._done = True
             return
@@ -869,13 +844,10 @@ class PayloadCornerNavigateMode(Mode):
 
         self._annotate_tape_align(bgr, count, lateral_px, status)
         if status == "searching":
-            self.log(
-                f"PayloadCornerNavigateMode: TAPE_ALIGN searching (black_px={count})"
-            )
+            self.log(f"PayloadCornerNavigateMode: TAPE_ALIGN searching (black_px={count})")
         elif status == "turning":
             self.log(
-                f"PayloadCornerNavigateMode: TAPE_ALIGN turning "
-                f"lat={lateral_px:.1f}px black_px={count}"
+                f"PayloadCornerNavigateMode: TAPE_ALIGN turning lat={lateral_px:.1f}px black_px={count}"
             )
 
     # ------------------------------------------------------------------
@@ -1160,14 +1132,12 @@ class PayloadCornerNavigateMode(Mode):
         )
         self._put_label(
             debug,
-            f"{current}={cur_count}px(lat={cur_lateral_px:+.1f}) "
-            f"{other}={other_count}px(lat={other_lateral_px:+.1f})",
+            f"{current}={cur_count}px(lat={cur_lateral_px:+.1f}) {other}={other_count}px(lat={other_lateral_px:+.1f})",
             44,
         )
         self._put_label(
             debug,
-            f"min={self.p.line_follow_min_pixels} "
-            f"ang={angular:+.2f}rad/s v={self.p.line_follow_speed_mps:.2f}m/s",
+            f"min={self.p.line_follow_min_pixels} ang={angular:+.2f}rad/s v={self.p.line_follow_speed_mps:.2f}m/s",
             62,
         )
         self._publish_annotated(debug)

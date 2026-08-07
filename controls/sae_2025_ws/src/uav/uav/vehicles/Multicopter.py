@@ -34,9 +34,7 @@ class Multicopter(UAV):
 
     def vtol_transition_to(self, vtol_state, immediate=False):
         """Not available on multicopters."""
-        self.node.get_logger().warn(
-            "vtol_transition_to called on non-VTOL vehicle. Ignoring."
-        )
+        self.node.get_logger().warn("vtol_transition_to called on non-VTOL vehicle. Ignoring.")
 
     def _calculate_velocity(self, target_pos: tuple, lock_yaw: bool) -> list:
         """

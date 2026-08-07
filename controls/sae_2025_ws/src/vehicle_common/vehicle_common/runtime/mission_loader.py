@@ -69,12 +69,8 @@ class RuntimeMission(BaseModel):
 
 def get_mission_path(mission_name: str, package: str) -> str:
     # gets path in package's install directory where missions are installed to
-    mission_path = (
-        Path(get_package_share_directory(package)) / "missions" / f"{mission_name}.yaml"
-    )
+    mission_path = Path(get_package_share_directory(package)) / "missions" / f"{mission_name}.yaml"
     if not os.path.isfile(mission_path):
-        raise FileNotFoundError(
-            f"Mission {mission_name} was not found at {mission_path}"
-        )
+        raise FileNotFoundError(f"Mission {mission_name} was not found at {mission_path}")
 
     return str(mission_path)

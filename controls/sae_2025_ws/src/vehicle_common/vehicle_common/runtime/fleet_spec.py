@@ -50,11 +50,7 @@ class FleetDefaultsModel(BaseModel):
         normalized: list[str] = []
         seen: set[str] = set()
         for raw in raw_values:
-            parts = (
-                [segment for segment in raw.split(",")]
-                if isinstance(raw, str)
-                else [str(raw)]
-            )
+            parts = [segment for segment in raw.split(",")] if isinstance(raw, str) else [str(raw)]
             for part in parts:
                 candidate = part.strip()
                 if not candidate or candidate in seen:

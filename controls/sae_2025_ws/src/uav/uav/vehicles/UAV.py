@@ -27,8 +27,7 @@ from vehicle_common.vehicle import Vehicle
 _NAV_STATE_NAMES = {
     getattr(VehicleStatus, a): a
     for a in dir(VehicleStatus)
-    if a.startswith("NAVIGATION_STATE_")
-    and isinstance(getattr(VehicleStatus, a), (int, float))
+    if a.startswith("NAVIGATION_STATE_") and isinstance(getattr(VehicleStatus, a), (int, float))
 }
 
 
@@ -313,9 +312,7 @@ class UAV(Vehicle):
         # Earth's radius in feet (using an average value)
         curr_x, curr_y, curr_z = self.gps_to_local((lat1, lon1, alt1))
         tar_x, tar_y, tar_z = self.gps_to_local((lat2, lon2, alt2))
-        return np.sqrt(
-            (curr_x - tar_x) ** 2 + (curr_y - tar_y) ** 2 + (curr_z - tar_z) ** 2
-        )
+        return np.sqrt((curr_x - tar_x) ** 2 + (curr_y - tar_y) ** 2 + (curr_z - tar_z) ** 2)
 
     def gps_to_local(self, target):
         """
@@ -429,9 +426,7 @@ class UAV(Vehicle):
             self.node.get_logger().warn("No local position data available.")
             return None
 
-    def _calculate_proportional_velocity(
-        self, direction: np.ndarray, distance: float
-    ) -> list:
+    def _calculate_proportional_velocity(self, direction: np.ndarray, distance: float) -> list:
         """
         Calculate velocity using proportional control to prevent oscillation.
         Velocity smoothly decreases as distance to target decreases.
@@ -494,13 +489,9 @@ class UAV(Vehicle):
         msg.command = command
 
         msg.target_system = target_system if target_system else self.system_id
-        msg.target_component = (
-            target_component if target_component else self.component_id
-        )
+        msg.target_component = target_component if target_component else self.component_id
         msg.source_system = source_system if source_system else self.system_id
-        msg.source_component = (
-            source_component if source_component else self.component_id
-        )
+        msg.source_component = source_component if source_component else self.component_id
         msg.from_external = from_external
         msg.timestamp = int(Clock().now().nanoseconds / 1000)  # microseconds
 

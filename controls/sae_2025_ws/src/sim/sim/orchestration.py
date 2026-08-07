@@ -45,9 +45,7 @@ def normalize_named_records(
         normalized_items = []
         for index, entry in enumerate(records):
             if not isinstance(entry, dict):
-                raise ValueError(
-                    f"{record_type} entry at index {index} must be a mapping."
-                )
+                raise ValueError(f"{record_type} entry at index {index} must be a mapping.")
             name = str(entry.get("name", "")).strip()
             if not name:
                 raise ValueError(
@@ -57,9 +55,7 @@ def normalize_named_records(
             payload.pop("name", None)
             normalized_items.append((name, payload))
     else:
-        raise ValueError(
-            f"{record_type} records must be a mapping or a list of mappings."
-        )
+        raise ValueError(f"{record_type} records must be a mapping or a list of mappings.")
 
     normalized: dict[str, dict[str, Any]] = {}
     for name, payload in normalized_items:
@@ -100,17 +96,14 @@ def normalize_stage_world_params(
         world_params.get("controllables", {}),
         record_type="controllable",
     )
-    entities = normalize_named_records(
-        world_params.get("entities", {}), record_type="entity"
-    )
+    entities = normalize_named_records(world_params.get("entities", {}), record_type="entity")
 
     for key, value in world_params.items():
         if key in {"vehicle_pose", "entities", "controllables"}:
             continue
         if _looks_like_spawnable_record(value):
             raise ValueError(
-                f"Spawnable stage record '{key}' must live under "
-                "world.params.entities or world.params.controllables."
+                f"Spawnable stage record '{key}' must live under world.params.entities or world.params.controllables."
             )
         translated[key] = deepcopy(value)
 
@@ -146,9 +139,7 @@ def resolve_stage_world(
         mission_stage=resolved_stage,
     )
     if "world" not in sim_stage_params:
-        raise ValueError(
-            f"Missing 'world' section in simulation config: {sim_config_path}"
-        )
+        raise ValueError(f"Missing 'world' section in simulation config: {sim_config_path}")
 
     world_spec = deep_merge_dicts(sim_stage_params["world"], resolved_overrides)
     if not isinstance(world_spec, dict):

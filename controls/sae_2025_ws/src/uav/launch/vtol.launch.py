@@ -16,13 +16,9 @@ def generate_launch_description():
         cmd=["bash", "standalone_px4_vtol_cmd.sh"], cwd=px4_path, output="screen"
     )
 
-    gazebo = ExecuteProcess(
-        cmd=["bash", "standalone_gazebo_cmd.sh"], cwd=px4_path, output="screen"
-    )
+    gazebo = ExecuteProcess(cmd=["bash", "standalone_gazebo_cmd.sh"], cwd=px4_path, output="screen")
 
-    middleware = ExecuteProcess(
-        cmd=["MicroXRCEAgent", "udp4", "-p", "8888"], output="screen"
-    )
+    middleware = ExecuteProcess(cmd=["MicroXRCEAgent", "udp4", "-p", "8888"], output="screen")
 
     gz_ros_bridge = ExecuteProcess(
         cmd=[
@@ -36,9 +32,7 @@ def generate_launch_description():
         cwd=sae_ws_path,
     )
 
-    movement = Node(
-        output="screen", package="uav", executable="vtol_testing", name="vtol_testing"
-    )
+    movement = Node(output="screen", package="uav", executable="vtol_testing", name="vtol_testing")
 
     # camera_feed = Node(
     #     output='screen',
@@ -52,9 +46,7 @@ def generate_launch_description():
             middleware,
             TimerAction(period=3.0, actions=[gazebo]),  # Start Gazebo after 5 seconds
             TimerAction(period=6.0, actions=[px4_sitl]),  # Start PX4 after 10 seconds
-            TimerAction(
-                period=12.0, actions=[gz_ros_bridge]
-            ),  # Start Bridge after 15 seconds
+            TimerAction(period=12.0, actions=[gz_ros_bridge]),  # Start Bridge after 15 seconds
             # TimerAction(period=12.0, actions=[camera_feed]),  # Start Control Node last
             TimerAction(period=15.0, actions=[movement]),  # Start Control Node last
         ]
