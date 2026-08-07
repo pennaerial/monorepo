@@ -5,9 +5,21 @@ find_package(ament_cmake REQUIRED)
 find_package(builtin_interfaces REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 
-# Find all .msg and .srv files
-file(GLOB MSG_FILES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS "src/msg/*.msg")
-file(GLOB SRV_FILES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS "src/srv/*.srv")
+
+# all .msg files
+set(MSG_FILES
+    msg/DriveCommand.msg
+    msg/MotorState.msg
+    msg/PayloadHeartbeat.msg
+    msg/ServoCommand.msg
+)
+
+# all .srv files
+set(SRV_FILES
+    srv/ComputePidZieglerNichols.srv
+    srv/DeadReckon.srv
+    srv/TimedDrive.srv
+)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   ${MSG_FILES}

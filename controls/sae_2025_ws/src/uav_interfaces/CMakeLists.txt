@@ -6,9 +6,21 @@ find_package(builtin_interfaces REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 
-# Find all .msg and .srv files
-file(GLOB MSG_FILES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS "src/msg/*.msg")
-file(GLOB SRV_FILES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS "src/srv/*.srv")
+# set all .msg files
+set(MSG_FILES
+    msg/UdpTest.msg
+    msg/HelloWorld.msg
+)
+
+# set all .srv files
+set(SRV_FILES
+    srv/CameraData.srv
+    srv/PayloadAprilTagState.srv
+    srv/PayloadColorOrbitState.srv
+    srv/PayloadColorSquareState.srv
+    srv/PayloadDriveOutState.srv
+    srv/PayloadTracking.srv
+)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   ${MSG_FILES}
