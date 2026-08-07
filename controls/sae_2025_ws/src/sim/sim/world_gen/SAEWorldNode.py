@@ -37,16 +37,12 @@ class SAEWorldNode(WorldNode):
         self.physics = physics
         self.entities = entities or {}
         self.controllables = controllables or {}
-        self.instantiate_static_world(
-            template_world_path=template_world, physics=physics
-        )
+        self.instantiate_static_world(template_world_path=template_world, physics=physics)
 
     def generate_world(self):
         success = True
         success = self.spawn_entities(self.entities, label="static entity") and success
-        success = (
-            self.spawn_entities(self.controllables, label="controllable") and success
-        )
+        success = self.spawn_entities(self.controllables, label="controllable") and success
 
         return super().generate_world() and success
 

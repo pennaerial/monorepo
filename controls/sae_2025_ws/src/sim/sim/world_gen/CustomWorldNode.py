@@ -30,20 +30,13 @@ class CustomWorldNode(WorldNode):
         self.world_name = template_world
         # defaults to 0.6 if not provided
         self.physics = physics
-        self.instantiate_static_world(
-            template_world_path=template_world, physics=physics
-        )
+        self.instantiate_static_world(template_world_path=template_world, physics=physics)
 
     def generate_world(self):
         success = True
         if self.entities or self.controllables:
-            success = (
-                self.spawn_entities(self.entities, label="static entity") and success
-            )
-            success = (
-                self.spawn_entities(self.controllables, label="controllable")
-                and success
-            )
+            success = self.spawn_entities(self.entities, label="static entity") and success
+            success = self.spawn_entities(self.controllables, label="controllable") and success
         else:
             payload_0 = Entity(
                 name="payload_0",

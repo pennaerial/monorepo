@@ -68,9 +68,7 @@ def initialize_mode(logger: logging.Logger, node_path: str, params: dict) -> Nod
 
     module = __import__(module_name, fromlist=[class_name])
     if not hasattr(module, class_name):
-        raise AttributeError(
-            f"Class '{class_name}' not found in module '{module_name}'"
-        )
+        raise AttributeError(f"Class '{class_name}' not found in module '{module_name}'")
     node_class = getattr(module, class_name)
     args = build_node_arguments(node_class, params)
     return node_class(**args)
@@ -114,15 +112,11 @@ def launch_setup(context, *args, **kwargs):
     ).strip()
 
     if backend_override:
-        scoring_param = backend_override.get(
-            "use_scoring", backend_override.get("scoring", False)
-        )
+        scoring_param = backend_override.get("use_scoring", backend_override.get("scoring", False))
     else:
         scoring_param = legacy_params.get("scoring", DEFAULT_USE_SCORING)
     use_scoring = (
-        scoring_param.lower() == "true"
-        if isinstance(scoring_param, str)
-        else bool(scoring_param)
+        scoring_param.lower() == "true" if isinstance(scoring_param, str) else bool(scoring_param)
     )
 
     px4_path = os.path.expanduser(LaunchConfiguration("px4_path").perform(context))
@@ -131,9 +125,7 @@ def launch_setup(context, *args, **kwargs):
     cwd = os.path.expanduser(os.getcwd())
 
     model_store = os.path.expanduser("~/.simulation-gazebo")
-    server_config_path = os.path.join(
-        os.path.dirname(os.path.realpath(__file__)), "server.config"
-    )
+    server_config_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "server.config")
     gz_sim_env = {
         "GZ_SIM_RESOURCE_PATH": os.path.join(model_store, "models"),
         "GZ_SIM_SERVER_CONFIG_PATH": server_config_path,
@@ -168,9 +160,12 @@ def launch_setup(context, *args, **kwargs):
     )
 
     model = LaunchConfiguration("model").perform(context)
-    spawn_uav_model = LaunchConfiguration("spawn_uav_model").perform(
-        context
-    ).strip().lower() in {"1", "true", "yes", "on"}
+    spawn_uav_model = LaunchConfiguration("spawn_uav_model").perform(context).strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
 
     if "world" in backend_override:
         raise ValueError(
@@ -251,10 +246,7 @@ def launch_setup(context, *args, **kwargs):
 
     def maybe_start_sim(event):
         text = event.text.decode() if isinstance(event.text, bytes) else event.text
-        if (
-            sim_startup_started["value"]
-            or "Successfully generated world file:" not in text
-        ):
+        if sim_startup_started["value"] or "Successfully generated world file:" not in text:
             return None
         sim_startup_started["value"] = True
         startup_actions = [spawn_world, LogInfo(msg="Simulation world node started.")]

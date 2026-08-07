@@ -81,18 +81,14 @@ class TakeoffMode(Mode):
             == VtolVehicleStatus.VEHICLE_VTOL_STATE_MC
         ):
             self.vehicle.vtol_transition_to("FW", immediate=False)
-            self.node.get_logger().info(
-                "FW takeoff Step 1: requested VTOL transition to FW."
-            )
+            self.node.get_logger().info("FW takeoff Step 1: requested VTOL transition to FW.")
             return
 
         if (
             self.vehicle.vtol_vehicle_status.vehicle_vtol_state
             == VtolVehicleStatus.VEHICLE_VTOL_STATE_TRANSITION_TO_FW
         ):
-            self.node.get_logger().info(
-                "FW takeoff Step 1a: transition to FW in progress."
-            )
+            self.node.get_logger().info("FW takeoff Step 1a: transition to FW in progress.")
             return
 
         if (
@@ -124,11 +120,7 @@ class TakeoffMode(Mode):
             alt = self.vehicle.global_position.alt
             self.node.get_logger().info(f"Current GPS: {lat}, {lon}, {alt}")
 
-            if (
-                np.isnan(self.p.latitude)
-                or np.isnan(self.p.longitude)
-                or np.isnan(self.p.altitude)
-            ):
+            if np.isnan(self.p.latitude) or np.isnan(self.p.longitude) or np.isnan(self.p.altitude):
                 self.node.get_logger().info("Takeoff Destination GPS: Auto Calculated")
             else:
                 self.node.get_logger().info(
@@ -148,9 +140,7 @@ class TakeoffMode(Mode):
                 self.p.longitude,
                 self.p.altitude,
             )
-            self.node.get_logger().info(
-                "FW takeoff Step 2b: takeoff command sent while disarmed."
-            )
+            self.node.get_logger().info("FW takeoff Step 2b: takeoff command sent while disarmed.")
             time.sleep(0.1)
 
             self.vehicle.arm()
@@ -169,8 +159,7 @@ class TakeoffMode(Mode):
             return
 
         self.node.get_logger().info(
-            "FW takeoff: Waiting for AUTO_TAKEOFF nav state "
-            f"(current: {get_nav_state_str(self.vehicle.nav_state)})."
+            f"FW takeoff: Waiting for AUTO_TAKEOFF nav state (current: {get_nav_state_str(self.vehicle.nav_state)})."
         )
 
     def check_status(self) -> str:

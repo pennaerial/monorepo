@@ -182,11 +182,7 @@ class PayloadColorStringApproachMode(Mode):
         cv2.drawContours(debug, contours, -1, (0, 255, 0), 1)
         if cx is not None and cy is not None:
             cv2.circle(debug, (int(cx), int(cy)), 5, (0, 0, 255), -1)
-        center_x = (
-            int(self._image_width / 2.0)
-            if self._image_width > 0
-            else debug.shape[1] // 2
-        )
+        center_x = int(self._image_width / 2.0) if self._image_width > 0 else debug.shape[1] // 2
         cv2.line(debug, (center_x, 0), (center_x, debug.shape[0]), (255, 0, 0), 1)
         self._debug_pub.publish(self._bridge.cv2_to_imgmsg(debug, encoding="bgr8"))
 
@@ -201,8 +197,7 @@ class PayloadColorStringApproachMode(Mode):
             self.log("PayloadColorStringApproachMode: started — global HSV centroid")
         else:
             self.log(
-                "PayloadColorStringApproachMode: started — vertical blob "
-                f"(min h/w≥{self.p.vertical_blob_min_hw_ratio})"
+                f"PayloadColorStringApproachMode: started — vertical blob (min h/w≥{self.p.vertical_blob_min_hw_ratio})"
             )
 
     def on_update(self, time_delta: float) -> None:

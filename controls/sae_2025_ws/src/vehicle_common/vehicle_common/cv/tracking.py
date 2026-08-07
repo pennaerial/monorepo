@@ -120,9 +120,7 @@ def find_payload(
         is successful; otherwise, None.
     """
     hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-    requested_color = _normalize_payload_color(
-        payload_color, lower_payload, upper_payload
-    )
+    requested_color = _normalize_payload_color(payload_color, lower_payload, upper_payload)
 
     zone_mask = cv2.inRange(hsv_image, lower_zone, upper_zone)
     kernel = np.ones((5, 5), np.uint8)
@@ -130,9 +128,7 @@ def find_payload(
     zone_mask = cv2.morphologyEx(dilated, cv2.MORPH_CLOSE, kernel)
     zone_mask = cv2.morphologyEx(zone_mask, cv2.MORPH_OPEN, kernel)
 
-    contours, _ = cv2.findContours(
-        zone_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
-    )
+    contours, _ = cv2.findContours(zone_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if not contours:
         vis_image = image.copy() if debug or save_vision else None
         if debug or save_vision:
@@ -151,9 +147,7 @@ def find_payload(
     largest_zone_contour = max(contours, key=cv2.contourArea)
 
     zone_filled_mask = np.zeros_like(zone_mask)
-    cv2.drawContours(
-        zone_filled_mask, [largest_zone_contour], -1, 255, thickness=cv2.FILLED
-    )
+    cv2.drawContours(zone_filled_mask, [largest_zone_contour], -1, 255, thickness=cv2.FILLED)
     zone_moments = cv2.moments(zone_filled_mask)
     if zone_moments["m00"] == 0:
         return None
@@ -304,9 +298,7 @@ def find_dlz(
     pink_mask = cv2.morphologyEx(pink_mask, cv2.MORPH_CLOSE, kernel)
     pink_mask = cv2.morphologyEx(pink_mask, cv2.MORPH_OPEN, kernel)
 
-    contours, _ = cv2.findContours(
-        pink_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
-    )
+    contours, _ = cv2.findContours(pink_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if not contours:
         return None
 

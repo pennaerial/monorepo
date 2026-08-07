@@ -19,12 +19,8 @@ class AprilTagDebugger(Node):
         self.declare_parameter("camera_cy", 240.0)
 
         self.topic = self.get_parameter("topic").get_parameter_value().string_value
-        self.compressed = (
-            self.get_parameter("compressed").get_parameter_value().bool_value
-        )
-        self.tag_size_m = (
-            self.get_parameter("tag_size_m").get_parameter_value().double_value
-        )
+        self.compressed = self.get_parameter("compressed").get_parameter_value().bool_value
+        self.tag_size_m = self.get_parameter("tag_size_m").get_parameter_value().double_value
         fx = self.get_parameter("camera_fx").get_parameter_value().double_value
         fy = self.get_parameter("camera_fy").get_parameter_value().double_value
         cx = self.get_parameter("camera_cx").get_parameter_value().double_value
@@ -69,9 +65,7 @@ class AprilTagDebugger(Node):
             # Draw tag corners and border
             corners = det.corners.astype(int)
             for i in range(4):
-                cv.line(
-                    vis, tuple(corners[i]), tuple(corners[(i + 1) % 4]), (0, 255, 0), 2
-                )
+                cv.line(vis, tuple(corners[i]), tuple(corners[(i + 1) % 4]), (0, 255, 0), 2)
 
             # Draw center
             cx, cy = int(det.center[0]), int(det.center[1])

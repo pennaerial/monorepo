@@ -29,15 +29,11 @@ def canonical_vision_node_path(vision_node: object | str) -> str:
         if not text:
             raise ValueError("Vision node path cannot be empty.")
         if "." not in text:
-            raise ValueError(
-                f"Vision node path '{text}' is not canonical. Use a full import path."
-            )
+            raise ValueError(f"Vision node path '{text}' is not canonical. Use a full import path.")
         vision_class = load_vision_class(text)
         canonical = canonical_vision_node_path(vision_class)
         if canonical != text:
-            raise ValueError(
-                f"Vision node path '{text}' is not canonical. Use '{canonical}'."
-            )
+            raise ValueError(f"Vision node path '{text}' is not canonical. Use '{canonical}'.")
         return canonical
 
     module_path = str(getattr(vision_node, "__module__", "")).strip()

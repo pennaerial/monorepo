@@ -75,13 +75,10 @@ class ModeManager(Node):
         self.peer_heartbeat_hz = float(peer_heartbeat_hz)
         self.peer_stale_timeout_s = float(peer_stale_timeout_s)
         if self.peer_heartbeat_hz <= 0.0:
-            raise ValueError(
-                f"peer_heartbeat_hz must be positive, got {self.peer_heartbeat_hz!r}."
-            )
+            raise ValueError(f"peer_heartbeat_hz must be positive, got {self.peer_heartbeat_hz!r}.")
         if self.peer_stale_timeout_s <= 0.0:
             raise ValueError(
-                "peer_stale_timeout_s must be positive, "
-                f"got {self.peer_stale_timeout_s!r}."
+                f"peer_stale_timeout_s must be positive, got {self.peer_stale_timeout_s!r}."
             )
         self._shared_mode_state = {}
         self._current_comm_builder = None
@@ -109,9 +106,7 @@ class ModeManager(Node):
         if deploy_root:
             return Path(deploy_root) / "state" / "mission-started"
 
-        runtime_vehicle_name = str(
-            getattr(self, "_runtime_vehicle_name", "") or ""
-        ).strip()
+        runtime_vehicle_name = str(getattr(self, "_runtime_vehicle_name", "") or "").strip()
         if runtime_vehicle_name:
             return Path("/tmp/pennair") / runtime_vehicle_name / "mission-started"
         return Path("/tmp/pennair/mission-started")
@@ -124,18 +119,14 @@ class ModeManager(Node):
             marker_path.parent.mkdir(parents=True, exist_ok=True)
             marker_path.write_text(marker_text, encoding="utf-8")
         except OSError as exc:
-            self.get_logger().warn(
-                f"Failed to write mission-start marker {marker_path}: {exc}"
-            )
+            self.get_logger().warn(f"Failed to write mission-start marker {marker_path}: {exc}")
 
     def _clear_mission_started_marker(self) -> None:
         marker_path = self._mission_started_marker_path()
         try:
             marker_path.unlink(missing_ok=True)
         except OSError as exc:
-            self.get_logger().warn(
-                f"Failed to clear mission-start marker {marker_path}: {exc}"
-            )
+            self.get_logger().warn(f"Failed to clear mission-start marker {marker_path}: {exc}")
 
     def _comm_debug_snapshot(self) -> dict[str, Any]:
         return {
@@ -218,9 +209,7 @@ class ModeManager(Node):
             if client.wait_for_service(timeout_sec=1.0):
                 return client, service_name
             super().destroy_client(client)
-            self.get_logger().info(
-                f"Service {service_name} not available yet, waiting again..."
-            )
+            self.get_logger().info(f"Service {service_name} not available yet, waiting again...")
 
     def get_vision_client(self, vision_node):
         key = canonical_vision_node_path(vision_node)
@@ -282,9 +271,7 @@ class ModeManager(Node):
     ) -> Mode[Any, Any]:
         mode_instance = mode_class.__new__(mode_class)
         if not isinstance(mode_instance, mode_class):
-            raise TypeError(
-                f"Mode '{mode_id}' returned unexpected instance from __new__()."
-            )
+            raise TypeError(f"Mode '{mode_id}' returned unexpected instance from __new__().")
         builder = self._make_comm_builder(
             owner=mode_instance,
             owner_label=mode_id,
@@ -295,9 +282,7 @@ class ModeManager(Node):
             with self._use_comm_builder(builder):
                 mode_class.initialize(mode_instance, self, self.vehicle, params)
         except Exception:
-            self._managed_registry.destroy_for_owner(
-                mode_instance, lifetime="persistent"
-            )
+            self._managed_registry.destroy_for_owner(mode_instance, lifetime="persistent")
             raise
         return mode_instance
 
@@ -359,9 +344,7 @@ class ModeManager(Node):
 
     def setup_modes(self, runtime_mission: RuntimeMission) -> None:
         for mode_name, runtime_mode in runtime_mission.modes.items():
-            mode = self.initialize_mode(
-                runtime_mode.mode, runtime_mode._validated_params
-            )
+            mode = self.initialize_mode(runtime_mode.mode, runtime_mode._validated_params)
             self.add_mode(mode_name, mode)
             self.transitions[mode_name] = runtime_mode.transitions
 
@@ -370,9 +353,7 @@ class ModeManager(Node):
         self.get_logger().info(f"Mode {mode_name} registered.")
 
     def transition(self, state: str) -> str:
-        self.get_logger().info(
-            f"Transitioning from {self.active_mode} based on state {state}."
-        )
+        self.get_logger().info(f"Transitioning from {self.active_mode} based on state {state}.")
         return self.transitions[self.active_mode][state]
 
     def switch_mode(self, mode_name: str) -> None:
@@ -434,9 +415,7 @@ class ModeManager(Node):
             mode.deactivate()
             self._managed_registry.destroy_for_owner(mode, lifetime="active")
         except Exception as exc:
-            self.get_logger().warn(
-                f"Failed to deactivate mode {mode_name} during shutdown: {exc}"
-            )
+            self.get_logger().warn(f"Failed to deactivate mode {mode_name} during shutdown: {exc}")
 
     def _stop_vehicle(self) -> None:
         if self.vehicle is None:
@@ -451,9 +430,7 @@ class ModeManager(Node):
     def _start_mission_callback(self, request, response):
         started = self.start_mission()
         response.success = True
-        response.message = (
-            "Starting Mission!" if started else "Mission already started."
-        )
+        response.message = "Starting Mission!" if started else "Mission already started."
         return response
 
     def start_mission(self) -> bool:

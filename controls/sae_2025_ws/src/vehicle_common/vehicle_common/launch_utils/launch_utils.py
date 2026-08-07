@@ -30,9 +30,7 @@ def get_logger(name: str) -> logging.Logger:
 
     if not logger.handlers:
         handler = logging.StreamHandler()
-        handler.setFormatter(
-            PennairFormatter("[PENNAIR] [%(levelname)s] [%(name)s] %(message)s")
-        )
+        handler.setFormatter(PennairFormatter("[PENNAIR] [%(levelname)s] [%(name)s] %(message)s"))
         logger.addHandler(handler)
         logger.propagate = False
     logger.setLevel(logging.DEBUG if PENNAIR_LAUNCH_DEBUG else logging.INFO)

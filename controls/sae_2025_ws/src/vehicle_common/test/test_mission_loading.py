@@ -54,9 +54,7 @@ def test_runtime_mission_parses_modes():
     takeoff = mission.modes["takeoff"]
     assert takeoff.mode == "mock.VerticalTakeoffMode"
     assert takeoff.transitions == {"complete": "loiter"}
-    assert takeoff._registered == mode_registry.get_registered_mode(
-        "mock.VerticalTakeoffMode"
-    )
+    assert takeoff._registered == mode_registry.get_registered_mode("mock.VerticalTakeoffMode")
     assert takeoff._validated_params == MockVerticalTakeoffParams(
         takeoff_height=10.0, takeoff_method="OFFBOARD"
     )

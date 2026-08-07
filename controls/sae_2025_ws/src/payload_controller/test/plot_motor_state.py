@@ -73,9 +73,7 @@ class MotorStatePlotter(Node):
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Plot payload MotorState RPM traces")
-    parser.add_argument(
-        "--topic", default="/payload_0/motor_state", help="MotorState topic"
-    )
+    parser.add_argument("--topic", default="/payload_0/motor_state", help="MotorState topic")
     parser.add_argument(
         "--window-sec",
         type=float,

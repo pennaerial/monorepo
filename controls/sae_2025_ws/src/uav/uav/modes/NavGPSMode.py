@@ -77,11 +77,7 @@ class NavGPSMode(Mode[UAV, NavGPSParams]):
             yaw = (
                 self.vehicle.yaw
                 if self.vehicle.yaw is not None
-                else (
-                    self.vehicle.local_position.heading
-                    if self.vehicle.local_position
-                    else 0.0
-                )
+                else (self.vehicle.local_position.heading if self.vehicle.local_position else 0.0)
             )
             vel = (
                 (
@@ -114,9 +110,7 @@ class NavGPSMode(Mode[UAV, NavGPSParams]):
                 if self.index >= len(self.p.coordinates):
                     self.log("All waypoints completed")
                     return
-                self.goal, self.wait_time, self.coordinate_system = self.p.coordinates[
-                    self.index
-                ]
+                self.goal, self.wait_time, self.coordinate_system = self.p.coordinates[self.index]
                 self.target = self.get_local_target()
                 self.log(
                     f"Moving to waypoint {self.index + 1}/{len(self.p.coordinates)}: {self.goal} (wait time: {self.wait_time}s)"

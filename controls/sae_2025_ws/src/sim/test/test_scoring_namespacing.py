@@ -24,10 +24,7 @@ from sim.scoring.namespacing import (  # noqa: E402
 
 
 def test_vehicle_px4_local_position_topic_uses_vehicle_name():
-    assert (
-        vehicle_px4_local_position_topic("uav_0")
-        == "/uav_0/fmu/out/vehicle_local_position"
-    )
+    assert vehicle_px4_local_position_topic("uav_0") == "/uav_0/fmu/out/vehicle_local_position"
 
 
 def test_resolve_scoring_vehicle_name_prefers_explicit_vehicle_name():

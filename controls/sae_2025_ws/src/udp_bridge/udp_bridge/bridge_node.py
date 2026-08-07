@@ -83,9 +83,7 @@ class BridgeNode(Node):
         topics_param: list[str] = list(_topics_raw) if _topics_raw is not None else []
         for i, entry in enumerate(topics_param):
             if ":" not in entry:
-                raise ValueError(
-                    f"topics entry {entry!r} must be 'topic_name:pkg/msg/MsgType'"
-                )
+                raise ValueError(f"topics entry {entry!r} must be 'topic_name:pkg/msg/MsgType'")
             topic_name, type_str = entry.split(":", 1)
             msg_class = get_message(type_str)
             self._topic_types.append((topic_name, msg_class))
@@ -117,12 +115,8 @@ class BridgeNode(Node):
         self._sock.settimeout(_RECV_TIMEOUT_S)
         self._sock.bind(("0.0.0.0", self._my_port))
 
-        self._recv_thread = threading.Thread(
-            target=self._recv_loop, daemon=True, name="udp_recv"
-        )
-        self._ping_thread = threading.Thread(
-            target=self._ping_loop, daemon=True, name="udp_ping"
-        )
+        self._recv_thread = threading.Thread(target=self._recv_loop, daemon=True, name="udp_recv")
+        self._ping_thread = threading.Thread(target=self._ping_loop, daemon=True, name="udp_ping")
         self._recv_thread.start()
         self._ping_thread.start()
 
@@ -148,8 +142,7 @@ class BridgeNode(Node):
         was_dead = True
         with self._peer_lock:
             was_dead = sender_port not in self._peer_last_seen or (
-                time.monotonic() - self._peer_last_seen.get(sender_port, 0.0)
-                > self._peer_ttl
+                time.monotonic() - self._peer_last_seen.get(sender_port, 0.0) > self._peer_ttl
             )
             self._peer_last_seen[sender_port] = time.monotonic()
         if was_dead:
@@ -211,8 +204,7 @@ class BridgeNode(Node):
         ros_bytes = data[_DATA_HEADER.size :]
 
         self._debug(
-            f"IN data {len(data)}B from {addr[0]}:{sender_port} "
-            f"topic_id={topic_id} ros_payload={len(ros_bytes)}B"
+            f"IN data {len(data)}B from {addr[0]}:{sender_port} topic_id={topic_id} ros_payload={len(ros_bytes)}B"
         )
 
         if topic_id >= len(self._topic_types):
@@ -225,9 +217,7 @@ class BridgeNode(Node):
         try:
             msg = deserialize_message(ros_bytes, msg_class)
         except Exception as e:
-            self.get_logger().error(
-                f"IN deserialize failed for topic={topic_name!r}: {e}"
-            )
+            self.get_logger().error(f"IN deserialize failed for topic={topic_name!r}: {e}")
             return
 
         self._in_publishers[topic_id].publish(msg)
@@ -238,9 +228,7 @@ class BridgeNode(Node):
             return
         _, sender_port, seq = _PING_HEADER.unpack_from(data, 0)
         self._record_heartbeat(sender_port)
-        self._debug(
-            f"IN ping from {addr[0]}:{sender_port} seq={seq} active={self._active_peers()}"
-        )
+        self._debug(f"IN ping from {addr[0]}:{sender_port} seq={seq} active={self._active_peers()}")
 
     # ------------------------------------------------------------------
     # Ping sender — always broadcasts to all ports (enables discovery)

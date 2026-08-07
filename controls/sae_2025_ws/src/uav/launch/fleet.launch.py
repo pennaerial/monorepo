@@ -88,8 +88,7 @@ def _resolve_fleet_path(fleet_path: str) -> Path:
     if candidate.exists():
         return candidate.resolve()
     raise FileNotFoundError(
-        f"Could not find fleet file '{fleet_path}'. Tried cwd-relative "
-        f"'{direct}' and fleets dir '{candidate}'."
+        f"Could not find fleet file '{fleet_path}'. Tried cwd-relative '{direct}' and fleets dir '{candidate}'."
     )
 
 
@@ -171,8 +170,7 @@ def _defaults_config(fleet: dict) -> dict:
     for key in defaults:
         if key in _EXCLUDED_FLEET_KEYS:
             raise ValueError(
-                f"Fleet defaults do not support '{key}'. This setting is derived or "
-                "single-vehicle-only."
+                f"Fleet defaults do not support '{key}'. This setting is derived or single-vehicle-only."
             )
         if key not in _SHARED_DEFAULT_KEYS:
             raise ValueError(
@@ -186,8 +184,7 @@ def _validate_vehicle_keys(vehicle: dict, *, name_hint: str, backend_kind: str) 
     for key in _EXCLUDED_FLEET_KEYS:
         if key in vehicle:
             raise ValueError(
-                f"Fleet vehicle '{name_hint}' does not support '{key}'. "
-                "This setting is derived or single-vehicle-only."
+                f"Fleet vehicle '{name_hint}' does not support '{key}'. This setting is derived or single-vehicle-only."
             )
 
 
@@ -214,9 +211,7 @@ def _resolve_bool(value, *, key: str, default: bool) -> bool:
             return True
         if normalized in {"0", "false", "no", "off"}:
             return False
-    raise ValueError(
-        f"Fleet vehicle field '{key}' must be boolean, received {value!r}."
-    )
+    raise ValueError(f"Fleet vehicle field '{key}' must be boolean, received {value!r}.")
 
 
 def _vehicle_stack_configs(fleet: dict) -> tuple[dict, list[dict]]:
@@ -227,9 +222,7 @@ def _vehicle_stack_configs(fleet: dict) -> tuple[dict, list[dict]]:
     vehicles = _vehicles_config(fleet)
     backend_kind = backend["kind"]
     controllables = (
-        backend["_resolved_world"]["params"]["controllables"]
-        if backend_kind == "sim"
-        else {}
+        backend["_resolved_world"]["params"]["controllables"] if backend_kind == "sim" else {}
     )
 
     resolved = []
@@ -247,9 +240,7 @@ def _vehicle_stack_configs(fleet: dict) -> tuple[dict, list[dict]]:
         if not name:
             raise ValueError("Fleet vehicles require a non-empty name.")
         if backend_kind == "sim" and not controllable_name:
-            raise ValueError(
-                f"Fleet vehicle '{name}' requires a controllable reference."
-            )
+            raise ValueError(f"Fleet vehicle '{name}' requires a controllable reference.")
         if backend_kind == "sim" and controllable_name not in controllables:
             raise ValueError(
                 f"Fleet vehicle '{name}' references unknown controllable '{controllable_name}'."
@@ -261,8 +252,7 @@ def _vehicle_stack_configs(fleet: dict) -> tuple[dict, list[dict]]:
         declared_kind = str(vehicle.get("kind", "")).strip()
         if declared_kind and declared_kind != kind:
             raise ValueError(
-                f"Fleet vehicle '{name}' declared kind '{declared_kind}' "
-                f"but mission target is '{kind}'."
+                f"Fleet vehicle '{name}' declared kind '{declared_kind}' but mission target is '{kind}'."
             )
 
         if backend_kind == "sim":
@@ -287,9 +277,7 @@ def _vehicle_stack_configs(fleet: dict) -> tuple[dict, list[dict]]:
                 key="auto_launch",
                 default=backend_kind == "sim",
             ),
-            "debug": _resolve_bool(
-                vehicle.get("debug", False), key="debug", default=False
-            ),
+            "debug": _resolve_bool(vehicle.get("debug", False), key="debug", default=False),
             "vision_debug": _resolve_bool(
                 vehicle.get("vision_debug", False), key="vision_debug", default=False
             ),
@@ -312,22 +300,12 @@ def _vehicle_stack_configs(fleet: dict) -> tuple[dict, list[dict]]:
                 )
             ).strip(),
             "camera_rotate_degrees": float(
-                vehicle.get(
-                    "camera_rotate_degrees", 0.0 if backend_kind == "sim" else 180.0
-                )
+                vehicle.get("camera_rotate_degrees", 0.0 if backend_kind == "sim" else 180.0)
             ),
-            "camera_calibration_file": str(
-                vehicle.get("camera_calibration_file", "")
-            ).strip(),
-            "camera_preprocess_hook": str(
-                vehicle.get("camera_preprocess_hook", "")
-            ).strip(),
-            "camera_mount_offsets": list(
-                vehicle.get("camera_mount_offsets", [0.0, 0.0, 0.0])
-            ),
-            "px4_path": os.path.expanduser(
-                str(backend.get("px4_path", DEFAULT_PX4_PATH))
-            ),
+            "camera_calibration_file": str(vehicle.get("camera_calibration_file", "")).strip(),
+            "camera_preprocess_hook": str(vehicle.get("camera_preprocess_hook", "")).strip(),
+            "camera_mount_offsets": list(vehicle.get("camera_mount_offsets", [0.0, 0.0, 0.0])),
+            "px4_path": os.path.expanduser(str(backend.get("px4_path", DEFAULT_PX4_PATH))),
             "sim_world_name": backend.get("world_name", ""),
             "sim_entity_name": controllable_name or name,
             "launch_middleware": backend_kind != "sim" and kind == "uav",
@@ -343,8 +321,7 @@ def _vehicle_stack_configs(fleet: dict) -> tuple[dict, list[dict]]:
                 vehicle.get("udp_all_ports") or [5000, 5001, 5002, 5003]
             )
             stack_config["udp_topics"] = list(
-                vehicle.get("udp_topics")
-                or ["heartbeat:payload_interfaces/msg/PayloadHeartbeat"]
+                vehicle.get("udp_topics") or ["heartbeat:payload_interfaces/msg/PayloadHeartbeat"]
             )
             stack_config["udp_broadcast_ip"] = str(
                 vehicle.get("udp_broadcast_ip") or "10.42.0.255"
@@ -394,30 +371,20 @@ def launch_setup(context, *args, **kwargs):
         actions.append(
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
-                    os.path.join(
-                        get_package_share_directory("sim"), "launch", "sim.launch.py"
-                    )
+                    os.path.join(get_package_share_directory("sim"), "launch", "sim.launch.py")
                 ),
                 launch_arguments={
                     "px4_path": str(backend.get("px4_path", DEFAULT_PX4_PATH)),
                     "backend_json": json.dumps(
-                        {
-                            key: value
-                            for key, value in backend.items()
-                            if not key.startswith("_")
-                        }
+                        {key: value for key, value in backend.items() if not key.startswith("_")}
                     ),
                 }.items(),
             )
         )
 
-    if backend["kind"] == "sim" and any(
-        vehicle["kind"] == "uav" for vehicle in vehicles
-    ):
+    if backend["kind"] == "sim" and any(vehicle["kind"] == "uav" for vehicle in vehicles):
         middleware_port = int(backend.get("middleware_port", 8888))
-        logger.info(
-            f"Launching shared MicroXRCEAgent for fleet on UDP port {middleware_port}."
-        )
+        logger.info(f"Launching shared MicroXRCEAgent for fleet on UDP port {middleware_port}.")
         actions.append(
             ExecuteProcess(
                 cmd=["MicroXRCEAgent", "udp4", "-p", str(middleware_port)],

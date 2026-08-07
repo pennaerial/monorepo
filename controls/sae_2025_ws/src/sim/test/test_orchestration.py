@@ -86,9 +86,7 @@ def test_normalize_named_records_rejects_missing_names():
     except ValueError as exc:
         assert "non-empty 'name'" in str(exc)
     else:
-        raise AssertionError(
-            "Expected normalize_named_records to reject missing names."
-        )
+        raise AssertionError("Expected normalize_named_records to reject missing names.")
 
 
 def test_normalized_stage_name_defaults_to_base():
@@ -190,9 +188,7 @@ def test_resolve_stage_world_exposes_standard_stage_spawnables(monkeypatch):
             Path("/tmp/sae/payload_retreat.yaml"),
         )
 
-    monkeypatch.setattr(
-        "sim.orchestration.load_sim_parameters", fake_load_sim_parameters
-    )
+    monkeypatch.setattr("sim.orchestration.load_sim_parameters", fake_load_sim_parameters)
     resolved = resolve_stage_world(world_name="sae", mission_stage="payload_retreat")
 
     assert resolved["world_name"] == "sae"
@@ -202,12 +198,8 @@ def test_resolve_stage_world_exposes_standard_stage_spawnables(monkeypatch):
     assert resolved["world"]["params"]["entities"]["dlz"]["path_to_sdf"].endswith(
         "dlz_white/model.sdf"
     )
-    assert (
-        resolved["world"]["params"]["controllables"]["uav_0"]["px4_airframe_id"] == 4004
-    )
-    assert (
-        resolved["world"]["params"]["controllables"]["payload_0"]["kind"] == "payload"
-    )
+    assert resolved["world"]["params"]["controllables"]["uav_0"]["px4_airframe_id"] == 4004
+    assert resolved["world"]["params"]["controllables"]["payload_0"]["kind"] == "payload"
 
 
 def test_resolve_stage_world_defaults_to_base_stage(monkeypatch):
@@ -228,9 +220,7 @@ def test_resolve_stage_world_defaults_to_base_stage(monkeypatch):
                     "params": {
                         "template_world": "template.sdf",
                         "entities": {
-                            "dlz": {
-                                "path_to_sdf": "~/.simulation-gazebo/models/dlz/model.sdf"
-                            }
+                            "dlz": {"path_to_sdf": "~/.simulation-gazebo/models/dlz/model.sdf"}
                         },
                         "controllables": {
                             "payload_0": {
@@ -248,17 +238,13 @@ def test_resolve_stage_world_defaults_to_base_stage(monkeypatch):
             Path("/tmp/sae/base.yaml"),
         )
 
-    monkeypatch.setattr(
-        "sim.orchestration.load_sim_parameters", fake_load_sim_parameters
-    )
+    monkeypatch.setattr("sim.orchestration.load_sim_parameters", fake_load_sim_parameters)
     resolved = resolve_stage_world(world_name="sae")
 
     assert resolved["world_name"] == "sae"
     assert resolved["mission_stage"] == "base"
     assert resolved["config_path"].name == "base.yaml"
-    assert resolved["world"]["params"]["entities"]["dlz"]["path_to_sdf"].endswith(
-        "dlz/model.sdf"
-    )
+    assert resolved["world"]["params"]["entities"]["dlz"]["path_to_sdf"].endswith("dlz/model.sdf")
     assert "payload_0" in resolved["world"]["params"]["controllables"]
     assert "payload_1" in resolved["world"]["params"]["controllables"]
 
@@ -303,9 +289,7 @@ def test_resolve_stage_world_loads_specific_stage_and_merges_world_overrides(
             Path("/tmp/sae/payload_retreat.yaml"),
         )
 
-    monkeypatch.setattr(
-        "sim.orchestration.load_sim_parameters", fake_load_sim_parameters
-    )
+    monkeypatch.setattr("sim.orchestration.load_sim_parameters", fake_load_sim_parameters)
     resolved = resolve_stage_world(
         world_name="sae",
         mission_stage="payload_retreat",
@@ -338,9 +322,7 @@ def test_resolve_stage_world_loads_specific_stage_and_merges_world_overrides(
     assert resolved["world"]["params"]["entities"]["marker"]["path_to_sdf"].endswith(
         "marker/model.sdf"
     )
-    assert (
-        resolved["world"]["params"]["controllables"]["payload_0"]["kind"] == "payload"
-    )
+    assert resolved["world"]["params"]["controllables"]["payload_0"]["kind"] == "payload"
     assert resolved["world"]["params"]["controllables"]["uav_0"]["kind"] == "uav"
     assert resolved["world"]["params"]["controllables"]["uav_0"]["position"] == [
         4.0,
@@ -355,9 +337,7 @@ def test_resolve_stage_world_rejects_non_mapping_overrides():
     except ValueError as exc:
         assert "world_overrides must be a mapping" in str(exc)
     else:
-        raise AssertionError(
-            "Expected resolve_stage_world to reject non-mapping overrides."
-        )
+        raise AssertionError("Expected resolve_stage_world to reject non-mapping overrides.")
 
 
 def test_resolve_stage_world_rejects_unknown_world():

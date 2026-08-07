@@ -61,9 +61,7 @@ def find_payload(image):
     pink_mask = cv2.morphologyEx(pink_mask, cv2.MORPH_OPEN, kernel)
 
     # Find contours in the pink mask
-    contours, _ = cv2.findContours(
-        pink_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
-    )
+    contours, _ = cv2.findContours(pink_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     result_image = image.copy()
     largest_green_contour = None
@@ -74,9 +72,7 @@ def find_payload(image):
 
         # Create a mask for the pink square
         pink_square_mask = np.zeros_like(pink_mask)
-        cv2.drawContours(
-            pink_square_mask, [largest_contour], -1, 255, thickness=cv2.FILLED
-        )
+        cv2.drawContours(pink_square_mask, [largest_contour], -1, 255, thickness=cv2.FILLED)
 
         # Mask the original image to only search within the pink square
         masked_image = cv2.bitwise_and(image, image, mask=pink_square_mask)
@@ -92,9 +88,7 @@ def find_payload(image):
         green_mask = cv2.inRange(hsv_masked, lower_green, upper_green)
 
         # Find contours in the green mask
-        green_contours, _ = cv2.findContours(
-            green_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
-        )
+        green_contours, _ = cv2.findContours(green_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
         if green_contours:
             # Find the largest contour (assuming it's the green circle)

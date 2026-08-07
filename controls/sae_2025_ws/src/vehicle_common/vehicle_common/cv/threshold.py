@@ -6,9 +6,7 @@ def distance(c1: tuple[int, int], c2: tuple[int, int]) -> int:
     return (c1[0] - c2[0]) ** 2 + (c1[1] - c2[1]) ** 2
 
 
-def detect_contour(
-    threshold, frame: np.ndarray
-) -> tuple[list[np.ndarray], list[tuple[int, int]]]:
+def detect_contour(threshold, frame: np.ndarray) -> tuple[list[np.ndarray], list[tuple[int, int]]]:
     hsl = cv2.cvtColor(frame, cv2.COLOR_BGR2HLS)
     hsl = cv2.GaussianBlur(hsl, (5, 5), 0)
 

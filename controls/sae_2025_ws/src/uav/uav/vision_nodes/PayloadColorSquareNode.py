@@ -157,9 +157,7 @@ class PayloadColorSquareNode(VisionNode):
         blue_mask = cv2.inRange(hsv, _LOWER_B, _UPPER_B)
 
         response.current_color = _detect_current_color(orange_mask, blue_mask)
-        detected, lateral_error_px, boundary_angle = _detect_tape_following(
-            orange_mask, blue_mask
-        )
+        detected, lateral_error_px, boundary_angle = _detect_tape_following(orange_mask, blue_mask)
         response.boundary_detected = detected
         response.lateral_error_px = lateral_error_px
         response.boundary_angle = boundary_angle
@@ -176,9 +174,7 @@ class PayloadColorSquareNode(VisionNode):
         orange_mask = _red_mask(hsv)
         blue_mask = cv2.inRange(hsv, _LOWER_B, _UPPER_B)
         current_color = _detect_current_color(orange_mask, blue_mask)
-        detected, lateral_error_px, boundary_angle = _detect_tape_following(
-            orange_mask, blue_mask
-        )
+        detected, lateral_error_px, boundary_angle = _detect_tape_following(orange_mask, blue_mask)
         self.draw_debug(
             bgr,
             strip,
@@ -211,18 +207,12 @@ class PayloadColorSquareNode(VisionNode):
             orange_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
         )
         offset = np.array([[[0, strip_start]]], dtype=np.int32)
-        shifted_orange = [
-            (contour + offset).astype(np.int32) for contour in orange_contours
-        ]
+        shifted_orange = [(contour + offset).astype(np.int32) for contour in orange_contours]
         cv2.drawContours(debug, shifted_orange, -1, (255, 255, 255), 2)
 
         # White contours around detected blue regions
-        blue_contours, _ = cv2.findContours(
-            blue_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
-        )
-        shifted_blue = [
-            (contour + offset).astype(np.int32) for contour in blue_contours
-        ]
+        blue_contours, _ = cv2.findContours(blue_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        shifted_blue = [(contour + offset).astype(np.int32) for contour in blue_contours]
         cv2.drawContours(debug, shifted_blue, -1, (255, 255, 255), 2)
 
         # Faint grey line at the strip cut
@@ -251,9 +241,7 @@ class PayloadColorSquareNode(VisionNode):
             if boundary_detected
             else "boundary=none"
         )
-        cv2.putText(
-            debug, color_label, (8, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2
-        )
+        cv2.putText(debug, color_label, (8, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
         cv2.putText(
             debug,
             err_label,

@@ -60,8 +60,7 @@ class HeadlessGroundStation:
         heartbeat = self._master.wait_heartbeat(timeout=timeout_s)
         if heartbeat is not None:
             self._log(
-                f"connected: sys {self._master.target_system} "
-                f"comp {self._master.target_component}"
+                f"connected: sys {self._master.target_system} comp {self._master.target_component}"
             )
         return heartbeat
 
@@ -131,9 +130,7 @@ class HeadlessGroundStation:
             lambda _msg: self._ever_armed,
             timeout_s=timeout_s,
             deadline=deadline,
-            timeout_message=lambda active_deadline: self._mission_timeout_message(
-                active_deadline
-            ),
+            timeout_message=lambda active_deadline: self._mission_timeout_message(active_deadline),
         )
 
     def wait_airborne(
@@ -146,9 +143,7 @@ class HeadlessGroundStation:
             lambda _msg: self._ever_airborne,
             timeout_s=timeout_s,
             deadline=deadline,
-            timeout_message=lambda active_deadline: self._mission_timeout_message(
-                active_deadline
-            ),
+            timeout_message=lambda active_deadline: self._mission_timeout_message(active_deadline),
         )
 
     def wait_landed(
@@ -165,9 +160,7 @@ class HeadlessGroundStation:
             ),
             timeout_s=timeout_s,
             deadline=deadline,
-            timeout_message=lambda active_deadline: self._mission_timeout_message(
-                active_deadline
-            ),
+            timeout_message=lambda active_deadline: self._mission_timeout_message(active_deadline),
         )
 
         pending_states = self.pending_vtol_states()
@@ -234,10 +227,7 @@ class HeadlessGroundStation:
             self._log(f"[{elapsed_s:6.1f}s] VTOL_STATE -> {reached}")
 
         self._landed_state = msg.landed_state
-        if (
-            msg.landed_state == mavlink.MAV_LANDED_STATE_IN_AIR
-            and not self._ever_airborne
-        ):
+        if msg.landed_state == mavlink.MAV_LANDED_STATE_IN_AIR and not self._ever_airborne:
             self._ever_airborne = True
             self._log(f"[{elapsed_s:6.1f}s] AIRBORNE (takeoff)")
 
@@ -274,10 +264,7 @@ class HeadlessGroundStation:
                 f"(armed={self._ever_armed}, airborne={self._ever_airborne}, "
                 f"pending_vtol_states={self._pending_vtol_states})"
             )
-        return (
-            f"TIMEOUT after {deadline.timeout_s:.0f}s "
-            f"(armed={self._ever_armed}, airborne={self._ever_airborne})"
-        )
+        return f"TIMEOUT after {deadline.timeout_s:.0f}s (armed={self._ever_armed}, airborne={self._ever_airborne})"
 
     def _load_mavutil(self) -> Any:
         if self._mavutil is not None:
@@ -286,8 +273,7 @@ class HeadlessGroundStation:
             from pymavlink import mavutil
         except ModuleNotFoundError as exc:
             raise RuntimeError(
-                "HeadlessGroundStation requires pymavlink. Install pymavlink "
-                "or run inside the sim CI image."
+                "HeadlessGroundStation requires pymavlink. Install pymavlink or run inside the sim CI image."
             ) from exc
         self._mavutil = mavutil
         return self._mavutil

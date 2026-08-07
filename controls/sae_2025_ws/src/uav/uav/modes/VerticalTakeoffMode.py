@@ -31,9 +31,7 @@ class VerticalTakeoffMode(Mode):
     transition_labels = ("complete",)
 
     @override
-    def initialize(
-        self, node: Node, vehicle: UAV, params: VerticalTakeoffParams
-    ) -> None:
+    def initialize(self, node: Node, vehicle: UAV, params: VerticalTakeoffParams) -> None:
         self.node = node
         self.vehicle = vehicle
         self.p = params
@@ -87,9 +85,7 @@ class VerticalTakeoffMode(Mode):
             self.sent_px4_tko_command = True
             return
 
-        self.logger.info(
-            " PX4 vertical auto takeoff in progress.", throttle_duration_sec=1.0
-        )
+        self.logger.info(" PX4 vertical auto takeoff in progress.", throttle_duration_sec=1.0)
 
         if (
             self.elapsed >= 1.0

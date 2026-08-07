@@ -68,9 +68,7 @@ class PayloadAprilTagApproachMode(Mode):
         self.vehicle = vehicle
         self.p = params
         self.tag_id = None if params.tag_id is None else int(params.tag_id)
-        self.tag_family = (
-            str(params.tag_family) if params.tag_family else DEFAULT_TAG_FAMILY
-        )
+        self.tag_family = str(params.tag_family) if params.tag_family else DEFAULT_TAG_FAMILY
 
         self._bridge = CvBridge()
         self._latest_image: Optional[Image | CompressedImage] = None
@@ -129,9 +127,7 @@ class PayloadAprilTagApproachMode(Mode):
         self._last_no_tag_log_time = 0.0
         self._last_drive_log_time = 0.0
         self.vehicle.set_servo(180.0)
-        self.log(
-            "PayloadAprilTagApproachMode: servo set to 180, detecting apriltags inline"
-        )
+        self.log("PayloadAprilTagApproachMode: servo set to 180, detecting apriltags inline")
 
     def _detect_observations(self) -> Optional[dict[int, TagObservation]]:
         bgr = self._get_bgr_frame()
@@ -179,9 +175,7 @@ class PayloadAprilTagApproachMode(Mode):
         self.log("PayloadAprilTagApproachMode: tag lost; transitioning")
         return True
 
-    def _select_target(
-        self, observations: dict[int, TagObservation]
-    ) -> Optional[TagObservation]:
+    def _select_target(self, observations: dict[int, TagObservation]) -> Optional[TagObservation]:
         if self.tag_id is not None:
             return observations.get(int(self.tag_id))
         if not observations:
@@ -195,9 +189,7 @@ class PayloadAprilTagApproachMode(Mode):
         now = self._now()
 
         if self._detector is None:
-            self.log(
-                "PayloadAprilTagApproachMode: apriltag not installed; cannot detect tags."
-            )
+            self.log("PayloadAprilTagApproachMode: apriltag not installed; cannot detect tags.")
             return
 
         if self._latest_image is None or self._latest_camera_info is None:
@@ -230,8 +222,7 @@ class PayloadAprilTagApproachMode(Mode):
                 self._last_no_tag_log_time = now
                 if observations:
                     self.log(
-                        "PayloadAprilTagApproachMode: tags in view "
-                        f"{list(observations)} but no match"
+                        f"PayloadAprilTagApproachMode: tags in view {list(observations)} but no match"
                     )
                 else:
                     self.log("PayloadAprilTagApproachMode: no tag in view")
@@ -244,17 +235,13 @@ class PayloadAprilTagApproachMode(Mode):
             self.vehicle.set_servo(0.0)
             self.vehicle.stop()
             self._done = True
-            self.log(
-                f"PayloadAprilTagApproachMode: servo set to 0, stopped at {distance:.3f}m"
-            )
+            self.log(f"PayloadAprilTagApproachMode: servo set to 0, stopped at {distance:.3f}m")
             return
 
         image_width = self._image_width if self._image_width > 0.0 else 640.0
         lateral_error_px = float(target.center_x - (image_width / 2.0))
         linear = min(self.p.forward_gain * distance, self.p.max_forward_speed)
-        angular = (-self.p.angular_gain * lateral_error_px) - (
-            self.p.yaw_gain * target.yaw_error
-        )
+        angular = (-self.p.angular_gain * lateral_error_px) - (self.p.yaw_gain * target.yaw_error)
 
         if now - self._last_drive_log_time >= 1.0:
             self._last_drive_log_time = now

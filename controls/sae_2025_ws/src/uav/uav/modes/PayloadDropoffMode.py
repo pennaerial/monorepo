@@ -37,9 +37,7 @@ class PayloadDropoffMode(Mode):
     transition_labels = ("complete",)
 
     @override
-    def initialize(
-        self, node: Node, vehicle: UAV, params: PayloadDropoffParams
-    ) -> None:
+    def initialize(self, node: Node, vehicle: UAV, params: PayloadDropoffParams) -> None:
         self.node = node
         self.vehicle = vehicle
         self.p = params
@@ -47,9 +45,7 @@ class PayloadDropoffMode(Mode):
         self.response = None
         self.done = False
         self.camera_offsets = self.vehicle.camera_offsets
-        self.mode = (
-            0  # 0 for uav centering, 1 for landing, 2 for retracting, 3 for taking off
-        )
+        self.mode = 0  # 0 for uav centering, 1 for landing, 2 for retracting, 3 for taking off
 
     def on_update(self, time_delta: float) -> None:
         """
@@ -104,9 +100,7 @@ class PayloadDropoffMode(Mode):
         )
         direction = [
             x + y + z
-            for x, y, z in zip(
-                direction, offsets, self.vehicle.uav_to_local(camera_offsets)
-            )
+            for x, y, z in zip(direction, offsets, self.vehicle.uav_to_local(camera_offsets))
         ]
 
         if request.altitude < 1:

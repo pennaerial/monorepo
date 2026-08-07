@@ -71,9 +71,7 @@ class HoopScoringNode(ScoringNode):
         self.prev_position: Optional[Tuple[float, float, float]] = None
 
         # Directional detection tracking
-        self.drone_last_side: List[
-            int
-        ] = []  # Track which side of each hoop drone is on
+        self.drone_last_side: List[int] = []  # Track which side of each hoop drone is on
         self.landed_at_origin = False
         self.landing_bonus_awarded = False
 
@@ -109,9 +107,7 @@ class HoopScoringNode(ScoringNode):
             return
 
         if not self.hoop_client.wait_for_service(timeout_sec=0.0):
-            self.get_logger().warn(
-                "Waiting for 'list_hoops' service...", throttle_duration_sec=5.0
-            )
+            self.get_logger().warn("Waiting for 'list_hoops' service...", throttle_duration_sec=5.0)
             return
 
         future = self.hoop_client.call_async(HoopList.Request())
@@ -130,9 +126,7 @@ class HoopScoringNode(ScoringNode):
         self.passed_hoops = []
         self.drone_last_side = []
         for hoop in response.hoop_positions:
-            self.hoop_poses.append(
-                (hoop.x, hoop.y, hoop.z, hoop.roll, hoop.pitch, hoop.yaw)
-            )
+            self.hoop_poses.append((hoop.x, hoop.y, hoop.z, hoop.roll, hoop.pitch, hoop.yaw))
             self.passed_hoops.append(False)
             self.drone_last_side.append(0)
 
@@ -152,9 +146,7 @@ class HoopScoringNode(ScoringNode):
             # rclpy.spin_until_future_complete(self, future)
 
             if future.result() is None:
-                self.get_logger().error(
-                    f"'list_hoops' failed with exception: {future.exception()}"
-                )
+                self.get_logger().error(f"'list_hoops' failed with exception: {future.exception()}")
                 raise RuntimeError("Service call to 'list_hoops' failed")
 
             response = future.result()
@@ -177,8 +169,7 @@ class HoopScoringNode(ScoringNode):
                 self.drone_last_side.append(0)
 
                 self.get_logger().info(
-                    f"Hoop {i + 1}: x={x:.2f}, y={y:.2f}, z={z:.2f}, "
-                    f"roll={roll:.2f}, pitch={pitch:.2f}, yaw={yaw:.2f}"
+                    f"Hoop {i + 1}: x={x:.2f}, y={y:.2f}, z={z:.2f}, roll={roll:.2f}, pitch={pitch:.2f}, yaw={yaw:.2f}"
                 )
 
             self.get_logger().info(
@@ -189,9 +180,7 @@ class HoopScoringNode(ScoringNode):
             self.get_logger().error(f"Failed to load hoop positions: {e}")
             raise
 
-    def set_course_hoops(
-        self, hoop_poses: List[Tuple[float, float, float, float, float, float]]
-    ):
+    def set_course_hoops(self, hoop_poses: List[Tuple[float, float, float, float, float, float]]):
         """Set the hoop positions for scoring. (UPDATED)"""
         self.hoop_poses = hoop_poses
         self.passed_hoops = [False] * len(hoop_poses)
@@ -247,18 +236,14 @@ class HoopScoringNode(ScoringNode):
                     self.current_score += points
 
                     # Publish status and score
-                    self.publish_status(
-                        f"Hoop {i + 1} passed! Score: {self.current_score}"
-                    )
+                    self.publish_status(f"Hoop {i + 1} passed! Score: {self.current_score}")
                     self.publish_score()
 
                     # Log the achievement
                     self.get_logger().info(
                         f"🎯 HOOP {i + 1} PASSED THROUGH! Score: {self.current_score}"
                     )
-                    self.get_logger().info(
-                        f"Crossed from side {last_side} to side {current_side}"
-                    )
+                    self.get_logger().info(f"Crossed from side {last_side} to side {current_side}")
 
                 # Update side tracking
                 self.drone_last_side[i] = current_side

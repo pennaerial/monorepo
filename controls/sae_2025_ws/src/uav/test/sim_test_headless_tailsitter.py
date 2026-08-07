@@ -58,9 +58,7 @@ class TestTailsitterMission(unittest.TestCase):
             mavutil.mavlink.MAV_VTOL_STATE_MC,
         ]
 
-        with HeadlessGroundStation(
-            MAVLINK_ENDPOINT, mavutil_module=mavutil
-        ) as ground_station:
+        with HeadlessGroundStation(MAVLINK_ENDPOINT, mavutil_module=mavutil) as ground_station:
             self.assertIsNotNone(
                 ground_station.connect(timeout_s=60),
                 "no PX4 heartbeat within 60s",
@@ -79,6 +77,5 @@ class TestTailsitterMission(unittest.TestCase):
             self.assertEqual(
                 pending_vtol_states,
                 [],
-                f"landed before all VTOL transitions completed, "
-                f"still pending: {pending_vtol_states}",
+                f"landed before all VTOL transitions completed, still pending: {pending_vtol_states}",
             )
