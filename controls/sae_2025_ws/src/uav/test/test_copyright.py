@@ -28,4 +28,4 @@ def test_copyright():
 
 
 def test_stub():
-    assert(True)
+    assert True

@@ -8,15 +8,11 @@ alias cbp='colcon build --packages-select'
 alias cbpsi='colcon build --symlink-install --packages-select'
 
 # TESTING
-#
-# alias ct='colcon test --event-handlers console_cohesion+'
-
+ctp() {
 # 1. runs colcon tests on selected packages
 # 2. merges xml test results into build/merged_results.xml
 # 3. Views merged_result.xml with xunit-viewer
-
 # runs unit tests from the selected packages
-ctp() {
     local pkgs=("$@")
     colcon test --packages-select "${pkgs[@]}"
 
