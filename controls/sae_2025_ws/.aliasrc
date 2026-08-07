@@ -14,6 +14,8 @@ alias cbpsi='colcon build --symlink-install --packages-select'
 # 1. runs colcon tests on selected packages
 # 2. merges xml test results into build/merged_results.xml
 # 3. Views merged_result.xml with xunit-viewer
+
+# runs unit tests from the selected packages
 ctp() {
     local pkgs=("$@")
     colcon test --packages-select "${pkgs[@]}"
@@ -36,9 +38,17 @@ ctp() {
     xunit-viewer -r build/merged_results.xml --console -C false -o build/merged_results.html
 }
 
-
+# Runs unit tests from ALL packages
 ct() {
     mapfile -t pkgs < <(colcon list -n)
     ctp "${pkgs[@]}"
 }
 
+# Runs all sim tests from ALL packages. Only supports ament_python packages so far.
+ctsim() {
+    mapfile -t pkgs < <(colcon list | grep 'ament_python' | awk '{print $1}')
+    colcon test --packages-select "${pkgs[@]}" --event-handlers console_direct+ --pytest-args -s -o python_files="sim_test_*.py"
+}
+
+# Runs all sim tests from the selected/specified packages
+alias ctpsim='colcon test --pytest-args -s -o python_files="sim_test_*.py" --event-handlers console_direct+ --packages-select'
