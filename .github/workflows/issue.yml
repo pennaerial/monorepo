@@ -11,7 +11,7 @@ jobs:
     steps:
       - name: Update Issue Priority
         env:
-          GH_TOKEN: ${{ secrets.ORG_FIELD_TOKEN }}
+          GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
           ISSUE_ID: ${{ github.event.issue.node_id }}
           ISSUE_BODY: ${{ github.event.issue.body }}
         run: |
