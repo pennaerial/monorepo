@@ -1,5 +1,5 @@
 {
-  "name": "gcs",
+  "name": "pennair_gcs",
   "private": true,
   "version": "0.1.0",
   "type": "module",
