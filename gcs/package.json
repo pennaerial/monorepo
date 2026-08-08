@@ -13,11 +13,13 @@
   "dependencies": {
     "@foxglove/rosmsg": "^5.0.5",
     "@foxglove/rosmsg2-serialization": "^3.1.2",
+    "@tailwindcss/vite": "^4.3.3",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-opener": "^2",
     "eventemitter3": "^5.0.4",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",
