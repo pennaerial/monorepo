@@ -6,6 +6,7 @@ import { MessageData } from "./foxglove-ws/types";
 import { parse } from "@foxglove/rosmsg";
 import { MessageReader } from "@foxglove/rosmsg2-serialization";
 import { StdMsgsString } from "./ros_interfaces";
+import { Button } from "@/components/ui/button";
 import "./App.css";
 
 function App() {
@@ -53,6 +54,7 @@ function App() {
 
   return (
     <main className="container">
+      <Button>shadcn button</Button>
       <h1>Welcome to PennAiR GCS</h1>
 
       <form
