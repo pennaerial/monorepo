@@ -1,6 +1,5 @@
 name: 📋 Task
 description: A general piece of work that doesn't fit into the bug or feature category
-title: "[Task]: "
 labels: ["task"]
 assignees: []
 body:

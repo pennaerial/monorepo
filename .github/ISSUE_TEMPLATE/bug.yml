@@ -1,6 +1,5 @@
 name: 🐛 Bug Report
 description: Report something that's broken or not working as expected
-title: "[Bug]: "
 labels: ["bug"]
 assignees: []
 body:
