@@ -12,11 +12,13 @@ jobs:
       - name: Update Issue Priority
         env:
           GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
-          ISSUE_ID: ${{ github.event.issue.node_id }}
           ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
 
+          # Extract Priority from the Issue Form.
           PRIORITY=$(printf '%s\n' "$ISSUE_BODY" |
             awk '
               /^### Priority$/ {
@@ -36,31 +38,42 @@ jobs:
             Low|Medium|High|Urgent)
               ;;
             *)
-              echo "Invalid priority: '$PRIORITY'"
+              echo "Invalid or missing priority: '$PRIORITY'"
               exit 1
               ;;
           esac
 
-          gh api graphql \
-            -f query="$(cat <<'GRAPHQL'
-          mutation($issueId: ID!, $priority: String!) {
-            updateIssueWithFields(input: {
-              issueId: $issueId
-              fields: [
-                {
-                  name: "Priority"
-                  value: $priority
-                }
-              ]
-            }) {
-              issue {
-                id
-              }
-            }
-          }
-          GRAPHQL
-          )" \
-            -f issueId="$ISSUE_ID" \
-            -f priority="$PRIORITY"
+          # Find the organization Issue Field named "Priority".
+          FIELD_ID=$(gh api \
+            "/orgs/pennaerial/issue-fields" |
+            jq -r '
+              .[]
+              | select(.name == "Priority")
+              | .id
+            ')
 
-          echo "Set issue Priority to '$PRIORITY'."
+          if [ -z "$FIELD_ID" ] || [ "$FIELD_ID" = "null" ]; then
+            echo "Issue Field 'Priority' not found."
+            exit 1
+          fi
+
+          echo "Priority field ID: $FIELD_ID"
+
+          # Set the Issue Field value.
+          gh api \
+            --method PUT \
+            "/repos/$REPO/issues/$ISSUE_NUMBER/issue-field-values" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2026-03-10" \
+            --input - <<EOF
+          {
+            "issue_field_values": [
+              {
+                "field_id": $FIELD_ID,
+                "value": "$PRIORITY"
+              }
+            ]
+          }
+          EOF
+
+          echo "Successfully set Issue Priority to '$PRIORITY'."
