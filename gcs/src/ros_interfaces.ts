@@ -1,135 +1,135 @@
 /* eslint-disable */
 // These files were generated using "ros-typescript-generator"
-export interface RosStdMsgsBool {
+export interface StdMsgsBool {
   data: boolean;
 }
 
-export interface RosStdMsgsByte {
+export interface StdMsgsByte {
   data: number;
 }
 
-export interface RosStdMsgsByteMultiArray {
-  layout: RosStdMsgsMultiArrayLayout;
+export interface StdMsgsByteMultiArray {
+  layout: StdMsgsMultiArrayLayout;
   data: number[];
 }
 
-export interface RosStdMsgsChar {
+export interface StdMsgsChar {
   data: number;
 }
 
-export interface RosStdMsgsColorRgba {
+export interface StdMsgsColorRgba {
   r: number;
   g: number;
   b: number;
   a: number;
 }
 
-export interface RosStdMsgsFloat32 {
+export interface StdMsgsFloat32 {
   data: number;
 }
 
-export interface RosStdMsgsFloat32MultiArray {
-  layout: RosStdMsgsMultiArrayLayout;
+export interface StdMsgsFloat32MultiArray {
+  layout: StdMsgsMultiArrayLayout;
   data: number[];
 }
 
-export interface RosStdMsgsFloat64 {
+export interface StdMsgsFloat64 {
   data: number;
 }
 
-export interface RosStdMsgsFloat64MultiArray {
-  layout: RosStdMsgsMultiArrayLayout;
+export interface StdMsgsFloat64MultiArray {
+  layout: StdMsgsMultiArrayLayout;
   data: number[];
 }
 
-export interface RosStdMsgsHeader {
+export interface StdMsgsHeader {
   stamp: { sec: number, nanosec: number };
   frame_id: string;
 }
 
-export interface RosStdMsgsInt16 {
+export interface StdMsgsInt16 {
   data: number;
 }
 
-export interface RosStdMsgsInt16MultiArray {
-  layout: RosStdMsgsMultiArrayLayout;
+export interface StdMsgsInt16MultiArray {
+  layout: StdMsgsMultiArrayLayout;
   data: number[];
 }
 
-export interface RosStdMsgsInt32 {
+export interface StdMsgsInt32 {
   data: number;
 }
 
-export interface RosStdMsgsInt32MultiArray {
-  layout: RosStdMsgsMultiArrayLayout;
+export interface StdMsgsInt32MultiArray {
+  layout: StdMsgsMultiArrayLayout;
   data: number[];
 }
 
-export interface RosStdMsgsInt64 {
+export interface StdMsgsInt64 {
   data: number;
 }
 
-export interface RosStdMsgsInt64MultiArray {
-  layout: RosStdMsgsMultiArrayLayout;
+export interface StdMsgsInt64MultiArray {
+  layout: StdMsgsMultiArrayLayout;
   data: number[];
 }
 
-export interface RosStdMsgsInt8 {
+export interface StdMsgsInt8 {
   data: number;
 }
 
-export interface RosStdMsgsInt8MultiArray {
-  layout: RosStdMsgsMultiArrayLayout;
+export interface StdMsgsInt8MultiArray {
+  layout: StdMsgsMultiArrayLayout;
   data: number[];
 }
 
-export interface RosStdMsgsMultiArrayDimension {
+export interface StdMsgsMultiArrayDimension {
   label: string;
   size: number;
   stride: number;
 }
 
-export interface RosStdMsgsMultiArrayLayout {
-  dim: RosStdMsgsMultiArrayDimension[];
+export interface StdMsgsMultiArrayLayout {
+  dim: StdMsgsMultiArrayDimension[];
   data_offset: number;
 }
 
-export interface RosStdMsgsString {
+export interface StdMsgsString {
   data: string;
 }
 
-export interface RosStdMsgsUInt16 {
+export interface StdMsgsUInt16 {
   data: number;
 }
 
-export interface RosStdMsgsUInt16MultiArray {
-  layout: RosStdMsgsMultiArrayLayout;
+export interface StdMsgsUInt16MultiArray {
+  layout: StdMsgsMultiArrayLayout;
   data: number[];
 }
 
-export interface RosStdMsgsUInt32 {
+export interface StdMsgsUInt32 {
   data: number;
 }
 
-export interface RosStdMsgsUInt32MultiArray {
-  layout: RosStdMsgsMultiArrayLayout;
+export interface StdMsgsUInt32MultiArray {
+  layout: StdMsgsMultiArrayLayout;
   data: number[];
 }
 
-export interface RosStdMsgsUInt64 {
+export interface StdMsgsUInt64 {
   data: number;
 }
 
-export interface RosStdMsgsUInt64MultiArray {
-  layout: RosStdMsgsMultiArrayLayout;
+export interface StdMsgsUInt64MultiArray {
+  layout: StdMsgsMultiArrayLayout;
   data: number[];
 }
 
-export interface RosStdMsgsUInt8 {
+export interface StdMsgsUInt8 {
   data: number;
 }
 
-export interface RosStdMsgsUInt8MultiArray {
-  layout: RosStdMsgsMultiArrayLayout;
+export interface StdMsgsUInt8MultiArray {
+  layout: StdMsgsMultiArrayLayout;
   data: number[];
 }

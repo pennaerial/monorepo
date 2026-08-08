@@ -13,7 +13,6 @@ if (!distro) {
 const config = {
   output: "./src/ros_interfaces.ts",
   rosVersion: 2,
-  typePrefix: "Ros",
   useNamespaces: false,
   smartEnums: true,
   input: [
