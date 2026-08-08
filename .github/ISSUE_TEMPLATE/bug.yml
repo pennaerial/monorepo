@@ -9,10 +9,10 @@ body:
     attributes:
       label: Priority
       options:
-        - Minor
+        - Low
         - Medium
-        - Major
-        - Critical
+        - High
+        - Urgent
     validations:
       required: true
   - type: textarea
