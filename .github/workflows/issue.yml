@@ -11,13 +11,12 @@ jobs:
     steps:
       - name: Update Issue Priority
         env:
-          GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+          GH_TOKEN: ${{ secrets.ORG_FIELD_TOKEN }}
           ISSUE_ID: ${{ github.event.issue.node_id }}
           ISSUE_BODY: ${{ github.event.issue.body }}
         run: |
           set -euo pipefail
 
-          # Extract priority from the Issue Form.
           PRIORITY=$(printf '%s\n' "$ISSUE_BODY" |
             awk '
               /^### Priority$/ {
@@ -43,23 +42,24 @@ jobs:
           esac
 
           gh api graphql \
-            -f query='
-              mutation($issueId: ID!, $priority: String!) {
-                updateIssueWithFields(input: {
-                  issueId: $issueId
-                  fields: [
-                    {
-                      name: "Priority"
-                      value: $priority
-                    }
-                  ]
-                }) {
-                  issue {
-                    id
-                  }
+            -f query="$(cat <<'GRAPHQL'
+          mutation($issueId: ID!, $priority: String!) {
+            updateIssueWithFields(input: {
+              issueId: $issueId
+              fields: [
+                {
+                  name: "Priority"
+                  value: $priority
                 }
+              ]
+            }) {
+              issue {
+                id
               }
-            ' \
+            }
+          }
+          GRAPHQL
+          )" \
             -f issueId="$ISSUE_ID" \
             -f priority="$PRIORITY"
 
