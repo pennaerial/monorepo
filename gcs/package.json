@@ -11,6 +11,7 @@
     "ros-ts-gen": "node ros-ts-gen.js && ros-typescript-generator --config ros-ts-gen.json"
   },
   "dependencies": {
+    "@foxglove/rosmsg2-serialization": "^3.1.2",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-opener": "^2",
     "react": "^19.1.0",
