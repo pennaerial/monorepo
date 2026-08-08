@@ -58,7 +58,7 @@ const textEncoder = new TextEncoder();
  * "foxglove.websocket.v1").
  */
 export default class FoxgloveClient {
-  static SUPPORTED_SUBPROTOCOL = "foxglove.websocket.v1";
+  static SUPPORTED_SUBPROTOCOL = "foxglove.sdk.v1";
 
   #emitter = new EventEmitter<EventTypes>();
   #ws: IWebSocket;
