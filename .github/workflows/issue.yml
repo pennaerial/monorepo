@@ -1,0 +1,113 @@
+name: Issue
+
+on:
+  issues:
+    types: [opened, edited]
+
+jobs:
+  set-priority:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Set project priority
+        env:
+          GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_URL: ${{ github.event.issue.html_url }}
+          PROJECT_OWNER: pennaerial
+          PROJECT_NUMBER: 2
+        run: |
+          set -euo pipefail
+
+          # Extract the selected priority from the Issue Form.
+          PRIORITY=$(printf '%s\n' "$ISSUE_BODY" |
+            awk '
+              /^### Priority$/ {
+                getline
+                print
+                exit
+              }
+            ' |
+            xargs)
+
+          echo "Priority: $PRIORITY"
+
+          # Make sure we got a valid value.
+          case "$PRIORITY" in
+            Low|Medium|High|Urgent)
+              ;;
+            *)
+              echo "Invalid or missing priority: '$PRIORITY'"
+              exit 1
+              ;;
+          esac
+
+          # Get the Project ID.
+          PROJECT_ID=$(gh project view "$PROJECT_NUMBER" \
+            --owner "$PROJECT_OWNER" \
+            --format json |
+            jq -r '.id')
+
+          echo "Project ID: $PROJECT_ID"
+
+          # Find the Project item corresponding to this issue.
+          ITEM_ID=$(gh project item-list "$PROJECT_NUMBER" \
+            --owner "$PROJECT_OWNER" \
+            --format json |
+            jq -r --arg url "$ISSUE_URL" '
+              .items[]
+              | select(.content.url == $url)
+              | .id
+            ')
+
+          if [ -z "$ITEM_ID" ] || [ "$ITEM_ID" = "null" ]; then
+            echo "Issue is not in the Project yet."
+            exit 0
+          fi
+
+          echo "Project item ID: $ITEM_ID"
+
+          # Find the Priority field ID.
+          PRIORITY_FIELD_ID=$(gh project field-list "$PROJECT_NUMBER" \
+            --owner "$PROJECT_OWNER" \
+            --format json |
+            jq -r '
+              .fields[]
+              | select(.name == "Priority")
+              | .id
+            ')
+
+          echo "Priority field ID: $PRIORITY_FIELD_ID"
+
+          # Find the option ID for the selected priority.
+          OPTION_ID=$(gh project field-list "$PROJECT_NUMBER" \
+            --owner "$PROJECT_OWNER" \
+            --format json |
+            jq -r --arg priority "$PRIORITY" '
+              .fields[]
+              | select(.name == "Priority")
+              | .options[]
+              | select(.name == $priority)
+              | .id
+            ')
+
+          echo "Priority option ID: $OPTION_ID"
+
+          if [ -z "$PRIORITY_FIELD_ID" ] || [ "$PRIORITY_FIELD_ID" = "null" ]; then
+            echo "Priority field not found."
+            exit 1
+          fi
+
+          if [ -z "$OPTION_ID" ] || [ "$OPTION_ID" = "null" ]; then
+            echo "Priority option '$PRIORITY' not found in Project."
+            exit 1
+          fi
+
+          # Update the Project item's Priority field.
+          gh project item-edit \
+            --project-id "$PROJECT_ID" \
+            --id "$ITEM_ID" \
+            --field-id "$PRIORITY_FIELD_ID" \
+            --single-select-option-id "$OPTION_ID"
+
+          echo "Successfully set Project Priority to '$PRIORITY'."
