@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    gcs_lib::run()
+    pennair_gcs_lib::run()
 }

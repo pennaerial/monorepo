@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "gcs",
+  "productName": "pennair_gcs",
   "version": "0.1.0",
   "identifier": "com.pennaerial.gcs",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "PennAir Ground Control Station",
+        "title": "PennAiR GCS",
         "width": 800,
         "height": 600
       }
