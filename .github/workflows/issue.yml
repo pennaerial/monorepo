@@ -23,7 +23,10 @@ jobs:
           PRIORITY=$(printf '%s\n' "$ISSUE_BODY" |
             awk '
               /^### Priority$/ {
-                getline
+                found = 1
+                next
+              }
+              found && NF {
                 print
                 exit
               }
@@ -32,7 +35,6 @@ jobs:
 
           echo "Priority: $PRIORITY"
 
-          # Make sure we got a valid value.
           case "$PRIORITY" in
             Low|Medium|High|Urgent)
               ;;
@@ -67,7 +69,7 @@ jobs:
 
           echo "Project item ID: $ITEM_ID"
 
-          # Find the Priority field ID.
+          # Get the Priority field ID.
           PRIORITY_FIELD_ID=$(gh project field-list "$PROJECT_NUMBER" \
             --owner "$PROJECT_OWNER" \
             --format json |
@@ -79,7 +81,7 @@ jobs:
 
           echo "Priority field ID: $PRIORITY_FIELD_ID"
 
-          # Find the option ID for the selected priority.
+          # Get the option ID corresponding to the selected priority.
           OPTION_ID=$(gh project field-list "$PROJECT_NUMBER" \
             --owner "$PROJECT_OWNER" \
             --format json |
