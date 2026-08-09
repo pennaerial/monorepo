@@ -447,7 +447,6 @@ def _payload_launch_action(*, vehicle_name: str, controller: str, sim_entity_nam
     )
 
 
-
 def _middleware_action(*, sim: bool, config: dict):
     if sim:
         port = int(config.get("middleware_port", 8888))
@@ -646,7 +645,6 @@ def launch_setup(context, *args, **kwargs):
             )
         ],
     )
-
 
     actions = []
     if not is_uav and launch_payload_backend:

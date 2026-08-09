@@ -97,7 +97,6 @@ class Payload(Vehicle):
         msg.tag_distance_m = float(self.heartbeat_state.get("tag_distance_m", 0.0))
         msg.tag_bearing_deg = float(self.heartbeat_state.get("tag_bearing_deg", 0.0))
 
-
     def drive(self, linear: float, angular: float) -> None:
         self.drive_publisher.publish(DriveCommand(linear=float(linear), angular=float(angular)))
 
