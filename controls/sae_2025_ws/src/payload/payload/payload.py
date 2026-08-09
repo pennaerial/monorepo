@@ -54,19 +54,17 @@ class Payload(Vehicle):
         self._latest_motor_state: MotorState | None = None
 
         raw = node._raw_node_api
-        self._udp_heartbeat_pub = raw.create_publisher(
-            PayloadHeartbeat, "udp_bridge/out/heartbeat", 10
-        )
+
         raw.create_subscription(
             MotorState,
             self.namespaced_path("motor_state"),
             self._on_motor_state,
             1,
         )
-        self._udp_heartbeat_timer = raw.create_timer(
-            1.0 / float(udp_heartbeat_hz),
-            self._publish_udp_heartbeat,
-        )
+        # self._udp_heartbeat_timer = raw.create_timer(
+        #     1.0 / float(udp_heartbeat_hz),
+        #     self._publish_udp_heartbeat,
+        # )
 
     def _on_motor_state(self, msg: MotorState) -> None:
         self._latest_motor_state = msg
@@ -98,8 +96,6 @@ class Payload(Vehicle):
         msg.tag_visible = bool(self.heartbeat_state.get("tag_visible", False))
         msg.tag_distance_m = float(self.heartbeat_state.get("tag_distance_m", 0.0))
         msg.tag_bearing_deg = float(self.heartbeat_state.get("tag_bearing_deg", 0.0))
-
-        self._udp_heartbeat_pub.publish(msg)
 
     def drive(self, linear: float, angular: float) -> None:
         self.drive_publisher.publish(DriveCommand(linear=float(linear), angular=float(angular)))
