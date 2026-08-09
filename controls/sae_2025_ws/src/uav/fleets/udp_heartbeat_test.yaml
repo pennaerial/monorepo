@@ -10,11 +10,6 @@
 #   ros2 launch uav fleet.launch.py \
 #     fleet_file:=$(pwd)/src/uav/uav/fleets/udp_heartbeat_test.yaml
 #
-# Monitor received heartbeats from the other Pi:
-#   ros2 topic echo /payload_0/udp_bridge/in/heartbeat
-#
-# Monitor raw bridge debug traffic:
-#   ros2 topic echo /payload_0/udp_bridge/debug
 
 backend:
   kind: real

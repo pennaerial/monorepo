@@ -12,7 +12,7 @@ INSTALL_DEPS="${INSTALL_DEPS:-1}"
 
 # px4_msgs is left off because it is prebuilt into CI image
 WORKSPACE_PACKAGES=(
-    vehicle_common payload_interfaces uav_interfaces udp_bridge
+    vehicle_common payload_interfaces uav_interfaces
     payload payload_controller uav tools sim
 )
 
@@ -32,7 +32,7 @@ rosdep update --rosdistro "$ROS_DISTRO"
 rosdep install -r -i -y --rosdistro "$ROS_DISTRO" \
     --from-paths src/uav src/uav_interfaces src/px4_msgs \
     src/payload src/payload_interfaces src/tools src/vehicle_common \
-    src/payload_controller src/sim src/udp_bridge
+    src/payload_controller src/sim
 
 ci_log "Resolving prebuilt px4_msgs"
 PX4_MSGS_PREFIX="$(ci_px4_msgs_prefix)"

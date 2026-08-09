@@ -20,7 +20,6 @@ DEPLOY_PACKAGES=(
 	px4_msgs
 	uav
 	uav_interfaces
-	udp_bridge
 )
 
 # rsync exclude patterns — mirrors .gitignore "noise" without skipping
