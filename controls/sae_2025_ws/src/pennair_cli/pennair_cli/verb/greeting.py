@@ -5,7 +5,7 @@ def link(text: str, url: str) -> str:
     return f"\033]8;;{url}\033\\{text}\033]8;;\033\\"
 
 
-GREETING_MESSAGE = fr"""
+GREETING_MESSAGE = rf"""
 
 ⠀⠀⠀⠀⠀⠀⢀⣠⠴⠒⠒⠒⠒⠒⠶⠦⠤⠴⠒⠚⠉⣰⠟⠁⠀⠀⠀⠀⠀⠀
 ⠀⠀⠀⠀⢀⡞⠋⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠒⡿⠃⠀⠀⠀⠀⠀⠀⠀⠀
@@ -36,12 +36,6 @@ Greetings from the PennAiR Software Team!
 {link("GitHub: https://github.com/pennaerial/monorepo", "https://github.com/pennaerial/monorepo")}
 {link("Docs: https://pennaerial.github.io/monorepo", "https://pennaerial.github.io/monorepo")}
 """
-
-
-
-
-
-
 
 
 class GreetingVerb(VerbExtension):
