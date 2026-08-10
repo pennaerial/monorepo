@@ -16,7 +16,7 @@ def main() -> None:
     parser = ArgumentParser(
         prog="pennair",
         description="Pennair command-line tools.",
-        usage="%(prog)s [-h] Call `%(prog)s <command> -h` for more detailed usage. ...",
+        usage="%(prog)s [OPTIONS] COMMAND",
     )
 
     # register all sub commands here
@@ -32,7 +32,9 @@ def main() -> None:
 
         command_parser = subparsers.add_parser(
             name,
+            description=extension.__doc__,
             help=extension.__doc__,
+            usage=f"pennair {name} [OPTIONS] COMMAND",
         )
 
         extension.add_arguments(
