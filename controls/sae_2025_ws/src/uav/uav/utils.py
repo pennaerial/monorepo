@@ -3,7 +3,6 @@ import glob
 import re
 from pathlib import Path
 
-from ament_index_python.packages import get_package_share_directory
 from uav.vehicles.AirframeClass import AirframeClass
 
 R_earth = 6378137.0  # Earth's radius in meters (WGS84)
@@ -149,6 +148,3 @@ def clean_text(text):
     return ansi_escape.sub("", text).strip()
 
 
-def get_available_missions() -> list[str]:
-    path = Path(get_package_share_directory("uav")) / "missions"
-    return [mission.stem for mission in path.glob("*.yaml")]

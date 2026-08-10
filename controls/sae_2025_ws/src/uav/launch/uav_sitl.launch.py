@@ -11,7 +11,7 @@ from launch.actions import (
 )
 
 from uav.vehicles.AirframeClass import PX4Airframe
-from uav.utils import get_available_missions
+from vehicle_common.utils import get_available_missions
 from vehicle_common.runtime.mission_loader import RuntimeMission, get_mission_path
 from vehicle_common.launch_utils import (
     get_logger,
@@ -76,7 +76,7 @@ def launch_setup(context) -> list[Action]:
     check_unknown_launch_args(Args, config, logger)  # warn for unknown args
 
     mission: str = config[Args.MISSION]  # validate mission
-    if mission not in get_available_missions():
+    if mission not in get_available_missions("uav"):
         raise LaunchError( f"Mission: {mission} is not valid. Use --show-args to see list of valid missions")  # fmt: skip
 
     mission_path = get_mission_path(mission, "uav")
@@ -159,7 +159,7 @@ def generate_launch_description():
                 default_value="basic",
                 description=format_bullet_list(
                     "Name of the mission to load.\n\tAvailable missions:",
-                    get_available_missions(),
+                    get_available_missions("uav"),
                 ),
             ),
             DeclareLaunchArgument(
