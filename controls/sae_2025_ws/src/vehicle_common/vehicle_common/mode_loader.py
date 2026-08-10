@@ -1,6 +1,6 @@
 from __future__ import annotations
 from pathlib import Path
-from typing import cast, ClassVar
+from typing import ClassVar
 import importlib
 import pkgutil
 
@@ -9,53 +9,13 @@ from pydantic import BaseModel, ConfigDict, field_validator, field_serializer
 from vehicle_common.mode import Mode
 from vehicle_common.vehicle import Vehicle
 from vehicle_common.base import VisionNode  # don't want to depend on uav package
+from vehicle_common.utils import serialize_type, deserialize_type
 
 
 class ParamsBase(BaseModel):
     """Wrapper around BaseModel that every Mode's Params Type should inherit from"""
 
     # doing this allows a default "Empty" instantiation since BaseModel() cannot be instantiated.
-
-
-def serialize_type(cls: type) -> str:
-    return f"{cls.__module__}:{cls.__qualname__}"
-
-
-def deserialize_type(path: str, base_cls: type) -> type:
-    """Resolve a serialized "module:QualName" path back into a class object.
-
-    Tries to instantiate the class after importing the module. The resolved
-    object must be a subclass of `base_cls`.
-
-    Args:
-        path: Serialized type reference in "module.path:QualName" form,
-            as produced by `serialize_type`.
-        base_cls: The class the resolved type must be a subclass of.
-
-    Returns:
-        The resolved class object.
-
-    Raises:
-        ValueError: If `path` isn't in "module:QualName" form, or the
-            resolved object is not a subclass of `base_cls`.
-    """
-
-    try:
-        module_path, class_name = path.split(":", 1)
-    except ValueError:
-        raise ValueError(f"Invalid type path '{path}'. Expected 'module:ClassName'")
-
-    module = importlib.import_module(module_path)
-    obj = module
-    for part in class_name.split("."):
-        obj = getattr(obj, part)
-
-    obj = cast(type, obj)
-    if not issubclass(obj, base_cls):
-        raise ValueError(f"{path} must be a {base_cls.__name__}")
-
-    return obj
-
 
 class RegisteredMode(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
