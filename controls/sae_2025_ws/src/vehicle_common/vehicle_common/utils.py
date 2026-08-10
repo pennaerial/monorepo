@@ -3,6 +3,7 @@ from ament_index_python.packages import get_package_share_directory
 from typing import cast
 import importlib
 
+
 def serialize_type(cls: type) -> str:
     """Returns the full import path of the provided type"""
 
@@ -36,7 +37,6 @@ def deserialize_type(path: str, base_cls: type | None = None) -> type:
     obj = module
     for part in class_name.split("."):
         obj = getattr(obj, part)
-
 
     obj = cast(type, obj)
     if base_cls:

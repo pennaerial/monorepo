@@ -1,4 +1,6 @@
-from ros2cli.verb import VerbExtension
+from typing import override
+
+from pennair_cli.extension import CommandExtension
 
 
 def link(text: str, url: str) -> str:
@@ -38,8 +40,9 @@ Greetings from the PennAiR Software Team!
 """
 
 
-class GreetingVerb(VerbExtension):
+class GreetingCommand(CommandExtension):
     """Prints out a greeting from the PennAiR Software Team."""
 
+    @override
     def main(self, *, args):
         print(GREETING_MESSAGE)

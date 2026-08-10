@@ -17,6 +17,7 @@ class ParamsBase(BaseModel):
 
     # doing this allows a default "Empty" instantiation since BaseModel() cannot be instantiated.
 
+
 class RegisteredMode(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
