@@ -119,7 +119,22 @@ class RegisteredMode(BaseModel):
         return paths  # vision_node types
 
     def __str__(self) -> str:
-        return self.model_dump_json(indent=2)
+        return "\n".join(
+            [
+                f"Mode: {self.id}",
+                f"  class:       {self.mode_cls.__name__}",
+                f"  params:      {self.params_cls.__name__}",
+                f"  targets:     {names(self.targets)}",
+                f"  vision:      {names(self.required_vision_nodes)}",
+                f"  peers:       {', '.join(self.peer_vehicle_names) or '—'}",
+                f"  camera:      {'True' if self.requires_camera else 'No'}",
+                f"  transitions: {', '.join(self.transition_labels) or '—'}",
+            ]
+        )
+
+
+def names(types):
+    return ", ".join(t.__name__ for t in types) or "—"
 
 
 class ModeRegistry(BaseModel):
