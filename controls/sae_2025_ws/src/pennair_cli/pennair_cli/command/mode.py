@@ -1,6 +1,8 @@
+from argparse import ArgumentParser
+from typing import override
+
 from pennair_cli.extension import CommandExtension
 from vehicle_common.mode_loader import ModeRegistry
-from argparse import ArgumentParser
 
 
 # ModeRegistry causes a bunch of imports, which makes the cli pretty slow. Either optimize the import speed (opencv could be the culprit)
@@ -8,36 +10,34 @@ from argparse import ArgumentParser
 class ModeCommand(CommandExtension):
     """Prints out general information about all registered modes"""
 
+    @override
     def add_arguments(self, parser: ArgumentParser, cli_name: str):
         self.parser = parser
 
-        parser.add_argument(
-            "--all",
-            action="store_true",
-            help="Print information about all registered modes.",
+        subparsers = parser.add_subparsers(
+            title="Commands",
+            dest="mode_command",
+            required=False,
         )
 
-        parser.add_argument(
-            "mode_ids",
-            nargs="*",
-            help="Prints out information about all modes with the provided ids",
-        )
+        ls_parser = subparsers.add_parser("ls", help="List registered modes.")
+        ls_parser.set_defaults(func=self.ls)
 
+        info_parser = subparsers.add_parser("info", help="Display info about specified modes")
+        info_parser.set_defaults(func=self.show_info)
+
+    @override
     def main(self, *, args):
-        print("mode command")
-        self.registry = ModeRegistry.get()
-        if not args.all and not args.mode_ids:
-            self.parser.print_help()
-            return
+        self.parser.print_help()
 
-        if args.all:
-            for registered_mode in self.registry.modes.values():
-                print(registered_mode, end="\n\n")
-            return
-
-        for id in args.mode_ids:
-            registered_mode = self.registry.modes.get(id, None)
-            if registered_mode is None:
-                print(f"{id} is not present in the ModeRegistry")
-                continue
+    def ls(self, *, args) -> None:
+        for registered_mode in ModeRegistry.get().modes.values():
             print(registered_mode, end="\n\n")
+        return
+
+    def show_info(self, mode_id: str) -> None:
+        registered_mode = ModeRegistry.get().modes.get(mode_id, None)
+        if registered_mode is None:
+            print(f"{id} is not present in the ModeRegistry")
+            return
+        print(registered_mode, end="\n\n")
