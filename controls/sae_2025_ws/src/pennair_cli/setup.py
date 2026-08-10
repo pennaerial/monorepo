@@ -27,6 +27,7 @@ setup(
         ],
         "pennair.verb": [  # register verbs under pennair command. 'ros2 pennair <verb>'
             "greeting = pennair_cli.verb.greeting:GreetingVerb",
+            "mode = pennair_cli.verb.mode:ModeVerb",
         ],
     },
 )
