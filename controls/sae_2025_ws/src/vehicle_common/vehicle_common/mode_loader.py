@@ -118,6 +118,9 @@ class RegisteredMode(BaseModel):
             return [deserialize_type(p, VisionNode) for p in paths]
         return paths  # vision_node types
 
+    def __str__(self) -> str:
+        return self.model_dump_json(indent=2)
+
 
 class ModeRegistry(BaseModel):
     modes: dict[str, RegisteredMode]
