@@ -12,6 +12,7 @@ set -euo pipefail
 
 
 # covers any 3rd party submodules that we only want on pinned tag, not on default branch
+# managed submodules will get manually checked out to default later
 git submodule sync --recursive
 git submodule update --init --recursive
 
@@ -53,8 +54,4 @@ git config user.email "github-actions[bot]@users.noreply.github.com"
 git add "${MANAGED_SUBMODULES[@]}"
 if git diff --cached --quiet; then
     echo "No submodule changes to commit."
-# else
-#     git commit -m "NIGHTLY: bump submodule to most up-to-date"
-#     git push origin HEAD
-#     echo "Committed and pushed submodule updates."
 fi
