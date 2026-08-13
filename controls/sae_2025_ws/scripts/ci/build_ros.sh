@@ -110,6 +110,9 @@ elif [[ "$BUILD_MODE" == "quick" ]]; then
 fi
 
 cd "${PENNAIR_SAE_WS_PATH}"
+set +u
+source "/opt/ros/$ROS_DISTRO/setup.bash"
+set -u
 
 if [[ "${BUILD_THIRD}" == "true" ]]; then
 	echo "[build_ros.sh] Building only third-party packages: ${THIRD_ROS_PACKAGES[*]}"
