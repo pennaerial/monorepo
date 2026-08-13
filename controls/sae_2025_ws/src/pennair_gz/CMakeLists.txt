@@ -47,7 +47,7 @@ if(BUILD_TESTING)
 endif()
 
 ament_environment_hooks(
-  "${CMAKE_CURRENT_SOURCE_DIR}/env-hooks/gz_sim_system_plugin_path.sh.in"
+  "${CMAKE_CURRENT_SOURCE_DIR}/hook/gz_plugin_path.sh.in"
 )
 
 ament_package()
