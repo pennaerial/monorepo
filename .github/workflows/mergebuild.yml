@@ -75,7 +75,7 @@ jobs:
           ct
 
   merge_build_status:
-    name: Workflow Status
+    name: Merge Build Status
     needs: # depend on each additional job here
       - validate_ros_workspace
     if: always()
