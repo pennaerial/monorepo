@@ -37,6 +37,7 @@ jobs:
               - 'controls/sae_2025_ws/**'
 
   validate_ros_workspace:
+    name: Validate ROS Workspace
     needs: changes
     runs-on: ubuntu-latest
     if: needs.changes.outputs.ros_ws == 'true'
@@ -51,8 +52,8 @@ jobs:
       - name: Checkout PR
         working-directory: /root/monorepo
         run: |
-          git fetch origin "${{ github.event.pull_request.sha }}"
-          git checkout "${{ github.event.pull_request.sha }}"
+          git fetch origin "${{ github.sha }}"
+          git checkout "${{ github.sha }}"
           bash ci/update_submodules.sh
 
       - name: Quick Install Dependencies
