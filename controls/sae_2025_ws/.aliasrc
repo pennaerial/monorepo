@@ -7,6 +7,18 @@ alias cb='colcon build'
 alias cbp='colcon build --packages-select'
 alias cbpsi='colcon build --symlink-install --packages-select'
 
+# rm -rf's the build and install of each specified package
+cleanp() {
+    if [[ $# -eq 0 ]]; then
+        echo "Usage: cleanp <package> [package ...]"
+        return 1
+    fi
+
+    for pkg in "$@"; do
+        rm -rf "build/$pkg" "install/$pkg"
+    done
+}
+
 # TESTING
 ctp() {
 # 1. runs colcon tests on selected packages
