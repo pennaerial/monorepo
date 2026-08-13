@@ -15,27 +15,27 @@ BUILD_THIRD=false # if flag set, only builds THIRD_ROS_PACKAGES
 # Parse arguments. use via: ./build_ros_new --build-mode [BUILD_MODE]
 while [[ $# -gt 0 ]]; do
 	case "$1" in
-		--build-mode)
-			case "$2" in
-				clean)
-					BUILD_MODE="clean"
-					;;
-				quick)
-					BUILD_MODE="quick"
-					;;
-				*)
-					BUILD_MODE="quick"
-					;;
-			esac
-			shift 2
+	--build-mode)
+		case "$2" in
+		clean)
+			BUILD_MODE="clean"
 			;;
-		--third)
-			BUILD_THIRD=true
-			shift
+		quick)
+			BUILD_MODE="quick"
 			;;
 		*)
-			shift
+			BUILD_MODE="quick"
 			;;
+		esac
+		shift 2
+		;;
+	--third)
+		BUILD_THIRD=true
+		shift
+		;;
+	*)
+		shift
+		;;
 	esac
 done
 
@@ -111,13 +111,23 @@ fi
 
 cd "${PENNAIR_SAE_WS_PATH}"
 
-
 if [[ "${BUILD_THIRD}" == "true" ]]; then
 	echo "[build_ros.sh] Building only third-party packages: ${THIRD_ROS_PACKAGES[*]}"
-	colcon build --packages-select "${THIRD_ROS_PACKAGES[@]}"
+    colcon \
+        --log-base "${PENNAIR_SAE_WS_PATH}/log" \
+        build \
+        --base-paths "${PENNAIR_SAE_WS_PATH}/src" \
+        --build-base "${PENNAIR_SAE_WS_PATH}/build" \
+        --install-base "${PENNAIR_SAE_WS_PATH}/install" \
+        --packages-select "${THIRD_ROS_PACKAGES[@]}"
 else
-    echo "[build_ros.sh] Building All Packages..."
-	colcon build
+	echo "[build_ros.sh] Building All Packages..."
+    colcon \
+        --log-base "${PENNAIR_SAE_WS_PATH}/log" \
+        build \
+        --base-paths "${PENNAIR_SAE_WS_PATH}/src" \
+        --build-base "${PENNAIR_SAE_WS_PATH}/build" \
+        --install-base "${PENNAIR_SAE_WS_PATH}/install"
 fi
 
 if [[ ${#THIRD_ROS_PACKAGES[@]} -gt 0 ]]; then
@@ -126,8 +136,8 @@ if [[ ${#THIRD_ROS_PACKAGES[@]} -gt 0 ]]; then
 		pkg_src_dir="${SRC_DIR}/${pkg}"
 		pkg_build_dir="${BUILD_DIR}/${pkg}"
 		if [[ -d "${pkg_build_dir}" ]]; then
-            echo "[build_ros.sh] Writing COMMIT_TAG at ${pkg_build_dir}/COMMIT_TAG"
-			git -C "${pkg_src_dir}" rev-parse HEAD > "${pkg_build_dir}/COMMIT_TAG"
+			echo "[build_ros.sh] Writing COMMIT_TAG at ${pkg_build_dir}/COMMIT_TAG"
+			git -C "${pkg_src_dir}" rev-parse HEAD >"${pkg_build_dir}/COMMIT_TAG"
 		else
 			echo "[build_ros.sh] WARNING: expected build dir for '${pkg}' not found at ${pkg_build_dir}, skipping COMMIT_TAG write"
 		fi

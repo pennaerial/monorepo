@@ -57,8 +57,16 @@ jobs:
           bash ci/update_submodules.sh
 
       - name: Quick Install Dependencies
-        working-directory: /root/monorepo
-        run: ./ci/install_deps.sh --quick
+        run: |
+          "$PENNAIR_MONOREPO_PATH/ci/install_deps.sh" --quick
+
+      - name: Build ROS Packages
+        run: |
+          "$PENNAIR_SAE_WS_PATH/scripts/ci/build_ros.sh" --quick
+
+      - name: Run Unit Tests
+        run: |
+          echo Running tests
 
 
 
