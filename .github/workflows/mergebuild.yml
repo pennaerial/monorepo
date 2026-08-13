@@ -65,8 +65,14 @@ jobs:
           "$PENNAIR_SAE_WS_PATH/scripts/ci/build_ros.sh" --quick
 
       - name: Run Unit Tests
+        shell: bash
         run: |
-          echo Running tests
+          # shellcheck disable=SC1090
+          source "/opt/ros/$ROS_DISTRO/setup.bash"
+          source "$PENNAIR_SAE_WS_PATH/install/setup.bash"
+          source "$PENNAIR_SAE_WS_PATH/.aliasrc" # imports the bash testing functions
+          cd "$PENNAIR_SAE_WS_PATH"
+          ct
 
 
 
