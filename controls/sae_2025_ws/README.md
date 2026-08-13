@@ -19,7 +19,7 @@ Before you begin, make sure you have the following installed:
 - ROS 2 Humble (follow the installation guide for your OS)
 - Gazebo Harmonic
 - PX4 Autopilot — used to be external install, but now vendored as a git submodule, so there is no separate install; it is pulled by the submodule step below
-- QGroundControl
+- QGroundControl.
 
 > [!NOTE]
 > **Updating from Ubuntu 22.04**
