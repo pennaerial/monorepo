@@ -1,0 +1,63 @@
+name: Merge Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: mergebuild-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+
+    outputs:
+      ros_ws: ${{ steps.filter.outputs.ros_ws }}
+      # payload_controller: ${{ steps.filter.outputs.payload_controller }}
+      # gcs: ${{ steps.filter.outputs.gcs }}
+      # docs: ${{ steps.filter.outputs.docs }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4 # don't checkout submodules
+
+      - name: Detect changed paths
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: | # TODO: add docs, payload_controller, and gcs
+            ros_ws:
+              - 'controls/sae_2025_ws/**'
+
+  validate_ros_workspace:
+    needs: changes
+    runs-on: ubuntu-latest
+    if: needs.changes.outputs.ros_ws == 'true'
+
+    container:
+      image: ghcr.io/pennaerial/monorepo:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout PR
+        working-directory: /root/monorepo
+        run: |
+          git fetch origin "${{ github.event.pull_request.sha }}"
+          git checkout "${{ github.event.pull_request.sha }}"
+          bash ci/update_submodules.sh
+
+      - name: Quick Install Dependencies
+        working-directory: /root/monorepo
+        run: ./ci/install_deps.sh --quick
+
+
+
