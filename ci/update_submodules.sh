@@ -48,10 +48,6 @@ for submodule_path in "${MANAGED_SUBMODULES[@]}"; do
     )
 done
 echo "All managed submodules updated to latest on their default branch."
-# Commit the bumped submodule pins in the superproject
-git config user.name "github-actions[bot]"
-git config user.email "github-actions[bot]@users.noreply.github.com"
-git add "${MANAGED_SUBMODULES[@]}"
 if git diff --cached --quiet; then
-    echo "No submodule changes to commit."
+    echo "No submodule changes."
 fi
