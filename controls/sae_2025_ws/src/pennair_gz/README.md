@@ -1,4 +1,4 @@
-# custom_gz_plugins
+# pennair_gz
 
 Custom Gazebo Harmonic system plugins for simulation.
 
@@ -75,7 +75,7 @@ gz topic -e -t /model/standard_vtol/dynamic_detachable_joint/state
 Built as part of the colcon workspace:
 
 ```bash
-colcon build --packages-select custom_gz_plugins
+colcon build --packages-select pennair_gz
 ```
 
 Depends on `custom_gz_msgs` for the protobuf service definitions.

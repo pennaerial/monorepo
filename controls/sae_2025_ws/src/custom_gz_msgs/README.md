@@ -47,4 +47,4 @@ colcon build --packages-select custom_gz_msgs
 
 The build generates a C++ protobuf library (`custom_gz_msgs-msgs`) and installs headers to `include/gz/custom_msgs/`. An environment hook automatically adds the installed descriptor path to `GZ_DESCRIPTOR_PATH` so Gazebo can resolve the custom message types at runtime.
 
-Consumed by `custom_gz_plugins` (plugin implementation) and `custom_sim_bridge` (ROS 2 bridge).
+Consumed by `pennair_gz` (plugin implementation) and `custom_sim_bridge` (ROS 2 bridge).
