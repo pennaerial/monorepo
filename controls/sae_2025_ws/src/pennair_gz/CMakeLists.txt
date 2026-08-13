@@ -17,27 +17,7 @@ find_package(gz-common5 REQUIRED COMPONENTS profiler)
 find_package(gz-msgs10 REQUIRED)
 find_package(custom_gz_msgs REQUIRED)
 
-# DynamicDetachableJoint plugin
-add_library(DynamicDetachableJoint SHARED
-  src/dynamic_detachable_joint/DynamicDetachableJoint.cpp
-)
-
-target_include_directories(DynamicDetachableJoint PRIVATE
-  src/dynamic_detachable_joint
-)
-
-target_link_libraries(DynamicDetachableJoint
-  gz-sim8::gz-sim8
-  gz-plugin2::gz-plugin2
-  gz-transport13::gz-transport13
-  gz-common5::gz-common5-profiler
-  gz-msgs10::gz-msgs10
-  custom_gz_msgs-msgs
-)
-
-install(TARGETS DynamicDetachableJoint
-  LIBRARY DESTINATION lib
-)
+add_subdirectory(plugins)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -46,8 +26,5 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
-ament_environment_hooks(
-  "${CMAKE_CURRENT_SOURCE_DIR}/hook/gz_plugin_path.sh.in"
-)
 
 ament_package()
