@@ -8,8 +8,7 @@ namespace pennair_gz::bridge
 
 using AttachDetach = sim_interfaces::srv::AttachDetach;
 
-class AttachDetachBridge
-  : public rclcpp::Node
+class AttachDetachBridge : public rclcpp::Node
 {
 public:
   AttachDetachBridge()
@@ -25,9 +24,7 @@ public:
       throw std::invalid_argument("Invalid bridge parameters");
     }
 
-    RCLCPP_INFO(
-      this->get_logger(), "ROS AttachDetach srv at: %s",
-      params_.ros_service_name.c_str());
+    RCLCPP_INFO(this->get_logger(), "ROS AttachDetach srv at: %s", params_.ros_service_name.c_str());
     RCLCPP_INFO(this->get_logger(), "GZ AttachDetach srv at: %s", params_.gz_service_name.c_str());
 
     gz_node_ = std::make_shared<gz::transport::Node>();

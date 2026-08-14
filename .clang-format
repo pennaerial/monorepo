@@ -19,9 +19,8 @@ AllowShortLoopsOnASingleLine: false
 
 # --- MODERN READABILITY TUNING ---
 
-# Ensure standard 4-space indentation (highly preferred by most club members)
-IndentWidth: 4
-TabWidth: 4
+IndentWidth: 2
+TabWidth: 2
 UseTab: Never
 
 # Clean up layout around assignments and control flows
