@@ -1,4 +1,4 @@
-custom_sim_bridge:
+pennair_gz::bridge:
   ros_service_name:
     type: string
     default_value: ""
@@ -8,7 +8,7 @@ custom_sim_bridge:
     type: string
     default_value: ""
     description: "GZ service name"
-  
+
   ros_topic_name:
     type: string
     default_value: ""
@@ -17,4 +17,4 @@ custom_sim_bridge:
   gz_topic_name:
     type: string
     default_value: ""
-    description: "gz topic name"
+    description: "GZ topic name"
