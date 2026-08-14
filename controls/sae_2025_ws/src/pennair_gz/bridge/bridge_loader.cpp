@@ -9,7 +9,7 @@ int main(int argc, char ** argv)
     return 1;
   }
 
-  std::string bridge_type = std::string("custom_sim_bridge::") + argv[1];
+  std::string bridge_type = std::string("pennair_gz::bridge::") + argv[1];
   rclcpp::init(argc, argv);
 
   try {

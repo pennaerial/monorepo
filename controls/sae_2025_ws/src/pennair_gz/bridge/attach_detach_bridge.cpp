@@ -3,7 +3,7 @@
 #include "pennair_gz/pennair_gz_bridge_parameters.hpp"
 #include "gz/transport/Node.hh"
 
-namespace custom_sim_bridge
+namespace pennair_gz::bridge
 {
 
 using AttachDetach = sim_interfaces::srv::AttachDetach;
@@ -15,7 +15,7 @@ public:
   AttachDetachBridge()
   : rclcpp::Node("attach_detach_bridge")
   {
-    param_listener_ = std::make_shared<custom_sim_bridge::ParamListener>(this);
+    param_listener_ = std::make_shared<pennair_gz::bridge::ParamListener>(this);
     params_ = param_listener_->get_params();
     //validate necessary params
     if (params_.ros_service_name.empty() || params_.gz_service_name.empty()) {
@@ -57,8 +57,8 @@ public:
   }
 
 private:
-  custom_sim_bridge::Params params_;
-  std::shared_ptr<custom_sim_bridge::ParamListener> param_listener_;
+  pennair_gz::bridge::Params params_;
+  std::shared_ptr<pennair_gz::bridge::ParamListener> param_listener_;
   std::shared_ptr<gz::transport::Node> gz_node_;
   rclcpp::Service<AttachDetach>::SharedPtr attach_detach_ros_service_;
 
@@ -70,4 +70,4 @@ private:
 
 #include <pluginlib/class_list_macros.hpp>
 
-PLUGINLIB_EXPORT_CLASS(custom_sim_bridge::AttachDetachBridge, rclcpp::Node)
+PLUGINLIB_EXPORT_CLASS(pennair_gz::bridge::AttachDetachBridge, rclcpp::Node)
