@@ -1,0 +1,32 @@
+# Simulation Configuration
+world:
+  name: HoopCourse
+  params:
+    course: "ascent"
+    dlz: [10, 5, 0]     # Drop zone coordinates [x, y, z]
+    uav: [0, 0, 0]       # UAV starting position [x, y, z]
+    controllables:
+      uav_0:
+        kind: uav
+        model: gz_x500_mono_cam
+        px4_airframe_id: 4010
+        path_to_sdf: "~/.simulation-gazebo/models/x500_mono_cam/model.sdf"
+        position: [0, 0, 0]
+        rpy: [0.0, 0.0, 0.0]
+    num_hoops: 2          # Number of hoops to generate
+    height: 5
+    max_dist: 1
+    template_world: "template.sdf"   # Gazebo world template
+    # output_filename is optional - defaults to competition name
+    physics:
+      friction: 0.0 # friction coefficient for the ground plane
+
+# Scoring parameters
+scoring:
+  name: HoopScore
+  params:
+    vehicle_name: uav_0     # ROS identity whose PX4 state the scorer should track
+    hoop_tolerance: 1.5       # meters - Distance tolerance for hoop passage
+    landing_bonus: 5.0        # Points awarded for landing bonus
+    landing_tolerance: 2.0    # meters - Distance tolerance for landing
+    landing_altitude_max: 0.4 # meters - Maximum altitude to be considered "landed"

@@ -5,7 +5,7 @@ from glob import glob
 package_name = "sim"
 
 models_root = os.path.join("sim", "world_gen", "models")
-simulations_root = os.path.join("sim", "simulations")
+simulations_root = os.path.join("simulations")
 
 model_data_files = []
 if os.path.isdir(models_root):
@@ -20,14 +20,16 @@ if os.path.isdir(models_root):
         model_data_files.append((dest_dir, files))
 
 simulation_data_files = []
+
 if os.path.isdir(simulations_root):
     for dirpath, dirnames, filenames in os.walk(simulations_root):
         yaml_files = [f for f in filenames if f.endswith(".yaml")]
         if not yaml_files:
             continue
 
-        rel_dir = os.path.relpath(dirpath, "sim")
-        dest_dir = os.path.join("share", package_name, rel_dir)
+        rel_dir = os.path.relpath(dirpath, simulations_root)
+        dest_dir = os.path.join("share", package_name, "simulations", rel_dir)
+
         files = [os.path.join(dirpath, f) for f in yaml_files]
         simulation_data_files.append((dest_dir, files))
 

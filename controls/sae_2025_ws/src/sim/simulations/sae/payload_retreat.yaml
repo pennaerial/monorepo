@@ -1,0 +1,24 @@
+world:
+  name: SAEWorldNode
+  params:
+    template_world: "template.sdf"
+    physics:
+      friction: 0.6
+    entities:
+      dlz:
+        path_to_sdf: "~/.simulation-gazebo/models/dlz_alternating_border/model.sdf"
+        position: [0.0, 0.0, -0.1]
+        rpy: [0.0, 0.0, 0.0]
+    controllables:
+      uav_0:
+        kind: uav
+        model: gz_standard_vtol
+        px4_airframe_id: 4004
+        path_to_sdf: ~/.simulation-gazebo/models/standard_vtol/model.sdf
+        position: [0.0, 0.0, 0.1]
+        rpy: [0.0, 0.0, 0.0]
+      payload_0:
+        kind: payload
+        path_to_sdf: "~/.simulation-gazebo/models/payload/model.sdf"
+        position: [0.2, 0.2, 0.1]   # center of the white DLZ
+        rpy: [0.0, 0.0, 0.7854]
