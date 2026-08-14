@@ -1,7 +1,12 @@
+from __future__ import annotations
+from pathlib import Path
+import os
+from math import cos, sin
+
+from pydantic import BaseModel, model_validator
+
 from ros_gz_interfaces.msg import EntityFactory
 from geometry_msgs.msg import Pose
-from math import cos, sin
-import os
 
 
 def quaternion_from_euler(
@@ -26,25 +31,45 @@ def quaternion_from_euler(
     )
 
 
-class Entity:
+
+class Entity(BaseModel):
     """
-    Docstring for Entity
     Entity class for dynamically spawning world objects via /world/{competition}/create service
     """
 
-    def __init__(
-        self,
-        name: str,
-        path_to_sdf: str,
-        position: tuple[float, float, float],
-        rpy: tuple[float, float, float],
-        world: str,
-    ):
-        self.name = name
-        self.path_to_sdf = os.path.expanduser(path_to_sdf)
-        self.position = position
-        self.rpy = rpy
-        self.world = world
+    name: str
+    path_to_sdf: str = ""
+    model: str = ""
+    position: tuple[float, float, float]
+    rpy: tuple[float, float, float]
+    world: str
+
+    @model_validator(mode="after")
+    def post_validate(self) -> Entity:
+        if not self.model and not self.path_to_sdf:
+            raise ValueError("Error: must provide either model or path_to_sdf field to entity")
+
+        # if only path_to_sdf is defined, derive model from it
+        if not self.model: # /path/to/model/model.sdf --> "model"
+            self.model = str(Path(self.path_to_sdf).parent)
+            self.validate_path_to_sdf()
+
+        # if only model is defined, or both, path_to_sdf gets overridden by path derived from self.model
+        else:
+            path = Path(os.environ["PENNAIR_GZ_MODELS_PATH"]) / "models" / self.model / "model.sdf"
+            self.path_to_sdf = str(path)
+            self.validate_path_to_sdf()
+
+        return self
+
+    # validates path_to_sdf is .sdf file and exists
+    def validate_path_to_sdf(self):
+        sdf_path = Path(self.path_to_sdf).expanduser()
+        if sdf_path.suffix.lower() != ".sdf":
+            raise ValueError("path_to_sdf must point to an .sdf file")
+        if not sdf_path.is_file():
+            raise ValueError(f"SDF file does not exist: {sdf_path}")
+
 
     def to_entity_factory_msg(self):
         pose = Pose()
