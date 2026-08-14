@@ -1,6 +1,6 @@
 #include <rclcpp/rclcpp.hpp>
-#include "custom_sim_bridge/convert.hpp"
-#include "custom_sim_bridge/custom_sim_bridge_parameters.hpp"
+#include "pennair_gz/bridge/convert.hpp"
+#include "pennair_gz/pennair_gz_bridge_parameters.hpp"
 #include "gz/transport/Node.hh"
 
 namespace custom_sim_bridge
