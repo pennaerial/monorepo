@@ -251,8 +251,8 @@ void DynamicDetachableJoint::PreUpdate(
 
 //////////////////////////////////////////////////
 bool DynamicDetachableJoint::OnServiceRequest(
-  const gz::custom_msgs::AttachDetachRequest & _req,
-  gz::custom_msgs::AttachDetachResponse & _res)
+  const pennair_gz::msgs::AttachDetachRequest & _req,
+  pennair_gz::msgs::AttachDetachResponse & _res)
 {
   GZ_PROFILE("DynamicDetachableJoint::OnServiceRequest");
   std::lock_guard<std::mutex> lock(this->mutex);

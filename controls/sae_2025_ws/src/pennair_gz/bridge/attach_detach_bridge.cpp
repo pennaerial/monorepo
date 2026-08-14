@@ -43,7 +43,7 @@ public:
     AttachDetach::Response::SharedPtr response)
   {
     auto gz_req = convert_to_gz(request);
-    gz::custom_msgs::AttachDetachResponse gz_resp;
+    pennair_gz::msgs::AttachDetachResponse gz_resp;
     bool result;
     bool executed = gz_node_->Request(params_.gz_service_name, gz_req, 5000, gz_resp, result);
 

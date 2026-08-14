@@ -10,7 +10,7 @@
   <buildtool_depend>ament_cmake</buildtool_depend>
   <buildtool_depend>sae_gz_cmake</buildtool_depend>
 
-  <depend>custom_gz_msgs</depend>
+  <depend>pennair_gz_msgs</depend>
   <depend>sim_interfaces</depend>
 
   <test_depend>ament_lint_auto</test_depend>

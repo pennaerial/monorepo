@@ -24,7 +24,7 @@ ament_target_dependencies(pennair_gz_bridge_plugins
 target_link_libraries(pennair_gz_bridge_plugins
   gz-transport13::gz-transport13
   gz-msgs10::gz-msgs10
-  custom_gz_msgs-msgs
+  pennair_gz_msgs-msgs
   pennair_gz_bridge_parameters
 )
 
