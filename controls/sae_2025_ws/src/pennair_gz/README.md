@@ -78,4 +78,4 @@ Built as part of the colcon workspace:
 colcon build --packages-select pennair_gz
 ```
 
-Depends on `custom_gz_msgs` for the protobuf service definitions.
+Depends on `pennair_gz_msgs` for the protobuf service definitions.

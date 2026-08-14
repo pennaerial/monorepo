@@ -20,7 +20,7 @@
 #ifndef GZ_SIM_SYSTEMS_DYNAMICDETACHABLEJOINT_HH_
 #define GZ_SIM_SYSTEMS_DYNAMICDETACHABLEJOINT_HH_
 
-#include <gz/custom_msgs/dynamic_detachable_joint.pb.h>
+#include "pennair_gz/msgs/dynamic_detachable_joint.pb.h"
 #include <gz/msgs/entity.pb.h>
 
 #include <mutex>
@@ -109,8 +109,8 @@ private:
 
 private:
   bool OnServiceRequest(
-    const gz::custom_msgs::AttachDetachRequest & _req,
-    gz::custom_msgs::AttachDetachResponse & _res);
+    const pennair_gz::msgs::AttachDetachRequest & _req,
+    pennair_gz::msgs::AttachDetachResponse & _res);
 
   /// \brief Helper function to publish the state of the detachment
 

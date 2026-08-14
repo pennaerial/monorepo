@@ -1,4 +1,4 @@
-# custom_gz_msgs
+# pennair_gz_msgs
 
 Custom Gazebo Harmonic protobuf message definitions for the simulation environment.
 
@@ -42,9 +42,9 @@ gz service -s /model/standard_vtol/dynamic_detachable_joint/attach_detach \
 Built as part of the colcon workspace:
 
 ```bash
-colcon build --packages-select custom_gz_msgs
+colcon build --packages-select pennair_gz_msgs
 ```
 
-The build generates a C++ protobuf library (`custom_gz_msgs-msgs`) and installs headers to `include/gz/custom_msgs/`. An environment hook automatically adds the installed descriptor path to `GZ_DESCRIPTOR_PATH` so Gazebo can resolve the custom message types at runtime.
+The build generates a C++ protobuf library (`pennair_gz_msgs-msgs`) and installs headers to `include/gz/custom_msgs/`. An environment hook automatically adds the installed descriptor path to `GZ_DESCRIPTOR_PATH` so Gazebo can resolve the custom message types at runtime.
 
 Consumed by `pennair_gz` (plugin implementation) and `custom_sim_bridge` (ROS 2 bridge).

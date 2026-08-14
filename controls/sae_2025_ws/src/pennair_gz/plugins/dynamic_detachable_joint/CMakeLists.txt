@@ -13,7 +13,7 @@ target_link_libraries(DynamicDetachableJoint
   gz-transport13::gz-transport13
   gz-common5::gz-common5-profiler
   gz-msgs10::gz-msgs10
-  custom_gz_msgs-msgs
+  pennair_gz_msgs-msgs
 )
 
 # goes to install/pennair_gz/lib/libDynamicDetachableJoint.so
