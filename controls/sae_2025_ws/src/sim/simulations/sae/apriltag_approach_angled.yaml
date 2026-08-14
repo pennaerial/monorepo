@@ -1,0 +1,39 @@
+world:
+  name: SAEWorldNode
+  params:
+    template_world: "template.sdf"   # Gazebo world template
+    vehicle_pose: [0.3, 0.0, 0.1, 0.0, 0.0, 0.0]  # [x, y, z, roll, pitch, yaw]
+
+    physics:
+      friction: 0.6 # friction coefficient for the ground plane
+    entities:
+      dlz:
+        path_to_sdf: "~/.simulation-gazebo/models/dlz_alternating_border/model.sdf"
+        position: [0.0, 0.0, -0.1]
+        rpy: [0.0, 0.0, 0.0]
+      string_obstacle:
+        path_to_sdf: "~/.simulation-gazebo/models/string_obstacle/model.sdf"
+        position: [0.20, 0.0, 0.0]
+        rpy: [0.0, 0.0, 0.0]
+    controllables:
+      uav_0:
+        kind: uav
+        model: gz_standard_vtol
+        px4_airframe_id: 4004
+        path_to_sdf: "~/.simulation-gazebo/models/standard_vtol/model.sdf"
+        position: [0.3, 0.0, 0.1]
+        rpy: [0.0, 0.0, 0.0]
+      payload_0:
+        kind: payload
+        path_to_sdf: "~/.simulation-gazebo/models/payload/model.sdf"
+        position: [-0.8, -0.7, 0.1]
+        rpy: [0.0, 0.0, 1.3]
+    # payload_1:
+    #   path_to_sdf: "~/.simulation-gazebo/models/payload/model.sdf"
+    #   position: [0.0, 0.0, 0.0]
+    #   rpy: [0.0, 0.0, 0.0]
+    # entities:  # misc entities not specific to SAE (e.g. debug markers, extra props)
+    #   my_marker:
+    #     path_to_sdf: "~/.simulation-gazebo/models/my_marker/model.sdf"
+    #     position: [0.0, 0.0, 0.0]
+    #     rpy: [0.0, 0.0, 0.0]
