@@ -19,11 +19,11 @@
 // Neobotix GmbH
 
 syntax = "proto3";
-package gz.custom_msgs;
-option java_package = "com.gz.custom_msgs";
+package pennair_gz.msgs;
+option java_package = "com.pennair_gz.msgs";
 option java_outer_classname = "DynamicDetachableJointProtos";
 
-/// \ingroup gz.custom_msgs
+/// \ingroup pennair_gz.msgs
 /// \interface DynamicDetachableJoint
 /// \brief Message for dynamic detachable joint
 
@@ -31,18 +31,18 @@ message AttachDetachRequest
 {
     /// \brief Optional header data
 
-    /// \brief 
+    /// \brief
     string child_model_name                    = 1;
 
-    /// \brief 
+    /// \brief
     string child_link_name                    = 2;
 
-    /// \brief 
+    /// \brief
     string command                     = 3;
 
 }
 
-/// \brief 
+/// \brief
 message AttachDetachResponse
 {
     /// \brief Optional header data
