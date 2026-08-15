@@ -27,6 +27,7 @@ ctp() {
 # runs unit tests from the selected packages
     local pkgs=("$@")
     colcon test --packages-select "${pkgs[@]}"
+    local test_status=$?
 
     local paths=()
     for pkg in "${pkgs[@]}"; do
@@ -44,6 +45,7 @@ ctp() {
 
 	junitparser merge --glob "${paths[@]}" build/merged_results.xml
     xunit-viewer -r build/merged_results.xml --console -C false -o build/merged_results.html
+    return "$test_status"
 }
 
 # Runs unit tests from ALL packages
