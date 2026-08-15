@@ -6,6 +6,7 @@ from sim.world_gen.entity import Entity
 
 # some tests require valid gz-models to be updated
 
+
 def test_entity_requires_model_or_path_to_sdf():
     with pytest.raises(ValueError):
         Entity(
@@ -17,6 +18,7 @@ def test_entity_requires_model_or_path_to_sdf():
 
 
 MODELS_PATH = Path(os.environ["PENNAIR_GZ_MODELS_PATH"]) / "models"
+
 
 def test_only_path_to_sdf():
     model_dir = MODELS_PATH / "x500"
@@ -50,6 +52,7 @@ def test_only_model():
     assert entity.model == "x500"
     assert entity.path_to_sdf == str(sdf_path)
 
+
 def test_both_path_to_sdf_and_model():
     model_dir = MODELS_PATH / "x500"
 
@@ -65,7 +68,9 @@ def test_both_path_to_sdf_and_model():
     expected_sdf_path = model_dir / "model.sdf"
     assert entity.path_to_sdf == str(expected_sdf_path)
 
-TMP =Path("/tmp")
+
+TMP = Path("/tmp")
+
 
 def test_entity_rejects_non_sdf_path():
     sdf_path = TMP / "nonsdf.txt"

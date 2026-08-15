@@ -31,7 +31,6 @@ def quaternion_from_euler(
     )
 
 
-
 class Entity(BaseModel):
     """
     Entity class for dynamically spawning world objects via /world/{competition}/create service
@@ -50,7 +49,7 @@ class Entity(BaseModel):
             raise ValueError("Error: must provide either model or path_to_sdf field to entity")
 
         # if only path_to_sdf is defined, derive model from it
-        if not self.model: # /path/to/model/model.sdf --> "model"
+        if not self.model:  # /path/to/model/model.sdf --> "model"
             self.model = str(Path(self.path_to_sdf).parent)
             self.validate_path_to_sdf()
 
@@ -69,7 +68,6 @@ class Entity(BaseModel):
             raise ValueError("path_to_sdf must point to an .sdf file")
         if not sdf_path.is_file():
             raise ValueError(f"SDF file does not exist: {sdf_path}")
-
 
     def to_entity_factory_msg(self):
         pose = Pose()
