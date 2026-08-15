@@ -1,5 +1,7 @@
+# DDS Client code
+
 set(srcs
-    pc_xrce_dds_client.cpp
+    dds_client.cpp
 )
 
 idf_component_register(
@@ -72,7 +74,7 @@ if(IDF_TARGET STREQUAL "linux")
         -DUCLIENT_PROFILE_CUSTOM_TRANSPORT:BOOL=OFF
     )
 else()
-    # Use the custom-transport profile with UART config supplied from pc_xrce_dds_client.cpp.
+    # Use the custom-transport profile with UART config supplied from dds_client.cpp.
     list(APPEND client_profile_args
         -DUCLIENT_PROFILE_SERIAL:BOOL=OFF
         -DUCLIENT_PROFILE_CUSTOM_TRANSPORT:BOOL=ON
@@ -109,3 +111,69 @@ add_dependencies(microxrcedds_client_imported xrce_dds_client_project)
 
 target_include_directories(${COMPONENT_LIB} PRIVATE ${xrce_deps_install_dir}/include)
 target_link_libraries(${COMPONENT_LIB} PRIVATE microxrcedds_client_imported microcdr_imported)
+
+
+#################################################################################################
+#                                      Msgs generation
+#################################################################################################
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+
+set(GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
+set(IDL_PATH "${CMAKE_CURRENT_SOURCE_DIR}/idl")
+
+set(IDL_FILES
+    "${IDL_PATH}/builtin_interfaces/msg/Time.idl"
+    "${IDL_PATH}/geometry_msgs/msg/Quaternion.idl"
+    "${IDL_PATH}/geometry_msgs/msg/Vector3.idl"
+    "${IDL_PATH}/sensor_msgs/msg/Imu.idl"
+    "${IDL_PATH}/std_msgs/msg/Header.idl"
+)
+
+file(MAKE_DIRECTORY "${GENERATED_DIR}")
+
+message(STATUS "Python: ${Python3_EXECUTABLE}")
+message(STATUS "Generator: ${CMAKE_CURRENT_SOURCE_DIR}/generate.py")
+message(STATUS "IDL path: ${IDL_PATH}")
+message(STATUS "Output: ${GENERATED_DIR}")
+message(STATUS "IDL files: ${IDL_FILES}")
+
+execute_process(
+    COMMAND
+        ${Python3_EXECUTABLE}
+        "${CMAKE_CURRENT_SOURCE_DIR}/generate.py"
+        --idl-path "${IDL_PATH}"
+        --o "${GENERATED_DIR}"
+        --idl-files ${IDL_FILES}
+
+    RESULT_VARIABLE GENERATE_RESULT
+    OUTPUT_VARIABLE GENERATE_OUTPUT
+    ERROR_VARIABLE GENERATE_ERROR
+)
+
+message(STATUS "Generator result: ${GENERATE_RESULT}")
+message(STATUS "Generator stdout: ${GENERATE_OUTPUT}")
+message(STATUS "Generator stderr: ${GENERATE_ERROR}")
+
+if(NOT GENERATE_RESULT EQUAL 0)
+    message(FATAL_ERROR "Failed to generate Micro XRCE-DDS interfaces")
+endif()
+
+set(GENERATED_SOURCES
+    "${GENERATED_DIR}/builtin_interfaces/msg/Time.c"
+    "${GENERATED_DIR}/geometry_msgs/msg/Quaternion.c"
+    "${GENERATED_DIR}/geometry_msgs/msg/Vector3.c"
+    "${GENERATED_DIR}/sensor_msgs/msg/Imu.c"
+    "${GENERATED_DIR}/std_msgs/msg/Header.c"
+)
+
+target_sources(
+    ${COMPONENT_LIB}
+    PRIVATE
+        ${GENERATED_SOURCES}
+)
+
+target_include_directories(
+    ${COMPONENT_LIB}
+    PUBLIC
+        "${GENERATED_DIR}"
+)

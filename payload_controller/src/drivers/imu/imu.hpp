@@ -1,5 +1,4 @@
-#ifndef IMU_HPP
-#define IMU_HPP
+#pragma once
 
 #include <memory>
 namespace imu {
@@ -17,17 +16,15 @@ class IMU {
     virtual ~IMU() = default;
 
     /**
-     * @brief Starts the IMU. It should immediately start writing interfaces::msg::IMU to the IMU access layer
+     * @brief Starts the IMU. It should immediately start writing imu messages to the IMU access layer
      */
     virtual void start() = 0;
 };
 
 /**
  * @brief Creates an instance of IMU, which is implemented by whichever IMU driver .cpp file is selected at compile time
- *
  */
 std::unique_ptr<IMU> make_imu();
 }  // namespace imu
 
 
-#endif
