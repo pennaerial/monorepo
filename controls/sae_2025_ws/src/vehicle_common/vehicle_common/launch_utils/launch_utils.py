@@ -10,16 +10,21 @@ from launch.actions import IncludeLaunchDescription
 PENNAIR_LAUNCH_DEBUG = os.getenv("PENNAIR_LAUNCH_DEBUG", "0").lower() == "1"
 
 RED = "\033[31m"
+YELLOW = "\033[33m"
 CYAN = "\033[36m"
 RESET = "\033[0m"
 
 
-class PennairFormatter(logging.Formatter):
+class LaunchFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         msg = super().format(record)
 
         if record.levelno == logging.DEBUG:
             return f"{CYAN}{msg}{RESET}"
+        if record.levelno == logging.WARNING:
+            return f"{YELLOW}{msg}{RESET}"
+        if record.levelno >= logging.ERROR:
+            return f"{RED}{msg}{RESET}"
 
         return msg
 
@@ -30,7 +35,7 @@ def get_logger(name: str) -> logging.Logger:
 
     if not logger.handlers:
         handler = logging.StreamHandler()
-        handler.setFormatter(PennairFormatter("[PENNAIR] [%(levelname)s] [%(name)s] %(message)s"))
+        handler.setFormatter(LaunchFormatter("[%(levelname)s] [%(name)s] %(message)s"))
         logger.addHandler(handler)
         logger.propagate = False
     logger.setLevel(logging.DEBUG if PENNAIR_LAUNCH_DEBUG else logging.INFO)
