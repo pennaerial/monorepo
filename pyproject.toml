@@ -14,5 +14,6 @@ exclude = [
     "controls/sae_2025_ws/src/px4_msgs",
     "PX4-Autopilot",
     "gz-models",
+    "Dependencies"
 ]
 line-length=100
