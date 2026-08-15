@@ -109,13 +109,13 @@ def launch_setup(context) -> list[Action]:
             executable=node_name,
             arguments=[],
             output="screen",
-            name=node_name
+            name=node_name,
         )
         actions.append(world_node)
         logger.info(f"Launching world node: {node_name}")
     except FileNotFoundError:
         # no configuration exists, so don't launch world node
-        logger.warning(f"No configuration found for {{ world: {world}, stage: {stage} }} Not launching a world node")
+        logger.warning(f"No configuration found for {{ world: {world}, stage: {stage} }} Not launching a world node")  # fmt: skip
 
     return actions
 
@@ -134,7 +134,7 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 Args.STAGE,
                 default_value="base",
-                description="Stage name for the specified world. Only applies if there is a world node for the world and if a world <stage> configuration is defined"
+                description="Stage name for the specified world. Only applies if there is a world node for the world and if a world <stage> configuration is defined",
             ),
             DeclareLaunchArgument(
                 Args.HEADLESS,

@@ -21,6 +21,7 @@ def test_minimum_world_params():
     assert params.world.entities == []
     assert params.scoring is None
 
+
 with_physics = """
 world:
   name: custom
@@ -28,6 +29,7 @@ world:
   physics:
     friction: 0.8
 """
+
 
 def test_with_physics_sim_params():
     data = yaml.safe_load(with_physics)
@@ -40,6 +42,7 @@ def test_with_physics_sim_params():
     assert params.world.controllables == []
     assert params.world.entities == []
     assert params.scoring is None
+
 
 sae_params = """
 world:
@@ -63,6 +66,7 @@ world:
       rpy: [0.0, 0.0, 0.0]
 """
 
+
 def test_sae_params():
     data = yaml.safe_load(sae_params)
     params = SimulationParams.model_validate(data)
@@ -75,10 +79,10 @@ def test_sae_params():
     expected_entities = [
         Entity(
             name="dlz",
-            model = "dlz",
-            position = (0.0, 0.0, -0.1),
-            rpy = (0.0, 0.0, 0.0),
-            world="sae"
+            model="dlz",
+            position=(0.0, 0.0, -0.1),
+            rpy=(0.0, 0.0, 0.0),
+            world="sae",
         )
     ]
 
@@ -86,16 +90,16 @@ def test_sae_params():
         Entity(
             name="payload_0",
             model="payload",
-            position = (5.0, 0.0, 0.0),
-            rpy = (0.0, 0.0, 0.0),
-            world="sae"
+            position=(5.0, 0.0, 0.0),
+            rpy=(0.0, 0.0, 0.0),
+            world="sae",
         ),
         Entity(
             name="payload_1",
             model="payload",
-            position = (0.0, 0.0, 0.0),
-            rpy = (0.0, 0.0, 0.0),
-            world="sae"
+            position=(0.0, 0.0, 0.0),
+            rpy=(0.0, 0.0, 0.0),
+            world="sae",
         ),
     ]
 

@@ -10,6 +10,7 @@ from sim.world_gen.entity import Entity
 class Physics(BaseModel):
     friction: float
 
+
 class WorldParams(BaseModel):
     node: str
     name: str
@@ -36,6 +37,7 @@ class WorldParams(BaseModel):
 
         return data
 
+
 class ScoringParams(BaseModel):
     node: str
 
@@ -46,11 +48,9 @@ class SimulationParams(BaseModel):
     world: WorldParams
     scoring: ScoringParams | None = None
 
-
     @classmethod
     def load_from_stage(cls, world: str, stage: str = "base") -> SimulationParams:
         simulation_file = get_package_share_path("sim") / "simulations" / world / f"{stage}.yaml"
         with open(simulation_file) as f:
             data = yaml.safe_load(f)
             return SimulationParams.model_validate(data)
-
