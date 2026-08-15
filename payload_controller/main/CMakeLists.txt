@@ -1,5 +1,5 @@
 
-SET (priv_requires imu encoder pc_xrce_dds_client)
+SET (priv_requires imu encoder DDS)
 
 if(IDF_TARGET STREQUAL "linux")
     list(APPEND priv_requires "sitl")
