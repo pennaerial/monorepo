@@ -1,7 +1,7 @@
 # Simulation Configuration
 world:
   name: in_house
-  node: hoop_course
+  node: hoop_course_node
 
   physics:
     friction: 0.0
@@ -13,7 +13,6 @@ world:
     num_hoops: 2
     height: 5
     max_dist: 1
-    template_world: template.sdf
 
   controllables:
     - name: uav_0
