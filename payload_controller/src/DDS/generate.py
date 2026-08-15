@@ -18,7 +18,6 @@ def main(args) -> None:
     idl_path = args.idl_path.resolve()
 
     for idl_file in args.idl_files:
-
         idl_file = idl_file.resolve()
 
         relative_path = idl_file.relative_to(idl_path)

@@ -1,5 +1,5 @@
 set(srcs "")
-set(priv_requires "")
+set(priv_requires DDS)
 
 if(IDF_TARGET STREQUAL "linux")
     list(APPEND srcs "imu_sitl.cpp")
