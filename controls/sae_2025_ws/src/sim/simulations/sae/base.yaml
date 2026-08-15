@@ -5,9 +5,6 @@ world:
   physics:
     friction: 0.6
 
-  config:
-    template_world: template.sdf
-
   entities:
     - name: dlz
       model: dlz

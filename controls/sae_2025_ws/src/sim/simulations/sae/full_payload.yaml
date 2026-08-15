@@ -1,0 +1,28 @@
+world:
+  name: sae
+  node: sae_world_node
+
+  physics:
+    friction: 0.6
+  params:
+  entities:
+    - name: dlz
+      model: dlz_alternating_border
+      position: [0.0, 0.0, -0.1]
+      rpy: [0.0, 0.0, 0.0]
+
+    - name: string_obstacle
+      model: string_obstacle
+      position: [-0.25, 0.0, 0.0]
+      rpy: [0.0, 0.0, 0.0]
+
+  controllables:
+    - name: uav_0
+      model: standard_vtol
+      position: [0.0, 0.0, 0.1]
+      rpy: [0.0, 0.0, 0.0]
+
+    - name: payload_0
+      model: payload
+      position: [1.1, 0.0, 0.1]
+      rpy: [0.0, 0.0, 3.14159]
