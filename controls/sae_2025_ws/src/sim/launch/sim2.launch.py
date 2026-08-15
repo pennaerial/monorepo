@@ -3,6 +3,7 @@ from enum import StrEnum
 from pathlib import Path
 
 from launch import LaunchDescription, Action
+from launch_ros.actions import Node
 from launch.actions import (
     DeclareLaunchArgument,
     OpaqueFunction,
@@ -18,6 +19,7 @@ from vehicle_common.launch_utils import (
 )
 
 from sim.utils import get_available_worlds
+from sim.simulation_params import SimulationParams
 
 logger = get_logger("sim.launch")
 
@@ -56,6 +58,7 @@ class Args(StrEnum):
     """Maps constants to launch argument keyords"""
 
     WORLD = "world"
+    STAGE = "stage"
     HEADLESS = "headless"
 
 
@@ -72,6 +75,7 @@ def launch_setup(context) -> list[Action]:
 
     headless: bool = is_truthy(config[Args.HEADLESS])
     world: str = config[Args.WORLD]
+    stage: str = config[Args.STAGE]
 
     gz_env = {
         "GZ_SIM_RESOURCE_PATH": GZ_SIM_RESOURCE_PATH,
@@ -86,15 +90,34 @@ def launch_setup(context) -> list[Action]:
         gz_env["QT_QPA_PLATFORM_PLUGIN_PATH"] = ""
         gz_env["QT_QPA_FONTDIR"] = ""
 
+    actions = []
     gz = ExecuteProcess(
         cmd=gz_sim_command(world, headless),
         output="log",
-        name=f"gz_{world}",
+        name="gz_sim",
         additional_env=gz_env,  # type: ignore (dict[str, str] works instead of SomeSubstitutionsType)
     )
 
-    logger.info(f"Creating world: {world}")
-    return [gz]
+    actions.append(gz)
+    logger.info(f"Launching world: {world}")
+
+    try:
+        simulation_params = SimulationParams.load_from_stage(world, stage)
+        node_name = simulation_params.world.node
+        world_node = Node(
+            package="sim",
+            executable=node_name,
+            arguments=[],
+            output="screen",
+            name=node_name
+        )
+        actions.append(world_node)
+        logger.info(f"Launching world node: {node_name}")
+    except FileNotFoundError:
+        # no configuration exists, so don't launch world node
+        logger.warning(f"No configuration found for {{ world: {world}, stage: {stage} }} Not launching a world node")
+
+    return actions
 
 
 def generate_launch_description():
@@ -107,6 +130,11 @@ def generate_launch_description():
                     "simulation world for gz to load. Looks under {PENNAIR_GZ_MODELS_PATH}/worlds/{world}.sdf\n\tAvailable Worlds:",
                     options=get_available_worlds(GZ_WORLDS_PATH),
                 ),
+            ),
+            DeclareLaunchArgument(
+                Args.STAGE,
+                default_value="base",
+                description="Stage name for the specified world. Only applies if there is a world node for the world and if a world <stage> configuration is defined"
             ),
             DeclareLaunchArgument(
                 Args.HEADLESS,
