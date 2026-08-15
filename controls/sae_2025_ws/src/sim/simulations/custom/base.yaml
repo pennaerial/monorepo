@@ -1,7 +1,8 @@
 world:
   name: CustomWorldNode
+  node: custom_world_node
   params:
     template_world: "template.sdf"   # Gazebo world template
     physics:
       friction: 0.6 # friction coefficient for the ground plane
-  
+
