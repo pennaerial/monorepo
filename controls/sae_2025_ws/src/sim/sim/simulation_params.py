@@ -19,6 +19,9 @@ class WorldParams(BaseModel):
     controllables: list[Entity] = Field(default_factory=list)
     entities: list[Entity] = Field(default_factory=list)
 
+    # world node specific config
+    config: dict = Field(default_factory=dict)
+
     @model_validator(mode="before")
     @classmethod
     def inject_world(cls, data: dict) -> dict:
