@@ -14,6 +14,7 @@ from sim_interfaces.msg import HoopPose
 
 Pose = tuple[float, float, float, float, float, float]
 
+
 class CourseStyle(ABC):
     """Abstract base class for all course styles."""
 
@@ -373,6 +374,7 @@ class BezierCourse(CourseStyle):
 
         return hoops
 
+
 class HoopCourseConfig(BaseModel):
     course: str
     dlz: Tuple[float, float, float]
@@ -380,6 +382,7 @@ class HoopCourseConfig(BaseModel):
     num_hoops: int
     max_dist: int
     height: int
+
 
 class HoopCourseNode(WorldNode):
     """

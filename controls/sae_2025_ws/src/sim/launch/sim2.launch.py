@@ -102,17 +102,18 @@ def launch_setup(context) -> list[Action]:
     actions.append(gz_sim)
     logger.info(f"Launching world: {world}")
 
-
     try:
         simulation_params = SimulationParams.load_from_stage(world, stage)
         node_name = simulation_params.world.node
         world_node = Node(
             package="sim",
             executable=node_name,
-            parameters=[{
-                "world": world,
-                "stage": stage,
-            }],
+            parameters=[
+                {
+                    "world": world,
+                    "stage": stage,
+                }
+            ],
             output="screen",
             name=node_name,
         )
