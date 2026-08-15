@@ -1,27 +1,26 @@
 world:
-  name: SAEWorldNode
-  params:
-    template_world: "template.sdf"   # Gazebo world template
-    physics:
-      friction: 0.6 # friction coefficient for the ground plane
-    entities:
-      dlz:
-        path_to_sdf: "~/.simulation-gazebo/models/dlz/model.sdf"
-        position: [0.0, 0.0, -0.1]
-        rpy: [0.0, 0.0, 0.0]
-    controllables:
-      payload_0:
-        kind: payload
-        path_to_sdf: "~/.simulation-gazebo/models/payload/model.sdf"
-        position: [5.0, 0.0, 0.0]
-        rpy: [0.0, 0.0, 0.0]
-      payload_1:
-        kind: payload
-        path_to_sdf: "~/.simulation-gazebo/models/payload/model.sdf"
-        position: [0.0, 0.0, 0.0]
-        rpy: [0.0, 0.0, 0.0]
-    # entities:  # misc entities not specific to SAE (e.g. debug markers, extra props)
-    #   my_marker:
-    #     path_to_sdf: "~/.simulation-gazebo/models/my_marker/model.sdf"
-    #     position: [0.0, 0.0, 0.0]
-    #     rpy: [0.0, 0.0, 0.0]
+  node: sae_world_node
+  name: sae
+
+  physics:
+    friction: 0.6
+
+  config:
+    template_world: template.sdf
+
+  entities:
+    - name: dlz
+      model: dlz
+      position: [0.0, 0.0, -0.1]
+      rpy: [0.0, 0.0, 0.0]
+
+  controllables:
+    - name: payload_0
+      model: payload
+      position: [5.0, 0.0, 0.0]
+      rpy: [0.0, 0.0, 0.0]
+
+    - name: payload_1
+      model: payload
+      position: [0.0, 0.0, 0.0]
+      rpy: [0.0, 0.0, 0.0]
