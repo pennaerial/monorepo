@@ -91,15 +91,17 @@ def launch_setup(context) -> list[Action]:
         gz_env["QT_QPA_FONTDIR"] = ""
 
     actions = []
-    gz = ExecuteProcess(
+
+    gz_sim = ExecuteProcess(
         cmd=gz_sim_command(world, headless),
         output="log",
         name="gz_sim",
         additional_env=gz_env,  # type: ignore (dict[str, str] works instead of SomeSubstitutionsType)
     )
 
-    actions.append(gz)
+    actions.append(gz_sim)
     logger.info(f"Launching world: {world}")
+
 
     try:
         simulation_params = SimulationParams.load_from_stage(world, stage)
@@ -107,14 +109,27 @@ def launch_setup(context) -> list[Action]:
         world_node = Node(
             package="sim",
             executable=node_name,
-            arguments=[],
+            parameters=[{
+                "world": world,
+                "stage": stage,
+            }],
             output="screen",
             name=node_name,
         )
         actions.append(world_node)
         logger.info(f"Launching world node: {node_name}")
+
+        spawn_entity_bridge = Node(
+            package="ros_gz_bridge",
+            executable="parameter_bridge",
+            arguments=[f"/world/{world}/create@ros_gz_interfaces/srv/SpawnEntity"],
+            output="screen",
+            name="spawn_entity_bridge",
+        )
+        actions.append(spawn_entity_bridge)
+        logger.info("Launching entity bridge")
     except FileNotFoundError:
-        # no configuration exists, so don't launch world node
+        # no configuration exists, so don't launch world node or any gz world bridges
         logger.warning(f"No configuration found for {{ world: {world}, stage: {stage} }} Not launching a world node")  # fmt: skip
 
     return actions
