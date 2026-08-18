@@ -3,6 +3,8 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 
+// TODO: Test that this actually prevents race conditions somehow
+
 namespace util {
 
 /// RAII wrapper around a FreeRTOS mutex semaphore.
