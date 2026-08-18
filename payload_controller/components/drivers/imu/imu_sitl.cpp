@@ -1,11 +1,9 @@
 #include <cstdio>
 #include "imu_sitl.hpp"
+#include "esp_log.h"
 #include "convert.hpp"
 #include "sensor_msgs/msg/Imu.h"
 #include "std_msgs/msg/Header.h"
-
-
-#include "esp_log.h"
 
 static const char* TAG = "IMU_SITL";
 
@@ -39,6 +37,7 @@ void IMU_SITL::on_imu_msg(const gz::msgs::IMU& gz_msg)
   ESP_LOGI(TAG, "on_imu_msg");
 
   sensor_msgs_msg_Imu msg = gz_to_dds(gz_msg);
+  write_latest(msg); // update our latest imu value
   ESP_LOGI(TAG, "hdr stamp sec: %d", msg.header.stamp.sec);
   ESP_LOGI(TAG, "hdr stamp nsec: %d", msg.header.stamp.nanosec);
   ESP_LOGI(TAG, "hdr frame_id: %s", msg.header.frame_id);
