@@ -2,11 +2,21 @@ set(srcs "")
 set(priv_requires DDS)
 set(requires util)
 
-if(IDF_TARGET STREQUAL "linux")
-    list(APPEND srcs "imu_sitl.cpp")
-    list(APPEND priv_requires "sitl")
+set(sitl_srcs
+    imu_sitl.cpp
+    imu.cpp
+)
+
+set(hardware_srcs
+    imu_hw.cpp
+)
+
+
+if(IDF_TARGET STREQUAL linux)
+    list(APPEND srcs ${sitl_srcs})
+    list(APPEND priv_requires sitl)
 else()
-    list(APPEND srcs "imu_hw.cpp")
+    list(APPEND srcs ${hardware_srcs})
 endif()
 
 idf_component_register(

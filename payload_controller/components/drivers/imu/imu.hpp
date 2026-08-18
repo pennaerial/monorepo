@@ -19,9 +19,9 @@ class IMU {
     /// Starts the IMU. It should immediately start writing imu messages to internal buffer
     virtual void start() = 0;
     /// Writes a new incoming imu reading to
-    void write(const sensor_msgs_msg_Imu& msg);
+    void write_latest(const sensor_msgs_msg_Imu& msg);
     /// returns the latest imu reading
-    sensor_msgs_msg_Imu latest();
+    sensor_msgs_msg_Imu get_latest();
     /// Gets singleton instance of imu implementation (sitl, hardware). implemented in backend .cpp files, not imu.cpp
     static IMU* instance();
 
