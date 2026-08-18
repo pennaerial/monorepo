@@ -1,11 +1,9 @@
-#include <memory>
-
-#include "esp_log.h"
 #include "imu.hpp"
+#include "esp_log.h"
 
 static const char* TAG = "IMU_HW";
 
-namespace imu {
+namespace drivers {
 
 /**
  * @brief Stub real-hardware IMU implementation. Not wired to any sensor yet
@@ -18,8 +16,9 @@ class IMU_HW : public IMU {
     }
 };
 
-std::unique_ptr<IMU> make_imu() {
-    return std::make_unique<IMU_HW>();
+IMU* IMU::instance() {
+  static IMU_HW instance; // only instantiated once because static
+  return &instance;
 }
 
-}  // namespace imu
+}  // namespace drivers

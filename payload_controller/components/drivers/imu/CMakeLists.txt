@@ -1,5 +1,6 @@
 set(srcs "")
 set(priv_requires DDS)
+set(requires util)
 
 if(IDF_TARGET STREQUAL "linux")
     list(APPEND srcs "imu_sitl.cpp")
@@ -12,6 +13,7 @@ idf_component_register(
     SRCS ${srcs}
     INCLUDE_DIRS "."
     PRIV_REQUIRES ${priv_requires}
+    REQUIRES ${requires}
 )
 
 if(IDF_TARGET STREQUAL "linux")
