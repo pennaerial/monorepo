@@ -17,6 +17,6 @@ idf_component_register(
 )
 
 if(IDF_TARGET STREQUAL "linux")
-    include("${CMAKE_CURRENT_LIST_DIR}/../../gz_deps.cmake")
+    include("${CMAKE_SOURCE_DIR}/cmake/gz_deps.cmake")
     link_gz_transport(${COMPONENT_LIB})
 endif()
