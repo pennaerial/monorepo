@@ -18,6 +18,7 @@ Clone The Repository
 
     the ``--recurse-submodules`` flag automatically clones all of monorepo's submodules.
 
+.. _px4-installation:
 
 PX4 Installation
 ``````````````````
@@ -56,7 +57,7 @@ Build and Running PX4 Software
 
     make px4_sitl
 
-2. Download QGroundControl `here <https://docs.qgroundcontrol.com/master/en/qgc-user-guide/getting_started/download_and_install.html#ubuntu>`_. 
+2. Download QGroundControl `here <https://docs.qgroundcontrol.com/master/en/qgc-user-guide/getting_started/download_and_install.html#ubuntu>`_.
    PX4 needs a connection to a Ground Control Station by default, or else the vehicle won't arm.
 
 3. Start QGC. Then, run the command to start the Gazebo Simulator with an X500 model.
@@ -243,7 +244,7 @@ Install ESP-IDF Toolchain
 
     eim install --config payload_controller/eim_config.toml
 
-3. Setup direnv. This allows automatic environment sourcing upon entering directories with ``.envrc`` files
+3. Setup direnv
 
 .. code-block:: bash
     :caption: bash
@@ -257,6 +258,11 @@ Install ESP-IDF Toolchain
     cd payload_controller
     direnv allow # tell direnv to trust the .envrc in payload_controller
 
+.. note::
+
+    This allows automatic environment sourcing upon entering directories with ``.envrc`` files
+
+
 4. Verify that builds for both ``linux`` and ``esp32s3`` targets work
 
 .. code-block:: bash
@@ -264,3 +270,7 @@ Install ESP-IDF Toolchain
 
     make linux
     make esp32s3
+
+.. note::
+
+    The Makefile that define these commands is just a light wrapper around ``idf.py`` build commands
