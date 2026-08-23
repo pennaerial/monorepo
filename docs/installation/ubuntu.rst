@@ -150,6 +150,7 @@ from monorepo root:
     :caption: Bash
 
     source ci/ci.conf
+    ./ci/apt_sources.sh # adds any external apt sources
     echo ${APT_PACKAGES[@]} # prints out the entire bash array defined in ci.conf
     sudo apt update
     sudo apt install ${APT_PACKAGES[@]}
@@ -224,3 +225,42 @@ Build and run the ROS workspace
 
    source install/setup.bash
    ros2 launch uav uav_sitl.launch.py
+
+Install ESP-IDF Toolchain
+```````````````````````````
+
+1. Verify that eim was correctly installed:
+
+.. code-block:: bash
+    :caption: bash
+
+    eim --version
+
+2. Install the ESP-IDF toolchain from our eim_config.toml installation file. Make sure you are in monorepo's root directory.
+
+.. code-block:: bash
+    :caption: bash
+
+    eim install --config payload_controller/eim_config.toml
+
+3. Setup direnv. This allows automatic environment sourcing upon entering directories with ``.envrc`` files
+
+.. code-block:: bash
+    :caption: bash
+
+    sudo apt update
+    sudo apt install direnv
+
+    echo 'eval "$(direnv hook bash)"' >> ~/.bashrc # run this once
+    source ~/.bashrc
+
+    cd payload_controller
+    direnv allow # tell direnv to trust the .envrc in payload_controller
+
+4. Verify that builds for both ``linux`` and ``esp32s3`` targets work
+
+.. code-block:: bash
+    :caption: bash
+
+    make linux
+    make esp32s3
