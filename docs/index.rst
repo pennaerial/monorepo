@@ -22,8 +22,8 @@ PennAiR Monorepo
     :doc:`Get Started <installation/index>`
     `GitHub <https://github.com/pennaerial/monorepo>`_
 
-Quick Links:
----------------
+Quick Links
+-----------
 
 .. grid:: 1 1 2 3
     :gutter: 2
@@ -41,6 +41,7 @@ Quick Links:
    :caption: GETTING STARTED
 
    installation/index
+   tutorials/index
    docs-contribution
 
 .. toctree::
@@ -56,7 +57,3 @@ Quick Links:
    :caption: PAYLOAD CONTROLLER
 
    C++ API Reference <pc_api/index>
-
-
-
-
