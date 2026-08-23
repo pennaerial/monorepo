@@ -6,6 +6,8 @@ Ubuntu Installation
    Installation Guide for Ubuntu 24.04. Covering installing ROS 2, PX4-Autopilot, Gazebo,
    and the ESP-IDF toolchain.
 
+----
+
 Clone The Repository
 ````````````````````
 
