@@ -29,7 +29,7 @@ class IMU_SITL : public IMU {
      * Runs in a gz background thread not managed by FreeRTOS/Linux/POSIX
      * simulator.
      *
-     * @param msg Gazebo IMU message.
+     * @param gz_msg Gazebo IMU message.
      */
     void on_imu_msg(const gz::msgs::IMU& gz_msg);
 

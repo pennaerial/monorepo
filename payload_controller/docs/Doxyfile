@@ -10,7 +10,7 @@ PROJECT_NAME           = "Payload Controller"
 PROJECT_BRIEF          = "ESP32 payload controller firmware"
 OUTPUT_DIRECTORY       = $(PENNAIR_PAYLOAD_CONTROLLER_PATH)/docs/doxygen
 
-INPUT                  = $(PENNAIR_PAYLOAD_CONTROLLER_PATH)/main $(PENNAIR_PAYLOAD_CONTROLLER_PATH)/src
+INPUT                  = $(PENNAIR_PAYLOAD_CONTROLLER_PATH)/main $(PENNAIR_PAYLOAD_CONTROLLER_PATH)/components
 RECURSIVE              = YES
 FILE_PATTERNS          = *.c *.cpp *.h *.hpp
 EXCLUDE_PATTERNS       = */build/* */managed_components/*
