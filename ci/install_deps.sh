@@ -18,6 +18,8 @@ for arg in "$@"; do
 	esac
 done
 
+"${SCRIPT_DIR}/apt_sources.sh" # make sure all apt_sources are updated before apt update
+
 sudo apt-get update
 
 if [[ "$QUICK" == false ]]; then
