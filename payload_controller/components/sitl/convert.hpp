@@ -24,7 +24,7 @@ const char* find_gz_header_data(const gz::msgs::Header& header, const std::strin
  *
  * @param gz_msg Gazebo Float_V message containing the source data.
  * @param arr Destination double array to copy the data into.
- * @param N Number of elements in the destination DDS array.
+ * @tparam N Number of elements in the destination DDS array.
  */
 template<std::size_t N>
 void gz_float_v_cpy(const gz::msgs::Float_V& gz_msg, double (&arr)[N])
