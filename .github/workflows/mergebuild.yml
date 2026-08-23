@@ -20,6 +20,7 @@ jobs:
     runs-on: ubuntu-latest
 
     outputs:
+      all: ${{ steps.filter.outputs.all }}
       ros_ws: ${{ steps.filter.outputs.ros_ws }}
       # payload_controller: ${{ steps.filter.outputs.payload_controller }}
       # gcs: ${{ steps.filter.outputs.gcs }}
@@ -33,6 +34,9 @@ jobs:
         uses: dorny/paths-filter@v3
         with:
           filters: | # TODO: add docs, payload_controller, and gcs
+            all:
+              - 'ci/**'
+              - '.github/workflows/mergebuild.yml'
             ros_ws:
               - 'controls/sae_2025_ws/**'
 
@@ -40,7 +44,7 @@ jobs:
     name: Validate ROS Workspace
     needs: detect_changes
     runs-on: ubuntu-latest
-    if: needs.detect_changes.outputs.ros_ws == 'true'
+    if: needs.detect_changes.outputs.ros_ws == 'true' || needs.detect_changes.outputs.all == 'true'
 
     container:
       image: ghcr.io/pennaerial/monorepo:latest
