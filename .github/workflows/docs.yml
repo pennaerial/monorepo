@@ -38,20 +38,20 @@ jobs:
       - name: Install Dependencies
         run: |
           uv venv
-          uv pip install -r sphinx/docs-requirements.txt
+          uv pip install -r docs/docs-requirements.txt
           sudo apt-get update
           sudo apt-get install -y doxygen
 
       - name: Build docs
         run: |
           source dev_env.sh # env var paths necessary for configuring docs build paths
-          cd sphinx
+          cd docs
           uv run make html
 
       - name: Upload Artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: 'sphinx/build/html'
+          path: 'docs/build/html'
 
       - name: Deploy to GitHub Pages
         id: deployment
