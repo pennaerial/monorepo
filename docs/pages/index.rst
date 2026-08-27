@@ -2,7 +2,7 @@
 
 
 
-.. image:: ../sphinx/assets/penn-air-full-logo.png
+.. image:: ../_static/penn-air-full-logo.png
     :alt: PennAiR Logo
     :align: center
     :width: 600px
