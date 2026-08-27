@@ -75,7 +75,7 @@ To takeoff, run the following command in the same terminal:
 
     commander takeoff
 
-.. image:: ../resources/gz_x500.png
+.. image:: ../../_static/gz_x500.png
 
 From there, you should be able to control the drone manually using QGC.
 
