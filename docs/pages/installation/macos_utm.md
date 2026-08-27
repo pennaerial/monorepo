@@ -37,7 +37,7 @@
 2. Run `colcon build`, followed by `source install/setup.bash` and `ros2 launch uav main.launch.py`
 
 - Verify that the UAV is able to take off and land.
-  ![UTM Simulation Takeoff](../resources/utm_sim.png)
+  ![UTM Simulation Takeoff](../../_static/utm_sim.png)
 
 3. The VM should be ready!
 
