@@ -4,6 +4,8 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 
 import os
+import sys
+from pathlib import Path
 
 # -- Project information -----------------------------------------------------
 project = "PennAiR Monorepo"
@@ -36,6 +38,8 @@ SKIP_AUTOAPI_BUILD = (os.environ.get("SKIP_AUTOAPI_BUILD") == "1")
 
 SAE_WS_PATH = os.environ["PENNAIR_SAE_WS_PATH"]
 
+sys.path.insert(0, str(Path(__file__).parent / "_ext")) # make _ext modules discoverable
+
 # -- General configuration ----------------------------------------------------
 extensions = [
     "sphinx.ext.napoleon",  # for parsing Google and NumPy style docstrings
@@ -46,6 +50,9 @@ extensions = [
     "sphinx_copybutton",
     "sphinx_tabs.tabs",
     "sphinx_iconify",
+
+    # CUSTOM EXTENSIONS
+    "pennair_contributors",
 ]
 if not SKIP_AUTOAPI_BUILD:
     extensions.append("autoapi.extension")
