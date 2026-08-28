@@ -67,9 +67,14 @@ def check_unknown_launch_args(
         )
 
 
-def include_launch(pkg: str, launch_file: str, launch_arguments: dict[str, str]) -> IncludeLaunchDescription:
+def include_launch(
+    pkg: str, launch_file: str, launch_arguments: dict[str, str] = {}
+) -> IncludeLaunchDescription:
     path = Path(get_package_share_directory(pkg)) / "launch" / launch_file
-    return IncludeLaunchDescription(PythonLaunchDescriptionSource(str(path)))
+    return IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(str(path)),
+        launch_arguments=launch_arguments.items(),
+    )
 
 
 def format_bullet_list(title: str, options: list[str]) -> str:

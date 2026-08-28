@@ -81,7 +81,7 @@ def launch_setup(context) -> list[Action]:
         logger.warning( f"{mission} is not an installed mission. Using filepath as fallback...")  # fmt: skip
         mission_path = Path(mission).expanduser().resolve()
         if not mission_path.is_file() or mission_path.suffix != ".yaml":
-            raise LaunchError(f"Mission: {mission} is not installed or a valid path to a mission yaml file")
+            raise LaunchError(f"{mission} is not installed or a valid path to a mission yaml file")
     else:
         mission_path = get_mission_path(mission, "uav")
     try:

@@ -4,13 +4,12 @@
 import os
 import unittest
 
-from ament_index_python.packages import get_package_share_directory
-from headless_ground_station import HeadlessGroundStation
-import launch
-from launch.actions import IncludeLaunchDescription
-from launch.launch_description_sources import PythonLaunchDescriptionSource
-import launch_testing.actions
 import pytest
+import launch
+import launch_testing.actions
+
+from vehicle_common.launch_utils import include_launch
+from headless_ground_station import HeadlessGroundStation
 
 # Live marker prevents colcon test from running this test in non-sim CI
 pytestmark = pytest.mark.live
@@ -23,22 +22,14 @@ TIMEOUT_S = float(os.environ.get("SIM_SMOKE_TIMEOUT", "180"))
 @pytest.mark.launch_test
 @pytest.mark.sim_test
 def generate_test_description():
-    px4_path = os.environ["PENNAIR_PX4_PATH"]
-    params_file = os.path.join(
-        get_package_share_directory("uav"), "launch", "ci", "launch_params_basic.yaml"
-    )
-    main_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            os.path.join(get_package_share_directory("uav"), "launch", "main.launch.py")
-        ),
-        launch_arguments={
-            "px4_path": px4_path,
-            "params_file": params_file,
-        }.items(),
+    uav_sitl = include_launch(
+        pkg="uav",
+        launch_file="uav_sitl.launch.py",
+        launch_arguments={"airframe": "quadcopter", "mission": "basic"},
     )
     return launch.LaunchDescription(
         [
-            main_launch,
+            uav_sitl,
             launch_testing.actions.ReadyToTest(),
         ]
     )
