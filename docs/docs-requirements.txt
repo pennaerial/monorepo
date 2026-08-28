@@ -9,3 +9,4 @@ sphinx-new-tab-link
 sphinx-copybutton
 sphinx-tabs
 sphinx-iconify
+sphinx-docsearch

@@ -26,7 +26,7 @@ First, create a virtual environment and install all required dependencies.
 
         .. code-block:: bash
 
-            cd sphinx
+            cd docs
             python3 -m venv venv
             source venv/bin/activate
             pip install -r docs-requirements.txt
@@ -36,7 +36,7 @@ First, create a virtual environment and install all required dependencies.
 
         .. code-block:: bash
 
-            cd sphinx
+            cd docs
             uv venv venv
             source venv/bin/activate
             uv pip install -r docs-requirements.txt
@@ -48,6 +48,13 @@ Then, run the command for serving locally:
     :caption: Bash
 
     make serve
+
+Alternatively, if you want to skip the autoapi build step:
+
+.. code-block:: bash
+    :caption: Bash
+
+    SKIP_AUTOAPI_BUILD=1 make serve
 
 .. note::
 
