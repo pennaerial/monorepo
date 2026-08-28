@@ -72,7 +72,6 @@ class UAVModeManager(ModeManager):
 
         self.get_logger().info("Mission Node has started.")
         self.setup_vision([canonical_vision_node_path(vc) for vc in mission_spec._vision_nodes])
-        self.configure_peer_vehicle_names(mission_spec._peer_vehicle_names)
         self.setup_modes(mission_spec)
 
     def _auto_launch_ready(self) -> bool:
@@ -118,7 +117,7 @@ class UAVModeManager(ModeManager):
             return
 
         if self.servo_only:
-            self._run_active_mode(current_time)
+            self.run_active_mode(current_time)
             return
 
         if not self.vehicle.origin_set:
@@ -155,7 +154,7 @@ class UAVModeManager(ModeManager):
             return
 
         self.vehicle.publish_offboard_control_heartbeat_signal()
-        self._run_active_mode(current_time)
+        self.run_active_mode(current_time)
 
         if self.vehicle.nav_state == VehicleStatus.NAVIGATION_STATE_AUTO_LAND:
             self.get_logger().info("Landing")
