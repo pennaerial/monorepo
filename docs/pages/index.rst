@@ -57,3 +57,19 @@ Quick Links
    :caption: PAYLOAD CONTROLLER
 
    C++ API Reference <pc_api/index>
+
+Active Contributors
+-------------------
+
+.. pennair-contributors::
+    :path: contributors
+    :repo: pennaerial/monorepo
+    :role: active
+
+Past Contributors (Alums)
+-------------------------
+
+.. pennair-contributors::
+    :path: contributors
+    :repo: pennaerial/monorepo
+    :role: alum

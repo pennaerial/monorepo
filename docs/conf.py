@@ -34,11 +34,11 @@ html_theme_options = {
 }
 
 # if 1, skips autoapi build for faster local iteration on handwritten docs
-SKIP_AUTOAPI_BUILD = (os.environ.get("SKIP_AUTOAPI_BUILD") == "1")
+SKIP_AUTOAPI_BUILD = os.environ.get("SKIP_AUTOAPI_BUILD") == "1"
 
 SAE_WS_PATH = os.environ["PENNAIR_SAE_WS_PATH"]
 
-sys.path.insert(0, str(Path(__file__).parent / "_ext")) # make _ext modules discoverable
+sys.path.insert(0, str(Path(__file__).parent / "_ext"))  # make _ext modules discoverable
 
 # -- General configuration ----------------------------------------------------
 extensions = [
@@ -50,7 +50,6 @@ extensions = [
     "sphinx_copybutton",
     "sphinx_tabs.tabs",
     "sphinx_iconify",
-
     # CUSTOM EXTENSIONS
     "pennair_contributors",
 ]
