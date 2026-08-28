@@ -50,9 +50,15 @@ extensions = [
     "sphinx_copybutton",
     "sphinx_tabs.tabs",
     "sphinx_iconify",
+    # "sphinx_docsearch",
     # CUSTOM EXTENSIONS
     "pennair_contributors",
 ]
+#
+# docsearch_app_id = "<DOCSEARCH_APP_ID>"
+# docsearch_api_key = "<DOCSEARCH_SEARCH_API_KEY>"
+# docsearch_index_name = "<DOCSEARCH_INDEX_NAME>"
+#
 if not SKIP_AUTOAPI_BUILD:
     extensions.append("autoapi.extension")
 add_module_names = False  # object names don't show full header path so its not too verbose. E.g., uav.modes.LandingMode vs LandingMode
