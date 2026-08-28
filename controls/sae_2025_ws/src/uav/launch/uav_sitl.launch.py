@@ -1,5 +1,6 @@
 import os
 from enum import StrEnum
+from pathlib import Path
 
 from pydantic import ValidationError
 from launch import Action, LaunchDescription
@@ -77,9 +78,12 @@ def launch_setup(context) -> list[Action]:
 
     mission: str = config[Args.MISSION]  # validate mission
     if mission not in get_available_missions("uav"):
-        raise LaunchError( f"Mission: {mission} is not valid. Use --show-args to see list of valid missions")  # fmt: skip
-
-    mission_path = get_mission_path(mission, "uav")
+        logger.warning( f"{mission} is not an installed mission. Using filepath as fallback...")  # fmt: skip
+        mission_path = Path(mission).expanduser().resolve()
+        if not mission_path.is_file() or mission_path.suffix != ".yaml":
+            raise LaunchError(f"Mission: {mission} is not installed or a valid path to a mission yaml file")
+    else:
+        mission_path = get_mission_path(mission, "uav")
     try:
         _ = RuntimeMission.load_from_path(mission_path)  # run this step only for mission validation
     except ValidationError as e:
