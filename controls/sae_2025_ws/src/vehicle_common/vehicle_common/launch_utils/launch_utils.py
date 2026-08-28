@@ -67,7 +67,7 @@ def check_unknown_launch_args(
         )
 
 
-def include_launch(pkg: str, launch_file: str) -> IncludeLaunchDescription:
+def include_launch(pkg: str, launch_file: str, launch_arguments: dict[str, str]) -> IncludeLaunchDescription:
     path = Path(get_package_share_directory(pkg)) / "launch" / launch_file
     return IncludeLaunchDescription(PythonLaunchDescriptionSource(str(path)))
 
