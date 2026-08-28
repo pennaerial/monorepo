@@ -43,7 +43,7 @@ class ContributorsDirective(SphinxDirective):
     def run(self) -> list[nodes.Node]:
 
         source_dir = (Path(self.env.app.srcdir) / self.env.docname).parent
-        contributions_list = get_github_contributions(self.options["repo"])
+        contributions_list = self._get_contributions(self.options["repo"])
         # default to contributors dir if not specified
         contributors_path = source_dir / self.options.get("path", "contributors")
         directive_role = self.options["role"]
@@ -68,6 +68,18 @@ class ContributorsDirective(SphinxDirective):
         contributors.sort(key=lambda c: c["contributions"], reverse=True)
 
         return self._create_grid(contributors)
+
+    def _get_contributions(self, repo: str) -> dict[str, int]:
+        cache = self.env.app.config.pennair_contributors_cache
+
+        if repo in cache:
+            return cache[repo]
+
+        contributions = get_github_contributions(repo)
+
+        cache[repo] = contributions
+
+        return contributions
 
     # create the rst programmatically
     def _create_grid(self, contributors):
@@ -108,11 +120,15 @@ class ContributorsDirective(SphinxDirective):
 
 
 def setup(app: Sphinx):
-    print("Hello from my extension!")
-
     app.add_directive(
         "pennair-contributors",
         ContributorsDirective,
+    )
+
+    app.add_config_value(
+        "pennair_contributors_cache",
+        {},
+        "env",
     )
 
     return {
