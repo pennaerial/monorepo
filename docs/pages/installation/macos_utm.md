@@ -48,5 +48,7 @@
 - Look at the [Ubuntu Installation](./ubuntu.rst) for further instructions
 
 ```{note}
-The UTM image contains a frozen snapshot of the dependencies and codebase at the time it was created and uploaded to the drive. It is usually updated infrequently due to the hassle of uploading and compressing the large file to our drive, so we highly recommend to make sure the codebase and its submodules are updated and then following the **Ubuntu Installation** starting from {ref}`PX4 Installation <px4-installation>`.
+The UTM image contains a frozen snapshot of the dependencies and codebase at the time it was created and uploaded to the drive. It is usually updated infrequently due to the hassle of uploading and compressing the large file to our drive.
+
+Please run ``git pull origin main`` and ``git submodule update --recursive`` to make sure monorepo is up-to-date. Then follow the **Ubuntu Installation** starting from {ref}`PX4 Installation <px4-installation>` to make sure no dependencies are missing.
 ```
