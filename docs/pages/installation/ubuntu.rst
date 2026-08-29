@@ -20,6 +20,10 @@ Clone The Repository
 
     the ``--recurse-submodules`` flag automatically clones all of monorepo's submodules.
 
+.. note::
+
+    It is recommended to clone this in your home directory, but any directory will work.
+
 .. _px4-installation:
 
 PX4 Installation
@@ -276,3 +280,24 @@ Install ESP-IDF Toolchain
 .. note::
 
     The Makefile that define these commands is just a light wrapper around ``idf.py`` build commands
+
+Setting Up Shell Dotfile (.bashrc)
+`````````````````````````````````````
+
+monorepo relies on setting up the correct environment variables to work properly, found in ``dev_env.sh``. It is highly recommended
+to add the following line to your ``~/.bashrc`` or whatever terminal dotfile you use.
+
+.. code-block:: bash
+    :caption: Bash
+
+    source /path/to/monorepo/dev_env.sh
+
+replace the ``/path/to`` with the actual path to monorepo. Make sure it is an absolute path.
+
+Re-source the dotfile and verify that the environment variables are working:
+
+.. code-block:: bash
+    :caption: Bash
+
+    source ~/.bashrc
+    env | grep PENNAIR
