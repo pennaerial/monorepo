@@ -264,7 +264,7 @@ Install ESP-IDF Toolchain
 .. code-block:: bash
     :caption: bash
 
-    sudo eim install --config payload_controller/eim_config.toml
+    eim install --config payload_controller/eim_config.toml
 
 3. Setup direnv
 
