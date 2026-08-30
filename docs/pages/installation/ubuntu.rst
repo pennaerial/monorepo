@@ -243,7 +243,7 @@ Install ESP-IDF Toolchain
 
     eim --version
 
-2. Install the ESP-IDF toolchain from our eim_config.toml installation file. Make sure you are in monorepo's root directory.
+2. Install the ESP-IDF toolchain from our eim_config.toml installation file. Make sure you are in monorepo's root directory. A new .toml file will be created in monorepo's root directory with the information about the install. It can be deleted.
 
 .. code-block:: bash
     :caption: bash
