@@ -140,7 +140,7 @@ From monorepo root:
 .. code-block:: bash
     :caption: Bash
 
-    uv pip install --system --break-system-packages -r pyproject.toml
+    sudo $(which uv) pip install --system --break-system-packages -r pyproject.toml
 
 .. note::
 
@@ -192,12 +192,28 @@ to build all of them.
 
 Run the install script:
 
+
+
 .. code-block:: bash
     :caption: Bash
 
     # from monorepo root:
     source dev_env.sh # exports environment variables that the build_all.sh script needs
     ./Dependencies/build_all.sh
+
+.. danger::
+
+    Due to a gradle incompatiability, ensure you are on **Java 17** or **Java 11** before running the above. You can do the following to switch:
+
+    .. code-block:: bash
+        :caption: Bash
+
+        sudo apt update
+        sudo apt install openjdk-17-jdk
+        sudo update-alternatives --config java
+
+    Follow the command line prompt to switch to the correct version of Java, then run the above again.
+
 
 .. note::
 
@@ -248,7 +264,7 @@ Install ESP-IDF Toolchain
 .. code-block:: bash
     :caption: bash
 
-    eim install --config payload_controller/eim_config.toml
+    sudo eim install --config payload_controller/eim_config.toml
 
 3. Setup direnv
 
