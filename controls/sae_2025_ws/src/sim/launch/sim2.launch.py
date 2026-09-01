@@ -1,4 +1,3 @@
-import os
 from enum import StrEnum
 from pathlib import Path
 
@@ -10,42 +9,31 @@ from launch.actions import (
     ExecuteProcess,
 )
 
-from vehicle_common.launch_utils import (
-    get_logger,
-    LaunchError,
-    is_truthy,
-    format_bullet_list,
-    prepend_env_path,
-)
-
 from sim.utils import get_available_worlds
 from sim.simulation_params import SimulationParams
+from vehicle_common.env import require_env, prepend_env_path
+from vehicle_common.launch_utils import (
+    get_logger,
+    is_truthy,
+    format_bullet_list,
+)
 
 logger = get_logger("sim.launch")
 
-# TODO: Make these get envs during launch a helper
-PENNAIR_GZ_MODELS_PATH = os.environ.get("PENNAIR_GZ_MODELS_PATH", "")
-if not PENNAIR_GZ_MODELS_PATH:
-    raise LaunchError(
-        "PENNAIR_GZ_MODELS_PATH is not set. Please source dev_env.sh or manually set it"
-    )
+PENNAIR_GZ_MODELS_PATH = require_env("PENNAIR_GZ_MODELS_PATH")
+PENNAIR_PX4_PATH = require_env("PENNAIR_PX4_PATH")
 
-PENNAIR_PX4_PATH = os.environ.get("PENNAIR_PX4_PATH", "")
-if not PENNAIR_PX4_PATH:
-    raise LaunchError("PENNAIR_PX4_PATH is not set. Please source dev_env.sh or manually set it")
-
+# setup GZ environment variables
 GZ_SIM_RESOURCE_PATH = Path(PENNAIR_GZ_MODELS_PATH) / "models"
-# Prepends value to existing value, bc we don't want to overwrite any user-set paths
+# prepend to avoid overwriting existing values
 GZ_SIM_RESOURCE_PATH = prepend_env_path("GZ_SIM_RESOURCE_PATH", str(GZ_SIM_RESOURCE_PATH))
-
 GZ_SIM_SERVER_CONFIG_PATH = Path(PENNAIR_GZ_MODELS_PATH) / "server.config"
 
 # .so plugins include: libOpticalFlowSystem.so, libGstCameraSystem.so, etc.
 GZ_SIM_SYSTEM_PLUGIN_PATH = Path(PENNAIR_PX4_PATH) / "build" / "px4_sitl_default" / "src" / "modules" / "simulation" / "gz_plugins"  # fmt: skip
 GZ_SIM_SYSTEM_PLUGIN_PATH = prepend_env_path("GZ_SIM_SYSTEM_PLUGIN_PATH", str(GZ_SIM_SYSTEM_PLUGIN_PATH))  # fmt: skip
 
-# not a default GZ_SIM* env var, so no need to prepend
-GZ_WORLDS_PATH = Path(PENNAIR_GZ_MODELS_PATH) / "worlds"
+GZ_WORLDS_PATH = Path(PENNAIR_GZ_MODELS_PATH) / "worlds"  # directory where world.sdf files are
 
 logger.debug(f"ENV VAR DETECTED: PENNAIR_GZ_MODELS_PATH={PENNAIR_GZ_MODELS_PATH}")
 logger.debug(f"ENV VAR DETECTED: PENNAIR_PX4_PATH={PENNAIR_PX4_PATH}")
