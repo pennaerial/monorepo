@@ -1,0 +1,46 @@
+name: Build Docs
+description: Build documentation and optionally deploy to GitHub Pages
+
+inputs:
+  deploy:
+    description: Whether to deploy to GitHub Pages
+    required: false
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Pages Metadata
+      if: inputs.deploy == 'true'
+      uses: actions/configure-pages@v5
+
+    - name: Set up uv
+      uses: astral-sh/setup-uv@v6
+      with:
+        python-version: "3.12"
+        enable-cache: true
+
+    - name: Install Dependencies
+      shell: bash
+      run: |
+        uv venv
+        uv pip install -r docs/docs-requirements.txt
+        sudo apt-get update
+        sudo apt-get install -y doxygen
+
+    - name: Build docs
+      shell: bash
+      run: |
+        source dev_env.sh
+        cd docs
+        uv run make html
+
+    - name: Upload Pages Artifact
+      if: inputs.deploy == 'true'
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: docs/build/html
+
+    - name: Deploy to GitHub Pages
+      if: inputs.deploy == 'true'
+      uses: actions/deploy-pages@v4
