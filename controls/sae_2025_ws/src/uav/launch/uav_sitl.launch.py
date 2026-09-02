@@ -1,4 +1,3 @@
-import os
 from enum import StrEnum
 from pathlib import Path
 
@@ -13,6 +12,7 @@ from launch.actions import (
 
 from uav.vehicles.AirframeClass import PX4Airframe
 from vehicle_common.utils import get_available_missions
+from vehicle_common.env import require_env
 from vehicle_common.runtime.mission_loader import RuntimeMission, get_mission_path
 from vehicle_common.launch_utils import (
     get_logger,
@@ -20,19 +20,12 @@ from vehicle_common.launch_utils import (
     check_unknown_launch_args,
     include_launch,
     format_bullet_list,
+    is_truthy,
 )
 
 
 logger = get_logger("uav_sitl.launch")
-
-### env vars. TODO: Make a PENNAIR env python module. Can automatically search for all envs with 'PENNAIR_' prefix
-PENNAIR_PX4_PATH = os.environ.get("PENNAIR_PX4_PATH", "")
-if not PENNAIR_PX4_PATH:
-    raise LaunchError("PENNAIR_PX4_PATH is not set. Please source dev_env.sh or manually set it")
-
-
-def as_bool(value: str) -> bool:
-    return value.lower() == "true"
+PENNAIR_PX4_PATH = require_env("PENNAIR_PX4_PATH")
 
 
 class Args(StrEnum):
@@ -98,9 +91,9 @@ def launch_setup(context) -> list[Action]:
     ns_id = int(config[Args.NS_ID])
     vehicle_ns = f"uav_{ns_id}"
     world = config[Args.WORLD]
-    standalone: bool = as_bool(config[Args.STANDALONE])
-    run_mw: bool = standalone or as_bool(config[Args.RUN_MW])
-    launch_sim: bool = standalone or as_bool(config[Args.LAUNCH_SIM])
+    standalone: bool = is_truthy(config[Args.STANDALONE])
+    run_mw: bool = standalone or is_truthy(config[Args.RUN_MW])
+    launch_sim: bool = standalone or is_truthy(config[Args.LAUNCH_SIM])
 
     # PRINTING HEADER
     logger.debug(f"ENV VAR DETECTED: PENNAIR_PX4_PATH={PENNAIR_PX4_PATH}")
@@ -176,7 +169,7 @@ def generate_launch_description():
                 default_value="quadcopter",
                 description=format_bullet_list(
                     "UAV airframe to load.\n\tAvailable airframes: (alias/id/model)",
-                    PX4Airframe.get_flying(),
+                    [str(a) for a in PX4Airframe.get_flying()],
                 ),
             ),
             DeclareLaunchArgument(
