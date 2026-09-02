@@ -151,11 +151,12 @@ From monorepo root:
 APT Packages
 '''''''''''''
 
-from monorepo root:
+From monorepo root:
 
 .. code-block:: bash
     :caption: Bash
 
+    source dev_env.sh # exports necessary environment variables
     source ci/ci.conf
     ./ci/apt_sources.sh # adds any external apt sources
     echo ${APT_PACKAGES[@]} # prints out the entire bash array defined in ci.conf
