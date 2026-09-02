@@ -1,7 +1,7 @@
 target = ["all"]
 idf_versions = ["v6.0.2"]
 tools_json_file = "tools/tools.json"
-config_file_save_path = "eim_config.toml"
+config_file_save_path = "/dev/null"
 non_interactive = true
 wizard_all_questions = false
 mirror = "https://github.com"
