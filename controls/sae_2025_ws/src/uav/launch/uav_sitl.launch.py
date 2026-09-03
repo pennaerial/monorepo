@@ -70,8 +70,6 @@ def launch_setup(context) -> list[Action]:
     config = context.launch_configurations  # dict containing declared launch arguments
     check_unknown_launch_args(Args, config, logger)  # warn for unknown args
 
-    headless = config[Args.HEADLESS]
-
     mission: str = config[Args.MISSION]  # validate mission
     if mission not in get_available_missions("uav"):
         logger.warning( f"{mission} is not an installed mission. Using filepath as fallback...")  # fmt: skip
@@ -97,6 +95,7 @@ def launch_setup(context) -> list[Action]:
     standalone: bool = is_truthy(config[Args.STANDALONE])
     run_mw: bool = standalone or is_truthy(config[Args.RUN_MW])
     launch_sim: bool = standalone or is_truthy(config[Args.LAUNCH_SIM])
+    headless: str = config[Args.HEADLESS]
 
     # PRINTING HEADER
     logger.debug(f"ENV VAR DETECTED: PENNAIR_PX4_PATH={PENNAIR_PX4_PATH}")
@@ -202,7 +201,7 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 Args.HEADLESS,
                 default_value="false",
-                description="If true, runs gz server in headless mode (no GUI). Requires standalone/launch_sim is true.",
+                description="If true, runs gz server in headless mode (no GUI). Only applies when standalone/launch_sim is true.",
                 choices=["true", "false", "t", "f", "0", "1"],
             ),
             OpaqueFunction(function=launch_setup),
