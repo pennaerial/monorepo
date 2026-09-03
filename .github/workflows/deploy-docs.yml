@@ -1,0 +1,33 @@
+name: Deploy Docs
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow only one concurrent deployment to prevent conflicts
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Build and Deploy Docs
+        uses: ./.github/actions/build-docs
+        with:
+          deploy: "true"
