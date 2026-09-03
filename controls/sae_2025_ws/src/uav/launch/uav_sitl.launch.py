@@ -70,6 +70,8 @@ def launch_setup(context) -> list[Action]:
     config = context.launch_configurations  # dict containing declared launch arguments
     check_unknown_launch_args(Args, config, logger)  # warn for unknown args
 
+    headless = config[Args.HEADLESS]
+
     mission: str = config[Args.MISSION]  # validate mission
     if mission not in get_available_missions("uav"):
         logger.warning( f"{mission} is not an installed mission. Using filepath as fallback...")  # fmt: skip
@@ -106,6 +108,7 @@ def launch_setup(context) -> list[Action]:
     logger.debug(f"Standalone Mode:     {standalone}")
     logger.debug(f"Middleware:          {run_mw}")
     logger.debug(f"Launch Sim:          {launch_sim}")
+    logger.debug(f"Headless Mode:       {headless}")
 
     ## create actions
     actions = []
@@ -138,7 +141,7 @@ def launch_setup(context) -> list[Action]:
         "sim2.launch.py",
         launch_arguments={
             "world": world,
-            "headless": config[Args.HEADLESS],
+            "headless": headless,
         },
     )
 
@@ -182,24 +185,24 @@ def generate_launch_description():
                 Args.RUN_MW,
                 default_value="false",
                 description="if this or standalone is true, runs the MicroXRCEAgent middleware to bridge ROS to PX4 SITL",
-                choices=["true", "false"],
+                choices=["true", "false", "t", "f", "0", "1"],
             ),
             DeclareLaunchArgument(
                 Args.LAUNCH_SIM,
                 default_value="false",
                 description="if this or standalone is true, runs sim.launch.py to launch gazebo with the specified world argument",
-                choices=["true", "false"],
+                choices=["true", "false", "t", "f", "0", "1"],
             ),
             DeclareLaunchArgument(
                 Args.STANDALONE,
                 default_value="true",
                 description="if true, runs all necessary standalone components, like middleware, sim, etc",
-                choices=["true", "false"],
+                choices=["true", "false", "t", "f", "0", "1"],
             ),
             DeclareLaunchArgument(
                 Args.HEADLESS,
                 default_value="false",
-                description="If true, runs gz server in headless mode (no GUI)",
+                description="If true, runs gz server in headless mode (no GUI). Requires standalone/launch_sim is true.",
                 choices=["true", "false", "t", "f", "0", "1"],
             ),
             OpaqueFunction(function=launch_setup),
