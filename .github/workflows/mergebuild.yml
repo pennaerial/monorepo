@@ -42,7 +42,7 @@ jobs:
               - 'controls/sae_2025_ws/**'
             docs:
               - 'docs/**'
-              - '.github/actions/build-docs/actions.yaml'
+              - '.github/actions/build-docs/action.yaml'
 
   validate_ros_workspace:
     name: Validate ROS Workspace
