@@ -38,6 +38,7 @@ class Args(StrEnum):
     RUN_MW = "run_mw"
     LAUNCH_SIM = "launch_sim"
     STANDALONE = "standalone"
+    HEADLESS = "headless"
 
 
 def px4_sitl_action(
@@ -137,7 +138,7 @@ def launch_setup(context) -> list[Action]:
         "sim2.launch.py",
         launch_arguments={
             "world": world,
-            "headless": "false",
+            "headless": config[Args.HEADLESS],
         },
     )
 
@@ -194,6 +195,12 @@ def generate_launch_description():
                 default_value="true",
                 description="if true, runs all necessary standalone components, like middleware, sim, etc",
                 choices=["true", "false"],
+            ),
+            DeclareLaunchArgument(
+                Args.HEADLESS,
+                default_value="false",
+                description="If true, runs gz server in headless mode (no GUI)",
+                choices=["true", "false", "t", "f", "0", "1"],
             ),
             OpaqueFunction(function=launch_setup),
         ]
