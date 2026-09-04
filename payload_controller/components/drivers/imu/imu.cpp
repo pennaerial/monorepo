@@ -1,6 +1,7 @@
 #include "imu.hpp"
 
-namespace drivers {
+namespace drivers
+{
 
 void IMU::write_latest(const sensor_msgs_msg_Imu& msg)
 {
@@ -14,4 +15,4 @@ sensor_msgs_msg_Imu IMU::get_latest()
   return reading_;
 }
 
-}
+}  // namespace drivers

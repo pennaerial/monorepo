@@ -5,16 +5,20 @@
 
 // TODO: Test that this actually prevents race conditions somehow
 
-namespace util {
+namespace util
+{
 
 /// RAII wrapper around a FreeRTOS mutex semaphore.
-class StaticMutex {
+class StaticMutex
+{
 public:
-  StaticMutex() : handle_(xSemaphoreCreateMutexStatic(&buffer_)) {
+  StaticMutex() : handle_(xSemaphoreCreateMutexStatic(&buffer_))
+  {
     configASSERT(handle_ != nullptr);
   }
 
-  ~StaticMutex() {
+  ~StaticMutex()
+  {
     if (handle_ != nullptr) {
       vSemaphoreDelete(handle_);
     }
@@ -28,8 +32,14 @@ public:
   StaticMutex(StaticMutex&&) = delete;
   StaticMutex& operator=(StaticMutex&&) = delete;
 
-  void lock() { xSemaphoreTake(handle_, portMAX_DELAY); }
-  void unlock() { xSemaphoreGive(handle_); }
+  void lock()
+  {
+    xSemaphoreTake(handle_, portMAX_DELAY);
+  }
+  void unlock()
+  {
+    xSemaphoreGive(handle_);
+  }
 
 private:
   StaticSemaphore_t buffer_;
@@ -37,11 +47,17 @@ private:
 };
 
 /// RAII scoped lock, mirrors std::lock_guard.
-class StaticMutexGuard {
-
+class StaticMutexGuard
+{
 public:
-  explicit StaticMutexGuard(StaticMutex& m) : m_(m) { m_.lock(); }
-  ~StaticMutexGuard() { m_.unlock(); }
+  explicit StaticMutexGuard(StaticMutex& m) : m_(m)
+  {
+    m_.lock();
+  }
+  ~StaticMutexGuard()
+  {
+    m_.unlock();
+  }
 
   StaticMutexGuard(const StaticMutexGuard&) = delete;
   StaticMutexGuard& operator=(const StaticMutexGuard&) = delete;

@@ -4,10 +4,9 @@
 #include "payload_controller/gpio.hpp"
 
 /// Which side of the vehicle this motor drives.
-enum class MotorType
-{
-  LEFT,    ///< Left-side motor
-  RIGHT    ///< Right-side motor
+enum class MotorType {
+  LEFT,  ///< Left-side motor
+  RIGHT  ///< Right-side motor
 };
 
 /// Abstract base class for all motor drivers.

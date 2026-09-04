@@ -1,7 +1,8 @@
 #include <rclcpp/rclcpp.hpp>
+
+#include "gz/transport/Node.hh"
 #include "pennair_gz/bridge/convert.hpp"
 #include "pennair_gz/pennair_gz_bridge_parameters.hpp"
-#include "gz/transport/Node.hh"
 
 namespace pennair_gz::bridge
 {
@@ -11,16 +12,13 @@ using AttachDetach = sim_interfaces::srv::AttachDetach;
 class AttachDetachBridge : public rclcpp::Node
 {
 public:
-  AttachDetachBridge()
-  : rclcpp::Node("attach_detach_bridge")
+  AttachDetachBridge() : rclcpp::Node("attach_detach_bridge")
   {
     param_listener_ = std::make_shared<pennair_gz::bridge::ParamListener>(this);
     params_ = param_listener_->get_params();
-    //validate necessary params
+    // validate necessary params
     if (params_.ros_service_name.empty() || params_.gz_service_name.empty()) {
-      RCLCPP_ERROR(
-        this->get_logger(),
-        "Both ros_service_name and gz_service_name must be non-empty");
+      RCLCPP_ERROR(this->get_logger(), "Both ros_service_name and gz_service_name must be non-empty");
       throw std::invalid_argument("Invalid bridge parameters");
     }
 
@@ -29,15 +27,12 @@ public:
 
     gz_node_ = std::make_shared<gz::transport::Node>();
     attach_detach_ros_service_ = this->create_service<AttachDetach>(
-      params_.ros_service_name, std::bind(
-        &AttachDetachBridge::attach_detach_callback, this, std::placeholders::_1,
-        std::placeholders::_2)
+        params_.ros_service_name,
+        std::bind(&AttachDetachBridge::attach_detach_callback, this, std::placeholders::_1, std::placeholders::_2)
     );
   }
 
-  void attach_detach_callback(
-    AttachDetach::Request::SharedPtr request,
-    AttachDetach::Response::SharedPtr response)
+  void attach_detach_callback(AttachDetach::Request::SharedPtr request, AttachDetach::Response::SharedPtr response)
   {
     auto gz_req = convert_to_gz(request);
     pennair_gz::msgs::AttachDetachResponse gz_resp;
@@ -58,11 +53,10 @@ private:
   std::shared_ptr<pennair_gz::bridge::ParamListener> param_listener_;
   std::shared_ptr<gz::transport::Node> gz_node_;
   rclcpp::Service<AttachDetach>::SharedPtr attach_detach_ros_service_;
-
 };
 
 
-}
+}  // namespace pennair_gz::bridge
 
 
 #include <pluginlib/class_list_macros.hpp>
