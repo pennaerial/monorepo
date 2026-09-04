@@ -48,6 +48,7 @@ Quick Links
 
    installation/index
    tutorials/index
+   concepts/index
    docs-contribution
 
 .. toctree::
