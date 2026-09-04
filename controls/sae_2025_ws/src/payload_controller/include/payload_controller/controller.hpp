@@ -12,7 +12,7 @@ class Controller
 {
 public:
   virtual ~Controller() = default;
-  virtual void initialize(rclcpp::Node * node) = 0;
+  virtual void initialize(rclcpp::Node* node) = 0;
   virtual void drive_command(double linear, double angular) = 0;
   virtual void servo_command(double degree) = 0;
   virtual void safe_shutdown() = 0;

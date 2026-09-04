@@ -3,8 +3,7 @@
 
 #include <rclcpp/rclcpp.hpp>
 
-enum class Direction
-{
+enum class Direction {
   Input,
   Output
 };

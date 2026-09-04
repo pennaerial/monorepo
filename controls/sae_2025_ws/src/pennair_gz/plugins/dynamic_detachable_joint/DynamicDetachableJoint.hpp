@@ -20,20 +20,18 @@
 #ifndef GZ_SIM_SYSTEMS_DYNAMICDETACHABLEJOINT_HH_
 #define GZ_SIM_SYSTEMS_DYNAMICDETACHABLEJOINT_HH_
 
-#include "pennair_gz/msgs/dynamic_detachable_joint.pb.h"
 #include <gz/msgs/entity.pb.h>
 
-#include <mutex>
-#include <memory>
-#include <string>
-
 #include <gz/transport/Node.hh>
+#include <memory>
+#include <mutex>
+#include <string>
 
 #include "gz/sim/EntityComponentManager.hh"
 #include "gz/sim/EventManager.hh"
-
 #include "gz/sim/Model.hh"
 #include "gz/sim/System.hh"
+#include "pennair_gz/msgs/dynamic_detachable_joint.pb.h"
 
 namespace gz
 {
@@ -66,10 +64,7 @@ namespace systems
 /// - `<output_topic>` (optional): Topic name for publishing attachment state.
 ///   Defaults to `/model/{model_name}/detachable_joint/state`.
 
-class DynamicDetachableJoint
-  : public System,
-  public ISystemConfigure,
-  public ISystemPreUpdate
+class DynamicDetachableJoint : public System, public ISystemConfigure, public ISystemPreUpdate
 {
   /// Documentation inherited
 
@@ -80,17 +75,16 @@ public:
 
 public:
   void Configure(
-    const Entity & _entity,
-    const std::shared_ptr<const sdf::Element> & _sdf,
-    EntityComponentManager & _ecm,
-    EventManager & _eventMgr) final;
+      const Entity& _entity,
+      const std::shared_ptr<const sdf::Element>& _sdf,
+      EntityComponentManager& _ecm,
+      EventManager& _eventMgr
+  ) final;
 
   /// Documentation inherited
 
 public:
-  void PreUpdate(
-    const gz::sim::UpdateInfo & _info,
-    gz::sim::EntityComponentManager & _ecm) final;
+  void PreUpdate(const gz::sim::UpdateInfo& _info, gz::sim::EntityComponentManager& _ecm) final;
 
   /// \brief Gazebo communication node.
 
@@ -108,9 +102,8 @@ private:
   /// \return Always returns true to indicate message was processed
 
 private:
-  bool OnServiceRequest(
-    const pennair_gz::msgs::AttachDetachRequest & _req,
-    pennair_gz::msgs::AttachDetachResponse & _res);
+  bool
+  OnServiceRequest(const pennair_gz::msgs::AttachDetachRequest& _req, pennair_gz::msgs::AttachDetachResponse& _res);
 
   /// \brief Helper function to publish the state of the detachment
 
@@ -199,9 +192,9 @@ private:
 private:
   std::mutex mutex;
 };
-}
-}
-}
-}
+}  // namespace systems
+}  // namespace GZ_SIM_VERSION_NAMESPACE
+}  // namespace sim
+}  // namespace gz
 
 #endif

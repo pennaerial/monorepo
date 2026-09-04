@@ -1,4 +1,3 @@
-import os
 from enum import StrEnum
 from pathlib import Path
 
@@ -13,6 +12,7 @@ from launch.actions import (
 
 from uav.vehicles.AirframeClass import PX4Airframe
 from vehicle_common.utils import get_available_missions
+from vehicle_common.env import require_env
 from vehicle_common.runtime.mission_loader import RuntimeMission, get_mission_path
 from vehicle_common.launch_utils import (
     get_logger,
@@ -20,19 +20,12 @@ from vehicle_common.launch_utils import (
     check_unknown_launch_args,
     include_launch,
     format_bullet_list,
+    is_truthy,
 )
 
 
 logger = get_logger("uav_sitl.launch")
-
-### env vars. TODO: Make a PENNAIR env python module. Can automatically search for all envs with 'PENNAIR_' prefix
-PENNAIR_PX4_PATH = os.environ.get("PENNAIR_PX4_PATH", "")
-if not PENNAIR_PX4_PATH:
-    raise LaunchError("PENNAIR_PX4_PATH is not set. Please source dev_env.sh or manually set it")
-
-
-def as_bool(value: str) -> bool:
-    return value.lower() == "true"
+PENNAIR_PX4_PATH = require_env("PENNAIR_PX4_PATH")
 
 
 class Args(StrEnum):
@@ -45,6 +38,7 @@ class Args(StrEnum):
     RUN_MW = "run_mw"
     LAUNCH_SIM = "launch_sim"
     STANDALONE = "standalone"
+    HEADLESS = "headless"
 
 
 def px4_sitl_action(
@@ -98,9 +92,10 @@ def launch_setup(context) -> list[Action]:
     ns_id = int(config[Args.NS_ID])
     vehicle_ns = f"uav_{ns_id}"
     world = config[Args.WORLD]
-    standalone: bool = as_bool(config[Args.STANDALONE])
-    run_mw: bool = standalone or as_bool(config[Args.RUN_MW])
-    launch_sim: bool = standalone or as_bool(config[Args.LAUNCH_SIM])
+    standalone: bool = is_truthy(config[Args.STANDALONE])
+    run_mw: bool = standalone or is_truthy(config[Args.RUN_MW])
+    launch_sim: bool = standalone or is_truthy(config[Args.LAUNCH_SIM])
+    headless: str = config[Args.HEADLESS]
 
     # PRINTING HEADER
     logger.debug(f"ENV VAR DETECTED: PENNAIR_PX4_PATH={PENNAIR_PX4_PATH}")
@@ -112,6 +107,7 @@ def launch_setup(context) -> list[Action]:
     logger.debug(f"Standalone Mode:     {standalone}")
     logger.debug(f"Middleware:          {run_mw}")
     logger.debug(f"Launch Sim:          {launch_sim}")
+    logger.debug(f"Headless Mode:       {headless}")
 
     ## create actions
     actions = []
@@ -144,7 +140,7 @@ def launch_setup(context) -> list[Action]:
         "sim2.launch.py",
         launch_arguments={
             "world": world,
-            "headless": "false",
+            "headless": headless,
         },
     )
 
@@ -176,7 +172,7 @@ def generate_launch_description():
                 default_value="quadcopter",
                 description=format_bullet_list(
                     "UAV airframe to load.\n\tAvailable airframes: (alias/id/model)",
-                    PX4Airframe.get_flying(),
+                    [str(a) for a in PX4Airframe.get_flying()],
                 ),
             ),
             DeclareLaunchArgument(
@@ -188,19 +184,25 @@ def generate_launch_description():
                 Args.RUN_MW,
                 default_value="false",
                 description="if this or standalone is true, runs the MicroXRCEAgent middleware to bridge ROS to PX4 SITL",
-                choices=["true", "false"],
+                choices=["true", "false", "t", "f", "0", "1"],
             ),
             DeclareLaunchArgument(
                 Args.LAUNCH_SIM,
                 default_value="false",
                 description="if this or standalone is true, runs sim.launch.py to launch gazebo with the specified world argument",
-                choices=["true", "false"],
+                choices=["true", "false", "t", "f", "0", "1"],
             ),
             DeclareLaunchArgument(
                 Args.STANDALONE,
                 default_value="true",
                 description="if true, runs all necessary standalone components, like middleware, sim, etc",
-                choices=["true", "false"],
+                choices=["true", "false", "t", "f", "0", "1"],
+            ),
+            DeclareLaunchArgument(
+                Args.HEADLESS,
+                default_value="false",
+                description="If true, runs gz server in headless mode (no GUI). Only applies when standalone/launch_sim is true.",
+                choices=["true", "false", "t", "f", "0", "1"],
             ),
             OpaqueFunction(function=launch_setup),
         ]

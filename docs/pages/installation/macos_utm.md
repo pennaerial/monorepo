@@ -29,6 +29,16 @@
 - First boot is expected to take awhile
 
 5. Log in to the system
+6. Make sure to edit the network service to prevent long boot times:
+- Edit `systemd-networkd-wait-online.service` using the following command: `sudo systemctl edit systemd-networkd-wait-online.service`
+- Insert the following content before `### Edits below this comment will be discarded`:
+```
+[Service]
+ExecStart= # this line is left intentionally blank to clear Ubuntu's defaults
+ExecStart=/usr/lib/systemd/systemd-networkd-wait-online --any --timeout=5
+```
+
+
 
 ## First Run
 
@@ -51,4 +61,8 @@
 The UTM image contains a frozen snapshot of the dependencies and codebase at the time it was created and uploaded to the drive. It is usually updated infrequently due to the hassle of uploading and compressing the large file to our drive.
 
 Please run ``git pull origin main`` and ``git submodule update --recursive`` to make sure monorepo is up-to-date. Then follow the **Ubuntu Installation** starting from {ref}`PX4 Installation <px4-installation>` to make sure no dependencies are missing.
+```
+
+```{warning}
+If you're getting slow boot times after setting up UTM and past the first boot, make sure to follow step 6 in [Setting Up](#setting-up)
 ```

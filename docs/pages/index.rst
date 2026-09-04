@@ -49,7 +49,6 @@ Quick Links
    installation/index
    tutorials/index
    concepts/index
-   docs-contribution
 
 .. toctree::
    :hidden:
@@ -64,6 +63,15 @@ Quick Links
    :caption: PAYLOAD CONTROLLER
 
    C++ API Reference <pc_api/index>
+
+.. toctree::
+    :hidden:
+    :maxdepth: 2
+    :caption: CONTRIBUTING
+
+    development-guide
+    docs-contribution
+
 
 Active Contributors
 -------------------

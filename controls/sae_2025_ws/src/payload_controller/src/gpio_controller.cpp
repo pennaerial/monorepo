@@ -1,16 +1,16 @@
 #include "payload_controller/gpio_controller.hpp"
 
-#include <cmath>
 #include <pigpiod_if2.h>
+
+#include <cmath>
 #include <pluginlib/class_list_macros.hpp>
 
 GPIOController::GPIOController() {}
 
-GPIOController::GPIOController(
-  std::unique_ptr<Motor> left_motor,
-  std::unique_ptr<Motor> right_motor)
-: left_motor_(std::move(left_motor)),
-  right_motor_(std::move(right_motor)) {}
+GPIOController::GPIOController(std::unique_ptr<Motor> left_motor, std::unique_ptr<Motor> right_motor)
+    : left_motor_(std::move(left_motor)), right_motor_(std::move(right_motor))
+{
+}
 
 GPIOController::~GPIOController()
 {
@@ -38,7 +38,7 @@ GPIOController::~GPIOController()
   }
 }
 
-void GPIOController::initialize(rclcpp::Node * node)
+void GPIOController::initialize(rclcpp::Node* node)
 {
   node_ = node;
   RCLCPP_INFO(node_->get_logger(), "GPIO | Starting initialization...");
@@ -49,51 +49,32 @@ void GPIOController::initialize(rclcpp::Node * node)
   pi_ = pigpio_start(nullptr, nullptr);
   if (pi_ < 0) {
     RCLCPP_FATAL(
-      node_->get_logger(),
-      "GPIO | pigpio_start() failed (err=%d). Is pigpiod running? Try: sudo systemctl start pigpiod",
-      pi_);
-    throw std::runtime_error(
-            "GPIOController failed to connect to pigpiod daemon.");
+        node_->get_logger(),
+        "GPIO | pigpio_start() failed (err=%d). Is pigpiod running? Try: sudo systemctl "
+        "start pigpiod",
+        pi_
+    );
+    throw std::runtime_error("GPIOController failed to connect to pigpiod daemon.");
   }
   initialized_ = true;
 
-  const int pwm_hz = std::max(
-    1, static_cast<int>(std::lround(p.motor.pwm_frequency)));
+  const int pwm_hz = std::max(1, static_cast<int>(std::lround(p.motor.pwm_frequency)));
 
-  left_motor_ = std::make_unique<SNMotor>(
-    pi_,
-    p.pins.LEFT_PWM,
-    p.pins.LEFT_IN1,
-    p.pins.LEFT_IN2,
-    pwm_hz,
-    MotorType::LEFT);
-  right_motor_ = std::make_unique<SNMotor>(
-    pi_,
-    p.pins.RIGHT_PWM,
-    p.pins.RIGHT_IN1,
-    p.pins.RIGHT_IN2,
-    pwm_hz,
-    MotorType::RIGHT);
+  left_motor_ =
+      std::make_unique<SNMotor>(pi_, p.pins.LEFT_PWM, p.pins.LEFT_IN1, p.pins.LEFT_IN2, pwm_hz, MotorType::LEFT);
+  right_motor_ =
+      std::make_unique<SNMotor>(pi_, p.pins.RIGHT_PWM, p.pins.RIGHT_IN1, p.pins.RIGHT_IN2, pwm_hz, MotorType::RIGHT);
 
-  left_encoder_ = std::make_unique<QuadratureEncoder>(
-    pi_,
-    p.pins.ENCB_CH1,
-    p.pins.ENCB_CH2,
-    p.encoder.output_cpr,
-    MotorType::LEFT);
+  left_encoder_ =
+      std::make_unique<QuadratureEncoder>(pi_, p.pins.ENCB_CH1, p.pins.ENCB_CH2, p.encoder.output_cpr, MotorType::LEFT);
   right_encoder_ = std::make_unique<QuadratureEncoder>(
-    pi_,
-    p.pins.ENCA_CH1,
-    p.pins.ENCA_CH2,
-    p.encoder.output_cpr,
-    MotorType::RIGHT);
+      pi_, p.pins.ENCA_CH1, p.pins.ENCA_CH2, p.encoder.output_cpr, MotorType::RIGHT
+  );
 
   servo_ = std::make_unique<Servo>(
-    pi_,
-    p.pins.SERVO,
-    p.servo.frequency,
-    static_cast<float>(p.servo.pulse_min_us),
-    static_cast<float>(p.servo.pulse_max_us));
+      pi_, p.pins.SERVO, p.servo.frequency, static_cast<float>(p.servo.pulse_min_us),
+      static_cast<float>(p.servo.pulse_max_us)
+  );
 
   prev_left_count_ = left_encoder_->count();
   prev_right_count_ = right_encoder_->count();
@@ -107,35 +88,29 @@ void GPIOController::initialize(rclcpp::Node * node)
   const std::string state_topic = "motor_state";
   const std::string zn_service_name = "compute_pid_zn";
 
-  motor_state_pub_ =
-    node_->create_publisher<payload_interfaces::msg::MotorState>(state_topic, 10);
-  zn_service_ =
-    node_->create_service<payload_interfaces::srv::ComputePidZieglerNichols>(
-    zn_service_name,
-    [this](
-      const std::shared_ptr<payload_interfaces::srv::ComputePidZieglerNichols::Request>
-      request,
-      std::shared_ptr<payload_interfaces::srv::ComputePidZieglerNichols::Response>
-      response) {compute_pid_zn_callback(request, response);});
+  motor_state_pub_ = node_->create_publisher<payload_interfaces::msg::MotorState>(state_topic, 10);
+  zn_service_ = node_->create_service<payload_interfaces::srv::ComputePidZieglerNichols>(
+      zn_service_name, [this](
+                           const std::shared_ptr<payload_interfaces::srv::ComputePidZieglerNichols::Request> request,
+                           std::shared_ptr<payload_interfaces::srv::ComputePidZieglerNichols::Response> response
+                       ) { compute_pid_zn_callback(request, response); }
+  );
 
-  dead_reckon_cbg_ = node_->create_callback_group(
-    rclcpp::CallbackGroupType::MutuallyExclusive);
+  dead_reckon_cbg_ = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   const std::string dr_service_name = "dead_reckon";
   dead_reckon_srv_ = node_->create_service<payload_interfaces::srv::DeadReckon>(
-    dr_service_name,
-    std::bind(
-      &GPIOController::dead_reckon_callback, this,
-      std::placeholders::_1, std::placeholders::_2),
-    rmw_qos_profile_services_default,
-    dead_reckon_cbg_);
+      dr_service_name,
+      std::bind(&GPIOController::dead_reckon_callback, this, std::placeholders::_1, std::placeholders::_2),
+      rmw_qos_profile_services_default, dead_reckon_cbg_
+  );
 
   running_ = true;
   control_thread_ = std::thread(&GPIOController::control_loop, this);
 
   RCLCPP_INFO(
-    node_->get_logger(),
-    "GPIO | Ready. state_topic=%s zn_service=%s dr_service=%s",
-    state_topic.c_str(), zn_service_name.c_str(), dr_service_name.c_str());
+      node_->get_logger(), "GPIO | Ready. state_topic=%s zn_service=%s dr_service=%s", state_topic.c_str(),
+      zn_service_name.c_str(), dr_service_name.c_str()
+  );
 }
 
 void GPIOController::drive_command(double linear, double angular)
@@ -194,14 +169,14 @@ void GPIOController::safe_shutdown()
 }
 
 void GPIOController::compute_pid_zn_callback(
-  const std::shared_ptr<payload_interfaces::srv::ComputePidZieglerNichols::Request> request,
-  std::shared_ptr<payload_interfaces::srv::ComputePidZieglerNichols::Response> response)
+    const std::shared_ptr<payload_interfaces::srv::ComputePidZieglerNichols::Request> request,
+    std::shared_ptr<payload_interfaces::srv::ComputePidZieglerNichols::Response> response
+)
 {
   payload::control_math::PidGains gains;
   std::string error;
 
-  const bool ok = payload::control_math::compute_ziegler_nichols_classic(
-    request->ku, request->pu, gains, error);
+  const bool ok = payload::control_math::compute_ziegler_nichols_classic(request->ku, request->pu, gains, error);
 
   response->success = ok;
   if (ok) {
@@ -218,8 +193,9 @@ void GPIOController::compute_pid_zn_callback(
 }
 
 void GPIOController::dead_reckon_callback(
-  const std::shared_ptr<payload_interfaces::srv::DeadReckon::Request> request,
-  std::shared_ptr<payload_interfaces::srv::DeadReckon::Response> response)
+    const std::shared_ptr<payload_interfaces::srv::DeadReckon::Request> request,
+    std::shared_ptr<payload_interfaces::srv::DeadReckon::Response> response
+)
 {
   if (shutdown_requested_.load()) {
     response->success = false;
@@ -256,12 +232,10 @@ void GPIOController::dead_reckon_callback(
   double angular_cmd = 0.0;
 
   if (has_linear) {
-    target_counts = static_cast<int64_t>(
-      std::ceil(std::abs(request->linear) * cpr / (2.0 * M_PI * r)));
+    target_counts = static_cast<int64_t>(std::ceil(std::abs(request->linear) * cpr / (2.0 * M_PI * r)));
     linear_cmd = std::copysign(request->speed, request->linear);
   } else {
-    target_counts = static_cast<int64_t>(
-      std::ceil((L / 2.0) * std::abs(request->angular) * cpr / (2.0 * M_PI * r)));
+    target_counts = static_cast<int64_t>(std::ceil((L / 2.0) * std::abs(request->angular) * cpr / (2.0 * M_PI * r)));
     angular_cmd = std::copysign(request->speed, request->angular);
   }
 
@@ -288,9 +262,11 @@ void GPIOController::dead_reckon_callback(
   const int64_t right_goal = right_now + target_counts * right_dir;
 
   RCLCPP_INFO(
-    node_->get_logger(),
-    "DeadReckon | target=%ld counts  left_start=%ld goal=%ld  right_start=%ld goal=%ld  linear=%.3f  angular=%.3f",
-    target_counts, left_now, left_goal, right_now, right_goal, linear_cmd, angular_cmd);
+      node_->get_logger(),
+      "DeadReckon | target=%ld counts  left_start=%ld goal=%ld  right_start=%ld goal=%ld  "
+      "linear=%.3f  angular=%.3f",
+      target_counts, left_now, left_goal, right_now, right_goal, linear_cmd, angular_cmd
+  );
 
   dr_left_start_.store(left_now);
   dr_right_start_.store(right_now);
@@ -304,8 +280,7 @@ void GPIOController::dead_reckon_callback(
   control_mode_.store(ControlMode::DEAD_RECKONING);
 
   const double timeout_s = (request->timeout_sec > 0.0) ? request->timeout_sec : 30.0;  // <= 0 falls back to 30 s
-  const auto deadline = std::chrono::steady_clock::now() +
-    std::chrono::duration<double>(timeout_s);
+  const auto deadline = std::chrono::steady_clock::now() + std::chrono::duration<double>(timeout_s);
 
   while (control_mode_.load() == ControlMode::DEAD_RECKONING && !shutdown_requested_.load()) {
     if (std::chrono::steady_clock::now() >= deadline) {
@@ -314,11 +289,13 @@ void GPIOController::dead_reckon_callback(
       dr_left_done_.store(true);
       dr_right_done_.store(true);
       control_mode_.store(ControlMode::NORMAL);
-      if (left_motor_) {left_motor_->hard_brake();}
-      if (right_motor_) {right_motor_->hard_brake();}
-      RCLCPP_WARN(
-        node_->get_logger(),
-        "DeadReckon | TIMEOUT after %.1f s — motors stopped", timeout_s);
+      if (left_motor_) {
+        left_motor_->hard_brake();
+      }
+      if (right_motor_) {
+        right_motor_->hard_brake();
+      }
+      RCLCPP_WARN(node_->get_logger(), "DeadReckon | TIMEOUT after %.1f s — motors stopped", timeout_s);
       response->success = false;
       response->message = "Dead reckoning timed out after " + std::to_string(timeout_s) + " s";
       return;
@@ -345,11 +322,8 @@ void GPIOController::control_loop()
     const double linear = cmd_linear_.load();
     const double angular = cmd_angular_.load();
     const auto setpoints = payload::control_math::compute_wheel_setpoints(
-      linear,
-      angular,
-      p.kinematics.wheel_separation_m,
-      p.kinematics.wheel_radius_m,
-      p.motor.max_wheel_rpm);
+        linear, angular, p.kinematics.wheel_separation_m, p.kinematics.wheel_radius_m, p.motor.max_wheel_rpm
+    );
 
     const int64_t left_count = left_encoder_->count();
     const int64_t right_count = right_encoder_->count();
@@ -361,10 +335,8 @@ void GPIOController::control_loop()
     }
     prev_loop_time_ = now;
 
-    const int64_t left_delta =
-      (left_count - prev_left_count_) * static_cast<int64_t>(p.encoder.left_sign);
-    const int64_t right_delta =
-      (right_count - prev_right_count_) * static_cast<int64_t>(p.encoder.right_sign);
+    const int64_t left_delta = (left_count - prev_left_count_) * static_cast<int64_t>(p.encoder.left_sign);
+    const int64_t right_delta = (right_count - prev_right_count_) * static_cast<int64_t>(p.encoder.right_sign);
 
     prev_left_count_ = left_count;
     prev_right_count_ = right_count;
@@ -383,21 +355,17 @@ void GPIOController::control_loop()
 
       // Done when count has reached or passed goal in the intended direction.
       // Direction is inferred from goal vs start — no separate sign param needed.
-      const bool left_done = (left_goal >= left_start) ?
-        (left_count >= left_goal) :
-        (left_count <= left_goal);
-      const bool right_done = (right_goal >= right_start) ?
-        (right_count >= right_goal) :
-        (right_count <= right_goal);
+      const bool left_done = (left_goal >= left_start) ? (left_count >= left_goal) : (left_count <= left_goal);
+      const bool right_done = (right_goal >= right_start) ? (right_count >= right_goal) : (right_count <= right_goal);
 
       const int64_t left_rem = std::abs(left_goal - left_count);
       const int64_t right_rem = std::abs(right_goal - right_count);
 
       RCLCPP_INFO_THROTTLE(
-        node_->get_logger(), *node_->get_clock(), 200,
-        "DR | left=%ld goal=%ld rem=%ld done=%d  right=%ld goal=%ld rem=%ld done=%d",
-        left_count, left_goal, left_rem, left_done,
-        right_count, right_goal, right_rem, right_done);
+          node_->get_logger(), *node_->get_clock(), 200,
+          "DR | left=%ld goal=%ld rem=%ld done=%d  right=%ld goal=%ld rem=%ld done=%d", left_count, left_goal, left_rem,
+          left_done, right_count, right_goal, right_rem, right_done
+      );
 
       if (left_done && !dr_left_done_.load()) {
         dr_left_done_.store(true);
@@ -411,58 +379,41 @@ void GPIOController::control_loop()
       if (dr_left_done_.load() && dr_right_done_.load()) {
         cmd_linear_.store(0.0);
         cmd_angular_.store(0.0);
-        if (left_motor_) {left_motor_->hard_brake();}
-        if (right_motor_) {right_motor_->hard_brake();}
+        if (left_motor_) {
+          left_motor_->hard_brake();
+        }
+        if (right_motor_) {
+          right_motor_->hard_brake();
+        }
         control_mode_.store(ControlMode::NORMAL);
         RCLCPP_INFO(node_->get_logger(), "DR | Complete — braking motors");
       }
-
     }
 
     {
-      const double left_raw_rpm = payload::control_math::rpm_from_count_delta(
-        left_delta, p.encoder.output_cpr, dt_s);
-      const double right_raw_rpm = payload::control_math::rpm_from_count_delta(
-        right_delta, p.encoder.output_cpr, dt_s);
+      const double left_raw_rpm = payload::control_math::rpm_from_count_delta(left_delta, p.encoder.output_cpr, dt_s);
+      const double right_raw_rpm = payload::control_math::rpm_from_count_delta(right_delta, p.encoder.output_cpr, dt_s);
 
-      left_filtered_rpm_ = payload::control_math::low_pass_filter(
-        left_raw_rpm, left_filtered_rpm_, p.pid.velocity_alpha);
-      right_filtered_rpm_ = payload::control_math::low_pass_filter(
-        right_raw_rpm, right_filtered_rpm_, p.pid.velocity_alpha);
+      left_filtered_rpm_ =
+          payload::control_math::low_pass_filter(left_raw_rpm, left_filtered_rpm_, p.pid.velocity_alpha);
+      right_filtered_rpm_ =
+          payload::control_math::low_pass_filter(right_raw_rpm, right_filtered_rpm_, p.pid.velocity_alpha);
 
-      const payload::control_math::PidConfig left_pid_cfg {
-        p.pid.left_kp,
-        p.pid.left_ki,
-        p.pid.left_kd,
-        p.pid.i_clamp,
-        p.pid.output_limit_norm,
-        p.pid.stop_deadband_rpm,
+      const payload::control_math::PidConfig left_pid_cfg{
+          p.pid.left_kp, p.pid.left_ki, p.pid.left_kd, p.pid.i_clamp, p.pid.output_limit_norm, p.pid.stop_deadband_rpm,
       };
-      const payload::control_math::PidConfig right_pid_cfg {
-        p.pid.right_kp,
-        p.pid.right_ki,
-        p.pid.right_kd,
-        p.pid.i_clamp,
-        p.pid.output_limit_norm,
-        p.pid.stop_deadband_rpm,
+      const payload::control_math::PidConfig right_pid_cfg{
+          p.pid.right_kp, p.pid.right_ki,          p.pid.right_kd,
+          p.pid.i_clamp,  p.pid.output_limit_norm, p.pid.stop_deadband_rpm,
       };
 
       const bool in_dr = (control_mode_.load() == ControlMode::DEAD_RECKONING);
       const double left_sp = (in_dr && dr_left_done_.load()) ? 0.0 : setpoints.left_rpm;
       const double right_sp = (in_dr && dr_right_done_.load()) ? 0.0 : setpoints.right_rpm;
 
-      left_terms = payload::control_math::pid_step(
-        left_sp,
-        left_filtered_rpm_,
-        dt_s,
-        left_pid_cfg,
-        left_pid_state_);
-      right_terms = payload::control_math::pid_step(
-        right_sp,
-        right_filtered_rpm_,
-        dt_s,
-        right_pid_cfg,
-        right_pid_state_);
+      left_terms = payload::control_math::pid_step(left_sp, left_filtered_rpm_, dt_s, left_pid_cfg, left_pid_state_);
+      right_terms =
+          payload::control_math::pid_step(right_sp, right_filtered_rpm_, dt_s, right_pid_cfg, right_pid_state_);
 
       left_duty = static_cast<float>(std::abs(left_terms.output) * 100.0);
       right_duty = static_cast<float>(std::abs(right_terms.output) * 100.0);
@@ -482,7 +433,6 @@ void GPIOController::control_loop()
       } else {
         right_motor_->coast();
       }
-
     }
 
 
@@ -511,8 +461,7 @@ void GPIOController::control_loop()
       motor_state_pub_->publish(msg);
     }
 
-    std::this_thread::sleep_until(
-      loop_start + std::chrono::milliseconds(p.control.loop_ms));
+    std::this_thread::sleep_until(loop_start + std::chrono::milliseconds(p.control.loop_ms));
   }
 }
 

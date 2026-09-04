@@ -12,11 +12,12 @@ namespace payload::control_math
 {
 
 WheelSetpoints compute_wheel_setpoints(
-  double linear_mps,
-  double angular_rad_s,
-  double wheel_separation_m,
-  double wheel_radius_m,
-  double max_wheel_rpm)
+    double linear_mps,
+    double angular_rad_s,
+    double wheel_separation_m,
+    double wheel_radius_m,
+    double max_wheel_rpm
+)
 {
   WheelSetpoints setpoints;
 
@@ -45,12 +46,7 @@ double low_pass_filter(double current, double previous_filtered, double alpha)
   return (a * current) + ((1.0 - a) * previous_filtered);
 }
 
-PidTerms pid_step(
-  double setpoint_rpm,
-  double measured_rpm,
-  double dt_s,
-  const PidConfig & config,
-  PidState & state)
+PidTerms pid_step(double setpoint_rpm, double measured_rpm, double dt_s, const PidConfig& config, PidState& state)
 {
   PidTerms terms;
   terms.error = setpoint_rpm - measured_rpm;
@@ -82,11 +78,7 @@ PidTerms pid_step(
   return terms;
 }
 
-bool compute_ziegler_nichols_classic(
-  double ku,
-  double pu,
-  PidGains & gains,
-  std::string & error_message)
+bool compute_ziegler_nichols_classic(double ku, double pu, PidGains& gains, std::string& error_message)
 {
   if (ku <= 0.0) {
     error_message = "Ku must be > 0";

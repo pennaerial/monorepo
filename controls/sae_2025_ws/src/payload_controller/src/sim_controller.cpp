@@ -1,12 +1,9 @@
 #include "payload_controller/sim_controller.hpp"
 
 
-SimController::SimController()
-{
+SimController::SimController() {}
 
-}
-
-void SimController::initialize(rclcpp::Node * node)
+void SimController::initialize(rclcpp::Node* node)
 {
   gz_node_ = std::make_shared<gz::transport::Node>();
 
@@ -17,9 +14,7 @@ void SimController::initialize(rclcpp::Node * node)
   std::string gz_drive_topic = "/model/" + sim_entity_name + "/cmd_vel";
 
   gz_drive_publisher_ = gz_node_->Advertise<gz::msgs::Twist>(gz_drive_topic);
-  RCLCPP_INFO(
-    node->get_logger(), "SIM | Publishing gz drive commands to %s",
-    gz_drive_topic.c_str());
+  RCLCPP_INFO(node->get_logger(), "SIM | Publishing gz drive commands to %s", gz_drive_topic.c_str());
 }
 
 void SimController::publish_drive_command(double linear, double angular)
@@ -29,8 +24,8 @@ void SimController::publish_drive_command(double linear, double angular)
   }
 
   gz::msgs::Twist msg;
-  msg.mutable_linear()->set_x(linear);   //head-on direction
-  msg.mutable_angular()->set_z(angular);   //positive for left, negative for right
+  msg.mutable_linear()->set_x(linear);    // head-on direction
+  msg.mutable_angular()->set_z(angular);  // positive for left, negative for right
   gz_drive_publisher_.Publish(msg);
 }
 

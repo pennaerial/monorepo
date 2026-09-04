@@ -1,14 +1,12 @@
 #include "payload_controller/gpio.hpp"
+
 #include <pigpiod_if2.h>
 
-GPIO::GPIO(int pi, int pin, Direction direction)
-: pi_(pi), pin_(pin), direction_(direction)
+GPIO::GPIO(int pi, int pin, Direction direction) : pi_(pi), pin_(pin), direction_(direction)
 {
   int rc = 0;
   switch (direction_) {
-    case Direction::Input:
-      rc = set_mode(pi_, pin_, PI_INPUT);
-      break;
+    case Direction::Input: rc = set_mode(pi_, pin_, PI_INPUT); break;
     case Direction::Output:
       rc = set_mode(pi_, pin_, PI_OUTPUT);
       if (rc == 0) {
@@ -29,7 +27,9 @@ void GPIO::write_high()
     return;
   }
   int rc = gpio_write(pi_, pin_, 1);
-  if (rc != 0) {RCLCPP_WARN(logger(), "gpio_write HIGH failed on pin %d: rc=%d", pin_, rc);}
+  if (rc != 0) {
+    RCLCPP_WARN(logger(), "gpio_write HIGH failed on pin %d: rc=%d", pin_, rc);
+  }
 }
 
 void GPIO::write_low()
@@ -39,7 +39,9 @@ void GPIO::write_low()
     return;
   }
   int rc = gpio_write(pi_, pin_, 0);
-  if (rc != 0) {RCLCPP_WARN(logger(), "gpio_write LOW failed on pin %d: rc=%d", pin_, rc);}
+  if (rc != 0) {
+    RCLCPP_WARN(logger(), "gpio_write LOW failed on pin %d: rc=%d", pin_, rc);
+  }
 }
 
 void GPIO::write_pwm(float frequency, float duty_cycle)
@@ -55,7 +57,9 @@ void GPIO::write_pwm(float frequency, float duty_cycle)
   }
   int duty_val = static_cast<int>(duty_cycle * 100.0f);
   rc = set_PWM_dutycycle(pi_, pin_, duty_val);
-  if (rc != 0) {RCLCPP_WARN(logger(), "set_PWM_dutycycle failed on pin %d: rc=%d", pin_, rc);}
+  if (rc != 0) {
+    RCLCPP_WARN(logger(), "set_PWM_dutycycle failed on pin %d: rc=%d", pin_, rc);
+  }
 }
 
 void GPIO::write_servo(int pulse_width)
@@ -65,7 +69,9 @@ void GPIO::write_servo(int pulse_width)
     return;
   }
   int rc = set_servo_pulsewidth(pi_, pin_, pulse_width);
-  if (rc != 0) {RCLCPP_WARN(logger(), "set_servo_pulsewidth failed on pin %d: rc=%d", pin_, rc);}
+  if (rc != 0) {
+    RCLCPP_WARN(logger(), "set_servo_pulsewidth failed on pin %d: rc=%d", pin_, rc);
+  }
 }
 
 rclcpp::Logger GPIO::logger()

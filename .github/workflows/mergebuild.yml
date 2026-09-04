@@ -24,7 +24,7 @@ jobs:
       ros_ws: ${{ steps.filter.outputs.ros_ws }}
       # payload_controller: ${{ steps.filter.outputs.payload_controller }}
       # gcs: ${{ steps.filter.outputs.gcs }}
-      # docs: ${{ steps.filter.outputs.docs }}
+      docs: ${{ steps.filter.outputs.docs }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4 # don't checkout submodules
@@ -37,8 +37,12 @@ jobs:
             all:
               - 'ci/**'
               - '.github/workflows/mergebuild.yml'
+              - 'dev_env.sh'
             ros_ws:
               - 'controls/sae_2025_ws/**'
+            docs:
+              - 'docs/**'
+              - '.github/actions/build-docs/action.yaml'
 
   validate_ros_workspace:
     name: Validate ROS Workspace
@@ -78,10 +82,25 @@ jobs:
           cd "$PENNAIR_SAE_WS_PATH"
           ct
 
+  docs:
+    name: Build Docs
+    needs: detect_changes
+    runs-on: ubuntu-latest
+    if: needs.detect_changes.outputs.docs == 'true' || needs.detect_changes.outputs.all == 'true'
+    steps:
+     - name: Checkout Code
+       uses: actions/checkout@v4
+
+     - name: Build Docs
+       uses: ./.github/actions/build-docs
+       with:
+         deploy: "false"
+
   merge_build_status:
     name: Merge Build Status
     needs: # depend on each additional job here
       - validate_ros_workspace
+      - docs
     if: always()
     runs-on: ubuntu-latest
 
@@ -89,17 +108,32 @@ jobs:
       - name: Check validation results
         env:
           ROS_WS_RESULT: ${{ needs.validate_ros_workspace.result }}
-        run: |
-          echo "Validation results:"
-          echo "  ROS Workspace: $ROS_WS_RESULT"
+          DOCS_RESULT: ${{ needs.docs.result }}
 
-          if [[ "$ROS_WS_RESULT" != "success" && "$ROS_WS_RESULT" != "skipped" ]]; then
-            echo "::error::ROS Workspace validation failed ($ROS_WS_RESULT)"
+        run: |
+          # Create a map of different mergebuild jobs to check. MODIFY THIS IF ADDING A MERGEBUILD JOB
+          declare -A checks=(
+            ["ROS Workspace"]="$ROS_WS_RESULT"
+            ["Docs"]="$DOCS_RESULT"
+          )
+
+          failed=0
+
+          echo "Validation results:"
+
+          for name in "${!checks[@]}"; do
+            result="${checks[$name]}"
+
+            echo "  $name: $result"
+
+            if [[ "$result" != "success" && "$result" != "skipped" ]]; then
+              echo "::error::$name validation failed ($result)"
+              failed=1
+            fi
+          done
+
+          if [[ "$failed" -ne 0 ]]; then
             exit 1
           fi
 
           echo "All applicable validations passed."
-
-
-
-
