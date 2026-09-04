@@ -4,6 +4,7 @@
 
 # BUILDING
 alias cb='colcon build'
+alias cbcc="colcon build --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON && ln -s build/compile_commands.json compile_commands.json"
 alias cbp='colcon build --packages-select'
 alias cbpsi='colcon build --symlink-install --packages-select'
 
@@ -66,7 +67,7 @@ alias ctpsim='colcon test --pytest-args -s -o python_files="sim_test_*.py" --eve
 
 
 # Clang-format shortcut
-cfmt() {
+cppfmt() {
     local check=false
 
     case "${1:-}" in
