@@ -127,7 +127,7 @@ The decorator records the information needed to use this class:
    The vehicle types that can run this mode.
 
 ``transition_labels``
-   The custom outcomes this mode can report. A mission using this mode defines 
+   The custom outcomes this mode can report. A mission using this mode defines
    which mode should follow each outcome.
 
 
@@ -200,57 +200,69 @@ Finish the class by adding ``check_status()``:
            return "continue"
 
 The method keeps the mode active until the UAV is within ``margin`` meters of
-the target. Returning ``"complete"`` reports that the behavior has finished. 
+the target. Returning ``"complete"`` reports that the behavior has finished.
 In the next tutorial, the mission will connect this outcome to another mode.
 
 At this point, your file should contain the imports, ``FlyToPointParams``, the
 decorated ``FlyToPointMode`` class, and its three required lifecycle methods.
 
 
-How the Mode is Discovered
-------------------------------
+.. dropdown:: Complete FlyToPointMode.py
 
-Mission files identify modes using strings such as ``uav.FlyToPointMode``, but
-Python needs the actual ``FlyToPointMode`` class before it can create an object.
-The **mode registry** connects the two. You can think of it as a lookup table:
+   .. code-block:: python
+      :caption: FlyToPointMode.py
 
-.. code-block:: text
+      from typing import override
 
-   "uav.FlyToPointMode"
-       class       -> FlyToPointMode
-       parameters  -> FlyToPointParams
-       targets     -> UAV
-       transitions -> complete
+      from rclpy.node import Node
 
-Registering a mode only adds this description to the lookup table. It does not
-create the mode, call its lifecycle methods, or command the UAV. That happens
-later, when a mission refers to the registered ID.
+      from uav.vehicles.UAV import UAV
+      from vehicle_common.mode import Mode
+      from vehicle_common.mode_loader import ParamsBase, register_mode
 
-The registry builds its lookup table the first time a mission or CLI command
-asks for it:
 
-#. The registry walks through the ``uav.modes`` and ``payload.modes`` packages.
-#. It imports each Python module it finds. It is importing normal Python files,
-   not searching their text for class names.
-#. When Python imports ``FlyToPointMode.py``, it executes the module's top-level
-   code. This includes the ``@register_mode(...)`` decorator.
-#. The decorator gives the registry the class and metadata shown above.
-#. After all mode modules have been imported, the registry can find each mode by
-   its unique ID.
+      class FlyToPointParams(ParamsBase):
+          target: tuple[float, float, float]
+          margin: float = 0.5
 
-This is why you do not need to maintain a central list or add an import to
-``uav/modes/__init__.py``. Placing the decorated class in the discovered package
-is enough.
 
-For that automatic process to succeed:
+      @register_mode(
+          id="uav.FlyToPointMode",
+          params_cls=FlyToPointParams,
+          targets=[UAV],
+          transition_labels=["complete"],
+      )
+      class FlyToPointMode(Mode[UAV, FlyToPointParams]):
+          """Fly a UAV to one position in its local NED frame."""
 
-* The file must be inside one of the discovered ``modes`` packages.
-* The module must import without errors.
-* Its registered ID must be unique.
+          @override
+          def initialize(
+              self,
+              node: Node,
+              vehicle: UAV,
+              params: FlyToPointParams,
+          ) -> None:
+              self.node = node
+              self.vehicle = vehicle
+              self.p = params
 
-The ``pennair mode ls`` command used below requests this same registry and
-prints the lookup-table entries. If your mode appears, you know that its module
-was imported and its decorator ran successfully.
+          @override
+          def on_update(self, time_delta: float) -> None:
+              if self.vehicle.local_position is None:
+                  return
+
+              self.vehicle.publish_position_setpoint(self.p.target)
+
+          @override
+          def check_status(self) -> str:
+              if self.vehicle.local_position is None:
+                  return "continue"
+
+              distance = self.vehicle.distance_to_waypoint("LOCAL", self.p.target)
+              if distance <= self.p.margin:
+                  return "complete"
+
+              return "continue"
 
 
 Build and Source the Workspace
@@ -274,6 +286,7 @@ Use the PennAiR CLI to list the registered modes:
 
 .. code-block:: bash
    :caption: Bash
+
    pennair mode ls
 
 Find this entry in the output:
@@ -290,6 +303,30 @@ Find this entry in the output:
      transitions: complete
 
 If the entry appears, the mode was successfully registered.
+
+
+How Mode Discovery Works
+------------------------
+
+Mission files refer to modes by registered IDs such as
+``uav.FlyToPointMode``. The mode registry connects that ID to the Python class,
+its parameter type, its supported vehicles, and its possible outcomes.
+
+When the registry is first requested, it imports the Python modules inside the
+``uav.modes`` and ``payload.modes`` packages. Importing
+``FlyToPointMode.py`` runs its ``@register_mode(...)`` decorator, which adds the
+mode to the registry. You do not need to add the class to a central list or
+import it from ``uav/modes/__init__.py``.
+
+Automatic discovery succeeds when:
+
+* The file is inside one of the discovered ``modes`` packages.
+* The module imports without errors.
+* The registered ID is unique.
+
+The ``pennair mode ls`` command reads this registry. Seeing
+``uav.FlyToPointMode`` in its output confirms that the file was imported and the
+decorator registered the class.
 
 Next Step
 ---------
