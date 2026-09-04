@@ -30,9 +30,10 @@ In a :doc:`mission <missions>`, each use of a mode has a local name and refers
 to a reusable mode type. The mission can also provide parameters that adjust
 the behavior and define which mode should follow each possible outcome.
 
-For example:
+For example, a mission could look like:
 
 .. code-block:: yaml
+   :caption: yaml
 
    modes:
      start:
