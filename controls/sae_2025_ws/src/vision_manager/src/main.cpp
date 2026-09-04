@@ -6,5 +6,5 @@ int main(int argc, char* argv[])
   rclcpp::init(argc, argv);
   rclcpp::spin(std::make_shared<pennair_vision::VisionManager>());
   rclcpp::shutdown();
-  return 0;
+   return 0;
 }
