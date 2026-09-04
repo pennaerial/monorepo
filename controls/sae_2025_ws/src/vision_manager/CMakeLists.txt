@@ -11,9 +11,21 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
 
-add_executable(vision_manager src/vision_manager.cpp)
-ament_target_dependencies(vision_manager rclcpp std_msgs)
+include_directories(include)
+
+add_executable(vision_manager
+    src/main.cpp
+    src/vision_manager.cpp
+    src/vision_plugin.cpp
+)
+
+ament_target_dependencies(vision_manager
+    rclcpp
+    std_msgs
+    sensor_msgs
+)
 
 install(TARGETS
   vision_manager
