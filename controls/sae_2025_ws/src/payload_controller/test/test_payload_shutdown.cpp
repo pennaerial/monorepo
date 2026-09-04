@@ -1,10 +1,9 @@
 #include <gtest/gtest.h>
 
 #include <memory>
+#include <rclcpp/rclcpp.hpp>
 #include <utility>
 #include <vector>
-
-#include <rclcpp/rclcpp.hpp>
 
 #include "payload_controller/controller.hpp"
 #include "payload_controller/payload_controller.hpp"
@@ -15,7 +14,7 @@ namespace
 class RecordingController : public Controller
 {
 public:
-  void initialize(rclcpp::Node * node) override
+  void initialize(rclcpp::Node* node) override
   {
     (void)node;
     ++initialize_calls;
@@ -38,8 +37,8 @@ public:
     servo_commands.push_back(0.0);
   }
 
-  int initialize_calls {0};
-  int safe_shutdown_calls {0};
+  int initialize_calls{0};
+  int safe_shutdown_calls{0};
   std::vector<std::pair<double, double>> drive_commands;
   std::vector<double> servo_commands;
 };
@@ -62,7 +61,8 @@ protected:
   }
 };
 
-TEST_F(PayloadShutdownTest, DestructorInvokesControllerSafeShutdownOnce) {
+TEST_F(PayloadShutdownTest, DestructorInvokesControllerSafeShutdownOnce)
+{
   auto controller = std::make_shared<RecordingController>();
 
   {
@@ -79,7 +79,8 @@ TEST_F(PayloadShutdownTest, DestructorInvokesControllerSafeShutdownOnce) {
   EXPECT_DOUBLE_EQ(controller->servo_commands.back(), 0.0);
 }
 
-TEST_F(PayloadShutdownTest, PrepareForShutdownIsIdempotent) {
+TEST_F(PayloadShutdownTest, PrepareForShutdownIsIdempotent)
+{
   auto controller = std::make_shared<RecordingController>();
 
   {

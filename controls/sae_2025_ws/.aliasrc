@@ -62,3 +62,40 @@ ctsim() {
 
 # Runs all sim tests from the selected/specified packages
 alias ctpsim='colcon test --pytest-args -s -o python_files="sim_test_*.py" --event-handlers console_direct+ --packages-select'
+
+
+
+# Clang-format shortcut
+cfmt() {
+    local check=false
+
+    case "${1:-}" in
+        "")
+            ;;
+        --check)
+            check=true
+            ;;
+        *)
+            echo "Usage: cfmt [--check]"
+            echo "  cfmt          Apply clang-format"
+            echo "  cfmt --check  Check formatting without modifying files"
+            return 1
+            ;;
+    esac
+
+    local files
+    files=$(git ls-files | grep -E '\.(cpp|h|hpp|cc)$')
+
+    if [[ -z "$files" ]]; then
+        echo "No matching C/C++ files found."
+        return 0
+    fi
+
+    if $check; then
+        echo "Checking clang-format..."
+        echo "$files" | xargs clang-format --dry-run --Werror --verbose
+    else
+        echo "Applying clang-format..."
+        echo "$files" | xargs clang-format -i --style=file
+    fi
+}

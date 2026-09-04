@@ -4,10 +4,10 @@
 #include <gz/msgs/time.pb.h>
 
 #include "builtin_interfaces/msg/Time.h"
-#include "sensor_msgs/msg/Imu.h"
-#include "std_msgs/msg/Header.h"
 #include "geometry_msgs/msg/Quaternion.h"
 #include "geometry_msgs/msg/Vector3.h"
+#include "sensor_msgs/msg/Imu.h"
+#include "std_msgs/msg/Header.h"
 
 
 /**
@@ -26,7 +26,7 @@ const char* find_gz_header_data(const gz::msgs::Header& header, const std::strin
  * @param arr Destination double array to copy the data into.
  * @tparam N Number of elements in the destination DDS array.
  */
-template<std::size_t N>
+template <std::size_t N>
 void gz_float_v_cpy(const gz::msgs::Float_V& gz_msg, double (&arr)[N])
 {
   assert(gz_msg.data_size() == N);
