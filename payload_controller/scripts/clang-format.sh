@@ -14,9 +14,9 @@ if [[ -z "$FILES" ]]; then
 fi
 
 if $CHECK; then
-  echo "Running clang-format check..."
-  echo "$FILES" | xargs clang-format --dry-run --Werror
+  echo "Checking clang-format"
+  echo "$FILES" | xargs clang-format --dry-run --Werror --verbose
 else
   echo "Applying clang-format..."
-  echo "$FILES" | xargs -i clang-format
+  echo "$FILES" | xargs clang-format -i --style=file
 fi

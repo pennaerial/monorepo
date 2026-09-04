@@ -5,14 +5,14 @@ BasedOnStyle: Google
 # --- RELAXED ACCESSIBILITY TUNING ---
 
 # Expand the line limit so developers don't have to constantly wrap code
-ColumnLimit: 120
+ColumnLimit: 100
 
-# Let developers group code logically with empty lines without the linter deleting them
+# Let developers group code logically with empty lines without the formatter deleting them
 MaxEmptyLinesToKeep: 2
 
 # Keep short blocks on multiple lines for better readability
 AllowShortBlocksOnASingleLine: false
-AllowShortCaseLabelsOnASingleLine: false
+AllowShortCaseLabelsOnASingleLine: true
 AllowShortFunctionsOnASingleLine: Empty
 AllowShortIfStatementsOnASingleLine: Never
 AllowShortLoopsOnASingleLine: false
@@ -23,10 +23,33 @@ IndentWidth: 2
 TabWidth: 2
 UseTab: Never
 
+# Align public:/protected:/private: with the class declaration
+AccessModifierOffset: -2
+
+# New-line braces for functions, classes, and namespaces.
+# Keep other constructs on the same line.
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterClass: true
+  AfterFunction: true
+  AfterNamespace: true
+
+  AfterStruct: false
+  AfterUnion: false
+  AfterEnum: false
+  AfterControlStatement: Never
+
+  BeforeElse: false
+  BeforeCatch: false
+  BeforeWhile: false
+
+  IndentBraces: false
+
 # Clean up layout around assignments and control flows
 SpaceBeforeAssignmentOperators: true
 SpaceBeforeParens: ControlStatements
 
 # Sort includes alphabetically automatically to avoid merge conflicts
 SortIncludes: true
+
 ...
