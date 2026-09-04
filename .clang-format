@@ -5,7 +5,7 @@ BasedOnStyle: Google
 # --- RELAXED ACCESSIBILITY TUNING ---
 
 # Expand the line limit so developers don't have to constantly wrap code
-ColumnLimit: 100
+ColumnLimit: 120
 
 # Let developers group code logically with empty lines without the formatter deleting them
 MaxEmptyLinesToKeep: 2
@@ -16,10 +16,13 @@ AllowShortCaseLabelsOnASingleLine: true
 AllowShortFunctionsOnASingleLine: Empty
 AllowShortIfStatementsOnASingleLine: Never
 AllowShortLoopsOnASingleLine: false
-
+AllowShortEnumsOnASingleLine: false
+AllowAllParametersOfDeclarationOnNextLine: false
 # --- MODERN READABILITY TUNING ---
 
 IndentWidth: 2
+ContinuationIndentWidth: 4
+AlignAfterOpenBracket: BlockIndent
 TabWidth: 2
 UseTab: Never
 
@@ -44,6 +47,9 @@ BraceWrapping:
   BeforeWhile: false
 
   IndentBraces: false
+
+# Put each parameter on its own line when a function declaration must wrap
+BinPackParameters: false
 
 # Clean up layout around assignments and control flows
 SpaceBeforeAssignmentOperators: true
