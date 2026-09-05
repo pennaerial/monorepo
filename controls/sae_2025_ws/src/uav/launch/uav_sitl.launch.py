@@ -117,7 +117,7 @@ def launch_setup(context) -> list[Action]:
         namespace=vehicle_ns,
         parameters=[
             {
-                "mode_map": mission_path,
+                "mode_map": str(mission_path),
                 "vehicle_name": vehicle_ns,
                 "vehicle_class": airframe.airframe_class.name,
                 "auto_launch": True,
