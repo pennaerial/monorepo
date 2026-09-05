@@ -61,12 +61,12 @@ monorepo root, create:
 
 .. code-block:: text
 
-   controls/sae_2025_ws/src/uav/uav/modes/FlyToPointMode.py
+   controls/sae_2025_ws/src/uav/uav/modes/fly_to_point_mode.py
 
 Start the file with these imports:
 
 .. code-block:: python
-   :caption: FlyToPointMode.py
+   :caption: fly_to_point_mode.py
 
    from typing import override
 
@@ -207,10 +207,10 @@ At this point, your file should contain the imports, ``FlyToPointParams``, the
 decorated ``FlyToPointMode`` class, and its three required lifecycle methods.
 
 
-.. dropdown:: Complete FlyToPointMode.py
+.. dropdown:: Complete fly_to_point_mode.py
 
    .. code-block:: python
-      :caption: FlyToPointMode.py
+      :caption: fly_to_point_mode.py
 
       from typing import override
 
@@ -314,7 +314,7 @@ its parameter type, its supported vehicles, and its possible outcomes.
 
 When the registry is first requested, it imports the Python modules inside the
 ``uav.modes`` and ``payload.modes`` packages. Importing
-``FlyToPointMode.py`` runs its ``@register_mode(...)`` decorator, which adds the
+``fly_to_point_mode.py`` runs its ``@register_mode(...)`` decorator, which adds the
 mode to the registry. You do not need to add the class to a central list or
 import it from ``uav/modes/__init__.py``.
 
