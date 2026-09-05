@@ -61,7 +61,6 @@ ExternalProject_Add(microcdr_project
 
 # Profiles shared by both targets.
 set(client_profile_args
-    -DUCLIENT_PROFILE_UDP:BOOL=OFF
     -DUCLIENT_PROFILE_TCP:BOOL=OFF
     -DUCLIENT_PROFILE_DISCOVERY:BOOL=OFF
     -DUCLIENT_PROFILE_SHARED_MEMORY:BOOL=OFF
@@ -70,14 +69,16 @@ set(client_profile_args
 
 if(IDF_TARGET STREQUAL "linux")
     list(APPEND client_profile_args
-        -DUCLIENT_PROFILE_SERIAL:BOOL=ON
+        -DUCLIENT_PROFILE_UDP:BOOL=ON
+        -DUCLIENT_PROFILE_SERIAL:BOOL=OFF
         -DUCLIENT_PROFILE_CUSTOM_TRANSPORT:BOOL=OFF
     )
 else()
     # Use the custom-transport profile with UART config supplied from dds_client.cpp.
     list(APPEND client_profile_args
-        -DUCLIENT_PROFILE_SERIAL:BOOL=OFF
-        -DUCLIENT_PROFILE_CUSTOM_TRANSPORT:BOOL=ON
+        -DUCLIENT_PROFILE_SERIAL:BOOL=ON
+        -DUCLIENT_PROFILE_UDP:BOOL=OFF
+        -DUCLIENT_PROFILE_CUSTOM_TRANSPORT:BOOL=OFF
     )
 endif()
 
