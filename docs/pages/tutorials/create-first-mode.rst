@@ -3,8 +3,7 @@ Creating Your First Mode
 
 .. rst-class:: lead
 
-   Create a UAV mode that flies to one local coordinate, register it with
-   PennAiR, and verify that the mode can be discovered.
+   Create a UAV mode that flies to one local coordinate and verify that the mode can be discovered.
 
 ----
 
@@ -92,8 +91,8 @@ Below the imports, define the values that a mission can provide:
        target: tuple[float, float, float]
        margin: float = 0.5
 
-``ParamsBase`` is a Pydantic model. When a mission is loaded, PennAiR validates
-the mission's ``params`` and converts them into a ``FlyToPointParams`` object.
+``ParamsBase`` is a Pydantic model. When a mission is loaded, its ``params`` 
+are validated and converted into a ``FlyToPointParams`` object.
 
 ``target`` has no default, so every use of this mode must provide three
 coordinates. ``margin`` is optional and defaults to 0.5 meters.
