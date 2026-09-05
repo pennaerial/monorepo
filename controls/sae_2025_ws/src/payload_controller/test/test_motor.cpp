@@ -1,4 +1,3 @@
-#include <rclcpp/rclcpp.hpp>
 #include <pigpiod_if2.h>
 
 #include <chrono>
@@ -6,6 +5,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
+#include <rclcpp/rclcpp.hpp>
 #include <thread>
 
 #include "payload_controller/encoder.hpp"
@@ -35,34 +35,43 @@ constexpr float FREQ = 200.0f;
 static constexpr int ENC_CPR = 2400;
 
 static int g_pi = -1;
-static void pause(int ms) {std::this_thread::sleep_for(std::chrono::milliseconds(ms));}
+static void pause(int ms)
+{
+  std::this_thread::sleep_for(std::chrono::milliseconds(ms));
+}
 
-static void pause_print(int ms, QuadratureEncoder & enc_a, QuadratureEncoder & enc_b)
+static void pause_print(int ms, QuadratureEncoder& enc_a, QuadratureEncoder& enc_b)
 {
   auto end = std::chrono::steady_clock::now() + std::chrono::milliseconds(ms);
   while (std::chrono::steady_clock::now() < end) {
     printf(
-      "  enc_a: %lld (%.1f deg)   enc_b: %lld (%.1f deg)\n",
-      static_cast<long long>(enc_a.count()), enc_a.angle_deg(),
-      static_cast<long long>(enc_b.count()), enc_b.angle_deg());
+        "  enc_a: %lld (%.1f deg)   enc_b: %lld (%.1f deg)\n", static_cast<long long>(enc_a.count()), enc_a.angle_deg(),
+        static_cast<long long>(enc_b.count()), enc_b.angle_deg()
+    );
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
   }
 }
 
-static Motor * g_motor_a = nullptr;
-static Motor * g_motor_b = nullptr;
+static Motor* g_motor_a = nullptr;
+static Motor* g_motor_b = nullptr;
 
 static void on_sigint(int)
 {
   printf("\nCaught SIGINT — coasting motors and cleaning up\n");
-  if (g_motor_a) {g_motor_a->coast();}
-  if (g_motor_b) {g_motor_b->coast();}
-  if (g_pi >= 0) {pigpio_stop(g_pi);}
+  if (g_motor_a) {
+    g_motor_a->coast();
+  }
+  if (g_motor_b) {
+    g_motor_b->coast();
+  }
+  if (g_pi >= 0) {
+    pigpio_stop(g_pi);
+  }
   rclcpp::shutdown();
   std::exit(0);
 }
 
-int main(int argc, char ** argv)
+int main(int argc, char** argv)
 {
   rclcpp::init(argc, argv);
 
@@ -78,9 +87,10 @@ int main(int argc, char ** argv)
   std::unique_ptr<Motor> motor_left;
   printf("Running SNMotor test\n");
   motor_right = std::make_unique<SNMotor>(
-    g_pi, SN_RIGHT_PWM, SN_RIGHT_IN1, SN_RIGHT_IN2, static_cast<int>(FREQ), MotorType::RIGHT);
-  motor_left = std::make_unique<SNMotor>(
-    g_pi, SN_LEFT_PWM, SN_LEFT_IN1, SN_LEFT_IN2, static_cast<int>(FREQ), MotorType::LEFT);
+      g_pi, SN_RIGHT_PWM, SN_RIGHT_IN1, SN_RIGHT_IN2, static_cast<int>(FREQ), MotorType::RIGHT
+  );
+  motor_left =
+      std::make_unique<SNMotor>(g_pi, SN_LEFT_PWM, SN_LEFT_IN1, SN_LEFT_IN2, static_cast<int>(FREQ), MotorType::LEFT);
   g_motor_a = motor_right.get();
   g_motor_b = motor_left.get();
   std::signal(SIGINT, on_sigint);

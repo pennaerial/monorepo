@@ -4,39 +4,38 @@
 #include <stdexcept>
 #include <utility>
 
-Payload::Payload(const std::string & vehicle_name)
-: rclcpp::Node(vehicle_name),
-  controller_loader_("payload_controller", "Controller")
+Payload::Payload(const std::string& vehicle_name)
+    : rclcpp::Node(vehicle_name), controller_loader_("payload_controller", "Controller")
 {
   create_command_subscriptions();
   load_controller_from_params();
 }
 
-Payload::Payload(const std::string & vehicle_name, std::shared_ptr<Controller> controller)
-: rclcpp::Node(vehicle_name),
-  controller_loader_("payload_controller", "Controller"),
-  controller_(std::move(controller)),
-  controller_name_("<injected>")
+Payload::Payload(const std::string& vehicle_name, std::shared_ptr<Controller> controller)
+    : rclcpp::Node(vehicle_name),
+      controller_loader_("payload_controller", "Controller"),
+      controller_(std::move(controller)),
+      controller_name_("<injected>")
 {
   if (!controller_) {
     throw std::invalid_argument("Injected payload controller must not be null.");
   }
   create_command_subscriptions();
-  RCLCPP_INFO(
-    this->get_logger(),
-    "Using injected payload controller for testing.");
+  RCLCPP_INFO(this->get_logger(), "Using injected payload controller for testing.");
 }
 
 void Payload::create_command_subscriptions()
 {
   std::string ros_drive_topic = "cmd_drive";
   ros_drive_subscriber_ = this->create_subscription<payload_interfaces::msg::DriveCommand>(
-    ros_drive_topic, 10, std::bind(&Payload::drive_callback, this, std::placeholders::_1));
+      ros_drive_topic, 10, std::bind(&Payload::drive_callback, this, std::placeholders::_1)
+  );
   RCLCPP_INFO(this->get_logger(), "Listening on: %s", ros_drive_topic.c_str());
 
   std::string servo_topic = "servo";
   servo_subscriber_ = this->create_subscription<payload_interfaces::msg::ServoCommand>(
-    servo_topic, 10, std::bind(&Payload::servo_callback, this, std::placeholders::_1));
+      servo_topic, 10, std::bind(&Payload::servo_callback, this, std::placeholders::_1)
+  );
   RCLCPP_INFO(this->get_logger(), "Servo listening on: %s", servo_topic.c_str());
 }
 
@@ -46,18 +45,13 @@ void Payload::load_controller_from_params()
   const auto params = payload_params_listener_->get_params();
   controller_name_ = params.controller;
 
-  RCLCPP_INFO(
-    this->get_logger(),
-    "Loading payload controller plugin: %s",
-    controller_name_.c_str());
+  RCLCPP_INFO(this->get_logger(), "Loading payload controller plugin: %s", controller_name_.c_str());
   try {
     controller_ = controller_loader_.createSharedInstance(controller_name_);
-  } catch (const std::exception & ex) {
+  } catch (const std::exception& ex) {
     RCLCPP_FATAL(
-      this->get_logger(),
-      "Failed to create payload controller '%s': %s",
-      controller_name_.c_str(),
-      ex.what());
+        this->get_logger(), "Failed to create payload controller '%s': %s", controller_name_.c_str(), ex.what()
+    );
     throw;
   }
 }
@@ -93,17 +87,16 @@ void Payload::shutdown_actuators() noexcept
   if (controller_) {
     try {
       controller_->safe_shutdown();
-    } catch (const std::exception & ex) {
+    } catch (const std::exception& ex) {
       RCLCPP_ERROR(
-        this->get_logger(),
-        "Failed to safely shut down payload controller '%s': %s",
-        controller_name_.c_str(),
-        ex.what());
+          this->get_logger(), "Failed to safely shut down payload controller '%s': %s", controller_name_.c_str(),
+          ex.what()
+      );
     } catch (...) {
       RCLCPP_ERROR(
-        this->get_logger(),
-        "Failed to safely shut down payload controller '%s' due to an unknown error.",
-        controller_name_.c_str());
+          this->get_logger(), "Failed to safely shut down payload controller '%s' due to an unknown error.",
+          controller_name_.c_str()
+      );
     }
   }
 }
@@ -112,25 +105,18 @@ void Payload::init()
 {
   try {
     controller_->initialize(this);
-  } catch (const std::exception & ex) {
+  } catch (const std::exception& ex) {
     RCLCPP_FATAL(
-      this->get_logger(),
-      "Failed to initialize payload controller '%s': %s",
-      controller_name_.c_str(),
-      ex.what());
+        this->get_logger(), "Failed to initialize payload controller '%s': %s", controller_name_.c_str(), ex.what()
+    );
     throw;
   }
-  RCLCPP_INFO(
-    this->get_logger(),
-    "Payload controller initialized: %s",
-    controller_name_.c_str());
+  RCLCPP_INFO(this->get_logger(), "Payload controller initialized: %s", controller_name_.c_str());
 
   std::string timed_drive_name = "timed_drive";
   timed_drive_srv_ = this->create_service<payload_interfaces::srv::TimedDrive>(
-    timed_drive_name,
-    std::bind(
-      &Payload::timed_drive_callback, this,
-      std::placeholders::_1, std::placeholders::_2));
+      timed_drive_name, std::bind(&Payload::timed_drive_callback, this, std::placeholders::_1, std::placeholders::_2)
+  );
   RCLCPP_INFO(this->get_logger(), "Timed drive service: %s", timed_drive_name.c_str());
 }
 
@@ -164,8 +150,9 @@ void Payload::clear_timed_override()
 }
 
 void Payload::timed_drive_callback(
-  const std::shared_ptr<payload_interfaces::srv::TimedDrive::Request> request,
-  std::shared_ptr<payload_interfaces::srv::TimedDrive::Response> response)
+    const std::shared_ptr<payload_interfaces::srv::TimedDrive::Request> request,
+    std::shared_ptr<payload_interfaces::srv::TimedDrive::Response> response
+)
 {
   if (shutdown_actuators_requested_.load()) {
     response->success = false;
@@ -185,9 +172,9 @@ void Payload::timed_drive_callback(
   if (controller_) {
     controller_->drive_command(request->linear, request->angular);
   }
-  timed_drive_timer_ = this->create_wall_timer(
-    std::chrono::duration<double>(request->duration_sec),
-    [this]() {clear_timed_override();});
+  timed_drive_timer_ = this->create_wall_timer(std::chrono::duration<double>(request->duration_sec), [this]() {
+    clear_timed_override();
+  });
   response->success = true;
   response->message = "Timed drive started";
 }

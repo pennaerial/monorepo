@@ -5,10 +5,9 @@
 // DRVMotor
 
 DRVMotor::DRVMotor(int pi, int in1, int in2, int frequency, MotorType motor_type)
-: frequency_(frequency),
-  in1_(pi, in1, Direction::Output),
-  in2_(pi, in2, Direction::Output),
-  motor_type_(motor_type) {}
+    : frequency_(frequency), in1_(pi, in1, Direction::Output), in2_(pi, in2, Direction::Output), motor_type_(motor_type)
+{
+}
 
 void DRVMotor::set_speed(float speed)
 {
@@ -67,11 +66,13 @@ void DRVMotor::hard_brake()
 // SNMotor
 
 SNMotor::SNMotor(int pi, int pwm_pin, int in1, int in2, int frequency, MotorType motor_type)
-: frequency_(frequency),
-  pwm_(pi, pwm_pin, Direction::Output),
-  in1_(pi, in1, Direction::Output),
-  in2_(pi, in2, Direction::Output),
-  motor_type_(motor_type) {}
+    : frequency_(frequency),
+      pwm_(pi, pwm_pin, Direction::Output),
+      in1_(pi, in1, Direction::Output),
+      in2_(pi, in2, Direction::Output),
+      motor_type_(motor_type)
+{
+}
 
 void SNMotor::set_speed(float speed)
 {

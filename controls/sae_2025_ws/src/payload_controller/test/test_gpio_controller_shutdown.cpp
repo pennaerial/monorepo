@@ -35,18 +35,19 @@ public:
     ++hard_brake_calls;
   }
 
-  float last_speed {0.0f};
-  float last_forward {0.0f};
-  float last_reverse {0.0f};
-  int coast_calls {0};
-  int hard_brake_calls {0};
+  float last_speed{0.0f};
+  float last_forward{0.0f};
+  float last_reverse{0.0f};
+  int coast_calls{0};
+  int hard_brake_calls{0};
 };
 
-TEST(GPIOControllerShutdownTest, SafeShutdownBrakesDriveMotors) {
+TEST(GPIOControllerShutdownTest, SafeShutdownBrakesDriveMotors)
+{
   auto left_motor = std::make_unique<RecordingMotor>();
   auto right_motor = std::make_unique<RecordingMotor>();
-  auto * left = left_motor.get();
-  auto * right = right_motor.get();
+  auto* left = left_motor.get();
+  auto* right = right_motor.get();
 
   GPIOController controller(std::move(left_motor), std::move(right_motor));
 

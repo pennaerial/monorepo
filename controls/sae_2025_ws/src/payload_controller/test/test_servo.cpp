@@ -1,32 +1,38 @@
-#include "payload_controller/servo.hpp"
+#include <pigpiod_if2.h>
 
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
+#include <rclcpp/rclcpp.hpp>
 #include <thread>
 
-#include <pigpiod_if2.h>
-#include <rclcpp/rclcpp.hpp>
+#include "payload_controller/servo.hpp"
 
 
 constexpr int SERVO_PIN = 23;
-constexpr float PULSE_MIN = 600.0f; // used to be 700.0f, but that was too low for the servo to reliably reach 0 degrees. Adjusted after testing with an oscilloscope.
+constexpr float PULSE_MIN = 600.0f;  // used to be 700.0f, but that was too low for the servo to reliably reach 0
+                                     // degrees. Adjusted after testing with an oscilloscope.
 constexpr float PULSE_MAX = 2200.0f;
 constexpr int FREQ = 50;
 
 static int g_pi = -1;
-static void pause(int ms) {std::this_thread::sleep_for(std::chrono::milliseconds(ms));}
+static void pause(int ms)
+{
+  std::this_thread::sleep_for(std::chrono::milliseconds(ms));
+}
 
 static void on_sigint(int)
 {
   std::printf("\nCaught SIGINT -- closing servo and cleaning up\n");
-  if (g_pi >= 0) {pigpio_stop(g_pi);}
+  if (g_pi >= 0) {
+    pigpio_stop(g_pi);
+  }
   rclcpp::shutdown();
   std::exit(0);
 }
 
-int main(int argc, char ** argv)
+int main(int argc, char** argv)
 {
   rclcpp::init(argc, argv);
   std::signal(SIGINT, on_sigint);

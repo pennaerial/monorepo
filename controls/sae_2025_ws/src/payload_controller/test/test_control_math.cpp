@@ -6,38 +6,32 @@
 
 namespace cm = payload::control_math;
 
-TEST(ControlMathTest, WheelSetpointsStraight) {
-  const auto setpoints = cm::compute_wheel_setpoints(
-    1.0,
-    0.0,
-    0.12132,
-    0.01611839,
-    500.0);
+TEST(ControlMathTest, WheelSetpointsStraight)
+{
+  const auto setpoints = cm::compute_wheel_setpoints(1.0, 0.0, 0.12132, 0.01611839, 500.0);
 
   EXPECT_NEAR(setpoints.left_mps, 1.0, 1e-9);
   EXPECT_NEAR(setpoints.right_mps, 1.0, 1e-9);
   EXPECT_NEAR(setpoints.left_rpm, setpoints.right_rpm, 1e-9);
 }
 
-TEST(ControlMathTest, WheelSetpointsTurning) {
-  const auto setpoints = cm::compute_wheel_setpoints(
-    0.5,
-    2.0,
-    0.12132,
-    0.01611839,
-    500.0);
+TEST(ControlMathTest, WheelSetpointsTurning)
+{
+  const auto setpoints = cm::compute_wheel_setpoints(0.5, 2.0, 0.12132, 0.01611839, 500.0);
 
   EXPECT_LT(setpoints.left_mps, setpoints.right_mps);
   EXPECT_LT(setpoints.left_rpm, setpoints.right_rpm);
 }
 
-TEST(ControlMathTest, RpmFromCounts) {
+TEST(ControlMathTest, RpmFromCounts)
+{
   // Half a revolution over 0.5s -> 60 RPM.
   const double rpm = cm::rpm_from_count_delta(308, 616, 0.5);
   EXPECT_NEAR(rpm, 60.0, 0.5);
 }
 
-TEST(ControlMathTest, PidOutputSaturatesAndIntegralClamps) {
+TEST(ControlMathTest, PidOutputSaturatesAndIntegralClamps)
+{
   cm::PidConfig cfg;
   cfg.kp = 0.1;
   cfg.ki = 1.0;
@@ -57,7 +51,8 @@ TEST(ControlMathTest, PidOutputSaturatesAndIntegralClamps) {
   EXPECT_NEAR(terms.output, 0.5, 1e-6);
 }
 
-TEST(ControlMathTest, DeadbandResetsIntegralAndZeroesOutput) {
+TEST(ControlMathTest, DeadbandResetsIntegralAndZeroesOutput)
+{
   cm::PidConfig cfg;
   cfg.kp = 1.0;
   cfg.ki = 1.0;
@@ -75,7 +70,8 @@ TEST(ControlMathTest, DeadbandResetsIntegralAndZeroesOutput) {
   EXPECT_NEAR(terms.output, 0.0, 1e-9);
 }
 
-TEST(ControlMathTest, ZieglerNicholsClassic) {
+TEST(ControlMathTest, ZieglerNicholsClassic)
+{
   cm::PidGains gains;
   std::string error;
 
@@ -86,7 +82,8 @@ TEST(ControlMathTest, ZieglerNicholsClassic) {
   EXPECT_NEAR(gains.kd, 0.6, 1e-9);
 }
 
-TEST(ControlMathTest, ZieglerNicholsRejectsInvalidInputs) {
+TEST(ControlMathTest, ZieglerNicholsRejectsInvalidInputs)
+{
   cm::PidGains gains;
   std::string error;
 

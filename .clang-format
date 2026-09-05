@@ -7,21 +7,49 @@ BasedOnStyle: Google
 # Expand the line limit so developers don't have to constantly wrap code
 ColumnLimit: 120
 
-# Let developers group code logically with empty lines without the linter deleting them
+# Let developers group code logically with empty lines without the formatter deleting them
 MaxEmptyLinesToKeep: 2
 
 # Keep short blocks on multiple lines for better readability
 AllowShortBlocksOnASingleLine: false
-AllowShortCaseLabelsOnASingleLine: false
+AllowShortCaseLabelsOnASingleLine: true
 AllowShortFunctionsOnASingleLine: Empty
 AllowShortIfStatementsOnASingleLine: Never
 AllowShortLoopsOnASingleLine: false
-
+AllowShortEnumsOnASingleLine: false
+AllowAllParametersOfDeclarationOnNextLine: false
 # --- MODERN READABILITY TUNING ---
 
 IndentWidth: 2
+ContinuationIndentWidth: 4
+AlignAfterOpenBracket: BlockIndent
 TabWidth: 2
 UseTab: Never
+
+# Align public:/protected:/private: with the class declaration
+AccessModifierOffset: -2
+
+# New-line braces for functions, classes, and namespaces.
+# Keep other constructs on the same line.
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterClass: true
+  AfterFunction: true
+  AfterNamespace: true
+
+  AfterStruct: false
+  AfterUnion: false
+  AfterEnum: false
+  AfterControlStatement: Never
+
+  BeforeElse: false
+  BeforeCatch: false
+  BeforeWhile: false
+
+  IndentBraces: false
+
+# Put each parameter on its own line when a function declaration must wrap
+BinPackParameters: false
 
 # Clean up layout around assignments and control flows
 SpaceBeforeAssignmentOperators: true
@@ -29,4 +57,5 @@ SpaceBeforeParens: ControlStatements
 
 # Sort includes alphabetically automatically to avoid merge conflicts
 SortIncludes: true
+
 ...
