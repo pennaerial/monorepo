@@ -138,7 +138,7 @@ You might run into the following issues during the build process. Here are solut
 
     Navigate to the PX4 installation and add `--render-engine=ogre` to `simulation-gazebo` (should be line 97). The result should be:
     ```python
-    cmd += f'gz sim --render-engine=ogre -r {args.model_store}/worlds/{args.world}.sdf'
+    cmd += f"gz sim --render-engine=ogre -r {args.model_store}/worlds/{args.world}.sdf"
     ```
 
 ---
