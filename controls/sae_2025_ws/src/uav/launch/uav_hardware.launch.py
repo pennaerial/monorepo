@@ -12,20 +12,16 @@ from launch.actions import (
 
 from uav.vehicles.AirframeClass import PX4Airframe
 from vehicle_common.utils import get_available_missions
-from vehicle_common.env import require_env
 from vehicle_common.runtime.mission_loader import RuntimeMission, get_mission_path
 from vehicle_common.launch_utils import (
     get_logger,
     LaunchError,
     check_unknown_launch_args,
-    include_launch,
     format_bullet_list,
-    is_truthy,
 )
 
 
 logger = get_logger("uav_sitl.launch")
-PENNAIR_PX4_PATH = require_env("PENNAIR_PX4_PATH")
 
 
 class Args(StrEnum):
@@ -34,36 +30,6 @@ class Args(StrEnum):
     MISSION = "mission"
     NS_ID = "ns_id"
     AIRFRAME = "airframe"
-    WORLD = "world"
-    RUN_MW = "run_mw"
-    LAUNCH_SIM = "launch_sim"
-    STANDALONE = "standalone"
-    HEADLESS = "headless"
-
-
-def px4_sitl_action(
-    autostart_id: int,
-    vehicle_ns: str,  # e.g. uav_0
-    world: str,
-    sim_model: str = "x500",  # TOOD: Make uav_sitl know whether or not to auto spawn a model
-) -> Action:
-    env_export = {
-        # "PX4_GZ_MODEL_NAME": vehicle_ns,
-        "PX4_SIM_MODEL": sim_model,
-        "PX4_GZ_WORLD": world,
-        "PX4_GZ_STANDALONE": "1",
-        "PX4_SYS_AUTOSTART": str(autostart_id),
-        "PX4_UXRCE_DDS_NS": vehicle_ns,
-    }
-
-    return ExecuteProcess(
-        cmd=["./build/px4_sitl_default/bin/px4"],
-        cwd=PENNAIR_PX4_PATH,
-        output="screen",
-        name=f"{vehicle_ns}_px4_sitl",
-        additional_env=env_export,  # type: ignore (dict[str, str] works instead of SomeSubstitutionsType)
-        log_cmd=True,
-    )
 
 
 def launch_setup(context) -> list[Action]:
@@ -91,26 +57,14 @@ def launch_setup(context) -> list[Action]:
 
     ns_id = int(config[Args.NS_ID])
     vehicle_ns = f"uav_{ns_id}"
-    world = config[Args.WORLD]
-    standalone: bool = is_truthy(config[Args.STANDALONE])
-    run_mw: bool = standalone or is_truthy(config[Args.RUN_MW])
-    launch_sim: bool = standalone or is_truthy(config[Args.LAUNCH_SIM])
-    headless: str = config[Args.HEADLESS]
 
     # PRINTING HEADER
-    logger.debug(f"ENV VAR DETECTED: PENNAIR_PX4_PATH={PENNAIR_PX4_PATH}")
+    # logger.debug(f"ENV VAR DETECTED: PENNAIR_PX4_PATH={PENNAIR_PX4_PATH}")
     logger.debug("LAUNCH PARAMS")
     logger.debug(f"Mission:             {mission}")
     logger.debug(f"Vehicle Namespace:   {vehicle_ns}")
     logger.debug(f"PX4 Airframe:        {airframe}")
-    logger.debug(f"Sim World:           {world}")
-    logger.debug(f"Standalone Mode:     {standalone}")
-    logger.debug(f"Middleware:          {run_mw}")
-    logger.debug(f"Launch Sim:          {launch_sim}")
-    logger.debug(f"Headless Mode:       {headless}")
-
     ## create actions
-    actions = []
 
     mode_manager = Node(
         executable="uav_mission",
@@ -122,32 +76,24 @@ def launch_setup(context) -> list[Action]:
                 "mode_map": str(mission_path),
                 "vehicle_name": vehicle_ns,
                 "vehicle_class": airframe.airframe_class.name,
-                "auto_launch": True,
+                "auto_launch": False,
             }
         ],
         output="screen",
     )
 
     middleware = ExecuteProcess(
-        cmd=["MicroXRCEAgent", "udp4", "-p", "8888"],
+        # -b 921600 = baud rate of UART connection
+        # /dev/serial0 is the device name
+        cmd=["MicroXRCEAgent", "serial", "--dev", "/dev/serial0", "-b", "921600"],
         output="screen",
         name="MicroXRCEAgent",
     )
 
-    px4_sitl = px4_sitl_action(airframe.id, vehicle_ns, world, sim_model=airframe.model)
-    include_sim_launch = include_launch(
-        "sim",
-        "sim2.launch.py",
-        launch_arguments={
-            "world": world,
-            "headless": headless,
-        },
-    )
-
-    actions.append(mode_manager)
-    actions.extend([middleware] if run_mw else [])
-    actions.append(px4_sitl)
-    actions.extend([include_sim_launch] if launch_sim else [])
+    actions = [
+        mode_manager,
+        middleware,
+    ]
     return actions
 
 
@@ -174,35 +120,6 @@ def generate_launch_description():
                     "UAV airframe to load.\n\tAvailable airframes: (alias/id/model)",
                     [str(a) for a in PX4Airframe.get_flying()],
                 ),
-            ),
-            DeclareLaunchArgument(
-                Args.WORLD,
-                default_value="default",
-                description="name of the simulation world that this uav instance belongs to. If standalone=true, then it launches this world using sim package.",
-            ),
-            DeclareLaunchArgument(
-                Args.RUN_MW,
-                default_value="false",
-                description="if this or standalone is true, runs the MicroXRCEAgent middleware to bridge ROS to PX4 SITL",
-                choices=["true", "false", "t", "f", "0", "1"],
-            ),
-            DeclareLaunchArgument(
-                Args.LAUNCH_SIM,
-                default_value="false",
-                description="if this or standalone is true, runs sim.launch.py to launch gazebo with the specified world argument",
-                choices=["true", "false", "t", "f", "0", "1"],
-            ),
-            DeclareLaunchArgument(
-                Args.STANDALONE,
-                default_value="true",
-                description="if true, runs all necessary standalone components, like middleware, sim, etc",
-                choices=["true", "false", "t", "f", "0", "1"],
-            ),
-            DeclareLaunchArgument(
-                Args.HEADLESS,
-                default_value="false",
-                description="If true, runs gz server in headless mode (no GUI). Only applies when standalone/launch_sim is true.",
-                choices=["true", "false", "t", "f", "0", "1"],
             ),
             OpaqueFunction(function=launch_setup),
         ]
