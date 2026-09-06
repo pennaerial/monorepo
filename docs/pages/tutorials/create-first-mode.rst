@@ -52,6 +52,17 @@ For example, ``[5.0, 0.0, -5.0]`` represents a point 5 meters north and 5
 meters above the local origin.
 
 
+Creating a Branch
+`````````````````
+
+Before making any changes, create a new branch for your mission.
+Use the following naming convention, replacing ``<github-username>`` with your GitHub username:
+
+.. code-block:: bash
+    :caption: Bash
+
+    git checkout -b user/<github-username>/add-mode
+
 Create the Mode File
 --------------------
 
@@ -326,6 +337,16 @@ Automatic discovery succeeds when:
 The ``pennair mode ls`` command reads this registry. Seeing
 ``uav.FlyToPointMode`` in its output confirms that the file was imported and the
 decorator registered the class.
+
+Committing Your Changes
+-----------------------
+
+To save your progress locally, commit your changes to the branch you created at the start of this tutorial.
+
+.. code-block:: bash
+    :caption: Bash
+
+    git commit -m "<Descriptive message about your changes>"
 
 Next Step
 ---------

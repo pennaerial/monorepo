@@ -89,17 +89,6 @@ so you cannot use them as labels for your transitions, read more at :doc:`Modes 
     The ``land`` state has no ``transitions`` block at all, since it is a terminal state, as ``LandingMode``
     returns the reserved ``terminate`` string.
 
-Creating a Branch
-`````````````````
-
-Before making any changes, create a new branch for your mission (or stay on the same one you used to create the new mode).
-Use the following naming convention, replacing ``<github-username>`` with your GitHub username:
-
-.. code-block:: bash
-    :caption: Bash
-
-    git checkout -b user/<github-username>/add-mission
-
 Writing Your Mission
 ````````````````````
 
@@ -163,3 +152,27 @@ Then launch SITL with your mission selected by name, making sure to replace ``<m
     :caption: Bash
 
     ros2 launch uav uav_sitl.launch.py mission:=<mission-name>
+
+Committing Your Changes
+-----------------------
+
+To save your progress locally, commit your changes to the branch you created at the start of this tutorial.
+
+.. code-block:: bash
+    :caption: Bash
+
+    git commit -m "<Descriptive message about your changes>"
+
+Congrats, You Did It!
+`````````````````````
+
+You successfully created an entire mode, incorporated it into a mission, and flew it in sim!
+
+You are on your way to being able to contribute to production code!
+
+Feel free to save your local progress on the branch you created, or delete it with the command below.
+
+.. code-block:: bash
+    :caption: Bash
+
+    git branch -d user/<github-username>/add-mode
