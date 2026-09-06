@@ -85,7 +85,7 @@ cppfmt() {
     esac
 
     local files
-    files=$(git ls-files | grep -E '\.(cpp|cc|cxx|h|hh|hpp|hxx)$')
+    files=$(git ls-files | grep -E '\.(cpp|cc|h|hh|hpp)$')
 
     if [[ -z "$files" ]]; then
         echo "No matching C/C++ files found."
