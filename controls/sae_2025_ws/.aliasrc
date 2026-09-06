@@ -77,15 +77,15 @@ cppfmt() {
             check=true
             ;;
         *)
-            echo "Usage: cfmt [--check]"
-            echo "  cfmt          Apply clang-format"
-            echo "  cfmt --check  Check formatting without modifying files"
+            echo "Usage: cppfmt [--check]"
+            echo "  cppfmt          Apply clang-format"
+            echo "  cppfmt --check  Check formatting without modifying files"
             return 1
             ;;
     esac
 
     local files
-    files=$(git ls-files | grep -E '\.(cpp|h|hpp|cc)$')
+    files=$(git ls-files | grep -E '\.(cpp|cc|h|hh|hpp)$')
 
     if [[ -z "$files" ]]; then
         echo "No matching C/C++ files found."
@@ -93,10 +93,28 @@ cppfmt() {
     fi
 
     if $check; then
-        echo "Checking clang-format..."
-        echo "$files" | xargs clang-format --dry-run --Werror --verbose
+        echo "Checking C++ formatting..."
+
+        local failed=false
+
+        while IFS= read -r file; do
+            if ! clang-format --dry-run --Werror "$file" 2>/dev/null; then
+                echo "  ✗ $file"
+                failed=true
+            fi
+        done <<< "$files"
+
+        if $failed; then
+            echo
+            echo "C++ formatting check failed."
+            echo "Run 'cppfmt' to fix formatting errors."
+            return 1
+        fi
+
+        echo "C++ formatting check passed."
     else
-        echo "Applying clang-format..."
+        echo "Applying C++ formatting..."
         echo "$files" | xargs clang-format -i --style=file
+        echo "C++ formatting complete."
     fi
 }

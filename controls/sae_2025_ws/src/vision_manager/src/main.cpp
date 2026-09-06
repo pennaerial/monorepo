@@ -1,4 +1,5 @@
 #include <rclcpp/rclcpp.hpp>
+
 #include "vision_manager/vision_manager.hpp"
 
 int main(int argc, char* argv[])

@@ -1,7 +1,8 @@
 #pragma once
 
-#include <rclcpp/rclcpp.hpp>
 #include <rclcpp/node.hpp>
+#include <rclcpp/rclcpp.hpp>
+
 #include "std_msgs/msg/string.hpp"
 
 namespace pennair_vision
@@ -18,4 +19,4 @@ private:
   size_t count_;
 };
 
-} // namespace pennair_vision
+}  // namespace pennair_vision
