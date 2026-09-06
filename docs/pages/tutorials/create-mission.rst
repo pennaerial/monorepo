@@ -17,12 +17,21 @@ branch, and have built the ROS workspace. If you have not, follow the :doc:`Ubun
 This tutorial also assumes that you have already created a mode with the previous tutorial.
 If you have not, follow the :doc:`Creating Your First Mode <create-first-mode>` tutorial first.
 
+You should also be familiar with the following concepts:
+
+* :doc:`Modes <../concepts/modes>`
+* :doc:`Missions <../concepts/missions>`
+* :doc:`Mode Manager <../concepts/mode-manager>`
+
+Those pages explain the mode lifecycle and how transition labels connect modes
+inside a mission. Here, you will put those ideas into practice.
+
 Reading an Existing Mission
 ```````````````````````````
 
 Before writing your own mission, read an example one to see how it's structured.
-Here is ``controls/sae_2025_ws/src/uav/missions/hover.yaml``, a
-mission that takes off, flies to two waypoints, and then lands:
+Here is ``controls/sae_2025_ws/src/uav/missions/basic.yaml``, a
+mission that takes off, flies to a waypoint, and then lands:
 
 .. code-block:: yaml
 
@@ -38,13 +47,19 @@ mission that takes off, flies to two waypoints, and then lands:
         mode: uav.NavGPSMode
         params:
           coordinates:
-            - [[0, 0, -3], 5, LOCAL]
-            - [[0, 0, -6], 5, LOCAL]
+            - [[5, 0, -5], 1, LOCAL]
         transitions:
           complete: land
 
       land:
         mode: uav.LandingMode
+
+.. note::
+
+    The coordinates parameter for uav.NavGPSMode is a list of waypoints, 
+    where each waypoint is a 3-D tuple of either (x, y, z) or (lat, lon, alt) coordinates depending on the frame,
+    a wait time in seconds, and a frame type of either LOCAL or GPS.
+    In this case, the UAV will fly to the point (5, 0, -5) with a waittime of 1 second in the LOCAL frame.
 
 The keys nested directly under ``modes:`` are **state names**: ``start``, ``GPS``, and ``land``. These are just labels
 chosen for the mission. There is no requirement that the state named ``GPS`` has to run a mode with "GPS" in its name.
@@ -67,7 +82,7 @@ Read the transitions as ``label: target``. For example, ``GPS`` has ``complete: 
 the program should go to the state named ``land``. Note that the target is a **state name in this file**, not an actual mode id.
 
 The manager checks for three reserved strings via ``check_status()`` before it ever looks at your ``transitions:`` block,
-so you cannot use them as labels for your transitions.
+so you cannot use them as labels for your transitions, read more at :doc:`Modes <../concepts/modes>`.
 
 .. note::
 
@@ -96,55 +111,38 @@ Create a new YAML file in the UAV missions directory and name it accordingly:
 
 You should attempt to create a mission that takes off, calls the mode you created in the previous tutorial ``uav.FlyToPointMode``,
 passing in a required 3-tuple target argument and optionally a margin argument, then lands.
-Use the below template, adding in the FlyToPointMode call and parameters:
-
-.. code-block:: yaml
-
-    modes:
-      start:
-        mode: uav.vtol.TakeoffMode
-        params:
-          takeoff_type: vertical
-        transitions:
-          complete: <state-name>
-
-      <state-name>:
-        mode: uav.FlyToPointMode
-        params:
-          target: [x, y, z]
-          margin: m
-        transitions:
-          complete: land
-
-      land:
-        mode: uav.LandingMode
-
-Replace ``<state-name>`` with a label of your choice, ``[x, y, z]`` with a 3-tuple of coordinates in meters, and ``m`` with a margin value in meters.
+Use the above ``basic.yaml`` as a  template, replacing ``uav.NavGPSMode`` with the ``uav.FlyToPointMode`` call and parameters:
 
 .. note::
 
     To see what parameters a mode accepts, read its params model next to the mode itself. For example, you had ``FlyToPointMode`` declare
-    ``FlyToPointParams`` at the top of ``uav/uav/modes/FlyToPointMode.py`` in the mode tutorial, which provides the schema the ``params:`` block is checked against.
+    ``FlyToPointParams`` at the top of ``controls/sae_2025_ws/src/uav/uav/modes/fly_to_point_mode.py`` in the mode tutorial,
+    which provides the schema the ``params:`` block is checked against.
 
-Validating Your Mission
-```````````````````````
+Here is a completed version of the mission:
 
-To check whether your mission is well-formed without launching it, load it through the same loader
-launch uses, but make sure to replace ``<mission-name>`` with the name of your mission file:
+.. dropdown:: Complete Mission fly_to_point.yaml
 
-.. code-block:: bash
-    :caption: Bash
+    .. code-block:: yaml
 
-    source /opt/ros/jazzy/setup.bash
-    cd controls/sae_2025_ws
-    source install/setup.bash
-    python3 -c "from vehicle_common.runtime.mission_loader import RuntimeMission; m = RuntimeMission.load_from_path('src/uav/missions/<mission-name>.yaml'); print(list(m.modes))"
+        modes:
+          start:
+            mode: uav.vtol.TakeoffMode
+            params:
+              takeoff_type: vertical
+            transitions:
+              complete: fly_to_point
 
-A well-formed mission prints its state names, for example ``['start', '<state-name>', 'land']``.
+          fly_to_point:
+            mode: uav.FlyToPointMode
+            params:
+              target: [5.0, 0.0, -5.0]
+              margin: 1.0
+            transitions:
+              complete: land
 
-If the schema or params are invalid, a ``ValidationError`` is raised.
-Passing in an unknown mode id raises a ``KeyError`` that lists the registered modes.
-The transition labels are not checked, so a mission with a transition to a non-existent state will still load, but will fail once the mission is running.
+          land:
+            mode: uav.LandingMode
 
 Running Your Mission in Sim
 ````````````````````````````
@@ -159,42 +157,9 @@ Missions are installed into the package share directory, so build the workspace 
     colcon build --packages-select uav
     source install/setup.bash
 
-Then launch SITL with your mission selected by name, again making sure to replace ``<mission-name>`` with the name of your mission file:
+Then launch SITL with your mission selected by name, making sure to replace ``<mission-name>`` with the name of your mission file:
 
 .. code-block:: bash
     :caption: Bash
 
-    ros2 launch uav uav_sitl.launch.py world:=custom mission:=<mission-name>
-
-Committing and Pushing Your Changes
-```````````````````````````````````
-
-If this was a mission meant for the main repository, follow the steps below to commit and push your changes:
-
-.. code-block:: bash
-    :caption: Bash
-
-    git add controls/sae_2025_ws/src/uav/missions/<mission-name>.yaml
-
-If you had not committed your new mode yet, you could add it as well:
-
-.. code-block:: bash
-    :caption: Bash
-
-    git add controls/sae_2025_ws/src/uav/uav/modes/<mode-name>.py
-
-Then commit your changes, adjusting the message accordingly to any other edits you made on the branch:
-
-.. code-block:: bash
-    :caption: Bash
-
-    git commit -m "feat: add <mission-name> mission"
-
-Finally, push your branch to GitHub:
-
-.. code-block:: bash
-    :caption: Bash
-
-    git push -u origin user/<github-username>/add-mission
-
-After pushing, open a pull request on GitHub from your branch into ``main``.
+    ros2 launch uav uav_sitl.launch.py mission:=<mission-name>
