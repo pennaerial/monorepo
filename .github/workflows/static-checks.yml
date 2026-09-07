@@ -32,6 +32,12 @@ jobs:
               - 'pyproject.toml'
             workflows:
               - '.github/workflows/**'
+            cpp:
+              - '**/*.cpp'
+              - '**/*.cc'
+              - '**/*.h'
+              - '**/*.hpp'
+              - '**/*.hh'
 
       - name: Install Ruff
         if: ${{ steps.filter.outputs.python == 'true' }}
@@ -53,3 +59,16 @@ jobs:
           bash <(curl https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
           ./actionlint -color
         shell: bash
+
+      - name: Install Clang tools
+        if: ${{ steps.filter.outputs.cpp == 'true' }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format clang-tidy
+
+      - name: Run Clang Format
+        if: ${{ steps.filter.outputs.cpp == 'true' }}
+        run: |
+          source dev_env.sh
+          source "$PENNAIR_SAE_WS_PATH/.aliasrc" # imports the bash testing functions
+          cppfmt --check

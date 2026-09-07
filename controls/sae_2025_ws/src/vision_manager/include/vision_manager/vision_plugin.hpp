@@ -2,6 +2,7 @@
 
 #include <rclcpp/node.hpp>
 #include <rclcpp/rclcpp.hpp>
+
 #include "sensor_msgs/msg/image.hpp"
 
 namespace pennair_vision
@@ -22,8 +23,7 @@ public:
 private:
   /// node ptr for params and creating publishers
   rclcpp::Node::SharedPtr node_;
-
 };
 
 
-} // pennair_vision
+}  // namespace pennair_vision

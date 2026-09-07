@@ -133,17 +133,19 @@ from rclpy.node import Node
 from std_msgs.msg import String
 import random
 
+
 class Talker(Node):
     def __init__(self):
-        super().__init__('talker')
-        self.publisher_ = self.create_publisher(String, 'random_number', 10)
+        super().__init__("talker")
+        self.publisher_ = self.create_publisher(String, "random_number", 10)
         self.timer = self.create_timer(1.0, self.publish_number)
 
     def publish_number(self):
         msg = String()
-        msg.data = f'Random number: {random.randint(0, 100)}'
+        msg.data = f"Random number: {random.randint(0, 100)}"
         self.publisher_.publish(msg)
         self.get_logger().info(f'Publishing: "{msg.data}"')
+
 
 def main(args=None):
     rclpy.init(args=args)
@@ -151,9 +153,10 @@ def main(args=None):
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()
-    
-if __name__ == '__main__':
-	main()
+
+
+if __name__ == "__main__":
+    main()
 ```
 
 ---
@@ -167,14 +170,15 @@ import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String
 
+
 class Listener(Node):
     def __init__(self):
-        super().__init__('listener')
-        self.subscription = self.create_subscription(
-            String, 'random_number', self.callback, 10)
+        super().__init__("listener")
+        self.subscription = self.create_subscription(String, "random_number", self.callback, 10)
 
     def callback(self, msg):
         self.get_logger().info(f'I heard: "{msg.data}"')
+
 
 def main(args=None):
     rclpy.init(args=args)
@@ -182,9 +186,10 @@ def main(args=None):
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()
-    
-if __name__ == '__main__':
-	main()
+
+
+if __name__ == "__main__":
+    main()
 ```
 
 ---
@@ -196,12 +201,14 @@ Add these lines in `entry_points`:
 This block tells setuptools/colcon to generate two terminal executables (`talker` and `listener`) that directly run your `main()` functions in the corresponding Python modules. This is the standard way ROS 2 Python nodes become runnable via `ros2 run`.
 
 ```python
-entry_points={
-    'console_scripts': [
-        'talker = py_pubsub.talker:main',
-        'listener = py_pubsub.listener:main',
-    ],
-},
+entry_points = (
+    {
+        "console_scripts": [
+            "talker = py_pubsub.talker:main",
+            "listener = py_pubsub.listener:main",
+        ],
+    },
+)
 ```
 
 ---
