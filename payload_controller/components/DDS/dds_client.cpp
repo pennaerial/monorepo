@@ -1,9 +1,11 @@
 #include "dds_client.hpp"
 #include "esp_log.h"
-#include "esp_mac.h"
+#include "uxr/client/core/session/create_entities_xml.h"
+#include "uxr/client/core/session/object_id.h"
+#include "uxr/client/core/session/session.h"
+#include "uxr/client/core/session/session_info.h"
+// #include "esp_mac.h"
 
-#define STREAM_HISTORY  8
-#define BUFFER_SIZE     UXR_CONFIG_UDP_TRANSPORT_MTU* STREAM_HISTORY
 
 static const char* TAG = "DDSClient";
 
@@ -30,12 +32,9 @@ void DDSClient::run()
 
 
 
-  uxrSession session = session_;
-  uint8_t output_reliable_stream_buffer[BUFFER_SIZE];
-  uxrStreamId reliable_out = uxr_create_output_reliable_stream(&session, output_reliable_stream_buffer, BUFFER_SIZE, STREAM_HISTORY);
+  uxrStreamId reliable_out = uxr_create_output_reliable_stream(&session_, output_reliable_stream_buffer_, BUFFER_SIZE, STREAM_HISTORY);
 
-  uint8_t input_reliable_stream_buffer[BUFFER_SIZE];
-  uxrStreamId reliable_in = uxr_create_input_reliable_stream(&session, input_reliable_stream_buffer, BUFFER_SIZE, STREAM_HISTORY);
+  uxrStreamId reliable_in = uxr_create_input_reliable_stream(&session_, input_reliable_stream_buffer_, BUFFER_SIZE, STREAM_HISTORY);
 
   uxrObjectId participant_id = uxr_object_id(0x01, UXR_PARTICIPANT_ID);
   const char* participant_xml = "<dds>"
@@ -45,8 +44,8 @@ void DDSClient::run()
                                       "</rtps>"
                                   "</participant>"
                               "</dds>";
-  uint16_t participant_req = uxr_buffer_create_participant_ref(
-    &session,
+  uint16_t participant_req = uxr_buffer_create_participant_xml(
+    &session_,
     reliable_out,
     participant_id,
     0,                  // DDS domain ID
@@ -61,17 +60,55 @@ void DDSClient::run()
                                   "<dataType>HelloWorld</dataType>"
                               "</topic>"
                           "</dds>";
-  uint16_t topic_req = uxr_buffer_create_topic_xml(&session, reliable_out, topic_id, participant_id, topic_xml, UXR_REPLACE);
+  uint16_t topic_req = uxr_buffer_create_topic_xml(&session_, reliable_out, topic_id, participant_id, topic_xml, UXR_REPLACE);
 
 
 
   uxrObjectId publisher_id = uxr_object_id(0x01, UXR_PUBLISHER_ID);
   const char* publisher_xml = "";
-  uint16_t publisher_req = uxr_buffer_create_publisher_xml(&session, reliable_out, publisher_id, participant_id, publisher_xml, UXR_REPLACE);
+  uint16_t publisher_req = uxr_buffer_create_publisher_xml(&session_, reliable_out, publisher_id, participant_id, publisher_xml, UXR_REPLACE);
 
   uxrObjectId subscriber_id = uxr_object_id(0x01, UXR_SUBSCRIBER_ID);
   const char* subscriber_xml = "";
-  uint16_t subscriber_req = uxr_buffer_create_subscriber_xml(&session, reliable_out, subscriber_id, participant_id, subscriber_xml, UXR_REPLACE);
+  uint16_t subscriber_req = uxr_buffer_create_subscriber_xml(&session_, reliable_out, subscriber_id, participant_id, subscriber_xml, UXR_REPLACE);
+
+  uxrObjectId datawriter_id = uxr_object_id(0x01, UXR_DATAWRITER_ID);
+  const char* datawriter_xml = "<dds>"
+                                 "<data_writer>"
+                                     "<topic>"
+                                         "<kind>NO_KEY</kind>"
+                                         "<name>HelloWorldTopic</name>"
+                                         "<dataType>HelloWorld</dataType>"
+                                     "</topic>"
+                                 "</data_writer>"
+                             "</dds>";
+  uint16_t datawriter_req = uxr_buffer_create_datawriter_xml(&session_, reliable_out, datawriter_id, publisher_id, datawriter_xml, UXR_REPLACE);
+
+  uxrObjectId datareader_id = uxr_object_id(0x01, UXR_DATAREADER_ID);
+  const char* datareader_xml = "<dds>"
+                                 "<data_reader>"
+                                     "<topic>"
+                                         "<kind>NO_KEY</kind>"
+                                         "<name>HelloWorldTopic</name>"
+                                         "<dataType>HelloWorld</dataType>"
+                                     "</topic>"
+                                 "</data_reader>"
+                               "</dds>";
+  uint16_t datareader_req = uxr_buffer_create_datareader_xml(&session_, reliable_out, datareader_id, subscriber_id, datareader_xml, UXR_REPLACE);
+
+  // create requester and replier...
+
+  // Create entities
+  uint8_t status[6];
+  uint16_t requests[6] = { participant_req, topic_req, publisher_req, subscriber_req, datawriter_req, datareader_req };
+
+  if (!uxr_run_session_until_all_status(&session_, 1000, requests, status, 6)) {
+    ESP_LOGE(TAG, "Error at creating 6 entities");
+    return;
+  }
+
+  ESP_LOGI(TAG, "Entities creation success");
+
 }
 
 void DDSClient::on_topic_callback(uxrSession* session, uxrObjectId object_id, uint16_t request_id, uxrStreamId stream_id, ucdrBuffer* ub, uint16_t length, void* args)
