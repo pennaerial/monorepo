@@ -4,6 +4,9 @@
 #include <uxr/client/config.h>
 #include <cstdint>
 
+#define STREAM_HISTORY  8
+#define BUFFER_SIZE     UXR_CONFIG_UDP_TRANSPORT_MTU* STREAM_HISTORY
+
 enum class TransportType {
   SERIAL,
   UDP,
@@ -40,6 +43,10 @@ private:
   uxrUDPTransport transport_udp_{};
   /// the uxr session object. Interacts directly with DDS Agent
   uxrSession session_;
+  /// Stream buffer for 
+  uint8_t output_reliable_stream_buffer_[BUFFER_SIZE];
+  ///
+  uint8_t input_reliable_stream_buffer_[BUFFER_SIZE];
 
 
 
