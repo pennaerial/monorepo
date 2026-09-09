@@ -1,9 +1,6 @@
 #include "dds_client.hpp"
 #include "esp_log.h"
-#include "uxr/client/core/session/create_entities_xml.h"
-#include "uxr/client/core/session/object_id.h"
-#include "uxr/client/core/session/session.h"
-#include "uxr/client/core/session/session_info.h"
+
 // #include "esp_mac.h"
 
 
@@ -32,9 +29,9 @@ void DDSClient::run()
 
 
 
-  uxrStreamId reliable_out = uxr_create_output_reliable_stream(&session_, output_reliable_stream_buffer_, BUFFER_SIZE, STREAM_HISTORY);
+  reliable_out_ = uxr_create_output_reliable_stream(&session_, output_reliable_stream_buffer_, BUFFER_SIZE, STREAM_HISTORY);
 
-  uxrStreamId reliable_in = uxr_create_input_reliable_stream(&session_, input_reliable_stream_buffer_, BUFFER_SIZE, STREAM_HISTORY);
+  reliable_in_ = uxr_create_input_reliable_stream(&session_, input_reliable_stream_buffer_, BUFFER_SIZE, STREAM_HISTORY);
 
   uxrObjectId participant_id = uxr_object_id(0x01, UXR_PARTICIPANT_ID);
   const char* participant_xml = "<dds>"
@@ -46,7 +43,7 @@ void DDSClient::run()
                               "</dds>";
   uint16_t participant_req = uxr_buffer_create_participant_xml(
     &session_,
-    reliable_out,
+    reliable_out_,
     participant_id,
     0,                  // DDS domain ID
     participant_xml,
@@ -56,45 +53,47 @@ void DDSClient::run()
   uxrObjectId topic_id = uxr_object_id(0x01, UXR_TOPIC_ID);
   const char* topic_xml = "<dds>"
                               "<topic>"
-                                  "<name>HelloWorldTopic</name>"
-                                  "<dataType>HelloWorld</dataType>"
+                                  // "<name>HelloWorldTopic</name>"
+                                  // "<dataType>HelloWorld</dataType>"
+                                  "<name>rt/imu</name>" // ROS naming conventions in DDS namespace
+                                  "<dataType>sensor_msgs::msg::dds_::Imu_</dataType>"
                               "</topic>"
                           "</dds>";
-  uint16_t topic_req = uxr_buffer_create_topic_xml(&session_, reliable_out, topic_id, participant_id, topic_xml, UXR_REPLACE);
+  uint16_t topic_req = uxr_buffer_create_topic_xml(&session_, reliable_out_, topic_id, participant_id, topic_xml, UXR_REPLACE);
 
 
 
   uxrObjectId publisher_id = uxr_object_id(0x01, UXR_PUBLISHER_ID);
   const char* publisher_xml = "";
-  uint16_t publisher_req = uxr_buffer_create_publisher_xml(&session_, reliable_out, publisher_id, participant_id, publisher_xml, UXR_REPLACE);
+  uint16_t publisher_req = uxr_buffer_create_publisher_xml(&session_, reliable_out_, publisher_id, participant_id, publisher_xml, UXR_REPLACE);
 
   uxrObjectId subscriber_id = uxr_object_id(0x01, UXR_SUBSCRIBER_ID);
   const char* subscriber_xml = "";
-  uint16_t subscriber_req = uxr_buffer_create_subscriber_xml(&session_, reliable_out, subscriber_id, participant_id, subscriber_xml, UXR_REPLACE);
+  uint16_t subscriber_req = uxr_buffer_create_subscriber_xml(&session_, reliable_out_, subscriber_id, participant_id, subscriber_xml, UXR_REPLACE);
 
-  uxrObjectId datawriter_id = uxr_object_id(0x01, UXR_DATAWRITER_ID);
+  datawriter_id_ = uxr_object_id(0x01, UXR_DATAWRITER_ID);
   const char* datawriter_xml = "<dds>"
                                  "<data_writer>"
                                      "<topic>"
                                          "<kind>NO_KEY</kind>"
-                                         "<name>HelloWorldTopic</name>"
-                                         "<dataType>HelloWorld</dataType>"
+                                         "<name>rt/imu</name>"
+                                         "<dataType>sensor_msgs::msg::dds_::Imu_</dataType>"
                                      "</topic>"
                                  "</data_writer>"
                              "</dds>";
-  uint16_t datawriter_req = uxr_buffer_create_datawriter_xml(&session_, reliable_out, datawriter_id, publisher_id, datawriter_xml, UXR_REPLACE);
+  uint16_t datawriter_req = uxr_buffer_create_datawriter_xml(&session_, reliable_out_, datawriter_id_, publisher_id, datawriter_xml, UXR_REPLACE);
 
   uxrObjectId datareader_id = uxr_object_id(0x01, UXR_DATAREADER_ID);
   const char* datareader_xml = "<dds>"
                                  "<data_reader>"
                                      "<topic>"
                                          "<kind>NO_KEY</kind>"
-                                         "<name>HelloWorldTopic</name>"
-                                         "<dataType>HelloWorld</dataType>"
+                                         "<name>rt/imu</name>"
+                                         "<dataType>sensor_msgs::msg::dds_::Imu_</dataType>"
                                      "</topic>"
                                  "</data_reader>"
                                "</dds>";
-  uint16_t datareader_req = uxr_buffer_create_datareader_xml(&session_, reliable_out, datareader_id, subscriber_id, datareader_xml, UXR_REPLACE);
+  uint16_t datareader_req = uxr_buffer_create_datareader_xml(&session_, reliable_out_, datareader_id, subscriber_id, datareader_xml, UXR_REPLACE);
 
   // create requester and replier...
 
@@ -124,4 +123,15 @@ void DDSClient::on_topic_callback(uxrSession* session, uxrObjectId object_id, ui
 void DDSClient::handle_topic(uxrSession* session, uxrObjectId object_id, uint16_t request_id, uxrStreamId stream_id, ucdrBuffer* ub, uint16_t length)
 {
   ESP_LOGI(TAG, "handling topic..");
+}
+
+
+void DDSClient::update()
+{
+  ucdrBuffer ub;
+  uint32_t topic_size = sensor_msgs_msg_Imu_size_of_topic(&imu_msg, 0);
+  uxr_prepare_output_stream(&session_, reliable_out_, datawriter_id_, &ub, topic_size);
+  sensor_msgs_msg_Imu_serialize_topic(&ub, &imu_msg);
+
+  uxr_run_session_until_confirm_delivery(&session_, 1000);
 }
