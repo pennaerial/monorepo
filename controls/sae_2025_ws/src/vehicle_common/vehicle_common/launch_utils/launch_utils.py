@@ -1,13 +1,10 @@
 import logging
-import os
 from enum import StrEnum
 from pathlib import Path
 
 from ament_index_python.packages import get_package_share_directory
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.actions import IncludeLaunchDescription
-
-PENNAIR_LAUNCH_DEBUG = os.getenv("PENNAIR_LAUNCH_DEBUG", "0").lower() == "1"
 
 RED = "\033[31m"
 YELLOW = "\033[33m"
@@ -29,7 +26,7 @@ class LaunchFormatter(logging.Formatter):
         return msg
 
 
-def get_logger(name: str) -> logging.Logger:
+def get_logger(name: str, level: int = logging.INFO) -> logging.Logger:
     logger = logging.getLogger(name)
     handler = logging.StreamHandler()
 
@@ -38,7 +35,7 @@ def get_logger(name: str) -> logging.Logger:
         handler.setFormatter(LaunchFormatter("[%(levelname)s] [%(name)s] %(message)s"))
         logger.addHandler(handler)
         logger.propagate = False
-    logger.setLevel(logging.DEBUG if PENNAIR_LAUNCH_DEBUG else logging.INFO)
+    logger.setLevel(level)
 
     return logger
 
