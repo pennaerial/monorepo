@@ -41,6 +41,12 @@ Quick Links
 
         Beginner Tutorials for monorepo development. Includes making your first contribution, creating modes, mission, etc.
 
+    .. grid-item-card:: :iconify:`material-symbols:rule` Contributing
+        :link: development-guide
+        :link-type: doc
+
+        General guidelines for development and any contributions. Covers Git workflow and writing docs.
+
 .. toctree::
    :hidden:
    :maxdepth: 2
