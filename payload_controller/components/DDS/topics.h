@@ -1,14 +1,15 @@
 #pragma once
 
-#include <cstdint>
 #include <uxr/client/client.h>
+
+#include <cstdint>
 
 // TODO: write more pub/subs here
 enum class Topic : uint8_t {
-  // publishers
+  // topics to publish to
   IMU_PUB,
 
-  // subscribers
+  // topics to subscribe to
   CMD_VEL_SUB,
 };
 
@@ -22,7 +23,7 @@ inline constexpr uint8_t to_underlying(const Topic topic)
 struct Publisher {
   const uint8_t topic_id;
   const uint8_t pub_id;
-  const uxrObjectId dw_id; // datawriter
+  const uxrObjectId dw_id;  // datawriter
   const char* topic_name;
   const char* type_name;
   const uxrQoS_t qos;
@@ -33,21 +34,19 @@ struct Publisher {
 struct Subscriber {
   const uint8_t topic_id;
   const uint8_t sub_id;
-  const uxrObjectId dr_id; // datareader
+  const uxrObjectId dr_id;  // datareader
   const char* topic_name;
   const char* type_name;
   const uxrQoS_t qos;
 };
 
 // TODO: fill this out
-constexpr Publisher publishers[] =
-{
+constexpr Publisher publishers[] = {
 
 
 };
 
 // TODO: fill this out
-constexpr Subscriber subscribers[] =
-{
+constexpr Subscriber subscribers[] = {
 
 };

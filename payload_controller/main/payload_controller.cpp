@@ -1,7 +1,7 @@
 
+#include "dds_client.hpp"
 #include "esp_log.h"
 #include "imu.hpp"
-#include "dds_client.hpp"
 
 const char* TAG{"APP_MAIN"};
 
