@@ -1,10 +1,10 @@
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 cmake_minimum_required(VERSION 3.8)
-project(vision_manager)
+project(pennair_vision)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  add_compile_options(-Wall -Wextra -Wpedantic)
+    add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
 # find dependencies
@@ -28,8 +28,14 @@ ament_target_dependencies(vision_manager
 )
 
 install(TARGETS
-  vision_manager
-  DESTINATION lib/${PROJECT_NAME})
+    vision_manager
+    DESTINATION lib/${PROJECT_NAME}
+)
+
+install(DIRECTORY
+    launch
+    DESTINATION share/${PROJECT_NAME}
+)
 
 
 ament_package()
