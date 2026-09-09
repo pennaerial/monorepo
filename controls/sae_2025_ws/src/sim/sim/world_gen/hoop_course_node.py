@@ -8,7 +8,7 @@ from rclpy.executors import ExternalShutdownException
 from pydantic import BaseModel
 
 from sim.world_gen.world_node import WorldNode
-from sim.world_gen.entity import Entity
+from sim.entity import Entity
 from sim_interfaces.srv import HoopList
 from sim_interfaces.msg import HoopPose
 

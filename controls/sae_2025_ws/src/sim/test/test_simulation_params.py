@@ -1,6 +1,6 @@
 import yaml
 from sim.simulation_params import SimulationParams
-from sim.world_gen.entity import Entity
+from sim.entity import Entity
 
 minimum_world_params = """
 world:

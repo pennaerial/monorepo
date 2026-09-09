@@ -6,7 +6,7 @@ from rclpy.node import Node
 from ros_gz_interfaces.srv import SpawnEntity
 from std_srvs.srv import Trigger
 
-from sim.world_gen.entity import Entity
+from sim.entity import Entity
 from sim.simulation_params import SimulationParams
 
 

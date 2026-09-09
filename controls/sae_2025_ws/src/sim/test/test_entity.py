@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
-from sim.world_gen.entity import Entity
+from sim.entity import Entity
 
 
 @pytest.fixture
@@ -82,9 +82,7 @@ def test_model_falls_back_to_sdf(models_path: Path):
     assert entity.path_to_model == str(sdf_path)
 
 
-def test_path_to_model_takes_precedence_over_model(
-    tmp_path: Path, models_path: Path
-):
+def test_path_to_model_takes_precedence_over_model(tmp_path: Path, models_path: Path):
     named_model_dir = models_path / "payload"
     named_model_dir.mkdir()
     (named_model_dir / "model.urdf").touch()
@@ -126,9 +124,7 @@ def test_entity_rejects_non_model_path(tmp_path: Path):
     model_path = tmp_path / "nonmodel.txt"
     model_path.touch()
 
-    with pytest.raises(
-        ValueError, match="Model path must point to a .urdf or .sdf file"
-    ):
+    with pytest.raises(ValueError, match="Model path must point to a .urdf or .sdf file"):
         Entity(
             name="test",
             path_to_model=str(model_path),

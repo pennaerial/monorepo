@@ -2,7 +2,7 @@ import rclpy
 from rclpy.executors import ExternalShutdownException
 
 from sim.world_gen.world_node import WorldNode
-from sim.world_gen.entity import Entity
+from sim.entity import Entity
 
 
 class CustomWorldNode(WorldNode):

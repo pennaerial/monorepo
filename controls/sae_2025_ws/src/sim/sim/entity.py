@@ -71,14 +71,16 @@ class Entity(BaseModel):
         self.path_to_model = str(resolved_path)
 
         return self
-    
+
     @staticmethod
     def validate_model_path(path: str | Path) -> Path:
         model_path = Path(path).expanduser()
 
         if model_path.suffix.lower() not in {".sdf", ".urdf"}:
-            raise ValueError(f"Model path must point to a .urdf or .sdf file; received: {model_path}")
-        if not model_path.is_file(): 
+            raise ValueError(
+                f"Model path must point to a .urdf or .sdf file; received: {model_path}"
+            )
+        if not model_path.is_file():
             raise ValueError(f"Model file does not exist: {model_path}")
 
         return model_path.resolve()
