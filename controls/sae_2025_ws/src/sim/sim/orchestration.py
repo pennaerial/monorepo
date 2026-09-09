@@ -74,7 +74,7 @@ def _looks_like_spawnable_record(value: Any) -> bool:
     return isinstance(value, dict) and any(
         field in value
         for field in {
-            "path_to_sdf",
+            "path_to_model",
             "position",
             "rpy",
             "kind",
