@@ -1,11 +1,13 @@
 #pragma once
 
 #include <uxr/client/client.h>
+
 #include <cstdint>
+
 #include "sensor_msgs/msg/Imu.h"
 
-#define STREAM_HISTORY  8
-#define BUFFER_SIZE     UXR_CONFIG_UDP_TRANSPORT_MTU* STREAM_HISTORY
+#define STREAM_HISTORY 8
+#define BUFFER_SIZE UXR_CONFIG_UDP_TRANSPORT_MTU* STREAM_HISTORY
 
 enum class TransportType {
   SERIAL,
@@ -25,10 +27,25 @@ public:
 
 private:
   /// callback function for receiving a topic. Recreates the DDSClient instance with void* args and calls handle_topic
-  static void on_topic_callback(uxrSession* session, uxrObjectId object_id, uint16_t request_id, uxrStreamId stream_id, ucdrBuffer* ub, uint16_t length, void* args);
+  static void on_topic_callback(
+      uxrSession* session,
+      uxrObjectId object_id,
+      uint16_t request_id,
+      uxrStreamId stream_id,
+      ucdrBuffer* ub,
+      uint16_t length,
+      void* args
+  );
 
   /// Finishes handling the topic
-  void handle_topic(uxrSession* session, uxrObjectId object_id, uint16_t request_id, uxrStreamId stream_id, ucdrBuffer* ub, uint16_t length);
+  void handle_topic(
+      uxrSession* session,
+      uxrObjectId object_id,
+      uint16_t request_id,
+      uxrStreamId stream_id,
+      ucdrBuffer* ub,
+      uint16_t length
+  );
 
 
   /// TODO: Compute a 32 bit unique key
