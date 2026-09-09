@@ -139,7 +139,7 @@ def _inject_single_uav_controllable(
     world_params["controllables"][vehicle_name] = {
         "kind": "uav",
         "px4_airframe_id": int(px4_airframe_id),
-        "path_to_sdf": f"~/.simulation-gazebo/models/{sim_model_name}/model.sdf",
+        "path_to_model": f"~/.simulation-gazebo/models/{sim_model_name}/model.sdf",
         "model": model,
         "position": list(vehicle_pose[:3]),
         "rpy": list(vehicle_pose[3:]),

@@ -63,15 +63,15 @@ def test_deep_merge_dicts_merges_nested_structures():
 def test_normalize_named_records_accepts_mapping_and_list():
     mapping = normalize_named_records(
         {
-            "payload_0": {"path_to_sdf": "payload.sdf"},
-            "uav_0": {"path_to_sdf": "uav.sdf"},
+            "payload_0": {"path_to_model": "payload.sdf"},
+            "uav_0": {"path_to_model": "uav.sdf"},
         },
         record_type="controllable",
     )
     listed = normalize_named_records(
         [
-            {"name": "payload_0", "path_to_sdf": "payload.sdf"},
-            {"name": "uav_0", "path_to_sdf": "uav.sdf"},
+            {"name": "payload_0", "path_to_model": "payload.sdf"},
+            {"name": "uav_0", "path_to_model": "uav.sdf"},
         ],
         record_type="controllable",
     )
@@ -82,7 +82,7 @@ def test_normalize_named_records_accepts_mapping_and_list():
 
 def test_normalize_named_records_rejects_missing_names():
     try:
-        normalize_named_records([{"path_to_sdf": "payload.sdf"}], record_type="entity")
+        normalize_named_records([{"path_to_model": "payload.sdf"}], record_type="entity")
     except ValueError as exc:
         assert "non-empty 'name'" in str(exc)
     else:
@@ -100,8 +100,8 @@ def test_normalize_stage_world_params_keeps_standard_spawnables_separated():
         {
             "template_world": "template.sdf",
             "entities": {
-                "dlz": {"path_to_sdf": "dlz.sdf"},
-                "marker": {"path_to_sdf": "marker.sdf"},
+                "dlz": {"path_to_model": "dlz.sdf"},
+                "marker": {"path_to_model": "marker.sdf"},
             },
             "controllables": {
                 "uav_0": {
@@ -111,26 +111,31 @@ def test_normalize_stage_world_params_keeps_standard_spawnables_separated():
                 },
                 "payload_0": {
                     "kind": "payload",
-                    "path_to_sdf": "payload.sdf",
+                    "path_to_model": "payload.sdf",
                 },
             },
         }
     )
 
     assert params["template_world"] == "template.sdf"
-    assert params["entities"]["dlz"]["path_to_sdf"] == "dlz.sdf"
-    assert params["entities"]["marker"]["path_to_sdf"] == "marker.sdf"
+    assert params["entities"]["dlz"]["path_to_model"] == "dlz.sdf"
+    assert params["entities"]["marker"]["path_to_model"] == "marker.sdf"
     assert params["controllables"]["uav_0"]["px4_airframe_id"] == 4010
-    assert params["controllables"]["payload_0"]["path_to_sdf"] == "payload.sdf"
+    assert params["controllables"]["payload_0"]["path_to_model"] == "payload.sdf"
 
 
 @pytest.mark.parametrize("legacy_key", ["dlz", "payload_0", "payload_1"])
-def test_normalize_stage_world_params_rejects_legacy_top_level_spawnables(legacy_key):
+@pytest.mark.parametrize("spawnable_field", ["model", "path_to_model"])
+def test_normalize_stage_world_params_rejects_legacy_top_level_spawnables(
+    legacy_key, spawnable_field
+):
+    field_value = legacy_key if spawnable_field == "model" else f"{legacy_key}.sdf"
+
     try:
         normalize_stage_world_params(
             {
                 "template_world": "template.sdf",
-                legacy_key: {"path_to_sdf": f"{legacy_key}.sdf"},
+                legacy_key: {spawnable_field: field_value},
             }
         )
     except ValueError as exc:
@@ -161,7 +166,7 @@ def test_resolve_stage_world_exposes_standard_stage_spawnables(monkeypatch):
                         "template_world": "template.sdf",
                         "entities": {
                             "dlz": {
-                                "path_to_sdf": "~/.simulation-gazebo/models/dlz_white/model.sdf",
+                                "path_to_model": "~/.simulation-gazebo/models/dlz_white/model.sdf",
                                 "position": [0.0, 0.0, 0.0],
                                 "rpy": [0.0, 0.0, 0.0],
                             }
@@ -171,13 +176,13 @@ def test_resolve_stage_world_exposes_standard_stage_spawnables(monkeypatch):
                                 "kind": "uav",
                                 "model": "gz_standard_vtol",
                                 "px4_airframe_id": 4004,
-                                "path_to_sdf": "~/.simulation-gazebo/models/standard_vtol/model.sdf",
+                                "path_to_model": "~/.simulation-gazebo/models/standard_vtol/model.sdf",
                                 "position": [5.0, 0.0, 0.1],
                                 "rpy": [0.0, 0.0, 0.0],
                             },
                             "payload_0": {
                                 "kind": "payload",
-                                "path_to_sdf": "~/.simulation-gazebo/models/payload/model.sdf",
+                                "path_to_model": "~/.simulation-gazebo/models/payload/model.sdf",
                                 "position": [0.0, 0.0, 0.1],
                                 "rpy": [0.0, 0.0, 0.0],
                             },
@@ -195,7 +200,7 @@ def test_resolve_stage_world_exposes_standard_stage_spawnables(monkeypatch):
     assert resolved["mission_stage"] == "payload_retreat"
     assert resolved["config_path"].name == "payload_retreat.yaml"
     assert resolved["world"]["name"] == "SAEWorldNode"
-    assert resolved["world"]["params"]["entities"]["dlz"]["path_to_sdf"].endswith(
+    assert resolved["world"]["params"]["entities"]["dlz"]["path_to_model"].endswith(
         "dlz_white/model.sdf"
     )
     assert resolved["world"]["params"]["controllables"]["uav_0"]["px4_airframe_id"] == 4004
@@ -220,16 +225,16 @@ def test_resolve_stage_world_defaults_to_base_stage(monkeypatch):
                     "params": {
                         "template_world": "template.sdf",
                         "entities": {
-                            "dlz": {"path_to_sdf": "~/.simulation-gazebo/models/dlz/model.sdf"}
+                            "dlz": {"path_to_model": "~/.simulation-gazebo/models/dlz/model.sdf"}
                         },
                         "controllables": {
                             "payload_0": {
                                 "kind": "payload",
-                                "path_to_sdf": "~/.simulation-gazebo/models/payload/model.sdf",
+                                "path_to_model": "~/.simulation-gazebo/models/payload/model.sdf",
                             },
                             "payload_1": {
                                 "kind": "payload",
-                                "path_to_sdf": "~/.simulation-gazebo/models/payload/model.sdf",
+                                "path_to_model": "~/.simulation-gazebo/models/payload/model.sdf",
                             },
                         },
                     },
@@ -244,7 +249,7 @@ def test_resolve_stage_world_defaults_to_base_stage(monkeypatch):
     assert resolved["world_name"] == "sae"
     assert resolved["mission_stage"] == "base"
     assert resolved["config_path"].name == "base.yaml"
-    assert resolved["world"]["params"]["entities"]["dlz"]["path_to_sdf"].endswith("dlz/model.sdf")
+    assert resolved["world"]["params"]["entities"]["dlz"]["path_to_model"].endswith("dlz/model.sdf")
     assert "payload_0" in resolved["world"]["params"]["controllables"]
     assert "payload_1" in resolved["world"]["params"]["controllables"]
 
@@ -270,7 +275,7 @@ def test_resolve_stage_world_loads_specific_stage_and_merges_world_overrides(
                         "template_world": "template.sdf",
                         "entities": {
                             "dlz": {
-                                "path_to_sdf": "~/.simulation-gazebo/models/dlz_white/model.sdf",
+                                "path_to_model": "~/.simulation-gazebo/models/dlz_white/model.sdf",
                                 "position": [0.0, 0.0, 0.0],
                                 "rpy": [0.0, 0.0, 0.0],
                             }
@@ -278,7 +283,7 @@ def test_resolve_stage_world_loads_specific_stage_and_merges_world_overrides(
                         "controllables": {
                             "payload_0": {
                                 "kind": "payload",
-                                "path_to_sdf": "~/.simulation-gazebo/models/payload/model.sdf",
+                                "path_to_model": "~/.simulation-gazebo/models/payload/model.sdf",
                                 "position": [0.0, 0.0, 0.1],
                                 "rpy": [0.0, 0.0, 0.0],
                             }
@@ -297,7 +302,7 @@ def test_resolve_stage_world_loads_specific_stage_and_merges_world_overrides(
             "params": {
                 "entities": {
                     "marker": {
-                        "path_to_sdf": "~/.simulation-gazebo/models/marker/model.sdf",
+                        "path_to_model": "~/.simulation-gazebo/models/marker/model.sdf",
                         "position": [1.0, 2.0, 3.0],
                         "rpy": [0.0, 0.0, 0.0],
                     }
@@ -305,7 +310,7 @@ def test_resolve_stage_world_loads_specific_stage_and_merges_world_overrides(
                 "controllables": {
                     "uav_0": {
                         "kind": "uav",
-                        "path_to_sdf": "~/.simulation-gazebo/models/x500/model.sdf",
+                        "path_to_model": "~/.simulation-gazebo/models/x500/model.sdf",
                         "position": [4.0, 5.0, 6.0],
                         "rpy": [0.0, 0.0, 0.0],
                     }
@@ -316,10 +321,10 @@ def test_resolve_stage_world_loads_specific_stage_and_merges_world_overrides(
 
     assert resolved["mission_stage"] == "payload_retreat"
     assert resolved["config_path"].name == "payload_retreat.yaml"
-    assert resolved["world"]["params"]["entities"]["dlz"]["path_to_sdf"].endswith(
+    assert resolved["world"]["params"]["entities"]["dlz"]["path_to_model"].endswith(
         "dlz_white/model.sdf"
     )
-    assert resolved["world"]["params"]["entities"]["marker"]["path_to_sdf"].endswith(
+    assert resolved["world"]["params"]["entities"]["marker"]["path_to_model"].endswith(
         "marker/model.sdf"
     )
     assert resolved["world"]["params"]["controllables"]["payload_0"]["kind"] == "payload"
