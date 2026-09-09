@@ -198,7 +198,7 @@ def launch_setup(context, *args, **kwargs):
             )
         entities = dict(world_params.get("entities", {}))
         entities[f"{sim_model_name}_0"] = {
-            "path_to_sdf": f"~/.simulation-gazebo/models/{sim_model_name}/model.sdf",
+            "path_to_model": f"~/.simulation-gazebo/models/{sim_model_name}/model.sdf",
             "position": vehicle_pose[:3],
             "rpy": vehicle_pose[3:],
         }

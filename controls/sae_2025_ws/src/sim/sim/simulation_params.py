@@ -4,7 +4,7 @@ import yaml
 from ament_index_python import get_package_share_path
 from pydantic import BaseModel, Field, model_validator
 
-from sim.world_gen.entity import Entity
+from sim.entity import Entity
 
 
 class Physics(BaseModel):

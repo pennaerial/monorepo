@@ -55,7 +55,7 @@ backend:
     params:
       entities:
         dlz:
-          path_to_sdf: ~/.simulation-gazebo/models/dlz/model.sdf
+          path_to_model: ~/.simulation-gazebo/models/dlz/model.sdf
           position: [0.0, 0.0, -0.1]
           rpy: [0.0, 0.0, 0.0]
       controllables:
@@ -63,7 +63,7 @@ backend:
           kind: uav
           model: gz_standard_vtol
           px4_airframe_id: 4004
-          path_to_sdf: ~/.simulation-gazebo/models/standard_vtol/model.sdf
+          path_to_model: ~/.simulation-gazebo/models/standard_vtol/model.sdf
 
 defaults:
   auto_launch: true
