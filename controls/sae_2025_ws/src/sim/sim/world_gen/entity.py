@@ -37,7 +37,7 @@ class Entity(BaseModel):
     """
 
     name: str
-    path_to_sdf: str = ""
+    path_to_model: str = ""
     model: str = ""
     position: tuple[float, float, float]
     rpy: tuple[float, float, float]
@@ -45,29 +45,43 @@ class Entity(BaseModel):
 
     @model_validator(mode="after")
     def post_validate(self) -> Entity:
-        if not self.model and not self.path_to_sdf:
-            raise ValueError("Error: must provide either model or path_to_sdf field to entity")
+        # An explicit file path takes precedence
+        if self.path_to_model:
+            resolved_path = self.validate_model_path(self.path_to_model)
 
-        # if only path_to_sdf is defined, derive model from it
-        if not self.model:  # /path/to/model/model.sdf --> "model"
-            self.model = str(Path(self.path_to_sdf).parent)
-            self.validate_path_to_sdf()
+            if not self.model:
+                self.model = resolved_path.parent.name
 
-        # if only model is defined, or both, path_to_sdf gets overridden by path derived from self.model
+        elif self.model:
+            # check for corresponding urdf or sdf file in that priority order
+            models_dir = Path(os.environ["PENNAIR_GZ_MODELS_PATH"]) / "models"
+            urdf_path = models_dir / self.model / "model.urdf"
+            sdf_path = models_dir / self.model / "model.sdf"
+
+            if urdf_path.is_file():
+                resolved_path = urdf_path.resolve()
+            elif sdf_path.is_file():
+                resolved_path = sdf_path.resolve()
+            else:
+                raise ValueError(f"Model '{self.model}' has neither '{urdf_path}' nor '{sdf_path}'")
+
         else:
-            path = Path(os.environ["PENNAIR_GZ_MODELS_PATH"]) / "models" / self.model / "model.sdf"
-            self.path_to_sdf = str(path)
-            self.validate_path_to_sdf()
+            raise ValueError("Error: must provide either model or path_to_model field to entity")
+
+        self.path_to_model = str(resolved_path)
 
         return self
+    
+    @staticmethod
+    def validate_model_path(path: str | Path) -> Path:
+        model_path = Path(path).expanduser()
 
-    # validates path_to_sdf is .sdf file and exists
-    def validate_path_to_sdf(self):
-        sdf_path = Path(self.path_to_sdf).expanduser()
-        if sdf_path.suffix.lower() != ".sdf":
-            raise ValueError("path_to_sdf must point to an .sdf file")
-        if not sdf_path.is_file():
-            raise ValueError(f"SDF file does not exist: {sdf_path}")
+        if model_path.suffix.lower() not in {".sdf", ".urdf"}:
+            raise ValueError(f"Model path must point to a .urdf or .sdf file; received: {model_path}")
+        if not model_path.is_file(): 
+            raise ValueError(f"Model file does not exist: {model_path}")
+
+        return model_path.resolve()
 
     def to_entity_factory_msg(self):
         pose = Pose()
@@ -82,7 +96,7 @@ class Entity(BaseModel):
 
         ent_fact = EntityFactory()
         ent_fact.name = self.name
-        ent_fact.sdf_filename = self.path_to_sdf
+        ent_fact.sdf_filename = self.path_to_model
         ent_fact.pose = pose
         ent_fact.relative_to = self.world
         return ent_fact
