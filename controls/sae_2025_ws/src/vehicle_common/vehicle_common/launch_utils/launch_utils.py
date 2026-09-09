@@ -6,8 +6,6 @@ from ament_index_python.packages import get_package_share_directory
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.actions import IncludeLaunchDescription
 
-PENNAIR_LAUNCH_DEBUG = os.getenv("PENNAIR_LAUNCH_DEBUG", "0").lower() == "1"
-
 RED = "\033[31m"
 YELLOW = "\033[33m"
 CYAN = "\033[36m"
