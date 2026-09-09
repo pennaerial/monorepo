@@ -1,5 +1,4 @@
 import logging
-import os
 from enum import StrEnum
 from pathlib import Path
 
@@ -29,7 +28,7 @@ class LaunchFormatter(logging.Formatter):
         return msg
 
 
-def get_logger(name: str) -> logging.Logger:
+def get_logger(name: str, level: int = logging.INFO) -> logging.Logger:
     logger = logging.getLogger(name)
     handler = logging.StreamHandler()
 
@@ -38,7 +37,7 @@ def get_logger(name: str) -> logging.Logger:
         handler.setFormatter(LaunchFormatter("[%(levelname)s] [%(name)s] %(message)s"))
         logger.addHandler(handler)
         logger.propagate = False
-    logger.setLevel(logging.DEBUG if PENNAIR_LAUNCH_DEBUG else logging.INFO)
+    logger.setLevel(level)
 
     return logger
 
