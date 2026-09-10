@@ -1,4 +1,4 @@
-#include "vision_manager/vision_manager.hpp"
+#include "pennair_vision/vision_manager.hpp"
 
 #include <chrono>
 #include <memory>
