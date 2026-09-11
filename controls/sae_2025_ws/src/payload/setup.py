@@ -17,6 +17,10 @@ setup(
             os.path.join("share", package_name, "missions"),
             glob(os.path.join("missions", "*.yaml")),
         ),
+        (
+            os.path.join("share", package_name, "urdf"),
+            glob(os.path.join("urdf", "*.urdf.xacro")),
+        ),
     ],
     install_requires=["setuptools"],
     zip_safe=True,
