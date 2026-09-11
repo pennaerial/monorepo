@@ -68,7 +68,7 @@ Quick Links
    :maxdepth: 2
    :caption: PAYLOAD CONTROLLER
 
-   C++ API Reference <pc_api/index>
+   C++ API Reference <pc/index>
 
 .. toctree::
     :hidden:
