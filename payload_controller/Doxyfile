@@ -8,7 +8,7 @@
 
 PROJECT_NAME           = "Payload Controller"
 PROJECT_BRIEF          = "ESP32 payload controller firmware"
-OUTPUT_DIRECTORY       = $(PENNAIR_PAYLOAD_CONTROLLER_PATH)/docs/doxygen
+OUTPUT_DIRECTORY       = $(PENNAIR_PAYLOAD_CONTROLLER_PATH)/doxygen
 
 INPUT                  = $(PENNAIR_PAYLOAD_CONTROLLER_PATH)/main $(PENNAIR_PAYLOAD_CONTROLLER_PATH)/components
 RECURSIVE              = YES
