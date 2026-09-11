@@ -91,5 +91,5 @@ if not SKIP_AUTOAPI_BUILD:
 # =============================================================================
 
 breathe_projects = {
-    "payload_controller": f"{os.environ['PENNAIR_PAYLOAD_CONTROLLER_PATH']}/docs/doxygen/xml"
+    "payload_controller": f"{os.environ['PENNAIR_PAYLOAD_CONTROLLER_PATH']}/doxygen/xml"
 }
