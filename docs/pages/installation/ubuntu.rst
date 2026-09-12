@@ -193,18 +193,9 @@ to build all of them.
 
 Run the install script:
 
+.. warning::
 
-
-.. code-block:: bash
-    :caption: Bash
-
-    # from monorepo root:
-    source dev_env.sh # exports environment variables that the build_all.sh script needs
-    ./Dependencies/build_all.sh
-
-.. danger::
-
-    Due to a gradle incompatiability, ensure you are on **Java 17** or **Java 11** before running the above. You can do the following to switch:
+    Due to a gradle incompatiability, ensure you are on **Java 17** or **Java 11** before running the below. You can do the following to switch:
 
     .. code-block:: bash
         :caption: Bash
@@ -214,6 +205,13 @@ Run the install script:
         sudo update-alternatives --config java
 
     Follow the command line prompt to switch to the correct version of Java, then run the above again.
+
+.. code-block:: bash
+    :caption: Bash
+
+    # from monorepo root:
+    source dev_env.sh # exports environment variables that the build_all.sh script needs
+    ./Dependencies/build_all.sh
 
 
 .. note::
