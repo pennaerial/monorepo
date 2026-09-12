@@ -188,7 +188,7 @@ def generate_launch_description():
             ),
             DeclareLaunchArgument(
                 Args.LAUNCH_SIM,
-                default_value="false",
+                default_value="true",
                 description="if this or standalone is true, runs sim.launch.py to launch gazebo with the specified world argument",
                 choices=["true", "false", "t", "f", "0", "1"],
             ),

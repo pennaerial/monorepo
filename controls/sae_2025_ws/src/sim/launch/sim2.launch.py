@@ -88,6 +88,16 @@ def launch_setup(context) -> list[Action]:
     )
 
     actions.append(gz_sim)
+
+    # Simulation time is shared by every ROS node using use_sim_time = True
+    clock_bridge = Node(
+        package="ros_gz_bridge",
+        executable="parameter_bridge",
+        arguments=["/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock"],
+        output="screen",
+        name="clock_bridge",
+    )
+    actions.append(clock_bridge)
     logger.info(f"Launching world: {world}")
     try:
         simulation_params = SimulationParams.load_from_stage(world, stage)
