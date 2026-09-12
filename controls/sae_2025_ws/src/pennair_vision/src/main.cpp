@@ -1,5 +1,5 @@
-#include <rclcpp/rclcpp.hpp>
 #include <memory>
+#include <rclcpp/rclcpp.hpp>
 
 #include "pennair_vision/vision_manager.hpp"
 

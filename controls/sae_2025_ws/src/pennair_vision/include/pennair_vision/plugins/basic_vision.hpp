@@ -1,7 +1,8 @@
 #pragma once
 
-#include "pennair_vision/vision_plugin.hpp"
 #include <rclcpp/rclcpp.hpp>
+
+#include "pennair_vision/vision_plugin.hpp"
 
 namespace pennair_vision
 {
@@ -16,4 +17,4 @@ public:
   void process(sensor_msgs::msg::Image::ConstSharedPtr image) override;
 };
 
-}; // pennair_vision
+};  // namespace pennair_vision
