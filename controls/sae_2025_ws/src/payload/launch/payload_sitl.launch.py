@@ -146,7 +146,7 @@ def launch_setup(context) -> list[Action]:
     )
     actions.append(payload_controller)
 
-    rviz_config_path = payload_share / "rviz" / "temp_payload.rviz"
+    rviz_config_path = payload_share / "rviz" / "payload.rviz"
 
     rviz = Node(
         package="rviz2",

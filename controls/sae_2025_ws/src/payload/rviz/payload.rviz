@@ -7,6 +7,7 @@ Panels:
         - /Global Options1
         - /Status1
         - /RobotModel1
+        - /RobotModel1/Description Topic1
       Splitter Ratio: 0.5
     Tree Height: 542
   - Class: rviz_common/Selection
@@ -55,7 +56,7 @@ Visualization Manager:
       Description Source: Topic
       Description Topic:
         Depth: 5
-        Durability Policy: Volatile
+        Durability Policy: Transient Local
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /payload_0/robot_description
@@ -76,12 +77,26 @@ Visualization Manager:
           Show Axes: false
           Show Trail: false
           Value: true
-        left_tread:
+        camera_optical_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        front_left_wheel:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        right_tread:
+        front_right_wheel:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        rear_left_wheel:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        rear_right_wheel:
           Alpha: 1
           Show Axes: false
           Show Trail: false
@@ -140,7 +155,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 10
+      Distance: 2.7850098609924316
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
