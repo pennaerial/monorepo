@@ -18,11 +18,12 @@ from rclpy.qos import (
 from sim_interfaces.srv import HoopList
 from std_msgs.msg import Float32MultiArray
 
-from sim.scoring import ScoringNode
 from sim.scoring.namespacing import (
     normalize_vehicle_name,
     vehicle_px4_local_position_topic,
 )
+
+from .ScoringNode import ScoringNode
 
 
 class HoopScoringNode(ScoringNode):
