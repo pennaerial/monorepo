@@ -7,18 +7,12 @@ from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 from launch.substitutions import Command, FindExecutable
 from launch import LaunchDescription, Action
-from launch.actions import (
-    LogInfo,
-    OpaqueFunction,
-    DeclareLaunchArgument
-)
+from launch.actions import OpaqueFunction, DeclareLaunchArgument
 
 from vehicle_common.launch_utils import (
     get_logger,
-    LaunchError,
     check_unknown_launch_args,
     include_launch,
-    format_bullet_list,
     is_truthy,
 )
 
@@ -27,12 +21,13 @@ logger = get_logger("uav_sitl.launch")
 
 class Args(StrEnum):
     """Maps constants to launch argument keyords"""
-    
+
     NS_ID = "ns_id"
     LAUNCH_RVIZ = "launch_rviz"
     WORLD = "world"
     LAUNCH_SIM = "launch_sim"
     HEADLESS = "headless"
+
 
 def launch_setup(context) -> list[Action]:
     config = context.launch_configurations
@@ -74,10 +69,10 @@ def launch_setup(context) -> list[Action]:
         parameters=[
             {
                 "robot_description": robot_description,
-                "use_sim_time": False, # True to keep tf synched with sim, False rn temporarily before sim
+                "use_sim_time": False,  # True to keep tf synched with sim, False rn temporarily before sim
             }
         ],
-        output="screen"
+        output="screen",
     )
     actions.append(robot_state_publisher)
 
@@ -130,12 +125,11 @@ def launch_setup(context) -> list[Action]:
             }
         ],
         output="screen",
-        arguments=["-d", str(rviz_config_path)]
+        arguments=["-d", str(rviz_config_path)],
     )
     actions.extend([rviz] if launch_rviz else [])
 
     return actions
-
 
 
 def generate_launch_description():
@@ -150,7 +144,7 @@ def generate_launch_description():
                 Args.LAUNCH_RVIZ,
                 default_value="true",
                 description="If true, launch RViz.",
-                choices=["true", "false", "t", "f", "0", "1"]
+                choices=["true", "false", "t", "f", "0", "1"],
             ),
             DeclareLaunchArgument(
                 Args.WORLD,
@@ -169,6 +163,6 @@ def generate_launch_description():
                 description="Run Gazebo without its graphical interface.",
                 choices=["true", "false", "t", "f", "0", "1"],
             ),
-            OpaqueFunction(function=launch_setup)
+            OpaqueFunction(function=launch_setup),
         ]
     )
