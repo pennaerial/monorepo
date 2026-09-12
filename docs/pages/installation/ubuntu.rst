@@ -195,7 +195,7 @@ Run the install script:
 
 .. warning::
 
-    Due to a gradle incompatiability, ensure you are on **Java 17** or **Java 11** before running the above. You can do the following to switch:
+    Due to a gradle incompatiability, ensure you are on **Java 17** or **Java 11** before running the below. You can do the following to switch:
 
     .. code-block:: bash
         :caption: Bash
