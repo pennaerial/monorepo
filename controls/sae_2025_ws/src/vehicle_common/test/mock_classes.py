@@ -1,10 +1,10 @@
-from vehicle_common.vehicle import Vehicle
-from vehicle_common.mode import Mode
 from vehicle_common.base import VisionNode
+from vehicle_common.mode import Mode
 from vehicle_common.mode_loader import (
     ParamsBase,
     register_mode,
 )
+from vehicle_common.vehicle import Vehicle
 
 
 class MockVehicle(Vehicle):

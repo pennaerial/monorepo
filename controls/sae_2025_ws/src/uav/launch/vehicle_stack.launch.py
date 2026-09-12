@@ -16,11 +16,6 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.logging import get_logger
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
-
-from uav.vehicles.AirframeClass import AirframeClass
-from uav.vehicles.UAV import UAV
-from vehicle_common.base import VisionNode
-from vehicle_common.runtime.mission_loader import RuntimeMission, get_mission_path
 from uav.utils import (
     camel_to_snake,
     find_folder_with_heuristic,
@@ -28,6 +23,10 @@ from uav.utils import (
     vehicle_camera_map,
     vehicle_id_dict,
 )
+from uav.vehicles.AirframeClass import AirframeClass
+from uav.vehicles.UAV import UAV
+from vehicle_common.base import VisionNode
+from vehicle_common.runtime.mission_loader import RuntimeMission, get_mission_path
 
 
 def _load_vehicle_config(context) -> dict:

@@ -16,15 +16,14 @@ from launch.actions import (
 from launch.event_handlers import OnProcessExit, OnProcessIO, OnProcessStart
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
-
 from sim.constants import (
     COMPETITION_NAMES,
     DEFAULT_COMPETITION,
     DEFAULT_USE_SCORING,
     Competition,
 )
-from sim.scoring.namespacing import resolve_scoring_vehicle_name
 from sim.orchestration import parse_json_config, resolve_stage_world
+from sim.scoring.namespacing import resolve_scoring_vehicle_name
 from sim.utils import (
     build_node_arguments,
     camel_to_snake,

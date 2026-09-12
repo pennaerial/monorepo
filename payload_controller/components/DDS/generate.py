@@ -2,9 +2,8 @@
 
 import argparse
 import os
-from pathlib import Path
 import subprocess
-
+from pathlib import Path
 
 PC_PATH = os.environ["PENNAIR_PAYLOAD_CONTROLLER_PATH"]
 XRCE_GEN_PATH = os.environ["PENNAIR_XRCE_DDS_GEN_PATH"]

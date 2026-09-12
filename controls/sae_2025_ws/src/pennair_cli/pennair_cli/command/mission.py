@@ -1,12 +1,11 @@
 from argparse import ArgumentParser
-from pydantic import ValidationError
 from typing import override
 
 from ament_index_python.packages import get_packages_with_prefixes
-
-from vehicle_common.utils import get_available_missions
-from vehicle_common.runtime.mission_loader import get_mission_path, RuntimeMission
 from pennair_cli.extension import CommandExtension
+from pydantic import ValidationError
+from vehicle_common.runtime.mission_loader import RuntimeMission, get_mission_path
+from vehicle_common.utils import get_available_missions
 
 
 class MissionCommand(CommandExtension):

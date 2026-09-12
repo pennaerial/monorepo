@@ -1,10 +1,10 @@
 from typing import override
 
 from rclpy.node import Node
-
-from uav.vehicles.UAV import UAV
 from vehicle_common.mode import Mode
 from vehicle_common.mode_loader import ParamsBase, register_mode
+
+from uav.vehicles.UAV import UAV
 
 
 class FlyToPointParams(ParamsBase):

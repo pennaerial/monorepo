@@ -5,7 +5,6 @@ from copy import deepcopy
 from pathlib import Path
 
 import yaml
-
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import (
@@ -16,11 +15,10 @@ from launch.actions import (
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.logging import get_logger
 from launch.substitutions import LaunchConfiguration
-
-from vehicle_common.runtime.mission_loader import RuntimeMission, get_mission_path
 from uav.utils import find_folder_with_heuristic, get_airframe_details, vehicle_id_dict
 from uav.vehicles.UAV import UAV
 from vehicle_common.px4 import DEFAULT_PX4_PATH
+from vehicle_common.runtime.mission_loader import RuntimeMission, get_mission_path
 
 
 def _load_launch_parameters(context) -> dict:
