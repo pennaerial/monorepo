@@ -1,0 +1,21 @@
+# Simulation Configuration
+world:
+  name: in_house_2026
+  node: in_house_2026_node
+
+  physics:
+    friction: 0.0
+
+  config: # world node specific config
+
+  controllables:
+    - name: uav_0
+      model: x500_mono_cam
+      position: [0, 0, 0]
+      rpy: [0.0, 0.0, 0.0]
+
+# Scoring parameters
+# scoring:
+#   name: TODO
+#   params:
+#     vehicle_name: uav_0     # ROS identity whose PX4 state the scorer should track
