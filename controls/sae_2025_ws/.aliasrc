@@ -7,6 +7,7 @@ alias cb='colcon build'
 alias cbcc="colcon build --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON && ln -s build/compile_commands.json compile_commands.json"
 alias cbp='colcon build --packages-select'
 alias cbpsi='colcon build --symlink-install --packages-select'
+    alias sisb='source install/setup.bash'
 
 # rm -rf's the build and install of each specified package
 cleanp() {

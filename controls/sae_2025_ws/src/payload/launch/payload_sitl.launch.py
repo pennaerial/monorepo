@@ -58,7 +58,8 @@ def launch_setup(context) -> list[Action]:
 
     # Feed in string-valued ROS parameter "xacro <path>/payload.urdf.xacro"
     robot_description = ParameterValue(
-        Command([FindExecutable(name="xacro"), " ", str(xacro_path)]), value_type=str,
+        Command([FindExecutable(name="xacro"), " ", str(xacro_path)]),
+        value_type=str,
     )
 
     robot_state_publisher = Node(
