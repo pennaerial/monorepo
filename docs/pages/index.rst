@@ -94,3 +94,7 @@ Past Contributors (Alums)
     :path: contributors
     :repo: pennaerial/monorepo
     :role: alum
+
+
+.. monkeytype-leaderboard::
+    :path: contributors

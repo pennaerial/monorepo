@@ -7,6 +7,8 @@ from docutils.statemachine import StringList
 from sphinx.application import Sphinx
 from sphinx.util.docutils import SphinxDirective
 
+from monkeytype_leaderboard import MonkeytypeLeaderboard
+
 
 def get_github_contributions(repo: str) -> dict[str, int]:
     response = requests.get(
@@ -124,6 +126,8 @@ def setup(app: Sphinx):
         "pennair-contributors",
         ContributorsDirective,
     )
+
+    app.add_directive("monkeytype-leaderboard", MonkeytypeLeaderboard)
 
     app.add_config_value(
         "pennair_contributors_cache",
