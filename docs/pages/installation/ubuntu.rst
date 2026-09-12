@@ -140,11 +140,11 @@ From monorepo root:
 .. code-block:: bash
     :caption: Bash
 
-    sudo $(which uv) pip install --system --break-system-packages -r pyproject.toml
+    sudo $(which uv) pip install --system --break-system-packages -r pyproject.toml --group dev
 
 .. note::
 
-    This above command installs the listed dependencies as system-wide python packages.
+    The above command installs the listed dependencies and the ``dev`` dependency group.
     Unlike traditional uv/pip usage that uses a virtual environment, ROS setups use system wide packages
     which doesn't work too well with venvs.
 
