@@ -4,18 +4,18 @@ import cv2
 import numpy as np
 import rclpy
 from rclpy.executors import ExternalShutdownException
+from uav_interfaces.srv import PayloadColorOrbitState
+from vehicle_common.base import VisionNode
 
 from uav.utils import green, pink
-from vehicle_common.base import VisionNode
 from uav.vision_nodes.payload_perception_common import (
-    AprilTagDetectorCache,
     DEFAULT_TAG_FAMILY,
+    AprilTagDetectorCache,
     back_view_angle_deg,
     compute_edge_follow_control,
     compute_edge_metrics,
     solve_payload_apriltags,
 )
-from uav_interfaces.srv import PayloadColorOrbitState
 
 
 class PayloadColorOrbitNode(VisionNode):

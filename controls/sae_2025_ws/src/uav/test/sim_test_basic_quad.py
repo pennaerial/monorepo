@@ -4,12 +4,11 @@
 import os
 import unittest
 
-import pytest
 import launch
 import launch_testing.actions
-
-from vehicle_common.launch_utils import include_launch
+import pytest
 from headless_ground_station import HeadlessGroundStation
+from vehicle_common.launch_utils import include_launch
 
 # Live marker prevents colcon test from running this test in non-sim CI
 pytestmark = pytest.mark.live

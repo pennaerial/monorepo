@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
 import json
-import sys
 import math
+import sys
 import time
 from typing import List, Optional, Tuple
 
@@ -15,8 +15,9 @@ from rclpy.qos import (
     QoSProfile,
     QoSReliabilityPolicy,
 )
-from std_msgs.msg import Float32MultiArray
 from sim_interfaces.srv import HoopList
+from std_msgs.msg import Float32MultiArray
+
 from sim.scoring import ScoringNode
 from sim.scoring.namespacing import (
     normalize_vehicle_name,

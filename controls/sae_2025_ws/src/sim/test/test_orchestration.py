@@ -8,12 +8,11 @@ if str(package_root) not in sys.path:
     sys.path.insert(0, str(package_root))
 
 import pytest  # noqa: E402
-
 from sim.orchestration import (  # noqa: E402
     deep_merge_dicts,
     normalize_named_records,
-    normalized_stage_name,
     normalize_stage_world_params,
+    normalized_stage_name,
     parse_json_config,
     resolve_stage_world,
 )

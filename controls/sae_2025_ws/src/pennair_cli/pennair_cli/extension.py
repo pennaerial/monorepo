@@ -1,5 +1,5 @@
-from argparse import ArgumentParser
 from abc import ABC, abstractmethod
+from argparse import ArgumentParser
 
 
 class CommandExtension(ABC):

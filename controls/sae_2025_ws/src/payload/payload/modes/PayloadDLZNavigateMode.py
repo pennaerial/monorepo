@@ -3,22 +3,20 @@ from __future__ import annotations
 import math
 from typing import Literal, Optional, Tuple, override
 
-from typing_extensions import TypedDict
-
 import cv2
 import numpy as np
 from cv_bridge import CvBridge
 from rclpy.node import Node
 from sensor_msgs.msg import CompressedImage, Image
-
-from vehicle_common.cv.dlz_convex_hull import build_dlz_hull_mask
-from vehicle_common.mode import Mode
-from vehicle_common.mode_loader import ParamsBase, register_mode
-from payload.payload import Payload
+from typing_extensions import TypedDict
 from uav.vision_nodes import PayloadAprilTagNode
 from uav.vision_nodes.payload_perception_common import DEFAULT_TAG_FAMILY
 from uav_interfaces.srv import PayloadAprilTagState
+from vehicle_common.cv.dlz_convex_hull import build_dlz_hull_mask
+from vehicle_common.mode import Mode
+from vehicle_common.mode_loader import ParamsBase, register_mode
 
+from payload.payload import Payload
 
 # Corner-turn vision thresholds (mirrors PayloadCornerNavigateMode defaults)
 _CORNER_CENTER_TOL_PX = 75.0  # lateral error tolerance (px)

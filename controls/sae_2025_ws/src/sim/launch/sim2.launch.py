@@ -1,21 +1,20 @@
 from enum import StrEnum
 from pathlib import Path
 
-from launch import LaunchDescription, Action
-from launch_ros.actions import Node
+from launch import Action, LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
-    OpaqueFunction,
     ExecuteProcess,
+    OpaqueFunction,
 )
-
-from sim.utils import get_available_worlds
+from launch_ros.actions import Node
 from sim.simulation_params import SimulationParams
-from vehicle_common.env import require_env, prepend_env_path
+from sim.utils import get_available_worlds
+from vehicle_common.env import prepend_env_path, require_env
 from vehicle_common.launch_utils import (
+    format_bullet_list,
     get_logger,
     is_truthy,
-    format_bullet_list,
 )
 
 logger = get_logger("sim.launch")

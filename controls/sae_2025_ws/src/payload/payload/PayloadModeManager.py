@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 from time import time
 
-from payload.payload import Payload
 from vehicle_common.mode_manager import ModeManager
 from vehicle_common.runtime.mission_loader import RuntimeMission
 from vehicle_common.runtime.vision_loader import canonical_vision_node_path
+
+from payload.payload import Payload
 
 
 class PayloadModeManager(ModeManager):

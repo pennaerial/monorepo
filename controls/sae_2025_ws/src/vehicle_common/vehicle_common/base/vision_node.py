@@ -1,6 +1,6 @@
 import os
-import uuid
 import re
+import uuid
 
 import cv2
 import numpy as np
