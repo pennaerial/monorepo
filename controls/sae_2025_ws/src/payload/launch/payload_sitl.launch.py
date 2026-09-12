@@ -30,6 +30,9 @@ class Args(StrEnum):
     
     NS_ID = "ns_id"
     LAUNCH_RVIZ = "launch_rviz"
+    WORLD = "world"
+    LAUNCH_SIM = "launch_sim"
+    HEADLESS = "headless"
 
 def launch_setup(context) -> list[Action]:
     config = context.launch_configurations
@@ -39,6 +42,21 @@ def launch_setup(context) -> list[Action]:
     ns_id = int(config[Args.NS_ID])
     vehicle_ns = f"payload_{ns_id}"
     launch_rviz = is_truthy(config[Args.LAUNCH_RVIZ])
+    world = config[Args.WORLD]
+    launch_sim = is_truthy(config[Args.LAUNCH_SIM])
+    headless = config[Args.HEADLESS]
+
+    # PRINTING HEADER
+    logger.debug("LAUNCH PARAMS")
+    # logger.debug(f"Mission:             {mission}")
+    logger.debug(f"Vehicle Namespace:   {vehicle_ns}")
+    logger.debug(f"Sim World:           {world}")
+    # logger.debug(f"Middleware:          {run_mw}")
+    logger.debug(f"Launch Sim:          {launch_sim}")
+    logger.debug(f"Headless Mode:       {headless}")
+
+    ## create actions
+    actions = []
 
     payload_share = get_package_share_path("payload")
     xacro_path = payload_share / "urdf" / "payload.urdf.xacro"
@@ -61,6 +79,7 @@ def launch_setup(context) -> list[Action]:
         ],
         output="screen"
     )
+    actions.append(robot_state_publisher)
 
     temporary_payload_pose = Node(
         package="tf2_ros",
@@ -87,29 +106,33 @@ def launch_setup(context) -> list[Action]:
         ],
         output="screen",
     )
+    actions.append(temporary_payload_pose)
 
-    actions = [
-        LogInfo(msg=f"Launching RViz prototype for {vehicle_ns}"),
-        robot_state_publisher,
-        temporary_payload_pose,
-    ]
+    include_sim_launch = include_launch(
+        "sim",
+        "sim2.launch.py",
+        launch_arguments={
+            "world": world,
+            "headless": headless,
+        },
+    )
+    actions.extend([include_sim_launch] if launch_sim else [])
 
     rviz_config_path = payload_share / "rviz" / "temp_payload.rviz"
 
-    if launch_rviz:
-        rviz = Node(
-            package="rviz2",
-            executable="rviz2",
-            name="rviz2",
-            parameters=[
-                {
-                    "use_sim_time": False,
-                }
-            ],
-            output="screen",
-            arguments=["-d", str(rviz_config_path)]
-        )
-        actions.append(rviz)
+    rviz = Node(
+        package="rviz2",
+        executable="rviz2",
+        name="rviz2",
+        parameters=[
+            {
+                "use_sim_time": False,
+            }
+        ],
+        output="screen",
+        arguments=["-d", str(rviz_config_path)]
+    )
+    actions.extend([rviz] if launch_rviz else [])
 
     return actions
 
@@ -129,7 +152,23 @@ def generate_launch_description():
                 description="If true, launch RViz.",
                 choices=["true", "false", "t", "f", "0", "1"]
             ),
-            OpaqueFunction(function=launch_setup),
-            LogInfo(msg="payload_sitl.launch.py loaded successfully"),
+            DeclareLaunchArgument(
+                Args.WORLD,
+                default_value="default",
+                description="name of the simulation world that this uav instance belongs to. If standalone=true, then it launches this world using sim package.",
+            ),
+            DeclareLaunchArgument(
+                Args.LAUNCH_SIM,
+                default_value="true",
+                description="if this or standalone is true, runs sim.launch.py to launch gazebo with the specified world argument",
+                choices=["true", "false", "t", "f", "0", "1"],
+            ),
+            DeclareLaunchArgument(
+                Args.HEADLESS,
+                default_value="false",
+                description="Run Gazebo without its graphical interface.",
+                choices=["true", "false", "t", "f", "0", "1"],
+            ),
+            OpaqueFunction(function=launch_setup)
         ]
     )
