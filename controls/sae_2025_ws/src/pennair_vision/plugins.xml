@@ -1,0 +1,5 @@
+<library path="vision_plugins">
+  <class type="pennair_vision::BasicVision" base_class_type="pennair_vision::VisionPlugin">
+    <description>Basic VisionPlugin example</description>
+  </class>
+</library>
