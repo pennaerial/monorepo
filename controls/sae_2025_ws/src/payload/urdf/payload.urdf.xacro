@@ -1,12 +1,51 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="payload">
-  <!-- Placeholder RViz model. Gazebo continues to use models/payload/model.sdf. -->
-  <xacro:property name="body_length" value="0.50"/>
-  <xacro:property name="body_width" value="0.28"/>
-  <xacro:property name="body_height" value="0.15"/>
-  <xacro:property name="tread_length" value="0.50"/>
-  <xacro:property name="tread_width" value="0.08"/>
-  <xacro:property name="tread_height" value="0.12"/>
+  <!--
+    Canonical payload description for both RViz and Gazebo Sim.
+
+    Coordinate convention:
+      x: forward
+      y: left
+      z: up
+
+    These dimensions are properties so measured values can replace the
+    prototype geometry without changing link, joint, plugin, or launch APIs.
+  -->
+
+  <!-- Chassis and drivetrain dimensions (metres). -->
+  <xacro:property name="body_length" value="0.12033"/>
+  <xacro:property name="body_width" value="0.10000"/>
+  <xacro:property name="body_height" value="0.02500"/>
+  <xacro:property name="body_mass" value="0.50"/>
+
+  <xacro:property name="wheel_radius" value="0.01611839"/>
+  <xacro:property name="wheel_width" value="0.01338964"/>
+  <xacro:property name="wheel_mass" value="0.05"/>
+  <xacro:property name="wheel_separation" value="0.12132"/>
+  <xacro:property name="wheel_base" value="0.08500"/>
+  <xacro:property name="wheel_z" value="-0.00625"/>
+
+  <!-- Decorative tread geometry. Wheel collisions provide the physics. -->
+  <xacro:property name="tread_length" value="0.12000"/>
+  <xacro:property name="tread_width" value="0.01400"/>
+  <xacro:property name="tread_height" value="0.03200"/>
+
+  <!-- Camera dimensions and mounting pose (metres / radians). -->
+  <xacro:property name="camera_length" value="0.020"/>
+  <xacro:property name="camera_width" value="0.040"/>
+  <xacro:property name="camera_height" value="0.040"/>
+  <xacro:property name="camera_mass" value="0.050"/>
+  <xacro:property name="camera_x" value="0.058"/>
+  <xacro:property name="camera_y" value="0.000"/>
+  <xacro:property name="camera_z" value="0.050"/>
+
+  <!-- Simulation parameters. -->
+  <xacro:property name="wheel_mu" value="1.0"/>
+  <xacro:property name="wheel_mu2" value="1.0"/>
+  <xacro:property name="camera_horizontal_fov" value="1.74"/>
+  <xacro:property name="camera_width_px" value="1280"/>
+  <xacro:property name="camera_height_px" value="960"/>
+  <xacro:property name="camera_update_rate" value="30"/>
 
   <material name="payload_body_color">
     <color rgba="0.35 0.35 0.35 1.0"/>
@@ -16,58 +55,252 @@
     <color rgba="0.08 0.08 0.08 1.0"/>
   </material>
 
+  <material name="payload_camera_color">
+    <color rgba="0.10 0.10 0.12 1.0"/>
+  </material>
+
+  <xacro:macro name="box_inertial" params="mass x y z">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="${mass}"/>
+      <inertia
+        ixx="${mass * (y * y + z * z) / 12.0}"
+        ixy="0.0"
+        ixz="0.0"
+        iyy="${mass * (x * x + z * z) / 12.0}"
+        iyz="0.0"
+        izz="${mass * (x * x + y * y) / 12.0}"/>
+    </inertial>
+  </xacro:macro>
+
+  <!--
+    A wheel cylinder is drawn with its axis along y. The joint frame remains
+    aligned with base_link, making its rotation axis unambiguously +y.
+  -->
+  <xacro:macro name="drive_wheel" params="name x y">
+    <link name="${name}">
+      <visual>
+        <origin xyz="0 0 0" rpy="1.57079632679 0 0"/>
+        <geometry>
+          <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+        </geometry>
+        <material name="payload_tread_color"/>
+      </visual>
+
+      <collision>
+        <origin xyz="0 0 0" rpy="1.57079632679 0 0"/>
+        <geometry>
+          <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+        </geometry>
+      </collision>
+
+      <inertial>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <mass value="${wheel_mass}"/>
+        <!-- Solid-cylinder inertia with the cylinder axis along y. -->
+        <inertia
+          ixx="${wheel_mass * (3.0 * wheel_radius * wheel_radius + wheel_width * wheel_width) / 12.0}"
+          ixy="0.0"
+          ixz="0.0"
+          iyy="${wheel_mass * wheel_radius * wheel_radius / 2.0}"
+          iyz="0.0"
+          izz="${wheel_mass * (3.0 * wheel_radius * wheel_radius + wheel_width * wheel_width) / 12.0}"/>
+      </inertial>
+    </link>
+
+    <joint name="${name}_joint" type="continuous">
+      <origin xyz="${x} ${y} ${wheel_z}" rpy="0 0 0"/>
+      <parent link="base_link"/>
+      <child link="${name}"/>
+      <axis xyz="0 1 0"/>
+      <dynamics damping="0.01" friction="0.0"/>
+    </joint>
+
+    <gazebo reference="${name}">
+      <mu1>${wheel_mu}</mu1>
+      <mu2>${wheel_mu2}</mu2>
+    </gazebo>
+  </xacro:macro>
+
   <link name="base_link">
-    <visual>
-      <origin xyz="0 0 0.135" rpy="0 0 0"/>
+    <visual name="body_visual">
+      <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
         <box size="${body_length} ${body_width} ${body_height}"/>
       </geometry>
       <material name="payload_body_color"/>
     </visual>
-  </link>
 
-  <link name="left_tread">
-    <visual>
+    <!-- Treads are visual approximations; the wheels handle contact. -->
+    <visual name="left_tread_visual">
+      <origin xyz="0 ${wheel_separation / 2.0} ${wheel_z}" rpy="0 0 0"/>
       <geometry>
         <box size="${tread_length} ${tread_width} ${tread_height}"/>
       </geometry>
       <material name="payload_tread_color"/>
     </visual>
-  </link>
 
-  <joint name="left_tread_joint" type="fixed">
-    <parent link="base_link"/>
-    <child link="left_tread"/>
-    <origin xyz="0 0.18 0.06" rpy="0 0 0"/>
-  </joint>
-
-  <link name="right_tread">
-    <visual>
+    <visual name="right_tread_visual">
+      <origin xyz="0 ${-wheel_separation / 2.0} ${wheel_z}" rpy="0 0 0"/>
       <geometry>
         <box size="${tread_length} ${tread_width} ${tread_height}"/>
       </geometry>
       <material name="payload_tread_color"/>
     </visual>
+
+    <collision name="body_collision">
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="${body_length} ${body_width} ${body_height}"/>
+      </geometry>
+    </collision>
+
+    <xacro:box_inertial
+      mass="${body_mass}"
+      x="${body_length}"
+      y="${body_width}"
+      z="${body_height}"/>
   </link>
 
-  <joint name="right_tread_joint" type="fixed">
-    <parent link="base_link"/>
-    <child link="right_tread"/>
-    <origin xyz="0 -0.18 0.06" rpy="0 0 0"/>
-  </joint>
+  <xacro:drive_wheel
+    name="front_left_wheel"
+    x="${wheel_base / 2.0}"
+    y="${wheel_separation / 2.0}"/>
+  <xacro:drive_wheel
+    name="rear_left_wheel"
+    x="${-wheel_base / 2.0}"
+    y="${wheel_separation / 2.0}"/>
+  <xacro:drive_wheel
+    name="front_right_wheel"
+    x="${wheel_base / 2.0}"
+    y="${-wheel_separation / 2.0}"/>
+  <xacro:drive_wheel
+    name="rear_right_wheel"
+    x="${-wheel_base / 2.0}"
+    y="${-wheel_separation / 2.0}"/>
 
   <link name="camera_link">
     <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <box size="0.05 0.06 0.04"/>
+        <box size="${camera_length} ${camera_width} ${camera_height}"/>
       </geometry>
-      <material name="payload_body_color"/>
+      <material name="payload_camera_color"/>
     </visual>
+
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="${camera_length} ${camera_width} ${camera_height}"/>
+      </geometry>
+    </collision>
+
+    <xacro:box_inertial
+      mass="${camera_mass}"
+      x="${camera_length}"
+      y="${camera_width}"
+      z="${camera_height}"/>
   </link>
 
   <joint name="camera_joint" type="fixed">
+    <origin xyz="${camera_x} ${camera_y} ${camera_z}" rpy="0 0 0"/>
     <parent link="base_link"/>
     <child link="camera_link"/>
-    <origin xyz="0.23 0 0.20" rpy="0 0 0"/>
   </joint>
+
+  <!-- Standard ROS optical-frame convention: z forward, x right, y down. -->
+  <link name="camera_optical_frame"/>
+  <joint name="camera_optical_joint" type="fixed">
+    <origin xyz="0 0 0" rpy="-1.57079632679 0 -1.57079632679"/>
+    <parent link="camera_link"/>
+    <child link="camera_optical_frame"/>
+  </joint>
+
+  <!-- Keep camera_link as an SDF link so its scoped Gazebo topic is stable. -->
+  <gazebo reference="camera_joint">
+    <preserveFixedJoint>true</preserveFixedJoint>
+  </gazebo>
+
+  <gazebo reference="camera_link">
+    <sensor name="camera" type="camera">
+      <pose>0 0 0 0 0 0</pose>
+      <gz_frame_id>camera_optical_frame</gz_frame_id>
+      <always_on>true</always_on>
+      <update_rate>${camera_update_rate}</update_rate>
+      <visualize>true</visualize>
+      <camera>
+        <horizontal_fov>${camera_horizontal_fov}</horizontal_fov>
+        <image>
+          <width>${camera_width_px}</width>
+          <height>${camera_height_px}</height>
+          <format>R8G8B8</format>
+        </image>
+        <clip>
+          <near>0.1</near>
+          <far>3000.0</far>
+        </clip>
+      </camera>
+    </sensor>
+  </gazebo>
+
+  <gazebo reference="base_link">
+    <sensor name="imu_sensor" type="imu">
+      <pose>0 0 0 0 0 0</pose>
+      <gz_frame_id>base_link</gz_frame_id>
+      <always_on>true</always_on>
+      <update_rate>200</update_rate>
+      <visualize>false</visualize>
+      <imu>
+        <angular_velocity>
+          <x><noise type="gaussian"><mean>0.0</mean><stddev>0.0002</stddev></noise></x>
+          <y><noise type="gaussian"><mean>0.0</mean><stddev>0.0002</stddev></noise></y>
+          <z><noise type="gaussian"><mean>0.0</mean><stddev>0.0002</stddev></noise></z>
+        </angular_velocity>
+        <linear_acceleration>
+          <x><noise type="gaussian"><mean>0.0</mean><stddev>0.01</stddev></noise></x>
+          <y><noise type="gaussian"><mean>0.0</mean><stddev>0.01</stddev></noise></y>
+          <z><noise type="gaussian"><mean>0.0</mean><stddev>0.01</stddev></noise></z>
+        </linear_acceleration>
+      </imu>
+    </sensor>
+  </gazebo>
+
+  <gazebo>
+    <self_collide>false</self_collide>
+
+    <!-- Four-wheel skid-steer drive. Runtime model name selects cmd_vel. -->
+    <plugin
+      filename="gz-sim-diff-drive-system"
+      name="gz::sim::systems::DiffDrive">
+      <left_joint>front_left_wheel_joint</left_joint>
+      <left_joint>rear_left_wheel_joint</left_joint>
+      <right_joint>front_right_wheel_joint</right_joint>
+      <right_joint>rear_right_wheel_joint</right_joint>
+      <wheel_separation>${wheel_separation}</wheel_separation>
+      <wheel_radius>${wheel_radius}</wheel_radius>
+      <odom_publish_frequency>50</odom_publish_frequency>
+      <frame_id>odom</frame_id>
+      <child_frame_id>base_link</child_frame_id>
+    </plugin>
+
+    <!-- Enables a later Gazebo joint-state bridge for animated RViz wheels. -->
+    <plugin
+      filename="gz-sim-joint-state-publisher-system"
+      name="gz::sim::systems::JointStatePublisher">
+      <joint_name>front_left_wheel_joint</joint_name>
+      <joint_name>rear_left_wheel_joint</joint_name>
+      <joint_name>front_right_wheel_joint</joint_name>
+      <joint_name>rear_right_wheel_joint</joint_name>
+    </plugin>
+
+    <!-- Enables a later Gazebo pose-to-TF bridge for live RViz motion. -->
+    <plugin
+      filename="gz-sim-pose-publisher-system"
+      name="gz::sim::systems::PosePublisher">
+      <publish_link_pose>true</publish_link_pose>
+      <use_pose_vector_msg>true</use_pose_vector_msg>
+      <static_publisher>true</static_publisher>
+      <static_update_frequency>1</static_update_frequency>
+    </plugin>
+  </gazebo>
 </robot>

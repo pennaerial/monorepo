@@ -58,7 +58,7 @@ def launch_setup(context) -> list[Action]:
 
     # Feed in string-valued ROS parameter "xacro <path>/payload.urdf.xacro"
     robot_description = ParameterValue(
-        Command([FindExecutable(name="xacro"), " ", str(xacro_path)])
+        Command([FindExecutable(name="xacro"), " ", str(xacro_path)]), value_type=str,
     )
 
     robot_state_publisher = Node(
@@ -69,17 +69,19 @@ def launch_setup(context) -> list[Action]:
         parameters=[
             {
                 "robot_description": robot_description,
-                "use_sim_time": False,  # True to keep tf synched with sim, False rn temporarily before sim
+                "use_sim_time": True,  # True to keep tf synched with sim, False rn temporarily before sim
             }
         ],
         output="screen",
     )
     actions.append(robot_state_publisher)
 
-    temporary_payload_pose = Node(
+    # Gazebo's DiffDrive plugin publishes odom -> base_link dynamically. This
+    # static transform anchors that odometry tree in RViz's world frame.
+    world_to_payload_odom = Node(
         package="tf2_ros",
         executable="static_transform_publisher",
-        name="temporary_payload_pose",
+        name="world_to_payload_odom",
         namespace=vehicle_ns,
         arguments=[
             "--x",
@@ -97,11 +99,11 @@ def launch_setup(context) -> list[Action]:
             "--frame-id",
             "world",
             "--child-frame-id",
-            "base_link",
+            "odom",
         ],
         output="screen",
     )
-    actions.append(temporary_payload_pose)
+    actions.append(world_to_payload_odom)
 
     include_sim_launch = include_launch(
         "sim",
@@ -113,6 +115,36 @@ def launch_setup(context) -> list[Action]:
     )
     actions.extend([include_sim_launch] if launch_sim else [])
 
+    gz_tf_topic = f"/model/{vehicle_ns}/tf"
+    gz_joint_state_topic = f"/world/{world}/model/{vehicle_ns}/joint_state"
+    payload_state_bridge = Node(
+        package="ros_gz_bridge",
+        executable="parameter_bridge",
+        name="payload_state_bridge",
+        namespace=vehicle_ns,
+        arguments=[
+            f"{gz_tf_topic}@tf2_msgs/msg/TFMessage[gz.msgs.Pose_V",
+            f"{gz_joint_state_topic}@sensor_msgs/msg/JointState[gz.msgs.Model",
+        ],
+        remappings=[
+            (gz_tf_topic, "/tf"),
+            (gz_joint_state_topic, f"/{vehicle_ns}/joint_states"),
+        ],
+        output="screen",
+    )
+    actions.append(payload_state_bridge)
+
+    payload_controller = include_launch(
+        "payload_controller",
+        "payload_controller.launch.py",
+        launch_arguments={
+            "vehicle_name": vehicle_ns,
+            "sim_entity_name": vehicle_ns,
+            "controller": "SimController",
+        },
+    )
+    actions.append(payload_controller)
+
     rviz_config_path = payload_share / "rviz" / "temp_payload.rviz"
 
     rviz = Node(
@@ -121,7 +153,7 @@ def launch_setup(context) -> list[Action]:
         name="rviz2",
         parameters=[
             {
-                "use_sim_time": False,
+                "use_sim_time": True,
             }
         ],
         output="screen",
@@ -148,7 +180,7 @@ def generate_launch_description():
             ),
             DeclareLaunchArgument(
                 Args.WORLD,
-                default_value="default",
+                default_value="custom",
                 description="name of the simulation world that this uav instance belongs to. If standalone=true, then it launches this world using sim package.",
             ),
             DeclareLaunchArgument(
