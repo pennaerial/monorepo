@@ -22,7 +22,7 @@ private:
   rclcpp::Node::SharedPtr node_;
   /// ClassLoader for dynamically creating VisionPlugins
   pluginlib::ClassLoader<VisionPlugin> plugin_loader_;
-
+  /// VisionPlugin instance; TODO: make this to dynamically updating map of plugins
   pluginlib::UniquePtr<VisionPlugin> plugin_instance_;
 
 };
