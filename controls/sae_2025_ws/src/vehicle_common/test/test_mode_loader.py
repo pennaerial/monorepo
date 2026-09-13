@@ -1,18 +1,17 @@
+import json
+
 import pytest
+from mock_classes import MockMode, MockParams, MockVehicle, MockVisionNode, NoParamsMock
 from pydantic import BaseModel, ValidationError
+from vehicle_common.base import VisionNode
+from vehicle_common.mode import Mode
 from vehicle_common.mode_loader import (
-    serialize_type,
-    deserialize_type,
-    RegisteredMode,
     ModeRegistry,
     ParamsBase,
+    RegisteredMode,
+    deserialize_type,
+    serialize_type,
 )
-from mock_classes import MockMode, MockParams, MockVehicle, MockVisionNode, NoParamsMock
-
-
-from vehicle_common.mode import Mode
-from vehicle_common.base import VisionNode
-import json
 
 mode_registry = ModeRegistry.get()
 

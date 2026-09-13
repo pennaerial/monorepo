@@ -8,11 +8,10 @@ import numpy as np
 import rclpy
 from rclpy.executors import ExternalShutdownException
 from sensor_msgs.msg import CompressedImage
+from uav_interfaces.srv import PayloadColorSquareState
+from vehicle_common.base import VisionNode
 
 from uav.utils import blue, red
-from uav_interfaces.srv import PayloadColorSquareState
-
-from vehicle_common.base import VisionNode
 
 # Color A = red, Color B = blue (matches dlz_alternating_border model)
 # Red wraps around the HSV hue wheel so two ranges are required.

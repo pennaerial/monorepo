@@ -7,6 +7,11 @@ dependencies = [ # these should be packages that AREN'T already installed system
     "junitparser",
 ]
 
+[dependency-groups]
+dev = [
+    "ruff==0.16.7",
+]
+
 [tool.ruff]
 exclude = [
     "controls/sae_2025_ws/src/ros_gz",
@@ -17,3 +22,6 @@ exclude = [
     "Dependencies"
 ]
 line-length=100
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]

@@ -24,18 +24,17 @@ from __future__ import annotations
 import math
 from collections import deque
 from enum import Enum
-from typing import Optional, List, override
+from typing import List, Optional, override
 
 import cv2
 import numpy as np
 from cv_bridge import CvBridge
 from rclpy.node import Node
 from sensor_msgs.msg import CompressedImage, Image
-
-from payload.payload import Payload
-
 from vehicle_common.mode import Mode
 from vehicle_common.mode_loader import ParamsBase, register_mode
+
+from payload.payload import Payload
 
 
 class PayloadWaitForDriveOutParams(ParamsBase):
