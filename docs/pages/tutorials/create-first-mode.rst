@@ -61,7 +61,7 @@ Use the following naming convention, replacing ``<github-username>`` with your G
 .. code-block:: bash
     :caption: Bash
 
-    git checkout -b user/<github-username>/add-mode
+    git checkout -b user/<github-username>/tutorial
 
 Create the Mode File
 --------------------
