@@ -6,21 +6,24 @@
 
 
 static const char* TAG = "DDSClient";
+// TODO: This shouldn't be hardcoded in, should be derived by some vehicle-specific parameter.
+// Need to set up a parameter system first
+static constexpr uint32_t SESSION_KEY = 0xABCDABCD;
 
-DDSClient::DDSClient(TransportType transport, const char* ip, const char* port)
-    : transport_(transport), ip_(ip), port_(port)
+DDSClient::DDSClient(const char* ip, const char* port)
+    : ip_(ip), port_(port)
 {
 }
 
 void DDSClient::run()
 {
-  if (!uxr_init_udp_transport(&transport_udp_, UXR_IPv4, ip_, port_)) {
+  if (!uxr_init_udp_transport(&transport_, UXR_IPv4, ip_, port_)) {
     ESP_LOGE(TAG, "UXR UDP transport failed to init!");
     return;
   }
   ESP_LOGI(TAG, "UXR UDP transport init success!");
 
-  uxr_init_session(&session_, &transport_udp_.comm, 0xABCDABCD);
+  uxr_init_session(&session_, &transport_.comm, SESSION_KEY);
   uxr_set_topic_callback(&session_, on_topic_callback, this);
   if (!uxr_create_session(&session_)) {
     ESP_LOGI(TAG, "Error creating session");

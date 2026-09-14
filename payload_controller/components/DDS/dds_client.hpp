@@ -7,17 +7,22 @@
 #include "sensor_msgs/msg/Imu.h"
 
 #define STREAM_HISTORY 8
-#define BUFFER_SIZE UXR_CONFIG_UDP_TRANSPORT_MTU* STREAM_HISTORY
 
-enum class TransportType {
-  SERIAL,
-  UDP,
-};
+#if defined(UCLIENT_PROFILE_UDP)
+  #define TRANSPORT_MTU UXR_CONFIG_UDP_TRANSPORT_MTU
+#elif defined(UCLIENT_PROFILE_CUSTOM_TRANSPORT)
+  #define TRANSPORT_MTU UXR_CONFIG_CUSTOM_TRANSPORT_MTU
+#else
+  #error "No supported Micro-XRCE-DDS transport enabled"
+#endif
+
+#define BUFFER_SIZE TRANSPORT_MTU * STREAM_HISTORY
+
 
 class DDSClient
 {
 public:
-  DDSClient(TransportType transport, const char* ip, const char* port);
+  DDSClient(const char* ip, const char* port);
 
   /// Run the DDSClient
   void run();
@@ -51,16 +56,18 @@ private:
   /// TODO: Compute a 32 bit unique key
   // uint32_t unique_key();
 
-  /// transport type of client, UDP or SERIAL
-  TransportType transport_;
   /// ip for UDP transport
   const char* ip_;
   /// port for UDP transport
   const char* port_;
   /// participant ID registered with agent
   uxrObjectId participant_id_;
-  /// UDP transport object
-  uxrUDPTransport transport_udp_;
+
+#if defined(UCLIENT_PROFILE_UDP)
+  uxrUDPTransport transport_;
+#elif defined(UCLIENT_PROFILE_CUSTOM_TRANSPORT)
+  uxrCustomTransport transport_;
+#endif
   /// the uxr session object. Interacts directly with DDS Agent
   uxrSession session_;
 

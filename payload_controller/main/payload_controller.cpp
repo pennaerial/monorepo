@@ -12,7 +12,7 @@ extern "C" void app_main(void)
   drivers::IMU* imu = drivers::IMU::instance();
   imu->start();
 
-  DDSClient dds_client(TransportType::UDP, "127.0.0.1", "7777");
+  DDSClient dds_client("127.0.0.1", "7777");
   dds_client.run();
 
 

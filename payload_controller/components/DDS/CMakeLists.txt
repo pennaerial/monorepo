@@ -76,9 +76,9 @@ if(IDF_TARGET STREQUAL "linux")
 else()
     # Use the custom-transport profile with UART config supplied from dds_client.cpp.
     list(APPEND client_profile_args
-        -DUCLIENT_PROFILE_SERIAL:BOOL=ON
         -DUCLIENT_PROFILE_UDP:BOOL=OFF
-        -DUCLIENT_PROFILE_CUSTOM_TRANSPORT:BOOL=OFF
+        -DUCLIENT_PROFILE_SERIAL:BOOL=OFF
+        -DUCLIENT_PROFILE_CUSTOM_TRANSPORT:BOOL=ON
     )
 endif()
 
