@@ -10,10 +10,7 @@ static const char* TAG = "DDSClient";
 // Need to set up a parameter system first
 static constexpr uint32_t SESSION_KEY = 0xABCDABCD;
 
-DDSClient::DDSClient(const char* ip, const char* port)
-    : ip_(ip), port_(port)
-{
-}
+DDSClient::DDSClient(const char* ip, const char* port) : ip_(ip), port_(port) {}
 
 void DDSClient::run()
 {

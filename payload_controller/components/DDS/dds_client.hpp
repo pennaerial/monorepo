@@ -6,17 +6,17 @@
 
 #include "sensor_msgs/msg/Imu.h"
 
-#define STREAM_HISTORY 8
+constexpr uint32_t STREAM_HISTORY = 8;
 
 #if defined(UCLIENT_PROFILE_UDP)
-  #define TRANSPORT_MTU UXR_CONFIG_UDP_TRANSPORT_MTU
+constexpr uint32_t TRANSPORT_MTU = UXR_CONFIG_UDP_TRANSPORT_MTU;
 #elif defined(UCLIENT_PROFILE_CUSTOM_TRANSPORT)
-  #define TRANSPORT_MTU UXR_CONFIG_CUSTOM_TRANSPORT_MTU
+constexpr uint32_t TRANSPORT_MTU = UXR_CONFIG_CUSTOM_TRANSPORT_MTU;
 #else
-  #error "No supported Micro-XRCE-DDS transport enabled"
+#error "No supported Micro-XRCE-DDS transport enabled"
 #endif
 
-#define BUFFER_SIZE TRANSPORT_MTU * STREAM_HISTORY
+constexpr uint32_t BUFFER_SIZE = TRANSPORT_MTU * STREAM_HISTORY;
 
 
 class DDSClient
