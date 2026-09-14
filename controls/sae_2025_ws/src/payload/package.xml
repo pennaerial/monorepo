@@ -11,6 +11,19 @@
   <depend>python3-opencv</depend>
   <depend>vehicle_common</depend>
 
+  <exec_depend>ament_index_python</exec_depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>payload_controller</exec_depend>
+  <exec_depend>robot_state_publisher</exec_depend>
+  <exec_depend>ros_gz_bridge</exec_depend>
+  <exec_depend>rviz2</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>sim</exec_depend>
+  <exec_depend>tf2_msgs</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+  <exec_depend>xacro</exec_depend>
+
   <test_depend>ament_copyright</test_depend>
   <test_depend>python3-pytest</test_depend>
 

@@ -1,5 +1,6 @@
-import pigpio  # pyright: ignore[reportMissingImports]
 import time
+
+import pigpio  # pyright: ignore[reportMissingImports]
 
 # ----------------------
 # Pin Definitions (BCM)

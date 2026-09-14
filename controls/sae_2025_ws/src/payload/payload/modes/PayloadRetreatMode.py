@@ -15,15 +15,15 @@ from typing import Optional, Tuple, override
 
 import cv2
 import numpy as np
+from cv_bridge import CvBridge
+from payload_interfaces.msg import DriveCommand
 from rclpy.node import Node
 from sensor_msgs.msg import CompressedImage, Image
-from payload_interfaces.msg import DriveCommand
-from cv_bridge import CvBridge
-
+from uav.vision_nodes import PayloadAprilTagNode
 from vehicle_common.mode import Mode
 from vehicle_common.mode_loader import ParamsBase, register_mode
+
 from payload.payload import Payload
-from uav.vision_nodes import PayloadAprilTagNode
 
 # HSV range for white (high value, low saturation)
 _WHITE_LOWER = np.array([0, 0, 200], dtype=np.uint8)

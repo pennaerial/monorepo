@@ -5,7 +5,6 @@ from copy import deepcopy
 from pathlib import Path
 
 import yaml
-
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import (
@@ -17,7 +16,6 @@ from launch.actions import (
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.logging import get_logger
 from launch.substitutions import LaunchConfiguration
-
 from vehicle_common.px4 import DEFAULT_PX4_PATH
 from vehicle_common.runtime.fleet_spec import load_fleet_document
 from vehicle_common.runtime.mission_spec import MissionSpec, mission_path_for_name

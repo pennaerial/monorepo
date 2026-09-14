@@ -1,27 +1,30 @@
+import math
 from abc import abstractmethod
-from rclpy.node import Node
+
+import numpy as np
 from px4_msgs.msg import (
     OffboardControlMode,
+    SensorGps,
     TrajectorySetpoint,
-    VehicleStatus,
-    VehicleCommand,
     VehicleAttitude,
+    VehicleCommand,
     VehicleGlobalPosition,
     VehicleLocalPosition,
-    SensorGps,
+    VehicleStatus,
 )
 from rclpy.clock import Clock
+from rclpy.node import Node
 from rclpy.qos import (
+    QoSDurabilityPolicy,
+    QoSHistoryPolicy,
     QoSProfile,
     QoSReliabilityPolicy,
-    QoSHistoryPolicy,
-    QoSDurabilityPolicy,
 )
-import numpy as np
-import math
-from .px4_modes import PX4CustomMainMode, PX4CustomSubModeAuto
-from uav.utils import R_earth
 from vehicle_common.vehicle import Vehicle
+
+from uav.utils import R_earth
+
+from .px4_modes import PX4CustomMainMode, PX4CustomSubModeAuto
 
 # Map nav_state value -> name for readable logging
 _NAV_STATE_NAMES = {
