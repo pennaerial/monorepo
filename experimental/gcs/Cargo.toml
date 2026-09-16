@@ -8,6 +8,7 @@ edition = "2021"
 
 [dependencies]
 dioxus = { version = "0.7.1", features = ["router"] }
+tokio-tungstenite = "0.30.0"
 
 [features]
 default = ["desktop"]
