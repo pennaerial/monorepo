@@ -1894,6 +1894,10 @@ name = "gcs"
 version = "0.1.0"
 dependencies = [
  "dioxus",
+ "futures-util",
+ "serde",
+ "serde_json",
+ "tokio",
  "tokio-tungstenite",
 ]
 
