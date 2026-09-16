@@ -1,0 +1,56 @@
+{
+  "name": "PennAiR Monorepo (WSL2 + GPU)",
+  "image": "ghcr.io/pennaerial/monorepo:latest",
+
+  // Bind-mount local clone over the image's repo so vscode changes survive container rebuilds
+  // Adjust the source path to point to local clone of repo if it isn't in the default location
+  "workspaceMount": "source=${localWorkspaceFolder},target=/root/monorepo,type=bind",
+  "workspaceFolder": "/root/monorepo",
+
+  "runArgs": [
+    "--gpus=all"
+  ],
+
+  "containerEnv": {
+    // WSLg display forwarding from env variables
+    "DISPLAY": "${localEnv:DISPLAY}",
+    "WAYLAND_DISPLAY": "${localEnv:WAYLAND_DISPLAY}",
+    "XDG_RUNTIME_DIR": "${localEnv:XDG_RUNTIME_DIR}",
+
+    // Without "all," gazebo falls back to llvmpipe instead of nvidia gpu
+    "NVIDIA_DRIVER_CAPABILITIES": "all",
+
+    // Forces Mesa to use the WSL D3D12 Gallium driver, not llvmpipe
+    "GALLIUM_DRIVER": "d3d12",
+
+    // Stops Mesa from picking up integrated graphics, forces it to use the discrete nvidia card.
+    // Adjust if your system has a different GPU vendor.
+    "MESA_D3D12_DEFAULT_ADAPTER_NAME": "NVIDIA",
+
+    "LD_LIBRARY_PATH": "/usr/lib/wsl/lib:${containerEnv:LD_LIBRARY_PATH}"
+  },
+
+  "mounts": [
+    "source=/tmp/.X11-unix,target=/tmp/.X11-unix,type=bind",
+    "source=/mnt/wslg,target=/mnt/wslg,type=bind",
+    "source=/usr/lib/wsl,target=/usr/lib/wsl,type=bind"
+  ],
+
+  // Runs once when the container is first created (not on every restart).
+  // Installs mesa-utils so glxinfo is available for the check below.
+  // Adds git config to tell git to trust the mounted repo
+  "postCreateCommand": "apt-get update && apt-get install -y mesa-utils && git config --global --add safe.directory '*'",
+  // Check if nvidia gpu is correctly used by opengl (or true stops container from failing)
+  "postStartCommand": "nvidia-smi; glxinfo | grep 'OpenGL renderer' || true",
+
+  // Auto add relevant vscode extensions
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.cpptools",
+        "ms-python.python",
+        "Ranch-Hand-Robotics.rde-ros-2"
+      ]
+    }
+  }
+}
