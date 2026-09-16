@@ -1,8 +1,7 @@
-from glob import glob
 import os
+from glob import glob
 
 from setuptools import find_packages, setup
-
 
 # Keeping these comments in case we want to micro optimize with static jsons at build time
 # UAV_MODE_REGISTRY_PATH = Path(__file__).parent / "uav" / "mode_registry.json"

@@ -1,28 +1,26 @@
 from enum import StrEnum
 from pathlib import Path
 
-from pydantic import ValidationError
 from launch import Action, LaunchDescription
-from launch_ros.actions import Node
 from launch.actions import (
     DeclareLaunchArgument,
-    OpaqueFunction,
     ExecuteProcess,
+    OpaqueFunction,
 )
-
+from launch_ros.actions import Node
+from pydantic import ValidationError
 from uav.vehicles.AirframeClass import PX4Airframe
-from vehicle_common.utils import get_available_missions
 from vehicle_common.env import require_env
-from vehicle_common.runtime.mission_loader import RuntimeMission, get_mission_path
 from vehicle_common.launch_utils import (
-    get_logger,
     LaunchError,
     check_unknown_launch_args,
-    include_launch,
     format_bullet_list,
+    get_logger,
+    include_launch,
     is_truthy,
 )
-
+from vehicle_common.runtime.mission_loader import RuntimeMission, get_mission_path
+from vehicle_common.utils import get_available_missions
 
 logger = get_logger("uav_sitl.launch")
 PENNAIR_PX4_PATH = require_env("PENNAIR_PX4_PATH")

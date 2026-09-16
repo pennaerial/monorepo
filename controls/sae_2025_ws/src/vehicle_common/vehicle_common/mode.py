@@ -1,12 +1,12 @@
 from abc import ABC, abstractmethod
 from typing import ClassVar, Mapping
 
-from rclpy.node import Node
 from pydantic import BaseModel
+from rclpy.node import Node
 
-from vehicle_common.vehicle import Vehicle
 from vehicle_common.base import VisionNode
 from vehicle_common.runtime.vision_loader import canonical_vision_node_path
+from vehicle_common.vehicle import Vehicle
 
 
 class Mode[VehicleT: Vehicle, ParamsT: BaseModel](ABC):

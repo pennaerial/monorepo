@@ -1,7 +1,8 @@
 # check if mnist_model.pth exists
 import os
-import torch
+
 import cv2
+import torch
 import torchvision
 
 if not os.path.exists("mnist_model.pth"):

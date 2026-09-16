@@ -1,6 +1,6 @@
-import yaml
 from pathlib import Path
 
+import yaml
 from docutils import nodes
 from docutils.statemachine import StringList
 from sphinx.util.docutils import SphinxDirective

@@ -1,10 +1,10 @@
-from rclpy.node import Node
-import rclpy
-from sensor_msgs.msg import Image, CompressedImage
 import cv2 as cv
 import numpy as np
 import pupil_apriltags  # pyright: ignore[reportMissingImports]
+import rclpy
 from cv_bridge import CvBridge
+from rclpy.node import Node
+from sensor_msgs.msg import CompressedImage, Image
 
 
 class AprilTagDebugger(Node):

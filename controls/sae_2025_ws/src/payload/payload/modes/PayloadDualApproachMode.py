@@ -20,16 +20,15 @@ import numpy as np
 from cv_bridge import CvBridge
 from rclpy.node import Node
 from sensor_msgs.msg import CameraInfo, CompressedImage, Image
-
-from payload.payload import Payload
 from uav.vision_nodes.payload_perception_common import (
     DEFAULT_TAG_FAMILY,
     AprilTagDetectorCache,
     detect_payload_apriltags,
 )
-
 from vehicle_common.mode import Mode
 from vehicle_common.mode_loader import ParamsBase, register_mode
+
+from payload.payload import Payload
 
 
 def _color_blob_info(
