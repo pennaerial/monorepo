@@ -69,10 +69,10 @@ def px4_sitl_action(
 
 
 def launch_setup(context) -> list[Action]:
-    global logger
     config = context.launch_configurations  # dict containing declared launch arguments
+    debug: str = config[Args.DEBUG]
     logger = get_logger(
-        "uav_sitl.launch", logging.DEBUG if is_truthy(config[Args.DEBUG]) else logging.INFO
+        "uav_sitl.launch", logging.DEBUG if is_truthy(debug) else logging.INFO
     )
     check_unknown_launch_args(Args, config, logger)  # warn for unknown args
 
@@ -102,7 +102,6 @@ def launch_setup(context) -> list[Action]:
     run_mw: bool = standalone or is_truthy(config[Args.RUN_MW])
     launch_sim: bool = standalone or is_truthy(config[Args.LAUNCH_SIM])
     headless: str = config[Args.HEADLESS]
-    debug: str = config[Args.DEBUG]
 
     # PRINTING HEADER
     logger.debug(f"ENV VAR DETECTED: PENNAIR_PX4_PATH={PENNAIR_PX4_PATH}")

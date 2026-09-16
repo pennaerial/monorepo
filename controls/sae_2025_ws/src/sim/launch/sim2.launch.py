@@ -66,10 +66,9 @@ def launch_setup(context) -> list[Action]:
     headless: bool = is_truthy(config[Args.HEADLESS])
     world: str = config[Args.WORLD]
     stage: str = config[Args.STAGE]
-    debug: bool = is_truthy(config[Args.DEBUG])
+    debug: str = config[Args.DEBUG]
 
-    global logger
-    logger = get_logger("sim.launch", logging.DEBUG if debug else logging.INFO)
+    logger = get_logger("sim.launch", logging.DEBUG if is_truthy(debug) else logging.INFO)
 
     gz_env = {
         "GZ_SIM_RESOURCE_PATH": GZ_SIM_RESOURCE_PATH,
