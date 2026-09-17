@@ -1,10 +1,9 @@
-set(srcs "")
+set(srcs imu.cpp)
 set(priv_requires DDS)
 set(requires util)
 
 set(sitl_srcs
     imu_sitl.cpp
-    imu.cpp
 )
 
 set(hardware_srcs
@@ -17,6 +16,7 @@ if(IDF_TARGET STREQUAL linux)
     list(APPEND priv_requires sitl)
 else()
     list(APPEND srcs ${hardware_srcs})
+    list(APPEND priv_requires esp_driver_gpio esp_driver_i2c esp_timer)
 endif()
 
 idf_component_register(

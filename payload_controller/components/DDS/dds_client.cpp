@@ -2,7 +2,10 @@
 
 #include "esp_log.h"
 
-// #include "esp_mac.h"
+#if defined(UCLIENT_PROFILE_CUSTOM_TRANSPORT)
+#include "driver/uart.h"
+#include "freertos/FreeRTOS.h"
+#endif
 
 
 static const char* TAG = "DDSClient";
@@ -10,20 +13,87 @@ static const char* TAG = "DDSClient";
 // Need to set up a parameter system first
 static constexpr uint32_t SESSION_KEY = 0xABCDABCD;
 
+#if defined(UCLIENT_PROFILE_CUSTOM_TRANSPORT)
+namespace
+{
+constexpr uart_port_t DDS_UART = UART_NUM_1;
+constexpr int DDS_UART_TX = 39;
+constexpr int DDS_UART_RX = 38;
+constexpr int DDS_UART_BAUD = 115200;
+
+bool uart_open(uxrCustomTransport* transport)
+{
+  (void)transport;
+  const uart_config_t config{
+      .baud_rate = DDS_UART_BAUD,
+      .data_bits = UART_DATA_8_BITS,
+      .parity = UART_PARITY_DISABLE,
+      .stop_bits = UART_STOP_BITS_1,
+      .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+      .rx_flow_ctrl_thresh = 0,
+      .source_clk = UART_SCLK_DEFAULT,
+      .flags = {},
+  };
+
+  if (uart_param_config(DDS_UART, &config) != ESP_OK ||
+      uart_set_pin(DDS_UART, DDS_UART_TX, DDS_UART_RX, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE) != ESP_OK ||
+      uart_driver_install(DDS_UART, 2 * UXR_CONFIG_CUSTOM_TRANSPORT_MTU, 0, 0, nullptr, 0) != ESP_OK) {
+    return false;
+  }
+  uart_flush_input(DDS_UART);
+  return true;
+}
+
+bool uart_close(uxrCustomTransport* transport)
+{
+  (void)transport;
+  return uart_driver_delete(DDS_UART) == ESP_OK;
+}
+
+size_t uart_write(uxrCustomTransport* transport, const uint8_t* buffer, size_t length, uint8_t* error_code)
+{
+  (void)transport;
+  const int written = uart_write_bytes(DDS_UART, buffer, length);
+  *error_code = written < 0 ? 1 : 0;
+  return written < 0 ? 0 : static_cast<size_t>(written);
+}
+
+size_t uart_read(uxrCustomTransport* transport, uint8_t* buffer, size_t length, int timeout, uint8_t* error_code)
+{
+  (void)transport;
+  const int read = uart_read_bytes(DDS_UART, buffer, length, pdMS_TO_TICKS(timeout));
+  *error_code = read < 0 ? 1 : 0;
+  return read < 0 ? 0 : static_cast<size_t>(read);
+}
+}  // namespace
+#endif
+
 DDSClient::DDSClient(const char* ip, const char* port) : ip_(ip), port_(port) {}
 
 void DDSClient::run()
 {
+#if defined(UCLIENT_PROFILE_UDP)
   if (!uxr_init_udp_transport(&transport_, UXR_IPv4, ip_, port_)) {
     ESP_LOGE(TAG, "UXR UDP transport failed to init!");
     return;
   }
   ESP_LOGI(TAG, "UXR UDP transport init success!");
+#elif defined(UCLIENT_PROFILE_CUSTOM_TRANSPORT)
+  uxr_set_custom_transport_callbacks(&transport_, true, uart_open, uart_close, uart_write, uart_read);
+  if (!uxr_init_custom_transport(&transport_, nullptr)) {
+    ESP_LOGE(TAG, "UXR UART transport failed to init!");
+    return;
+  }
+  ESP_LOGI(TAG, "UXR UART transport init success on TX=%d RX=%d", DDS_UART_TX, DDS_UART_RX);
+#endif
 
   uxr_init_session(&session_, &transport_.comm, SESSION_KEY);
   uxr_set_topic_callback(&session_, on_topic_callback, this);
   if (!uxr_create_session(&session_)) {
-    ESP_LOGI(TAG, "Error creating session");
+    ESP_LOGE(TAG, "Error creating session");
+#if defined(UCLIENT_PROFILE_CUSTOM_TRANSPORT)
+    uxr_close_custom_transport(&transport_);
+#endif
     return;
   }
   ESP_LOGI(TAG, "UXR Session created");
@@ -117,6 +187,7 @@ void DDSClient::run()
     return;
   }
 
+  connected_ = true;
   ESP_LOGI(TAG, "Entities creation success");
 }
 
@@ -151,8 +222,12 @@ void DDSClient::handle_topic(
 }
 
 
-void DDSClient::update()
+void DDSClient::update(const sensor_msgs_msg_Imu& imu_msg)
 {
+  if (!connected_) {
+    return;
+  }
+
   ucdrBuffer ub;
   uint32_t topic_size = sensor_msgs_msg_Imu_size_of_topic(&imu_msg, 0);
   uxr_prepare_output_stream(&session_, reliable_out_, datawriter_id_, &ub, topic_size);

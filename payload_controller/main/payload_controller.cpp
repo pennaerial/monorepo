@@ -1,6 +1,8 @@
 
 #include "dds_client.hpp"
 #include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "imu.hpp"
 
 const char* TAG{"APP_MAIN"};
@@ -17,6 +19,7 @@ extern "C" void app_main(void)
 
 
   while (1) {
-    dds_client.update();
+    dds_client.update(imu->get_latest());
+    vTaskDelay(pdMS_TO_TICKS(10));
   }
 }

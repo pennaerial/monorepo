@@ -4,9 +4,15 @@ set(srcs
     dds_client.cpp
 )
 
+set(priv_requires "")
+if(NOT IDF_TARGET STREQUAL "linux")
+    list(APPEND priv_requires esp_driver_uart)
+endif()
+
 idf_component_register(
     SRCS ${srcs}
     INCLUDE_DIRS "."
+    PRIV_REQUIRES ${priv_requires}
 )
 
 foreach(_var PENNAIR_XRCE_DDS_CLIENT_PATH PENNAIR_XRCE_DDS_MICROCDR_PATH)
@@ -110,7 +116,7 @@ set_target_properties(microxrcedds_client_imported PROPERTIES
 )
 add_dependencies(microxrcedds_client_imported xrce_dds_client_project)
 
-target_include_directories(${COMPONENT_LIB} PRIVATE ${xrce_deps_install_dir}/include)
+target_include_directories(${COMPONENT_LIB} PUBLIC ${xrce_deps_install_dir}/include)
 target_link_libraries(${COMPONENT_LIB} PRIVATE microxrcedds_client_imported microcdr_imported)
 
 

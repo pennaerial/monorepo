@@ -27,8 +27,8 @@ public:
   /// Run the DDSClient
   void run();
 
-  /// updates all internal msgs
-  void update();
+  /// Publishes the latest IMU message when the DDS session is connected.
+  void update(const sensor_msgs_msg_Imu& imu_msg);
 
 private:
   /// callback function for receiving a topic. Recreates the DDSClient instance with void* args and calls handle_topic
@@ -81,7 +81,5 @@ private:
   uxrStreamId reliable_in_;
 
   uxrObjectId datawriter_id_;
-
-  /// IMU msg sent to DDS agent
-  sensor_msgs_msg_Imu imu_msg;
+  bool connected_{false};
 };
