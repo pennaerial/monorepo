@@ -71,9 +71,7 @@ def px4_sitl_action(
 def launch_setup(context) -> list[Action]:
     config = context.launch_configurations  # dict containing declared launch arguments
     debug: str = config[Args.DEBUG]
-    logger = get_logger(
-        "uav_sitl.launch", logging.DEBUG if is_truthy(debug) else logging.INFO
-    )
+    logger = get_logger("uav_sitl.launch", logging.DEBUG if is_truthy(debug) else logging.INFO)
     check_unknown_launch_args(Args, config, logger)  # warn for unknown args
 
     mission: str = config[Args.MISSION]  # validate mission
