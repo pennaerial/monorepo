@@ -22,7 +22,7 @@ jobs:
     outputs:
       all: ${{ steps.filter.outputs.all }}
       ros_ws: ${{ steps.filter.outputs.ros_ws }}
-      # payload_controller: ${{ steps.filter.outputs.payload_controller }}
+      payload_controller: ${{ steps.filter.outputs.payload_controller }}
       # gcs: ${{ steps.filter.outputs.gcs }}
       docs: ${{ steps.filter.outputs.docs }}
     steps:
@@ -43,6 +43,8 @@ jobs:
             docs:
               - 'docs/**'
               - '.github/actions/build-docs/action.yaml'
+            payload_controller:
+              - 'payload_controller/**'
 
   validate_ros_workspace:
     name: Validate ROS Workspace
@@ -95,12 +97,25 @@ jobs:
        uses: ./.github/actions/build-docs
        with:
          deploy: "false"
+  
+  validate_payload_controller:
+    name: Validate Payload Controller
+    needs: detect_changes
+    runs-on: ubuntu-latest
+    if: needs.detect_changes.outputs.payload_controller == 'true' || needs.detect_changes.outputs.all == 'true'
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
+      - name: Verify
+        run: bash ci/validate_payload_controller.sh
+      
   merge_build_status:
     name: Merge Build Status
     needs: # depend on each additional job here
       - validate_ros_workspace
       - docs
+      - validate_payload_controller
     if: always()
     runs-on: ubuntu-latest
 
@@ -109,12 +124,13 @@ jobs:
         env:
           ROS_WS_RESULT: ${{ needs.validate_ros_workspace.result }}
           DOCS_RESULT: ${{ needs.docs.result }}
-
+          PC_RESULT: ${{ needs.validate_payload_controller.result }}
         run: |
           # Create a map of different mergebuild jobs to check. MODIFY THIS IF ADDING A MERGEBUILD JOB
           declare -A checks=(
             ["ROS Workspace"]="$ROS_WS_RESULT"
             ["Docs"]="$DOCS_RESULT"
+            ["Payload Controller"]="$PC_RESULT"
           )
 
           failed=0
