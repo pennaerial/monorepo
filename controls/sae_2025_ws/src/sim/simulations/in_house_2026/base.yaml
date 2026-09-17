@@ -1,0 +1,33 @@
+# Simulation Configuration
+world:
+  name: in_house_2026
+  node: in_house_2026_node
+
+  config: # InHouse2026Config in sim/world_gen/in_house_2026_node.py
+    seed: null                     # set an int for a reproducible layout
+    area: [[-10, -10], [10, 10]]   # xy min / xy max
+    counts: {circle: 3, square: 3, triangle: 3, star: 3}
+    min_spacing: 2.0               # centre-to-centre, metres
+    keep_out: [[0, 0, 2.0]]        # (x, y, radius) - clear of the UAV spawn
+    random_yaw: true
+    palette:                       # each field is RGBA; specular/emissive optional
+      red:
+        ambient: [1.0, 0.0, 0.0, 1.0]
+        diffuse: [1.0, 0.0, 0.0, 1.0]
+      green:
+        ambient: [0.0, 1.0, 0.0, 1.0]
+        diffuse: [0.0, 1.0, 0.0, 1.0]
+      blue:
+        ambient: [0.0, 0.0, 1.0, 1.0]
+        diffuse: [0.0, 0.0, 1.0, 1.0]
+      yellow:
+        ambient: [1.0, 1.0, 0.0, 1.0]
+        diffuse: [1.0, 1.0, 0.0, 1.0]
+        specular: [0.01, 0.01, 0.01, 1.0]
+        emissive: [0.0, 0.0, 0.0, 1.0]
+
+  controllables:
+    - name: uav_0
+      model: x500_mono_cam
+      position: [0, 0, 0]
+      rpy: [0.0, 0.0, 0.0]

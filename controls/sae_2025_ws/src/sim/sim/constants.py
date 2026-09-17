@@ -13,14 +13,16 @@ class Competition(IntEnum):
     IARC = 1
     CUSTOM = 2
     SAE = 3
+    IN_HOUSE_2026 = 4
 
 
-# Competition name mapping
+# Competition name mapping (values are the directory under simulations/ and the world .sdf stem)
 COMPETITION_NAMES = {
     Competition.IN_HOUSE: "in_house",
     Competition.IARC: "iarc",
     Competition.CUSTOM: "custom",
     Competition.SAE: "sae",
+    Competition.IN_HOUSE_2026: "in_house_2026",
 }
 
 # Platform name mapping
