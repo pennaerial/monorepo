@@ -103,12 +103,39 @@ jobs:
     needs: detect_changes
     runs-on: ubuntu-latest
     if: needs.detect_changes.outputs.payload_controller == 'true' || needs.detect_changes.outputs.all == 'true'
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
 
-      - name: Verify
-        run: bash ci/validate_payload_controller.sh
+    container:
+      image: ghcr.io/pennaerial/monorepo:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout PR
+        working-directory: /root/monorepo
+        run: |
+          git fetch origin "${{ github.sha }}"
+          git checkout "${{ github.sha }}"
+          bash ci/update_submodules.sh
+
+      - name: Quick Install Dependencies
+        run: |
+          "$PENNAIR_MONOREPO_PATH/ci/install_deps.sh" --quick
+
+      - name: Build Linux 
+        shell: bash
+        run: |
+          cd "$PENNAIR_PAYLOAD_CONTROLLER_PATH"
+          direnv allow .
+          direnv exec . make linux
+      
+      - name: Build Hardware 
+        shell: bash
+        run: |
+          cd "$PENNAIR_PAYLOAD_CONTROLLER_PATH"
+          direnv allow .
+          direnv exec . make esp32s3
+
       
   merge_build_status:
     name: Merge Build Status
