@@ -134,12 +134,12 @@ jobs:
           direnv allow .
           direnv exec . make linux
       
-      - name: Build Hardware 
-        shell: bash
-        run: |
-          cd "$PENNAIR_PAYLOAD_CONTROLLER_PATH"
-          direnv allow .
-          direnv exec . make esp32s3
+      # - name: Build Hardware 
+      #   shell: bash
+      #   run: |
+      #     cd "$PENNAIR_PAYLOAD_CONTROLLER_PATH"
+      #     direnv allow .
+      #     direnv exec . make esp32s3
 
       
   merge_build_status:
