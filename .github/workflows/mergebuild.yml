@@ -121,6 +121,11 @@ jobs:
       - name: Quick Install Dependencies
         run: |
           "$PENNAIR_MONOREPO_PATH/ci/install_deps.sh" --quick
+      
+      - name: Install ESP-IDF
+        run: |
+          eim install --config "$PENNAIR_PAYLOAD_CONTROLLER_PATH/eim_config.toml"
+          test -f "$HOME/.espressif/tools/activate_idf_v6.0.2.sh"
 
       - name: Build Linux 
         shell: bash
