@@ -22,7 +22,7 @@ jobs:
     outputs:
       all: ${{ steps.filter.outputs.all }}
       ros_ws: ${{ steps.filter.outputs.ros_ws }}
-      # payload_controller: ${{ steps.filter.outputs.payload_controller }}
+      payload_controller: ${{ steps.filter.outputs.payload_controller }}
       # gcs: ${{ steps.filter.outputs.gcs }}
       docs: ${{ steps.filter.outputs.docs }}
     steps:
@@ -43,6 +43,8 @@ jobs:
             docs:
               - 'docs/**'
               - '.github/actions/build-docs/action.yaml'
+            payload_controller:
+              - 'payload_controller/**'
 
   validate_ros_workspace:
     name: Validate ROS Workspace
@@ -95,12 +97,66 @@ jobs:
        uses: ./.github/actions/build-docs
        with:
          deploy: "false"
+  
+  validate_payload_controller:
+    name: Validate Payload Controller
+    needs: detect_changes
+    runs-on: ubuntu-latest
+    if: needs.detect_changes.outputs.payload_controller == 'true' || needs.detect_changes.outputs.all == 'true'
 
+    container:
+      image: ghcr.io/pennaerial/monorepo:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout PR
+        working-directory: /root/monorepo
+        run: |
+          git fetch origin "${{ github.sha }}"
+          git checkout "${{ github.sha }}"
+          bash ci/update_submodules.sh
+
+      - name: Quick Install Dependencies
+        run: |
+          "$PENNAIR_MONOREPO_PATH/ci/install_deps.sh" --quick
+      
+      - name: Ensure ESP-IDF is installed
+        shell: bash
+        env:
+          HOME: /root # Necessary because in the docker image esp-idf is installed in /root 
+        run: |
+          if [[ ! -f "$HOME/.espressif/tools/activate_idf_v6.0.2.sh" ]]; then
+            eim install --config "$PENNAIR_PAYLOAD_CONTROLLER_PATH/eim_config.toml"
+          fi
+          test -f "$HOME/.espressif/tools/activate_idf_v6.0.2.sh"
+
+      - name: Build Linux 
+        shell: bash
+        env:
+          HOME: /root
+        run: |
+          cd "$PENNAIR_PAYLOAD_CONTROLLER_PATH"
+          direnv allow .
+          direnv exec . make linux
+      
+      # - name: Build Hardware 
+      #   shell: bash
+      #   env:
+      #     HOME: /root
+      #   run: |
+      #     cd "$PENNAIR_PAYLOAD_CONTROLLER_PATH"
+      #     direnv allow .
+      #     direnv exec . make esp32s3
+
+      
   merge_build_status:
     name: Merge Build Status
     needs: # depend on each additional job here
       - validate_ros_workspace
       - docs
+      - validate_payload_controller
     if: always()
     runs-on: ubuntu-latest
 
@@ -109,12 +165,13 @@ jobs:
         env:
           ROS_WS_RESULT: ${{ needs.validate_ros_workspace.result }}
           DOCS_RESULT: ${{ needs.docs.result }}
-
+          PC_RESULT: ${{ needs.validate_payload_controller.result }}
         run: |
           # Create a map of different mergebuild jobs to check. MODIFY THIS IF ADDING A MERGEBUILD JOB
           declare -A checks=(
             ["ROS Workspace"]="$ROS_WS_RESULT"
             ["Docs"]="$DOCS_RESULT"
+            ["Payload Controller"]="$PC_RESULT"
           )
 
           failed=0
