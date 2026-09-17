@@ -6,7 +6,8 @@ set(srcs
 
 set(priv_requires "")
 if(NOT IDF_TARGET STREQUAL "linux")
-    list(APPEND priv_requires esp_driver_uart)
+    list(APPEND srcs dds_uart_transport.cpp)
+    list(APPEND priv_requires esp_driver_gpio esp_driver_uart)
 endif()
 
 idf_component_register(

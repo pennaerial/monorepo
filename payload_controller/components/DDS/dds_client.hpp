@@ -6,17 +6,24 @@
 
 #include "sensor_msgs/msg/Imu.h"
 
-constexpr uint32_t STREAM_HISTORY = 8;
+namespace dds_config
+{
+
+// Keep eight reliable frames so short transport stalls do not immediately drop IMU samples.
+inline constexpr uint32_t STREAM_HISTORY = 8;
 
 #if defined(UCLIENT_PROFILE_UDP)
-constexpr uint32_t TRANSPORT_MTU = UXR_CONFIG_UDP_TRANSPORT_MTU;
+inline constexpr uint32_t TRANSPORT_MTU = UXR_CONFIG_UDP_TRANSPORT_MTU;
 #elif defined(UCLIENT_PROFILE_CUSTOM_TRANSPORT)
-constexpr uint32_t TRANSPORT_MTU = UXR_CONFIG_CUSTOM_TRANSPORT_MTU;
+inline constexpr uint32_t TRANSPORT_MTU = UXR_CONFIG_CUSTOM_TRANSPORT_MTU;
 #else
 #error "No supported Micro-XRCE-DDS transport enabled"
 #endif
 
-constexpr uint32_t BUFFER_SIZE = TRANSPORT_MTU * STREAM_HISTORY;
+// Micro-XRCE-DDS requires one MTU-sized slot for every reliable-history entry.
+inline constexpr uint32_t BUFFER_SIZE = TRANSPORT_MTU * STREAM_HISTORY;
+
+}  // namespace dds_config
 
 
 class DDSClient
@@ -72,11 +79,11 @@ private:
   uxrSession session_;
 
   /// DDS stream buffer for reliable output
-  uint8_t output_reliable_stream_buffer_[BUFFER_SIZE];
+  uint8_t output_reliable_stream_buffer_[dds_config::BUFFER_SIZE];
   /// uxrStreamId associated with output reliable buffer
   uxrStreamId reliable_out_;
   /// DDS stream buffer for reliable input
-  uint8_t input_reliable_stream_buffer_[BUFFER_SIZE];
+  uint8_t input_reliable_stream_buffer_[dds_config::BUFFER_SIZE];
   /// uxrStreamId associated with input reliable buffer
   uxrStreamId reliable_in_;
 
