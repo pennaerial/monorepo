@@ -51,7 +51,7 @@ async fn run_client() {
     let mut client = FoxgloveClient::new();
     match client.connect("ws://localhost:8765").await {
         Ok(()) => (),
-        Err(error) => println!("connection failed! {error}"),
+        Err(error) => eprintln!("connection failed! {error}"),
     }
 }
 
