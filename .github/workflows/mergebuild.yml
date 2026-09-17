@@ -102,6 +102,8 @@ jobs:
     name: Validate Payload Controller
     needs: detect_changes
     runs-on: ubuntu-latest
+    env:
+      HOME: /root # Necessary because in the docker image esp-idf is installed in /root 
     if: needs.detect_changes.outputs.payload_controller == 'true' || needs.detect_changes.outputs.all == 'true'
 
     container:
@@ -122,9 +124,11 @@ jobs:
         run: |
           "$PENNAIR_MONOREPO_PATH/ci/install_deps.sh" --quick
       
-      - name: Install ESP-IDF
+      - name: Ensure ESP-IDF is installed
         run: |
-          eim install --config "$PENNAIR_PAYLOAD_CONTROLLER_PATH/eim_config.toml"
+          if [[ ! -f "$HOME/.espressif/tools/activate_idf_v6.0.2.sh" ]]; then
+            eim install --config "$PENNAIR_PAYLOAD_CONTROLLER_PATH/eim_config.toml"
+          fi
           test -f "$HOME/.espressif/tools/activate_idf_v6.0.2.sh"
 
       - name: Build Linux 
