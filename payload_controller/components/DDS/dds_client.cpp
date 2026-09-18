@@ -91,7 +91,7 @@ void DDSClient::run()
       &session_, reliable_out_, datawriter_id_, publisher_id, datawriter_xml, UXR_REPLACE
   );
 
-  uxrObjectId datareader_id = uxr_object_id(0x01, UXR_DATAREADER_ID);
+  datareader_id_ = uxr_object_id(0x01, UXR_DATAREADER_ID);
   const char* datareader_xml =
       "<dds>"
       "<data_reader>"
@@ -103,14 +103,17 @@ void DDSClient::run()
       "</data_reader>"
       "</dds>";
   uint16_t datareader_req = uxr_buffer_create_datareader_xml(
-      &session_, reliable_out_, datareader_id, subscriber_id, datareader_xml, UXR_REPLACE
+      &session_, reliable_out_, datareader_id_, subscriber_id, datareader_xml, UXR_REPLACE
   );
 
-  // create requester and replier...
+  uxrDeliveryControl delivery_control{};
+  delivery_control.max_samples = UXR_MAX_SAMPLES_UNLIMITED;
+  uint16_t read_data_req =
+      uxr_buffer_request_data(&session_, reliable_out_, datareader_id_, reliable_in_, &delivery_control);
 
   // Create entities
-  uint8_t status[6];
-  uint16_t requests[6] = {participant_req, topic_req, publisher_req, subscriber_req, datawriter_req, datareader_req};
+  uint8_t status[7];
+  uint16_t requests[7] = {participant_req, topic_req, publisher_req, subscriber_req, datawriter_req, datareader_req, read_data_req};
 
   if (!uxr_run_session_until_all_status(&session_, 1000, requests, status, 6)) {
     ESP_LOGE(TAG, "Error at creating 6 entities");
@@ -147,16 +150,25 @@ void DDSClient::handle_topic(
     uint16_t length
 )
 {
-  ESP_LOGI(TAG, "handling topic..");
+    sensor_msgs_msg_Imu msg;
+    sensor_msgs_msg_Imu_deserialize_topic(ub, &msg);
+    ESP_LOGI(TAG, "orientation x: %f", msg.orientation.x);
+    ESP_LOGI(TAG, "orientation y: %f", msg.orientation.y);
+    ESP_LOGI(TAG, "orientation z: %f", msg.orientation.z);
+    ESP_LOGI(TAG, "orientation w: %f", msg.orientation.w);
+    ESP_LOGI(TAG, "handling topic..");
 }
 
 
-void DDSClient::update()
+void DDSClient::update(const sensor_msgs_msg_Imu& msg)
 {
+  ESP_LOGI(TAG, "Updating");
+  imu_msg = msg;
   ucdrBuffer ub;
   uint32_t topic_size = sensor_msgs_msg_Imu_size_of_topic(&imu_msg, 0);
   uxr_prepare_output_stream(&session_, reliable_out_, datawriter_id_, &ub, topic_size);
   sensor_msgs_msg_Imu_serialize_topic(&ub, &imu_msg);
 
   uxr_run_session_until_confirm_delivery(&session_, 1000);
+  uxr_run_session_time(&session_, 10);
 }
