@@ -8,7 +8,8 @@
   "workspaceFolder": "/root/monorepo",
 
   "runArgs": [
-    "--gpus=all"
+    "--gpus=all",
+    "--network=host"
   ],
 
   "containerEnv": {
