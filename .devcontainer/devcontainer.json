@@ -37,12 +37,10 @@
     "source=/usr/lib/wsl,target=/usr/lib/wsl,type=bind"
   ],
 
-  // Runs once when the container is first created (not on every restart).
-  // Installs mesa-utils so glxinfo is available for the check below.
-  // Adds git config to tell git to trust the mounted repo
-  "postCreateCommand": "apt-get update && apt-get install -y mesa-utils && git config --global --add safe.directory '*'",
+  // Runs once when the container is first created (not on every restart)
+  "postCreateCommand": "bash .devcontainer/postCreate.sh",
   // Check if nvidia gpu is correctly used by opengl (or true stops container from failing)
-  "postStartCommand": "nvidia-smi; glxinfo | grep 'OpenGL renderer' || true",
+  "postStartCommand": "nvidia-smi -L; glxinfo | grep 'OpenGL renderer' || true",
 
   // Auto add relevant vscode extensions
   "customizations": {
