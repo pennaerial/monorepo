@@ -1,13 +1,12 @@
-import yaml
 from pathlib import Path
 
 import requests
+import yaml
 from docutils import nodes
 from docutils.statemachine import StringList
+from monkeytype_leaderboard import MonkeytypeLeaderboard
 from sphinx.application import Sphinx
 from sphinx.util.docutils import SphinxDirective
-
-from monkeytype_leaderboard import MonkeytypeLeaderboard
 
 
 def get_github_contributions(repo: str) -> dict[str, int]:

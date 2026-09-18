@@ -1,8 +1,9 @@
-import numpy as np
 import cv2
+import numpy as np
 import scipy.stats as stats
-from vehicle_common.cv.recalibrate import detect_contour
+
 from vehicle_common.cv.confidence import confidence
+from vehicle_common.cv.recalibrate import detect_contour
 
 
 def calibrate(frame: np.ndarray) -> tuple[float, float]:

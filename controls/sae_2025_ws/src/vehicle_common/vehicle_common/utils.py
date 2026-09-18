@@ -1,7 +1,8 @@
-from pathlib import Path
-from ament_index_python.packages import get_package_share_directory
-from typing import cast
 import importlib
+from pathlib import Path
+from typing import cast
+
+from ament_index_python.packages import get_package_share_directory
 
 
 def serialize_type(cls: type) -> str:

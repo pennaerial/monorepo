@@ -175,4 +175,4 @@ Feel free to save your local progress on the branch you created, or delete it wi
 .. code-block:: bash
     :caption: Bash
 
-    git branch -d user/<github-username>/add-mode
+    git branch -d user/<github-username>/tutorial

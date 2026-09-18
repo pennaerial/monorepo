@@ -1,7 +1,7 @@
-from sim.world_gen.world_node import WorldNode
-
 import rclpy
 from rclpy.executors import ExternalShutdownException
+
+from sim.world_gen.world_node import WorldNode
 
 
 class SAEWorldNode(WorldNode):

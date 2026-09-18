@@ -8,8 +8,9 @@ from pydantic import BaseModel
 from rclpy.node import Node
 from std_srvs.srv import Trigger
 
-from vehicle_common.vehicle import Vehicle
 from vehicle_common.mode import Mode
+from vehicle_common.mode_loader import ModeRegistry
+from vehicle_common.runtime.mission_loader import RuntimeMission
 from vehicle_common.runtime.peer_connections import (
     declared_remote_peer_names,
     normalize_vehicle_name,
@@ -18,9 +19,7 @@ from vehicle_common.runtime.vision_loader import (
     canonical_vision_node_path,
     load_vision_class,
 )
-from vehicle_common.mode_loader import ModeRegistry
-from vehicle_common.runtime.mission_loader import RuntimeMission
-
+from vehicle_common.vehicle import Vehicle
 
 MISSION_STARTED_MARKER_ENV = "PENNAIR_MISSION_STARTED_MARKER_PATH"
 
