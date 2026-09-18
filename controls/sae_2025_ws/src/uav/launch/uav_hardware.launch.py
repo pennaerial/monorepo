@@ -109,7 +109,7 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 Args.NS_ID,
                 default_value="0",
-                description="Integer namespace id for the vehicle. An id of 0 makes the namespace uav_0. Correponds to the ROS node namespace and PX4 SITL namespace",
+                description="Integer namespace id for the vehicle. An id of 0 makes the namespace uav_0. Correponds to the ROS node namespace and PX4 UXRCE namespace",
             ),
             DeclareLaunchArgument(
                 Args.AIRFRAME,
