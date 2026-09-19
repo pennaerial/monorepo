@@ -17,7 +17,7 @@ class Multicopter(UAV):
     ):
         super().__init__(
             node,
-            camera_offsets = camera_offsets,
+            camera_offsets=camera_offsets,
             vehicle_name=vehicle_name,
         )
 
