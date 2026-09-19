@@ -17,6 +17,6 @@ extern "C" void app_main(void)
 
 
   while (1) {
-    dds_client.update();
+    dds_client.update(imu->get_latest());
   }
 }
