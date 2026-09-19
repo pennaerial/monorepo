@@ -57,12 +57,11 @@ mission that takes off, flies to a waypoint, and then lands:
 
 .. note::
 
-    The coordinates parameter for uav.NavGPSMode is a list of waypoints, 
-    where each waypoint is a 3-D tuple of either (x, y, z) or (lat, lon, alt) coordinates depending on the frame,
-    a wait time in seconds, and a frame type of either LOCAL or GPS.
+    The ``coordinates`` parameter for ``uav.NavGPSMode`` is a list of waypoints. Each waypoint has the form
+    ``[coordinates, wait_seconds, frame]``, where ``coordinates`` is either ``[x, y, z]`` or ``[lat, lon, alt]``.
     ``LOCAL`` uses PX4's local NED frame in meters: X is north, Y is east, and Z is down.
     Coordinates are relative to PX4's local position origin, so negative Z values are above the origin.
-    In this case, the UAV will fly to the point (5, 0, -5) with a waittime of 1 second in the LOCAL frame.
+    In this case, the UAV will fly to the point (5, 0, -5) with a wait time of 1 second in the LOCAL frame.
 
 The keys nested directly under ``modes:`` are **state names**: ``start``, ``GPS``, and ``land``. These are just labels
 chosen for the mission. There is no requirement that the state named ``GPS`` has to run a mode with "GPS" in its name.
