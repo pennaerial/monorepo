@@ -38,6 +38,25 @@ DEFAULT_PALETTE = {
 }
 
 
+BORDER_MODEL = "InHouse2026Border"
+
+DEFAULT_BORDER_MATERIAL = Material(
+    ambient=(0.6, 0.0, 0.0, 1.0),
+    diffuse=(1.0, 0.0, 0.0, 1.0),
+    emissive=(0.25, 0.0, 0.0, 1.0),
+)
+
+
+class BorderConfig(BaseModel):
+    """Red outline drawn around the shape spawn `area`."""
+
+    enabled: bool = True
+    margin: float = 0.5  
+    thickness: float = 0.15
+    height: float = 0.02  
+    material: Material = Field(default_factory=lambda: DEFAULT_BORDER_MATERIAL.model_copy())
+
+
 class InHouse2026Config(BaseModel):
     """Schema for `world.config` in simulations/in_house_2026/*.yaml"""
 
@@ -50,6 +69,7 @@ class InHouse2026Config(BaseModel):
     keep_out: list[tuple[float, float, float]] = Field(default_factory=list)  # (x, y, radius)
     random_yaw: bool = True
     palette: dict[str, Material] = Field(default_factory=lambda: dict(DEFAULT_PALETTE))
+    border: BorderConfig = Field(default_factory=BorderConfig)
 
 
 class InHouse2026WorldNode(WorldNode):
@@ -65,6 +85,8 @@ class InHouse2026WorldNode(WorldNode):
         self.controllables = self.sim_params.world.controllables
         self.shapes: list[Entity] = []
         self.cached_templates: dict[str, str] = {}  # model.sdf text keyed by path
+        # (x, y, radius) zones shapes must avoid
+        self.keep_out: list[tuple[float, float, float]] = list(self.config.keep_out)
 
         if self.config.seed is not None:
             self.rng.seed(self.config.seed)
@@ -77,7 +99,7 @@ class InHouse2026WorldNode(WorldNode):
         for _ in range(MAX_PLACEMENT_ATTEMPTS):
             x = self.rng.uniform(x_min, x_max)
             y = self.rng.uniform(y_min, y_max)
-            if any((x - kx) ** 2 + (y - ky) ** 2 < kr**2 for kx, ky, kr in self.config.keep_out):
+            if any((x - kx) ** 2 + (y - ky) ** 2 < kr**2 for kx, ky, kr in self.keep_out):
                 continue
             if any((x - px) ** 2 + (y - py) ** 2 < min_sq for px, py in placed):
                 continue
@@ -123,6 +145,65 @@ class InHouse2026WorldNode(WorldNode):
 
         return entities
 
+    def build_border_sdf(self) -> str:
+        """Return an SDF model outlining `area` in red."""
+        border = self.config.border
+        (x_min, y_min), (x_max, y_max) = self.config.area
+        x_min, y_min = x_min - border.margin, y_min - border.margin
+        x_max, y_max = x_max + border.margin, y_max + border.margin
+
+        t = border.thickness
+        z = border.height / 2
+        # strips are centred on the boundary lines; overlap by `t` so the corners join
+        span_x = (x_max - x_min) + t
+        span_y = (y_max - y_min) + t
+        mid_x = (x_min + x_max) / 2
+        mid_y = (y_min + y_max) / 2
+
+        strips = {
+            "border_y_min": ((mid_x, y_min), (span_x, t)),
+            "border_y_max": ((mid_x, y_max), (span_x, t)),
+            "border_x_min": ((x_min, mid_y), (t, span_y)),
+            "border_x_max": ((x_max, mid_y), (t, span_y)),
+        }
+
+        material = "".join(
+            f"<{tag}>{' '.join(f'{c:g}' for c in rgba)}</{tag}>"
+            for tag, rgba in border.material.model_dump().items()
+        )
+
+        # no collision
+        visuals = "".join(
+            f'<visual name="{name}">'
+            f"<pose>{cx:g} {cy:g} {z:g} 0 0 0</pose>"
+            f"<geometry><box><size>{sx:g} {sy:g} {border.height:g}</size></box></geometry>"
+            f"<material>{material}</material>"
+            f"</visual>"
+            for name, ((cx, cy), (sx, sy)) in strips.items()
+        )
+
+        return (
+            '<?xml version="1.0"?>'
+            '<sdf version="1.9">'
+            f'<model name="{BORDER_MODEL}">'
+            "<static>true</static>"
+            f'<link name="link">{visuals}</link>'
+            "</model>"
+            "</sdf>"
+        )
+
+    def border_entity(self) -> Entity:
+        """Border entity whose on-disk model.sdf is replaced by geometry matching `area`."""
+        entity = Entity(
+            name="spawn_border",
+            model=BORDER_MODEL,
+            position=(0.0, 0.0, 0.0),
+            rpy=(0.0, 0.0, 0.0),
+            world=self.world,
+        )
+        entity.sdf = self.build_border_sdf()
+        return entity
+
     def generate_sdf_string(self, template_path: str, material: Material) -> str:
         """Return the model.sdf at `template_path` with its <material> colours replaced."""
         sdf = self.cached_templates.get(template_path)
@@ -137,8 +218,12 @@ class InHouse2026WorldNode(WorldNode):
         return sdf
 
     def generate_world(self):
+        # reset so re-triggering generate_world doesn't stack keep-out zones
+        self.keep_out = list(self.config.keep_out)
         self.shapes = self.random_shapes()
         success = True
+        if self.config.border.enabled:
+            success = self.spawn_entity(self.border_entity()) and success
         success = self.spawn_entities(self.shapes) and success
         success = self.spawn_entities(self.entities) and success
         success = self.spawn_entities(self.controllables) and success
