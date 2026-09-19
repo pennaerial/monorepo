@@ -54,6 +54,13 @@ rosdep install -r -i -y --rosdistro "$ROS_DISTRO" \
 echo "Installing ci.conf apt packages... ${APT_PACKAGES[@]}"
 sudo apt-get install -y --no-install-recommends "${APT_PACKAGES[@]}"
 
+if [[ "$QUICK" == false ]]; then
+	#### install ESP-IDF for payload_controller
+    echo "Installing ESP-IDF for payload_controller..."
+    eim install --config "${PENNAIR_PAYLOAD_CONTROLLER_PATH}/eim_config.toml"
+    test -f "$HOME/.espressif/tools/activate_idf_v6.0.2.sh"
+fi
+
 #### install python dependencies into system using uv
 echo "Installing pyproject dependencies globally..."
 uv pip install --system --break-system-packages --no-cache -r ${PENNAIR_MONOREPO_PATH}/pyproject.toml

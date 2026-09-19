@@ -55,12 +55,13 @@ meters above the local origin.
 Creating a Branch
 `````````````````
 
-Before making any changes, create a new branch for your mission.
-Use the following naming convention, replacing ``<github-username>`` with your GitHub username:
+Before making any changes, switch to ``main`` and create a branch for the tutorial.
+Replace ``<github-username>`` with your GitHub username:
 
 .. code-block:: bash
     :caption: Bash
 
+    git checkout main
     git checkout -b user/<github-username>/tutorial
 
 Create the Mode File
@@ -341,12 +342,14 @@ decorator registered the class.
 Committing Your Changes
 -----------------------
 
-To save your progress locally, commit your changes to the branch you created at the start of this tutorial.
+To save your progress locally, stage and commit your changes to the branch you created at the start of this tutorial.
 
 .. code-block:: bash
     :caption: Bash
 
-    git commit -m "<Descriptive message about your changes>"
+    # from monorepo/controls/sae_2025_ws
+    git add src/uav/uav/modes/fly_to_point_mode.py
+    git commit -m "created first mode"
 
 Next Step
 ---------
