@@ -4,12 +4,14 @@ from .command.airframe import AirframeCommand
 from .command.greeting import GreetingCommand
 from .command.mission import MissionCommand
 from .command.mode import ModeCommand
+from .command.world import WorldCommand
 
 EXTENSIONS = {
     "airframe": AirframeCommand,
     "greeting": GreetingCommand,
     "mission": MissionCommand,
     "mode": ModeCommand,
+    "world": WorldCommand,
 }
 
 
