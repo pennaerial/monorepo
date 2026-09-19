@@ -35,9 +35,9 @@ world:
         diffuse: [1.0, 0.0, 0.0, 1.0]
         emissive: [0.25, 0.0, 0.0, 1.0]         
 
-  # Issue with sim launch, doesn't attach PX4 to the uav spawned by world
-  controllables:
-    - name: uav_0
-      model: x500_mono_cam
-      position: [0, 0, 0]
-      rpy: [0.0, 0.0, 0.0]
+  # # Issue with sim launch, doesn't attach PX4 to the uav spawned by world
+  # controllables:
+  #   - name: uav_0
+  #     model: x500_mono_cam
+  #     position: [0, 0, 0]
+  #     rpy: [0.0, 0.0, 0.0]
