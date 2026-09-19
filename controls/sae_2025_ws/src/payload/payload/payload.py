@@ -52,15 +52,13 @@ class Payload(Vehicle):
         self._udp_heartbeat_seq = 0
         self._latest_motor_state: MotorState | None = None
 
-        raw = node._raw_node_api
-
-        raw.create_subscription(
+        self.node.create_subscription(
             MotorState,
             self.namespaced_path("motor_state"),
             self._on_motor_state,
             1,
         )
-        # self._udp_heartbeat_timer = raw.create_timer(
+        # self._udp_heartbeat_timer = self.node.create_timer(
         #     1.0 / float(udp_heartbeat_hz),
         #     self._publish_udp_heartbeat,
         # )

@@ -1,0 +1,43 @@
+world:
+  name: in_house_2026
+  node: in_house_2026_node
+
+  config: 
+    seed: null                     # set an int for a reproducible layout
+    area: [[-10, -10], [10, 10]]   # xy min / xy max
+    counts: {circle: 5, square: 6, triangle: 4, star: 1}
+    min_spacing: 1.0               # center-to-center, meters
+    keep_out: [[0, 0, 2.0]]        # (x, y, radius) zones shapes avoid - clear of the UAV
+    random_yaw: true
+    palette:                       # each field is RGBA (ambent, diffuse, specular, emissive) 
+      red:
+        ambient: [1.0, 0.0, 0.0, 1.0]
+        diffuse: [1.0, 0.0, 0.0, 1.0]
+      purple:
+        ambient: [0.29, 0.0, 0.509, 1.0]
+        diffuse: [0.29, 0.0, 0.509, 1.0]
+      blue:
+        ambient: [0.0, 0.0, 1.0, 1.0]
+        diffuse: [0.0, 0.0, 1.0, 1.0]
+      yellow:
+        ambient: [1.0, 1.0, 0.0, 1.0]
+        diffuse: [1.0, 1.0, 0.0, 1.0]
+        specular: [0.01, 0.01, 0.01, 1.0]
+        emissive: [0.0, 0.0, 0.0, 1.0]
+
+    border:                        # red outline of the shape spawn area
+      enabled: true
+      margin: 0.5                  
+      thickness: 0.15
+      height: 0.02                 
+      material:
+        ambient: [0.6, 0.0, 0.0, 1.0]
+        diffuse: [1.0, 0.0, 0.0, 1.0]
+        emissive: [0.25, 0.0, 0.0, 1.0]         
+
+  # # Issue with sim launch, doesn't attach PX4 to the uav spawned by world
+  # controllables:
+  #   - name: uav_0
+  #     model: x500_mono_cam
+  #     position: [0, 0, 0]
+  #     rpy: [0.0, 0.0, 0.0]
