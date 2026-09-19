@@ -1,3 +1,4 @@
+import logging
 from enum import StrEnum
 from pathlib import Path
 
@@ -37,6 +38,7 @@ class Args(StrEnum):
     LAUNCH_SIM = "launch_sim"
     STANDALONE = "standalone"
     HEADLESS = "headless"
+    DEBUG = "debug"
 
 
 def px4_sitl_action(
@@ -66,6 +68,8 @@ def px4_sitl_action(
 
 def launch_setup(context) -> list[Action]:
     config = context.launch_configurations  # dict containing declared launch arguments
+    debug: str = config[Args.DEBUG]
+    logger = get_logger("uav_sitl.launch", logging.DEBUG if is_truthy(debug) else logging.INFO)
     check_unknown_launch_args(Args, config, logger)  # warn for unknown args
 
     mission: str = config[Args.MISSION]  # validate mission
@@ -106,6 +110,7 @@ def launch_setup(context) -> list[Action]:
     logger.debug(f"Middleware:          {run_mw}")
     logger.debug(f"Launch Sim:          {launch_sim}")
     logger.debug(f"Headless Mode:       {headless}")
+    logger.debug(f"Debug Mode:          {debug}")
 
     ## create actions
     actions = []
@@ -139,6 +144,7 @@ def launch_setup(context) -> list[Action]:
         launch_arguments={
             "world": world,
             "headless": headless,
+            "debug": debug,
         },
     )
 
@@ -200,6 +206,12 @@ def generate_launch_description():
                 Args.HEADLESS,
                 default_value="false",
                 description="If true, runs gz server in headless mode (no GUI). Only applies when standalone/launch_sim is true.",
+                choices=["true", "false", "t", "f", "0", "1"],
+            ),
+            DeclareLaunchArgument(
+                Args.DEBUG,
+                default_value="false",
+                description="If true, sets the launch logger's log level to DEBUG.",
                 choices=["true", "false", "t", "f", "0", "1"],
             ),
             OpaqueFunction(function=launch_setup),
