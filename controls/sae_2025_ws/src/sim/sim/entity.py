@@ -42,7 +42,6 @@ class Entity(BaseModel):
     position: tuple[float, float, float]
     rpy: tuple[float, float, float]
     world: str
-    sdf: str | None = None
 
     @model_validator(mode="after")
     def post_validate(self) -> Entity:
@@ -99,11 +98,7 @@ class Entity(BaseModel):
 
         ent_fact = EntityFactory()
         ent_fact.name = self.name
-        # Gazebo uses whichever of sdf / sdf_filename is non-empty; the other stays ""
-        if self.sdf:
-            ent_fact.sdf = self.sdf
-        else:
-            ent_fact.sdf_filename = self.path_to_model
+        ent_fact.sdf_filename = self.path_to_model
         ent_fact.pose = pose
         ent_fact.relative_to = self.world
         return ent_fact
