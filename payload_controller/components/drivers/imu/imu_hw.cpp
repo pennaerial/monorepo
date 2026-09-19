@@ -36,7 +36,6 @@ public:
     }
 
     ESP_LOGI(TAG, "LSM6DSO detected at 0x%02X", LSM6DSO::I2C_ADDRESS);
-    // Keep I2C polling off app_main so DDS work cannot delay sensor acquisition.
     if (xTaskCreate(
             read_task, imu_hw_config::READ_TASK_NAME, imu_hw_config::READ_TASK_STACK_SIZE_BYTES, this,
             imu_hw_config::READ_TASK_PRIORITY, nullptr

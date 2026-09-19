@@ -18,7 +18,6 @@ constexpr uint8_t TRANSPORT_ERROR = 1;
 
 bool uart_open(uxrCustomTransport* transport)
 {
-  // Micro-XRCE-DDS invokes this callback when the client transport is initialized.
   (void)transport;
   const uart_config_t config{
       .baud_rate = dds_uart_transport::BAUD_RATE,
@@ -76,7 +75,6 @@ namespace dds_uart_transport
 
 bool initialize(uxrCustomTransport& transport)
 {
-  // Register the ESP-IDF UART adapter before asking Micro-XRCE-DDS to open it.
   uxr_set_custom_transport_callbacks(&transport, USE_XRCE_FRAMING, uart_open, uart_close, uart_write, uart_read);
   return uxr_init_custom_transport(&transport, nullptr);
 }

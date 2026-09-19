@@ -20,8 +20,7 @@ extern "C" void app_main(void)
 
 
   while (1) {
-    // IMU acquisition runs independently; publish the newest complete sample at a bounded rate.
-    dds_client.update(imu->get_latest());
+    dds_client.publish_imu(imu->get_latest());
     vTaskDelay(pdMS_TO_TICKS(payload_controller_config::DDS_PUBLISH_PERIOD_MS));
   }
 }

@@ -28,7 +28,6 @@ DDSClient::DDSClient(const char* ip, const char* port) : ip_(ip), port_(port) {}
 
 void DDSClient::run()
 {
-  // Host simulation talks to a local UDP agent; ESP32-S3 uses the board's dedicated UART link.
 #if defined(UCLIENT_PROFILE_UDP)
   if (!uxr_init_udp_transport(&transport_, UXR_IPv4, ip_, port_)) {
     ESP_LOGE(TAG, "UXR UDP transport failed to init!");
@@ -146,7 +145,6 @@ void DDSClient::run()
     return;
   }
 
-  // Publishing is enabled only after the agent confirms every required DDS entity.
   connected_ = true;
   ESP_LOGI(TAG, "Entities creation success");
 }
@@ -182,7 +180,7 @@ void DDSClient::handle_topic(
 }
 
 
-void DDSClient::update(const sensor_msgs_msg_Imu& imu_msg)
+void DDSClient::publish_imu(const sensor_msgs_msg_Imu& imu_msg)
 {
   if (!connected_) {
     return;

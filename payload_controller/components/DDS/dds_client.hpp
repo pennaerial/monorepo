@@ -35,7 +35,7 @@ public:
   void run();
 
   /// Publishes the latest IMU message when the DDS session is connected.
-  void update(const sensor_msgs_msg_Imu& imu_msg);
+  void publish_imu(const sensor_msgs_msg_Imu& imu_msg);
 
 private:
   /// callback function for receiving a topic. Recreates the DDSClient instance with void* args and calls handle_topic
