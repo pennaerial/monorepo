@@ -51,9 +51,9 @@ class BorderConfig(BaseModel):
     """Red outline drawn around the shape spawn `area`."""
 
     enabled: bool = True
-    margin: float = 0.5  
+    margin: float = 0.5
     thickness: float = 0.15
-    height: float = 0.02  
+    height: float = 0.02
     material: Material = Field(default_factory=lambda: DEFAULT_BORDER_MATERIAL.model_copy())
 
 
