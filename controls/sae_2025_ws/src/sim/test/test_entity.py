@@ -164,8 +164,12 @@ def test_entity_factory_sdf_or_filename_behavior(tmp_path: Path, sdf: str | None
     model = tmp_path / "model.sdf"
     model.touch()
     entity = Entity(
-        name="test", path_to_model=str(model), sdf=sdf,
-        position=(0, 0, 0), rpy=(0, 0, 0), world="world",
+        name="test",
+        path_to_model=str(model),
+        sdf=sdf,
+        position=(0, 0, 0),
+        rpy=(0, 0, 0),
+        world="world",
     )
 
     msg = entity.to_entity_factory_msg()
