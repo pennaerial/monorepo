@@ -9,4 +9,3 @@ PLATFORM_NAMES = {
     "linux": "arm",
     "darwin": "arm",  # Mac
 }
-
