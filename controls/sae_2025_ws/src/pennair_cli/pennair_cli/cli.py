@@ -1,10 +1,12 @@
 from argparse import ArgumentParser
 
+from .command.airframe import AirframeCommand
 from .command.greeting import GreetingCommand
 from .command.mission import MissionCommand
 from .command.mode import ModeCommand
 
 EXTENSIONS = {
+    "airframe": AirframeCommand,
     "greeting": GreetingCommand,
     "mission": MissionCommand,
     "mode": ModeCommand,
