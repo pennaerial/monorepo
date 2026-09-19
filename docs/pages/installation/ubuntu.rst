@@ -245,6 +245,7 @@ Build and run the ROS workspace
 
 .. code-block:: bash
 
+   source ../../dev_env.sh  # path is monorepo/dev_env.sh. Sets up environment variables necessary to run uav_sitl.launch.py
    source install/setup.bash
    ros2 launch uav uav_sitl.launch.py
 
