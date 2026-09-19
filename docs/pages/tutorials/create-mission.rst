@@ -59,6 +59,8 @@ mission that takes off, flies to a waypoint, and then lands:
     The coordinates parameter for uav.NavGPSMode is a list of waypoints, 
     where each waypoint is a 3-D tuple of either (x, y, z) or (lat, lon, alt) coordinates depending on the frame,
     a wait time in seconds, and a frame type of either LOCAL or GPS.
+    ``LOCAL`` uses PX4's local NED frame in meters: X is north, Y is east, and Z is down.
+    Coordinates are relative to PX4's local position origin, so negative Z values are above the origin.
     In this case, the UAV will fly to the point (5, 0, -5) with a waittime of 1 second in the LOCAL frame.
 
 The keys nested directly under ``modes:`` are **state names**: ``start``, ``GPS``, and ``land``. These are just labels
@@ -81,8 +83,10 @@ it is good to keep them organized in a logically clear manner.
 Read the transitions as ``label: target``. For example, ``GPS`` has ``complete: land``, which means that when this mode reports ``complete``,
 the program should go to the state named ``land``. Note that the target is a **state name in this file**, not an actual mode id.
 
-The manager checks for three reserved strings via ``check_status()`` before it ever looks at your ``transitions:`` block,
-so you cannot use them as labels for your transitions, read more at :doc:`Modes <../concepts/modes>`.
+The manager treats three ``check_status()`` results specially: ``continue`` keeps the current mode running,
+``terminate`` ends the mission, and ``error`` invokes failure handling. Any other result is treated as a custom
+transition label and looked up in ``transitions:``, so do not use the three reserved strings as transition labels.
+See :doc:`Modes <../concepts/modes>` for more detail.
 
 .. note::
 
