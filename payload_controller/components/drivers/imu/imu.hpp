@@ -33,7 +33,7 @@ protected:
   IMU() = default;  // prevent public instantiation
 
 private:
-  sensor_msgs_msg_Imu reading_;
+  sensor_msgs_msg_Imu reading_{};
   util::StaticMutex mtx_;
 
 
