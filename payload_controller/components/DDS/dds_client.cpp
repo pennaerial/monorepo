@@ -113,7 +113,8 @@ void DDSClient::run()
 
   // Create entities
   uint8_t status[7];
-  uint16_t requests[7] = {participant_req, topic_req, publisher_req, subscriber_req, datawriter_req, datareader_req, read_data_req};
+  uint16_t requests[7] = {participant_req, topic_req,      publisher_req, subscriber_req,
+                          datawriter_req,  datareader_req, read_data_req};
 
   if (!uxr_run_session_until_all_status(&session_, 1000, requests, status, 6)) {
     ESP_LOGE(TAG, "Error at creating 6 entities");
@@ -150,13 +151,13 @@ void DDSClient::handle_topic(
     uint16_t length
 )
 {
-    sensor_msgs_msg_Imu msg;
-    sensor_msgs_msg_Imu_deserialize_topic(ub, &msg);
-    ESP_LOGI(TAG, "orientation x: %f", msg.orientation.x);
-    ESP_LOGI(TAG, "orientation y: %f", msg.orientation.y);
-    ESP_LOGI(TAG, "orientation z: %f", msg.orientation.z);
-    ESP_LOGI(TAG, "orientation w: %f", msg.orientation.w);
-    ESP_LOGI(TAG, "handling topic..");
+  sensor_msgs_msg_Imu msg;
+  sensor_msgs_msg_Imu_deserialize_topic(ub, &msg);
+  ESP_LOGI(TAG, "orientation x: %f", msg.orientation.x);
+  ESP_LOGI(TAG, "orientation y: %f", msg.orientation.y);
+  ESP_LOGI(TAG, "orientation z: %f", msg.orientation.z);
+  ESP_LOGI(TAG, "orientation w: %f", msg.orientation.w);
+  ESP_LOGI(TAG, "handling topic..");
 }
 
 
