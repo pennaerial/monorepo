@@ -26,5 +26,6 @@ class AirframeCommand(CommandExtension):
         self.parser.print_help()
 
     def ls(self, *, args) -> None:
+        print("Available airframes: (alias/id/model)")
         for airframe in PX4Airframe.get_flying():
-            print(airframe)
+            print(f"    {airframe}")

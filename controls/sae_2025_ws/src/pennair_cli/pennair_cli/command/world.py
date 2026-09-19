@@ -29,5 +29,6 @@ class WorldCommand(CommandExtension):
         self.parser.print_help()
 
     def ls(self, *, args) -> None:
+        print("Available worlds:")
         for world in get_available_worlds(GZ_WORLDS_PATH):
-            print(world)
+            print(f"    {world}")
