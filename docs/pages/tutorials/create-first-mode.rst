@@ -55,12 +55,13 @@ meters above the local origin.
 Creating a Branch
 `````````````````
 
-Before making any changes, create a new branch for your mission.
-Use the following naming convention, replacing ``<github-username>`` with your GitHub username:
+Before making any changes, switch to ``main`` and create a branch for the tutorial.
+Replace ``<github-username>`` with your GitHub username:
 
 .. code-block:: bash
     :caption: Bash
 
+    git checkout main
     git checkout -b user/<github-username>/tutorial
 
 Create the Mode File

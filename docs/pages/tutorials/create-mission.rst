@@ -11,11 +11,12 @@ Creating A Mission
 Before You Begin
 ````````````````````
 
-This tutorial assumes that you have already cloned monorepo, are checked out to its most up-to-date main
-branch, and have built the ROS workspace. If you have not, follow the :doc:`Ubuntu installation guide <../installation/ubuntu>` first.
+This tutorial continues from :doc:`Creating Your First Mode <create-first-mode>`. Stay on the
+``user/<github-username>/tutorial`` branch you created there because it contains your new
+``uav.FlyToPointMode``. If you have not completed that tutorial, follow it first.
 
-This tutorial also assumes that you have already created a mode with the previous tutorial.
-If you have not, follow the :doc:`Creating Your First Mode <create-first-mode>` tutorial first.
+This tutorial also assumes that you have installed the monorepo and built the ROS workspace. If you have not,
+follow the :doc:`Ubuntu installation guide <../installation/ubuntu>` first.
 
 You should also be familiar with the following concepts:
 
@@ -169,7 +170,7 @@ To save your progress locally, stage and commit your changes to the branch you c
     :caption: Bash
 
     # from monorepo/controls/sae_2025_ws
-    git add src/uav/uav/missions/<mission-name>
+    git add src/uav/uav/missions/<mission-name>.yaml
     git commit -m "created first mission"
 
 Congrats, You Did It!
@@ -177,12 +178,9 @@ Congrats, You Did It!
 
 You successfully created an entire mode, incorporated it into a mission, and flew it in sim!
 
-You are on your way to being able to contribute to production code!
-
-Feel free to save your local progress on the branch you created, or delete it with the command below.
+Your tutorial work is saved on its own branch. When you are finished, return to ``main``:
 
 .. code-block:: bash
     :caption: Bash
-    
+
     git checkout main
-    git branch -d user/<github-username>/tutorial
