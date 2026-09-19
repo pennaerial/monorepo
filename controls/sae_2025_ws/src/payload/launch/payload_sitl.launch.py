@@ -1,4 +1,5 @@
 from enum import StrEnum
+from pathlib import Path
 
 from ament_index_python import get_package_share_path
 from launch import Action, LaunchDescription
@@ -6,12 +7,17 @@ from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.substitutions import Command, FindExecutable
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
+from pydantic import ValidationError
 from vehicle_common.launch_utils import (
+    LaunchError,
     check_unknown_launch_args,
+    format_bullet_list,
     get_logger,
     include_launch,
     is_truthy,
 )
+from vehicle_common.runtime.mission_loader import RuntimeMission, get_mission_path
+from vehicle_common.utils import get_available_missions
 
 logger = get_logger("payload_sitl.launch")
 
@@ -19,6 +25,7 @@ logger = get_logger("payload_sitl.launch")
 class Args(StrEnum):
     """Maps constants to launch argument keyords"""
 
+    MISSION = "mission"
     NS_ID = "ns_id"
     LAUNCH_RVIZ = "launch_rviz"
     WORLD = "world"
@@ -31,6 +38,20 @@ def launch_setup(context) -> list[Action]:
 
     check_unknown_launch_args(Args, config, logger)
 
+    mission: str = config[Args.MISSION]  # validate mission
+    if mission not in get_available_missions("payload"):
+        logger.warning( f"{mission} is not an installed mission. Using filepath as fallback...")  # fmt: skip
+        mission_path = Path(mission).expanduser().resolve()
+        if not mission_path.is_file() or mission_path.suffix != ".yaml":
+            raise LaunchError(f"{mission} is not installed or a valid path to a mission yaml file")
+    else:
+        mission_path = get_mission_path(mission, "payload")
+    try:
+        _ = RuntimeMission.load_from_path(mission_path)  # run this step only for mission validation
+    except ValidationError as e:
+        logger.info(f"PYDANTIC RUNTIME MISSION VALIDATION ERROR: {e}")
+        raise LaunchError(f"Make sure {mission} is a valid mission file")
+
     ns_id = int(config[Args.NS_ID])
     vehicle_ns = f"payload_{ns_id}"
     launch_rviz = is_truthy(config[Args.LAUNCH_RVIZ])
@@ -40,7 +61,7 @@ def launch_setup(context) -> list[Action]:
 
     # PRINTING HEADER
     logger.debug("LAUNCH PARAMS")
-    # logger.debug(f"Mission:             {mission}")
+    logger.debug(f"Mission:             {mission}")
     logger.debug(f"Vehicle Namespace:   {vehicle_ns}")
     logger.debug(f"Sim World:           {world}")
     # logger.debug(f"Middleware:          {run_mw}")
@@ -50,6 +71,16 @@ def launch_setup(context) -> list[Action]:
     ## create actions
     actions = []
 
+    payload_mode_manager = Node(
+        executable="payload_mission",
+        package="payload",
+        name="payload_mode_manager",
+        namespace=vehicle_ns,
+        parameters=[
+            {"mode_map": str(mission_path), "auto_launch": True, "vehicle_name": vehicle_ns}
+        ],
+    )
+    actions.append(payload_mode_manager)
 
     # Launch sim
     include_sim_launch = include_launch(
@@ -61,7 +92,6 @@ def launch_setup(context) -> list[Action]:
         },
     )
     actions.extend([include_sim_launch] if launch_sim else [])
-
 
     # Initialize payload controller for sim (replace with new payload controller when ready)
     payload_controller = include_launch(
@@ -75,10 +105,11 @@ def launch_setup(context) -> list[Action]:
     )
     actions.append(payload_controller)
 
-
     # Bridge gazebo topics representing payload state to corresponding ros topics for visualization
-    gz_tf_topic = f"/model/{vehicle_ns}/tf" # gazebo topic containing movement/transforms of the vehicle
-    gz_joint_state_topic = f"/world/{world}/model/{vehicle_ns}/joint_state" # gazebo topic containing joint states like wheel angles
+    gz_tf_topic = (
+        f"/model/{vehicle_ns}/tf"  # gazebo topic containing movement/transforms of the vehicle
+    )
+    gz_joint_state_topic = f"/world/{world}/model/{vehicle_ns}/joint_state"  # gazebo topic containing joint states like wheel angles
 
     payload_state_bridge = Node(
         package="ros_gz_bridge",
@@ -90,13 +121,18 @@ def launch_setup(context) -> list[Action]:
             f"{gz_joint_state_topic}@sensor_msgs/msg/JointState[gz.msgs.Model",
         ],
         remappings=[
-            (gz_tf_topic, "/tf"), # /tf: ros topic used for defining transforms between world and robot frames
-            (gz_joint_state_topic, f"/{vehicle_ns}/joint_states"), # /join_states: ros topic used for visualizing joint info like wheel angles
+            (
+                gz_tf_topic,
+                "/tf",
+            ),  # /tf: ros topic used for defining transforms between world and robot frames
+            (
+                gz_joint_state_topic,
+                f"/{vehicle_ns}/joint_states",
+            ),  # /join_states: ros topic used for visualizing joint info like wheel angles
         ],
         output="screen",
     )
     actions.append(payload_state_bridge)
-
 
     # Connect the payload's odometry to RViz's world frame:
     # - `world` is the fixed frame used by RViz.
@@ -112,19 +148,26 @@ def launch_setup(context) -> list[Action]:
         name="world_to_payload_odom",
         namespace=vehicle_ns,
         arguments=[
-            "--x", "0",
-            "--y", "0",
-            "--z", "0",
-            "--yaw", "0",
-            "--pitch", "0",
-            "--roll", "0",
-            "--frame-id", "world",
-            "--child-frame-id", "odom",
+            "--x",
+            "0",
+            "--y",
+            "0",
+            "--z",
+            "0",
+            "--yaw",
+            "0",
+            "--pitch",
+            "0",
+            "--roll",
+            "0",
+            "--frame-id",
+            "world",
+            "--child-frame-id",
+            "odom",
         ],
         output="screen",
     )
     actions.append(world_to_payload_odom)
-
 
     payload_share = get_package_share_path("payload")
     xacro_path = payload_share / "urdf" / "payload.urdf.xacro"
@@ -150,7 +193,6 @@ def launch_setup(context) -> list[Action]:
     )
     actions.append(robot_state_publisher)
 
-
     # Spin up RViz
     rviz_config_path = payload_share / "rviz" / "payload.rviz"
     rviz = Node(
@@ -174,9 +216,17 @@ def generate_launch_description():
     return LaunchDescription(
         [
             DeclareLaunchArgument(
+                Args.MISSION,
+                default_value="basic",
+                description=format_bullet_list(
+                    "Name of the mission to load.\n\tAvailable missions:",
+                    get_available_missions("payload"),
+                ),
+            ),
+            DeclareLaunchArgument(
                 Args.NS_ID,
                 default_value="0",
-                description="Integer namespace id for the vehicle. An id of 0 makes the namespace uav_0. Correponds to the ROS node namespace and PX4 SITL namespace",
+                description="Integer namespace id for the vehicle. An id of 0 makes the namespace payload_0. Correponds to the ROS node namespace and PX4 SITL namespace",
             ),
             DeclareLaunchArgument(
                 Args.LAUNCH_RVIZ,
@@ -187,7 +237,7 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 Args.WORLD,
                 default_value="custom",
-                description="name of the simulation world that this uav instance belongs to. If standalone=true, then it launches this world using sim package.",
+                description="name of the simulation world that this payload instance belongs to. If standalone=true, then it launches this world using sim package.",
             ),
             DeclareLaunchArgument(
                 Args.LAUNCH_SIM,
