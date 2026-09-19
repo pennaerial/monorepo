@@ -1,6 +1,0 @@
-competition: 4 # 0 for in_house, 1 for iarc, 2 for custom, 3 for sae, 4 for in_house_2026 (see sim/constants.py)
-mission_stage: "base" # optional mission stage for world generation config
-                  # if empty: loads src/sim/simulations/<competition>/base.yaml
-                  # if set:   loads src/sim/simulations/<competition>/<mission_stage>.yaml
-                  #           e.g. "full_payload" loads .../sae/full_payload.yaml
-use_scoring: false
