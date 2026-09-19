@@ -39,6 +39,7 @@ class Entity(BaseModel):
     name: str
     path_to_model: str = ""
     model: str = ""
+    sdf: str | None = None
     position: tuple[float, float, float]
     rpy: tuple[float, float, float]
     world: str
@@ -98,7 +99,10 @@ class Entity(BaseModel):
 
         ent_fact = EntityFactory()
         ent_fact.name = self.name
-        ent_fact.sdf_filename = self.path_to_model
+        if self.sdf:
+            ent_fact.sdf = self.sdf
+        else:
+            ent_fact.sdf_filename = self.path_to_model
         ent_fact.pose = pose
         ent_fact.relative_to = self.world
         return ent_fact
