@@ -155,10 +155,7 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 Args.MISSION,
                 default_value="basic",
-                description=format_bullet_list(
-                    "Name of the mission to load.\n\tAvailable missions:",
-                    get_available_missions("uav"),
-                ),
+                description=f"Name of the mission to load. Run 'pennair mission uav' to see all available uav missions.",
             ),
             DeclareLaunchArgument(
                 Args.NS_ID,
@@ -168,10 +165,7 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 Args.AIRFRAME,
                 default_value="quadcopter",
-                description=format_bullet_list(
-                    "UAV airframe to load.\n\tAvailable airframes: (alias/id/model)",
-                    [str(a) for a in PX4Airframe.get_flying()],
-                ),
+                description=f"UAV airframe to load. Run 'pennair airframe ls' to see all available airframes.",
             ),
             DeclareLaunchArgument(
                 Args.WORLD,
