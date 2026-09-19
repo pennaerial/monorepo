@@ -22,7 +22,6 @@ class UAVModeManager(ModeManager):
         self,
         *,
         mission_spec: RuntimeMission,
-        debug: bool = False,
         servo_only: bool = False,
         vehicle_name: str = "uav",
         vehicle_class: AirframeClass = AirframeClass.MULTICOPTER,
@@ -59,7 +58,6 @@ class UAVModeManager(ModeManager):
         )
 
         vehicle_kwargs = {
-            "DEBUG": debug,
             "camera_offsets": camera_offsets,
             "vehicle_name": vehicle_name,
         }

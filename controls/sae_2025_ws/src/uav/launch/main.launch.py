@@ -248,7 +248,6 @@ def _single_vehicle_config(context, params: dict) -> tuple[dict, dict | None]:
         "mission_path": mission_path,
         "sim": sim,
         "auto_launch": auto_launch,
-        "debug": bool(params.get("debug", False)),
         "vision_debug": bool(params.get("vision_debug", False)),
         "save_vision_milliseconds": int(params.get("save_vision_milliseconds", 0)),
         "servo_only": bool(params.get("servo_only", False)),

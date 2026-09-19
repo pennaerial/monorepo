@@ -397,7 +397,6 @@ def _build_runtime_parameters(
     is_uav: bool,
     vehicle_name: str,
     auto_launch: bool,
-    debug: bool,
     vision_debug: bool,
     servo_only: bool,
     vehicle_class_name: str | None,
@@ -419,7 +418,6 @@ def _build_runtime_parameters(
     parameters.update(
         {
             "vehicle_name": vehicle_name,
-            "debug": bool(debug),
             "servo_only": bool(servo_only),
             "vehicle_class": vehicle_class_name,
             "camera_mount_offsets": list(camera_mount_offsets),
@@ -530,7 +528,6 @@ def launch_setup(context, *args, **kwargs):
 
     sim = _resolve_bool(config, "sim", False)
     auto_launch = _resolve_bool(config, "auto_launch", sim)
-    debug = _resolve_bool(config, "debug", False)
     vision_debug = _resolve_bool(config, "vision_debug", False)
     debug_vision_node = _resolve_bool(config, "debug_vision_node", False)
     servo_only = _resolve_bool(config, "servo_only", False)
@@ -637,7 +634,6 @@ def launch_setup(context, *args, **kwargs):
                 is_uav=is_uav,
                 vehicle_name=vehicle_name,
                 auto_launch=auto_launch,
-                debug=debug,
                 vision_debug=vision_debug,
                 servo_only=servo_only,
                 vehicle_class_name=(vehicle_class.name if vehicle_class is not None else None),

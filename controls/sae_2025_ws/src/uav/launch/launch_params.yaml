@@ -3,7 +3,6 @@ mission_name: basic
 # Vehicle namespace for mission-facing topics/services.
 # Leave blank to use the mission-target default (`uav` for UAV missions, `payload_0` for payload missions).
 vehicle_name: ""
-debug: true
 vision_debug: true
 # Automatically start the mission manager once its runtime is ready.
 # Set false to leave the mission idle until /<vehicle>/mode_manager/start_mission is called.

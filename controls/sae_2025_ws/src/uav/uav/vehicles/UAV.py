@@ -44,7 +44,6 @@ class UAV(Vehicle):
     def __init__(
         self,
         node: Node,
-        DEBUG=False,
         camera_offsets=[0, 0, 0],
         vehicle_name: str = "uav",
     ):
@@ -58,8 +57,6 @@ class UAV(Vehicle):
             camera_service_name="camera_data",
         )
         self.node = node
-        self.DEBUG = DEBUG
-        self.node.get_logger().info(f"Initializing UAV with DEBUG={DEBUG}")
 
         # Initialize necessary parameters to handle PX4 flight failures
         self.flight_check = False
@@ -514,10 +511,9 @@ class UAV(Vehicle):
         self.system_id = msg.system_id
         self.component_id = msg.component_id
         self.failsafe = self.failsafe_px4 or self.failsafe_trigger
-        if self.DEBUG:
-            self.node.get_logger().info(
-                f"Nav State: {self.nav_state}, Arm State: {self.arm_state}, Failsafe: {self.failsafe_px4}, Flight Check: {self.flight_check}"
-            )
+        self.node.get_logger().debug(
+            f"Nav State: {self.nav_state}, Arm State: {self.arm_state}, Failsafe: {self.failsafe_px4}, Flight Check: {self.flight_check}"
+        )
 
     def _attitude_callback(self, msg: VehicleAttitude):
         self.vehicle_attitude = msg

@@ -24,7 +24,6 @@ from vehicle_common.runtime.mission_spec import MissionSpec, mission_path_for_na
 
 _SHARED_DEFAULT_KEYS = {
     "auto_launch",
-    "debug",
     "vision_debug",
     "debug_vision_node",
     "force_camera",
@@ -277,7 +276,6 @@ def _vehicle_stack_configs(fleet: dict) -> tuple[dict, list[dict]]:
                 key="auto_launch",
                 default=backend_kind == "sim",
             ),
-            "debug": _resolve_bool(vehicle.get("debug", False), key="debug", default=False),
             "vision_debug": _resolve_bool(
                 vehicle.get("vision_debug", False), key="vision_debug", default=False
             ),

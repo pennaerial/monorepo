@@ -38,9 +38,6 @@ defaults:
   # If false, call `/<vehicle>/mode_manager/start_mission` manually.
   auto_launch: true
 
-  # Extra runtime logging from the mission manager and active modes.
-  debug: false
-
   # Extra logging/visualization from the vision stack.
   vision_debug: false
 
@@ -92,7 +89,6 @@ vehicles:
     # mission_path: /absolute/path/to/custom_uav_mission.yaml
 
     # Any shared knob from `defaults` can be overridden per vehicle.
-    debug: true
     camera_mount_offsets: [0.2, 0.0, 0.0]
     network_role: client
     allowed_ap_vehicles: [payload_0]

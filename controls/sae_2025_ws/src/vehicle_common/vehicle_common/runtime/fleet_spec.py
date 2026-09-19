@@ -18,7 +18,6 @@ class FleetDefaultsModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     auto_launch: bool | None = None
-    debug: bool | None = None
     vision_debug: bool | None = None
     debug_vision_node: bool | None = None
     force_camera: bool | None = None
