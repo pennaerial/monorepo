@@ -341,12 +341,14 @@ decorator registered the class.
 Committing Your Changes
 -----------------------
 
-To save your progress locally, commit your changes to the branch you created at the start of this tutorial.
+To save your progress locally, stage and commit your changes to the branch you created at the start of this tutorial.
 
 .. code-block:: bash
     :caption: Bash
 
-    git commit -m "<Descriptive message about your changes>"
+    # from monorepo/controls/sae_2025_ws
+    git add src/uav/uav/modes/fly_to_point_mode.py
+    git commit -m "created first mode"
 
 Next Step
 ---------
