@@ -1,7 +1,5 @@
 #include "pennair_vision/vision_manager.hpp"
 
-#include <chrono>
-#include <memory>
 #include <string>
 
 #include "std_msgs/msg/string.hpp"
@@ -11,16 +9,15 @@ using namespace std::chrono_literals;
 namespace pennair_vision
 {
 
-VisionManager::VisionManager() : Node("vision_manager"), count_(0)
+VisionManager::VisionManager(rclcpp::Node::SharedPtr node)
+    : node_(node), plugin_loader_("pennair_vision", "pennair_vision::VisionPlugin")
 {
-  publisher_ = this->create_publisher<std_msgs::msg::String>("topic", 10);
-  auto timer_callback = [this]() -> void {
-    auto message = std_msgs::msg::String();
-    message.data = "Hello, world! " + std::to_string(this->count_++);
-    RCLCPP_INFO(this->get_logger(), "Publishing: '%s'", message.data.c_str());
-    this->publisher_->publish(message);
-  };
-  timer_ = this->create_wall_timer(500ms, timer_callback);
+}
+
+void VisionManager::init_plugins()
+{
+  plugin_instance_ = plugin_loader_.createUniqueInstance("pennair_vision::BasicVision");
+  plugin_instance_->initialize(node_);
 }
 
 }  // namespace pennair_vision

@@ -1,22 +1,29 @@
 #pragma once
 
+#include <pluginlib/class_loader.hpp>
 #include <rclcpp/node.hpp>
 #include <rclcpp/rclcpp.hpp>
 
-#include "std_msgs/msg/string.hpp"
+#include "pennair_vision/vision_plugin.hpp"
 
 namespace pennair_vision
 {
 
-class VisionManager : public rclcpp::Node
+class VisionManager
 {
 public:
-  VisionManager();
+  VisionManager(rclcpp::Node::SharedPtr node);
+
+  /// Creates plugins specified at startup from ROS params
+  void init_plugins();
 
 private:
-  rclcpp::TimerBase::SharedPtr timer_;
-  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr publisher_;
-  size_t count_;
+  /// ROS node ptr
+  rclcpp::Node::SharedPtr node_;
+  /// ClassLoader for dynamically creating VisionPlugins
+  pluginlib::ClassLoader<VisionPlugin> plugin_loader_;
+  /// VisionPlugin instance; TODO: make this to dynamically updating map of plugins
+  pluginlib::UniquePtr<VisionPlugin> plugin_instance_;
 };
 
 }  // namespace pennair_vision

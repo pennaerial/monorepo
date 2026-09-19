@@ -2,21 +2,20 @@ import logging
 from enum import StrEnum
 from pathlib import Path
 
-from launch import LaunchDescription, Action
-from launch_ros.actions import Node
+from launch import Action, LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
-    OpaqueFunction,
     ExecuteProcess,
+    OpaqueFunction,
 )
-
-from sim.utils import get_available_worlds
+from launch_ros.actions import Node
 from sim.simulation_params import SimulationParams
-from vehicle_common.env import require_env, prepend_env_path
+from sim.utils import get_available_worlds
+from vehicle_common.env import prepend_env_path, require_env
 from vehicle_common.launch_utils import (
+    format_bullet_list,
     get_logger,
     is_truthy,
-    format_bullet_list,
 )
 
 logger = get_logger("sim.launch")
@@ -93,6 +92,16 @@ def launch_setup(context) -> list[Action]:
     )
 
     actions.append(gz_sim)
+
+    # Simulation time is shared by every ROS node using use_sim_time = True
+    clock_bridge = Node(
+        package="ros_gz_bridge",
+        executable="parameter_bridge",
+        arguments=["/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock"],
+        output="screen",
+        name="clock_bridge",
+    )
+    actions.append(clock_bridge)
     logger.info(f"Launching world: {world}")
     try:
         simulation_params = SimulationParams.load_from_stage(world, stage)

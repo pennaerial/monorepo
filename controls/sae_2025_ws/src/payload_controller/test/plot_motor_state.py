@@ -12,12 +12,10 @@ import time
 from collections import deque
 
 import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
-
 import rclpy
-from rclpy.node import Node
-
+from matplotlib.animation import FuncAnimation
 from payload_interfaces.msg import MotorState
+from rclpy.node import Node
 
 
 class MotorStatePlotter(Node):
