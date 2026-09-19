@@ -15,29 +15,6 @@ from typing import Any, Dict, Optional, Union
 import yaml
 
 
-def load_sim_launch_parameters() -> dict:
-    """Load simulation launch parameters from YAML (sim/launch/launch_params.yaml)."""
-    source_paths = [
-        Path(__file__).parent.parent / "launch" / "launch_params.yaml",
-        Path(os.getcwd()) / "src" / "sim" / "launch" / "launch_params.yaml",
-    ]
-    for path in source_paths:
-        if path.exists():
-            return load_yaml_to_dict(path)
-    try:
-        from ament_index_python.packages import get_package_share_directory
-
-        package_share = Path(get_package_share_directory("sim"))
-        installed_params = package_share / "launch" / "launch_params.yaml"
-        if installed_params.exists():
-            return load_yaml_to_dict(installed_params)
-    except Exception:
-        pass
-    raise FileNotFoundError(
-        f"Launch params file not found. Checked: {source_paths} and installed location."
-    )
-
-
 def load_yaml_to_dict(params_file: Path) -> dict:
     """Load and validate YAML file."""
     try:
@@ -261,58 +238,6 @@ def find_package_resource(
         f"Checked source paths: {source_paths} and installed location."
     )
 
-
-def template_world_reference_candidates(
-    template_world_path: Union[str, Path],
-) -> list[Path]:
-    template_path = Path(template_world_path).expanduser()
-    if template_path.is_absolute():
-        return [template_path]
-
-    if len(template_path.parts) != 1:
-        raise ValueError(
-            "template_world must be a bare filename like 'template.sdf' or an absolute path."
-        )
-
-    return [Path("worlds") / template_path.name]
-
-
-def copy_models_to_gazebo(src_models_dir: Path, dst_models_dir: Path) -> None:
-    """
-    Copy model files from source to Gazebo models directory.
-
-    Args:
-        src_models_dir: Source models directory
-        dst_models_dir: Destination models directory (Gazebo models path)
-
-    Raises:
-        OSError: If copy operations fail
-    """
-    if not src_models_dir.exists():
-        raise FileNotFoundError(f"Source models directory does not exist: {src_models_dir}")
-
-    if not src_models_dir.is_dir():
-        raise ValueError(f"Source path is not a directory: {src_models_dir}")
-
-    # Create destination directory if it doesn't exist
-    try:
-        dst_models_dir.mkdir(parents=True, exist_ok=True)
-    except OSError as e:
-        raise OSError(f"Failed to create destination directory {dst_models_dir}: {e}")
-
-    # Copy all content from src_models_dir to dst_models_dir, merging contents
-    try:
-        for item in src_models_dir.iterdir():
-            src_item = src_models_dir / item.name
-            dst_item = dst_models_dir / item.name
-
-            if src_item.is_dir():
-                # Copytree with dirs_exist_ok=True to allow merging/updating
-                shutil.copytree(src_item, dst_item, dirs_exist_ok=True)
-            elif src_item.is_file():
-                shutil.copy2(src_item, dst_item)
-    except (OSError, shutil.Error) as e:
-        raise OSError(f"Failed to copy models from {src_models_dir} to {dst_models_dir}: {e}")
 
 
 def camel_to_snake(name: str) -> str:
