@@ -150,6 +150,9 @@ Missions are installed into the package share directory, so build the workspace 
     colcon build --packages-select uav
     source install/setup.bash
 
+Before launching the mission, **start QGroundControl**. PX4 requires an active ground station connection to pass its
+preflight checks and arm the UAV.
+
 Then launch SITL with your mission selected by name, making sure to replace ``<mission-name>`` with the name of your mission file:
 
 .. code-block:: bash
@@ -160,12 +163,14 @@ Then launch SITL with your mission selected by name, making sure to replace ``<m
 Committing Your Changes
 -----------------------
 
-To save your progress locally, commit your changes to the branch you created at the start of this tutorial.
+To save your progress locally, stage and commit your changes to the branch you created at the start of this tutorial.
 
 .. code-block:: bash
     :caption: Bash
 
-    git commit -m "<Descriptive message about your changes>"
+    # from monorepo/controls/sae_2025_ws
+    git add src/uav/uav/missions/<mission-name>
+    git commit -m "created first mission"
 
 Congrats, You Did It!
 `````````````````````
@@ -178,5 +183,6 @@ Feel free to save your local progress on the branch you created, or delete it wi
 
 .. code-block:: bash
     :caption: Bash
-
+    
+    git checkout main
     git branch -d user/<github-username>/tutorial
