@@ -1,18 +1,19 @@
-// The dioxus prelude contains a ton of common items used in dioxus apps. It's a good idea to import wherever you
-// need dioxus
-use dioxus::prelude::*;
-
-use components::Hero;
-use views::{Blog, Home, Navbar};
-
 /// Define a components module that contains all shared components for our app.
 mod components;
+mod ros;
 /// Define a views module that contains the UI for all Layouts and Routes for our app.
 mod views;
 
+// The dioxus prelude contains a ton of common items used in dioxus apps. It's a good idea to import wherever you need dioxus
+use dioxus::prelude::*;
+
+// use components::Hero;
+use ros::foxglove_client::FoxgloveClient;
+use views::{Blog, Home, Navbar};
+
 /// The Route enum is used to define the structure of internal routes in our app. All route enums need to derive
 /// the [`Routable`] trait, which provides the necessary methods for the router to work.
-/// 
+///
 /// Each variant represents a different URL pattern that can be matched by the router. If that pattern is matched,
 /// the components for that route will be rendered.
 #[derive(Debug, Clone, Routable, PartialEq)]
@@ -46,12 +47,23 @@ fn main() {
     dioxus::launch(App);
 }
 
+async fn run_client() {
+    let mut client = FoxgloveClient::new();
+    match client.connect("ws://localhost:8765").await {
+        Ok(()) => (),
+        Err(error) => eprintln!("connection failed! {error}"),
+    }
+}
+
 /// App is the main component of our app. Components are the building blocks of dioxus apps. Each component is a function
 /// that takes some props and returns an Element. In this case, App takes no props because it is the root of our app.
 ///
 /// Components should be annotated with `#[component]` to support props, better error messages, and autocomplete
 #[component]
 fn App() -> Element {
+    println!("Hello from PennAiR!");
+    use_future(run_client);
+
     // The `rsx!` macro lets us define HTML inside of rust. It expands to an Element with all of our HTML inside.
     rsx! {
         // In addition to element and text (which we will see later), rsx can contain other components. In this case,

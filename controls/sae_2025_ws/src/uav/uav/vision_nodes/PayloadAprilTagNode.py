@@ -8,19 +8,19 @@ import rclpy
 from cv_bridge import CvBridge
 from rclpy.executors import ExternalShutdownException
 from sensor_msgs.msg import CameraInfo, CompressedImage
-
+from uav_interfaces.srv import PayloadAprilTagState
 from vehicle_common.base import VisionNode
+
 from uav.vision_nodes.payload_perception_common import (
-    AprilTagDetectorCache,
     DEFAULT_TAG_FAMILY,
+    AprilTagDetectorCache,
     AprilTagObservation,
-    detect_payload_apriltags,
-    solve_payload_apriltags,
     _iter_detections,
     _object_points_for_tag_size,
     camera_model_from_info,
+    detect_payload_apriltags,
+    solve_payload_apriltags,
 )
-from uav_interfaces.srv import PayloadAprilTagState
 
 
 class PayloadAprilTagNode(VisionNode):

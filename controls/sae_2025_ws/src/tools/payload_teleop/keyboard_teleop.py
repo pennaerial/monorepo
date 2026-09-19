@@ -1,13 +1,12 @@
-import threading
 import sys
+import termios
+import threading
+import tty
 from select import select
 
-import tty
-import termios
-
 import rclpy
-from rclpy.node import Node
 from payload_interfaces.msg import DriveCommand, ServoCommand
+from rclpy.node import Node
 
 
 def get_key(settings, timeout):

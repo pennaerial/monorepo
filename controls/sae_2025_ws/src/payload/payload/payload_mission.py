@@ -3,9 +3,9 @@ from __future__ import annotations
 import rclpy
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
+from vehicle_common.runtime.mission_loader import RuntimeMission, get_mission_path
 
 from .PayloadModeManager import PayloadModeManager
-from vehicle_common.runtime.mission_loader import RuntimeMission, get_mission_path
 
 
 class PayloadMissionBootstrap(Node):

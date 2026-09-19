@@ -1,21 +1,21 @@
+import logging
 from enum import StrEnum
 from pathlib import Path
 
-from launch import LaunchDescription, Action
-from launch_ros.actions import Node
+from launch import Action, LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
-    OpaqueFunction,
     ExecuteProcess,
+    OpaqueFunction,
 )
-
-from sim.utils import get_available_worlds
+from launch_ros.actions import Node
 from sim.simulation_params import SimulationParams
-from vehicle_common.env import require_env, prepend_env_path
+from sim.utils import get_available_worlds
+from vehicle_common.env import prepend_env_path, require_env
 from vehicle_common.launch_utils import (
+    format_bullet_list,
     get_logger,
     is_truthy,
-    format_bullet_list,
 )
 
 logger = get_logger("sim.launch")
@@ -48,6 +48,7 @@ class Args(StrEnum):
     WORLD = "world"
     STAGE = "stage"
     HEADLESS = "headless"
+    DEBUG = "debug"
 
 
 def gz_sim_command(world: str, headless: bool) -> list[str]:
@@ -64,6 +65,9 @@ def launch_setup(context) -> list[Action]:
     headless: bool = is_truthy(config[Args.HEADLESS])
     world: str = config[Args.WORLD]
     stage: str = config[Args.STAGE]
+    debug: str = config[Args.DEBUG]
+
+    logger = get_logger("sim.launch", logging.DEBUG if is_truthy(debug) else logging.INFO)
 
     gz_env = {
         "GZ_SIM_RESOURCE_PATH": GZ_SIM_RESOURCE_PATH,
@@ -166,6 +170,12 @@ def generate_launch_description():
                 Args.HEADLESS,
                 default_value="false",
                 description="If true, runs gz server in headless mode (no GUI)",
+                choices=["true", "false", "t", "f", "0", "1"],
+            ),
+            DeclareLaunchArgument(
+                Args.DEBUG,
+                default_value="false",
+                description="If true, sets the launch logger's log level to DEBUG.",
                 choices=["true", "false", "t", "f", "0", "1"],
             ),
             OpaqueFunction(function=launch_setup),

@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 from time import time
 
-from payload.payload import Payload
 from vehicle_common.mode_manager import ModeManager
 from vehicle_common.runtime.mission_loader import RuntimeMission
 from vehicle_common.runtime.vision_loader import canonical_vision_node_path
+
+from payload.payload import Payload
 
 
 class PayloadModeManager(ModeManager):
@@ -37,7 +38,6 @@ class PayloadModeManager(ModeManager):
 
         self.vehicle = Payload(self, str(vehicle_name))
         self.setup_vision([canonical_vision_node_path(vc) for vc in mission_spec._vision_nodes])
-        self.configure_peer_vehicle_names(mission_spec._peer_vehicle_names)
         self.setup_modes(mission_spec)
         self.timer = None
 
@@ -45,7 +45,7 @@ class PayloadModeManager(ModeManager):
         current_time = time()
         if self.active_mode is None:
             self.switch_mode("start")
-        self._run_active_mode(current_time)
+        self.run_active_mode(current_time)
 
     def _auto_launch_ready(self) -> bool:
         if self.vehicle is None:

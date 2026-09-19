@@ -2,15 +2,15 @@ from time import time
 
 from px4_msgs.msg import VehicleStatus
 from std_srvs.srv import Trigger
-
-from uav.vehicles.VTOL import VTOL
-from uav.vehicles.Multicopter import Multicopter
-from uav.vehicles.AirframeClass import AirframeClass
-from uav.vehicles.UAV import UAV
-from uav.modes.LandingMode import LandingMode
 from vehicle_common.mode_manager import ModeManager
 from vehicle_common.runtime.mission_loader import RuntimeMission
 from vehicle_common.runtime.vision_loader import canonical_vision_node_path
+
+from uav.modes.LandingMode import LandingMode
+from uav.vehicles.AirframeClass import AirframeClass
+from uav.vehicles.Multicopter import Multicopter
+from uav.vehicles.UAV import UAV
+from uav.vehicles.VTOL import VTOL
 
 
 class UAVModeManager(ModeManager):
