@@ -116,6 +116,8 @@ def test_entity_factory_uses_urdf_path(tmp_path: Path):
         world="world",
     )
 
+    assert entity.sdf is None
+    assert entity.to_entity_factory_msg().sdf == ""
     assert entity.to_entity_factory_msg().sdf_filename == str(urdf_path)
 
 
@@ -155,3 +157,22 @@ def test_entity_rejects_unknown_model(models_path: Path):
             rpy=(0.0, 0.0, 0.0),
             world="world",
         )
+
+
+@pytest.mark.parametrize("sdf", [None, "", '<sdf version="1.9"><model name="test"/></sdf>'])
+def test_entity_factory_sdf_or_filename_behavior(tmp_path: Path, sdf: str | None):
+    model = tmp_path / "model.sdf"
+    model.touch()
+    entity = Entity(
+        name="test",
+        path_to_model=str(model),
+        sdf=sdf,
+        position=(0, 0, 0),
+        rpy=(0, 0, 0),
+        world="world",
+    )
+
+    msg = entity.to_entity_factory_msg()
+    assert entity.sdf == sdf
+    assert msg.sdf == (sdf or "")
+    assert msg.sdf_filename == ("" if sdf else str(model))

@@ -1,0 +1,4 @@
+# Keep the payload stationary indefinitely.
+modes:
+  start:
+    mode: payload.PayloadIdleMode
