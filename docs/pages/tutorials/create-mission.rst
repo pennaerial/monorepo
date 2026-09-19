@@ -11,11 +11,12 @@ Creating A Mission
 Before You Begin
 ````````````````````
 
-This tutorial assumes that you have already cloned monorepo, are checked out to its most up-to-date main
-branch, and have built the ROS workspace. If you have not, follow the :doc:`Ubuntu installation guide <../installation/ubuntu>` first.
+This tutorial continues from :doc:`Creating Your First Mode <create-first-mode>`. Stay on the
+``user/<github-username>/tutorial`` branch you created there because it contains your new
+``uav.FlyToPointMode``. If you have not completed that tutorial, follow it first.
 
-This tutorial also assumes that you have already created a mode with the previous tutorial.
-If you have not, follow the :doc:`Creating Your First Mode <create-first-mode>` tutorial first.
+This tutorial also assumes that you have installed the monorepo and built the ROS workspace. If you have not,
+follow the :doc:`Ubuntu installation guide <../installation/ubuntu>` first.
 
 You should also be familiar with the following concepts:
 
@@ -56,10 +57,11 @@ mission that takes off, flies to a waypoint, and then lands:
 
 .. note::
 
-    The coordinates parameter for uav.NavGPSMode is a list of waypoints, 
-    where each waypoint is a 3-D tuple of either (x, y, z) or (lat, lon, alt) coordinates depending on the frame,
-    a wait time in seconds, and a frame type of either LOCAL or GPS.
-    In this case, the UAV will fly to the point (5, 0, -5) with a waittime of 1 second in the LOCAL frame.
+    The ``coordinates`` parameter for ``uav.NavGPSMode`` is a list of waypoints. Each waypoint has the form
+    ``[coordinates, wait_seconds, frame]``, where ``coordinates`` is either ``[x, y, z]`` or ``[lat, lon, alt]``.
+    ``LOCAL`` uses PX4's local NED frame in meters: X is north, Y is east, and Z is down.
+    Coordinates are relative to PX4's local position origin, so negative Z values are above the origin.
+    In this case, the UAV will fly to the point (5, 0, -5) with a wait time of 1 second in the LOCAL frame.
 
 The keys nested directly under ``modes:`` are **state names**: ``start``, ``GPS``, and ``land``. These are just labels
 chosen for the mission. There is no requirement that the state named ``GPS`` has to run a mode with "GPS" in its name.
@@ -81,8 +83,10 @@ it is good to keep them organized in a logically clear manner.
 Read the transitions as ``label: target``. For example, ``GPS`` has ``complete: land``, which means that when this mode reports ``complete``,
 the program should go to the state named ``land``. Note that the target is a **state name in this file**, not an actual mode id.
 
-The manager checks for three reserved strings via ``check_status()`` before it ever looks at your ``transitions:`` block,
-so you cannot use them as labels for your transitions, read more at :doc:`Modes <../concepts/modes>`.
+The manager treats three ``check_status()`` results specially: ``continue`` keeps the current mode running,
+``terminate`` ends the mission, and ``error`` invokes failure handling. Any other result is treated as a custom
+transition label and looked up in ``transitions:``, so do not use the three reserved strings as transition labels.
+See :doc:`Modes <../concepts/modes>` for more detail.
 
 .. note::
 
@@ -146,6 +150,9 @@ Missions are installed into the package share directory, so build the workspace 
     colcon build --packages-select uav
     source install/setup.bash
 
+Before launching the mission, **start QGroundControl**. PX4 requires an active ground station connection to pass its
+preflight checks and arm the UAV.
+
 Then launch SITL with your mission selected by name, making sure to replace ``<mission-name>`` with the name of your mission file:
 
 .. code-block:: bash
@@ -156,23 +163,23 @@ Then launch SITL with your mission selected by name, making sure to replace ``<m
 Committing Your Changes
 -----------------------
 
-To save your progress locally, commit your changes to the branch you created at the start of this tutorial.
+To save your progress locally, stage and commit your changes to the branch you created at the start of this tutorial.
 
 .. code-block:: bash
     :caption: Bash
 
-    git commit -m "<Descriptive message about your changes>"
+    # from monorepo/controls/sae_2025_ws
+    git add src/uav/uav/missions/<mission-name>.yaml
+    git commit -m "created first mission"
 
 Congrats, You Did It!
 `````````````````````
 
 You successfully created an entire mode, incorporated it into a mission, and flew it in sim!
 
-You are on your way to being able to contribute to production code!
-
-Feel free to save your local progress on the branch you created, or delete it with the command below.
+Your tutorial work is saved on its own branch. When you are finished, return to ``main``:
 
 .. code-block:: bash
     :caption: Bash
 
-    git branch -d user/<github-username>/tutorial
+    git checkout main
