@@ -55,6 +55,9 @@ class MissionCommand(CommandExtension):
             try:
                 missions = get_available_missions(args.package)
             except ValueError: # invalid name
+                print(f"{args.package}: invalid name")
+                return
+            except PackageNotFoundError: # not a package
                 print(f"{args.package}: package not found")
                 return
             if missions:
