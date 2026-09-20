@@ -128,6 +128,7 @@ def launch_setup(context) -> list[Action]:
             }
         ],
         output="screen",
+        arguments=["--ros-args", "--log-level", "debug" if is_truthy(debug) else "info"],
     )
 
     middleware = ExecuteProcess(
