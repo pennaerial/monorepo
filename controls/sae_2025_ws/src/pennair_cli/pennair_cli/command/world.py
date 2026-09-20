@@ -5,8 +5,10 @@ from vehicle_common.env import require_env
 
 from sim.utils import get_available_worlds
 from pennair_cli.extension import CommandExtension
+
 PENNAIR_GZ_MODELS_PATH = require_env("PENNAIR_GZ_MODELS_PATH")
 GZ_WORLDS_PATH = Path(PENNAIR_GZ_MODELS_PATH) / "worlds"
+
 
 class WorldCommand(CommandExtension):
     """Prints out available worlds."""

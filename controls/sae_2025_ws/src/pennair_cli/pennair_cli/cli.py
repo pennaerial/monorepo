@@ -4,8 +4,16 @@ from importlib import import_module
 COMMANDS = {
     "airframe": (".command.airframe", "AirframeCommand", "Prints out available UAV airframes."),
     "greeting": (".command.greeting", "GreetingCommand", "Prints a greeting."),
-    "mission": (".command.mission", "MissionCommand", "Prints out general information about all missions."),
-    "mode": (".command.mode", "ModeCommand", "Prints out general information about all registered modes."),
+    "mission": (
+        ".command.mission",
+        "MissionCommand",
+        "Prints out general information about all missions.",
+    ),
+    "mode": (
+        ".command.mode",
+        "ModeCommand",
+        "Prints out general information about all registered modes.",
+    ),
     "world": (".command.world", "WorldCommand", "Prints out available worlds."),
 }
 
@@ -24,7 +32,7 @@ def main() -> None:
         dest="command",
         required=False,
     )
-    command_parsers = {} # store the command parsers so we can add arguments to them later
+    command_parsers = {}  # store the command parsers so we can add arguments to them later
     for name, (_, _, description) in COMMANDS.items():
         command_parser = subparsers.add_parser(
             name,
