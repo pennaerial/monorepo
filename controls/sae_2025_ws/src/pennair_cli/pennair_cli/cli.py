@@ -41,6 +41,7 @@ def main() -> None:
         parser.print_help()
         return
 
+    # Load and configure only the selected command to avoid importing unused extensions.
     module_name, class_name, _ = COMMANDS[preliminary_args.command]
     extension_module = import_module(module_name, package=__package__)
     extension = getattr(extension_module, class_name)()
