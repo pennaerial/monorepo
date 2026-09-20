@@ -14,7 +14,6 @@ from vehicle_common.env import require_env
 from vehicle_common.launch_utils import (
     LaunchError,
     check_unknown_launch_args,
-    format_bullet_list,
     get_logger,
     include_launch,
     is_truthy,
@@ -155,7 +154,7 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 Args.MISSION,
                 default_value="basic",
-                description=f"Name of the mission to load. Run 'pennair mission uav' to see all available uav missions.",
+                description="Name of the mission to load. Run 'pennair mission uav' to see all available uav missions.",
             ),
             DeclareLaunchArgument(
                 Args.NS_ID,
@@ -165,7 +164,7 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 Args.AIRFRAME,
                 default_value="quadcopter",
-                description=f"UAV airframe to load. Run 'pennair airframe ls' to see all available airframes.",
+                description="UAV airframe to load. Run 'pennair airframe ls' to see all available airframes.",
             ),
             DeclareLaunchArgument(
                 Args.WORLD,

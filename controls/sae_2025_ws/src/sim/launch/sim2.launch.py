@@ -9,10 +9,8 @@ from launch.actions import (
 )
 from launch_ros.actions import Node
 from sim.simulation_params import SimulationParams
-from sim.utils import get_available_worlds
 from vehicle_common.env import prepend_env_path, require_env
 from vehicle_common.launch_utils import (
-    format_bullet_list,
     get_logger,
     is_truthy,
 )
