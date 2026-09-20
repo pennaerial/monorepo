@@ -1,3 +1,4 @@
+import logging
 from enum import StrEnum
 from pathlib import Path
 
@@ -45,6 +46,7 @@ class Args(StrEnum):
     WORLD = "world"
     STAGE = "stage"
     HEADLESS = "headless"
+    DEBUG = "debug"
 
 
 def gz_sim_command(world: str, headless: bool) -> list[str]:
@@ -61,6 +63,9 @@ def launch_setup(context) -> list[Action]:
     headless: bool = is_truthy(config[Args.HEADLESS])
     world: str = config[Args.WORLD]
     stage: str = config[Args.STAGE]
+    debug: str = config[Args.DEBUG]
+
+    logger = get_logger("sim.launch", logging.DEBUG if is_truthy(debug) else logging.INFO)
 
     gz_env = {
         "GZ_SIM_RESOURCE_PATH": GZ_SIM_RESOURCE_PATH,
@@ -160,6 +165,12 @@ def generate_launch_description():
                 Args.HEADLESS,
                 default_value="false",
                 description="If true, runs gz server in headless mode (no GUI)",
+                choices=["true", "false", "t", "f", "0", "1"],
+            ),
+            DeclareLaunchArgument(
+                Args.DEBUG,
+                default_value="false",
+                description="If true, sets the launch logger's log level to DEBUG.",
                 choices=["true", "false", "t", "f", "0", "1"],
             ),
             OpaqueFunction(function=launch_setup),
