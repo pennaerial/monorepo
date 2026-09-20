@@ -1,8 +1,9 @@
 from argparse import ArgumentParser
 from pathlib import Path
 from typing import override
-from sim.utils import get_available_worlds
+
 from pennair_cli.extension import CommandExtension
+from sim.utils import get_available_worlds
 from vehicle_common.env import require_env
 
 PENNAIR_GZ_MODELS_PATH = require_env("PENNAIR_GZ_MODELS_PATH")
