@@ -25,8 +25,8 @@ void VisionManager::init_plugins()
   // TODO: add better error handling for plugins that don't exist or fail to initialize
   auto initialize_plugin = [this](const std::string& plugin_name) {
     try {
-      plugin_map_[plugin_name] = plugin_loader_.createUniqueInstance(plugin_name);
-      plugin_map_[plugin_name]->initialize(node_);
+      plugin_map_[plugin_name].plugin_instance_ = plugin_loader_.createUniqueInstance(plugin_name);
+      plugin_map_[plugin_name].plugin_instance_->initialize(node_);
     } catch (const pluginlib::PluginlibException& ex) {
       RCLCPP_ERROR(node_->get_logger(), "Failed to create plugin: %s", ex.what());
     }
