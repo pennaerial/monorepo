@@ -9,6 +9,8 @@ use dioxus::prelude::*;
 
 // use components::Hero;
 use ros::foxglove_client::FoxgloveClient;
+use ros_interfaces::std_msgs;
+
 use views::{Blog, Home, Navbar};
 
 /// The Route enum is used to define the structure of internal routes in our app. All route enums need to derive
@@ -49,6 +51,8 @@ fn main() {
 
 async fn run_client() {
     let mut client = FoxgloveClient::new();
+    let string = std_msgs::msg::String { data: String::from("Hello") };
+    println!("std_msgs::msg::String: {}", string.data);
     match client.connect("ws://localhost:8765").await {
         Ok(()) => (),
         Err(error) => eprintln!("connection failed! {error}"),
