@@ -268,9 +268,7 @@ def _render_raw_struct(message):
         f"pub struct {name} {{",
     ]
     for member in structure.members:
-        lines.append(
-            f"    pub {get_rs_name(member.name)}: {_raw_rs_type(member.type)},"
-        )
+        lines.append(f"    pub {get_rs_name(member.name)}: {_raw_rs_type(member.type)},")
     lines.append("}")
     if message.constants:
         lines.extend(["", f"impl {name} {{"])
@@ -332,7 +330,11 @@ def _write_raw_crate(messages, crate_name, output_dir, package_version):
 
 
 def generate_rs(
-    package=None, idl_root=DEFAULT_IDL_ROOT, output_dir=DEFAULT_OUTPUT_DIR, package_version="0.0.0", idl_files=None,
+    package=None,
+    idl_root=DEFAULT_IDL_ROOT,
+    output_dir=DEFAULT_OUTPUT_DIR,
+    package_version="0.0.0",
+    idl_files=None,
     crate_name="ros_interfaces",
 ):
     """Generate one Serde-based crate from one or more ROS IDL packages.
@@ -348,16 +350,18 @@ def generate_rs(
     packages = [package] if isinstance(package, str) else list(package or [])
     if not packages:
         packages = [
-            path.name for path in idl_root.iterdir()
-            if path.is_dir() and any(path.rglob("*.idl"))
+            path.name for path in idl_root.iterdir() if path.is_dir() and any(path.rglob("*.idl"))
         ]
     packages = sorted(set(packages))
     if not packages:
         raise ValueError(f"No ROS interface packages containing IDL files found under {idl_root}")
     if idl_files is not None and len(packages) != 1:
         raise ValueError("--idl requires exactly one input package")
-    if (not crate_name or not crate_name.isascii()
-            or not crate_name.replace("-", "_").isidentifier()):
+    if (
+        not crate_name
+        or not crate_name.isascii()
+        or not crate_name.replace("-", "_").isidentifier()
+    ):
         raise ValueError(f"Invalid Rust crate name: {crate_name!r}")
 
     messages = {}
@@ -369,7 +373,8 @@ def generate_rs(
             raise ValueError(f"IDL package directory not found: {package_root}")
         paths = (
             sorted(path.relative_to(package_root) for path in package_root.rglob("*.idl"))
-            if idl_files is None else [pathlib.Path(path) for path in idl_files]
+            if idl_files is None
+            else [pathlib.Path(path) for path in idl_files]
         )
         if not paths:
             raise ValueError(f"No IDL files found for package {package!r}")
@@ -640,11 +645,13 @@ def main(argv=None):
         description="Generate one Serde-based Rust crate from ROS IDL packages."
     )
     parser.add_argument(
-        "package", nargs="*",
-        help="Optional package subset; default: all packages containing IDLs under --idl-root."
+        "package",
+        nargs="*",
+        help="Optional package subset; default: all packages containing IDLs under --idl-root.",
     )
     parser.add_argument(
-        "--crate-name", default="ros_interfaces",
+        "--crate-name",
+        default="ros_interfaces",
         help="Generated crate name (default: ros_interfaces).",
     )
     parser.add_argument(

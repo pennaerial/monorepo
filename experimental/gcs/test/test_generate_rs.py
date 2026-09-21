@@ -1,11 +1,12 @@
 """Regression tests; run in the ROS Python environment with Cargo available.
 
-    python3 -m unittest discover -s experimental/gcs/test -p test_generate_rs.py
+python3 -m unittest discover -s experimental/gcs/test -p test_generate_rs.py
 """
+
 import pathlib
 import shutil
-import sys
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -59,9 +60,14 @@ class NamespaceTests(unittest.TestCase):
             shutil.copytree(idl_root, script_dir / "idl")
             elsewhere = root / "elsewhere"
             elsewhere.mkdir()
-            subprocess.run([
-                sys.executable, str(script),
-            ], cwd=elsewhere, check=True)
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(script),
+                ],
+                cwd=elsewhere,
+                check=True,
+            )
             default_crate = script_dir / "crates/ros_interfaces"
             self.assertTrue((default_crate / "Cargo.toml").is_file())
             self.assertTrue((default_crate / "src/lib.rs").is_file())
@@ -71,9 +77,14 @@ class NamespaceTests(unittest.TestCase):
             # Empty non-package directories are ignored during discovery.
             (idl_root / "notes").mkdir()
             output = root / "generated"
-            generate_rs.main([
-                "--idl-root", str(idl_root), "--output-dir", str(output),
-            ])
+            generate_rs.main(
+                [
+                    "--idl-root",
+                    str(idl_root),
+                    "--output-dir",
+                    str(output),
+                ]
+            )
             crate = output
             source = (crate / "src/lib.rs").read_text()
             self.assertEqual(source, (default_crate / "src/lib.rs").read_text())
@@ -112,13 +123,22 @@ class NamespaceTests(unittest.TestCase):
                     assert_eq!(std_msgs::msg::Int32 { data: 42 }.data, 42);
                 }
             """)
-            subprocess.run([
-                "cargo", "test", "--offline", "--manifest-path", str(crate / "Cargo.toml"),
-            ], check=True)
+            subprocess.run(
+                [
+                    "cargo",
+                    "test",
+                    "--offline",
+                    "--manifest-path",
+                    str(crate / "Cargo.toml"),
+                ],
+                check=True,
+            )
 
             # A single selected message still discovers shared dependencies.
             generate_rs.generate_rs(
-                "sensor_msgs", idl_root, output,
+                "sensor_msgs",
+                idl_root,
+                output,
                 idl_files=["msg/Image.idl", "msg/Image.idl"],
             )
             source = (crate / "src/lib.rs").read_text()
@@ -126,7 +146,9 @@ class NamespaceTests(unittest.TestCase):
                 self.assertEqual(source.count(f"pub struct {name} {{"), 1)
             with self.assertRaisesRegex(ValueError, "exactly one input package"):
                 generate_rs.generate_rs(
-                    ["std_msgs", "sensor_msgs"], idl_root, output,
+                    ["std_msgs", "sensor_msgs"],
+                    idl_root,
+                    output,
                     idl_files=["msg/Image.idl"],
                 )
 
