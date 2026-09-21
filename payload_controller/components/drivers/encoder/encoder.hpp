@@ -22,24 +22,24 @@ public:
   /// Starts the encoder. It should immediately start writing encoder messages to internal buffer
   virtual void start() = 0;
   /// Writes a new incoming encoder reading to
-//   [-]void write_latest(const sensor_msgs_msg_encoder& msg);
+  //   [-]void write_latest(const sensor_msgs_msg_encoder& msg);
   /// returns the latest Encoder reading
-  
-//   [-]sensor_msgs_msg_encoder get_latest();
+
+  //   [-]sensor_msgs_msg_encoder get_latest();
 
   /// Gets singleton instance of encoder implementation (sitl, hardware). implemented in backend .cpp
   /// files, not encoder.cpp
   static Encoder* instance();
 
-    /**
-   * @brief Publishes the desired right motor velocity 
+  /**
+   * @brief Publishes the desired right motor velocity
    *
    * @param rad_s Desired velocity
    */
   virtual void publish_motor_right(double rad_s) = 0;
 
   /**
-   * @brief Publishes the desired left motor velocity 
+   * @brief Publishes the desired left motor velocity
    *
    * @param rad_s Desired velocity
    */
@@ -49,7 +49,7 @@ protected:
   Encoder() = default;  // prevent public instantiation
 
 private:
-//   [-]sensor_msgs_msg_encoder reading_;
+  //   [-]sensor_msgs_msg_encoder reading_;
   util::StaticMutex mtx_;
 
 

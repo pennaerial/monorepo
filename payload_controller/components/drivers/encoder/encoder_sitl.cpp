@@ -21,7 +21,7 @@ void Encoder_SITL::start()
   make_encoder_topic(topic, sizeof(topic));
 
   char poster_right[128];
-    make_motor_advertiser_right(poster_right, sizeof(poster_right));
+  make_motor_advertiser_right(poster_right, sizeof(poster_right));
 
   char poster_left[128];
   make_motor_advertiser_left(poster_left, sizeof(poster_left));
@@ -38,42 +38,38 @@ void Encoder_SITL::start()
 
 void Encoder_SITL::make_motor_advertiser_right(char* buf, std::size_t size)
 {
-  std::snprintf(
-      buf, size, "/model/%s/command/motor_speed_right", sitl_config_.gz_model
-  );
+  std::snprintf(buf, size, "/model/%s/command/motor_speed_right", sitl_config_.gz_model);
 }
 
 void Encoder_SITL::make_motor_advertiser_left(char* buf, std::size_t size)
 {
-  std::snprintf(
-      buf, size, "/model/%s/command/motor_speed_left", sitl_config_.gz_model
-  );
+  std::snprintf(buf, size, "/model/%s/command/motor_speed_left", sitl_config_.gz_model);
 }
 
-void Encoder_SITL::publish_motor_right(double rad_s) {
-    ESP_LOGI(TAG, "Changing right motor velocity");
-    gz::msgs::Actuators msg;
+void Encoder_SITL::publish_motor_right(double rad_s)
+{
+  ESP_LOGI(TAG, "Changing right motor velocity");
+  gz::msgs::Actuators msg;
 
-    // TODO convert rad/s to PWM
-    msg.add_velocity(rad_s);
-    right_motor_publisher.Publish(msg);
+  // TODO convert rad/s to PWM
+  msg.add_velocity(rad_s);
+  right_motor_publisher.Publish(msg);
 }
 
-void Encoder_SITL::publish_motor_left(double rad_s) {
-    ESP_LOGI(TAG, "Changing left motor velocity");
+void Encoder_SITL::publish_motor_left(double rad_s)
+{
+  ESP_LOGI(TAG, "Changing left motor velocity");
 
-    gz::msgs::Actuators msg;
+  gz::msgs::Actuators msg;
 
-    // TODO convert rad/s to PWM
-    msg.add_velocity(rad_s);
-    left_motor_publisher.Publish(msg);
+  // TODO convert rad/s to PWM
+  msg.add_velocity(rad_s);
+  left_motor_publisher.Publish(msg);
 }
 
 void Encoder_SITL::make_encoder_topic(char* buf, std::size_t size)
 {
-  std::snprintf(
-      buf, size, "/world/%s/model/%s/joint_state", sitl_config_.gz_world, sitl_config_.gz_model
-  );
+  std::snprintf(buf, size, "/world/%s/model/%s/joint_state", sitl_config_.gz_world, sitl_config_.gz_model);
 }
 
 void Encoder_SITL::on_encoder_msg(const gz::msgs::Model& gz_msg)
@@ -81,18 +77,18 @@ void Encoder_SITL::on_encoder_msg(const gz::msgs::Model& gz_msg)
   ESP_LOGI(TAG, "on_encoder_msg");
 
   // For each joint just print the position (which should be its rotation)
-for (int i = 0; i < gz_msg.joint_size(); ++i) {
+  for (int i = 0; i < gz_msg.joint_size(); ++i) {
     const gz::msgs::Joint& jointMsg = gz_msg.joint(i);
     std::string name = jointMsg.name();
     ESP_LOGI(TAG, "Joint Name: %s", name.c_str());
     if (jointMsg.has_axis1()) {
-        double position = jointMsg.axis1().position();
-        ESP_LOGI(TAG, "Joint Position: %f", position);
+      double position = jointMsg.axis1().position();
+      ESP_LOGI(TAG, "Joint Position: %f", position);
     }
   }
 
-//   [-]sensor_msgs_msg_encoder msg = gz_to_dds(gz_msg);
-//   [-]write_latest(msg);  // update our latest encoder value
+  //   [-]sensor_msgs_msg_encoder msg = gz_to_dds(gz_msg);
+  //   [-]write_latest(msg);  // update our latest encoder value
 }
 
 Encoder* Encoder::instance()
