@@ -3,7 +3,11 @@ from importlib import import_module
 
 COMMANDS = {
     "airframe": (".command.airframe", "AirframeCommand", "Prints out available UAV airframes."),
-    "greeting": (".command.greeting", "GreetingCommand", "Prints out a greeting from the PennAiR Software Team."),
+    "greeting": (
+        ".command.greeting",
+        "GreetingCommand",
+        "Prints out a greeting from the PennAiR Software Team.",
+    ),
     "mission": (
         ".command.mission",
         "MissionCommand",
@@ -42,9 +46,16 @@ def main() -> None:
         )
         command_parsers[name] = command_parser
 
+    # Parse the cli args to find what command was requested
+    # This allows --help to get the correct help message without module imports
+    discovery_parser = ArgumentParser(add_help=False)
+    discovery_subparsers = discovery_parser.add_subparsers(dest="command")
+    for name in COMMANDS:
+        discovery_subparsers.add_parser(name, add_help=False)
+
     # Parse just far enough to identify the command before importing its extension.
     # Avoids importing all extensions when its not necessary
-    preliminary_args, _ = parser.parse_known_args()
+    preliminary_args, _ = discovery_parser.parse_known_args()
     if preliminary_args.command is None:
         parser.print_help()
         return
