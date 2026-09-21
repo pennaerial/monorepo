@@ -6,7 +6,12 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[workspace]
+members = ["crates/ros_interfaces"]
+resolver = "2"
+
 [dependencies]
+ros_interfaces = { path = "crates/ros_interfaces" }
 dioxus = { version = "0.7.1", features = ["router"] }
 futures-util = "0.3.34"
 serde = { version = "1.0.229", features = ["derive"] }
