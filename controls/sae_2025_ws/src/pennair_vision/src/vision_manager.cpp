@@ -16,8 +16,25 @@ VisionManager::VisionManager(rclcpp::Node::SharedPtr node)
 
 void VisionManager::init_plugins()
 {
-  plugin_instance_ = plugin_loader_.createUniqueInstance("pennair_vision::BasicVision");
-  plugin_instance_->initialize(node_);
+  // TODO: read this list dynamically from ROS params
+  std::vector<std::string> plugin_names = {"pennair_vision::BasicVision"};
+
+  // this lambda function will be used to initialize each plugin in the list and
+  // add it to the plugin_map_
+
+  // TODO: add better error handling for plugins that don't exist or fail to initialize
+  auto initialize_plugin = [this](const std::string& plugin_name) {
+    try {
+      plugin_map_[plugin_name].plugin_instance_ = plugin_loader_.createUniqueInstance(plugin_name);
+      plugin_map_[plugin_name].plugin_instance_->initialize(node_);
+    } catch (const pluginlib::PluginlibException& ex) {
+      RCLCPP_ERROR(node_->get_logger(), "Failed to create plugin: %s", ex.what());
+    }
+  };
+
+  for (const std::string& plugin_name : plugin_names) {
+    initialize_plugin(plugin_name);
+  }
 }
 
 }  // namespace pennair_vision

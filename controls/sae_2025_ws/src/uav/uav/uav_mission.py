@@ -14,7 +14,6 @@ class UAVMissionBootstrap(Node):
         super().__init__("uav_mission_bootstrap")
         self.declare_parameter("mode_map", get_mission_path("basic", "uav"))
         self.declare_parameter("auto_launch", True)
-        self.declare_parameter("debug", False)
         self.declare_parameter("servo_only", False)
         self.declare_parameter("vehicle_name", "uav_0")
         self.declare_parameter("vehicle_class", AirframeClass.MULTICOPTER.name)
@@ -55,7 +54,6 @@ class UAVMissionBootstrap(Node):
         return {
             "mission_spec": runtime_mission,
             "auto_launch": self._bool_parameter("auto_launch"),
-            "debug": bool(self.get_parameter("debug").value),
             "servo_only": bool(self.get_parameter("servo_only").value),
             "vehicle_name": str(self.get_parameter("vehicle_name").value).strip() or "uav",
             "vehicle_class": AirframeClass.parse(self.get_parameter("vehicle_class").value),
