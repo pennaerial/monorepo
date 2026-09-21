@@ -270,14 +270,14 @@
 
     <plugin filename="gz-sim-joint-controller-system" name="gz::sim::systems::JointController">
       <joint_name>front_left_wheel_joint</joint_name>
-      <sub_topic>command/motor_speed</sub_topic>
+      <sub_topic>command/motor_speed_left</sub_topic>
       <use_actuator_msg>true</use_actuator_msg>
       <actuator_number>0</actuator_number>
     </plugin>
 
     <plugin filename="gz-sim-joint-controller-system" name="gz::sim::systems::JointController">
       <joint_name>front_right_wheel_joint</joint_name>
-      <sub_topic>command/motor_speed</sub_topic>
+      <sub_topic>command/motor_speed_right</sub_topic>
       <use_actuator_msg>true</use_actuator_msg>
       <actuator_number>0</actuator_number>
     </plugin>

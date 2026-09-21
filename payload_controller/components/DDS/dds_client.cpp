@@ -153,6 +153,7 @@ void DDSClient::handle_topic(
 {
   sensor_msgs_msg_Imu msg;
   sensor_msgs_msg_Imu_deserialize_topic(ub, &msg);
+
   ESP_LOGI(TAG, "orientation x: %f", msg.orientation.x);
   ESP_LOGI(TAG, "orientation y: %f", msg.orientation.y);
   ESP_LOGI(TAG, "orientation z: %f", msg.orientation.z);
