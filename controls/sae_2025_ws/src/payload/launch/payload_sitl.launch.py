@@ -11,7 +11,6 @@ from pydantic import ValidationError
 from vehicle_common.launch_utils import (
     LaunchError,
     check_unknown_launch_args,
-    format_bullet_list,
     get_logger,
     include_launch,
     is_truthy,
@@ -220,10 +219,7 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 Args.MISSION,
                 default_value="basic",
-                description=format_bullet_list(
-                    "Name of the mission to load.\n\tAvailable missions:",
-                    get_available_missions("payload"),
-                ),
+                description="Name of the mission to load. Run 'pennair mission payload' to see all available payload missions.",
             ),
             DeclareLaunchArgument(
                 Args.NS_ID,

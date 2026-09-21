@@ -1,13 +1,24 @@
 from argparse import ArgumentParser
+from importlib import import_module
 
-from .command.greeting import GreetingCommand
-from .command.mission import MissionCommand
-from .command.mode import ModeCommand
-
-EXTENSIONS = {
-    "greeting": GreetingCommand,
-    "mission": MissionCommand,
-    "mode": ModeCommand,
+COMMANDS = {
+    "airframe": (".command.airframe", "AirframeCommand", "Prints out available UAV airframes."),
+    "greeting": (
+        ".command.greeting",
+        "GreetingCommand",
+        "Prints out a greeting from the PennAiR Software Team.",
+    ),
+    "mission": (
+        ".command.mission",
+        "MissionCommand",
+        "Prints out general information about all missions. Must provide package and missions names or --all flag",
+    ),
+    "mode": (
+        ".command.mode",
+        "ModeCommand",
+        "Prints out general information about all registered modes",
+    ),
+    "world": (".command.world", "WorldCommand", "Prints out available worlds."),
 }
 
 
@@ -25,26 +36,37 @@ def main() -> None:
         dest="command",
         required=False,
     )
-
-    # Register command extensions
-    for name, extension_cls in EXTENSIONS.items():
-        extension = extension_cls()
-
+    command_parsers = {}  # store the command parsers so we can add arguments to them later
+    for name, (_, _, description) in COMMANDS.items():
         command_parser = subparsers.add_parser(
             name,
-            description=extension.__doc__,
-            help=extension.__doc__,
+            description=description,
+            help=description,
             usage=f"pennair {name} [OPTIONS] COMMAND",
         )
+        command_parsers[name] = command_parser
 
-        extension.add_arguments(
-            command_parser,
-            "pennair",
-        )
+    # Parse the cli args to find what command was requested
+    # This allows --help to get the correct help message without module imports
+    discovery_parser = ArgumentParser(add_help=False)
+    discovery_subparsers = discovery_parser.add_subparsers(dest="command")
+    for name in COMMANDS:
+        discovery_subparsers.add_parser(name, add_help=False)
 
-        command_parser.set_defaults(
-            func=extension.main,
-        )
+    # Parse just far enough to identify the command before importing its extension.
+    # Avoids importing all extensions when its not necessary
+    preliminary_args, _ = discovery_parser.parse_known_args()
+    if preliminary_args.command is None:
+        parser.print_help()
+        return
+
+    # Load and configure only the selected command to avoid importing unused extensions.
+    module_name, class_name, _ = COMMANDS[preliminary_args.command]
+    extension_module = import_module(module_name, package=__package__)
+    extension = getattr(extension_module, class_name)()
+    command_parser = command_parsers[preliminary_args.command]
+    extension.add_arguments(command_parser, "pennair")
+    command_parser.set_defaults(func=extension.main)
 
     args = parser.parse_args()
 

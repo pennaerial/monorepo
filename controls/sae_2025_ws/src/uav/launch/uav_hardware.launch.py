@@ -13,7 +13,6 @@ from uav.vehicles.AirframeClass import PX4Airframe
 from vehicle_common.launch_utils import (
     LaunchError,
     check_unknown_launch_args,
-    format_bullet_list,
     get_logger,
 )
 from vehicle_common.runtime.mission_loader import RuntimeMission, get_mission_path
@@ -101,10 +100,7 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 Args.MISSION,
                 default_value="basic",
-                description=format_bullet_list(
-                    "Name of the mission to load.\n\tAvailable missions:",
-                    get_available_missions("uav"),
-                ),
+                description="Name of the mission to load. Run 'pennair mission uav' to see all available uav missions.",
             ),
             DeclareLaunchArgument(
                 Args.NS_ID,
@@ -114,10 +110,7 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 Args.AIRFRAME,
                 default_value="quadcopter",
-                description=format_bullet_list(
-                    "UAV airframe to load.\n\tAvailable airframes: (alias/id/model)",
-                    [str(a) for a in PX4Airframe.get_flying()],
-                ),
+                description="UAV airframe to load. Run 'pennair airframe ls' to see all available airframes.",
             ),
             OpaqueFunction(function=launch_setup),
         ]
