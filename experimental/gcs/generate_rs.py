@@ -21,6 +21,9 @@ import shutil
 
 from pathlib import Path
 
+DEFAULT_IDL_ROOT = Path(__file__).resolve().parent / "idl"
+DEFAULT_OUTPUT_DIR = Path(__file__).resolve().parent / "crates" / "ros_interfaces"
+
 if os.environ["ROS_DISTRO"] <= "humble":
     import rosidl_cmake as rosidl_pycommon
 else:
@@ -189,7 +192,7 @@ def _idl_locator(idl_tuple, package, idl_root=None):
     return IdlLocator(str(root), str(rooted_rel_path)), idl_rel_path
 
 
-def _raw_rs_type(type_, root_package):
+def _raw_rs_type(type_):
     basic_types = {
         "boolean": "bool",
         "byte": "u8",
@@ -212,13 +215,11 @@ def _raw_rs_type(type_, root_package):
     if isinstance(type_, AbstractGenericString):
         return "std::string::String"
     if isinstance(type_, Array):
-        return f"[{_raw_rs_type(type_.value_type, root_package)}; {type_.size}]"
+        return f"[{_raw_rs_type(type_.value_type)}; {type_.size}]"
     if isinstance(type_, AbstractSequence):
-        return f"Vec<{_raw_rs_type(type_.value_type, root_package)}>"
+        return f"Vec<{_raw_rs_type(type_.value_type)}>"
     if isinstance(type_, NamespacedType):
         parts = list(type_.namespaces) + [type_.name]
-        if parts[0] == root_package:
-            parts = parts[1:]
         return "crate::" + "::".join(get_rs_name(part) for part in parts)
     if isinstance(type_, NamedType):
         return get_rs_name(type_.name)
@@ -259,7 +260,7 @@ def _load_referenced_messages(messages, idl_root):
     return result
 
 
-def _render_raw_struct(message, root_package):
+def _render_raw_struct(message):
     structure = message.structure
     name = get_rs_name(structure.namespaced_type.name)
     lines = [
@@ -268,13 +269,13 @@ def _render_raw_struct(message, root_package):
     ]
     for member in structure.members:
         lines.append(
-            f"    pub {get_rs_name(member.name)}: {_raw_rs_type(member.type, root_package)},"
+            f"    pub {get_rs_name(member.name)}: {_raw_rs_type(member.type)},"
         )
     lines.append("}")
     if message.constants:
         lines.extend(["", f"impl {name} {{"])
         for constant in message.constants:
-            constant_type = _raw_rs_type(constant.type, root_package)
+            constant_type = _raw_rs_type(constant.type)
             if isinstance(constant.type, AbstractGenericString):
                 constant_type = "&'static str"
             lines.append(
@@ -285,7 +286,7 @@ def _render_raw_struct(message, root_package):
     return "\n".join(lines)
 
 
-def _write_raw_crate(messages, root_package, output_dir, package_version):
+def _write_raw_crate(messages, crate_name, output_dir, package_version):
     grouped = {}
     for message in messages:
         namespaced_type = message.structure.namespaced_type
@@ -294,26 +295,23 @@ def _write_raw_crate(messages, root_package, output_dir, package_version):
 
     source = ["// Generated raw Rust structs. No ROS runtime is required.", ""]
     for package in sorted(grouped):
-        indent = ""
-        if package != root_package:
-            source.extend([f"pub mod {get_rs_name(package)} {{", ""])
-            indent = "    "
+        source.extend([f"pub mod {get_rs_name(package)} {{", ""])
+        indent = "    "
         for namespace in sorted(grouped[package]):
             source.append(f"{indent}pub mod {get_rs_name(namespace)} {{")
             for message in sorted(
                 grouped[package][namespace], key=lambda item: item.structure.namespaced_type.name
             ):
-                rendered = _render_raw_struct(message, root_package)
+                rendered = _render_raw_struct(message)
                 source.extend(
                     indent + "    " + line if line else "" for line in rendered.splitlines()
                 )
                 source.append("")
             source.append(f"{indent}}}")
             source.append("")
-        if package != root_package:
-            source.extend(["}", ""])
+        source.extend(["}", ""])
 
-    crate_dir = pathlib.Path(output_dir) / "rust"
+    crate_dir = pathlib.Path(output_dir)
     source_dir = crate_dir / "src"
     if source_dir.exists():
         shutil.rmtree(source_dir)
@@ -324,7 +322,7 @@ def _write_raw_crate(messages, root_package, output_dir, package_version):
     (crate_dir / "src/lib.rs").write_text("\n".join(source), encoding="utf-8")
     cargo_toml = (
         "[package]\n"
-        f'name = "{root_package}"\n'
+        f'name = "{crate_name}"\n'
         f'version = "{package_version}"\n'
         'edition = "2021"\n\n'
         "[dependencies]\n"
@@ -333,55 +331,59 @@ def _write_raw_crate(messages, root_package, output_dir, package_version):
     (crate_dir / "Cargo.toml").write_text(cargo_toml, encoding="utf-8")
 
 
-def generate_rs(package, idl_root, output_dir, package_version="0.0.0", idl_files=None):
-    """Generate dependency-free Rust structs from a ROS IDL package."""
+def generate_rs(
+    package=None, idl_root=DEFAULT_IDL_ROOT, output_dir=DEFAULT_OUTPUT_DIR, package_version="0.0.0", idl_files=None,
+    crate_name="ros_interfaces",
+):
+    """Generate one Serde-based crate from one or more ROS IDL packages.
+
+    All types retain their package/namespace modules, including transitively
+    referenced types. Omit package to discover all package directories with
+    IDLs under idl_root. Explicit idl_files apply to a single input package.
+    """
     idl_root = pathlib.Path(idl_root).expanduser().resolve()
     if not idl_root.is_dir():
         raise ValueError(f"IDL root is not a directory: {idl_root}")
 
-    package_root = idl_root / package
-    if not package_root.is_dir():
-        raise ValueError(f"IDL package directory not found: {package_root}")
+    packages = [package] if isinstance(package, str) else list(package or [])
+    if not packages:
+        packages = [
+            path.name for path in idl_root.iterdir()
+            if path.is_dir() and any(path.rglob("*.idl"))
+        ]
+    packages = sorted(set(packages))
+    if not packages:
+        raise ValueError(f"No ROS interface packages containing IDL files found under {idl_root}")
+    if idl_files is not None and len(packages) != 1:
+        raise ValueError("--idl requires exactly one input package")
+    if (not crate_name or not crate_name.isascii()
+            or not crate_name.replace("-", "_").isidentifier()):
+        raise ValueError(f"Invalid Rust crate name: {crate_name!r}")
 
-    if idl_files is None:
-        idl_files = sorted(path.relative_to(package_root) for path in package_root.rglob("*.idl"))
+    messages = {}
+    for package in packages:
+        if not package.isascii() or not package.isidentifier():
+            raise ValueError(f"Invalid ROS package name: {package!r}")
+        package_root = idl_root / package
+        if not package_root.is_dir():
+            raise ValueError(f"IDL package directory not found: {package_root}")
+        paths = (
+            sorted(path.relative_to(package_root) for path in package_root.rglob("*.idl"))
+            if idl_files is None else [pathlib.Path(path) for path in idl_files]
+        )
+        if not paths:
+            raise ValueError(f"No IDL files found for package {package!r}")
+        for path in sorted(set(paths)):
+            if path.is_absolute() or ".." in path.parts:
+                raise ValueError(f"IDL path must be relative to {package_root}: {path}")
+            locator, _ = _idl_locator(f"{package_root}:{path}", package, idl_root)
+            parsed = parse_idl_file(locator)
+            for message in parsed.content.get_elements_of_type(Message):
+                key = tuple(message.structure.namespaced_type.namespaced_name())
+                messages[key] = message
 
-    idl_files = [pathlib.Path(path) for path in idl_files]
-    if not idl_files:
-        raise ValueError(f"No IDL files found for package {package!r}")
-
-    for idl_file in idl_files:
-        if idl_file.is_absolute() or ".." in idl_file.parts:
-            raise ValueError(f"IDL path must be relative to {package_root}: {idl_file}")
-        if not (package_root / idl_file).is_file():
-            raise ValueError(f"IDL file not found: {package_root / idl_file}")
-
-    args = {
-        "package_name": package,
-        "output_dir": str(output_dir),
-        "package_version": package_version,
-        "idl_tuples": [f"{package_root}:{path}" for path in idl_files],
-    }
-
-    global package_name
-    package_name = args["package_name"]
-
-    # expand init modules for each directory
-    modules = {}
-    idl_content = IdlContent()
-    (Path(args["output_dir"]) / "rust/src").mkdir(parents=True, exist_ok=True)
-
-    for idl_tuple in args.get("idl_tuples", []):
-        locator, idl_rel_path = _idl_locator(idl_tuple, package_name, idl_root)
-        idl_stems = modules.setdefault(str(idl_rel_path.parent), set())
-        idl_stems.add(idl_rel_path.stem)
-
-        idl_file = parse_idl_file(locator)
-        idl_content.elements += idl_file.content.elements
-
-    messages = list(idl_content.get_elements_of_type(Message))
-    messages = _load_referenced_messages(messages, idl_root)
-    _write_raw_crate(messages, package_name, output_dir, package_version)
+    messages = _load_referenced_messages(messages.values(), idl_root)
+    _write_raw_crate(messages, crate_name, output_dir, package_version)
     return 0
 
 
@@ -635,20 +637,27 @@ def make_get_rs_type(idiomatic):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(
-        description="Generate dependency-free Rust structs from ROS IDL."
+        description="Generate one Serde-based Rust crate from ROS IDL packages."
     )
-    parser.add_argument("package", help="ROS interface package to generate, e.g. std_msgs.")
+    parser.add_argument(
+        "package", nargs="*",
+        help="Optional package subset; default: all packages containing IDLs under --idl-root."
+    )
+    parser.add_argument(
+        "--crate-name", default="ros_interfaces",
+        help="Generated crate name (default: ros_interfaces).",
+    )
     parser.add_argument(
         "--idl-root",
         type=pathlib.Path,
-        required=True,
-        help="Directory containing package directories such as std_msgs/.",
+        default=DEFAULT_IDL_ROOT,
+        help="IDL package root (default: idl/ beside this script).",
     )
     parser.add_argument(
         "--output-dir",
         type=pathlib.Path,
-        required=True,
-        help="Directory in which to create the generated rust/ crate.",
+        default=DEFAULT_OUTPUT_DIR,
+        help="Crate directory (default: crates/ros_interfaces beside this script).",
     )
     parser.add_argument(
         "--package-version", default="0.0.0", help="Version written to Cargo.toml (default: 0.0.0)."
@@ -658,7 +667,7 @@ def main(argv=None):
         dest="idl_files",
         action="append",
         type=pathlib.Path,
-        help="Relative IDL path; omit to discover all package IDLs.",
+        help="Relative IDL path (single package only); omit to discover all package IDLs.",
     )
     args = parser.parse_args(argv)
 
@@ -668,6 +677,7 @@ def main(argv=None):
         args.output_dir,
         package_version=args.package_version,
         idl_files=args.idl_files,
+        crate_name=args.crate_name,
     )
 
 
