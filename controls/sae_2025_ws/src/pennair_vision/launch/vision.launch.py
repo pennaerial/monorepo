@@ -135,17 +135,17 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 Args.CAMERA_FORMAT,
                 default_value=AUTO,
-                description=f"pixel format for the camera_ros driver, e.g. YUYV, RGB888, BGR888. \"{AUTO}\" lets the driver pick the sensor default. ignored when sim is true.",
+                description=f'pixel format for the camera_ros driver, e.g. YUYV, RGB888, BGR888. "{AUTO}" lets the driver pick the sensor default. ignored when sim is true.',
             ),
             DeclareLaunchArgument(
                 Args.CAMERA_WIDTH,
                 default_value=AUTO,
-                description=f"camera capture width in pixels. must be a mode the sensor supports. \"{AUTO}\" lets the driver pick. ignored when sim is true.",
+                description=f'camera capture width in pixels. must be a mode the sensor supports. "{AUTO}" lets the driver pick. ignored when sim is true.',
             ),
             DeclareLaunchArgument(
                 Args.CAMERA_HEIGHT,
                 default_value=AUTO,
-                description=f"camera capture height in pixels. must be a mode the sensor supports. \"{AUTO}\" lets the driver pick. ignored when sim is true.",
+                description=f'camera capture height in pixels. must be a mode the sensor supports. "{AUTO}" lets the driver pick. ignored when sim is true.',
             ),
             DeclareLaunchArgument(
                 Args.CAMERA_ORIENTATION,
