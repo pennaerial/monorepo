@@ -24,7 +24,6 @@ class Args(StrEnum):
     CAMERA_WIDTH = "camera_width"
     CAMERA_HEIGHT = "camera_height"
     CAMERA_ORIENTATION = "camera_orientation"
-    CAMERA_FRAME_ID = "camera_frame_id"
 
 
 def launch_setup(context) -> list[Action]:
@@ -41,7 +40,6 @@ def launch_setup(context) -> list[Action]:
     camera_width = config[Args.CAMERA_WIDTH]
     camera_height = config[Args.CAMERA_HEIGHT]
     camera_orientation = int(config[Args.CAMERA_ORIENTATION])
-    camera_frame_id = config[Args.CAMERA_FRAME_ID]
 
     # launch arguments always arrive as strings, so parse the list literal into a real list[str].
     # Otherwise the parameter would be typed as a string rather than a string array.
@@ -59,7 +57,6 @@ def launch_setup(context) -> list[Action]:
         logger.debug(f"Camera Format:       {camera_format}")
         logger.debug(f"Camera Resolution:   {camera_width}x{camera_height}")
         logger.debug(f"Camera Orientation:  {camera_orientation}")
-        logger.debug(f"Camera Frame ID:     {camera_frame_id}")
 
     ## create actions
     vision_manager = Node(
@@ -80,7 +77,6 @@ def launch_setup(context) -> list[Action]:
     # camera_ros autodetects anything left unset, so only send the settings that were overridden.
     camera_params: dict = {
         "orientation": camera_orientation,
-        "frame_id": camera_frame_id,
     }
     if camera_format != AUTO:
         camera_params["format"] = camera_format
