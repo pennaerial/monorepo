@@ -102,6 +102,7 @@ def launch_setup(context) -> list[Action]:
     return actions
 
 
+#camera_topic expects frames, will error out otherwise
 def generate_launch_description():
     return LaunchDescription(
         [
