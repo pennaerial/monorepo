@@ -8,6 +8,9 @@ from vehicle_common.launch_utils import check_unknown_launch_args, get_logger, i
 
 logger = get_logger("vision.launch")
 
+# sentinel meaning "let camera_ros detect this from the sensor rather than forcing a value"
+AUTO = "auto"
+
 
 class Args(StrEnum):
     """Maps constants to launch argument keyords"""
@@ -20,6 +23,8 @@ class Args(StrEnum):
     CAMERA_FORMAT = "camera_format"
     CAMERA_WIDTH = "camera_width"
     CAMERA_HEIGHT = "camera_height"
+    CAMERA_ORIENTATION = "camera_orientation"
+    CAMERA_FRAME_ID = "camera_frame_id"
 
 
 def launch_setup(context) -> list[Action]:
@@ -30,9 +35,13 @@ def launch_setup(context) -> list[Action]:
     debug: bool = is_truthy(config[Args.DEBUG])
     camera_topic = config[Args.CAMERA_TOPIC]
     sim: bool = is_truthy(config[Args.SIM])
+    # "auto" means leave the setting to camera_ros, which picks whatever the sensor reports.
+    # Anything we do not override is simply left out of the parameter dict below.
     camera_format = config[Args.CAMERA_FORMAT]
-    camera_width = int(config[Args.CAMERA_WIDTH])
-    camera_height = int(config[Args.CAMERA_HEIGHT])
+    camera_width = config[Args.CAMERA_WIDTH]
+    camera_height = config[Args.CAMERA_HEIGHT]
+    camera_orientation = int(config[Args.CAMERA_ORIENTATION])
+    camera_frame_id = config[Args.CAMERA_FRAME_ID]
 
     # launch arguments always arrive as strings, so parse the list literal into a real list[str].
     # Otherwise the parameter would be typed as a string rather than a string array.
@@ -49,6 +58,8 @@ def launch_setup(context) -> list[Action]:
     if not sim:
         logger.debug(f"Camera Format:       {camera_format}")
         logger.debug(f"Camera Resolution:   {camera_width}x{camera_height}")
+        logger.debug(f"Camera Orientation:  {camera_orientation}")
+        logger.debug(f"Camera Frame ID:     {camera_frame_id}")
 
     ## create actions
     vision_manager = Node(
@@ -61,15 +72,24 @@ def launch_setup(context) -> list[Action]:
                 "camera_topic": camera_topic,
                 "debug": debug,
             },
-            # ROS can't infer a type for an empty list, so only pass plugins when there are some.
             {"plugins": plugins} if plugins else {},
         ],
         arguments=["--ros-args", "--log-level", "debug" if debug else "info"],
     )
 
+    # camera_ros autodetects anything left unset, so only send the settings that were overridden.
+    camera_params: dict = {
+        "orientation": camera_orientation,
+        "frame_id": camera_frame_id,
+    }
+    if camera_format != AUTO:
+        camera_params["format"] = camera_format
+    if camera_width != AUTO:
+        camera_params["width"] = int(camera_width)
+    if camera_height != AUTO:
+        camera_params["height"] = int(camera_height)
+
     # On real hardware nothing publishes camera frames, so run the libcamera driver.
-    # In sim the frames come from Gazebo via ros_gz_bridge, so launching this too would
-    # put two publishers on the same topic.
     camera = Node(
         package="camera_ros",
         executable="camera_node",
@@ -77,13 +97,7 @@ def launch_setup(context) -> list[Action]:
         # is what makes the vision manager and the driver agree on a topic.
         name=camera_topic,
         output="screen",
-        parameters=[
-            {
-                "format": camera_format,
-                "width": camera_width,
-                "height": camera_height,
-            }
-        ],
+        parameters=[camera_params],
     )
 
     actions = [vision_manager]
@@ -124,18 +138,24 @@ def generate_launch_description():
             ),
             DeclareLaunchArgument(
                 Args.CAMERA_FORMAT,
-                default_value="RGB888",
-                description="pixel format published by the camera_ros driver, e.g. YUYV, RGB888, BGR888. ignored when sim is true.",
+                default_value=AUTO,
+                description=f"pixel format for the camera_ros driver, e.g. YUYV, RGB888, BGR888. \"{AUTO}\" lets the driver pick the sensor default. ignored when sim is true.",
             ),
             DeclareLaunchArgument(
                 Args.CAMERA_WIDTH,
-                default_value="1280",
-                description="camera capture width in pixels. must be a mode the sensor supports. ignored when sim is true.",
+                default_value=AUTO,
+                description=f"camera capture width in pixels. must be a mode the sensor supports. \"{AUTO}\" lets the driver pick. ignored when sim is true.",
             ),
             DeclareLaunchArgument(
                 Args.CAMERA_HEIGHT,
-                default_value="720",
-                description="camera capture height in pixels. must be a mode the sensor supports. ignored when sim is true.",
+                default_value=AUTO,
+                description=f"camera capture height in pixels. must be a mode the sensor supports. \"{AUTO}\" lets the driver pick. ignored when sim is true.",
+            ),
+            DeclareLaunchArgument(
+                Args.CAMERA_ORIENTATION,
+                default_value="0",
+                description="clockwise rotation applied to the camera image, in degrees. set this to match how the camera is physically mounted. ignored when sim is true.",
+                choices=["0", "90", "180", "270"],
             ),
             OpaqueFunction(function=launch_setup),
         ]
