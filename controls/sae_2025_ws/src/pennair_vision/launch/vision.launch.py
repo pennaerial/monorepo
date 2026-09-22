@@ -59,9 +59,10 @@ def launch_setup(context) -> list[Action]:
         parameters=[
             {
                 "camera_topic": camera_topic,
-                "plugins": plugins,
                 "debug": debug,
-            }
+            },
+            # ROS can't infer a type for an empty list, so only pass plugins when there are some.
+            {"plugins": plugins} if plugins else {},
         ],
         arguments=["--ros-args", "--log-level", "debug" if debug else "info"],
     )
@@ -87,7 +88,7 @@ def launch_setup(context) -> list[Action]:
 
     actions = [vision_manager]
     if not sim:
-        action.append(camera)
+        actions.append(camera)
     return actions
 
 
