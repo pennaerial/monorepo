@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="payload">
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="payload_pwm">
   <!--
     Canonical payload description for both RViz and Gazebo Sim.
 
@@ -42,6 +42,9 @@
   <!-- Simulation parameters. -->
   <xacro:property name="wheel_mu" value="1.0"/>
   <xacro:property name="wheel_mu2" value="1.0"/>
+  <xacro:property name="caster_mu" value="0.05"/>
+  <xacro:property name="caster_mu2" value="0.05"/>
+  <xacro:property name="joint_state_update_rate" value="20"/>
   <xacro:property name="camera_horizontal_fov" value="1.74"/>
   <xacro:property name="camera_width_px" value="1280"/>
   <xacro:property name="camera_height_px" value="960"/>
@@ -71,6 +74,54 @@
         iyz="0.0"
         izz="${mass * (x * x + y * y) / 12.0}"/>
     </inertial>
+  </xacro:macro>
+
+  <!--
+    Passive rear supports. URDF has no ball joint, so use spherical contacts
+    with low friction to behave like small caster balls in Gazebo.
+  -->
+  <xacro:macro name="caster_ball" params="name x y">
+    <link name="${name}">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <sphere radius="${wheel_radius}"/>
+        </geometry>
+        <material name="payload_tread_color"/>
+      </visual>
+
+      <collision>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <sphere radius="${wheel_radius}"/>
+        </geometry>
+      </collision>
+
+      <inertial>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <mass value="${wheel_mass}"/>
+        <inertia
+          ixx="${2.0 * wheel_mass * wheel_radius * wheel_radius / 5.0}"
+          ixy="0.0"
+          ixz="0.0"
+          iyy="${2.0 * wheel_mass * wheel_radius * wheel_radius / 5.0}"
+          iyz="0.0"
+          izz="${2.0 * wheel_mass * wheel_radius * wheel_radius / 5.0}"/>
+      </inertial>
+    </link>
+
+    <joint name="${name}_joint" type="continuous">
+      <origin xyz="${x} ${y} ${wheel_z}" rpy="0 0 0"/>
+      <parent link="base_link"/>
+      <child link="${name}"/>
+      <axis xyz="0 1 0"/>
+      <dynamics damping="0.0" friction="0.0"/>
+    </joint>
+
+    <gazebo reference="${name}">
+      <mu1>${caster_mu}</mu1>
+      <mu2>${caster_mu2}</mu2>
+    </gazebo>
   </xacro:macro>
 
   <!--
@@ -166,7 +217,7 @@
     name="front_left_wheel"
     x="${wheel_base / 2.0}"
     y="${wheel_separation / 2.0}"/>
-  <xacro:drive_wheel
+  <xacro:caster_ball
     name="rear_left_wheel"
     x="${-wheel_base / 2.0}"
     y="${wheel_separation / 2.0}"/>
@@ -174,7 +225,7 @@
     name="front_right_wheel"
     x="${wheel_base / 2.0}"
     y="${-wheel_separation / 2.0}"/>
-  <xacro:drive_wheel
+  <xacro:caster_ball
     name="rear_right_wheel"
     x="${-wheel_base / 2.0}"
     y="${-wheel_separation / 2.0}"/>
@@ -267,29 +318,28 @@
 
   <gazebo>
     <self_collide>false</self_collide>
-    <!-- Four-wheel skid-steer drive. Runtime model name selects cmd_vel. -->
-    <plugin
-      filename="gz-sim-diff-drive-system"
-      name="gz::sim::systems::DiffDrive">
-      <left_joint>front_left_wheel_joint</left_joint>
-      <left_joint>rear_left_wheel_joint</left_joint>
-      <right_joint>front_right_wheel_joint</right_joint>
-      <right_joint>rear_right_wheel_joint</right_joint>
-      <wheel_separation>${wheel_separation}</wheel_separation>
-      <wheel_radius>${wheel_radius}</wheel_radius>
-      <odom_publish_frequency>50</odom_publish_frequency>
-      <frame_id>odom</frame_id>
-      <child_frame_id>base_link</child_frame_id>
+
+    <plugin filename="gz-sim-joint-controller-system" name="gz::sim::systems::JointController">
+      <joint_name>front_left_wheel_joint</joint_name>
+      <sub_topic>command/motor_speed_left</sub_topic>
+      <use_actuator_msg>true</use_actuator_msg>
+      <actuator_number>0</actuator_number>
+    </plugin>
+
+    <plugin filename="gz-sim-joint-controller-system" name="gz::sim::systems::JointController">
+      <joint_name>front_right_wheel_joint</joint_name>
+      <sub_topic>command/motor_speed_right</sub_topic>
+      <use_actuator_msg>true</use_actuator_msg>
+      <actuator_number>0</actuator_number>
     </plugin>
 
     <!-- Enables a later Gazebo joint-state bridge for animated RViz wheels. -->
     <plugin
       filename="gz-sim-joint-state-publisher-system"
       name="gz::sim::systems::JointStatePublisher">
+      <update_rate>${joint_state_update_rate}</update_rate>
       <joint_name>front_left_wheel_joint</joint_name>
-      <joint_name>rear_left_wheel_joint</joint_name>
       <joint_name>front_right_wheel_joint</joint_name>
-      <joint_name>rear_right_wheel_joint</joint_name>
     </plugin>
 
     <!-- Enables a later Gazebo pose-to-TF bridge for live RViz motion. -->
