@@ -21,3 +21,8 @@ world:
       model: payload
       position: [0.0, 0.0, 0.0]
       rpy: [0.0, 0.0, 0.0]
+
+    - name: payload_2
+      model: payload_pwm
+      position: [-5.0, 0.0, 0.0]
+      rpy: [0.0, 0.0, 0.0]

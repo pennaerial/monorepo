@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="payload">
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="payload_pwm">
   <!--
     Canonical payload description for both RViz and Gazebo Sim.
 
@@ -267,19 +267,19 @@
 
   <gazebo>
     <self_collide>false</self_collide>
-    <!-- Four-wheel skid-steer drive. Runtime model name selects cmd_vel. -->
-    <plugin
-      filename="gz-sim-diff-drive-system"
-      name="gz::sim::systems::DiffDrive">
-      <left_joint>front_left_wheel_joint</left_joint>
-      <left_joint>rear_left_wheel_joint</left_joint>
-      <right_joint>front_right_wheel_joint</right_joint>
-      <right_joint>rear_right_wheel_joint</right_joint>
-      <wheel_separation>${wheel_separation}</wheel_separation>
-      <wheel_radius>${wheel_radius}</wheel_radius>
-      <odom_publish_frequency>50</odom_publish_frequency>
-      <frame_id>odom</frame_id>
-      <child_frame_id>base_link</child_frame_id>
+
+    <plugin filename="gz-sim-joint-controller-system" name="gz::sim::systems::JointController">
+      <joint_name>front_left_wheel_joint</joint_name>
+      <sub_topic>command/motor_speed_left</sub_topic>
+      <use_actuator_msg>true</use_actuator_msg>
+      <actuator_number>0</actuator_number>
+    </plugin>
+
+    <plugin filename="gz-sim-joint-controller-system" name="gz::sim::systems::JointController">
+      <joint_name>front_right_wheel_joint</joint_name>
+      <sub_topic>command/motor_speed_right</sub_topic>
+      <use_actuator_msg>true</use_actuator_msg>
+      <actuator_number>0</actuator_number>
     </plugin>
 
     <!-- Enables a later Gazebo joint-state bridge for animated RViz wheels. -->
