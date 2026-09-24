@@ -36,10 +36,6 @@ private:
   sensor_msgs_msg_Imu reading_;
   util::StaticMutex mtx_;
 
-
-private:
-  /// Implemented once per backend (imu_sitl.cpp / imu_hw.cpp).
-  /// Constructs the concrete backend instance.
-  static IMU& create();
 };
+
 }  // namespace drivers
