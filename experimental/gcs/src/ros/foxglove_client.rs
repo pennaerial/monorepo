@@ -67,10 +67,12 @@ impl FoxgloveClient {
     }
 
     // keep as associated function w/o self bc we move all necessary resources into it
-    async fn on_message_loop(broadcaster: ServerMessageBroadcaster, socket_reader: SocketReader) {
-        loop {
-            println!("Dummy message!");
-            sleep(Duration::from_secs(1)).await;
+    async fn on_message_loop(broadcaster: ServerMessageBroadcaster, mut socket_reader: SocketReader) {
+        while let Some(msg) = socket_reader.next().await {
+            match msg {
+                Ok(msg) => println!("Received message {msg}"),
+                Err(err) => println!("Got error {err}"),
+            }
         }
     }
 
