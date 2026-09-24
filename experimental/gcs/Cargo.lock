@@ -1895,6 +1895,7 @@ version = "0.1.0"
 dependencies = [
  "dioxus",
  "futures-util",
+ "ros_interfaces",
  "serde",
  "serde_json",
  "tokio",
@@ -4458,6 +4459,13 @@ dependencies = [
  "libc",
  "untrusted",
  "windows-sys 0.52.0",
+]
+
+[[package]]
+name = "ros_interfaces"
+version = "0.0.0"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
