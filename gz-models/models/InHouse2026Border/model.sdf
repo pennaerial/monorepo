@@ -1,0 +1,69 @@
+<?xml version="1.0"?>
+<!--
+  In-house 2026 shape spawn area boundary: four thin red strips laid flat on the ground.
+  Visual only (no collision) so the UAV can never hit it.
+  NOTE: in_house_2026_node.py regenerates the strips' size and pose per run from world config
+-->
+<sdf version="1.9">
+  <model name="InHouse2026Border">
+    <static>true</static>
+    <link name="link">
+      <visual name="border_y_min">
+        <pose>0 -10.5 0.01 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>21.15 0.15 0.02</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0.6 0 0 1</ambient>
+          <diffuse>1 0 0 1</diffuse>
+          <specular>0.01 0.01 0.01 1</specular>
+          <emissive>0.25 0 0 1</emissive>
+        </material>
+      </visual>
+      <visual name="border_y_max">
+        <pose>0 10.5 0.01 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>21.15 0.15 0.02</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0.6 0 0 1</ambient>
+          <diffuse>1 0 0 1</diffuse>
+          <specular>0.01 0.01 0.01 1</specular>
+          <emissive>0.25 0 0 1</emissive>
+        </material>
+      </visual>
+      <visual name="border_x_min">
+        <pose>-10.5 0 0.01 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.15 21.15 0.02</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0.6 0 0 1</ambient>
+          <diffuse>1 0 0 1</diffuse>
+          <specular>0.01 0.01 0.01 1</specular>
+          <emissive>0.25 0 0 1</emissive>
+        </material>
+      </visual>
+      <visual name="border_x_max">
+        <pose>10.5 0 0.01 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.15 21.15 0.02</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0.6 0 0 1</ambient>
+          <diffuse>1 0 0 1</diffuse>
+          <specular>0.01 0.01 0.01 1</specular>
+          <emissive>0.25 0 0 1</emissive>
+        </material>
+      </visual>
+    </link>
+  </model>
+</sdf>

@@ -1,0 +1,63 @@
+name: SDF Parsing
+
+on:
+  push:
+    branches:
+      - '*'
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+              with:
+                fetch-depth: 2
+
+            - name: Install packages
+              id: install-packages
+              run: |
+                sudo apt install -y build-essential cmake python3-pip wget lsb-release gnupg curl
+                sudo sh -c 'echo "deb http://packages.osrfoundation.org/gazebo/ubuntu-stable `lsb_release -cs` main" > /etc/apt/sources.list.d/gazebo-stable.list'
+                wget http://packages.osrfoundation.org/gazebo.key -O - | sudo apt-key add -
+                sudo apt-get update
+                sudo apt install -y libsdformat14-dev libsdformat14
+
+            - name: Build check_sdf
+              id: build-check-sdf
+              run: |
+                cd ./sdf_parsing
+                mkdir build
+                cd build/
+                cmake .. -Wno-dev
+                make
+
+            - name: Get latest commit hash
+              id: latest_commit
+              run: echo "hash=$(git log --format="%H" -n 1 | tail -n 1)" >> $GITHUB_OUTPUT
+
+            - name: Get second-to-last commit hash
+              id: second_to_last_commit
+              run: echo "hash=$(git log --format="%H" -n 2 | tail -n 1)" >> $GITHUB_OUTPUT
+
+            # - name: Get changed files
+            #   id: changed-files
+            #   run:  echo "changed_files=$(git diff --name-only ${{ steps.second_to_last_commit.outputs.hash }} ${{ steps.latest_commit.outputs.hash }})" >> $GITHUB_OUTPUT
+
+            - name: Iterate, find and check .sdf files
+              run: |
+                failed=0
+                # --diff-filter=d: skip deleted paths (there is nothing to parse)
+                changed_files=$(git diff --name-only --diff-filter=d ${{ steps.second_to_last_commit.outputs.hash }} ${{ steps.latest_commit.outputs.hash }})
+                for file in $changed_files; do
+                  [[ $file == *.sdf ]] || continue
+                  echo "Checking $file"
+
+                  # `if !` keeps going under `bash -e` so every file is reported
+                  if ! ./sdf_parsing/build/check_sdf "$file"; then
+                    echo "::error file=$file::sdf parsing error in $file"
+                    failed=1
+                  fi
+                done
+                exit $failed
