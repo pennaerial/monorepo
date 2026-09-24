@@ -44,6 +44,7 @@
   <xacro:property name="wheel_mu2" value="1.0"/>
   <xacro:property name="caster_mu" value="0.05"/>
   <xacro:property name="caster_mu2" value="0.05"/>
+  <xacro:property name="joint_state_update_rate" value="20"/>
   <xacro:property name="camera_horizontal_fov" value="1.74"/>
   <xacro:property name="camera_width_px" value="1280"/>
   <xacro:property name="camera_height_px" value="960"/>
@@ -336,10 +337,9 @@
     <plugin
       filename="gz-sim-joint-state-publisher-system"
       name="gz::sim::systems::JointStatePublisher">
+      <update_rate>${joint_state_update_rate}</update_rate>
       <joint_name>front_left_wheel_joint</joint_name>
-      <joint_name>rear_left_wheel_joint</joint_name>
       <joint_name>front_right_wheel_joint</joint_name>
-      <joint_name>rear_right_wheel_joint</joint_name>
     </plugin>
 
     <!-- Enables a later Gazebo pose-to-TF bridge for live RViz motion. -->

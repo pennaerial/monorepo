@@ -22,7 +22,7 @@ extern "C" void app_main(void)
 
   while (1) {
     dds_client.update(imu->get_latest());
-    encoders->publish_motor_left(55);
+    encoders->publish_motor_left(10);
     encoders->publish_motor_right(5);
 
     // Delays by 50 ms to avoid spamming
