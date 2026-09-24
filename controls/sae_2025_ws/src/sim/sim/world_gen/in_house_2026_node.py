@@ -27,7 +27,7 @@ SHAPE_MODELS = {
 MAX_PLACEMENT_ATTEMPTS = 200
 
 TAG_FAMILY = "tag36h11"
-TAG_MODEL = "AprilTag36h11" # gz-models dir
+TAG_MODEL = "AprilTag36h11"  # gz-models dir
 TAG_CELLS = 8
 TAG_QUIET_CELLS = 1
 TAG_Z = 0.012
@@ -68,12 +68,13 @@ class BorderConfig(BaseModel):
     height: float = 0.02
     material: Material = Field(default_factory=lambda: DEFAULT_BORDER_MATERIAL.model_copy())
 
+
 class TagConfig(BaseModel):
     """AprilTag decal stamped on each spawned shape."""
 
     enabled: bool = True
-    size: float = 0.0254 # Size defaults to 2.54 cm = 1 in
-    id_range: tuple[int, int] = (10, 586) # Range of potential ids
+    size: float = 0.0254  # Size defaults to 2.54 cm = 1 in
+    id_range: tuple[int, int] = (10, 586)  # Range of potential ids
 
 
 class InHouse2026Config(BaseModel):
@@ -108,7 +109,7 @@ class InHouse2026WorldNode(WorldNode):
         self.answer_key_pub = self.create_publisher(
             String,
             f"/{self.world}/{ANSWER_KEY_TOPIC}",
-            QoSProfile(depth=1, durability=QoSDurabilityPolicy.TRANSIENT_LOCAL)
+            QoSProfile(depth=1, durability=QoSDurabilityPolicy.TRANSIENT_LOCAL),
         )
         self.cached_templates: dict[str, str] = {}  # model.sdf text keyed by path
         # (x, y, radius) zones shapes must avoid
@@ -282,7 +283,7 @@ class InHouse2026WorldNode(WorldNode):
 
     def with_apriltag(self, sdf: str, tag_id: int) -> str:
         """Return `sdf` with a tag plane laid on top of the shape.
-        
+
         Must run AFTER generate_sdf_string, whose recolor regex is global and would repaint the tag.
         """
         # the link <pose> recentres asymmetric meshes (star, triangle); undo it so the
