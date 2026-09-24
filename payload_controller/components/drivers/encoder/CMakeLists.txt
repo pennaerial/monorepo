@@ -8,6 +8,7 @@ set(sitl_srcs
 )
 
 set(hardware_srcs
+    encoder.cpp
     encoder_hw.cpp
 )
 
