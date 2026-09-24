@@ -26,4 +26,4 @@ world:
       model: payload_pwm
       position: [-5.0, 0.0, 0.0]
       rpy: [0.0, 0.0, 0.0]
-      # Temporary to get payload spawning
+      # TODO: Temporary to get payload spawning
