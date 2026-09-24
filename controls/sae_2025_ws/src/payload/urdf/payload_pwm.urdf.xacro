@@ -42,6 +42,8 @@
   <!-- Simulation parameters. -->
   <xacro:property name="wheel_mu" value="1.0"/>
   <xacro:property name="wheel_mu2" value="1.0"/>
+  <xacro:property name="caster_mu" value="0.05"/>
+  <xacro:property name="caster_mu2" value="0.05"/>
   <xacro:property name="camera_horizontal_fov" value="1.74"/>
   <xacro:property name="camera_width_px" value="1280"/>
   <xacro:property name="camera_height_px" value="960"/>
@@ -71,6 +73,54 @@
         iyz="0.0"
         izz="${mass * (x * x + y * y) / 12.0}"/>
     </inertial>
+  </xacro:macro>
+
+  <!--
+    Passive rear supports. URDF has no ball joint, so use spherical contacts
+    with low friction to behave like small caster balls in Gazebo.
+  -->
+  <xacro:macro name="caster_ball" params="name x y">
+    <link name="${name}">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <sphere radius="${wheel_radius}"/>
+        </geometry>
+        <material name="payload_tread_color"/>
+      </visual>
+
+      <collision>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <sphere radius="${wheel_radius}"/>
+        </geometry>
+      </collision>
+
+      <inertial>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <mass value="${wheel_mass}"/>
+        <inertia
+          ixx="${2.0 * wheel_mass * wheel_radius * wheel_radius / 5.0}"
+          ixy="0.0"
+          ixz="0.0"
+          iyy="${2.0 * wheel_mass * wheel_radius * wheel_radius / 5.0}"
+          iyz="0.0"
+          izz="${2.0 * wheel_mass * wheel_radius * wheel_radius / 5.0}"/>
+      </inertial>
+    </link>
+
+    <joint name="${name}_joint" type="continuous">
+      <origin xyz="${x} ${y} ${wheel_z}" rpy="0 0 0"/>
+      <parent link="base_link"/>
+      <child link="${name}"/>
+      <axis xyz="0 1 0"/>
+      <dynamics damping="0.0" friction="0.0"/>
+    </joint>
+
+    <gazebo reference="${name}">
+      <mu1>${caster_mu}</mu1>
+      <mu2>${caster_mu2}</mu2>
+    </gazebo>
   </xacro:macro>
 
   <!--
@@ -166,7 +216,7 @@
     name="front_left_wheel"
     x="${wheel_base / 2.0}"
     y="${wheel_separation / 2.0}"/>
-  <xacro:drive_wheel
+  <xacro:caster_ball
     name="rear_left_wheel"
     x="${-wheel_base / 2.0}"
     y="${wheel_separation / 2.0}"/>
@@ -174,7 +224,7 @@
     name="front_right_wheel"
     x="${wheel_base / 2.0}"
     y="${-wheel_separation / 2.0}"/>
-  <xacro:drive_wheel
+  <xacro:caster_ball
     name="rear_right_wheel"
     x="${-wheel_base / 2.0}"
     y="${-wheel_separation / 2.0}"/>
