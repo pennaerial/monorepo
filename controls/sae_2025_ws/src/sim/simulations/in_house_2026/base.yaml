@@ -33,7 +33,11 @@ world:
       material:
         ambient: [0.6, 0.0, 0.0, 1.0]
         diffuse: [1.0, 0.0, 0.0, 1.0]
-        emissive: [0.25, 0.0, 0.0, 1.0]         
+        emissive: [0.25, 0.0, 0.0, 1.0]    
+    
+    tags:                          # tag36h11 decal on each shape
+       enabled: true
+       size: 0.0254                 # meters, side of the black square (detector tag_size_m); 1 inch     
 
   # # Issue with sim launch, doesn't attach PX4 to the uav spawned by world
   # controllables:

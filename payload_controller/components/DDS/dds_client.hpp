@@ -4,16 +4,15 @@
 
 #include <cstdint>
 
+#include "sdkconfig.h"
 #include "sensor_msgs/msg/Imu.h"
 
 constexpr uint32_t STREAM_HISTORY = 8;
 
-#if defined(UCLIENT_PROFILE_UDP)
+#if defined(CONFIG_IDF_TARGET_LINUX)
 constexpr uint32_t TRANSPORT_MTU = UXR_CONFIG_UDP_TRANSPORT_MTU;
-#elif defined(UCLIENT_PROFILE_CUSTOM_TRANSPORT)
-constexpr uint32_t TRANSPORT_MTU = UXR_CONFIG_CUSTOM_TRANSPORT_MTU;
 #else
-#error "No supported Micro-XRCE-DDS transport enabled"
+constexpr uint32_t TRANSPORT_MTU = UXR_CONFIG_CUSTOM_TRANSPORT_MTU;
 #endif
 
 constexpr uint32_t BUFFER_SIZE = TRANSPORT_MTU * STREAM_HISTORY;
@@ -63,11 +62,12 @@ private:
   /// participant ID registered with agent
   uxrObjectId participant_id_;
 
-#if defined(UCLIENT_PROFILE_UDP)
+#if defined(CONFIG_IDF_TARGET_LINUX)
   uxrUDPTransport transport_;
-#elif defined(UCLIENT_PROFILE_CUSTOM_TRANSPORT)
+#else
   uxrCustomTransport transport_;
 #endif
+
   /// the uxr session object. Interacts directly with DDS Agent
   uxrSession session_;
 

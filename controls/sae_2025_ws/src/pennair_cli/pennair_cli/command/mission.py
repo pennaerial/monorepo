@@ -1,7 +1,7 @@
 from argparse import ArgumentParser
 from typing import override
 
-from ament_index_python.packages import get_packages_with_prefixes
+from ament_index_python.packages import PackageNotFoundError, get_packages_with_prefixes
 from pennair_cli.extension import CommandExtension
 from pydantic import ValidationError
 from vehicle_common.runtime.mission_loader import RuntimeMission, get_mission_path
@@ -47,7 +47,26 @@ class MissionCommand(CommandExtension):
                     print(f"{pkg}:")
                     for mission in missions:
                         print(f"    {mission}")
-        # print(f"package: {args.package}, missions: {args.missions}")
+            return
+
+        # package given, no missions given -> list all missions in package
+        # ex pennair mission uav -> lists all uav missions
+        if args.package and not args.missions:
+            try:
+                missions = get_available_missions(args.package)
+            except ValueError:  # invalid name
+                print(f"{args.package}: invalid name")
+                return
+            except PackageNotFoundError:  # not a package
+                print(f"{args.package}: package not found")
+                return
+            if missions:
+                print(f'Available missions in "{args.package}":')
+                for mission in missions:
+                    print(f"    {mission}")
+            else:
+                print(f"{args.package}: no missions found")
+            return
 
         for mission in args.missions:
             mission_path = get_mission_path(mission, args.package)

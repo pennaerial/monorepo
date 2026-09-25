@@ -97,7 +97,7 @@ jobs:
        uses: ./.github/actions/build-docs
        with:
          deploy: "false"
-  
+
   validate_payload_controller:
     name: Validate Payload Controller
     needs: detect_changes
@@ -121,18 +121,18 @@ jobs:
       - name: Quick Install Dependencies
         run: |
           "$PENNAIR_MONOREPO_PATH/ci/install_deps.sh" --quick
-      
+
       - name: Ensure ESP-IDF is installed
         shell: bash
         env:
-          HOME: /root # Necessary because in the docker image esp-idf is installed in /root 
+          HOME: /root # Necessary because in the docker image esp-idf is installed in /root
         run: |
           if [[ ! -f "$HOME/.espressif/tools/activate_idf_v6.0.2.sh" ]]; then
             eim install --config "$PENNAIR_PAYLOAD_CONTROLLER_PATH/eim_config.toml"
           fi
           test -f "$HOME/.espressif/tools/activate_idf_v6.0.2.sh"
 
-      - name: Build Linux 
+      - name: Build Linux Target
         shell: bash
         env:
           HOME: /root
@@ -140,17 +140,17 @@ jobs:
           cd "$PENNAIR_PAYLOAD_CONTROLLER_PATH"
           direnv allow .
           direnv exec . make linux
-      
-      # - name: Build Hardware 
-      #   shell: bash
-      #   env:
-      #     HOME: /root
-      #   run: |
-      #     cd "$PENNAIR_PAYLOAD_CONTROLLER_PATH"
-      #     direnv allow .
-      #     direnv exec . make esp32s3
 
-      
+      - name: Build esp32s3 target
+        shell: bash
+        env:
+          HOME: /root
+        run: |
+          cd "$PENNAIR_PAYLOAD_CONTROLLER_PATH"
+          direnv allow .
+          direnv exec . make esp32s3
+
+
   merge_build_status:
     name: Merge Build Status
     needs: # depend on each additional job here
