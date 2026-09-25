@@ -14,7 +14,7 @@ static constexpr uint32_t SESSION_KEY = 0xABCDABCD;
 
 DDSClient::DDSClient(const char* ip, const char* port) : ip_(ip), port_(port) {}
 
-void DDSClient::run()
+void DDSClient::init()
 {
   // Open the UDP link to the Micro-XRCE-DDS Agent. This is the transport
   // underneath the XRCE session; no DDS entities exist yet.
@@ -56,107 +56,102 @@ void DDSClient::run()
   reliable_in_ =
       uxr_create_input_reliable_stream(&session_, input_reliable_stream_buffer_, BUFFER_SIZE, STREAM_HISTORY);
 
-  uxrObjectId participant_id = uxr_object_id(0x01, UXR_PARTICIPANT_ID);
-  const char* participant_xml =
-      "<dds>"
-      "<participant>"
-      "<rtps>"
-      "<name>default_xrce_participant</name>"
-      "</rtps>"
-      "</participant>"
-      "</dds>";
-  // Queue creation of the DDS Participant. The returned request id is checked
-  // later when the session is run and the Agent replies with creation status.
-  uint16_t participant_req = uxr_buffer_create_participant_xml(
-      &session_, reliable_out_, participant_id,
+  participant_id_ = uxr_object_id(0x01, UXR_PARTICIPANT_ID);
+  publisher_id_ = uxr_object_id(DEFAULT_PUBLISHER_KEY, UXR_PUBLISHER_ID);
+  subscriber_id_ = uxr_object_id(DEFAULT_SUBSCRIBER_KEY, UXR_SUBSCRIBER_ID);
+
+  // Create one XRCE Publisher and one XRCE Subscriber. Individual topic entries
+  // decide whether they need a DataWriter, a DataReader, or both.
+  uint16_t participant_req = uxr_buffer_create_participant_bin(
+      &session_, reliable_out_, participant_id_,
       0,  // DDS domain ID
-      participant_xml, UXR_REPLACE
+      "default_xrce_participant", UXR_REPLACE
   );
 
-  uxrObjectId topic_id = uxr_object_id(0x01, UXR_TOPIC_ID);
-  const char* topic_xml =
-      "<dds>"
-      "<topic>"
-      // "<name>HelloWorldTopic</name>"
-      // "<dataType>HelloWorld</dataType>"
-      "<name>rt/imu</name>"  // ROS naming conventions in DDS namespace
-      "<dataType>sensor_msgs::msg::dds_::Imu_</dataType>"
-      "</topic>"
-      "</dds>";
-  // Queue creation of the DDS Topic that both the reader and writer will use.
-  uint16_t topic_req =
-      uxr_buffer_create_topic_xml(&session_, reliable_out_, topic_id, participant_id, topic_xml, UXR_REPLACE);
-
-
-  uxrObjectId publisher_id = uxr_object_id(0x01, UXR_PUBLISHER_ID);
-  const char* publisher_xml = "";
-  // Queue creation of a Publisher entity under the participant. An empty XML
-  // string asks the Agent to use defaults.
-  uint16_t publisher_req = uxr_buffer_create_publisher_xml(
-      &session_, reliable_out_, publisher_id, participant_id, publisher_xml, UXR_REPLACE
+  uint16_t publisher_req = uxr_buffer_create_publisher_bin(
+      &session_, reliable_out_, publisher_id_, participant_id_, UXR_REPLACE
   );
 
-  uxrObjectId subscriber_id = uxr_object_id(0x01, UXR_SUBSCRIBER_ID);
-  const char* subscriber_xml = "";
-  // Queue creation of a Subscriber entity under the participant.
-  uint16_t subscriber_req = uxr_buffer_create_subscriber_xml(
-      &session_, reliable_out_, subscriber_id, participant_id, subscriber_xml, UXR_REPLACE
+  uint16_t subscriber_req = uxr_buffer_create_subscriber_bin(
+      &session_, reliable_out_, subscriber_id_, participant_id_, UXR_REPLACE
   );
 
-  datawriter_id_ = uxr_object_id(0x01, UXR_DATAWRITER_ID);
-  const char* datawriter_xml =
-      "<dds>"
-      "<data_writer>"
-      "<topic>"
-      "<kind>NO_KEY</kind>"
-      "<name>rt/imu</name>"
-      "<dataType>sensor_msgs::msg::dds_::Imu_</dataType>"
-      "</topic>"
-      "</data_writer>"
-      "</dds>";
-  // Queue creation of the DataWriter used by update() to publish IMU samples.
-  uint16_t datawriter_req = uxr_buffer_create_datawriter_xml(
-      &session_, reliable_out_, datawriter_id_, publisher_id, datawriter_xml, UXR_REPLACE
-  );
+  /// INIT DONE
 
-  datareader_id_ = uxr_object_id(0x01, UXR_DATAREADER_ID);
-  const char* datareader_xml =
-      "<dds>"
-      "<data_reader>"
-      "<topic>"
-      "<kind>NO_KEY</kind>"
-      "<name>rt/imu</name>"
-      "<dataType>sensor_msgs::msg::dds_::Imu_</dataType>"
-      "</topic>"
-      "</data_reader>"
-      "</dds>";
-  // Queue creation of the DataReader used to receive samples through the topic
-  // callback registered above.
-  uint16_t datareader_req = uxr_buffer_create_datareader_xml(
-      &session_, reliable_out_, datareader_id_, subscriber_id, datareader_xml, UXR_REPLACE
-  );
+  constexpr std::size_t CREATE_REQUEST_COUNT = 3 + topic_count + datawriter_count() + (datareader_count() * 2);
+  uint16_t requests[CREATE_REQUEST_COUNT]{};
+  uint8_t status[CREATE_REQUEST_COUNT]{};
+  std::size_t request_count = 0;
 
-  uxrDeliveryControl delivery_control{};
-  delivery_control.max_samples = UXR_MAX_SAMPLES_UNLIMITED;
-  // Queue a read request on the DataReader. Incoming samples for this request
-  // are delivered on reliable_in_ and then dispatched to on_topic_callback.
-  uint16_t read_data_req =
-      uxr_buffer_request_data(&session_, reliable_out_, datareader_id_, reliable_in_, &delivery_control);
+  requests[request_count++] = participant_req;
+  requests[request_count++] = publisher_req;
+  requests[request_count++] = subscriber_req;
 
-  // Create entities
-  uint8_t status[7];
-  uint16_t requests[7] = {participant_req, topic_req,      publisher_req, subscriber_req,
-                          datawriter_req,  datareader_req, read_data_req};
+  generate_topics(requests, request_count);
+  generate_writers(requests, request_count);
+  generate_readers(requests, request_count);
+
+  datawriter_id_ = datawriter_id(IMU_TOPIC_INDEX); // REMOVE
 
   // Actually send the queued requests and wait for status responses from the
   // Agent. Buffer-create calls only enqueue work; this drives the session.
-  if (!uxr_run_session_until_all_status(&session_, 1000, requests, status, 6)) {
-    ESP_LOGE(TAG, "Error at creating 6 entities");
+  if (!uxr_run_session_until_all_status(&session_, 1000, requests, status, request_count)) {
+    ESP_LOGE(TAG, "Error creating DDS entities");
     return;
   }
 
   ESP_LOGI(TAG, "Entities creation success");
 }
+
+void DDSClient::generate_topics(uint16_t requests[], std::size_t& request_count)
+{
+  for (std::size_t topic_index = 0; topic_index < topic_count; ++topic_index) {
+    const Topic& topic = topics[topic_index];
+    /// TODO right now we create topics for both readers & writers, however it is likely that ROS will create the
+    /// topics for our readers so we might want to only run the code below for writers
+    ESP_LOGI(TAG, "Creating DDS topic %s (%s)", topic.topic_name, topic.type_name);
+    requests[request_count++] = uxr_buffer_create_topic_bin(
+        &session_, reliable_out_, topic_id(topic_index), participant_id_, topic.topic_name, topic.type_name, UXR_REPLACE
+    );
+  }
+}
+
+void DDSClient::generate_writers(uint16_t requests[], std::size_t& request_count)
+{
+  for (std::size_t topic_index = 0; topic_index < topic_count; ++topic_index) {
+    const Topic& topic = topics[topic_index];
+    if (topic.dir != Topic::Direction::WRITER) {
+      continue;
+    }
+
+    ESP_LOGI(TAG, "Creating DDS datawriter %s", topic.name);
+    requests[request_count++] = uxr_buffer_create_datawriter_bin(
+        &session_, reliable_out_, datawriter_id(topic_index), publisher_id_, topic_id(topic_index), topic.qos, UXR_REPLACE
+    );
+  }
+}
+
+void DDSClient::generate_readers(uint16_t requests[], std::size_t& request_count)
+{
+  for (std::size_t topic_index = 0; topic_index < topic_count; ++topic_index) {
+    const Topic& topic = topics[topic_index];
+    if (topic.dir != Topic::Direction::READER) {
+      continue;
+    }
+
+    const uxrObjectId reader_id = datareader_id(topic_index);
+    ESP_LOGI(TAG, "Creating DDS datareader %s", topic.name);
+    requests[request_count++] = uxr_buffer_create_datareader_bin(
+        &session_, reliable_out_, reader_id, subscriber_id_, topic_id(topic_index), topic.qos, UXR_REPLACE
+    );
+
+    // Creates a request to forward data to us
+    uxrDeliveryControl delivery_control{};
+    delivery_control.max_samples = UXR_MAX_SAMPLES_UNLIMITED;
+    requests[request_count++] = uxr_buffer_request_data(&session_, reliable_out_, reader_id, reliable_in_, &delivery_control);
+  }
+}
+
 
 void DDSClient::on_topic_callback(
     uxrSession* session,

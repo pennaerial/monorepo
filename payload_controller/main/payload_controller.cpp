@@ -17,7 +17,7 @@ extern "C" void app_main(void)
   encoders->start();
 
   DDSClient dds_client("127.0.0.1", "7777");
-  dds_client.run();
+  dds_client.init();
 
 
   while (1) {
