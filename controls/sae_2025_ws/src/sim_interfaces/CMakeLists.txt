@@ -10,6 +10,7 @@ find_package(ros_gz_interfaces REQUIRED)
 # set all .msg files
 set(MSG_FILES
     msg/HoopPose.msg
+    msg/ObjectState.msg
 )
 
 # set all .srv files
@@ -17,6 +18,7 @@ set(SRV_FILES
     srv/AttachDetach.srv
     srv/CreateMultiple.srv
     srv/HoopList.srv
+    srv/ObjectStateList.srv
 )
 
 rosidl_generate_interfaces(${PROJECT_NAME}
