@@ -21,7 +21,10 @@ extern "C" void app_main(void)
 
 
   while (1) {
-    dds_client.update(imu->get_latest());
+    sensor_msgs_msg_Imu imu_msg = imu->get_latest();
+    dds_client.publish("IMU", &imu_msg);
+    dds_client.update();
+    
     encoders->publish_motor_left(10);
     encoders->publish_motor_right(5);
 
