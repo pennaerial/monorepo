@@ -2,7 +2,9 @@
 
 #include "esp_log.h"
 
-// #include "esp_mac.h"
+#ifndef CONFIG_IDF_TARGET_LINUX
+#include "uart_transport.hpp"
+#endif
 
 
 static const char* TAG = "DDSClient";
@@ -16,11 +18,22 @@ void DDSClient::run()
 {
   // Open the UDP link to the Micro-XRCE-DDS Agent. This is the transport
   // underneath the XRCE session; no DDS entities exist yet.
+
+#if defined(CONFIG_IDF_TARGET_LINUX)
   if (!uxr_init_udp_transport(&transport_, UXR_IPv4, ip_, port_)) {
     ESP_LOGE(TAG, "UXR UDP transport failed to init!");
     return;
   }
   ESP_LOGI(TAG, "UXR UDP transport init success!");
+#else  // init custom transport
+  uxr_set_custom_transport_callbacks(&transport_, true, uart_open, uart_close, uart_write, uart_read);
+  UartTransportConfig uart_config{};
+  if (!uxr_init_custom_transport(&transport_, &uart_config)) {
+    ESP_LOGE(TAG, "Custom UART transport failed to initialize!");
+    return;
+  }
+  ESP_LOGE(TAG, "Custom UART transport successfully initialized");
+#endif
 
   // Bind the transport to an XRCE session. The session key identifies this
   // client to the Agent, and the topic callback receives subscribed samples.

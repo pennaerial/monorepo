@@ -51,11 +51,6 @@ protected:
 private:
   //   [-]sensor_msgs_msg_encoder reading_;
   util::StaticMutex mtx_;
-
-
-private:
-  /// Implemented once per backend (encoder_sitl.cpp / encoder_hw.cpp).
-  /// Constructs the concrete backend instance.
-  static Encoder& create();
 };
+
 }  // namespace drivers
