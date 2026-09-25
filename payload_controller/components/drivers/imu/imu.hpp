@@ -35,7 +35,6 @@ protected:
 private:
   sensor_msgs_msg_Imu reading_;
   util::StaticMutex mtx_;
-
 };
 
 }  // namespace drivers

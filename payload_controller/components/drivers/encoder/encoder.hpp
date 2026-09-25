@@ -51,7 +51,6 @@ protected:
 private:
   //   [-]sensor_msgs_msg_encoder reading_;
   util::StaticMutex mtx_;
-
 };
 
 }  // namespace drivers

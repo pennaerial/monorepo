@@ -12,7 +12,7 @@ size_t uart_write(uxrCustomTransport* transport, const uint8_t* buffer, size_t l
   return 0;
 }
 
-size_t uart_read( uxrCustomTransport* transport, uint8_t* buffer, size_t length, int timeout, uint8_t* error_code)
+size_t uart_read(uxrCustomTransport* transport, uint8_t* buffer, size_t length, int timeout, uint8_t* error_code)
 {
   // TODO
   return 0;

@@ -1,9 +1,11 @@
 #pragma once
 
 #include <uxr/client/client.h>
+
 #include <cstdint>
-#include "sensor_msgs/msg/Imu.h"
+
 #include "sdkconfig.h"
+#include "sensor_msgs/msg/Imu.h"
 
 constexpr uint32_t STREAM_HISTORY = 8;
 

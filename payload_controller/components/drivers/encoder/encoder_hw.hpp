@@ -2,9 +2,11 @@
 
 #include "encoder.hpp"
 
-namespace drivers {
+namespace drivers
+{
 
-class Encoder_HW : public Encoder {
+class Encoder_HW : public Encoder
+{
 public:
   /// See encoder.hpp
   void start() override;
@@ -14,4 +16,4 @@ public:
   void publish_motor_left(double) override;
 };
 
-} // namespace drivers
+}  // namespace drivers

@@ -7,7 +7,6 @@
 #endif
 
 
-
 static const char* TAG = "DDSClient";
 // TODO: This shouldn't be hardcoded in, should be derived by some vehicle-specific parameter.
 // Need to set up a parameter system first
@@ -26,7 +25,7 @@ void DDSClient::run()
     return;
   }
   ESP_LOGI(TAG, "UXR UDP transport init success!");
-#else // init custom transport
+#else  // init custom transport
   uxr_set_custom_transport_callbacks(&transport_, true, uart_open, uart_close, uart_write, uart_read);
   UartTransportConfig uart_config{};
   if (!uxr_init_custom_transport(&transport_, &uart_config)) {
