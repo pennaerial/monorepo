@@ -14,6 +14,7 @@
   <!-- <exec_depend>payload_controller</exec_depend> -->
   <depend>payload_interfaces</depend>
   <depend>sensor_msgs</depend>
+  <depend>sim_interfaces</depend>
   <depend>vehicle_common</depend>
   <depend>std_msgs</depend>
   <depend>std_srvs</depend>

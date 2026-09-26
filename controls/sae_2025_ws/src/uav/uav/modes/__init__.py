@@ -3,6 +3,7 @@ from importlib import import_module
 from . import LandingMode
 
 __all__ = [
+    "InHouseSearchMode",
     "LandingMode",
     "NavGPSMode",
 ]

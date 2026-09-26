@@ -1,0 +1,18 @@
+modes:
+  start:
+    mode: uav.vtol.TakeoffMode
+    params:
+      takeoff_type: vertical
+    transitions:
+      complete: search
+
+  search:
+    mode: uav.InHouseSearchMode
+    params:
+      scan_altitude: 6.0
+      inspect_altitude: 0.8
+    transitions:
+      complete: land
+
+  land:
+    mode: uav.LandingMode
