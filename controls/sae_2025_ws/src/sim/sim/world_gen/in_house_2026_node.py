@@ -439,9 +439,7 @@ class InHouse2026WorldNode(WorldNode):
         decoy_tags = [tag for tag in available_tags if tag != target_tag_id]
         if target_tag_id not in available_tags or not decoy_tags:
             raise ValueError("Patches require an available target tag and at least one decoy tag")
-        background_colors = [color for color in self.config.palette if color != "gold"]
-        if not background_colors:
-            raise ValueError("Patches require at least one non-gold background color")
+        background_colors = ["gold"] + [color for color in self.config.palette if color != "gold"]
 
         gold = Material(ambient=(1.0, 0.84, 0.0, 1.0), diffuse=(1.0, 0.84, 0.0, 1.0))
         entities: list[Entity] = []

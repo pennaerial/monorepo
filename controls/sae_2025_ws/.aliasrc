@@ -16,7 +16,37 @@ cleanp() {
     fi
 
     for pkg in "$@"; do
+        echo "Removing build/$pkg"
+        echo "Removing install/$pkg"
         rm -rf "build/$pkg" "install/$pkg"
+    done
+}
+
+cleanall() {
+    if [[ $# -gt 0 ]]; then
+        if [[ "$1" != "--except" && "$1" != "-e" ]] || [[ $# -lt 2 ]]; then
+            echo "Usage: cleanall [--except|-e package ...]" >&2
+            return 1
+        fi
+        shift
+    fi
+
+    if [[ ! -d src || ! -d build || ! -d install ]]; then
+        echo "Run cleanall from the ROS workspace root." >&2
+        return 1
+    fi
+
+    local dir pkg keep
+    for dir in build/* install/*; do
+        [[ -d "$dir" ]] || continue
+        pkg=${dir##*/}
+
+        for keep in "$@"; do
+            [[ "$pkg" == "$keep" ]] && continue 2
+        done
+
+        echo "Removing $dir"
+        rm -rf -- "$dir" || return
     done
 }
 
