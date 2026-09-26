@@ -7,18 +7,27 @@
 #endif
 
 
-static const char* TAG = "DDSClient";
-// TODO: This shouldn't be hardcoded in, should be derived by some vehicle-specific parameter.
-// Need to set up a parameter system first
-static constexpr uint32_t SESSION_KEY = 0xABCDABCD;
+namespace
+{
+
+const char* TAG = "DDSClient";
+// Placeholder XRCE client key until the vehicle parameter system can provide a unique 32-bit value.
+constexpr uint32_t SESSION_KEY = 0xABCDABCD;
+// All DDS objects belong to the first object instance in this client session.
+constexpr uint8_t OBJECT_INSTANCE_ID = 0x01;
+// Use the default DDS domain until domain selection becomes a vehicle parameter.
+constexpr uint16_t DDS_DOMAIN_ID = 0;
+// Bound agent handshakes and reliable delivery so a disconnected agent cannot block forever.
+constexpr int SESSION_TIMEOUT_MS = 1000;
+// Participant, topic, publisher, subscriber, writer, and reader are created together.
+constexpr uint16_t ENTITY_COUNT = 6;
+
+}  // namespace
 
 DDSClient::DDSClient(const char* ip, const char* port) : ip_(ip), port_(port) {}
 
 void DDSClient::run()
 {
-  // Open the UDP link to the Micro-XRCE-DDS Agent. This is the transport
-  // underneath the XRCE session; no DDS entities exist yet.
-
 #if defined(CONFIG_IDF_TARGET_LINUX)
   if (!uxr_init_udp_transport(&transport_, UXR_IPv4, ip_, port_)) {
     ESP_LOGE(TAG, "UXR UDP transport failed to init!");
@@ -43,7 +52,7 @@ void DDSClient::run()
   // Handshake with the Agent so later create/read/write requests have a live
   // XRCE session to run on.
   if (!uxr_create_session(&session_)) {
-    ESP_LOGI(TAG, "Error creating session");
+    ESP_LOGE(TAG, "Error creating session");
     return;
   }
   ESP_LOGI(TAG, "UXR Session created");
@@ -56,7 +65,7 @@ void DDSClient::run()
   reliable_in_ =
       uxr_create_input_reliable_stream(&session_, input_reliable_stream_buffer_, BUFFER_SIZE, STREAM_HISTORY);
 
-  uxrObjectId participant_id = uxr_object_id(0x01, UXR_PARTICIPANT_ID);
+  uxrObjectId participant_id = uxr_object_id(OBJECT_INSTANCE_ID, UXR_PARTICIPANT_ID);
   const char* participant_xml =
       "<dds>"
       "<participant>"
@@ -68,12 +77,10 @@ void DDSClient::run()
   // Queue creation of the DDS Participant. The returned request id is checked
   // later when the session is run and the Agent replies with creation status.
   uint16_t participant_req = uxr_buffer_create_participant_xml(
-      &session_, reliable_out_, participant_id,
-      0,  // DDS domain ID
-      participant_xml, UXR_REPLACE
+      &session_, reliable_out_, participant_id, DDS_DOMAIN_ID, participant_xml, UXR_REPLACE
   );
 
-  uxrObjectId topic_id = uxr_object_id(0x01, UXR_TOPIC_ID);
+  uxrObjectId topic_id = uxr_object_id(OBJECT_INSTANCE_ID, UXR_TOPIC_ID);
   const char* topic_xml =
       "<dds>"
       "<topic>"
@@ -88,7 +95,7 @@ void DDSClient::run()
       uxr_buffer_create_topic_xml(&session_, reliable_out_, topic_id, participant_id, topic_xml, UXR_REPLACE);
 
 
-  uxrObjectId publisher_id = uxr_object_id(0x01, UXR_PUBLISHER_ID);
+  uxrObjectId publisher_id = uxr_object_id(OBJECT_INSTANCE_ID, UXR_PUBLISHER_ID);
   const char* publisher_xml = "";
   // Queue creation of a Publisher entity under the participant. An empty XML
   // string asks the Agent to use defaults.
@@ -96,14 +103,14 @@ void DDSClient::run()
       &session_, reliable_out_, publisher_id, participant_id, publisher_xml, UXR_REPLACE
   );
 
-  uxrObjectId subscriber_id = uxr_object_id(0x01, UXR_SUBSCRIBER_ID);
+  uxrObjectId subscriber_id = uxr_object_id(OBJECT_INSTANCE_ID, UXR_SUBSCRIBER_ID);
   const char* subscriber_xml = "";
   // Queue creation of a Subscriber entity under the participant.
   uint16_t subscriber_req = uxr_buffer_create_subscriber_xml(
       &session_, reliable_out_, subscriber_id, participant_id, subscriber_xml, UXR_REPLACE
   );
 
-  datawriter_id_ = uxr_object_id(0x01, UXR_DATAWRITER_ID);
+  datawriter_id_ = uxr_object_id(OBJECT_INSTANCE_ID, UXR_DATAWRITER_ID);
   const char* datawriter_xml =
       "<dds>"
       "<data_writer>"
@@ -119,7 +126,7 @@ void DDSClient::run()
       &session_, reliable_out_, datawriter_id_, publisher_id, datawriter_xml, UXR_REPLACE
   );
 
-  datareader_id_ = uxr_object_id(0x01, UXR_DATAREADER_ID);
+  datareader_id_ = uxr_object_id(OBJECT_INSTANCE_ID, UXR_DATAREADER_ID);
   const char* datareader_xml =
       "<dds>"
       "<data_reader>"
@@ -150,11 +157,12 @@ void DDSClient::run()
 
   // Actually send the queued requests and wait for status responses from the
   // Agent. Buffer-create calls only enqueue work; this drives the session.
-  if (!uxr_run_session_until_all_status(&session_, 1000, requests, status, 6)) {
-    ESP_LOGE(TAG, "Error at creating 6 entities");
+  if (!uxr_run_session_until_all_status(&session_, 1000, requests, status, 7)) {
+    ESP_LOGE(TAG, "Error at creating 7 entities");
     return;
   }
 
+  connected_ = true;
   ESP_LOGI(TAG, "Entities creation success");
 }
 
@@ -210,6 +218,6 @@ void DDSClient::update(const sensor_msgs_msg_Imu& msg)
 
   // Flush the reliable output stream and wait for the Agent to acknowledge the
   // write, then briefly spin the session so input traffic/callbacks are served.
-  uxr_run_session_until_confirm_delivery(&session_, 1000);
+  uxr_run_session_until_confirm_delivery(&session_, SESSION_TIMEOUT_MS);
   uxr_run_session_time(&session_, 10);
 }

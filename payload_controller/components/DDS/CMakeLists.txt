@@ -4,13 +4,16 @@ set(srcs
     dds_client.cpp
 )
 
-if(NOT IDF_TARGET STREQUAL linux)
+set(priv_requires "")
+if(NOT IDF_TARGET STREQUAL "linux")
     list(APPEND srcs uart_transport.cpp)
+    list(APPEND priv_requires esp_driver_gpio esp_driver_uart)
 endif()
 
 idf_component_register(
     SRCS ${srcs}
     INCLUDE_DIRS "."
+    PRIV_REQUIRES ${priv_requires}
 )
 
 foreach(_var PENNAIR_XRCE_DDS_CLIENT_PATH PENNAIR_XRCE_DDS_MICROCDR_PATH)

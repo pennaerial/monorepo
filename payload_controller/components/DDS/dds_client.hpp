@@ -7,6 +7,7 @@
 #include "sdkconfig.h"
 #include "sensor_msgs/msg/Imu.h"
 
+// Keep eight reliable frames so short transport stalls do not immediately drop IMU samples.
 constexpr uint32_t STREAM_HISTORY = 8;
 
 #if defined(CONFIG_IDF_TARGET_LINUX)
@@ -15,6 +16,7 @@ constexpr uint32_t TRANSPORT_MTU = UXR_CONFIG_UDP_TRANSPORT_MTU;
 constexpr uint32_t TRANSPORT_MTU = UXR_CONFIG_CUSTOM_TRANSPORT_MTU;
 #endif
 
+// Micro-XRCE-DDS requires one MTU-sized slot for every reliable-history entry.
 constexpr uint32_t BUFFER_SIZE = TRANSPORT_MTU * STREAM_HISTORY;
 
 
@@ -25,7 +27,6 @@ public:
 
   /// Run the DDSClient
   void run();
-
   /// updates all internal msgs
   void update(const sensor_msgs_msg_Imu& msg);
 
@@ -80,8 +81,9 @@ private:
   /// uxrStreamId associated with input reliable buffer
   uxrStreamId reliable_in_;
 
-  uxrObjectId datawriter_id_;
   uxrObjectId datareader_id_;
+  uxrObjectId datawriter_id_;
+  bool connected_{false};
 
   /// IMU msg sent to DDS agent
   sensor_msgs_msg_Imu imu_msg{};
