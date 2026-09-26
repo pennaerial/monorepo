@@ -116,19 +116,25 @@ class InHouse2026WorldNode(WorldNode):
         self.cached_templates: dict[str, str] = {}  # model.sdf text keyed by path
         # (x, y, radius) zones shapes must avoid
         self.keep_out: list[tuple[float, float, float]] = list(self.config.keep_out)
-        
+
         # shape search location query variables
         self.search_locations: list[SearchLocation] = []
         self.target_tag_id: int = -1
-        self.query_search_locations_service = self.create_service(GetSearchLocations, "get_search_patches", self.get_patches_callback)
+        self.query_search_locations_service = self.create_service(
+            GetSearchLocations, "get_search_patches", self.get_patches_callback
+        )
         self.patches_ready = False
-        self.num_patches = 1 # TODO: make this a configurable param in the yaml
-
+        self.generation_started = False
+        self.pending_spawns = 0
+        self.spawn_failed = False
+        self.num_patches = 1  # TODO: make this a configurable param in the yaml
 
         if self.config.seed is not None:
             self.rng.seed(self.config.seed)
 
-    def get_patches_callback(self, request: GetSearchLocations.Request, response: GetSearchLocations.Response) -> GetSearchLocations.Response:
+    def get_patches_callback(
+        self, request: GetSearchLocations.Request, response: GetSearchLocations.Response
+    ) -> GetSearchLocations.Response:
         response.ready = self.patches_ready
         response.target_tag_id = self.target_tag_id
         response.search_locations = self.search_locations
@@ -387,83 +393,150 @@ class InHouse2026WorldNode(WorldNode):
         )
         return math.degrees(geographic.x()), math.degrees(geographic.y())
 
+    def sample_patch_position(self, center_xy: XY, radius_m: float, placed: list[XY]) -> XY:
+        """Sample a shape center inside the circle, respecting spacing and keep-out zones."""
+        cx, cy = center_xy
+        for _ in range(MAX_PLACEMENT_ATTEMPTS):
+            x = self.rng.uniform(cx - radius_m, cx + radius_m)
+            y = self.rng.uniform(cy - radius_m, cy + radius_m)
+            if (x - cx) ** 2 + (y - cy) ** 2 > radius_m**2:
+                continue
+            if any((x - kx) ** 2 + (y - ky) ** 2 < kr**2 for kx, ky, kr in self.keep_out):
+                continue
+            if any((x - px) ** 2 + (y - py) ** 2 < self.config.min_spacing**2 for px, py in placed):
+                continue
+            return x, y
+        raise ValueError("Could not fit all patch shapes; increase radius or reduce spacing")
+
     def generate_patch(
-        self, center_xy: XY, radius_m: float, contains_target: bool, target_tag_id: int
+        self,
+        center_xy: XY,
+        radius_m: float,
+        contains_target: bool,
+        target_tag_id: int,
+        name_prefix: str = "patch_0",
     ) -> list[Entity]:
-        """Build a patch around (east, north) in world meters; GPS is only for the service."""
+        """Generate four gold stars and twelve random shapes; reserve the target tag."""
+        if radius_m <= 0 or not self.config.tags.enabled:
+            raise ValueError("Patches require a positive radius and enabled AprilTags")
+        available_tags = self.available_tag_ids()
+        decoy_tags = [tag for tag in available_tags if tag != target_tag_id]
+        if target_tag_id not in available_tags or not decoy_tags:
+            raise ValueError("Patches require an available target tag and at least one decoy tag")
+        background_colors = [color for color in self.config.palette if color != "gold"]
+        if not background_colors:
+            raise ValueError("Patches require at least one non-gold background color")
+
+        gold = Material(ambient=(1.0, 0.84, 0.0, 1.0), diffuse=(1.0, 0.84, 0.0, 1.0))
         entities: list[Entity] = []
+        object_states: list[dict] = []
+        placed: list[XY] = []
+        for i in range(16):
+            # The target is the first of four gold stars, never an extra shape.
+            shape = "star" if i < 4 else self.rng.choice(list(SHAPE_MODELS))
+            color = "gold" if i < 4 else self.rng.choice(background_colors)
+            tag_id = target_tag_id if contains_target and i == 0 else self.rng.choice(decoy_tags)
+            x, y = self.sample_patch_position(center_xy, radius_m, placed)
+            placed.append((x, y))
+            yaw = self.rng.uniform(0.0, 2 * math.pi) if self.config.random_yaw else 0.0
+            entity = Entity(
+                name=f"{name_prefix}_{shape}_{i}",
+                model=SHAPE_MODELS[shape],
+                position=(x, y, 0.0),
+                rpy=(0.0, 0.0, yaw),
+                world=self.world,
+            )
+            material = gold if color == "gold" else self.config.palette[color]
+            entity.sdf = self.generate_sdf_string(entity.path_to_model, material)
+            entity.sdf = self.with_apriltag(entity.sdf, tag_id)
+            entities.append(entity)
+            object_states.append(
+                {
+                    "name": entity.name,
+                    "shape": shape,
+                    "model": entity.model,
+                    "color": color,
+                    "tag_id": tag_id,
+                    "x": x,
+                    "y": y,
+                    "yaw": yaw,
+                }
+            )
 
-        if contains_target:
-            pass
-            # generate target shape first
-        
-
-        # now generate shapes with tag id != taget_tag_id. tags don't have to be unique
-
-
-
+        self.object_states.extend(object_states)
         return entities
 
+    def spawn_next_entity(self) -> bool:
+        """Send one request at a time so the bridge is not flooded with spawns."""
+        entity = next(self.spawn_queue)
+        if not self.spawn_entity(entity):
+            self.spawn_failed = True
+            return False
+        return True
 
-
+    def log_spawn_result(self, name: str, future) -> None:
+        """Keep the existing spawn logging and mark ready only after all replies succeed."""
+        super()._log_spawn_result(name, future)
+        try:
+            if not future.result().success:
+                self.spawn_failed = True
+        except Exception:
+            self.spawn_failed = True
+        self.pending_spawns -= 1
+        if self.pending_spawns > 0:
+            self.spawn_next_entity()
+        elif not self.spawn_failed:
+            self.patches_ready = True
+            self.get_logger().info("Patch rea dy; call /get_search_patches for the challenge")
 
     def generate_world(self):
-        # need to set random apriltag id
-
-        # self.search_locations: list[SearchLocation] = []
-        # self.target_tag_id: int = -1
-        # self.query_search_locations_service = self.create_service(GetSearchLocations, "get_search_patches", self.get_patches_callback)
-        # self.patches_ready = False
-
-        
-        # TODO: maybe need to protect against multiple calls to generate_world
-        target_patch = self.rng.randrange(self.num_patches)
-        if self.config.tags.enabled:
-            available_tags = self.available_tag_ids()
-            self.target_tag_id = self.rng.choice(available_tags)
-
+        if self.generation_started:
+            self.get_logger().error("Generation already attempted; restart the world and node")
+            return False
+        self.generation_started = True
         self.shapes = []
+        self.object_states = []
         self.search_locations = []
         self.patches_ready = False
-        for i in range(self.num_patches):
-            # Fixed location for the p=1 milestone. Later, sample separated XY centers.
-            center_xy = (5.0, 5.0)
-            radius_m = 4.0
-            contains_target_id = (i == target_patch)
-            patch_entities = self.generate_patch(
-                center_xy=center_xy,
-                radius_m=radius_m,
-                contains_target=contains_target_id,
-                target_tag_id=self.target_tag_id,
-            )
-            self.shapes.extend(patch_entities)
-
-            # Convert center to lat, long for service querying
-            latitude, longitude = self.world_xy_to_gps(center_xy)
-            location = SearchLocation()
-            location.latitude_deg = latitude
-            location.longitude_deg = longitude
-            location.radius_m = radius_m
-            self.search_locations.append(location)
-
-
-
-        # reset so re-triggering generate_world doesn't stack keep-out zones
         self.keep_out = list(self.config.keep_out)
-        self.shapes = self.random_shapes()
+
+        try:
+            # Multiple random patch locations come after the single-patch milestone.
+            if self.num_patches != 1:
+                raise ValueError("This fixed-location version requires num_patches = 1")
+            available_tags = self.available_tag_ids()
+            if not self.config.tags.enabled or len(available_tags) < 2:
+                raise ValueError("Enable AprilTags and provide at least two tag images")
+            target_patch = self.rng.randrange(self.num_patches)
+            self.target_tag_id = self.rng.choice(available_tags)
+
+            for i in range(self.num_patches):
+                center_xy = (5.0, 5.0)
+                radius_m = 4.0
+                patch_entities = self.generate_patch(
+                    center_xy=center_xy,
+                    radius_m=radius_m,
+                    contains_target=(i == target_patch),
+                    target_tag_id=self.target_tag_id,
+                    name_prefix=f"patch_{i}",
+                )
+                self.shapes.extend(patch_entities)
+
+                latitude, longitude = self.world_xy_to_gps(center_xy)
+                location = SearchLocation()
+                location.latitude_deg = latitude
+                location.longitude_deg = longitude
+                location.radius_m = radius_m
+                self.search_locations.append(location)
+        except (ValueError, OSError) as exc:
+            self.get_logger().error(f"Patch generation failed: {exc}")
+            return False
 
         self.generated_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-        self.get_logger().info(
-            f"Object state ready for {len(self.object_states)} shapes; "
-            f"call {OBJECT_STATE_SERVICE} to read it"
-        )
-        success = True
-        if self.config.border.enabled:
-            success = self.spawn_entity(self.border_entity()) and success
-        success = self.spawn_entities(self.shapes) and success
-        success = self.spawn_entities(self.entities) and success
-        success = self.spawn_entities(self.controllables) and success
-        return success
+        entities = self.shapes + self.entities + self.controllables
+        self.pending_spawns = len(entities)
+        self.spawn_queue = iter(entities)
+        return self.spawn_next_entity()
 
 
 def main(args=None):
