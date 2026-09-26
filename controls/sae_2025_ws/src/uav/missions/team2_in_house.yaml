@@ -1,0 +1,11 @@
+modes:
+  start:
+    mode: uav.vtol.win
+    params:
+      
+    transitions:
+      complete: land
+
+
+  land:
+    mode: uav.LandingMode
