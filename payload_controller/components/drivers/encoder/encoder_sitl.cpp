@@ -53,7 +53,9 @@ void Encoder_SITL::publish_motor_right(double rad_s)
 
   // TODO convert rad/s to PWM
   msg.add_velocity(rad_s);
-  right_motor_publisher.Publish(msg);
+  ESP_LOGI(TAG, "Publishing right actuator message");
+  const bool published = right_motor_publisher.Publish(msg);
+  ESP_LOGI(TAG, "Right actuator publish returned: %d", published);
 }
 
 void Encoder_SITL::publish_motor_left(double rad_s)
@@ -64,7 +66,9 @@ void Encoder_SITL::publish_motor_left(double rad_s)
 
   // TODO convert rad/s to PWM
   msg.add_velocity(rad_s);
-  left_motor_publisher.Publish(msg);
+  ESP_LOGI(TAG, "Publishing left actuator message");
+  const bool published = left_motor_publisher.Publish(msg);
+  ESP_LOGI(TAG, "Left actuator publish returned: %d", published);
 }
 
 void Encoder_SITL::make_encoder_topic(char* buf, std::size_t size)

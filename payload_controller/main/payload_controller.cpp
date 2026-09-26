@@ -2,6 +2,8 @@
 #include "dds_client.hpp"
 #include "encoder.hpp"
 #include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "imu.hpp"
 
 #include <cstring>

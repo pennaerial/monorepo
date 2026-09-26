@@ -215,7 +215,7 @@ void DDSClient::update()
 {
   bool wrote_data = false;
   std::size_t writes_since_confirm = 0;
-  ESP_LOGI(TAG, "Pending messages: %d", pending_publishes_.size());
+  ESP_LOGI(TAG, "Pending messages: %zu", pending_publishes_.size());
 
   // Drain every queued message, preserving publish() call order across topics.
   // A reliable stream with history N has N blocks, so confirm delivery before
