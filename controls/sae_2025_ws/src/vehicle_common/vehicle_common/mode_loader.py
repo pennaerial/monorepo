@@ -25,7 +25,6 @@ class RegisteredMode(BaseModel):
     mode_cls: type[Mode]
     params_cls: type[ParamsBase] = ParamsBase
     targets: list[type[Vehicle]] = []
-    peer_vehicle_names: list[str] = []
     transition_labels: list[str] = []
 
     # define field serializers if we want future static inspection w/ JSONs
@@ -73,7 +72,6 @@ class RegisteredMode(BaseModel):
                 f"  class:       {self.mode_cls.__name__}",
                 f"  params:      {self.params_cls.__name__}",
                 f"  targets:     {names(self.targets)}",
-                f"  peers:       {', '.join(self.peer_vehicle_names) or '—'}",
                 f"  transitions: {', '.join(self.transition_labels) or '—'}",
             ]
         )
@@ -143,7 +141,6 @@ def register_mode(
     id: str,
     targets: list[type[Vehicle]],
     params_cls: type[ParamsBase] = ParamsBase,
-    peer_vehicle_names: list[str] = [],
     transition_labels: list[str] = [],
 ):
     """Class decorator that registers a Mode in the Mode Registry.
@@ -154,7 +151,6 @@ def register_mode(
     Args:
         id: used as main key to store and retrieve RegisteredMode objects
         targets: Vehicle types this mode is valid for
-        peer_vehicle_names: Names of peer vehicles this mode depends on
         transition_labels: Labels describing valid transitions into/out
             of this mode, used by whatever drives mode switching.
 
@@ -170,7 +166,6 @@ def register_mode(
                 targets=targets,
                 mode_cls=registered_mode_cls,
                 params_cls=params_cls,
-                peer_vehicle_names=peer_vehicle_names,
                 transition_labels=transition_labels,
             )
         )

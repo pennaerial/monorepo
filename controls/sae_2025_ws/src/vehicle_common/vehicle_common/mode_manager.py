@@ -25,8 +25,6 @@ class ModeManager(Node, ABC):
         *,
         vehicle_name: str = "",
         auto_launch: bool = True,
-        peer_heartbeat_hz: float = 10.0,
-        peer_stale_timeout_s: float = 0.5,
     ) -> None:
         super().__init__(node_name)
         self.vehicle: Vehicle | None = None
@@ -38,17 +36,6 @@ class ModeManager(Node, ABC):
         self.auto_launch = bool(auto_launch)
         self._auto_launch_timer = None
         self._runtime_vehicle_name = str(vehicle_name or "").strip().strip("/")
-        self.peer_heartbeat_hz = float(peer_heartbeat_hz)
-        self.peer_stale_timeout_s = float(peer_stale_timeout_s)
-        if self.peer_heartbeat_hz <= 0.0:
-            raise ValueError(f"peer_heartbeat_hz must be positive, got {self.peer_heartbeat_hz!r}.")
-        if self.peer_stale_timeout_s <= 0.0:
-            raise ValueError(
-                f"peer_stale_timeout_s must be positive, got {self.peer_stale_timeout_s!r}."
-            )
-        self._shared_mode_state = {}
-        self._current_comm_builder = None
-        self._runtime_closed = False
         self.start_mission_service = self.create_service(
             Trigger, "mode_manager/start_mission", self._start_mission_callback
         )
@@ -62,9 +49,6 @@ class ModeManager(Node, ABC):
 
     def get_active_mode(self) -> Mode:
         return self.modes[cast(str, self.active_mode)]
-
-    def _now_seconds(self) -> float:
-        return self.get_clock().now().nanoseconds * 1e-9
 
     def _mission_started_marker_path(self) -> Path:
         explicit_path = os.environ.get(MISSION_STARTED_MARKER_ENV, "").strip()

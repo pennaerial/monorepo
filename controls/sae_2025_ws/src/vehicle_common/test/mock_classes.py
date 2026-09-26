@@ -37,7 +37,6 @@ class MockRequiredParams(ParamsBase):
     id="mock.VerticalTakeoffMode",
     params_cls=MockVerticalTakeoffParams,
     targets=[MockVehicle],
-    peer_vehicle_names=["peer1"],
     transition_labels=["complete"],
 )
 class MockVerticalTakeoffMode(Mode):
@@ -49,10 +48,9 @@ class MockVerticalTakeoffMode(Mode):
     id="mock.loiter",
     params_cls=MockParams,
     targets=[MockVehicle],
-    peer_vehicle_names=["peer1"],
 )
 class MockLoiterMode(Mode):
-    """Second mock mode sharing the vehicle target and peer metadata."""
+    """Second mock mode sharing the vehicle target."""
 
 
 @register_mode(

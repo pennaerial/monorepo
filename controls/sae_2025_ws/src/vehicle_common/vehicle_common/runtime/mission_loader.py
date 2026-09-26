@@ -5,9 +5,7 @@ from typing import Any
 import yaml
 from ament_index_python.packages import get_package_share_directory
 from pydantic import BaseModel, ConfigDict, PrivateAttr
-from rclpy.node import Node
 
-from vehicle_common.mode import Mode
 from vehicle_common.mode_loader import ModeRegistry, RegisteredMode
 from vehicle_common.vehicle import Vehicle
 
@@ -26,10 +24,6 @@ class RuntimeMode(BaseModel):
         self._registered = mode_registry.get_registered_mode(self.mode)
         self._validated_params = self._registered.params_cls.model_validate(self.params)
 
-    def instantiate_mode(self, node: Node, vehicle: Vehicle) -> Mode:
-        mode = self._registered.mode_cls()
-        mode.initialize(node, vehicle, self._validated_params)
-        return mode
 
 
 class RuntimeMission(BaseModel):

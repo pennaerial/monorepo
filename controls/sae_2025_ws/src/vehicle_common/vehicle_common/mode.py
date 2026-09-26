@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import ClassVar, Mapping
+from typing import ClassVar
 
 from pydantic import BaseModel
 from rclpy.node import Node
@@ -13,7 +13,6 @@ class Mode[VehicleT: Vehicle, ParamsT: BaseModel](ABC):
     Provides a structured template for implementing autonomous behaviors.
     """
 
-    peer_vehicle_names: ClassVar[tuple[str, ...]] = ()
     transition_labels: ClassVar[tuple[str, ...]] = ()
 
     # self attributes
@@ -58,27 +57,6 @@ class Mode[VehicleT: Vehicle, ParamsT: BaseModel](ABC):
         """
         pass
 
-    def on_disconnect(self, time_delta: float, connection_status: Mapping[str, bool]) -> None:
-        """
-        Periodic logic executed while one or more required peers are disconnected.
-
-        Args:
-            time_delta (float): Time in seconds since the last update.
-            connection_status (Mapping[str, bool]): Current mission peer connection map.
-        """
-        pass
-
-    def connection_ready(self, connection_status: Mapping[str, bool]) -> bool:
-        """
-        Return whether the mode has enough peer connectivity to run `on_update()`.
-
-        `connection_status` contains only this mode's relevant remote peers.
-        The default implementation treats every provided peer as required.
-        """
-        if not connection_status:
-            return True
-        return all(bool(is_connected) for is_connected in connection_status.values())
-
     @abstractmethod
     def check_status(self) -> str:
         """
@@ -111,17 +89,6 @@ class Mode[VehicleT: Vehicle, ParamsT: BaseModel](ABC):
         """
         if self.active:
             self.on_update(time_delta)
-
-    def disconnect(self, time_delta: float, connection_status: Mapping[str, bool]) -> None:
-        """
-        Update the mode's disconnected behavior if it is active.
-
-        Args:
-            time_delta (float): Time in seconds since the last update.
-            connection_status (Mapping[str, bool]): Current mission peer connection map.
-        """
-        if self.active:
-            self.on_disconnect(time_delta, connection_status)
 
     def log(self, message: str) -> None:
         """

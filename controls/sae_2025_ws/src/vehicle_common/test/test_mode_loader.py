@@ -63,7 +63,6 @@ def test_get_registered_mode():
     assert m.id == "mock"
     assert m.mode_cls == MockMode
     assert m.targets == [MockVehicle]
-    assert m.peer_vehicle_names == []
 
 
 def test_registered_mode_to_json():
@@ -84,7 +83,6 @@ def test_registered_mode_to_json():
 
     assert data["targets"] == [serialize_type(MockVehicle)]
 
-    assert data["peer_vehicle_names"] == []
     assert data["transition_labels"] == []
 
 
@@ -112,7 +110,6 @@ def test_registered_mode_json_round_trip():
         mode_cls=MockMode,
         params_cls=MockParams,
         targets=[MockVehicle],
-        peer_vehicle_names=["vehicle1"],
         transition_labels=["done"],
     )
 
@@ -165,7 +162,6 @@ def test_mode_registry_json_round_trip():
                 "targets": [
                     "mock_classes:MockVehicle"
                 ],
-                "peer_vehicle_names": [],
                 "transition_labels": []
             }
         }

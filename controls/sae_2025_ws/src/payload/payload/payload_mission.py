@@ -23,14 +23,6 @@ class PayloadMissionBootstrap(Node):
             )
         return value
 
-    def _float_parameter(self, name: str) -> float:
-        value = self.get_parameter(name).value
-        if not isinstance(value, (int, float)) or isinstance(value, bool):
-            raise ValueError(
-                f"payload_mission requires numeric parameter '{name}', received {value!r}."
-            )
-        return float(value)
-
     def manager_kwargs(self) -> dict:
         mission_path = str(self.get_parameter("mode_map").value)
         if not mission_path:
