@@ -3,7 +3,6 @@ string name       # Gazebo entity name, e.g. "circle_0"
 string shape      # config key: circle, square, triangle, star
 string model      # gz-models model dir, e.g. "InHouse2027Circle"
 string color      # palette entry drawn for this instance, e.g. "purple"
-float64 scale     # x/y scale factor drawn for this instance; 1.0 is the ~1 m default
 int32 tag_id      # tag36h11 id, or -1 when tags are disabled
 float64 x         # world-frame position, metres
 float64 y         # world-frame position, metres
