@@ -30,10 +30,12 @@ void Encoder_SITL::start()
   gz_node_.Subscribe(topic, &Encoder_SITL::on_encoder_msg, this);
 
   ESP_LOGI(TAG, "Enabling posting to %s", poster_right);
-  right_motor_publisher = gz_node_.Advertise<gz::msgs::Actuators>(poster_right);
+  right_motor_publisher = motor_node_.Advertise<gz::msgs::Actuators>(poster_right);
+  ESP_LOGI(TAG, "Right actuator publisher valid: %d", right_motor_publisher.Valid());
 
   ESP_LOGI(TAG, "Enabling posting to %s", poster_left);
-  left_motor_publisher = gz_node_.Advertise<gz::msgs::Actuators>(poster_left);
+  left_motor_publisher = motor_node_.Advertise<gz::msgs::Actuators>(poster_left);
+  ESP_LOGI(TAG, "Left actuator publisher valid: %d", left_motor_publisher.Valid());
 }
 
 void Encoder_SITL::make_motor_advertiser_right(char* buf, std::size_t size)
@@ -53,9 +55,11 @@ void Encoder_SITL::publish_motor_right(double rad_s)
 
   // TODO convert rad/s to PWM
   msg.add_velocity(rad_s);
-  ESP_LOGI(TAG, "Publishing right actuator message");
+  if (!right_motor_publisher.Valid()) {
+    return;
+  }
+
   const bool published = right_motor_publisher.Publish(msg);
-  ESP_LOGI(TAG, "Right actuator publish returned: %d", published);
 }
 
 void Encoder_SITL::publish_motor_left(double rad_s)
@@ -66,9 +70,11 @@ void Encoder_SITL::publish_motor_left(double rad_s)
 
   // TODO convert rad/s to PWM
   msg.add_velocity(rad_s);
-  ESP_LOGI(TAG, "Publishing left actuator message");
+  if (!left_motor_publisher.Valid()) {
+    return;
+  }
+
   const bool published = left_motor_publisher.Publish(msg);
-  ESP_LOGI(TAG, "Left actuator publish returned: %d", published);
 }
 
 void Encoder_SITL::make_encoder_topic(char* buf, std::size_t size)

@@ -20,19 +20,18 @@ void testCallback(const Topic& topic, const void* msg, uint16_t length, void* ar
     return;
   }
 
+  static uint32_t callback_count = 0;
+  ++callback_count;
+
   const sensor_msgs_msg_Imu* imu_msg = static_cast<const sensor_msgs_msg_Imu*>(msg);
-  ESP_LOGI(TAG, "DDS IMU callback orientation: [%f, %f, %f, %f]",
-           imu_msg->orientation.x, imu_msg->orientation.y, imu_msg->orientation.z, imu_msg->orientation.w);
+  if ((callback_count % 10) == 0) {
+    ESP_LOGI(TAG, "DDS IMU callback #%u orientation: [%f, %f, %f, %f]",
+             callback_count, imu_msg->orientation.x, imu_msg->orientation.y, imu_msg->orientation.z, imu_msg->orientation.w);
+  }
 }
 
 extern "C" void app_main(void)
 {
-  drivers::IMU* imu = drivers::IMU::instance();
-  imu->start();
-
-  drivers::Encoder* encoders = drivers::Encoder::instance();
-  encoders->start();
-
   DDSClient dds_client("127.0.0.1", "7777");
   dds_client.init();
 
@@ -40,9 +39,14 @@ extern "C" void app_main(void)
     ESP_LOGW(TAG, "Failed to bind IMU DDS reader callback");
   }
 
+  drivers::IMU* imu = drivers::IMU::instance();
+  imu->set_dds_publisher(&dds_client, "IMU");
+  imu->start();
+
+  drivers::Encoder* encoders = drivers::Encoder::instance();
+  encoders->start();
+
   while (1) {
-    sensor_msgs_msg_Imu imu_msg = imu->get_latest();
-    dds_client.publish("IMU", &imu_msg);
     dds_client.update();
 
     encoders->publish_motor_left(10);

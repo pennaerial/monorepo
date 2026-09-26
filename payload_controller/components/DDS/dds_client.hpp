@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "sdkconfig.h"
+#include "static_mutex.hpp"
 #include "topics.h"
 
 constexpr uint32_t STREAM_HISTORY = 8;
@@ -115,6 +116,7 @@ private:
   };
 
   std::vector<PendingPublish> pending_publishes_;
+  util::StaticMutex pending_publishes_mtx_;
   std::array<ReaderCallback, topic_count> reader_callbacks_{};
   std::array<void*, topic_count> reader_callback_args_{};
 };

@@ -63,8 +63,11 @@ private:
   void publish_motor_left(double rad_s) override;
   void publish_motor_right(double rad_s) override;
 
-  /// gz node instance for communicating with gazebo
+  /// gz node instance for receiving encoder feedback from Gazebo.
   gz::transport::Node gz_node_;
+  /// Separate node for motor commands so subscriber callbacks cannot contend
+  /// with the publisher path on the same transport node.
+  gz::transport::Node motor_node_;
   // Right Encoder Publisher
   gz::transport::Node::Publisher right_motor_publisher;
   // Left Encoder Publisher

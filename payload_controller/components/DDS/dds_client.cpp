@@ -204,6 +204,7 @@ bool DDSClient::publish(const char* topic_name, const void* msg)
   }
 
   // Copy the typed message now so callers can publish stack/local data safely.
+  util::StaticMutexGuard lock(pending_publishes_mtx_);
   PendingPublish& pending = pending_publishes_.emplace_back();
   pending.topic_index = topic_index;
   pending.data.resize(topic->message_size);
@@ -213,14 +214,20 @@ bool DDSClient::publish(const char* topic_name, const void* msg)
 
 void DDSClient::update()
 {
+  std::vector<PendingPublish> pending_publishes;
+  {
+    util::StaticMutexGuard lock(pending_publishes_mtx_);
+    pending_publishes.swap(pending_publishes_);
+  }
+
   bool wrote_data = false;
   std::size_t writes_since_confirm = 0;
-  ESP_LOGI(TAG, "Pending messages: %zu", pending_publishes_.size());
+  ESP_LOGI(TAG, "Pending messages: %zu", pending_publishes.size());
 
   // Drain every queued message, preserving publish() call order across topics.
   // A reliable stream with history N has N blocks, so confirm delivery before
   // queuing more than STREAM_HISTORY normal writes into the stream.
-  for (const PendingPublish& pending : pending_publishes_) {
+  for (const PendingPublish& pending : pending_publishes) {
     if (writes_since_confirm >= STREAM_HISTORY) {
       confirm_delivery();
       writes_since_confirm = 0;
@@ -231,7 +238,6 @@ void DDSClient::update()
       ++writes_since_confirm;
     }
   }
-  pending_publishes_.clear();
 
   if (wrote_data) {
     confirm_delivery();
