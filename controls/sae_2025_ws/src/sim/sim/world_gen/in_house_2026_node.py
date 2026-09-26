@@ -5,12 +5,11 @@ import time
 import xml.etree.ElementTree as ET
 
 import rclpy
+from gz.math7 import Angle, SphericalCoordinates, Vector3d
 from pydantic import BaseModel, Field
 from rclpy.executors import ExternalShutdownException
-from sim_interfaces.msg import ObjectState
-from sim_interfaces.srv import ObjectStateList
-from sim_interfaces.msg import SearchLocation
-from sim_interfaces.srv import GetSearchLocations
+from sim_interfaces.msg import ObjectState, SearchLocation
+from sim_interfaces.srv import GetSearchLocations, ObjectStateList
 
 from sim.entity import Entity
 from sim.world_gen.world_node import WorldNode
@@ -105,6 +104,7 @@ class InHouse2026WorldNode(WorldNode):
     def __init__(self):
         super().__init__("in_house_2026_node")
         self.config = InHouse2026Config.model_validate(self.sim_params.world.config)
+        self.spherical_coordinates = self.load_world_coordinates()
         self.entities = self.sim_params.world.entities
         self.controllables = self.sim_params.world.controllables
         self.shapes: list[Entity] = []
@@ -122,6 +122,7 @@ class InHouse2026WorldNode(WorldNode):
         self.target_tag_id: int = -1
         self.query_search_locations_service = self.create_service(GetSearchLocations, "get_search_patches", self.get_patches_callback)
         self.patches_ready = False
+        self.num_patches = 1 # TODO: make this a configurable param in the yaml
 
 
         if self.config.seed is not None:
@@ -354,10 +355,103 @@ class InHouse2026WorldNode(WorldNode):
             response.objects.append(obj)
         return response
 
+    def load_world_coordinates(self) -> SphericalCoordinates:
+        """Read the world's geographic reference once when the node starts."""
+        world_path = os.path.join(
+            os.environ["PENNAIR_GZ_MODELS_PATH"], "worlds", f"{self.world}.sdf"
+        )
+        coordinates = ET.parse(world_path).find("./world/spherical_coordinates")
+        if coordinates is None:
+            raise ValueError(f"No geographic origin found in {world_path}")
+        if (
+            coordinates.findtext("surface_model", "EARTH_WGS84") != "EARTH_WGS84"
+            or coordinates.findtext("world_frame_orientation", "ENU") != "ENU"
+        ):
+            raise ValueError("Patch GPS conversion requires an EARTH_WGS84, ENU world")
+
+        return SphericalCoordinates(
+            SphericalCoordinates.EARTH_WGS84,
+            Angle(math.radians(float(coordinates.findtext("latitude_deg", "0")))),
+            Angle(math.radians(float(coordinates.findtext("longitude_deg", "0")))),
+            float(coordinates.findtext("elevation", "0")),
+            Angle(math.radians(float(coordinates.findtext("heading_deg", "0")))),
+        )
+
+    def world_xy_to_gps(self, center_xy: XY) -> tuple[float, float]:
+        """Convert a ground point (world z=0) to latitude/longitude in degrees."""
+        # Match Gazebo NavSat: LOCAL2 handles world heading; SPHERICAL uses radians.
+        geographic = self.spherical_coordinates.position_transform(
+            Vector3d(center_xy[0], center_xy[1], 0.0),
+            SphericalCoordinates.LOCAL2,
+            SphericalCoordinates.SPHERICAL,
+        )
+        return math.degrees(geographic.x()), math.degrees(geographic.y())
+
+    def generate_patch(
+        self, center_xy: XY, radius_m: float, contains_target: bool, target_tag_id: int
+    ) -> list[Entity]:
+        """Build a patch around (east, north) in world meters; GPS is only for the service."""
+        entities: list[Entity] = []
+
+        if contains_target:
+            pass
+            # generate target shape first
+        
+
+        # now generate shapes with tag id != taget_tag_id. tags don't have to be unique
+
+
+
+        return entities
+
+
+
+
     def generate_world(self):
+        # need to set random apriltag id
+
+        # self.search_locations: list[SearchLocation] = []
+        # self.target_tag_id: int = -1
+        # self.query_search_locations_service = self.create_service(GetSearchLocations, "get_search_patches", self.get_patches_callback)
+        # self.patches_ready = False
+
+        
+        # TODO: maybe need to protect against multiple calls to generate_world
+        target_patch = self.rng.randrange(self.num_patches)
+        if self.config.tags.enabled:
+            available_tags = self.available_tag_ids()
+            self.target_tag_id = self.rng.choice(available_tags)
+
+        self.shapes = []
+        self.search_locations = []
+        self.patches_ready = False
+        for i in range(self.num_patches):
+            # Fixed location for the p=1 milestone. Later, sample separated XY centers.
+            center_xy = (5.0, 5.0)
+            radius_m = 4.0
+            contains_target_id = (i == target_patch)
+            patch_entities = self.generate_patch(
+                center_xy=center_xy,
+                radius_m=radius_m,
+                contains_target=contains_target_id,
+                target_tag_id=self.target_tag_id,
+            )
+            self.shapes.extend(patch_entities)
+
+            # Convert center to lat, long for service querying
+            latitude, longitude = self.world_xy_to_gps(center_xy)
+            location = SearchLocation()
+            location.latitude_deg = latitude
+            location.longitude_deg = longitude
+            location.radius_m = radius_m
+            self.search_locations.append(location)
+
+
+
         # reset so re-triggering generate_world doesn't stack keep-out zones
         self.keep_out = list(self.config.keep_out)
         self.shapes = self.random_shapes()
+
         self.generated_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         self.get_logger().info(
             f"Object state ready for {len(self.object_states)} shapes; "
