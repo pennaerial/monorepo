@@ -63,7 +63,7 @@ jobs:
         working-directory: /root/monorepo
         run: |
           git fetch --no-recurse-submodules origin "${{ github.sha }}"
-          git clean -fd 
+          git clean -fdx
           git checkout "${{ github.sha }}"
           bash ci/update_submodules.sh
 
@@ -116,7 +116,7 @@ jobs:
         working-directory: /root/monorepo
         run: |
           git fetch --no-recurse-submodules origin  "${{ github.sha }}"
-          git clean -fd
+          git clean -fdx
           git checkout "${{ github.sha }}"
           bash ci/update_submodules.sh
 
