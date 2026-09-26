@@ -53,9 +53,6 @@ void DDSClient::run()
   // XRCE session to run on.
   if (!uxr_create_session(&session_)) {
     ESP_LOGE(TAG, "Error creating session");
-#if defined(UCLIENT_PROFILE_CUSTOM_TRANSPORT)
-    dds_uart_transport::close(transport_);
-#endif
     return;
   }
   ESP_LOGI(TAG, "UXR Session created");
