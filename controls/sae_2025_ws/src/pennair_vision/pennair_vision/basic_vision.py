@@ -2,13 +2,9 @@ from typing import override
 
 import cv2
 import rclpy
-
-from rclpy.executors import ExternalShutdownException
-
-from rclpy.lifecycle import LifecycleNode
-from rclpy.lifecycle import TransitionCallbackReturn
-
 from cv_bridge import CvBridge
+from rclpy.executors import ExternalShutdownException
+from rclpy.lifecycle import LifecycleNode, TransitionCallbackReturn
 from sensor_msgs.msg import Image
 from std_msgs.msg import Int32
 
