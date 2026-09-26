@@ -2,8 +2,8 @@
 
 #include <uxr/client/client.h>
 
-#include <cstddef>
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <vector>
 

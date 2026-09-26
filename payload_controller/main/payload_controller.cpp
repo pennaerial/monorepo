@@ -1,12 +1,12 @@
 
+#include <cstring>
+
 #include "dds_client.hpp"
 #include "encoder.hpp"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "imu.hpp"
-
-#include <cstring>
 
 const char* TAG{"APP_MAIN"};
 
@@ -25,8 +25,10 @@ void testCallback(const Topic& topic, const void* msg, uint16_t length, void* ar
 
   const sensor_msgs_msg_Imu* imu_msg = static_cast<const sensor_msgs_msg_Imu*>(msg);
   if ((callback_count % 10) == 0) {
-    ESP_LOGI(TAG, "DDS IMU callback #%u orientation: [%f, %f, %f, %f]",
-             callback_count, imu_msg->orientation.x, imu_msg->orientation.y, imu_msg->orientation.z, imu_msg->orientation.w);
+    ESP_LOGI(
+        TAG, "DDS IMU callback #%u orientation: [%f, %f, %f, %f]", callback_count, imu_msg->orientation.x,
+        imu_msg->orientation.y, imu_msg->orientation.z, imu_msg->orientation.w
+    );
   }
 }
 

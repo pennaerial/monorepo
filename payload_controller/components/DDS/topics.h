@@ -8,10 +8,10 @@
 #include "sensor_msgs/msg/Imu.h"
 
 constexpr uxrQoS_t DEFAULT_QOS = {
-  UXR_DURABILITY_VOLATILE,
-  UXR_RELIABILITY_BEST_EFFORT,
-  UXR_HISTORY_KEEP_LAST,
-  1,
+    UXR_DURABILITY_VOLATILE,
+    UXR_RELIABILITY_BEST_EFFORT,
+    UXR_HISTORY_KEEP_LAST,
+    1,
 };
 
 constexpr uint16_t DEFAULT_PUBLISHER_KEY = 0x01;
@@ -88,35 +88,41 @@ constexpr Topic make_topic(
 {
   using Adapter = TopicTypeAdapter<MessageT, SizeOfTopic, SerializeTopic, DeserializeTopic>;
   return {
-    name,
-    topic_name,
-    type_name,
-    qos,
-    dir,
-    sizeof(MessageT),
-    Adapter::size_of_topic,
-    Adapter::serialize_topic,
-    Adapter::deserialize_topic,
+      name,
+      topic_name,
+      type_name,
+      qos,
+      dir,
+      sizeof(MessageT),
+      Adapter::size_of_topic,
+      Adapter::serialize_topic,
+      Adapter::deserialize_topic,
   };
 }
 
 // This is the only list users should normally edit when adding DDS topics.
 // The generated functions passed to make_topic() must match the DDS type_name.
 constexpr Topic topics[] = {
-  make_topic<
-      sensor_msgs_msg_Imu,
-      sensor_msgs_msg_Imu_size_of_topic,
-      sensor_msgs_msg_Imu_serialize_topic,
-      sensor_msgs_msg_Imu_deserialize_topic>(
-      "IMU", "rt/imu", "sensor_msgs::msg::dds_::Imu_", Topic::Direction::WRITER
-  ),
-  make_topic<
-      sensor_msgs_msg_Imu,
-      sensor_msgs_msg_Imu_size_of_topic,
-      sensor_msgs_msg_Imu_serialize_topic,
-      sensor_msgs_msg_Imu_deserialize_topic>(
-      "IMU Reader", "rt/imu", "sensor_msgs::msg::dds_::Imu_", Topic::Direction::READER
-  ),
+    make_topic<
+        sensor_msgs_msg_Imu,
+        sensor_msgs_msg_Imu_size_of_topic,
+        sensor_msgs_msg_Imu_serialize_topic,
+        sensor_msgs_msg_Imu_deserialize_topic>(
+        "IMU",
+        "rt/imu",
+        "sensor_msgs::msg::dds_::Imu_",
+        Topic::Direction::WRITER
+    ),
+    make_topic<
+        sensor_msgs_msg_Imu,
+        sensor_msgs_msg_Imu_size_of_topic,
+        sensor_msgs_msg_Imu_serialize_topic,
+        sensor_msgs_msg_Imu_deserialize_topic>(
+        "IMU Reader",
+        "rt/imu",
+        "sensor_msgs::msg::dds_::Imu_",
+        Topic::Direction::READER
+    ),
 };
 
 constexpr std::size_t topic_count = sizeof(topics) / sizeof(topics[0]);

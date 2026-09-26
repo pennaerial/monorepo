@@ -1,8 +1,8 @@
 #include "dds_client.hpp"
 
-#include "esp_log.h"
-
 #include <cstring>
+
+#include "esp_log.h"
 
 #ifndef CONFIG_IDF_TARGET_LINUX
 #include "uart_transport.hpp"
@@ -21,7 +21,7 @@ bool same_object_id(const uxrObjectId lhs, const uxrObjectId rhs)
 {
   return lhs.id == rhs.id && lhs.type == rhs.type;
 }
-}
+}  // namespace
 
 DDSClient::DDSClient(const char* ip, const char* port) : ip_(ip), port_(port) {}
 
@@ -79,13 +79,11 @@ void DDSClient::init()
       "default_xrce_participant", UXR_REPLACE
   );
 
-  uint16_t publisher_req = uxr_buffer_create_publisher_bin(
-      &session_, reliable_out_, publisher_id, participant_id, UXR_REPLACE
-  );
+  uint16_t publisher_req =
+      uxr_buffer_create_publisher_bin(&session_, reliable_out_, publisher_id, participant_id, UXR_REPLACE);
 
-  uint16_t subscriber_req = uxr_buffer_create_subscriber_bin(
-      &session_, reliable_out_, subscriber_id, participant_id, UXR_REPLACE
-  );
+  uint16_t subscriber_req =
+      uxr_buffer_create_subscriber_bin(&session_, reliable_out_, subscriber_id, participant_id, UXR_REPLACE);
 
   // Participant, one Publisher, one Subscriber, every Topic, every DataWriter,
   // and each DataReader plus its request_data stream request.
@@ -136,7 +134,8 @@ void DDSClient::generate_writers(uint16_t requests[], std::size_t& request_count
 
     ESP_LOGI(TAG, "Creating DDS datawriter %s", topic.name);
     requests[request_count++] = uxr_buffer_create_datawriter_bin(
-        &session_, reliable_out_, datawriter_id(topic_index), publisher_id, topic_id(topic_index), topic.qos, UXR_REPLACE
+        &session_, reliable_out_, datawriter_id(topic_index), publisher_id, topic_id(topic_index), topic.qos,
+        UXR_REPLACE
     );
   }
 }
@@ -160,14 +159,15 @@ void DDSClient::generate_readers(uint16_t requests[], std::size_t& request_count
     // delivered to on_topic_callback until we request it from the Agent.
     uxrDeliveryControl delivery_control{};
     delivery_control.max_samples = UXR_MAX_SAMPLES_UNLIMITED;
-    requests[request_count++] = uxr_buffer_request_data(&session_, reliable_out_, reader_id, reliable_in_, &delivery_control);
+    requests[request_count++] =
+        uxr_buffer_request_data(&session_, reliable_out_, reader_id, reliable_in_, &delivery_control);
   }
 }
 
 bool DDSClient::topic_matches(const Topic& topic, const char* topic_name) const
 {
   return topic_name != nullptr &&
-      (std::strcmp(topic.name, topic_name) == 0 || std::strcmp(topic.topic_name, topic_name) == 0);
+         (std::strcmp(topic.name, topic_name) == 0 || std::strcmp(topic.topic_name, topic_name) == 0);
 }
 
 const Topic* DDSClient::find_topic(const char* topic_name, std::size_t& topic_index) const
@@ -257,8 +257,7 @@ bool DDSClient::send_publish(const std::size_t topic_index, const void* msg)
 
   ucdrBuffer ub;
   const uint32_t topic_size = topic.size_of_topic(msg, 0);
-  const bool use_fragmented_stream =
-      topic_size + ESTIMATED_XRCE_WRITE_OVERHEAD > RELIABLE_STREAM_BLOCK_SIZE;
+  const bool use_fragmented_stream = topic_size + ESTIMATED_XRCE_WRITE_OVERHEAD > RELIABLE_STREAM_BLOCK_SIZE;
 
   uint16_t request_id = UXR_INVALID_REQUEST_ID;
   if (use_fragmented_stream) {
