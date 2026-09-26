@@ -4,7 +4,6 @@ from px4_msgs.msg import VehicleStatus
 from std_srvs.srv import Trigger
 from vehicle_common.mode_manager import ModeManager
 from vehicle_common.runtime.mission_loader import RuntimeMission
-from vehicle_common.runtime.vision_loader import canonical_vision_node_path
 
 from uav.modes.LandingMode import LandingMode
 from uav.vehicles.AirframeClass import AirframeClass
@@ -27,16 +26,12 @@ class UAVModeManager(ModeManager):
         vehicle_class: AirframeClass = AirframeClass.MULTICOPTER,
         camera_offsets=None,
         auto_launch: bool = True,
-        peer_heartbeat_hz: float = 10.0,
-        peer_stale_timeout_s: float = 0.5,
         node_name: str = "mission",
     ) -> None:
         super().__init__(
             node_name,
             vehicle_name=vehicle_name,
             auto_launch=auto_launch,
-            peer_heartbeat_hz=peer_heartbeat_hz,
-            peer_stale_timeout_s=peer_stale_timeout_s,
         )
         if UAV not in mission_spec._targets:
             raise ValueError(
@@ -69,7 +64,6 @@ class UAVModeManager(ModeManager):
             self.vehicle = Multicopter(self, **vehicle_kwargs)
 
         self.get_logger().info("Mission Node has started.")
-        self.setup_vision([canonical_vision_node_path(vc) for vc in mission_spec._vision_nodes])
         self.setup_modes(mission_spec)
 
     def _auto_launch_ready(self) -> bool:

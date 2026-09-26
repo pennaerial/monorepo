@@ -22,14 +22,6 @@ param set-default NAV_FORCE_VT 0
 
 ## Troubleshooting
 
-### AprilTag missions fail immediately or no detector is available
-
-Install the runtime Python dependencies on the machine running the vision nodes:
-
-```bash
-python3 -m pip install "pydantic>=2,<3" apriltag
-```
-
 ### `auto_launch: false` and the mission never starts
 
 This is expected. The stack still launches, but the mission stays idle until `/<vehicle>/mode_manager/start_mission` is called. This applies to both UAV and payload missions.
@@ -37,14 +29,3 @@ This is expected. The stack still launches, but the mission stays idle until `/<
 ```bash
 ros2 service call /<vehicle>/mode_manager/start_mission std_srvs/srv/Trigger "{}"
 ```
-
-### Sim came up headless or with the wrong GUI mode
-
-GUI is the default. Either of these forces headless mode:
-
-- `SAE_SIM_GUI=0`
-- `SAE_SIM_HEADLESS=1`
-
-### Payload hardware issues
-
-For `pigpiod`, `GPIOController`, and payload hardware bringup details, use [payload/README.md](../../payload/README.md).
