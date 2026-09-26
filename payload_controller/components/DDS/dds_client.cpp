@@ -28,7 +28,6 @@ DDSClient::DDSClient(const char* ip, const char* port) : ip_(ip), port_(port) {}
 
 void DDSClient::run()
 {
-
 #if defined(CONFIG_IDF_TARGET_LINUX)
   if (!uxr_init_udp_transport(&transport_, UXR_IPv4, ip_, port_)) {
     ESP_LOGE(TAG, "UXR UDP transport failed to init!");
@@ -66,9 +65,8 @@ void DDSClient::run()
   reliable_out_ =
       uxr_create_output_reliable_stream(&session_, output_reliable_stream_buffer_, BUFFER_SIZE, STREAM_HISTORY);
 
-  reliable_in_ = uxr_create_input_reliable_stream(
-      &session_, input_reliable_stream_buffer_, BUFFER_SIZE, STREAM_HISTORY
-  );
+  reliable_in_ =
+      uxr_create_input_reliable_stream(&session_, input_reliable_stream_buffer_, BUFFER_SIZE, STREAM_HISTORY);
 
   uxrObjectId participant_id = uxr_object_id(OBJECT_INSTANCE_ID, UXR_PARTICIPANT_ID);
   const char* participant_xml =
