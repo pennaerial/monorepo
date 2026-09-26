@@ -86,6 +86,7 @@ class TagConfig(BaseModel):
     size: float = 0.0254  # Size defaults to 2.54 cm = 1 in
     id_range: tuple[int, int] = (10, 586)  # Range of potential ids
 
+
 class SizeConfig(BaseModel):
     """Per-instance X/Y scale drawn for each spawned shape. Thickness is never scaled."""
 
@@ -160,7 +161,9 @@ class InHouse2026WorldNode(WorldNode):
     def sample_position(self, placed: list[XY]) -> XY | None:
         """Rejection-sample an xy inside `area` honouring keep_out and min_spacing."""
         (x_min, y_min), (x_max, y_max) = self.config.area
-        min_sq = self.config.min_spacing**2 # Uses old min_spacing (centre-to-centre), so won't work with new edge-to-edge value
+        min_sq = (
+            self.config.min_spacing**2
+        )  # Uses old min_spacing (centre-to-centre), so won't work with new edge-to-edge value
 
         for _ in range(MAX_PLACEMENT_ATTEMPTS):
             x = self.rng.uniform(x_min, x_max)
@@ -383,7 +386,6 @@ class InHouse2026WorldNode(WorldNode):
             element.text = " ".join(values)
         return ET.tostring(root, encoding="unicode")
 
-
     def object_state_req(self, request, response):
         """Serve the tag, colour and pose of every spawned shape so runs can be graded."""
         response.world = self.world
@@ -454,7 +456,9 @@ class InHouse2026WorldNode(WorldNode):
             return x, y
         raise ValueError("Could not place all patches; enlarge area or reduce num_patches")
 
-    def sample_patch_position(self, center_xy: XY, radius_m: float, placed: list[XYR], own_radius: float) -> XY:
+    def sample_patch_position(
+        self, center_xy: XY, radius_m: float, placed: list[XYR], own_radius: float
+    ) -> XY:
         """Sample a shape center inside the circle, respecting spacing and keep-out zones."""
         cx, cy = center_xy
         for _ in range(MAX_PLACEMENT_ATTEMPTS):
