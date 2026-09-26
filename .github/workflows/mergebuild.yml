@@ -63,8 +63,8 @@ jobs:
         working-directory: /root/monorepo
         run: |
           git fetch --no-recurse-submodules origin "${{ github.sha }}"
-          git clean -fdx
-          git checkout "${{ github.sha }}"
+          git clean -ffdx
+          git checkout --force "${{ github.sha }}"
           bash ci/update_submodules.sh
 
       - name: Quick Install Dependencies
@@ -116,8 +116,8 @@ jobs:
         working-directory: /root/monorepo
         run: |
           git fetch --no-recurse-submodules origin  "${{ github.sha }}"
-          git clean -fdx
-          git checkout "${{ github.sha }}"
+          git clean -ffdx
+          git checkout --force "${{ github.sha }}"
           bash ci/update_submodules.sh
 
       - name: Quick Install Dependencies
