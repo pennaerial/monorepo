@@ -62,7 +62,7 @@ jobs:
       - name: Checkout PR
         working-directory: /root/monorepo
         run: |
-          git fetch origin "${{ github.sha }}"
+          git fetch --no-recurse-submodules origin "${{ github.sha }}"
           git checkout "${{ github.sha }}"
           bash ci/update_submodules.sh
 
@@ -114,7 +114,7 @@ jobs:
       - name: Checkout PR
         working-directory: /root/monorepo
         run: |
-          git fetch origin "${{ github.sha }}"
+          git fetch --no-recurse-submodules origin  "${{ github.sha }}"
           git checkout "${{ github.sha }}"
           bash ci/update_submodules.sh
 
