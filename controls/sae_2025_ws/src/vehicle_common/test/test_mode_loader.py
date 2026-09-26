@@ -1,9 +1,8 @@
 import json
 
 import pytest
-from mock_classes import MockMode, MockParams, MockVehicle, MockVisionNode, NoParamsMock
+from mock_classes import MockMode, MockParams, MockVehicle, NoParamsMock
 from pydantic import BaseModel, ValidationError
-from vehicle_common.base import VisionNode
 from vehicle_common.mode import Mode
 from vehicle_common.mode_loader import (
     ModeRegistry,
@@ -30,7 +29,7 @@ def test_deserialize_type():
 def test_deserialize_raises_wrong_base():
     path = serialize_type(MockVehicle)
     with pytest.raises(ValueError):
-        deserialize_type(path, VisionNode)
+        deserialize_type(path, Mode)
 
 
 def test_registered_mode_creation():
@@ -39,13 +38,11 @@ def test_registered_mode_creation():
         mode_cls=MockMode,
         params_cls=MockParams,
         targets=[MockVehicle],
-        required_vision_nodes=[MockVisionNode],
     )
 
     assert mode.id == "test"
     assert mode.mode_cls is MockMode
     assert mode.targets == [MockVehicle]
-    assert mode.required_vision_nodes == [MockVisionNode]
 
 
 def test_registered_mode_creation_no_params_mode():
@@ -59,17 +56,14 @@ def test_registered_mode_creation_no_params_mode():
     assert mode.mode_cls is NoParamsMock
     assert mode.params_cls is ParamsBase
     assert mode.targets == [MockVehicle]
-    assert mode.required_vision_nodes == []
 
 
 def test_get_registered_mode():
     m = mode_registry.get_registered_mode("mock")
     assert m.id == "mock"
     assert m.mode_cls == MockMode
-    assert m.required_vision_nodes == []
     assert m.targets == [MockVehicle]
     assert m.peer_vehicle_names == []
-    assert not m.requires_camera
 
 
 def test_registered_mode_to_json():
@@ -78,7 +72,6 @@ def test_registered_mode_to_json():
         mode_cls=MockMode,
         params_cls=MockParams,
         targets=[MockVehicle],
-        required_vision_nodes=[MockVisionNode],
     )
 
     json_str = mode.model_dump_json(indent=4)
@@ -91,10 +84,7 @@ def test_registered_mode_to_json():
 
     assert data["targets"] == [serialize_type(MockVehicle)]
 
-    assert data["required_vision_nodes"] == [serialize_type(MockVisionNode)]
-
     assert data["peer_vehicle_names"] == []
-    assert data["requires_camera"] is False
     assert data["transition_labels"] == []
 
 
@@ -104,7 +94,6 @@ def test_registered_mode_from_json():
         mode_cls=MockMode,
         params_cls=MockParams,
         targets=[MockVehicle],
-        required_vision_nodes=[MockVisionNode],
     )
 
     json_str = mode.model_dump_json()
@@ -115,7 +104,6 @@ def test_registered_mode_from_json():
     assert loaded.mode_cls is MockMode
     assert loaded.params_cls is MockParams
     assert loaded.targets == [MockVehicle]
-    assert loaded.required_vision_nodes == [MockVisionNode]
 
 
 def test_registered_mode_json_round_trip():
@@ -124,9 +112,7 @@ def test_registered_mode_json_round_trip():
         mode_cls=MockMode,
         params_cls=MockParams,
         targets=[MockVehicle],
-        required_vision_nodes=[MockVisionNode],
         peer_vehicle_names=["vehicle1"],
-        requires_camera=True,
         transition_labels=["done"],
     )
 
@@ -140,7 +126,6 @@ def test_registered_mode_from_json_invalid_mode_type():
         "id": "bad",
         "mode_cls": serialize_type(MockVehicle),
         "targets": [],
-        "required_vision_nodes": [],
     }
 
     with pytest.raises(ValueError):
@@ -152,7 +137,6 @@ def test_registered_mode_from_json_invalid_path():
         "id": "bad",
         "mode_cls": "not.a.real.module:FakeClass",
         "targets": [],
-        "required_vision_nodes": [],
     }
 
     with pytest.raises((ValueError, ModuleNotFoundError)):
@@ -167,7 +151,6 @@ def test_registered_mode_rejects_non_paramsbase_params_cls():
                 "mode_cls": MockMode,
                 "params_cls": BaseModel,
                 "targets": [MockVehicle],
-                "required_vision_nodes": [],
             }
         )
 
@@ -182,9 +165,7 @@ def test_mode_registry_json_round_trip():
                 "targets": [
                     "mock_classes:MockVehicle"
                 ],
-                "required_vision_nodes": [],
                 "peer_vehicle_names": [],
-                "requires_camera": false,
                 "transition_labels": []
             }
         }

@@ -19,13 +19,3 @@ world:
       model: x500_mono_cam
       position: [0, 0, 0]
       rpy: [0.0, 0.0, 0.0]
-
-# Scoring parameters
-# scoring:
-#   name: HoopScore
-#   params:
-#     vehicle_name: uav_0     # ROS identity whose PX4 state the scorer should track
-#     hoop_tolerance: 1.5       # meters - Distance tolerance for hoop passage
-#     landing_bonus: 5.0        # Points awarded for landing bonus
-#     landing_tolerance: 2.0    # meters - Distance tolerance for landing
-#     landing_altitude_max: 0.4 # meters - Maximum altitude to be considered "landed"

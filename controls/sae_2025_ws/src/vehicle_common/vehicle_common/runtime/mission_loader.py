@@ -7,7 +7,6 @@ from ament_index_python.packages import get_package_share_directory
 from pydantic import BaseModel, ConfigDict, PrivateAttr
 from rclpy.node import Node
 
-from vehicle_common.base import VisionNode
 from vehicle_common.mode import Mode
 from vehicle_common.mode_loader import ModeRegistry, RegisteredMode
 from vehicle_common.vehicle import Vehicle
@@ -39,22 +38,14 @@ class RuntimeMission(BaseModel):
     modes: dict[str, RuntimeMode]
 
     _targets: set[type[Vehicle]] = PrivateAttr()
-    _vision_nodes: set[type[VisionNode]] = PrivateAttr()
-    _requires_camera: bool = PrivateAttr()
 
     def model_post_init(self, context: Any, /) -> None:
         target_sets = []
-        vision_sets = []
-        requires_camera = False
 
         for m in self.modes.values():
             target_sets.append(set(m._registered.targets))
-            vision_sets.append(set(m._registered.required_vision_nodes))
-            requires_camera |= m._registered.requires_camera
 
         self._targets = set.intersection(*target_sets)
-        self._vision_nodes = set.union(*vision_sets)
-        self._requires_camera = requires_camera
 
     @classmethod
     def load_from_path(cls, path: Path | str):

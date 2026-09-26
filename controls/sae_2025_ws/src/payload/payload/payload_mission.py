@@ -14,7 +14,6 @@ class PayloadMissionBootstrap(Node):
         self.declare_parameter("mode_map", get_mission_path("basic", "payload"))
         self.declare_parameter("auto_launch", True)
         self.declare_parameter("vehicle_name", "")
-        self.declare_parameter("vision_debug", False)
 
     def _bool_parameter(self, name: str) -> bool:
         value = self.get_parameter(name).value
@@ -47,7 +46,6 @@ class PayloadMissionBootstrap(Node):
             "mission_spec": runtime_mission,
             "auto_launch": self._bool_parameter("auto_launch"),
             "vehicle_name": vehicle_name,
-            "vision_debug": self._bool_parameter("vision_debug"),
             "node_name": "mission",
         }
 

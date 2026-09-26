@@ -4,8 +4,6 @@ from typing import ClassVar, Mapping
 from pydantic import BaseModel
 from rclpy.node import Node
 
-from vehicle_common.base import VisionNode
-from vehicle_common.runtime.vision_loader import canonical_vision_node_path
 from vehicle_common.vehicle import Vehicle
 
 
@@ -15,14 +13,11 @@ class Mode[VehicleT: Vehicle, ParamsT: BaseModel](ABC):
     Provides a structured template for implementing autonomous behaviors.
     """
 
-    required_vision_nodes: ClassVar[tuple[object, ...]] = ()
     peer_vehicle_names: ClassVar[tuple[str, ...]] = ()
-    requires_camera: ClassVar[bool] = False
     transition_labels: ClassVar[tuple[str, ...]] = ()
 
     # self attributes
     active = False
-    pending_requests = {}
 
     @abstractmethod
     def initialize(self, node: Node, vehicle: VehicleT, params: ParamsT) -> None:
@@ -35,10 +30,6 @@ class Mode[VehicleT: Vehicle, ParamsT: BaseModel](ABC):
         """
 
     @classmethod
-    def required_vision_node_paths(cls) -> tuple[str, ...]:
-        return tuple(canonical_vision_node_path(node) for node in cls.required_vision_nodes)
-
-    @classmethod
     def declared_transition_labels(cls) -> tuple[str, ...]:
         return tuple(cls.transition_labels)
 
@@ -48,34 +39,6 @@ class Mode[VehicleT: Vehicle, ParamsT: BaseModel](ABC):
         Should include any initialization required for the mode.
         """
         pass
-
-    def send_request(self, vision_node: type["VisionNode"], request):
-        """
-        Send a request to a service.
-
-        Args:
-            request (SrvRequestT): The request to send.
-            service_name (VIsionNode): The name of the service.
-        """
-        service_name = self.vehicle.vision_service_name(vision_node)
-        future = self.pending_requests.get(service_name)
-        if future is None:
-            client = self.node.get_vision_client(vision_node)
-            future = client.call_async(request)
-            if future is None:
-                return None
-            self.pending_requests[service_name] = future
-            return None
-
-        if not future.done():
-            return None
-
-        response = future.result()
-        self.pending_requests.pop(service_name, None)
-        assert type(response) is vision_node.srv.Response, (
-            f"Expected response type {vision_node.srv.Response}, got {type(response)}."
-        )
-        return response
 
     def on_exit(self) -> None:
         """
@@ -136,7 +99,6 @@ class Mode[VehicleT: Vehicle, ParamsT: BaseModel](ABC):
         Deactivate the mode. Calls the `on_exit` method.
         """
         self.active = False
-        self.pending_requests.clear()
         self.node.get_logger().info(f"Deactivating mode: {self.__class__.__name__}")
         self.on_exit()
 

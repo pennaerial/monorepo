@@ -7,7 +7,6 @@ from typing import ClassVar
 
 from pydantic import BaseModel, ConfigDict, field_serializer, field_validator
 
-from vehicle_common.base import VisionNode  # don't want to depend on uav package
 from vehicle_common.mode import Mode
 from vehicle_common.utils import deserialize_type, serialize_type
 from vehicle_common.vehicle import Vehicle
@@ -26,9 +25,7 @@ class RegisteredMode(BaseModel):
     mode_cls: type[Mode]
     params_cls: type[ParamsBase] = ParamsBase
     targets: list[type[Vehicle]] = []
-    required_vision_nodes: list[type[VisionNode]] = []
     peer_vehicle_names: list[str] = []
-    requires_camera: bool = False
     transition_labels: list[str] = []
 
     # define field serializers if we want future static inspection w/ JSONs
@@ -42,10 +39,6 @@ class RegisteredMode(BaseModel):
 
     @field_serializer("targets")
     def serialize_targets(self, value: list[type[Vehicle]]) -> list[str]:
-        return [serialize_type(v) for v in value]
-
-    @field_serializer("required_vision_nodes")
-    def serialize_vision_nodes(self, value: list[type[VisionNode]]) -> list[str]:
         return [serialize_type(v) for v in value]
 
     # Each field_validator needs to support both actual types and strings so
@@ -73,13 +66,6 @@ class RegisteredMode(BaseModel):
             return [deserialize_type(p, Vehicle) for p in paths]
         return paths  # Vehicle types
 
-    @field_validator("required_vision_nodes", mode="before")
-    @classmethod
-    def deserialize_vision_nodes(cls, paths) -> list[type[VisionNode]]:
-        if all(isinstance(p, str) for p in paths):
-            return [deserialize_type(p, VisionNode) for p in paths]
-        return paths  # vision_node types
-
     def __str__(self) -> str:
         return "\n".join(
             [
@@ -87,9 +73,7 @@ class RegisteredMode(BaseModel):
                 f"  class:       {self.mode_cls.__name__}",
                 f"  params:      {self.params_cls.__name__}",
                 f"  targets:     {names(self.targets)}",
-                f"  vision:      {names(self.required_vision_nodes)}",
                 f"  peers:       {', '.join(self.peer_vehicle_names) or '—'}",
-                f"  camera:      {'True' if self.requires_camera else 'No'}",
                 f"  transitions: {', '.join(self.transition_labels) or '—'}",
             ]
         )
@@ -159,9 +143,7 @@ def register_mode(
     id: str,
     targets: list[type[Vehicle]],
     params_cls: type[ParamsBase] = ParamsBase,
-    required_vision_nodes: list[type[VisionNode]] = [],
     peer_vehicle_names: list[str] = [],
-    requires_camera: bool = False,
     transition_labels: list[str] = [],
 ):
     """Class decorator that registers a Mode in the Mode Registry.
@@ -172,9 +154,7 @@ def register_mode(
     Args:
         id: used as main key to store and retrieve RegisteredMode objects
         targets: Vehicle types this mode is valid for
-        required_vision_nodes: Vision node types that must be running for this mode to be usable.
         peer_vehicle_names: Names of peer vehicles this mode depends on
-        requires_camera: Whether this mode requires a camera to operate.
         transition_labels: Labels describing valid transitions into/out
             of this mode, used by whatever drives mode switching.
 
@@ -190,9 +170,7 @@ def register_mode(
                 targets=targets,
                 mode_cls=registered_mode_cls,
                 params_cls=params_cls,
-                required_vision_nodes=required_vision_nodes,
                 peer_vehicle_names=peer_vehicle_names,
-                requires_camera=requires_camera,
                 transition_labels=transition_labels,
             )
         )
