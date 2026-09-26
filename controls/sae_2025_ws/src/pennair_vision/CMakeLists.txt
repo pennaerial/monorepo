@@ -80,6 +80,7 @@ ament_python_install_package(${PROJECT_NAME})
 
 include(cmake/install_python_entry_point.cmake)
 install_python_entry_point(basic_vision_py pennair_vision.basic_vision main)
+install_python_entry_point(findstar pennair_vision.findstar main)
 
 
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
