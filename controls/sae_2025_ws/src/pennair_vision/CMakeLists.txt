@@ -1,6 +1,6 @@
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-cmake_minimum_required(VERSION 3.8)
+cmake_minimum_required(VERSION 3.19)
 project(pennair_vision)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
@@ -13,6 +13,7 @@ find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(pluginlib REQUIRED)
+find_package(ament_cmake_python REQUIRED) # for pennair_vision python module
 
 include_directories(include)
 
@@ -73,6 +74,12 @@ install(
   DIRECTORY include/
   DESTINATION include
 )
+
+############## PENNAIR_VISION AMENT_PYTHON PACKAGE #############
+ament_python_install_package(${PROJECT_NAME})
+
+include(cmake/install_python_entry_point.cmake)
+install_python_entry_point(basic_vision_py pennair_vision.basic_vision main)
 
 
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
