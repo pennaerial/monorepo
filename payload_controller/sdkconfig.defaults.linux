@@ -3,4 +3,3 @@
 #
 # default:
 CONFIG_IDF_TARGET="linux"
-CONFIG_LOG_COLORS=y

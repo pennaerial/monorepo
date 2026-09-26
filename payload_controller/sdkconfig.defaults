@@ -1,0 +1,2 @@
+# Shared settings for all targets.
+CONFIG_LOG_COLORS=y
