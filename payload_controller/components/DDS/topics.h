@@ -110,6 +110,13 @@ constexpr Topic topics[] = {
       sensor_msgs_msg_Imu_deserialize_topic>(
       "IMU", "rt/imu", "sensor_msgs::msg::dds_::Imu_", Topic::Direction::WRITER
   ),
+  make_topic<
+      sensor_msgs_msg_Imu,
+      sensor_msgs_msg_Imu_size_of_topic,
+      sensor_msgs_msg_Imu_serialize_topic,
+      sensor_msgs_msg_Imu_deserialize_topic>(
+      "IMU Reader", "rt/imu", "sensor_msgs::msg::dds_::Imu_", Topic::Direction::READER
+  ),
 };
 
 constexpr std::size_t topic_count = sizeof(topics) / sizeof(topics[0]);

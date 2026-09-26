@@ -215,6 +215,7 @@ void DDSClient::update()
 {
   bool wrote_data = false;
   std::size_t writes_since_confirm = 0;
+  ESP_LOGI(TAG, "Pending messages: %d", pending_publishes_.size());
 
   // Drain every queued message, preserving publish() call order across topics.
   // A reliable stream with history N has N blocks, so confirm delivery before
@@ -310,21 +311,19 @@ bool DDSClient::flush_output_stream(uxrSession* session, void* args)
 // Optional application hook for one received READER topic.
 bool DDSClient::set_reader_callback(const char* topic_name, ReaderCallback callback, void* args)
 {
-  std::size_t topic_index = 0;
-  const Topic* topic = find_topic(topic_name, topic_index);
-  if (topic == nullptr) {
-    ESP_LOGE(TAG, "Unknown DDS reader topic %s", topic_name == nullptr ? "<null>" : topic_name);
-    return false;
+  for (std::size_t topic_index = 0; topic_index < topic_count; ++topic_index) {
+    const Topic& topic = topics[topic_index];
+    if (topic.dir != Topic::Direction::READER || !topic_matches(topic, topic_name)) {
+      continue;
+    }
+
+    reader_callbacks_[topic_index] = callback;
+    reader_callback_args_[topic_index] = args;
+    return true;
   }
 
-  if (topic->dir != Topic::Direction::READER) {
-    ESP_LOGE(TAG, "DDS topic %s is not configured as a reader", topic->name);
-    return false;
-  }
-
-  reader_callbacks_[topic_index] = callback;
-  reader_callback_args_[topic_index] = args;
-  return true;
+  ESP_LOGE(TAG, "Unknown DDS reader topic %s", topic_name == nullptr ? "<null>" : topic_name);
+  return false;
 }
 
 // Static C callback required by Micro XRCE-DDS; routes back to this instance.

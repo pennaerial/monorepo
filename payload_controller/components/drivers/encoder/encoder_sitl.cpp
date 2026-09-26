@@ -74,18 +74,18 @@ void Encoder_SITL::make_encoder_topic(char* buf, std::size_t size)
 
 void Encoder_SITL::on_encoder_msg(const gz::msgs::Model& gz_msg)
 {
-  ESP_LOGI(TAG, "on_encoder_msg");
+  // ESP_LOGI(TAG, "on_encoder_msg");
 
-  // For each joint just print the position (which should be its rotation)
-  for (int i = 0; i < gz_msg.joint_size(); ++i) {
-    const gz::msgs::Joint& jointMsg = gz_msg.joint(i);
-    std::string name = jointMsg.name();
-    ESP_LOGI(TAG, "Joint Name: %s", name.c_str());
-    if (jointMsg.has_axis1()) {
-      double position = jointMsg.axis1().position();
-      ESP_LOGI(TAG, "Joint Position: %f", position);
-    }
-  }
+  // // For each joint just print the position (which should be its rotation)
+  // for (int i = 0; i < gz_msg.joint_size(); ++i) {
+  //   const gz::msgs::Joint& jointMsg = gz_msg.joint(i);
+  //   std::string name = jointMsg.name();
+  //   ESP_LOGI(TAG, "Joint Name: %s", name.c_str());
+  //   if (jointMsg.has_axis1()) {
+  //     double position = jointMsg.axis1().position();
+  //     ESP_LOGI(TAG, "Joint Position: %f", position);
+  //   }
+  // }
 
   //   [-]sensor_msgs_msg_encoder msg = gz_to_dds(gz_msg);
   //   [-]write_latest(msg);  // update our latest encoder value
