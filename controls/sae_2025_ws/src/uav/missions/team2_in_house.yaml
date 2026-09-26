@@ -1,0 +1,9 @@
+modes:
+  start: uav.win
+  params:
+  transitions:
+    complete: land
+
+  
+  land:
+    mode: uav.LandingMode
