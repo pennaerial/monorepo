@@ -70,7 +70,6 @@ setup(
     entry_points={
         "console_scripts": [
             "uav_mission = uav.uav_mission:main",
-            "camera = uav.CameraNode:main",
         ],
     },
 )
