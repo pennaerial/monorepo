@@ -1,0 +1,28 @@
+<?xml version="1.0" ?>
+<sdf version="1.4">
+  <model name="dlz_white">
+    <static>true</static>
+    <link name="dlz_white_link">
+      <!-- Recenter the model frame on the landing zone so spawn position matches world position. -->
+      <pose>-5.0192 0.0192 0 0 0 0</pose>
+      <inertial>
+        <mass>2</mass>
+      </inertial>
+      <visual name="visual">
+        <pose> 3.8 1.2 .1 1.5708 0 0 </pose>
+        <geometry>
+          <mesh>
+            <uri>model://dlz/meshes/dlz.STL</uri>
+            <scale> .001 .001 .001 </scale>
+          </mesh>
+        </geometry>
+        <material>
+          <ambient>1 1 1 1</ambient>
+          <diffuse>1 1 1 1</diffuse>
+          <emissive>1 1 1 1</emissive>
+          <specular>0.3 0.3 0.3 1</specular>
+        </material>
+      </visual>
+    </link>
+  </model>
+</sdf>
