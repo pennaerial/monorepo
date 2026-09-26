@@ -83,6 +83,7 @@ class InHouse2026Config(BaseModel):
     """Schema for `world.config` in simulations/in_house_2026/*.yaml"""
 
     seed: int | None = None  # set for a reproducible layout
+    num_patches: int = Field(default=1, ge=1)
     area: tuple[XY, XY] = ((-10.0, -10.0), (10.0, 10.0))  # xy min / xy max
     counts: dict[str, int] = Field(
         default_factory=lambda: {"circle": 3, "square": 3, "triangle": 3, "star": 3}
@@ -127,7 +128,6 @@ class InHouse2026WorldNode(WorldNode):
         self.generation_started = False
         self.pending_spawns = 0
         self.spawn_failed = False
-        self.num_patches = 1  # TODO: make this a configurable param in the yaml
 
         if self.config.seed is not None:
             self.rng.seed(self.config.seed)
@@ -393,6 +393,22 @@ class InHouse2026WorldNode(WorldNode):
         )
         return math.degrees(geographic.x()), math.degrees(geographic.y())
 
+    def sample_patch_center(self, radius_m: float, placed: list[XY]) -> XY:
+        """Samples patch locations and rejecting overlaps"""
+        (x_min, y_min), (x_max, y_max) = self.config.area
+        if x_max - x_min < 2 * radius_m or y_max - y_min < 2 * radius_m:
+            raise ValueError("Area is too small for the patch radius")
+        separation = 2 * radius_m + self.config.min_spacing
+        for _ in range(MAX_PLACEMENT_ATTEMPTS):
+            x = self.rng.uniform(x_min + radius_m, x_max - radius_m)
+            y = self.rng.uniform(y_min + radius_m, y_max - radius_m)
+            if any(math.hypot(x - px, y - py) < separation for px, py in placed):
+                continue
+            if any(math.hypot(x - kx, y - ky) < radius_m + kr for kx, ky, kr in self.keep_out):
+                continue
+            return x, y
+        raise ValueError("Could not place all patches; enlarge area or reduce num_patches")
+
     def sample_patch_position(self, center_xy: XY, radius_m: float, placed: list[XY]) -> XY:
         """Sample a shape center inside the circle, respecting spacing and keep-out zones."""
         cx, cy = center_xy
@@ -474,7 +490,7 @@ class InHouse2026WorldNode(WorldNode):
             return False
         return True
 
-    def log_spawn_result(self, name: str, future) -> None:
+    def _log_spawn_result(self, name: str, future) -> None:
         """Keep the existing spawn logging and mark ready only after all replies succeed."""
         super()._log_spawn_result(name, future)
         try:
@@ -487,7 +503,7 @@ class InHouse2026WorldNode(WorldNode):
             self.spawn_next_entity()
         elif not self.spawn_failed:
             self.patches_ready = True
-            self.get_logger().info("Patch rea dy; call /get_search_patches for the challenge")
+            self.get_logger().info("Patches ready; call /get_search_patches for the challenge")
 
     def generate_world(self):
         if self.generation_started:
@@ -501,18 +517,17 @@ class InHouse2026WorldNode(WorldNode):
         self.keep_out = list(self.config.keep_out)
 
         try:
-            # Multiple random patch locations come after the single-patch milestone.
-            if self.num_patches != 1:
-                raise ValueError("This fixed-location version requires num_patches = 1")
             available_tags = self.available_tag_ids()
             if not self.config.tags.enabled or len(available_tags) < 2:
                 raise ValueError("Enable AprilTags and provide at least two tag images")
-            target_patch = self.rng.randrange(self.num_patches)
+            target_patch = self.rng.randrange(self.config.num_patches)
             self.target_tag_id = self.rng.choice(available_tags)
 
-            for i in range(self.num_patches):
-                center_xy = (5.0, 5.0)
-                radius_m = 4.0
+            radius_m = 4.0
+            centers: list[XY] = []
+            for i in range(self.config.num_patches):
+                center_xy = self.sample_patch_center(radius_m, centers)
+                centers.append(center_xy)
                 patch_entities = self.generate_patch(
                     center_xy=center_xy,
                     radius_m=radius_m,
