@@ -16,6 +16,7 @@ from sim.world_gen.world_node import WorldNode
 
 RGBA = tuple[float, float, float, float]
 XY = tuple[float, float]
+XYR = tuple[float, float, float]
 
 SHAPE_MODELS = {
     "circle": "InHouse2027Circle",
@@ -23,6 +24,13 @@ SHAPE_MODELS = {
     "triangle": "InHouse2027Triangle",
     "star": "InHouse2027Star",
 }
+SHAPE_RADII = {"circle": 0.509, "square": 0.677, "triangle": 0.485, "star": 0.638}
+SCALED_XY_PATHS = (
+    "./model/link/pose",
+    "./model/link/visual/geometry/mesh/scale",
+    "./model/link/collision/pose",
+    "./model/link/collision/geometry/box/size",
+)
 
 # Give up on a shape after this many rejected samples (area too crowded / keep_out too big)
 MAX_PLACEMENT_ATTEMPTS = 200
@@ -79,6 +87,14 @@ class TagConfig(BaseModel):
     id_range: tuple[int, int] = (10, 586)  # Range of potential ids
 
 
+class SizeConfig(BaseModel):
+    """Per-instance X/Y scale drawn for each spawned shape. Thickness is never scaled."""
+
+    enabled: bool = True
+    min_scale: float = Field(default=0.75, gt=0.0)
+    max_scale: float = Field(default=1.25, gt=0.0)
+
+
 class InHouse2026Config(BaseModel):
     """Schema for `world.config` in simulations/in_house_2026/*.yaml"""
 
@@ -88,12 +104,14 @@ class InHouse2026Config(BaseModel):
     counts: dict[str, int] = Field(
         default_factory=lambda: {"circle": 3, "square": 3, "triangle": 3, "star": 3}
     )
-    min_spacing: float = 2.0  # centre-to-centre, metres
+    min_spacing: float = 0.05  # edge-to-edge, metres
+    min_patch_spacing: float = 2.0  # edge-to-edge gap between patches, metres
     keep_out: list[tuple[float, float, float]] = Field(default_factory=list)  # (x, y, radius)
     random_yaw: bool = True
     palette: dict[str, Material] = Field(default_factory=lambda: dict(DEFAULT_PALETTE))
     border: BorderConfig = Field(default_factory=BorderConfig)
     tags: TagConfig = Field(default_factory=TagConfig)
+    size: SizeConfig = Field(default_factory=SizeConfig)
 
 
 class InHouse2026WorldNode(WorldNode):
@@ -143,7 +161,9 @@ class InHouse2026WorldNode(WorldNode):
     def sample_position(self, placed: list[XY]) -> XY | None:
         """Rejection-sample an xy inside `area` honouring keep_out and min_spacing."""
         (x_min, y_min), (x_max, y_max) = self.config.area
-        min_sq = self.config.min_spacing**2
+        min_sq = (
+            self.config.min_spacing**2
+        )  # Uses old min_spacing (centre-to-centre), so won't work with new edge-to-edge value
 
         for _ in range(MAX_PLACEMENT_ATTEMPTS):
             x = self.rng.uniform(x_min, x_max)
@@ -211,6 +231,7 @@ class InHouse2026WorldNode(WorldNode):
                         "shape": shape,
                         "model": model_name,
                         "color": color,
+                        "scale": 1.0,
                         "tag_id": tag_id,
                         "x": round(xy[0], 4),
                         "y": round(xy[1], 4),
@@ -230,7 +251,7 @@ class InHouse2026WorldNode(WorldNode):
 
         t = border.thickness
         z = border.height / 2
-        # strips are centred on the boundary lines; overlap by `t` so the corners join
+        # strips are centered on the boundary lines; overlap by `t` so the corners join
         span_x = (x_max - x_min) + t
         span_y = (y_max - y_min) + t
         mid_x = (x_min + x_max) / 2
@@ -315,8 +336,6 @@ class InHouse2026WorldNode(WorldNode):
             self.get_logger().warning(f"No <model>/<link> found; skipping tag {tag_id}")
             return sdf
 
-        # the link <pose> recentres asymmetric meshes (star, triangle); undo it so the
-        # tag sits on the shape's visual centre rather than the link origin
         pose = link.find("pose")
         x, y = (float(v) for v in pose.text.split()[:2]) if pose is not None else (0.0, 0.0)
         tag_x, tag_y = -x or 0.0, -y or 0.0  # avoid rendering "-0"
@@ -340,6 +359,33 @@ class InHouse2026WorldNode(WorldNode):
         )
         return ET.tostring(root, encoding="unicode")
 
+    def with_scale(self, sdf: str, scale: float) -> str:
+        """Return `sdf` with the shape's X/Y footprint multiplied by `scale`.
+
+        Z is deliberately untouched, so every shape stays 1 cm thick and TAG_Z / the
+        collision <pose> z stay correct at any size. Must run BEFORE with_apriltag so
+        the tag reads the zeroed link <pose> and lands on the visual centre,
+        and so the tag's own plane <size> is not scaled with the shape.
+        """
+        root = ET.fromstring(sdf)
+        for path in SCALED_XY_PATHS:
+            element = root.find(path)
+            if element is None or not element.text:
+                self.get_logger().warning(f"No {path} to scale; leaving shape at 1.0x")
+                return sdf
+            values = element.text.split()
+            if path == "./model/link/pose":
+                # The meshes are already centred on their area centroid at the mesh
+                # origin; this pose only aligned the *bounding box* to the origin, which
+                # sits 96 mm (triangle) / 50 mm (star) off the visual centre. Zero it so
+                # the centroid, the tag and the reported x/y all coincide.
+                values[0] = values[1] = "0"
+            else:
+                values[0] = f"{float(values[0]) * scale:g}"
+                values[1] = f"{float(values[1]) * scale:g}"
+            element.text = " ".join(values)
+        return ET.tostring(root, encoding="unicode")
+
     def object_state_req(self, request, response):
         """Serve the tag, colour and pose of every spawned shape so runs can be graded."""
         response.world = self.world
@@ -354,6 +400,7 @@ class InHouse2026WorldNode(WorldNode):
             obj.shape = row["shape"]
             obj.model = row["model"]
             obj.color = row["color"]
+            obj.scale = float(row["scale"])
             obj.tag_id = int(row["tag_id"])
             obj.x = float(row["x"])
             obj.y = float(row["y"])
@@ -398,7 +445,7 @@ class InHouse2026WorldNode(WorldNode):
         (x_min, y_min), (x_max, y_max) = self.config.area
         if x_max - x_min < 2 * radius_m or y_max - y_min < 2 * radius_m:
             raise ValueError("Area is too small for the patch radius")
-        separation = 2 * radius_m + self.config.min_spacing
+        separation = 2 * radius_m + self.config.min_patch_spacing
         for _ in range(MAX_PLACEMENT_ATTEMPTS):
             x = self.rng.uniform(x_min + radius_m, x_max - radius_m)
             y = self.rng.uniform(y_min + radius_m, y_max - radius_m)
@@ -409,7 +456,9 @@ class InHouse2026WorldNode(WorldNode):
             return x, y
         raise ValueError("Could not place all patches; enlarge area or reduce num_patches")
 
-    def sample_patch_position(self, center_xy: XY, radius_m: float, placed: list[XY]) -> XY:
+    def sample_patch_position(
+        self, center_xy: XY, radius_m: float, placed: list[XYR], own_radius: float
+    ) -> XY:
         """Sample a shape center inside the circle, respecting spacing and keep-out zones."""
         cx, cy = center_xy
         for _ in range(MAX_PLACEMENT_ATTEMPTS):
@@ -417,9 +466,12 @@ class InHouse2026WorldNode(WorldNode):
             y = self.rng.uniform(cy - radius_m, cy + radius_m)
             if (x - cx) ** 2 + (y - cy) ** 2 > radius_m**2:
                 continue
-            if any((x - kx) ** 2 + (y - ky) ** 2 < kr**2 for kx, ky, kr in self.keep_out):
+            if any(math.hypot(x - kx, y - ky) < own_radius + kr for kx, ky, kr in self.keep_out):
                 continue
-            if any((x - px) ** 2 + (y - py) ** 2 < self.config.min_spacing**2 for px, py in placed):
+            if any(
+                math.hypot(x - px, y - py) < own_radius + pr + self.config.min_spacing
+                for px, py, pr in placed
+            ):
                 continue
             return x, y
         raise ValueError("Could not fit all patch shapes; increase radius or reduce spacing")
@@ -444,14 +496,20 @@ class InHouse2026WorldNode(WorldNode):
         gold = Material(ambient=(1.0, 0.84, 0.0, 1.0), diffuse=(1.0, 0.84, 0.0, 1.0))
         entities: list[Entity] = []
         object_states: list[dict] = []
-        placed: list[XY] = []
+        placed: list[XYR] = []
         for i in range(16):
             # The target is the first of four gold stars, never an extra shape.
             shape = "star" if i < 4 else self.rng.choice(list(SHAPE_MODELS))
             color = "gold" if i < 4 else self.rng.choice(background_colors)
             tag_id = target_tag_id if contains_target and i == 0 else self.rng.choice(decoy_tags)
-            x, y = self.sample_patch_position(center_xy, radius_m, placed)
-            placed.append((x, y))
+            scale = (
+                self.rng.uniform(self.config.size.min_scale, self.config.size.max_scale)
+                if self.config.size.enabled
+                else 1.0
+            )
+            own_radius = SHAPE_RADII[shape] * scale
+            x, y = self.sample_patch_position(center_xy, radius_m, placed, own_radius)
+            placed.append((x, y, own_radius))
             yaw = self.rng.uniform(0.0, 2 * math.pi) if self.config.random_yaw else 0.0
             entity = Entity(
                 name=f"{name_prefix}_{shape}_{i}",
@@ -462,6 +520,7 @@ class InHouse2026WorldNode(WorldNode):
             )
             material = gold if color == "gold" else self.config.palette[color]
             entity.sdf = self.generate_sdf_string(entity.path_to_model, material)
+            entity.sdf = self.with_scale(entity.sdf, scale)
             entity.sdf = self.with_apriltag(entity.sdf, tag_id)
             entities.append(entity)
             object_states.append(
@@ -470,6 +529,7 @@ class InHouse2026WorldNode(WorldNode):
                     "shape": shape,
                     "model": entity.model,
                     "color": color,
+                    "scale": scale,
                     "tag_id": tag_id,
                     "x": x,
                     "y": y,
