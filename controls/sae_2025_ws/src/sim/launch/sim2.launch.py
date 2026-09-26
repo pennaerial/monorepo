@@ -10,10 +10,8 @@ from launch.actions import (
 )
 from launch_ros.actions import Node
 from sim.simulation_params import SimulationParams
-from sim.utils import get_available_worlds
 from vehicle_common.env import prepend_env_path, require_env
 from vehicle_common.launch_utils import (
-    format_bullet_list,
     get_logger,
     is_truthy,
 )
@@ -156,10 +154,7 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 Args.WORLD,
                 default_value="default",
-                description=format_bullet_list(
-                    "simulation world for gz to load. Looks under {PENNAIR_GZ_MODELS_PATH}/worlds/{world}.sdf\n\tAvailable Worlds:",
-                    options=get_available_worlds(GZ_WORLDS_PATH),
-                ),
+                description="simulation world for gz to load. Looks under {PENNAIR_GZ_MODELS_PATH}/worlds/{world}.sdf\n\tRun `pennair world ls` to see all available worlds.",
             ),
             DeclareLaunchArgument(
                 Args.STAGE,

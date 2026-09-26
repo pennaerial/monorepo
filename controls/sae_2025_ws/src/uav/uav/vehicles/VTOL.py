@@ -23,7 +23,6 @@ class VTOL(UAV):
     def __init__(
         self,
         node: Node,
-        DEBUG=False,
         camera_offsets=[0, 0, 0],
         vehicle_name: str = "uav",
     ):
@@ -35,8 +34,7 @@ class VTOL(UAV):
 
         super().__init__(
             node,
-            DEBUG,
-            camera_offsets,
+            camera_offsets=camera_offsets,
             vehicle_name=vehicle_name,
         )
 

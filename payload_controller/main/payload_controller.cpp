@@ -1,5 +1,6 @@
 
 #include "dds_client.hpp"
+#include "encoder.hpp"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -15,12 +16,19 @@ extern "C" void app_main(void)
   drivers::IMU* imu = drivers::IMU::instance();
   imu->start();
 
-  DDSClient dds_client(payload_controller_config::DDS_AGENT_IP, payload_controller_config::DDS_AGENT_PORT);
+  drivers::Encoder* encoders = drivers::Encoder::instance();
+  encoders->start();
+
+  DDSClient dds_client("127.0.0.1", "7777");
   dds_client.run();
 
 
   while (1) {
-    dds_client.publish_imu(imu->get_latest());
-    vTaskDelay(pdMS_TO_TICKS(payload_controller_config::DDS_PUBLISH_PERIOD_MS));
+    dds_client.update(imu->get_latest());
+    encoders->publish_motor_left(10);
+    encoders->publish_motor_right(5);
+
+    // Delays by 100 ms to avoid spamming
+    vTaskDelay(pdMS_TO_TICKS(100));
   }
 }

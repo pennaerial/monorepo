@@ -9,6 +9,7 @@ set(sitl_srcs
 set(hardware_srcs
     imu_hw.cpp
     lsm6dso.cpp
+    imu.cpp
 )
 
 
