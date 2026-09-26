@@ -1,0 +1,15 @@
+modes:
+  start:
+    mode: uav.vtol.TakeoffMode
+    params:
+      takeoff_type: vertical
+    transitions:
+      complete: patch_1
+
+  patch_1:
+    mode: uav.FlyToPatch
+    params:
+      patch_number: 0
+      altitude: 7.0
+      margin: 1.0
+      hold: true
