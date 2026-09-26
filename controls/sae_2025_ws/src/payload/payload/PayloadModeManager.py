@@ -18,16 +18,12 @@ class PayloadModeManager(ModeManager):
         vehicle_name: str,
         auto_launch: bool = True,
         vision_debug: bool = False,
-        peer_heartbeat_hz: float = 10.0,
-        peer_stale_timeout_s: float = 0.5,
         node_name: str = "mission",
     ) -> None:
         super().__init__(
             node_name,
             vehicle_name=vehicle_name,
             auto_launch=auto_launch,
-            peer_heartbeat_hz=peer_heartbeat_hz,
-            peer_stale_timeout_s=peer_stale_timeout_s,
         )
         self.vision_debug = bool(vision_debug)
         if Payload not in mission_spec._targets:

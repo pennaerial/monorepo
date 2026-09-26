@@ -15,8 +15,6 @@ class PayloadMissionBootstrap(Node):
         self.declare_parameter("auto_launch", True)
         self.declare_parameter("vehicle_name", "")
         self.declare_parameter("vision_debug", False)
-        self.declare_parameter("peer_heartbeat_hz", 10.0)
-        self.declare_parameter("peer_stale_timeout_s", 0.5)
 
     def _bool_parameter(self, name: str) -> bool:
         value = self.get_parameter(name).value
@@ -50,8 +48,6 @@ class PayloadMissionBootstrap(Node):
             "auto_launch": self._bool_parameter("auto_launch"),
             "vehicle_name": vehicle_name,
             "vision_debug": self._bool_parameter("vision_debug"),
-            "peer_heartbeat_hz": self._float_parameter("peer_heartbeat_hz"),
-            "peer_stale_timeout_s": self._float_parameter("peer_stale_timeout_s"),
             "node_name": "mission",
         }
 

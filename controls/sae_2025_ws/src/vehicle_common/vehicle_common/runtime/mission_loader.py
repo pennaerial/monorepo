@@ -40,24 +40,20 @@ class RuntimeMission(BaseModel):
 
     _targets: set[type[Vehicle]] = PrivateAttr()
     _vision_nodes: set[type[VisionNode]] = PrivateAttr()
-    _peer_vehicle_names: set[str] = PrivateAttr()
     _requires_camera: bool = PrivateAttr()
 
     def model_post_init(self, context: Any, /) -> None:
         target_sets = []
         vision_sets = []
-        peer_vehicle_sets = []
         requires_camera = False
 
         for m in self.modes.values():
             target_sets.append(set(m._registered.targets))
             vision_sets.append(set(m._registered.required_vision_nodes))
-            peer_vehicle_sets.append(set(m._registered.peer_vehicle_names))
             requires_camera |= m._registered.requires_camera
 
         self._targets = set.intersection(*target_sets)
         self._vision_nodes = set.union(*vision_sets)
-        self._peer_vehicle_names = set.union(*peer_vehicle_sets)
         self._requires_camera = requires_camera
 
     @classmethod

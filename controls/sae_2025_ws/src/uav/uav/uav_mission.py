@@ -18,8 +18,6 @@ class UAVMissionBootstrap(Node):
         self.declare_parameter("vehicle_name", "uav_0")
         self.declare_parameter("vehicle_class", AirframeClass.MULTICOPTER.name)
         self.declare_parameter("camera_mount_offsets", [0.0, 0.0, 0.0])
-        self.declare_parameter("peer_heartbeat_hz", 10.0)
-        self.declare_parameter("peer_stale_timeout_s", 0.5)
 
     def _string_parameter(self, name: str, default: str = "") -> str:
         try:
@@ -58,8 +56,6 @@ class UAVMissionBootstrap(Node):
             "vehicle_name": str(self.get_parameter("vehicle_name").value).strip() or "uav",
             "vehicle_class": AirframeClass.parse(self.get_parameter("vehicle_class").value),
             "camera_offsets": list(self.get_parameter("camera_mount_offsets").value),
-            "peer_heartbeat_hz": self._float_parameter("peer_heartbeat_hz"),
-            "peer_stale_timeout_s": self._float_parameter("peer_stale_timeout_s"),
             "node_name": "mission",
         }
 

@@ -63,7 +63,6 @@ def test_runtime_mission_parses_modes():
     assert loiter._registered == mode_registry.get_registered_mode("mock.loiter")
     assert mission._targets == {MockVehicle}
     assert mission._vision_nodes == {MockVisionNode}
-    assert mission._peer_vehicle_names == {"peer1"}
     assert mission._requires_camera is True
 
 

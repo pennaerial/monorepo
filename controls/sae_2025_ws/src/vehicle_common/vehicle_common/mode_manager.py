@@ -11,10 +11,6 @@ from std_srvs.srv import Trigger
 from vehicle_common.mode import Mode
 from vehicle_common.mode_loader import ModeRegistry
 from vehicle_common.runtime.mission_loader import RuntimeMission
-from vehicle_common.runtime.peer_connections import (
-    declared_remote_peer_names,
-    normalize_vehicle_name,
-)
 from vehicle_common.runtime.vision_loader import (
     canonical_vision_node_path,
     load_vision_class,
@@ -46,7 +42,7 @@ class ModeManager(Node, ABC):
         self.timer = None
         self.auto_launch = bool(auto_launch)
         self._auto_launch_timer = None
-        self._runtime_vehicle_name = normalize_vehicle_name(vehicle_name)
+        self._runtime_vehicle_name = str(vehicle_name or "").strip().strip("/")
         self.peer_heartbeat_hz = float(peer_heartbeat_hz)
         self.peer_stale_timeout_s = float(peer_stale_timeout_s)
         if self.peer_heartbeat_hz <= 0.0:
@@ -145,9 +141,6 @@ class ModeManager(Node, ABC):
         if key not in self._vision_clients:
             raise KeyError(f"Vision client '{key}' is not registered.")
         return self._vision_clients[key]
-
-    def _mode_peer_names(self, mode_or_class: object) -> tuple[str, ...]:
-        return declared_remote_peer_names(mode_or_class, self._runtime_vehicle_name)
 
     def initialize_mode(self, mode_id: str, params: BaseModel) -> Mode:
         registered_mode = ModeRegistry.get().get_registered_mode(mode_id)
