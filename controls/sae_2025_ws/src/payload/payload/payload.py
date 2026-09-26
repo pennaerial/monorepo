@@ -3,6 +3,7 @@ from payload_interfaces.srv import DeadReckon, TimedDrive
 from rclpy.node import Node
 from vehicle_common.vehicle import Vehicle
 
+
 class Payload(Vehicle):
     """Mission-side adapter for one payload node namespace."""
 

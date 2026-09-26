@@ -25,7 +25,6 @@ class RuntimeMode(BaseModel):
         self._validated_params = self._registered.params_cls.model_validate(self.params)
 
 
-
 class RuntimeMission(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
