@@ -30,10 +30,12 @@ void Encoder_SITL::start()
   gz_node_.Subscribe(topic, &Encoder_SITL::on_encoder_msg, this);
 
   ESP_LOGI(TAG, "Enabling posting to %s", poster_right);
-  right_motor_publisher = gz_node_.Advertise<gz::msgs::Actuators>(poster_right);
+  right_motor_publisher = motor_node_.Advertise<gz::msgs::Actuators>(poster_right);
+  ESP_LOGI(TAG, "Right actuator publisher valid: %d", right_motor_publisher.Valid());
 
   ESP_LOGI(TAG, "Enabling posting to %s", poster_left);
-  left_motor_publisher = gz_node_.Advertise<gz::msgs::Actuators>(poster_left);
+  left_motor_publisher = motor_node_.Advertise<gz::msgs::Actuators>(poster_left);
+  ESP_LOGI(TAG, "Left actuator publisher valid: %d", left_motor_publisher.Valid());
 }
 
 void Encoder_SITL::make_motor_advertiser_right(char* buf, std::size_t size)
@@ -53,7 +55,11 @@ void Encoder_SITL::publish_motor_right(double rad_s)
 
   // TODO convert rad/s to PWM
   msg.add_velocity(rad_s);
-  right_motor_publisher.Publish(msg);
+  if (!right_motor_publisher.Valid()) {
+    return;
+  }
+
+  const bool published = right_motor_publisher.Publish(msg);
 }
 
 void Encoder_SITL::publish_motor_left(double rad_s)
@@ -64,7 +70,11 @@ void Encoder_SITL::publish_motor_left(double rad_s)
 
   // TODO convert rad/s to PWM
   msg.add_velocity(rad_s);
-  left_motor_publisher.Publish(msg);
+  if (!left_motor_publisher.Valid()) {
+    return;
+  }
+
+  const bool published = left_motor_publisher.Publish(msg);
 }
 
 void Encoder_SITL::make_encoder_topic(char* buf, std::size_t size)
@@ -74,18 +84,18 @@ void Encoder_SITL::make_encoder_topic(char* buf, std::size_t size)
 
 void Encoder_SITL::on_encoder_msg(const gz::msgs::Model& gz_msg)
 {
-  ESP_LOGI(TAG, "on_encoder_msg");
+  // ESP_LOGI(TAG, "on_encoder_msg");
 
-  // For each joint just print the position (which should be its rotation)
-  for (int i = 0; i < gz_msg.joint_size(); ++i) {
-    const gz::msgs::Joint& jointMsg = gz_msg.joint(i);
-    std::string name = jointMsg.name();
-    ESP_LOGI(TAG, "Joint Name: %s", name.c_str());
-    if (jointMsg.has_axis1()) {
-      double position = jointMsg.axis1().position();
-      ESP_LOGI(TAG, "Joint Position: %f", position);
-    }
-  }
+  // // For each joint just print the position (which should be its rotation)
+  // for (int i = 0; i < gz_msg.joint_size(); ++i) {
+  //   const gz::msgs::Joint& jointMsg = gz_msg.joint(i);
+  //   std::string name = jointMsg.name();
+  //   ESP_LOGI(TAG, "Joint Name: %s", name.c_str());
+  //   if (jointMsg.has_axis1()) {
+  //     double position = jointMsg.axis1().position();
+  //     ESP_LOGI(TAG, "Joint Position: %f", position);
+  //   }
+  // }
 
   //   [-]sensor_msgs_msg_encoder msg = gz_to_dds(gz_msg);
   //   [-]write_latest(msg);  // update our latest encoder value

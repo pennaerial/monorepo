@@ -1,5 +1,7 @@
 #include "dds_client.hpp"
 
+#include <cstring>
+
 #include "esp_log.h"
 
 #ifndef CONFIG_IDF_TARGET_LINUX
@@ -12,9 +14,18 @@ static const char* TAG = "DDSClient";
 // Need to set up a parameter system first
 static constexpr uint32_t SESSION_KEY = 0xABCDABCD;
 
+namespace
+{
+// XRCE object IDs are a numeric key plus an object type. Both must match.
+bool same_object_id(const uxrObjectId lhs, const uxrObjectId rhs)
+{
+  return lhs.id == rhs.id && lhs.type == rhs.type;
+}
+}  // namespace
+
 DDSClient::DDSClient(const char* ip, const char* port) : ip_(ip), port_(port) {}
 
-void DDSClient::run()
+void DDSClient::init()
 {
   // Open the UDP link to the Micro-XRCE-DDS Agent. This is the transport
   // underneath the XRCE session; no DDS entities exist yet.
@@ -56,108 +67,271 @@ void DDSClient::run()
   reliable_in_ =
       uxr_create_input_reliable_stream(&session_, input_reliable_stream_buffer_, BUFFER_SIZE, STREAM_HISTORY);
 
-  uxrObjectId participant_id = uxr_object_id(0x01, UXR_PARTICIPANT_ID);
-  const char* participant_xml =
-      "<dds>"
-      "<participant>"
-      "<rtps>"
-      "<name>default_xrce_participant</name>"
-      "</rtps>"
-      "</participant>"
-      "</dds>";
-  // Queue creation of the DDS Participant. The returned request id is checked
-  // later when the session is run and the Agent replies with creation status.
-  uint16_t participant_req = uxr_buffer_create_participant_xml(
+  const uxrObjectId participant_id = uxr_object_id(0x01, UXR_PARTICIPANT_ID);
+  const uxrObjectId publisher_id = uxr_object_id(DEFAULT_PUBLISHER_KEY, UXR_PUBLISHER_ID);
+  const uxrObjectId subscriber_id = uxr_object_id(DEFAULT_SUBSCRIBER_KEY, UXR_SUBSCRIBER_ID);
+
+  // Create one XRCE Publisher and one XRCE Subscriber. Topic entries decide
+  // whether they need a DataWriter or DataReader.
+  uint16_t participant_req = uxr_buffer_create_participant_bin(
       &session_, reliable_out_, participant_id,
       0,  // DDS domain ID
-      participant_xml, UXR_REPLACE
+      "default_xrce_participant", UXR_REPLACE
   );
 
-  uxrObjectId topic_id = uxr_object_id(0x01, UXR_TOPIC_ID);
-  const char* topic_xml =
-      "<dds>"
-      "<topic>"
-      // "<name>HelloWorldTopic</name>"
-      // "<dataType>HelloWorld</dataType>"
-      "<name>rt/imu</name>"  // ROS naming conventions in DDS namespace
-      "<dataType>sensor_msgs::msg::dds_::Imu_</dataType>"
-      "</topic>"
-      "</dds>";
-  // Queue creation of the DDS Topic that both the reader and writer will use.
-  uint16_t topic_req =
-      uxr_buffer_create_topic_xml(&session_, reliable_out_, topic_id, participant_id, topic_xml, UXR_REPLACE);
+  uint16_t publisher_req =
+      uxr_buffer_create_publisher_bin(&session_, reliable_out_, publisher_id, participant_id, UXR_REPLACE);
 
+  uint16_t subscriber_req =
+      uxr_buffer_create_subscriber_bin(&session_, reliable_out_, subscriber_id, participant_id, UXR_REPLACE);
 
-  uxrObjectId publisher_id = uxr_object_id(0x01, UXR_PUBLISHER_ID);
-  const char* publisher_xml = "";
-  // Queue creation of a Publisher entity under the participant. An empty XML
-  // string asks the Agent to use defaults.
-  uint16_t publisher_req = uxr_buffer_create_publisher_xml(
-      &session_, reliable_out_, publisher_id, participant_id, publisher_xml, UXR_REPLACE
-  );
+  // Participant, one Publisher, one Subscriber, every Topic, every DataWriter,
+  // and each DataReader plus its request_data stream request.
+  constexpr std::size_t CREATE_REQUEST_COUNT = 3 + topic_count + datawriter_count() + (datareader_count() * 2);
+  uint16_t requests[CREATE_REQUEST_COUNT]{};
+  uint8_t status[CREATE_REQUEST_COUNT]{};
+  std::size_t request_count = 0;
 
-  uxrObjectId subscriber_id = uxr_object_id(0x01, UXR_SUBSCRIBER_ID);
-  const char* subscriber_xml = "";
-  // Queue creation of a Subscriber entity under the participant.
-  uint16_t subscriber_req = uxr_buffer_create_subscriber_xml(
-      &session_, reliable_out_, subscriber_id, participant_id, subscriber_xml, UXR_REPLACE
-  );
+  requests[request_count++] = participant_req;
+  requests[request_count++] = publisher_req;
+  requests[request_count++] = subscriber_req;
 
-  datawriter_id_ = uxr_object_id(0x01, UXR_DATAWRITER_ID);
-  const char* datawriter_xml =
-      "<dds>"
-      "<data_writer>"
-      "<topic>"
-      "<kind>NO_KEY</kind>"
-      "<name>rt/imu</name>"
-      "<dataType>sensor_msgs::msg::dds_::Imu_</dataType>"
-      "</topic>"
-      "</data_writer>"
-      "</dds>";
-  // Queue creation of the DataWriter used by update() to publish IMU samples.
-  uint16_t datawriter_req = uxr_buffer_create_datawriter_xml(
-      &session_, reliable_out_, datawriter_id_, publisher_id, datawriter_xml, UXR_REPLACE
-  );
-
-  datareader_id_ = uxr_object_id(0x01, UXR_DATAREADER_ID);
-  const char* datareader_xml =
-      "<dds>"
-      "<data_reader>"
-      "<topic>"
-      "<kind>NO_KEY</kind>"
-      "<name>rt/imu</name>"
-      "<dataType>sensor_msgs::msg::dds_::Imu_</dataType>"
-      "</topic>"
-      "</data_reader>"
-      "</dds>";
-  // Queue creation of the DataReader used to receive samples through the topic
-  // callback registered above.
-  uint16_t datareader_req = uxr_buffer_create_datareader_xml(
-      &session_, reliable_out_, datareader_id_, subscriber_id, datareader_xml, UXR_REPLACE
-  );
-
-  uxrDeliveryControl delivery_control{};
-  delivery_control.max_samples = UXR_MAX_SAMPLES_UNLIMITED;
-  // Queue a read request on the DataReader. Incoming samples for this request
-  // are delivered on reliable_in_ and then dispatched to on_topic_callback.
-  uint16_t read_data_req =
-      uxr_buffer_request_data(&session_, reliable_out_, datareader_id_, reliable_in_, &delivery_control);
-
-  // Create entities
-  uint8_t status[7];
-  uint16_t requests[7] = {participant_req, topic_req,      publisher_req, subscriber_req,
-                          datawriter_req,  datareader_req, read_data_req};
+  generate_topics(requests, request_count, participant_id);
+  generate_writers(requests, request_count, publisher_id);
+  generate_readers(requests, request_count, subscriber_id);
 
   // Actually send the queued requests and wait for status responses from the
   // Agent. Buffer-create calls only enqueue work; this drives the session.
-  if (!uxr_run_session_until_all_status(&session_, 1000, requests, status, 6)) {
-    ESP_LOGE(TAG, "Error at creating 6 entities");
+  if (!uxr_run_session_until_all_status(&session_, 1000, requests, status, request_count)) {
+    ESP_LOGE(TAG, "Error creating DDS entities");
     return;
   }
 
   ESP_LOGI(TAG, "Entities creation success");
 }
 
+void DDSClient::generate_topics(uint16_t requests[], std::size_t& request_count, const uxrObjectId participant_id)
+{
+  for (std::size_t topic_index = 0; topic_index < topic_count; ++topic_index) {
+    const Topic& topic = topics[topic_index];
+    // TODO we might not want to create topics for the datareaders as ros2 might create those. IDK
+    // Create the XRCE topic once; readers and writers both reference this object.
+    ESP_LOGI(TAG, "Creating DDS topic %s (%s)", topic.topic_name, topic.type_name);
+    requests[request_count++] = uxr_buffer_create_topic_bin(
+        &session_, reliable_out_, topic_id(topic_index), participant_id, topic.topic_name, topic.type_name, UXR_REPLACE
+    );
+  }
+}
+
+// Creates DataWriters only for topics marked as WRITER in topics.h.
+void DDSClient::generate_writers(uint16_t requests[], std::size_t& request_count, const uxrObjectId publisher_id)
+{
+  for (std::size_t topic_index = 0; topic_index < topic_count; ++topic_index) {
+    const Topic& topic = topics[topic_index];
+    if (topic.dir != Topic::Direction::WRITER) {
+      continue;
+    }
+
+    ESP_LOGI(TAG, "Creating DDS datawriter %s", topic.name);
+    requests[request_count++] = uxr_buffer_create_datawriter_bin(
+        &session_, reliable_out_, datawriter_id(topic_index), publisher_id, topic_id(topic_index), topic.qos,
+        UXR_REPLACE
+    );
+  }
+}
+
+// Creates DataReaders only for topics marked as READER in topics.h.
+void DDSClient::generate_readers(uint16_t requests[], std::size_t& request_count, const uxrObjectId subscriber_id)
+{
+  for (std::size_t topic_index = 0; topic_index < topic_count; ++topic_index) {
+    const Topic& topic = topics[topic_index];
+    if (topic.dir != Topic::Direction::READER) {
+      continue;
+    }
+
+    const uxrObjectId reader_id = datareader_id(topic_index);
+    ESP_LOGI(TAG, "Creating DDS datareader %s", topic.name);
+    requests[request_count++] = uxr_buffer_create_datareader_bin(
+        &session_, reliable_out_, reader_id, subscriber_id, topic_id(topic_index), topic.qos, UXR_REPLACE
+    );
+
+    // A DataReader exists after create_datareader_bin(), but data will not be
+    // delivered to on_topic_callback until we request it from the Agent.
+    uxrDeliveryControl delivery_control{};
+    delivery_control.max_samples = UXR_MAX_SAMPLES_UNLIMITED;
+    requests[request_count++] =
+        uxr_buffer_request_data(&session_, reliable_out_, reader_id, reliable_in_, &delivery_control);
+  }
+}
+
+bool DDSClient::topic_matches(const Topic& topic, const char* topic_name) const
+{
+  return topic_name != nullptr &&
+         (std::strcmp(topic.name, topic_name) == 0 || std::strcmp(topic.topic_name, topic_name) == 0);
+}
+
+const Topic* DDSClient::find_topic(const char* topic_name, std::size_t& topic_index) const
+{
+  for (std::size_t i = 0; i < topic_count; ++i) {
+    if (topic_matches(topics[i], topic_name)) {
+      topic_index = i;
+      return &topics[i];
+    }
+  }
+
+  return nullptr;
+}
+
+// Public publish API: validate the named topic and copy the typed message into
+// a byte queue. Serialization intentionally happens later in update().
+bool DDSClient::publish(const char* topic_name, const void* msg)
+{
+  std::size_t topic_index = 0;
+  const Topic* topic = find_topic(topic_name, topic_index);
+  if (topic == nullptr) {
+    ESP_LOGE(TAG, "Unknown DDS topic %s", topic_name == nullptr ? "<null>" : topic_name);
+    return false;
+  }
+
+  if (topic->dir != Topic::Direction::WRITER) {
+    ESP_LOGE(TAG, "DDS topic %s is not configured as a writer", topic->name);
+    return false;
+  }
+
+  if (msg == nullptr) {
+    ESP_LOGE(TAG, "DDS publish called with null data for %s", topic->name);
+    return false;
+  }
+
+  // Copy the typed message now so callers can publish stack/local data safely.
+  util::StaticMutexGuard lock(pending_publishes_mtx_);
+  PendingPublish& pending = pending_publishes_.emplace_back();
+  pending.topic_index = topic_index;
+  pending.data.resize(topic->message_size);
+  std::memcpy(pending.data.data(), msg, topic->message_size);
+  return true;
+}
+
+void DDSClient::update()
+{
+  std::vector<PendingPublish> pending_publishes;
+  {
+    util::StaticMutexGuard lock(pending_publishes_mtx_);
+    pending_publishes.swap(pending_publishes_);
+  }
+
+  bool wrote_data = false;
+  std::size_t writes_since_confirm = 0;
+  ESP_LOGI(TAG, "Pending messages: %zu", pending_publishes.size());
+
+  // Drain every queued message, preserving publish() call order across topics.
+  // A reliable stream with history N has N blocks, so confirm delivery before
+  // queuing more than STREAM_HISTORY normal writes into the stream.
+  for (const PendingPublish& pending : pending_publishes) {
+    if (writes_since_confirm >= STREAM_HISTORY) {
+      confirm_delivery();
+      writes_since_confirm = 0;
+    }
+
+    if (send_publish(pending.topic_index, pending.data.data())) {
+      wrote_data = true;
+      ++writes_since_confirm;
+    }
+  }
+
+  if (wrote_data) {
+    confirm_delivery();
+  }
+
+  uxr_run_session_time(&session_, 10);
+}
+
+// Serializes one queued message into the XRCE reliable output stream.
+bool DDSClient::send_publish(const std::size_t topic_index, const void* msg)
+{
+  const Topic& topic = topics[topic_index];
+  if (topic.size_of_topic == nullptr || topic.serialize_topic == nullptr) {
+    ESP_LOGE(TAG, "DDS topic %s is missing serializer hooks", topic.name);
+    return false;
+  }
+
+  ucdrBuffer ub;
+  const uint32_t topic_size = topic.size_of_topic(msg, 0);
+  const bool use_fragmented_stream = topic_size + ESTIMATED_XRCE_WRITE_OVERHEAD > RELIABLE_STREAM_BLOCK_SIZE;
+
+  uint16_t request_id = UXR_INVALID_REQUEST_ID;
+  if (use_fragmented_stream) {
+    request_id = uxr_prepare_output_stream_fragmented(
+        &session_, reliable_out_, datawriter_id(topic_index), &ub, topic_size, flush_output_stream, this
+    );
+  } else {
+    request_id = uxr_prepare_output_stream(&session_, reliable_out_, datawriter_id(topic_index), &ub, topic_size);
+
+    // If the stream is full earlier than our batch estimate, flush and retry.
+    if (request_id == UXR_INVALID_REQUEST_ID) {
+      confirm_delivery();
+      request_id = uxr_prepare_output_stream(&session_, reliable_out_, datawriter_id(topic_index), &ub, topic_size);
+    }
+
+    // If the message still cannot fit in one reliable block, fall back to the
+    // fragmented path so large topic samples can span multiple blocks.
+    if (request_id == UXR_INVALID_REQUEST_ID) {
+      request_id = uxr_prepare_output_stream_fragmented(
+          &session_, reliable_out_, datawriter_id(topic_index), &ub, topic_size, flush_output_stream, this
+      );
+    }
+  }
+
+  if (request_id == UXR_INVALID_REQUEST_ID) {
+    ESP_LOGE(TAG, "Failed to reserve XRCE output stream space for %s", topic.name);
+    return false;
+  }
+
+  if (!topic.serialize_topic(&ub, msg)) {
+    ESP_LOGE(TAG, "Failed to serialize DDS topic %s", topic.name);
+    return false;
+  }
+
+  return true;
+}
+
+bool DDSClient::confirm_delivery()
+{
+  const bool delivered = uxr_run_session_until_confirm_delivery(&session_, 1000);
+  if (!delivered) {
+    ESP_LOGW(TAG, "Timed out waiting for XRCE reliable output delivery");
+  }
+  return delivered;
+}
+
+bool DDSClient::flush_output_stream(uxrSession* session, void* args)
+{
+  DDSClient* client = static_cast<DDSClient*>(args);
+  if (client == nullptr) {
+    return false;
+  }
+  return uxr_run_session_until_confirm_delivery(session, 1000);
+}
+
+// Optional application hook for one received READER topic.
+bool DDSClient::set_reader_callback(const char* topic_name, ReaderCallback callback, void* args)
+{
+  for (std::size_t topic_index = 0; topic_index < topic_count; ++topic_index) {
+    const Topic& topic = topics[topic_index];
+    if (topic.dir != Topic::Direction::READER || !topic_matches(topic, topic_name)) {
+      continue;
+    }
+
+    reader_callbacks_[topic_index] = callback;
+    reader_callback_args_[topic_index] = args;
+    return true;
+  }
+
+  ESP_LOGE(TAG, "Unknown DDS reader topic %s", topic_name == nullptr ? "<null>" : topic_name);
+  return false;
+}
+
+// Static C callback required by Micro XRCE-DDS; routes back to this instance.
 void DDSClient::on_topic_callback(
     uxrSession* session,
     uxrObjectId object_id,
@@ -185,31 +359,36 @@ void DDSClient::handle_topic(
     uint16_t length
 )
 {
-  sensor_msgs_msg_Imu msg;
-  sensor_msgs_msg_Imu_deserialize_topic(ub, &msg);
+  (void)session;
+  (void)request_id;
+  (void)stream_id;
 
-  ESP_LOGI(TAG, "orientation x: %f", msg.orientation.x);
-  ESP_LOGI(TAG, "orientation y: %f", msg.orientation.y);
-  ESP_LOGI(TAG, "orientation z: %f", msg.orientation.z);
-  ESP_LOGI(TAG, "orientation w: %f", msg.orientation.w);
-  ESP_LOGI(TAG, "handling topic..");
-}
+  // Match the incoming XRCE DataReader ID back to the configured Topic.
+  for (std::size_t topic_index = 0; topic_index < topic_count; ++topic_index) {
+    const Topic& topic = topics[topic_index];
+    if (topic.dir != Topic::Direction::READER || !same_object_id(object_id, datareader_id(topic_index))) {
+      continue;
+    }
 
+    if (topic.deserialize_topic == nullptr) {
+      ESP_LOGE(TAG, "DDS topic %s is missing deserializer hook", topic.name);
+      return;
+    }
 
-void DDSClient::update(const sensor_msgs_msg_Imu& msg)
-{
-  ESP_LOGI(TAG, "Updating");
-  imu_msg = msg;
-  ucdrBuffer ub;
-  uint32_t topic_size = sensor_msgs_msg_Imu_size_of_topic(&imu_msg, 0);
+    // The deserialized message has the generated C type associated with topic.
+    // It is stack-owned and only valid until reader_callback_ returns.
+    alignas(std::max_align_t) uint8_t msg_buffer[max_topic_message_size()];
+    if (!topic.deserialize_topic(ub, msg_buffer)) {
+      ESP_LOGE(TAG, "Failed to deserialize DDS topic %s", topic.name);
+      return;
+    }
 
-  // Reserve space in the reliable output stream for one DataWriter sample and
-  // attach a CDR buffer that the generated serializer can write into.
-  uxr_prepare_output_stream(&session_, reliable_out_, datawriter_id_, &ub, topic_size);
-  sensor_msgs_msg_Imu_serialize_topic(&ub, &imu_msg);
+    ReaderCallback callback = reader_callbacks_[topic_index];
+    if (callback != nullptr) {
+      callback(topic, msg_buffer, length, reader_callback_args_[topic_index]);
+    }
+    return;
+  }
 
-  // Flush the reliable output stream and wait for the Agent to acknowledge the
-  // write, then briefly spin the session so input traffic/callbacks are served.
-  uxr_run_session_until_confirm_delivery(&session_, 1000);
-  uxr_run_session_time(&session_, 10);
+  ESP_LOGW(TAG, "Received data for unknown DDS DataReader id=%u type=%u", object_id.id, object_id.type);
 }

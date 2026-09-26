@@ -2,10 +2,14 @@
 
 #include <uxr/client/client.h>
 
+#include <array>
+#include <cstddef>
 #include <cstdint>
+#include <vector>
 
 #include "sdkconfig.h"
-#include "sensor_msgs/msg/Imu.h"
+#include "static_mutex.hpp"
+#include "topics.h"
 
 constexpr uint32_t STREAM_HISTORY = 8;
 
@@ -16,20 +20,46 @@ constexpr uint32_t TRANSPORT_MTU = UXR_CONFIG_CUSTOM_TRANSPORT_MTU;
 #endif
 
 constexpr uint32_t BUFFER_SIZE = TRANSPORT_MTU * STREAM_HISTORY;
+constexpr uint32_t RELIABLE_STREAM_BLOCK_SIZE = BUFFER_SIZE / STREAM_HISTORY;
+constexpr uint32_t ESTIMATED_XRCE_WRITE_OVERHEAD = 32;
 
 
 class DDSClient
 {
 public:
+  // Called from update()/XRCE session servicing when a configured READER topic
+  // receives data. `msg` points to the deserialized generated message type
+  // associated with `topic`, and is only valid for the duration of the call.
+  using ReaderCallback = void (*)(const Topic& topic, const void* msg, uint16_t length, void* args);
+
   DDSClient(const char* ip, const char* port);
 
-  /// Run the DDSClient
-  void run();
+  /// Set ourselves up as a Micro XRCE-DDS Client and register to the agent as a session.
+  void init();
 
-  /// updates all internal msgs
-  void update(const sensor_msgs_msg_Imu& msg);
+  /// Queues a topic sample for writing. Data is copied into an internal queue,
+  /// so callers may pass stack/local messages safely.
+  bool publish(const char* topic_name, const void* msg);
+
+  /// Writes all queued publishes, clears the queue, and services incoming data.
+  void update();
+
+  /// Binds a callback for one configured READER topic.
+  bool set_reader_callback(const char* topic_name, ReaderCallback callback, void* args);
 
 private:
+  // These queue XRCE CREATE/request messages; init() later flushes and waits for status.
+  void generate_topics(uint16_t requests[], std::size_t& request_count, uxrObjectId participant_id);
+  void generate_writers(uint16_t requests[], std::size_t& request_count, uxrObjectId publisher_id);
+  void generate_readers(uint16_t requests[], std::size_t& request_count, uxrObjectId subscriber_id);
+
+  // Topic lookup accepts either the friendly name, e.g. "IMU", or DDS name, e.g. "rt/imu".
+  bool topic_matches(const Topic& topic, const char* topic_name) const;
+  const Topic* find_topic(const char* topic_name, std::size_t& topic_index) const;
+  bool send_publish(std::size_t topic_index, const void* msg);
+  bool confirm_delivery();
+  static bool flush_output_stream(uxrSession* session, void* args);
+
   /// callback function for receiving a topic. Recreates the DDSClient instance with void* args and calls handle_topic
   static void on_topic_callback(
       uxrSession* session,
@@ -59,8 +89,6 @@ private:
   const char* ip_;
   /// port for UDP transport
   const char* port_;
-  /// participant ID registered with agent
-  uxrObjectId participant_id_;
 
 #if defined(CONFIG_IDF_TARGET_LINUX)
   uxrUDPTransport transport_;
@@ -80,9 +108,15 @@ private:
   /// uxrStreamId associated with input reliable buffer
   uxrStreamId reliable_in_;
 
-  uxrObjectId datawriter_id_;
-  uxrObjectId datareader_id_;
+  // Stores copied message bytes so multiple publish() calls, including multiple
+  // messages for the same topic, can be drained in order by update().
+  struct PendingPublish {
+    std::size_t topic_index;
+    std::vector<uint8_t> data;
+  };
 
-  /// IMU msg sent to DDS agent
-  sensor_msgs_msg_Imu imu_msg{};
+  std::vector<PendingPublish> pending_publishes_;
+  util::StaticMutex pending_publishes_mtx_;
+  std::array<ReaderCallback, topic_count> reader_callbacks_{};
+  std::array<void*, topic_count> reader_callback_args_{};
 };
