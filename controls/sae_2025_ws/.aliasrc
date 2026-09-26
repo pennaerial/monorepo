@@ -2,6 +2,11 @@
 
 # aliases for faster development
 
+# SOURCING
+alias sr='source /opt/ros/jazzy/setup.bash'
+alias si='source install/setup.bash'
+alias sri='source /opt/ros/jazzy/setup.bash && source install/setup.bash'
+
 # BUILDING
 alias cb='colcon build'
 alias cbcc="colcon build --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON && ln -s build/compile_commands.json compile_commands.json"
