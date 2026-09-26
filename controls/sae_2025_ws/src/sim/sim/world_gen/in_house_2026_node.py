@@ -9,6 +9,8 @@ from pydantic import BaseModel, Field
 from rclpy.executors import ExternalShutdownException
 from sim_interfaces.msg import ObjectState
 from sim_interfaces.srv import ObjectStateList
+from sim_interfaces.msg import SearchLocation
+from sim_interfaces.srv import GetSearchLocations
 
 from sim.entity import Entity
 from sim.world_gen.world_node import WorldNode
@@ -114,9 +116,22 @@ class InHouse2026WorldNode(WorldNode):
         self.cached_templates: dict[str, str] = {}  # model.sdf text keyed by path
         # (x, y, radius) zones shapes must avoid
         self.keep_out: list[tuple[float, float, float]] = list(self.config.keep_out)
+        
+        # shape search location query variables
+        self.search_locations: list[SearchLocation] = []
+        self.target_tag_id: int = -1
+        self.query_search_locations_service = self.create_service(GetSearchLocations, "get_search_patches", self.get_patches_callback)
+        self.patches_ready = False
+
 
         if self.config.seed is not None:
             self.rng.seed(self.config.seed)
+
+    def get_patches_callback(self, request: GetSearchLocations.Request, response: GetSearchLocations.Response) -> GetSearchLocations.Response:
+        response.ready = self.patches_ready
+        response.target_tag_id = self.target_tag_id
+        response.search_locations = self.search_locations
+        return response
 
     def sample_position(self, placed: list[XY]) -> XY | None:
         """Rejection-sample an xy inside `area` honouring keep_out and min_spacing."""
