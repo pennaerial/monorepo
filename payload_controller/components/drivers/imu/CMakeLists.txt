@@ -2,22 +2,24 @@ set(srcs imu.cpp)
 set(priv_requires DDS)
 set(requires util)
 
-set(sitl_srcs
-    imu_sitl.cpp
-)
+# TODO: Remove these cmake defined args for kconfig later
+set(IMU_MODEL "hw" CACHE STRING "Hardware IMU model")
+set_property(CACHE IMU_MODEL PROPERTY STRINGS hw lsm6dso)
 
-set(hardware_srcs
-    imu_hw.cpp
-    lsm6dso.cpp
-    imu.cpp
-)
+if(IDF_TARGET STREQUAL "linux")
+    list(APPEND srcs "imu_sitl.cpp")
+elseif(IMU_MODEL STREQUAL "hw")
+    list(APPEND srcs "imu_hw.cpp")
+elseif(IMU_MODEL STREQUAL "lsm6dso")
+    list(APPEND srcs "lsm6dso.cpp")
+else()
+    message(FATAL_ERROR "Unsupported IMU_MODEL: ${IMU_MODEL}")
+endif()
 
 
 if(IDF_TARGET STREQUAL linux)
-    list(APPEND srcs ${sitl_srcs})
     list(APPEND priv_requires sitl)
 else()
-    list(APPEND srcs ${hardware_srcs})
     list(APPEND priv_requires esp_driver_gpio esp_driver_i2c esp_timer)
 endif()
 
