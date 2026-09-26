@@ -3,3 +3,7 @@ sdkconfig
 sdkconfig.old
 sdkconfig.*.old
 sdkconfig.*-clang-tidy
+
+# Generated target configurations; maintain sdkconfig.defaults.<target> instead.
+sdkconfig.linux
+sdkconfig.esp32s3
