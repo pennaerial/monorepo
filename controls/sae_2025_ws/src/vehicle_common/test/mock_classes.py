@@ -1,4 +1,3 @@
-from vehicle_common.base import VisionNode
 from vehicle_common.mode import Mode
 from vehicle_common.mode_loader import (
     ParamsBase,
@@ -8,10 +7,6 @@ from vehicle_common.vehicle import Vehicle
 
 
 class MockVehicle(Vehicle):
-    pass
-
-
-class MockVisionNode(VisionNode):
     pass
 
 
@@ -42,9 +37,6 @@ class MockRequiredParams(ParamsBase):
     id="mock.VerticalTakeoffMode",
     params_cls=MockVerticalTakeoffParams,
     targets=[MockVehicle],
-    required_vision_nodes=[MockVisionNode],
-    peer_vehicle_names=["peer1"],
-    requires_camera=True,
     transition_labels=["complete"],
 )
 class MockVerticalTakeoffMode(Mode):
@@ -56,13 +48,9 @@ class MockVerticalTakeoffMode(Mode):
     id="mock.loiter",
     params_cls=MockParams,
     targets=[MockVehicle],
-    required_vision_nodes=[MockVisionNode],
-    peer_vehicle_names=["peer1"],
 )
 class MockLoiterMode(Mode):
-    """Second mock mode sharing vision/peer requirements with MockVerticalTakeoffMode
-    but not requiring a camera, so RuntimeMission's intersection/union aggregation
-    across modes can be exercised."""
+    """Second mock mode sharing the vehicle target."""
 
 
 @register_mode(

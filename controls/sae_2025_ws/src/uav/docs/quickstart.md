@@ -3,16 +3,15 @@
 Sim-first onboarding for the UAV framework.
 
 ## Prerequisites
-- ROS 2 Humble sourced on the machine
+- ROS 2 sourced on the machine
 - A built workspace
-- The `PX4-Autopilot` submodule initialized (`git submodule update --init` at the repo root); the launch stack auto-detects this in-repo checkout
+- The `PX4-Autopilot` submodule initialized (`git submodule update --init` at the repo root)
 - For sim, Gazebo and `MicroXRCEAgent` available on `PATH`
 - `pydantic>=2,<3` installed in the Python environment that will run `uav`
 
 ## Build And Source
 ```bash
 source /opt/ros/jazzy/setup.bash
-cd /home/ubuntu/monorepo/controls/sae_2025_ws
 colcon build --packages-select sim uav payload
 source install/setup.bash
 ```
@@ -22,49 +21,3 @@ If your environment is missing the UAV runtime dependency, install it before lau
 ```bash
 python3 -m pip install "pydantic>=2,<3"
 ```
-
-## Single Vehicle
-Launch the default single-vehicle stack:
-
-```bash
-ros2 launch uav main.launch.py
-```
-
-Useful overrides on the legacy single-vehicle path:
-- `mission_name:=hover`
-- `vehicle_name:=uav`
-- `px4_path:=...` (defaults to the in-repo `PX4-Autopilot` submodule; set only to point at a different checkout)
-- `params_file:=$(pwd)/src/uav/launch/launch_params_hardware.yaml`
-
-What success looks like:
-- Gazebo starts
-- the selected mission loads
-- the mission node appears under `/<vehicle>/mission`
-- UAV missions start PX4 SITL when `sim:=true`
-- logs move past startup and the mode manager begins running the mission
-
-## Fleet Launch
-Launch a multi-vehicle sim fleet by passing a fleet YAML file:
-
-```bash
-ros2 launch uav fleet.launch.py \
-  fleet_file:=$(pwd)/src/uav/uav/fleets/example_fleet.yaml
-```
-
-What success looks like:
-- the sim backend/world starts once
-- each managed vehicle starts in its own namespace
-- UAV entries attach to backend controllables and start PX4 SITL
-- payload entries start payload runtime only
-- missions that need camera or vision bring up the required camera pipeline
-- missions with service-based CV also launch the relevant vision nodes
-
-## Where Things Live
-- Missions: `src/uav/uav/missions/*.yaml`
-- Sim stages: `src/sim/sim/simulations/<world>/<stage>.yaml`
-- Fleet YAMLs: `src/uav/uav/fleets/*.yaml`
-
-## Notes
-- `main.launch.py` is the legacy single-vehicle compatibility path
-- `fleet.launch.py` is the entry point for multi-vehicle orchestration
-- `vehicle_name` is the namespace/identity used by the runtime

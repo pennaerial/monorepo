@@ -35,14 +35,14 @@ However, IDs available for simulation can be found in PX4-Autopilot/ROMFS/px4fmu
 """
 vehicle_camera_map = {
     # Standard PX4 Sim Models (Update mapping as needed)
-    "gz_x500": False,
-    "gz_x500_mono_cam": True,
-    "gz_x500_mono_cam_down": True,
-    "gz_x500_depth": True,
-    "gz_standard_vtol": True,
-    "gz_tiltrotor": False,
-    "gz_rc_cessna": False,
-    "gz_quadtailsitter": False,
+    "x500": False,
+    "x500_mono_cam": True,
+    "x500_mono_cam_down": True,
+    "x500_depth": True,
+    "standard_vtol": True,
+    "tiltrotor": False,
+    "rc_cessna": False,
+    "quadtailsitter": False,
     # Custom/Team Models (Add custom model names below)
 }
 

@@ -10,6 +10,7 @@ from launch.actions import (
 )
 from launch_ros.actions import Node
 from pydantic import ValidationError
+from uav.utils import vehicle_camera_map
 from uav.vehicles.AirframeClass import PX4Airframe
 from vehicle_common.env import require_env
 from vehicle_common.launch_utils import (
@@ -110,6 +111,7 @@ def launch_setup(context) -> list[Action]:
     logger.debug(f"Launch Sim:          {launch_sim}")
     logger.debug(f"Headless Mode:       {headless}")
     logger.debug(f"Debug Mode:          {debug}")
+    logger.debug(f"Vehicle Camera Map:  {vehicle_camera_map}")
 
     ## create actions
     actions = []
@@ -147,6 +149,37 @@ def launch_setup(context) -> list[Action]:
             "debug": debug,
         },
     )
+
+    vehicle_name = airframe.model
+    if vehicle_camera_map.get(vehicle_name, False):
+        # TODO: make namespace integer not hardcoded to 0
+        vehicle_name_ns = f"{vehicle_name}_0"
+
+        gz_image_topic = (
+            f"/world/{world}/model/{vehicle_name_ns}/link/camera_link/sensor/camera/image"
+        )
+        gz_info_topic = (
+            f"/world/{world}/model/{vehicle_name_ns}/link/camera_link/sensor/camera/camera_info"
+        )
+
+        camera_bridge = Node(
+            package="ros_gz_bridge",
+            executable="parameter_bridge",
+            arguments=[
+                f"{gz_image_topic}@sensor_msgs/msg/Image[gz.msgs.Image",
+                f"{gz_info_topic}@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo",
+            ],
+            remappings=[
+                (gz_image_topic, f"/{vehicle_ns}/camera"),
+                (gz_info_topic, f"/{vehicle_ns}/camera_info"),
+            ],
+            output="screen",
+            name=f"{vehicle_ns}_camera_bridge",
+        )
+        actions.append(camera_bridge)
+        logger.debug(f"Camera bridge launched for '{vehicle_ns}' on topic: /{vehicle_ns}/camera")
+    else:
+        logger.debug(f"Vehicle model '{vehicle_name}' has no camera. Skipping camera bridge.")
 
     actions.append(mode_manager)
     actions.extend([middleware] if run_mw else [])

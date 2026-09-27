@@ -5,7 +5,6 @@ Utility functions for the sim package.
 
 import ast
 import inspect
-import logging
 import os
 import re
 from pathlib import Path
@@ -26,46 +25,6 @@ def load_yaml_to_dict(params_file: Path) -> dict:
         raise ValueError(f"Invalid YAML in {params_file}: {e}")
     except Exception as e:
         raise RuntimeError(f"Failed to load {params_file}: {e}")
-
-
-def load_sim_parameters(
-    competition: str,
-    logger: logging.Logger,
-    competition_name: str = "",
-    mission_stage: str = "",
-) -> tuple[dict, Path]:
-    """
-    Find simulation configuration file, checking source location first (for development),
-    then falling back to installed location.
-
-    Simulation stages live under ``simulations/<competition_name>/``. When
-    *mission_stage* is provided the loader looks for ``<mission_stage>.yaml``.
-    When *mission_stage* is empty/omitted the loader uses ``base.yaml``.
-
-    Args:
-        competition: Legacy competition selector retained for compatibility
-        logger: Logger instance
-        competition_name: Directory under ``simulations/`` to resolve from
-        mission_stage: Optional mission stage name (e.g., 'horizontal_takeoff')
-
-    Returns:
-        Tuple of (parsed YAML dict, config file path (as string))
-
-    Raises:
-        FileNotFoundError: If config file cannot be found
-    """
-    if mission_stage:
-        config_filename = f"{mission_stage}.yaml"
-    else:
-        config_filename = "base.yaml"
-
-    config_path = find_package_resource(
-        relative_path=f"simulations/{competition_name}/{config_filename}",
-        package_name="sim",
-        resource_type="file",
-        logger=logger,
-    )
-    return load_yaml_to_dict(config_path), config_path
 
 
 def convert_parameter_value(param_value: Any, param_annotation: Any, param_name: str) -> Any:
