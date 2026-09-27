@@ -1,8 +1,7 @@
 import math
+
 import cv2
 import numpy as np
-
-
 import rclpy
 from cv_bridge import CvBridge
 from geometry_msgs.msg import Pose, PoseArray
@@ -90,6 +89,7 @@ def draw_detections(frame_bgr: np.ndarray, centers: list[tuple[float, float]]) -
 
 EARTH_RADIUS_M = 6378137.0  # same flat-earth approximation as UAV.local_to_gps()
 
+
 def pixel_to_local_ned(
     u: float,
     v: float,
@@ -123,9 +123,11 @@ def local_ned_to_gps(
     lon = ref_lon + math.degrees(east / (EARTH_RADIUS_M * math.cos(math.radians(ref_lat))))
     return lat, lon
 
+
 # gives list
 
 HAVE_ROS = True
+
 
 def make_pose_array(points: list[tuple[float, float]], stamp, frame_id: str):
     # List of (x, y) -> PoseArray, the standard ROS 'list of positions' message

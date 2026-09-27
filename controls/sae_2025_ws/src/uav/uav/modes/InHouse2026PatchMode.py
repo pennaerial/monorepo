@@ -13,9 +13,9 @@ from uav.vehicles.UAV import UAV
 
 class FlyToPatchParams(ParamsBase):
     patch_number: int = Field(default=0, ge=0)
-    altitude: float = 7.0 # hover altitude for the patch
+    altitude: float = 7.0  # hover altitude for the patch
     margin: float = 1.0
-    hold: bool = False # testing
+    hold: bool = False  # testing
 
 
 @register_mode(
@@ -28,9 +28,7 @@ class FlyToPatch(Mode[UAV, FlyToPatchParams]):
     """Request a generated patch location and fly over it at a fixed altitude."""
 
     @override
-    def initialize(
-        self, node: Node, vehicle: UAV, params: FlyToPatchParams
-    ) -> None:
+    def initialize(self, node: Node, vehicle: UAV, params: FlyToPatchParams) -> None:
         self.node = node
         self.vehicle = vehicle
         self.params = params
@@ -50,7 +48,7 @@ class FlyToPatch(Mode[UAV, FlyToPatchParams]):
     def on_update(self, time_delta: float) -> None:
         if self.target is None and self.request_future is not None and self.request_future.done():
             try:
-                response = self.request_future.result() # ask for patches
+                response = self.request_future.result()  # ask for patches
             except Exception as e:
                 self.log(f"Patch request failed: {e}")
                 self.failed = True
@@ -89,9 +87,7 @@ class FlyToPatch(Mode[UAV, FlyToPatchParams]):
                 self.wait_remaining -= time_delta
         elif self.vehicle.local_position is not None:
             current = self.vehicle.local_position
-            self.vehicle.publish_position_setpoint(
-                (current.x, current.y, current.z), lock_yaw=True
-            )
+            self.vehicle.publish_position_setpoint((current.x, current.y, current.z), lock_yaw=True)
 
     @override
     def check_status(self) -> str:
