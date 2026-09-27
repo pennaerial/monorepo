@@ -23,10 +23,8 @@ public:
 
   /// Starts the IMU. It should immediately start writing imu messages to internal buffer
   virtual void start() = 0;
-  /// Writes a new incoming imu reading to the local cache and optional DDS topic.
+  /// Writes a new incoming imu reading to the local cache
   void write_latest(const sensor_msgs_msg_Imu& msg);
-  /// Enables write_latest() to queue each IMU sample for DDS publishing.
-  void set_dds_publisher(DDSClient* dds_client, const char* topic_name);
   /// returns the latest imu reading
   sensor_msgs_msg_Imu get_latest();
   /// Gets singleton instance of imu implementation (sitl, hardware). implemented in backend .cpp
@@ -39,8 +37,6 @@ protected:
 private:
   sensor_msgs_msg_Imu reading_{};
   util::StaticMutex mtx_;
-  DDSClient* dds_client_ = nullptr;
-  const char* dds_topic_name_ = nullptr;
 };
 
 }  // namespace drivers
