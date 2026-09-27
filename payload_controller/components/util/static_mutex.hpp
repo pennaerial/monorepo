@@ -1,17 +1,38 @@
 #pragma once
 
+#include "sdkconfig.h"
+
+#if defined(CONFIG_IDF_TARGET_LINUX)
+#include <mutex>
+#else
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
-
-// TODO: Test that this actually prevents race conditions somehow
+#endif
 
 namespace util
 {
 
-/// RAII wrapper around a FreeRTOS mutex semaphore.
+/// Small lock wrapper used by drivers that may be called from either app code
+/// or simulator callbacks. Linux/SITL callbacks run on native threads, so use
+/// std::mutex there; embedded targets use a FreeRTOS static mutex.
 class StaticMutex
 {
 public:
+#if defined(CONFIG_IDF_TARGET_LINUX)
+  StaticMutex() = default;
+  ~StaticMutex() = default;
+
+  void lock()
+  {
+    mutex_.lock();
+  }
+
+  void unlock()
+  {
+    mutex_.unlock();
+  }
+
+#else
   StaticMutex() : handle_(xSemaphoreCreateMutexStatic(&buffer_))
   {
     configASSERT(handle_ != nullptr);
@@ -24,26 +45,29 @@ public:
     }
   }
 
-  // Non-copyable: a FreeRTOS semaphore handle can't be meaningfully
-  // duplicated. Non-movable too, for simplicity (add a move ctor
-  // later only if you actually need to relocate ownership).
+  void lock()
+  {
+    xSemaphoreTake(handle_, portMAX_DELAY);
+  }
+
+  void unlock()
+  {
+    xSemaphoreGive(handle_);
+  }
+#endif
+
   StaticMutex(const StaticMutex&) = delete;
   StaticMutex& operator=(const StaticMutex&) = delete;
   StaticMutex(StaticMutex&&) = delete;
   StaticMutex& operator=(StaticMutex&&) = delete;
 
-  void lock()
-  {
-    xSemaphoreTake(handle_, portMAX_DELAY);
-  }
-  void unlock()
-  {
-    xSemaphoreGive(handle_);
-  }
-
 private:
+#if defined(CONFIG_IDF_TARGET_LINUX)
+  std::mutex mutex_;
+#else
   StaticSemaphore_t buffer_;
   SemaphoreHandle_t handle_;
+#endif
 };
 
 /// RAII scoped lock, mirrors std::lock_guard.
@@ -54,6 +78,7 @@ public:
   {
     m_.lock();
   }
+
   ~StaticMutexGuard()
   {
     m_.unlock();
