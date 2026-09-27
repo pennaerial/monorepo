@@ -59,7 +59,7 @@ void Encoder_SITL::publish_motor_right(double rad_s)
     return;
   }
 
-  const bool published = right_motor_publisher.Publish(msg);
+  right_motor_publisher.Publish(msg);
 }
 
 void Encoder_SITL::publish_motor_left(double rad_s)
@@ -74,7 +74,7 @@ void Encoder_SITL::publish_motor_left(double rad_s)
     return;
   }
 
-  const bool published = left_motor_publisher.Publish(msg);
+  left_motor_publisher.Publish(msg);
 }
 
 void Encoder_SITL::make_encoder_topic(char* buf, std::size_t size)

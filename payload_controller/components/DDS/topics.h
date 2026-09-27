@@ -17,6 +17,8 @@ constexpr uxrQoS_t DEFAULT_QOS = {
 constexpr uint16_t DEFAULT_PUBLISHER_KEY = 0x01;
 constexpr uint16_t DEFAULT_SUBSCRIBER_KEY = 0x01;
 
+enum class TopicId : uint16_t;
+
 // DDSClient stores topic operations generically so the runtime code does not
 // need to know every generated message type at compile sites outside topics.h.
 using TopicSizeFunc = uint32_t (*)(const void* msg, uint32_t size);
@@ -48,14 +50,15 @@ struct TopicTypeAdapter {
   }
 };
 
-/// User-facing topic config. Object IDs are derived from the topic's position
-/// in topics[], so users only need to list each topic once.
+/// User-facing topic config. Object IDs come from the explicit TopicId value
+/// supplied next to each entry in topics[].
 struct Topic {
   enum class Direction : bool {
     WRITER,
     READER,
   };
 
+  const TopicId id;
   const char* name;
   const char* topic_name;
   const char* type_name;
@@ -79,6 +82,7 @@ template <
     bool (*SerializeTopic)(ucdrBuffer* writer, const MessageT* msg),
     bool (*DeserializeTopic)(ucdrBuffer* reader, MessageT* msg)>
 constexpr Topic make_topic(
+    const TopicId id,
     const char* name,
     const char* topic_name,
     const char* type_name,
@@ -88,6 +92,7 @@ constexpr Topic make_topic(
 {
   using Adapter = TopicTypeAdapter<MessageT, SizeOfTopic, SerializeTopic, DeserializeTopic>;
   return {
+      id,
       name,
       topic_name,
       type_name,
@@ -100,6 +105,13 @@ constexpr Topic make_topic(
   };
 }
 
+// User-declared XRCE object keys for each entry in topics[]. DataWriters and
+// DataReaders reuse the same numeric key with their own XRCE object type.
+enum class TopicId : uint16_t {
+  IMU_WRITER = 0x01,
+  IMU_READER = 0x02,
+};
+
 // This is the only list users should normally edit when adding DDS topics.
 // The generated functions passed to make_topic() must match the DDS type_name.
 constexpr Topic topics[] = {
@@ -108,7 +120,8 @@ constexpr Topic topics[] = {
         sensor_msgs_msg_Imu_size_of_topic,
         sensor_msgs_msg_Imu_serialize_topic,
         sensor_msgs_msg_Imu_deserialize_topic>(
-        "IMU",
+        TopicId::IMU_WRITER,
+        "IMU Writer",
         "rt/imu",
         "sensor_msgs::msg::dds_::Imu_",
         Topic::Direction::WRITER
@@ -118,6 +131,7 @@ constexpr Topic topics[] = {
         sensor_msgs_msg_Imu_size_of_topic,
         sensor_msgs_msg_Imu_serialize_topic,
         sensor_msgs_msg_Imu_deserialize_topic>(
+        TopicId::IMU_READER,
         "IMU Reader",
         "rt/imu",
         "sensor_msgs::msg::dds_::Imu_",
@@ -163,11 +177,11 @@ constexpr std::size_t datareader_count()
   return count;
 }
 
-// XRCE object keys are deterministic: topic at index 0 gets key 1, index 1
-// gets key 2, etc. Object type keeps Topic/DataWriter/DataReader IDs separate.
+// Object type keeps Topic/DataWriter/DataReader IDs separate even when they
+// reuse the same user-declared numeric key.
 constexpr uint16_t object_key(const std::size_t topic_index)
 {
-  return static_cast<uint16_t>(topic_index + 1);
+  return static_cast<uint16_t>(topics[topic_index].id);
 }
 
 inline uxrObjectId topic_id(const std::size_t topic_index)

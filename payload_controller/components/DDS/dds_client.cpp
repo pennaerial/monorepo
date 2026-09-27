@@ -170,6 +170,7 @@ bool DDSClient::topic_matches(const Topic& topic, const char* topic_name) const
          (std::strcmp(topic.name, topic_name) == 0 || std::strcmp(topic.topic_name, topic_name) == 0);
 }
 
+// The following two functions are overloads
 const Topic* DDSClient::find_topic(const char* topic_name, std::size_t& topic_index) const
 {
   for (std::size_t i = 0; i < topic_count; ++i) {
@@ -182,14 +183,38 @@ const Topic* DDSClient::find_topic(const char* topic_name, std::size_t& topic_in
   return nullptr;
 }
 
-// Public publish API: validate the named topic and copy the typed message into
-// a byte queue. Serialization intentionally happens later in update().
+const Topic* DDSClient::find_topic(const TopicId topic_id, std::size_t& topic_index) const
+{
+  for (std::size_t i = 0; i < topic_count; ++i) {
+    if (topics[i].id == topic_id) {
+      topic_index = i;
+      return &topics[i];
+    }
+  }
+
+  return nullptr;
+}
+
+// Public publish API: validate the topic and copy the typed message into
+// that topic's latest-value slot. Serialization intentionally happens later in update().
 bool DDSClient::publish(const char* topic_name, const void* msg)
 {
+  for (const Topic& topic : topics) {
+    if (topic.dir == Topic::Direction::WRITER && topic_matches(topic, topic_name)) {
+      return publish(topic.id, msg);
+    }
+  }
+
+  ESP_LOGE(TAG, "Unknown DDS writer topic %s", topic_name == nullptr ? "<null>" : topic_name);
+  return false;
+}
+
+bool DDSClient::publish(const TopicId topic_id, const void* msg)
+{
   std::size_t topic_index = 0;
-  const Topic* topic = find_topic(topic_name, topic_index);
+  const Topic* topic = find_topic(topic_id, topic_index);
   if (topic == nullptr) {
-    ESP_LOGE(TAG, "Unknown DDS topic %s", topic_name == nullptr ? "<null>" : topic_name);
+    ESP_LOGE(TAG, "Unknown DDS topic id %u", static_cast<unsigned>(topic_id));
     return false;
   }
 
@@ -205,35 +230,49 @@ bool DDSClient::publish(const char* topic_name, const void* msg)
 
   // Copy the typed message now so callers can publish stack/local data safely.
   util::StaticMutexGuard lock(pending_publishes_mtx_);
-  PendingPublish& pending = pending_publishes_.emplace_back();
-  pending.topic_index = topic_index;
-  pending.data.resize(topic->message_size);
+  PendingPublish& pending = pending_publishes_[topic_index];
   std::memcpy(pending.data.data(), msg, topic->message_size);
+  pending.dirty = true;
   return true;
 }
 
 void DDSClient::update()
 {
-  std::vector<PendingPublish> pending_publishes;
+  // Copies the pending messages to avoid holding the mutex
+  std::array<PendingPublish, topic_count> pending_publishes{};
+  std::size_t pending_count = 0;
   {
     util::StaticMutexGuard lock(pending_publishes_mtx_);
-    pending_publishes.swap(pending_publishes_);
+    for (std::size_t topic_index = 0; topic_index < topic_count; ++topic_index) {
+      PendingPublish& pending = pending_publishes_[topic_index];
+      if (!pending.dirty) {
+        continue;
+      }
+
+      pending_publishes[topic_index] = pending;
+      pending.dirty = false;
+      ++pending_count;
+    }
   }
 
   bool wrote_data = false;
   std::size_t writes_since_confirm = 0;
-  ESP_LOGI(TAG, "Pending messages: %zu", pending_publishes.size());
+  ESP_LOGI(TAG, "Pending messages: %zu", pending_count);
 
-  // Drain every queued message, preserving publish() call order across topics.
-  // A reliable stream with history N has N blocks, so confirm delivery before
-  // queuing more than STREAM_HISTORY normal writes into the stream.
-  for (const PendingPublish& pending : pending_publishes) {
+  // Send each dirty topic slot once. If publish() is called again while update()
+  // is sending, that newer sample stays dirty for the next update cycle.
+  for (std::size_t topic_index = 0; topic_index < topic_count; ++topic_index) {
+    const PendingPublish& pending = pending_publishes[topic_index];
+    if (!pending.dirty) {
+      continue;
+    }
+
     if (writes_since_confirm >= STREAM_HISTORY) {
       confirm_delivery();
       writes_since_confirm = 0;
     }
 
-    if (send_publish(pending.topic_index, pending.data.data())) {
+    if (send_publish(topic_index, pending.data.data())) {
       wrote_data = true;
       ++writes_since_confirm;
     }
@@ -295,6 +334,8 @@ bool DDSClient::send_publish(const std::size_t topic_index, const void* msg)
   return true;
 }
 
+// I know the next two functions are basically duplicates but fragmenting messge in send_publish
+//  requires a very specifc method signature and so for readability we will keep them separate
 bool DDSClient::confirm_delivery()
 {
   const bool delivered = uxr_run_session_until_confirm_delivery(&session_, 1000);
@@ -316,19 +357,33 @@ bool DDSClient::flush_output_stream(uxrSession* session, void* args)
 // Optional application hook for one received READER topic.
 bool DDSClient::set_reader_callback(const char* topic_name, ReaderCallback callback, void* args)
 {
-  for (std::size_t topic_index = 0; topic_index < topic_count; ++topic_index) {
-    const Topic& topic = topics[topic_index];
-    if (topic.dir != Topic::Direction::READER || !topic_matches(topic, topic_name)) {
-      continue;
+  for (const Topic& topic : topics) {
+    if (topic.dir == Topic::Direction::READER && topic_matches(topic, topic_name)) {
+      return set_reader_callback(topic.id, callback, args);
     }
-
-    reader_callbacks_[topic_index] = callback;
-    reader_callback_args_[topic_index] = args;
-    return true;
   }
 
   ESP_LOGE(TAG, "Unknown DDS reader topic %s", topic_name == nullptr ? "<null>" : topic_name);
   return false;
+}
+
+bool DDSClient::set_reader_callback(const TopicId topic_id, ReaderCallback callback, void* args)
+{
+  std::size_t topic_index = 0;
+  const Topic* topic = find_topic(topic_id, topic_index);
+  if (topic == nullptr) {
+    ESP_LOGE(TAG, "Unknown DDS reader topic id %u", static_cast<unsigned>(topic_id));
+    return false;
+  }
+
+  if (topic->dir != Topic::Direction::READER) {
+    ESP_LOGE(TAG, "DDS topic %s is not configured as a reader", topic->name);
+    return false;
+  }
+
+  reader_callbacks_[topic_index] = callback;
+  reader_callback_args_[topic_index] = args;
+  return true;
 }
 
 // Static C callback required by Micro XRCE-DDS; routes back to this instance.
