@@ -9,10 +9,22 @@
 #endif
 
 
-static const char* TAG = "DDSClient";
-// TODO: This shouldn't be hardcoded in, should be derived by some vehicle-specific parameter.
-// Need to set up a parameter system first
-static constexpr uint32_t SESSION_KEY = 0xABCDABCD;
+namespace
+{
+
+const char* TAG = "DDSClient";
+// Placeholder XRCE client key until the vehicle parameter system can provide a unique 32-bit value.
+constexpr uint32_t SESSION_KEY = 0xABCDABCD;
+// All DDS objects belong to the first object instance in this client session.
+constexpr uint8_t OBJECT_INSTANCE_ID = 0x01;
+// Use the default DDS domain until domain selection becomes a vehicle parameter.
+constexpr uint16_t DDS_DOMAIN_ID = 0;
+// Bound agent handshakes and reliable delivery so a disconnected agent cannot block forever.
+constexpr int SESSION_TIMEOUT_MS = 1000;
+// Participant, topic, publisher, subscriber, writer, and reader are created together.
+constexpr uint16_t ENTITY_COUNT = 6;
+
+}  // namespace
 
 namespace
 {
@@ -27,9 +39,6 @@ DDSClient::DDSClient(const char* ip, const char* port) : ip_(ip), port_(port) {}
 
 void DDSClient::init()
 {
-  // Open the UDP link to the Micro-XRCE-DDS Agent. This is the transport
-  // underneath the XRCE session; no DDS entities exist yet.
-
 #if defined(CONFIG_IDF_TARGET_LINUX)
   if (!uxr_init_udp_transport(&transport_, UXR_IPv4, ip_, port_)) {
     ESP_LOGE(TAG, "UXR UDP transport failed to init!");
@@ -54,7 +63,7 @@ void DDSClient::init()
   // Handshake with the Agent so later create/read/write requests have a live
   // XRCE session to run on.
   if (!uxr_create_session(&session_)) {
-    ESP_LOGI(TAG, "Error creating session");
+    ESP_LOGE(TAG, "Error creating session");
     return;
   }
   ESP_LOGI(TAG, "UXR Session created");
@@ -107,6 +116,7 @@ void DDSClient::init()
     return;
   }
 
+  connected_ = true;
   ESP_LOGI(TAG, "Entities creation success");
 }
 

@@ -54,7 +54,7 @@ extern "C" void app_main(void)
     encoders->publish_motor_left(10);
     encoders->publish_motor_right(5);
 
-    // Delays by 50 ms to avoid spamming
+    // Delays by 100 ms to avoid spamming
     vTaskDelay(pdMS_TO_TICKS(100));
   }
 }

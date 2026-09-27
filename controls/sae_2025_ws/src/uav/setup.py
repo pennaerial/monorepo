@@ -70,12 +70,6 @@ setup(
     entry_points={
         "console_scripts": [
             "uav_mission = uav.uav_mission:main",
-            "payload_tracking_node = uav.vision_nodes.PayloadTrackingNode:main",
-            "payload_april_tag_node = uav.vision_nodes.PayloadAprilTagNode:main",
-            "payload_color_orbit_node = uav.vision_nodes.PayloadColorOrbitNode:main",
-            "payload_drive_out_node = uav.vision_nodes.PayloadDriveOutNode:main",
-            "payload_color_square_node = uav.vision_nodes.PayloadColorSquareNode:main",
-            "camera = uav.CameraNode:main",
         ],
     },
 )

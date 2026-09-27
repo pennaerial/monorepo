@@ -11,14 +11,6 @@ from std_srvs.srv import Trigger
 from vehicle_common.mode import Mode
 from vehicle_common.mode_loader import ModeRegistry
 from vehicle_common.runtime.mission_loader import RuntimeMission
-from vehicle_common.runtime.peer_connections import (
-    declared_remote_peer_names,
-    normalize_vehicle_name,
-)
-from vehicle_common.runtime.vision_loader import (
-    canonical_vision_node_path,
-    load_vision_class,
-)
 from vehicle_common.vehicle import Vehicle
 
 MISSION_STARTED_MARKER_ENV = "PENNAIR_MISSION_STARTED_MARKER_PATH"
@@ -33,8 +25,6 @@ class ModeManager(Node, ABC):
         *,
         vehicle_name: str = "",
         auto_launch: bool = True,
-        peer_heartbeat_hz: float = 10.0,
-        peer_stale_timeout_s: float = 0.5,
     ) -> None:
         super().__init__(node_name)
         self.vehicle: Vehicle | None = None
@@ -42,22 +32,10 @@ class ModeManager(Node, ABC):
         self.transitions: dict[str, dict[str, str]] = {}
         self.active_mode: str | None = None
         self.last_update_time = time()
-        self._vision_clients = {}
         self.timer = None
         self.auto_launch = bool(auto_launch)
         self._auto_launch_timer = None
-        self._runtime_vehicle_name = normalize_vehicle_name(vehicle_name)
-        self.peer_heartbeat_hz = float(peer_heartbeat_hz)
-        self.peer_stale_timeout_s = float(peer_stale_timeout_s)
-        if self.peer_heartbeat_hz <= 0.0:
-            raise ValueError(f"peer_heartbeat_hz must be positive, got {self.peer_heartbeat_hz!r}.")
-        if self.peer_stale_timeout_s <= 0.0:
-            raise ValueError(
-                f"peer_stale_timeout_s must be positive, got {self.peer_stale_timeout_s!r}."
-            )
-        self._shared_mode_state = {}
-        self._current_comm_builder = None
-        self._runtime_closed = False
+        self._runtime_vehicle_name = str(vehicle_name or "").strip().strip("/")
         self.start_mission_service = self.create_service(
             Trigger, "mode_manager/start_mission", self._start_mission_callback
         )
@@ -71,9 +49,6 @@ class ModeManager(Node, ABC):
 
     def get_active_mode(self) -> Mode:
         return self.modes[cast(str, self.active_mode)]
-
-    def _now_seconds(self) -> float:
-        return self.get_clock().now().nanoseconds * 1e-9
 
     def _mission_started_marker_path(self) -> Path:
         explicit_path = os.environ.get(MISSION_STARTED_MARKER_ENV, "").strip()
@@ -105,49 +80,6 @@ class ModeManager(Node, ABC):
             marker_path.unlink(missing_ok=True)
         except OSError as exc:
             self.get_logger().warn(f"Failed to clear mission-start marker {marker_path}: {exc}")
-
-    def setup_vision(self, vision_nodes: list[str]) -> None:
-        nodes_to_setup = [node for node in vision_nodes if node]
-        if not nodes_to_setup:
-            return
-        if self.vehicle is None or not getattr(self.vehicle, "has_camera", False):
-            raise ValueError("Vision nodes require an active vehicle camera contract.")
-
-        for vision_node in nodes_to_setup:
-            vision_class = load_vision_class(vision_node)
-            key = canonical_vision_node_path(vision_class)
-            if key in self._vision_clients:
-                continue
-            client, service_name = self._connect_vision_client(vision_class)
-            self._vision_clients[key] = client
-            self.get_logger().info(
-                f"Registered vision client {vision_class.__name__} on {service_name}."
-            )
-
-    @property
-    def vision_clients(self) -> dict:
-        return self._vision_clients
-
-    def _connect_vision_client(self, vision_class):
-        vehicle = self.vehicle
-        if vehicle is None:
-            raise ValueError("Vision nodes require an active vehicle camera contract.")
-        service_name = vehicle.vision_service_name(vision_class)
-        while True:
-            client = super().create_client(vision_class.srv, service_name)
-            if client.wait_for_service(timeout_sec=1.0):
-                return client, service_name
-            super().destroy_client(client)
-            self.get_logger().info(f"Service {service_name} not available yet, waiting again...")
-
-    def get_vision_client(self, vision_node):
-        key = canonical_vision_node_path(vision_node)
-        if key not in self._vision_clients:
-            raise KeyError(f"Vision client '{key}' is not registered.")
-        return self._vision_clients[key]
-
-    def _mode_peer_names(self, mode_or_class: object) -> tuple[str, ...]:
-        return declared_remote_peer_names(mode_or_class, self._runtime_vehicle_name)
 
     def initialize_mode(self, mode_id: str, params: BaseModel) -> Mode:
         registered_mode = ModeRegistry.get().get_registered_mode(mode_id)
