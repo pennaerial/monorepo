@@ -50,7 +50,6 @@ void Encoder_SITL::make_motor_advertiser_left(char* buf, std::size_t size)
 
 void Encoder_SITL::publish_motor_right(double rad_s)
 {
-  ESP_LOGI(TAG, "Changing right motor velocity");
   gz::msgs::Actuators msg;
 
   // TODO convert rad/s to PWM
@@ -64,8 +63,6 @@ void Encoder_SITL::publish_motor_right(double rad_s)
 
 void Encoder_SITL::publish_motor_left(double rad_s)
 {
-  ESP_LOGI(TAG, "Changing left motor velocity");
-
   gz::msgs::Actuators msg;
 
   // TODO convert rad/s to PWM

@@ -8,26 +8,27 @@
 #include "imu.hpp"
 #include "topics.h"
 
-class Payload {
+class Payload
+{
 public:
-    void init();
-    void update();
-    void publish_sensor_debug();
-    void motor_updates();
+  void init();
+  void update();
+  void publish_sensor_debug();
+  void motor_updates();
 
-    static Payload* instance();
+  static Payload* instance();
 
 private:
-    Payload();
-    ~Payload() = default;
+  Payload();
+  ~Payload() = default;
+  void start_dds_task();
 
-    Payload(const Payload&) = delete;
-    Payload& operator=(const Payload&) = delete;
-    Payload(Payload&&) = delete;
-    Payload& operator=(Payload&&) = delete;
+  Payload(const Payload&) = delete;
+  Payload& operator=(const Payload&) = delete;
+  Payload(Payload&&) = delete;
+  Payload& operator=(Payload&&) = delete;
 
-    DDSClient dds_client;
-    drivers::IMU* imu;
-    drivers::Encoder* encoders;
-
+  DDSClient dds_client;
+  drivers::IMU* imu;
+  drivers::Encoder* encoders;
 };
