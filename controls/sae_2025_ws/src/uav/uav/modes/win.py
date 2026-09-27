@@ -68,6 +68,8 @@ class WinMode(Mode[UAV, WinParams]):
                 pass
             case State.MOVING_TO_LOCATION:
                 self.vehicle.publish_position_setpoint(self.move_target)
+            case State.MOVING_BETWEEN_PATCHES:
+                pass
 
     def wait_for_world_setup(self) -> None:
         """Poll get_search_patches without blocking until the world reports ready."""
@@ -91,8 +93,6 @@ class WinMode(Mode[UAV, WinParams]):
             f"target tag {self.target_tag_id}"
         )
         self.state = State.MOVING_TO_LOCATION
-            case State.MOVING_BETWEEN_PATCHES:
-                pass
 
     # def move_to_target(self):
     #     self.timer = self.create_timer(1.0, self.timer_callback)
@@ -150,14 +150,13 @@ class WinMode(Mode[UAV, WinParams]):
             self.scan_waypoints.append((line_start_x, y, z))
             self.scan_waypoints.append((line_end_x, y, z))
 
-
     def scan(self):
-        # This timer will check 
+        # This timer will check
         self.timer = self.create_timer(1.0, self.timer_callback)
         # self.timer.cancel()
-        for waypoint in generated_waypoints:
+        for waypoint in self.scan_waypoints:
             pass
-        
+
         self.vehicle.publish_position_setpoint(self.p.target)
         self.vehicle.hover()
 
