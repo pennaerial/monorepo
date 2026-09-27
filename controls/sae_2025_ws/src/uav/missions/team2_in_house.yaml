@@ -1,10 +1,10 @@
 modes:
   start: 
-    mode: uav.vtol.VerticalTakeoffMode
+    mode: uav.vtol.TakeoffMode
     params:
       takeoff_type: vertical
     transitions:
-      complete: win'
+      complete: win
   
   win:
     mode: uav.WinMode
