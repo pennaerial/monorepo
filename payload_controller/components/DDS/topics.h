@@ -2,9 +2,9 @@
 
 #include <uxr/client/client.h>
 
+#include <cassert>
 #include <cstddef>
 #include <cstdint>
-#include <cassert>
 
 #include "sensor_msgs/msg/Imu.h"
 
@@ -159,10 +159,7 @@ constexpr bool topic_ids_match_indices()
   return true;
 }
 
-static_assert(
-  topic_ids_match_indices(),
-  "topics[] entries must match their zero-based TopicId indices"
-);
+static_assert(topic_ids_match_indices(), "topics[] entries must match their zero-based TopicId indices");
 
 
 /// Returns the Topic associated with the TopicId
