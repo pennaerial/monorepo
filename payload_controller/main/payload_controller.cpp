@@ -42,7 +42,7 @@ extern "C" void app_main(void)
   }
 
   drivers::IMU* imu = drivers::IMU::instance();
-  imu->set_dds_publisher(&dds_client, "IMU Reader");
+  imu->set_dds_publisher(&dds_client, "IMU Writer");
   imu->start();
 
   drivers::Encoder* encoders = drivers::Encoder::instance();
