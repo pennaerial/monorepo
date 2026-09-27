@@ -11,6 +11,9 @@
   <depend>python3-opencv</depend>
   <depend>rclpy</depend>
   <depend>payload_interfaces</depend>
+  <depend>px4_msgs</depend>
+  <depend>sim_interfaces</depend>
+  <depend>std_msgs</depend>
 
   <test_depend>ament_copyright</test_depend>
 

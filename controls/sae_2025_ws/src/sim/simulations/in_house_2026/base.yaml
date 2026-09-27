@@ -3,7 +3,7 @@ world:
   node: in_house_2026_node
   config:
     # Each patch has a fixed 4 m radius and 16 shapes, including 4 gold stars.
-    num_patches: 1
+    num_patches: 4
     seed: null                      # Set an integer to reproduce a layout.
     area: [[-30, -30], [30, 30]]    # World XY bounds in meters; whole patches fit inside.
     min_spacing: 0.1                # Minimum edge-to-edge spacing between shapes.

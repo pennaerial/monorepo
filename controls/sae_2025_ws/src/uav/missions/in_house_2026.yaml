@@ -4,12 +4,19 @@ modes:
     params:
       takeoff_type: vertical
     transitions:
-      complete: patch_1
+      complete: patchsearch
 
-  patch_1:
+  patchsearch:
     mode: uav.FlyToPatch
     params:
-      patch_number: 0
-      altitude: 7.0
+      altitude: 7.0 # alt to view patch
+      low_altitude: 0.3 # alt to view apriltag
+      hover_seconds: 3.0 # time to wait for camera settle
+      descent_rate: 1.0 # speed of descent
       margin: 1.0
-      hold: true
+      hold: false
+    transitions:
+      complete: land
+
+  land:
+    mode: uav.LandingMode

@@ -10,7 +10,7 @@ setup(
         ("share/ament_index/resource_index/packages", ["resource/" + package_name]),
         ("share/" + package_name, ["package.xml"]),
     ],
-    install_requires=["setuptools"],
+    install_requires=["setuptools", "apriltag"],
     zip_safe=True,
     maintainer="yuzhiliu8",
     maintainer_email="yuzhiliu8@gmail.com",
@@ -25,6 +25,8 @@ setup(
         "console_scripts": [
             "keyboard_teleop = payload_teleop.keyboard_teleop:main",
             "apriltag_debug = apriltag_debug.apriltag_debug:main",
+            "apriltag_detector = apriltag_detector.apriltag_detector:main",
+            "patch_points_service = patch_points_service.patch_points_service:main",
         ],
     },
 )

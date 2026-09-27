@@ -1,0 +1,1 @@
+"""GPS patch-point provider node."""

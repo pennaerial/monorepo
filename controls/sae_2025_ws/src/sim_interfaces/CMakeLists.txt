@@ -21,6 +21,8 @@ set(SRV_FILES
     srv/HoopList.srv
     srv/ObjectStateList.srv
     srv/GetSearchLocations.srv
+    srv/GetPatchPoints.srv
+    srv/GetAprilTagId.srv
 )
 
 rosidl_generate_interfaces(${PROJECT_NAME}

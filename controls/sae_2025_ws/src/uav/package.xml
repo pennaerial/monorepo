@@ -17,11 +17,12 @@
   <depend>vehicle_common</depend>
   <depend>std_msgs</depend>
   <depend>std_srvs</depend>
+  <depend>sim_interfaces</depend>
+  <depend>tools</depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>python3-pytest</test_depend>
   <test_depend>launch_testing</test_depend>
-  <test_depend>tools</test_depend>
   <depend>uav_interfaces</depend>
   <export>
     <build_type>ament_python</build_type>

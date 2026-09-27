@@ -1,0 +1,5 @@
+# Empty request
+---
+# List of latitude and longitude coordinates for the patch points
+float64[] latitude_deg
+float64[] longitude_deg

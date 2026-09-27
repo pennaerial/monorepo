@@ -133,6 +133,29 @@ def launch_setup(context) -> list[Action]:
         arguments=["--ros-args", "--log-level", "debug" if is_truthy(debug) else "info"],
     )
 
+    patch_points_provider = Node(
+        package="tools",
+        executable="patch_points_service",
+        parameters=[
+            {
+                "global_position_topic": f"/{vehicle_ns}/fmu/out/vehicle_global_position",
+            }
+        ],
+        output="screen",
+    )
+
+    apriltag_detector = Node(
+        package="tools",
+        executable="apriltag_detector",
+        parameters=[
+            {
+                "image_topic": f"/{vehicle_ns}/camera",
+                "ids_topic": f"/{vehicle_ns}/apriltag_ids",
+            }
+        ],
+        output="screen",
+    )
+
     middleware = ExecuteProcess(
         cmd=["MicroXRCEAgent", "udp4", "-p", "8888"],
         output="screen",
@@ -182,6 +205,9 @@ def launch_setup(context) -> list[Action]:
         logger.debug(f"Vehicle model '{vehicle_name}' has no camera. Skipping camera bridge.")
 
     actions.append(mode_manager)
+    actions.append(patch_points_provider)
+    if vehicle_camera_map.get(vehicle_name, False):
+        actions.append(apriltag_detector)
     actions.extend([middleware] if run_mw else [])
     actions.append(px4_sitl)
     actions.extend([include_sim_launch] if launch_sim else [])
