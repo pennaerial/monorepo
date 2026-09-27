@@ -15,14 +15,6 @@ namespace
 const char* TAG = "DDSClient";
 // Placeholder XRCE client key until the vehicle parameter system can provide a unique 32-bit value.
 constexpr uint32_t SESSION_KEY = 0xABCDABCD;
-// All DDS objects belong to the first object instance in this client session.
-constexpr uint8_t OBJECT_INSTANCE_ID = 0x01;
-// Use the default DDS domain until domain selection becomes a vehicle parameter.
-constexpr uint16_t DDS_DOMAIN_ID = 0;
-// Bound agent handshakes and reliable delivery so a disconnected agent cannot block forever.
-constexpr int SESSION_TIMEOUT_MS = 1000;
-// Participant, topic, publisher, subscriber, writer, and reader are created together.
-constexpr uint16_t ENTITY_COUNT = 6;
 
 }  // namespace
 
@@ -116,7 +108,6 @@ void DDSClient::init()
     return;
   }
 
-  connected_ = true;
   ESP_LOGI(TAG, "Entities creation success");
 }
 
