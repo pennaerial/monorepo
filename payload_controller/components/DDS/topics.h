@@ -2,6 +2,7 @@
 
 #include <uxr/client/client.h>
 
+#include <cassert>
 #include <cstddef>
 #include <cstdint>
 
@@ -105,16 +106,21 @@ constexpr Topic make_topic(
   };
 }
 
-// User-declared XRCE object keys for each entry in topics[]. DataWriters and
-// DataReaders reuse the same numeric key with their own XRCE object type.
+// User-declared XRCE object keys for each entry in topics[].
+// 0-based indexing to match with index in TOPICS
 enum class TopicId : uint16_t {
-  IMU_WRITER = 0x01,
-  IMU_READER = 0x02,
+  IMU_WRITER = 0x00,
+  IMU_READER,
 };
+
+inline uint16_t to_underlying(TopicId topic_id)
+{
+  return static_cast<uint16_t>(topic_id);
+}
 
 // This is the only list users should normally edit when adding DDS topics.
 // The generated functions passed to make_topic() must match the DDS type_name.
-constexpr Topic topics[] = {
+constexpr Topic TOPICS[] = {
     make_topic<
         sensor_msgs_msg_Imu,
         sensor_msgs_msg_Imu_size_of_topic,
@@ -139,14 +145,37 @@ constexpr Topic topics[] = {
     ),
 };
 
-constexpr std::size_t topic_count = sizeof(topics) / sizeof(topics[0]);
+constexpr std::size_t TOPIC_COUNT = sizeof(TOPICS) / sizeof(TOPICS[0]);
+
+/// Checks if TOPICS array if defined correctly. If topics are defined out-of-order
+/// in according withATopicId, the static_assert will fail at compile time.
+constexpr bool topic_ids_match_indices()
+{
+  for (std::size_t i = 0; i < TOPIC_COUNT; ++i) {
+    if (static_cast<std::size_t>(TOPICS[i].id) != i) {
+      return false;
+    }
+  }
+  return true;
+}
+
+static_assert(topic_ids_match_indices(), "topics[] entries must match their zero-based TopicId indices");
+
+
+/// Returns the Topic associated with the TopicId
+inline const Topic* get_topic(const TopicId topic_id)
+{
+  const uint16_t index = to_underlying(topic_id);
+  assert(index < TOPIC_COUNT && "Given topic_id does not exist in TOPICS array");
+  return index < TOPIC_COUNT ? &TOPICS[index] : nullptr;
+}
 
 // Reader callbacks deserialize into a stack buffer sized for the largest
 // configured message type. The callback must copy data it wants to keep.
 constexpr std::size_t max_topic_message_size()
 {
   std::size_t max_size = 0;
-  for (const Topic& topic : topics) {
+  for (const Topic& topic : TOPICS) {
     if (topic.message_size > max_size) {
       max_size = topic.message_size;
     }
@@ -158,7 +187,7 @@ constexpr std::size_t max_topic_message_size()
 constexpr std::size_t datawriter_count()
 {
   std::size_t count = 0;
-  for (const Topic& topic : topics) {
+  for (const Topic& topic : TOPICS) {
     if (topic.dir == Topic::Direction::WRITER) {
       ++count;
     }
@@ -169,7 +198,7 @@ constexpr std::size_t datawriter_count()
 constexpr std::size_t datareader_count()
 {
   std::size_t count = 0;
-  for (const Topic& topic : topics) {
+  for (const Topic& topic : TOPICS) {
     if (topic.dir == Topic::Direction::READER) {
       ++count;
     }
@@ -181,7 +210,7 @@ constexpr std::size_t datareader_count()
 // reuse the same user-declared numeric key.
 constexpr uint16_t object_key(const std::size_t topic_index)
 {
-  return static_cast<uint16_t>(topics[topic_index].id);
+  return static_cast<uint16_t>(TOPICS[topic_index].id);
 }
 
 inline uxrObjectId topic_id(const std::size_t topic_index)
