@@ -1,7 +1,5 @@
 #include "imu.hpp"
 
-#include "dds_client.hpp"
-
 namespace drivers
 {
 
