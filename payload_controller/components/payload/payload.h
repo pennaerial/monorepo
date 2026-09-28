@@ -21,14 +21,12 @@ public:
 private:
   Payload();
   ~Payload() = default;
-  void start_dds_task();
 
   Payload(const Payload&) = delete;
   Payload& operator=(const Payload&) = delete;
   Payload(Payload&&) = delete;
   Payload& operator=(Payload&&) = delete;
 
-  DDSClient dds_client;
   drivers::IMU* imu;
   drivers::Encoder* encoders;
 };

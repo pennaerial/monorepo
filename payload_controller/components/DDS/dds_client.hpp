@@ -37,8 +37,7 @@ public:
   // associated with `topic`, and is only valid for the duration of the call.
   using ReaderCallback = void (*)(const Topic& topic, const void* msg, uint16_t length, void* args);
 
-  /// Stores the Agent address used when init() opens the XRCE transport.
-  DDSClient(const char* ip, const char* port);
+  static DDSClient& instance();
 
   /// Opens transport/session streams and creates the configured XRCE-DDS entities.
   void init();
@@ -53,6 +52,11 @@ public:
   bool set_reader_callback(TopicId topic_id, ReaderCallback callback, void* args);
 
 private:
+  /// Stores the Agent address used when init() opens the XRCE transport.
+  DDSClient(const char* ip, const char* port);
+  DDSClient(const DDSClient&) = delete;
+  DDSClient& operator=(const DDSClient&) = delete;
+
   /// Queues XRCE Topic create requests for every configured topic.
   void generate_topics(uint16_t requests[], std::size_t& request_count, uxrObjectId participant_id);
   /// Queues XRCE DataWriter create requests for configured writer topics.
