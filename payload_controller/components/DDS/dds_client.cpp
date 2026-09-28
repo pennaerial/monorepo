@@ -16,11 +16,19 @@ namespace
 const char* TAG = "DDSClient";
 // Placeholder XRCE client key until the vehicle parameter system can provide a unique 32-bit value.
 constexpr uint32_t SESSION_KEY = 0xABCDABCD;
+constexpr char DEFAULT_AGENT_IP[] = "127.0.0.1";
+constexpr char DEFAULT_AGENT_PORT[] = "7777";
 
 }  // namespace
 
 
 DDSClient::DDSClient(const char* ip, const char* port) : ip_(ip), port_(port) {}
+
+DDSClient& DDSClient::instance()
+{
+  static DDSClient instance(DEFAULT_AGENT_IP, DEFAULT_AGENT_PORT);
+  return instance;
+}
 
 void DDSClient::init()
 {

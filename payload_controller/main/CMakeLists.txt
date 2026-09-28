@@ -1,5 +1,5 @@
 
-SET (priv_requires imu encoder DDS)
+SET (priv_requires imu encoder DDS payload)
 
 if(IDF_TARGET STREQUAL "linux")
     list(APPEND priv_requires "sitl")
