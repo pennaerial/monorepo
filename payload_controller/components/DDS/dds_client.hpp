@@ -43,15 +43,13 @@ public:
   /// Opens transport/session streams and creates the configured XRCE-DDS entities.
   void init();
 
-  /// Stores the latest sample for a writer topic matched by name or TopicId.
-  bool publish(const char* topic_name, const void* msg);
+  /// Stores the latest sample for a writer topic matched by TopicId.
   bool publish(TopicId topic_id, const void* msg);
 
   /// Writes each dirty publish slot once, clears those slots, and services incoming data.
   void update();
 
   /// Binds a callback for a reader topic matched by name or TopicId.
-  bool set_reader_callback(const char* topic_name, ReaderCallback callback, void* args);
   bool set_reader_callback(TopicId topic_id, ReaderCallback callback, void* args);
 
 private:
@@ -62,11 +60,6 @@ private:
   /// Queues XRCE DataReader create and request-data requests for configured reader topics.
   void generate_readers(uint16_t requests[], std::size_t& request_count, uxrObjectId subscriber_id);
 
-  /// Returns true when a topic matches a friendly name or DDS topic name.
-  bool topic_matches(const Topic& topic, const char* topic_name) const;
-  /// Finds a topic by name or TopicId and returns its topics[] index.
-  const Topic* find_topic(const char* topic_name, std::size_t& topic_index) const;
-  const Topic* find_topic(TopicId topic_id, std::size_t& topic_index) const;
   /// Serializes one topic sample into the XRCE reliable output stream.
   bool send_publish(std::size_t topic_index, const void* msg);
   /// Runs the XRCE session until reliable output delivery is confirmed or times out.
@@ -129,8 +122,8 @@ private:
     std::array<uint8_t, max_topic_message_size()> data{};
   };
 
-  std::array<PendingPublish, topic_count> pending_publishes_{};
+  std::array<PendingPublish, TOPIC_COUNT> pending_publishes_{};
   util::StaticMutex pending_publishes_mtx_;
-  std::array<ReaderCallback, topic_count> reader_callbacks_{};
-  std::array<void*, topic_count> reader_callback_args_{};
+  std::array<ReaderCallback, TOPIC_COUNT> reader_callbacks_{};
+  std::array<void*, TOPIC_COUNT> reader_callback_args_{};
 };

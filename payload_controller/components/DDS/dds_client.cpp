@@ -3,6 +3,7 @@
 #include <cstring>
 
 #include "esp_log.h"
+#include "topics.h"
 
 #ifndef CONFIG_IDF_TARGET_LINUX
 #include "uart_transport.hpp"
@@ -18,14 +19,6 @@ constexpr uint32_t SESSION_KEY = 0xABCDABCD;
 
 }  // namespace
 
-namespace
-{
-// XRCE object IDs are a numeric key plus an object type. Both must match.
-bool same_object_id(const uxrObjectId lhs, const uxrObjectId rhs)
-{
-  return lhs.id == rhs.id && lhs.type == rhs.type;
-}
-}  // namespace
 
 DDSClient::DDSClient(const char* ip, const char* port) : ip_(ip), port_(port) {}
 
@@ -88,7 +81,7 @@ void DDSClient::init()
 
   // Participant, one Publisher, one Subscriber, every Topic, every DataWriter,
   // and each DataReader plus its request_data stream request.
-  constexpr std::size_t CREATE_REQUEST_COUNT = 3 + topic_count + datawriter_count() + (datareader_count() * 2);
+  constexpr std::size_t CREATE_REQUEST_COUNT = 3 + TOPIC_COUNT + datawriter_count() + (datareader_count() * 2);
   uint16_t requests[CREATE_REQUEST_COUNT]{};
   uint8_t status[CREATE_REQUEST_COUNT]{};
   std::size_t request_count = 0;
@@ -113,8 +106,8 @@ void DDSClient::init()
 
 void DDSClient::generate_topics(uint16_t requests[], std::size_t& request_count, const uxrObjectId participant_id)
 {
-  for (std::size_t topic_index = 0; topic_index < topic_count; ++topic_index) {
-    const Topic& topic = topics[topic_index];
+  for (std::size_t topic_index = 0; topic_index < TOPIC_COUNT; ++topic_index) {
+    const Topic& topic = TOPICS[topic_index];
     // TODO we might not want to create topics for the datareaders as ros2 might create those. IDK
     // Create the XRCE topic once; readers and writers both reference this object.
     ESP_LOGI(TAG, "Creating DDS topic %s (%s)", topic.topic_name, topic.type_name);
@@ -127,8 +120,8 @@ void DDSClient::generate_topics(uint16_t requests[], std::size_t& request_count,
 // Creates DataWriters only for topics marked as WRITER in topics.h.
 void DDSClient::generate_writers(uint16_t requests[], std::size_t& request_count, const uxrObjectId publisher_id)
 {
-  for (std::size_t topic_index = 0; topic_index < topic_count; ++topic_index) {
-    const Topic& topic = topics[topic_index];
+  for (std::size_t topic_index = 0; topic_index < TOPIC_COUNT; ++topic_index) {
+    const Topic& topic = TOPICS[topic_index];
     if (topic.dir != Topic::Direction::WRITER) {
       continue;
     }
@@ -144,8 +137,8 @@ void DDSClient::generate_writers(uint16_t requests[], std::size_t& request_count
 // Creates DataReaders only for topics marked as READER in topics.h.
 void DDSClient::generate_readers(uint16_t requests[], std::size_t& request_count, const uxrObjectId subscriber_id)
 {
-  for (std::size_t topic_index = 0; topic_index < topic_count; ++topic_index) {
-    const Topic& topic = topics[topic_index];
+  for (std::size_t topic_index = 0; topic_index < TOPIC_COUNT; ++topic_index) {
+    const Topic& topic = TOPICS[topic_index];
     if (topic.dir != Topic::Direction::READER) {
       continue;
     }
@@ -165,55 +158,11 @@ void DDSClient::generate_readers(uint16_t requests[], std::size_t& request_count
   }
 }
 
-bool DDSClient::topic_matches(const Topic& topic, const char* topic_name) const
-{
-  return topic_name != nullptr &&
-         (std::strcmp(topic.name, topic_name) == 0 || std::strcmp(topic.topic_name, topic_name) == 0);
-}
-
-// The following two functions are overloads
-const Topic* DDSClient::find_topic(const char* topic_name, std::size_t& topic_index) const
-{
-  for (std::size_t i = 0; i < topic_count; ++i) {
-    if (topic_matches(topics[i], topic_name)) {
-      topic_index = i;
-      return &topics[i];
-    }
-  }
-
-  return nullptr;
-}
-
-const Topic* DDSClient::find_topic(const TopicId topic_id, std::size_t& topic_index) const
-{
-  for (std::size_t i = 0; i < topic_count; ++i) {
-    if (topics[i].id == topic_id) {
-      topic_index = i;
-      return &topics[i];
-    }
-  }
-
-  return nullptr;
-}
-
 // Public publish API: validate the topic and copy the typed message into
 // that topic's latest-value slot. Serialization intentionally happens later in update().
-bool DDSClient::publish(const char* topic_name, const void* msg)
-{
-  for (const Topic& topic : topics) {
-    if (topic.dir == Topic::Direction::WRITER && topic_matches(topic, topic_name)) {
-      return publish(topic.id, msg);
-    }
-  }
-
-  ESP_LOGE(TAG, "Unknown DDS writer topic %s", topic_name == nullptr ? "<null>" : topic_name);
-  return false;
-}
-
 bool DDSClient::publish(const TopicId topic_id, const void* msg)
 {
-  std::size_t topic_index = 0;
-  const Topic* topic = find_topic(topic_id, topic_index);
+  const Topic* topic = get_topic(topic_id);
   if (topic == nullptr) {
     ESP_LOGE(TAG, "Unknown DDS topic id %u", static_cast<unsigned>(topic_id));
     return false;
@@ -230,6 +179,7 @@ bool DDSClient::publish(const TopicId topic_id, const void* msg)
   }
 
   // Copy the typed message now so callers can publish stack/local data safely.
+  std::size_t topic_index = to_underlying(topic_id);
   util::StaticMutexGuard lock(pending_publishes_mtx_);
   PendingPublish& pending = pending_publishes_[topic_index];
   std::memcpy(pending.data.data(), msg, topic->message_size);
@@ -240,11 +190,11 @@ bool DDSClient::publish(const TopicId topic_id, const void* msg)
 void DDSClient::update()
 {
   // Copies the pending messages to avoid holding the mutex
-  std::array<PendingPublish, topic_count> pending_publishes{};
+  std::array<PendingPublish, TOPIC_COUNT> pending_publishes{};
   std::size_t pending_count = 0;
   {
     util::StaticMutexGuard lock(pending_publishes_mtx_);
-    for (std::size_t topic_index = 0; topic_index < topic_count; ++topic_index) {
+    for (std::size_t topic_index = 0; topic_index < TOPIC_COUNT; ++topic_index) {
       PendingPublish& pending = pending_publishes_[topic_index];
       if (!pending.dirty) {
         continue;
@@ -262,7 +212,7 @@ void DDSClient::update()
 
   // Send each dirty topic slot once. If publish() is called again while update()
   // is sending, that newer sample stays dirty for the next update cycle.
-  for (std::size_t topic_index = 0; topic_index < topic_count; ++topic_index) {
+  for (std::size_t topic_index = 0; topic_index < TOPIC_COUNT; ++topic_index) {
     const PendingPublish& pending = pending_publishes[topic_index];
     if (!pending.dirty) {
       continue;
@@ -289,7 +239,7 @@ void DDSClient::update()
 // Serializes one queued message into the XRCE reliable output stream.
 bool DDSClient::send_publish(const std::size_t topic_index, const void* msg)
 {
-  const Topic& topic = topics[topic_index];
+  const Topic& topic = TOPICS[topic_index];
   if (topic.size_of_topic == nullptr || topic.serialize_topic == nullptr) {
     ESP_LOGE(TAG, "DDS topic %s is missing serializer hooks", topic.name);
     return false;
@@ -355,23 +305,10 @@ bool DDSClient::flush_output_stream(uxrSession* session, void* args)
   return uxr_run_session_until_confirm_delivery(session, 1000);
 }
 
-// Optional application hook for one received READER topic.
-bool DDSClient::set_reader_callback(const char* topic_name, ReaderCallback callback, void* args)
-{
-  for (const Topic& topic : topics) {
-    if (topic.dir == Topic::Direction::READER && topic_matches(topic, topic_name)) {
-      return set_reader_callback(topic.id, callback, args);
-    }
-  }
-
-  ESP_LOGE(TAG, "Unknown DDS reader topic %s", topic_name == nullptr ? "<null>" : topic_name);
-  return false;
-}
-
 bool DDSClient::set_reader_callback(const TopicId topic_id, ReaderCallback callback, void* args)
 {
-  std::size_t topic_index = 0;
-  const Topic* topic = find_topic(topic_id, topic_index);
+  std::size_t topic_index = to_underlying(topic_id);
+  const Topic* topic = get_topic(topic_id);
   if (topic == nullptr) {
     ESP_LOGE(TAG, "Unknown DDS reader topic id %u", static_cast<unsigned>(topic_id));
     return false;
@@ -419,32 +356,33 @@ void DDSClient::handle_topic(
   (void)request_id;
   (void)stream_id;
 
-  // Match the incoming XRCE DataReader ID back to the configured Topic.
-  for (std::size_t topic_index = 0; topic_index < topic_count; ++topic_index) {
-    const Topic& topic = topics[topic_index];
-    if (topic.dir != Topic::Direction::READER || !same_object_id(object_id, datareader_id(topic_index))) {
-      continue;
-    }
-
-    if (topic.deserialize_topic == nullptr) {
-      ESP_LOGE(TAG, "DDS topic %s is missing deserializer hook", topic.name);
-      return;
-    }
-
-    // The deserialized message has the generated C type associated with topic.
-    // It is stack-owned and only valid until reader_callback_ returns.
-    alignas(std::max_align_t) uint8_t msg_buffer[max_topic_message_size()];
-    if (!topic.deserialize_topic(ub, msg_buffer)) {
-      ESP_LOGE(TAG, "Failed to deserialize DDS topic %s", topic.name);
-      return;
-    }
-
-    ReaderCallback callback = reader_callbacks_[topic_index];
-    if (callback != nullptr) {
-      callback(topic, msg_buffer, length, reader_callback_args_[topic_index]);
-    }
+  const std::size_t topic_index = object_id.id;
+  if (object_id.type != UXR_DATAREADER_ID || topic_index >= TOPIC_COUNT) {
     return;
   }
 
-  ESP_LOGW(TAG, "Received data for unknown DDS DataReader id=%u type=%u", object_id.id, object_id.type);
+  const Topic& topic = TOPICS[topic_index];
+  if (topic.dir != Topic::Direction::READER) {
+    return;
+  }
+
+  if (topic.deserialize_topic == nullptr) {
+    ESP_LOGE(TAG, "DDS topic %s is missing deserializer hook", topic.name);
+    return;
+  }
+
+  alignas(std::max_align_t) uint8_t msg_buffer[max_topic_message_size()];
+  if (!topic.deserialize_topic(ub, msg_buffer)) {
+    ESP_LOGE(TAG, "Failed to deserialize DDS topic %s", topic.name);
+    return;
+  }
+
+  ReaderCallback callback = reader_callbacks_[topic_index];
+  if (callback == nullptr) {
+    ESP_LOGW(TAG, "Received data for unknown DDS DataReader id=%u type=%u", object_id.id, object_id.type);
+    return;
+  }
+
+  callback(topic, msg_buffer, length, reader_callback_args_[topic_index]);
+  return;
 }
