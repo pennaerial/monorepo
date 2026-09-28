@@ -62,8 +62,8 @@ void Payload::motor_updates()
 
 void Payload::publish_sensor_debug()
 {
-  const sensor_msgs_msg_Imu latest = imu->get_latest();
-  if (has_last_published_imu_ && std::memcmp(&latest, &last_published_imu_, sizeof(latest)) == 0) {
+  sensor_msgs_msg_Imu latest{};
+  if (!imu->get_latest_if_updated(last_published_imu_update_, latest)) {
     return;
   }
 
@@ -71,7 +71,4 @@ void Payload::publish_sensor_debug()
     ESP_LOGW(TAG, "Failed to publish IMU DDS sample");
     return;
   }
-
-  last_published_imu_ = latest;
-  has_last_published_imu_ = true;
 }
