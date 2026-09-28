@@ -196,7 +196,8 @@ bool DDSClient::publish(const TopicId topic_id, const void* msg)
     return false;
   }
 
-  uint16_t request_id = uxr_prepare_output_stream(&session_, reliable_out_, datawriter_id(topic_index), &ub, topic_size);
+  uint16_t request_id =
+      uxr_prepare_output_stream(&session_, reliable_out_, datawriter_id(topic_index), &ub, topic_size);
   if (request_id == UXR_INVALID_REQUEST_ID) {
     ESP_LOGW(TAG, "XRCE reliable output stream is full; dropping DDS topic %s", topic->name);
     return false;
