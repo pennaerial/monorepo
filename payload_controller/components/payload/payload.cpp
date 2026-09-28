@@ -63,7 +63,15 @@ void Payload::motor_updates()
 void Payload::publish_sensor_debug()
 {
   const sensor_msgs_msg_Imu latest = imu->get_latest();
-  if (!DDSClient::instance().publish(TopicId::IMU_WRITER, &latest)) {
-    ESP_LOGW(TAG, "Failed to queue IMU DDS publish");
+  if (has_last_published_imu_ && std::memcmp(&latest, &last_published_imu_, sizeof(latest)) == 0) {
+    return;
   }
+
+  if (!DDSClient::instance().publish(TopicId::IMU_WRITER, &latest)) {
+    ESP_LOGW(TAG, "Failed to publish IMU DDS sample");
+    return;
+  }
+
+  last_published_imu_ = latest;
+  has_last_published_imu_ = true;
 }

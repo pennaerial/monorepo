@@ -29,4 +29,6 @@ private:
 
   drivers::IMU* imu;
   drivers::Encoder* encoders;
+  bool has_last_published_imu_ = false;
+  sensor_msgs_msg_Imu last_published_imu_{};
 };
