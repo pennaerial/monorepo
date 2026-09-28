@@ -37,7 +37,7 @@ extern "C" void app_main(void)
   DDSClient dds_client("127.0.0.1", "7777");
   dds_client.init();
 
-  if (!dds_client.set_reader_callback("rt/imu", &testCallback, nullptr)) {
+  if (!dds_client.set_reader_callback(TopicId::IMU_READER, &testCallback, nullptr)) {
     ESP_LOGW(TAG, "Failed to bind IMU DDS reader callback");
   }
 
