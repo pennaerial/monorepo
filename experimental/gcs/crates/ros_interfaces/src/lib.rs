@@ -12,7 +12,5 @@ pub mod std_msgs {
         pub struct String {
             pub data: std::string::String,
         }
-
     }
-
 }
