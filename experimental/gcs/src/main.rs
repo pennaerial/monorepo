@@ -51,12 +51,22 @@ fn main() {
 
 async fn run_client() {
     let mut client = FoxgloveClient::new();
-    let string = std_msgs::msg::String { data: String::from("Hello") };
+    let string = std_msgs::msg::String {
+        data: String::from("Hello"),
+    };
     println!("std_msgs::msg::String: {}", string.data);
     match client.connect("ws://localhost:8765").await {
         Ok(()) => (),
         Err(error) => eprintln!("connection failed! {error}"),
     }
+
+    // testing a hardcoded 4 id
+    match client.subscribe(4).await {
+        Ok(id) => println!("SUCCESSFUL channel sub: {id}"),
+        Err(err) => println!("SUBCRIBE ERROR: {err}"),
+    }
+
+    // let receiver = client.listen_to_events();
 }
 
 /// App is the main component of our app. Components are the building blocks of dioxus apps. Each component is a function
