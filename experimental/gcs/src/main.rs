@@ -51,7 +51,9 @@ fn main() {
 
 async fn run_client() {
     let mut client = FoxgloveClient::new();
-    let string = std_msgs::msg::String { data: String::from("Hello") };
+    let string = std_msgs::msg::String {
+        data: String::from("Hello"),
+    };
     println!("std_msgs::msg::String: {}", string.data);
     match client.connect("ws://localhost:8765").await {
         Ok(()) => (),

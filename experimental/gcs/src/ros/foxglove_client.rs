@@ -1,18 +1,17 @@
-use std::fmt;
 use crate::ros::server_types::ServerMessage;
 use futures_util::{
     stream::{SplitSink, SplitStream},
-    StreamExt,
-    SinkExt,
+    SinkExt, StreamExt,
 };
+use std::fmt;
 
+use serde_json::json;
 use tokio::{net::TcpStream, sync::broadcast};
 use tokio_tungstenite::{
     connect_async,
     tungstenite::{client::IntoClientRequest, http::HeaderValue, Message},
     MaybeTlsStream, WebSocketStream,
 };
-use serde_json::json;
 
 pub type ServerMessageBroadcaster = broadcast::Sender<ServerMessage>;
 pub type ServerMessageReceiver = broadcast::Receiver<ServerMessage>;
@@ -98,7 +97,9 @@ impl FoxgloveClient {
         // start the message handling loop
         let broadcaster_clone = self.broadcaster.clone();
         tokio::spawn(async move {
-            if let Err(err) = FoxgloveClient::on_message_loop(broadcaster_clone, socket_reader).await {
+            if let Err(err) =
+                FoxgloveClient::on_message_loop(broadcaster_clone, socket_reader).await
+            {
                 println!("Error occurred during on_message_loop: {err}");
             }
         });
@@ -107,12 +108,17 @@ impl FoxgloveClient {
     }
 
     // keep as associated function (no &mut self) bc we move all necessary resources into it
-    async fn on_message_loop(broadcaster: ServerMessageBroadcaster, mut socket_reader: SocketReader) -> Result<(), FoxgloveClientError> {
+    async fn on_message_loop(
+        broadcaster: ServerMessageBroadcaster,
+        mut socket_reader: SocketReader,
+    ) -> Result<(), FoxgloveClientError> {
         while let Some(msg) = socket_reader.next().await {
             let msg = msg?;
             match msg {
                 Message::Text(text) => println!("{text}"),
-                Message::Binary(bytes) => println!("Lossy string: {}", String::from_utf8_lossy(&bytes)),
+                Message::Binary(bytes) => {
+                    println!("Lossy string: {}", String::from_utf8_lossy(&bytes))
+                }
                 _ => (),
             }
             // TODO: use broadcaster for the correct ops/events
@@ -120,8 +126,13 @@ impl FoxgloveClient {
         Ok(())
     }
 
-    pub async fn subscribe(&mut self, channel_id: u32) -> Result<SubscriptionId, FoxgloveClientError> {
-        if !self.connected { return Err(FoxgloveClientError::NotConnected); }
+    pub async fn subscribe(
+        &mut self,
+        channel_id: u32,
+    ) -> Result<SubscriptionId, FoxgloveClientError> {
+        if !self.connected {
+            return Err(FoxgloveClientError::NotConnected);
+        }
         let id = self.next_subscription_id;
         self.next_subscription_id += 1;
         let subscriptions = json!({
@@ -135,10 +146,13 @@ impl FoxgloveClient {
         });
         let msg_str: String = serde_json::to_string(&subscriptions)?; // return JsonError error if fails
         let msg = Message::Text(msg_str.into());
-        self.socket_writer.as_mut().unwrap().send(msg).await?; // return WsError if fails
+        self.socket_writer
+            .as_mut()
+            .expect("Must be connected() before subscribe()")
+            .send(msg)
+            .await?; // return WsError if fails
         Ok(id)
     }
-
 
     pub fn listen_to_events(&mut self) -> Result<ServerMessageReceiver, FoxgloveClientError> {
         if !self.connected {
