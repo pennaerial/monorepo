@@ -238,6 +238,10 @@ class FlyToPatch(Mode[UAV, FlyToPatchParams]):
             seen = list(response.tag_ids) if response.success else []
             self.log(f"target={self.target_tag_id}, seen={seen}")
             if self.target_tag_id is not None and self.target_tag_id in seen:
+                latitude, longitude = self.points[self.point_index]
+                self.log(
+                    f"\n\nTarget found at ({latitude:.6f}, {longitude:.6f}) in patch #{self.patch_index + 1}\n"
+                )
                 self.target_found = True
         self.tag_request_future = None
 
