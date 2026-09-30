@@ -80,10 +80,20 @@ def find_star_centers(frame_bgr: np.ndarray) -> list[tuple[float, float]]:
 
 # Copy of the frame with a magenta ring + dot on each detected star
 def draw_detections(frame_bgr: np.ndarray, centers: list[tuple[float, float]]) -> np.ndarray:
+    # Full-frame magenta image-coordinate crosshair: +u points right, +v points down.
     out = frame_bgr.copy()
+    height, width = out.shape[:2]
+    center_u, center_v = width // 2, height // 2
+    magenta = (255, 0, 255)
+    cv2.line(out, (0, center_v), (width - 1, center_v), magenta, 2)
+    cv2.line(out, (center_u, 0), (center_u, height - 1), magenta, 2)
+    cv2.arrowedLine(out, (center_u, center_v), (width - 1, center_v), magenta, 2, tipLength=0.02)
+    cv2.arrowedLine(out, (center_u, center_v), (center_u, height - 1), magenta, 2, tipLength=0.04)
+    cv2.putText(out, "u", (width - 30, center_v - 10), cv2.FONT_HERSHEY_PLAIN, 3, magenta, 2)
+    cv2.putText(out, "v", (center_u + 30, height - 15), cv2.FONT_HERSHEY_PLAIN, 3, magenta, 2)
     for u, v in centers:
-        cv2.circle(out, (int(u), int(v)), 20, (255, 0, 255), 2)
-        cv2.circle(out, (int(u), int(v)), 3, (255, 0, 255), -1)
+        cv2.circle(out, (int(u), int(v)), 20, magenta, 2)
+        cv2.circle(out, (int(u), int(v)), 3, magenta, -1)
     return out
 
 
