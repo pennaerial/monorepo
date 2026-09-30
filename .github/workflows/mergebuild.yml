@@ -84,6 +84,19 @@ jobs:
           cd "$PENNAIR_SAE_WS_PATH"
           ct
 
+      - name: Run Sim Tests
+        shell: bash
+        timeout-minutes: 30
+        run: |
+          # shellcheck disable=SC1090
+          source "/opt/ros/$ROS_DISTRO/setup.bash"
+          source "$PENNAIR_SAE_WS_PATH/install/setup.bash"
+          source "$PENNAIR_SAE_WS_PATH/.aliasrc" # imports the bash testing functions
+          cd "$PENNAIR_SAE_WS_PATH"
+          colcon test-result --delete-yes # clear unit test results so only sim results are checked
+          ctsim
+          colcon test-result --verbose # ctsim exits 0 on test failures, so fail the step here
+
   docs:
     name: Build Docs
     needs: detect_changes
