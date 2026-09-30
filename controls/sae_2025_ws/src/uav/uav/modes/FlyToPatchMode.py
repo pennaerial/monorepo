@@ -35,15 +35,11 @@ class FlyToPatch(Mode[UAV, FlyToPatchParams]):
     searching for target apriltag. infinitely loops until target found"""
 
     @override
-    def initialize(
-        self, node: Node, vehicle: UAV, params: FlyToPatchParams
-    ) -> None:
+    def initialize(self, node: Node, vehicle: UAV, params: FlyToPatchParams) -> None:
         self.node = node
         self.vehicle = vehicle
         self.params = params
-        self.patch_client = self.node.create_client(
-            GetSearchLocations, "/get_search_patches"
-        )
+        self.patch_client = self.node.create_client(GetSearchLocations, "/get_search_patches")
         self.point_client = self.node.create_client(GetPatchPoints, "/get_patch_points")
         self.tag_client = self.node.create_client(GetAprilTagId, "/get_apriltag_id")
         self.patch_request_future = None
@@ -113,9 +109,7 @@ class FlyToPatch(Mode[UAV, FlyToPatchParams]):
         # fallback to hold position if there is no gps origin detected
         if self.vehicle.local_position is not None:
             current = self.vehicle.local_position
-            self.vehicle.publish_position_setpoint(
-                (current.x, current.y, current.z), lock_yaw=True
-            )
+            self.vehicle.publish_position_setpoint((current.x, current.y, current.z), lock_yaw=True)
 
     # stage handlers
 
@@ -150,9 +144,7 @@ class FlyToPatch(Mode[UAV, FlyToPatchParams]):
         if self.target is None:
             return
         distance = self.vehicle.distance_to_waypoint("LOCAL", self.target)
-        self.vehicle.publish_position_setpoint(
-            self.target, lock_yaw=distance < self.params.margin
-        )
+        self.vehicle.publish_position_setpoint(self.target, lock_yaw=distance < self.params.margin)
         if distance >= self.params.margin:
             return
         self.wait_remaining = self.params.hover_seconds
@@ -165,9 +157,7 @@ class FlyToPatch(Mode[UAV, FlyToPatchParams]):
         self.vehicle.publish_position_setpoint(self.target, lock_yaw=True)
         self.wait_remaining -= time_delta
         if self.wait_remaining <= 0:
-            self.point_request_future = self.point_client.call_async(
-                GetPatchPoints.Request()
-            )
+            self.point_request_future = self.point_client.call_async(GetPatchPoints.Request())
             self.stage = "request_points"
 
     def _handle_request_points(self) -> None:
@@ -263,15 +253,13 @@ class FlyToPatch(Mode[UAV, FlyToPatchParams]):
         if self.target is None:
             return
         distance = self.vehicle.distance_to_waypoint("LOCAL", self.target)
-        self.vehicle.publish_position_setpoint(
-            self.target, lock_yaw=distance < self.params.margin
-        )
+        self.vehicle.publish_position_setpoint(self.target, lock_yaw=distance < self.params.margin)
         if distance >= self.params.margin:
             return
         self.patch_index = (self.patch_index + 1) % len(self.patch_locations)
         self._set_patch_target()
 
-    #helpers
+    # helpers
 
     @staticmethod
     def _step_toward(current: float, target: float, max_delta: float) -> float:
@@ -315,5 +303,5 @@ class FlyToPatch(Mode[UAV, FlyToPatchParams]):
         if self.failed:
             return "error"
         if self.target_found:
-            return "complete" # move onto next mode and land
+            return "complete"  # move onto next mode and land
         return "continue"

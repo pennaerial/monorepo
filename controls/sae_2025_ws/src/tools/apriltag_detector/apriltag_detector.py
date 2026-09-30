@@ -1,4 +1,3 @@
-import cv2
 import apriltag
 import rclpy
 from cv_bridge import CvBridge
@@ -10,6 +9,7 @@ from std_msgs.msg import Int32MultiArray
 
 class AprilTagDetector(Node):
     """Detect AprilTags in camera images and provide their id in a service."""
+
     def __init__(self) -> None:
         super().__init__("apriltag_detector")
         self.declare_parameter("image_topic", "/uav_0/camera")
@@ -21,16 +21,12 @@ class AprilTagDetector(Node):
         self.bridge = CvBridge()
         self.detector = apriltag.Detector(apriltag.DetectorOptions(families="tag36h11"))
         self.publisher = self.create_publisher(Int32MultiArray, ids_topic, 10)
-        self.subscription = self.create_subscription(
-            Image, image_topic, self._image_callback, 10
-        )
+        self.subscription = self.create_subscription(Image, image_topic, self._image_callback, 10)
         self.service = self.create_service(
             GetAprilTagId, get_id_service, self._handle_get_apriltag_id
         )
         self.latest_image = None
-        self.get_logger().info(
-            f"Detecting tag36h11 from {image_topic}, serving {get_id_service}"
-        )
+        self.get_logger().info(f"Detecting tag36h11 from {image_topic}, serving {get_id_service}")
 
     def _image_callback(self, message: Image) -> None:
         self.latest_image = message

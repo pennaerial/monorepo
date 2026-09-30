@@ -14,6 +14,7 @@
   <depend>px4_msgs</depend>
   <depend>sim_interfaces</depend>
   <depend>std_msgs</depend>
+  <depend>sensor_msgs</depend>
 
   <test_depend>ament_copyright</test_depend>
 
