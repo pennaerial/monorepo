@@ -150,7 +150,6 @@ def launch_setup(context) -> list[Action]:
         parameters=[
             {
                 "image_topic": f"/{vehicle_ns}/camera",
-                "ids_topic": f"/{vehicle_ns}/apriltag_ids",
             }
         ],
         output="screen",

@@ -17,9 +17,10 @@ class FlyToPatchParams(ParamsBase):
     """Used as the stabilization wait after arriving over a patch
     (before requesting points) and as the per-point time used to
     check for the target AprilTag."""
-    descent_rate: float = 0.5
-    margin: float = 1.0
-    settle_seconds: float = 1.5
+    descent_rate: float = 10.0
+    patch_margin: float = 1.0
+    point_margin: float = 0.3
+    settle_seconds: float = 0.5
     """time to stabilize before scanning apriltag"""
     hold: bool = True
 
@@ -144,8 +145,10 @@ class FlyToPatch(Mode[UAV, FlyToPatchParams]):
         if self.target is None:
             return
         distance = self.vehicle.distance_to_waypoint("LOCAL", self.target)
-        self.vehicle.publish_position_setpoint(self.target, lock_yaw=distance < self.params.margin)
-        if distance >= self.params.margin:
+        self.vehicle.publish_position_setpoint(
+            self.target, lock_yaw=distance < self.params.patch_margin
+        )
+        if distance >= self.params.patch_margin:
             return
         self.wait_remaining = self.params.hover_seconds
         self.stage = "patch_stabilize"
@@ -195,7 +198,7 @@ class FlyToPatch(Mode[UAV, FlyToPatchParams]):
         self.vehicle.publish_position_setpoint(commanded, lock_yaw=True)
 
         distance = self.vehicle.distance_to_waypoint("LOCAL", self.point_target)
-        if distance < self.params.margin:
+        if distance < self.params.point_margin:
             self.wait_remaining = self.params.settle_seconds
             self.stage = "point_settle"
 
@@ -206,7 +209,7 @@ class FlyToPatch(Mode[UAV, FlyToPatchParams]):
         self.vehicle.publish_position_setpoint(self.point_target, lock_yaw=True)
 
         distance = self.vehicle.distance_to_waypoint("LOCAL", self.point_target)
-        if distance >= self.params.margin:
+        if distance >= self.params.point_margin:
             # Drifted back out before settling; restart the timer.
             self.wait_remaining = self.params.settle_seconds
             return
@@ -253,8 +256,10 @@ class FlyToPatch(Mode[UAV, FlyToPatchParams]):
         if self.target is None:
             return
         distance = self.vehicle.distance_to_waypoint("LOCAL", self.target)
-        self.vehicle.publish_position_setpoint(self.target, lock_yaw=distance < self.params.margin)
-        if distance >= self.params.margin:
+        self.vehicle.publish_position_setpoint(
+            self.target, lock_yaw=distance < self.params.patch_margin
+        )
+        if distance >= self.params.patch_margin:
             return
         self.patch_index = (self.patch_index + 1) % len(self.patch_locations)
         self._set_patch_target()

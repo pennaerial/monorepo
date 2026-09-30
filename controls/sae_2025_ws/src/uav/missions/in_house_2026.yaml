@@ -10,10 +10,12 @@ modes:
     mode: uav.FlyToPatch
     params:
       altitude: 7.0 # alt to view patch
-      low_altitude: 0.3 # alt to view apriltag
-      hover_seconds: 3.0 # time to wait for camera settle
-      descent_rate: 1.0 # speed of descent
-      margin: 1.0
+      low_altitude: 0.7 # alt to view apriltag
+      hover_seconds: 3.0 # time to wait for camera settle patch
+      settle_seconds: 0.5 # time to wait for camera settle point
+      descent_rate: 10.0 # speed of descent
+      patch_margin: 1.0
+      point_margin: 0.3
       hold: false
     transitions:
       complete: land
