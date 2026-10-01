@@ -29,6 +29,15 @@ You should also be familiar with the following concepts:
 Those pages explain the mode lifecycle and how transition labels connect modes
 inside a mission. Here, you will put those ideas into practice.
 
+..  note::
+    Make sure to ``source /opt/ros/jazzy/setup.bash`` and ``source dev_env.sh``
+    at the ``monorepo`` root before running ``ros`` commands.
+
+    To avoid sourcing every time, you can also add the lines to your ``~/.bashrc``
+    directly, making sure to specify the path for ``dev_env.sh``. This is an extension
+    of :doc:`Setting Up Shell Dotfile (.bashrc) <../installation/ubuntu>`, so you can
+    take a look there.
+
 
 Decide What the Mode Should Do
 ------------------------------
@@ -299,6 +308,16 @@ Use the PennAiR CLI to list the registered modes:
    :caption: Bash
 
    pennair mode ls
+
+.. warning::
+
+    If you get a message about the command not being found, try ``source install/setup.bash``.
+
+    If that doesn't work, make sure that the package is actually built: ``colcon build``.
+
+    Sometimes the previous ``install`` or ``build`` directories don't get removed,
+    so you can also try ``colcon build`` after removing those.
+
 
 Find this entry in the output:
 
