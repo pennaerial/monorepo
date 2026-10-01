@@ -1,0 +1,32 @@
+{
+  "name": "PennAiR Monorepo (macOS, Apple Silicon)",
+  // Built locally from ci/Dockerfile for arm64; the published ghcr image is amd64-only:
+  //   docker buildx build --platform linux/arm64 --load -t pennair-monorepo:arm64-local -f ci/Dockerfile ci/
+  "image": "pennair-monorepo:arm64-local",
+
+  // Bind-mount local clone over the image's repo so vscode changes survive container rebuilds
+  // Submodules must be initialized locally (git submodule update --init --recursive), since the mount hides the image's copies
+  "workspaceMount": "source=${localWorkspaceFolder},target=/root/monorepo,type=bind",
+  "workspaceFolder": "/root/monorepo",
+
+  "containerEnv": {
+    // X11 forwarding to XQuartz on the host (software rendering only; fine for rqt, slow for Gazebo/rviz2)
+    // Requires XQuartz with "Allow connections from network clients" enabled, then `xhost +localhost` on the host
+    "DISPLAY": "host.docker.internal:0",
+    "LIBGL_ALWAYS_SOFTWARE": "1"
+  },
+
+  // Adds git config to tell git to trust the mounted repo
+  "postCreateCommand": "git config --global --add safe.directory '*'",
+
+  // Auto add relevant vscode extensions
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.cpptools",
+        "ms-python.python",
+        "Ranch-Hand-Robotics.rde-ros-2"
+      ]
+    }
+  }
+}
