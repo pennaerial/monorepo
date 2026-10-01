@@ -24,7 +24,11 @@ def generate_test_description():
     uav_sitl = include_launch(
         pkg="uav",
         launch_file="uav_sitl.launch.py",
-        launch_arguments={"airframe": "quadtailsitter", "mission": "simple_tailsitter"},
+        launch_arguments={
+            "airframe": "quadtailsitter",
+            "mission": "simple_tailsitter",
+            "headless": "true",
+        },
     )
     return launch.LaunchDescription(
         [
