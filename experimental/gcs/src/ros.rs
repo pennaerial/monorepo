@@ -1,2 +1,4 @@
-pub mod foxglove_client;
+mod foxglove_client;
+pub use foxglove_client::FoxgloveClient;
+
 pub mod server_types;
