@@ -10,3 +10,10 @@ linux esp32s3:
 set_cc:
 	ln -sf build/$(TARGET)/compile_commands.json compile_commands.json
 
+WORLD ?= default
+
+# `make linux gz_<model>` builds, then spawns gz-models/models/<model> into
+# gz-models/worlds/$(WORLD).sdf and runs SITL against it (HEADLESS=1 for no GUI)
+gz_%: linux
+	./scripts/sim.sh $* $(WORLD)
+
