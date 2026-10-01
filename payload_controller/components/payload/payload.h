@@ -29,4 +29,5 @@ private:
 
   drivers::IMU* imu;
   drivers::Encoder* encoders;
+  uint32_t last_published_imu_update_ = 0;
 };
