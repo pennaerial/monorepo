@@ -7,7 +7,6 @@
 #include <cstdint>
 
 #include "sdkconfig.h"
-#include "static_mutex.hpp"
 #include "topics.h"
 
 /// Number of reliable XRCE stream blocks kept in the output/input history.
@@ -25,7 +24,7 @@ constexpr uint32_t TRANSPORT_MTU = UXR_CONFIG_CUSTOM_TRANSPORT_MTU;
 constexpr uint32_t BUFFER_SIZE = TRANSPORT_MTU * STREAM_HISTORY;
 /// Bytes available in one reliable stream history block.
 constexpr uint32_t RELIABLE_STREAM_BLOCK_SIZE = BUFFER_SIZE / STREAM_HISTORY;
-/// Conservative allowance for XRCE write framing when choosing fragmented writes.
+/// Conservative allowance for XRCE write framing when checking one-block writes.
 constexpr uint32_t ESTIMATED_XRCE_WRITE_OVERHEAD = 32;
 
 
@@ -42,10 +41,10 @@ public:
   /// Opens transport/session streams and creates the configured XRCE-DDS entities.
   void init();
 
-  /// Stores the latest sample for a writer topic matched by TopicId.
+  /// Writes a sample for a writer topic matched by TopicId.
   bool publish(TopicId topic_id, const void* msg);
 
-  /// Writes each dirty publish slot once, clears those slots, and services incoming data.
+  /// Services incoming data and reliable stream bookkeeping.
   void update();
 
   /// Binds a callback for a reader topic matched by name or TopicId.
@@ -64,12 +63,8 @@ private:
   /// Queues XRCE DataReader create and request-data requests for configured reader topics.
   void generate_readers(uint16_t requests[], std::size_t& request_count, uxrObjectId subscriber_id);
 
-  /// Serializes one topic sample into the XRCE reliable output stream.
-  bool send_publish(std::size_t topic_index, const void* msg);
   /// Runs the XRCE session until reliable output delivery is confirmed or times out.
   bool confirm_delivery();
-  /// Fragmented-output callback that flushes reliable stream data while serializing.
-  static bool flush_output_stream(uxrSession* session, void* args);
 
   /// Static XRCE topic callback that routes incoming samples back to this DDSClient.
   static void on_topic_callback(
@@ -119,15 +114,7 @@ private:
   /// uxrStreamId associated with input reliable buffer
   uxrStreamId reliable_in_;
 
-  // Stores one copied message per configured topic. Repeated publish() calls for
-  // the same topic replace the slot until update() sends it once.
-  struct PendingPublish {
-    bool dirty = false;
-    std::array<uint8_t, max_topic_message_size()> data{};
-  };
-
-  std::array<PendingPublish, TOPIC_COUNT> pending_publishes_{};
-  util::StaticMutex pending_publishes_mtx_;
+  bool delivery_pending_ = false;
   std::array<ReaderCallback, TOPIC_COUNT> reader_callbacks_{};
   std::array<void*, TOPIC_COUNT> reader_callback_args_{};
 };

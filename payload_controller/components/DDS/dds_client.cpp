@@ -1,7 +1,5 @@
 #include "dds_client.hpp"
 
-#include <cstring>
-
 #include "esp_log.h"
 #include "topics.h"
 
@@ -166,8 +164,7 @@ void DDSClient::generate_readers(uint16_t requests[], std::size_t& request_count
   }
 }
 
-// Public publish API: validate the topic and copy the typed message into
-// that topic's latest-value slot. Serialization intentionally happens later in update().
+// Public publish API: validate the topic and serialize it into the XRCE reliable stream.
 bool DDSClient::publish(const TopicId topic_id, const void* msg)
 {
   const Topic* topic = get_topic(topic_id);
@@ -186,115 +183,44 @@ bool DDSClient::publish(const TopicId topic_id, const void* msg)
     return false;
   }
 
-  // Copy the typed message now so callers can publish stack/local data safely.
-  std::size_t topic_index = to_underlying(topic_id);
-  util::StaticMutexGuard lock(pending_publishes_mtx_);
-  PendingPublish& pending = pending_publishes_[topic_index];
-  std::memcpy(pending.data.data(), msg, topic->message_size);
-  pending.dirty = true;
+  const std::size_t topic_index = to_underlying(topic_id);
+  if (topic->size_of_topic == nullptr || topic->serialize_topic == nullptr) {
+    ESP_LOGE(TAG, "DDS topic %s is missing serializer hooks", topic->name);
+    return false;
+  }
+
+  ucdrBuffer ub;
+  const uint32_t topic_size = topic->size_of_topic(msg, 0);
+  if (topic_size + ESTIMATED_XRCE_WRITE_OVERHEAD > RELIABLE_STREAM_BLOCK_SIZE) {
+    ESP_LOGE(TAG, "DDS topic %s is too large for one XRCE reliable stream block", topic->name);
+    return false;
+  }
+
+  uint16_t request_id =
+      uxr_prepare_output_stream(&session_, reliable_out_, datawriter_id(topic_index), &ub, topic_size);
+  if (request_id == UXR_INVALID_REQUEST_ID) {
+    ESP_LOGW(TAG, "XRCE reliable output stream is full; dropping DDS topic %s", topic->name);
+    return false;
+  }
+
+  if (!topic->serialize_topic(&ub, msg)) {
+    ESP_LOGE(TAG, "Failed to serialize DDS topic %s", topic->name);
+    return false;
+  }
+
+  delivery_pending_ = true;
   return true;
 }
 
 void DDSClient::update()
 {
-  // Copies the pending messages to avoid holding the mutex
-  std::array<PendingPublish, TOPIC_COUNT> pending_publishes{};
-  std::size_t pending_count = 0;
-  {
-    util::StaticMutexGuard lock(pending_publishes_mtx_);
-    for (std::size_t topic_index = 0; topic_index < TOPIC_COUNT; ++topic_index) {
-      PendingPublish& pending = pending_publishes_[topic_index];
-      if (!pending.dirty) {
-        continue;
-      }
-
-      pending_publishes[topic_index] = pending;
-      pending.dirty = false;
-      ++pending_count;
-    }
-  }
-
-  bool wrote_data = false;
-  std::size_t writes_since_confirm = 0;
-  ESP_LOGI(TAG, "Pending messages: %zu", pending_count);
-
-  // Send each dirty topic slot once. If publish() is called again while update()
-  // is sending, that newer sample stays dirty for the next update cycle.
-  for (std::size_t topic_index = 0; topic_index < TOPIC_COUNT; ++topic_index) {
-    const PendingPublish& pending = pending_publishes[topic_index];
-    if (!pending.dirty) {
-      continue;
-    }
-
-    if (writes_since_confirm >= STREAM_HISTORY) {
-      confirm_delivery();
-      writes_since_confirm = 0;
-    }
-
-    if (send_publish(topic_index, pending.data.data())) {
-      wrote_data = true;
-      ++writes_since_confirm;
-    }
-  }
-
-  if (wrote_data) {
-    confirm_delivery();
+  if (delivery_pending_) {
+    delivery_pending_ = !confirm_delivery();
   }
 
   uxr_run_session_time(&session_, 10);
 }
 
-// Serializes one queued message into the XRCE reliable output stream.
-bool DDSClient::send_publish(const std::size_t topic_index, const void* msg)
-{
-  const Topic& topic = TOPICS[topic_index];
-  if (topic.size_of_topic == nullptr || topic.serialize_topic == nullptr) {
-    ESP_LOGE(TAG, "DDS topic %s is missing serializer hooks", topic.name);
-    return false;
-  }
-
-  ucdrBuffer ub;
-  const uint32_t topic_size = topic.size_of_topic(msg, 0);
-  const bool use_fragmented_stream = topic_size + ESTIMATED_XRCE_WRITE_OVERHEAD > RELIABLE_STREAM_BLOCK_SIZE;
-
-  uint16_t request_id = UXR_INVALID_REQUEST_ID;
-  if (use_fragmented_stream) {
-    request_id = uxr_prepare_output_stream_fragmented(
-        &session_, reliable_out_, datawriter_id(topic_index), &ub, topic_size, flush_output_stream, this
-    );
-  } else {
-    request_id = uxr_prepare_output_stream(&session_, reliable_out_, datawriter_id(topic_index), &ub, topic_size);
-
-    // If the stream is full earlier than our batch estimate, flush and retry.
-    if (request_id == UXR_INVALID_REQUEST_ID) {
-      confirm_delivery();
-      request_id = uxr_prepare_output_stream(&session_, reliable_out_, datawriter_id(topic_index), &ub, topic_size);
-    }
-
-    // If the message still cannot fit in one reliable block, fall back to the
-    // fragmented path so large topic samples can span multiple blocks.
-    if (request_id == UXR_INVALID_REQUEST_ID) {
-      request_id = uxr_prepare_output_stream_fragmented(
-          &session_, reliable_out_, datawriter_id(topic_index), &ub, topic_size, flush_output_stream, this
-      );
-    }
-  }
-
-  if (request_id == UXR_INVALID_REQUEST_ID) {
-    ESP_LOGE(TAG, "Failed to reserve XRCE output stream space for %s", topic.name);
-    return false;
-  }
-
-  if (!topic.serialize_topic(&ub, msg)) {
-    ESP_LOGE(TAG, "Failed to serialize DDS topic %s", topic.name);
-    return false;
-  }
-
-  return true;
-}
-
-// I know the next two functions are basically duplicates but fragmenting messge in send_publish
-//  requires a very specifc method signature and so for readability we will keep them separate
 bool DDSClient::confirm_delivery()
 {
   const bool delivered = uxr_run_session_until_confirm_delivery(&session_, 1000);
@@ -302,15 +228,6 @@ bool DDSClient::confirm_delivery()
     ESP_LOGW(TAG, "Timed out waiting for XRCE reliable output delivery");
   }
   return delivered;
-}
-
-bool DDSClient::flush_output_stream(uxrSession* session, void* args)
-{
-  DDSClient* client = static_cast<DDSClient*>(args);
-  if (client == nullptr) {
-    return false;
-  }
-  return uxr_run_session_until_confirm_delivery(session, 1000);
 }
 
 bool DDSClient::set_reader_callback(const TopicId topic_id, ReaderCallback callback, void* args)
