@@ -27,6 +27,7 @@ setup(
             "apriltag_debug = apriltag_debug.apriltag_debug:main",
             "apriltag_detector = apriltag_detector.apriltag_detector:main",
             "patch_points_service = patch_points_service.patch_points_service:main",
+            "traveling_salesman = traveling_salesman.traveling_salesman:main",
         ],
     },
 )

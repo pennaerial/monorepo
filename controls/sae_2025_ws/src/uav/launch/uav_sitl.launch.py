@@ -155,6 +155,17 @@ def launch_setup(context) -> list[Action]:
         output="screen",
     )
 
+    traveling_salesman = Node(
+        package="tools",
+        executable="traveling_salesman",
+        parameters=[
+            {
+                "solve_service": "/solve_tsp",
+            }
+        ],
+        output="screen",
+    )
+
     middleware = ExecuteProcess(
         cmd=["MicroXRCEAgent", "udp4", "-p", "8888"],
         output="screen",
@@ -205,6 +216,7 @@ def launch_setup(context) -> list[Action]:
 
     actions.append(mode_manager)
     actions.append(patch_points_provider)
+    actions.append(traveling_salesman)
     if vehicle_camera_map.get(vehicle_name, False):
         actions.append(apriltag_detector)
     actions.extend([middleware] if run_mw else [])

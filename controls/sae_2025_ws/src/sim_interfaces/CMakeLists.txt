@@ -23,6 +23,7 @@ set(SRV_FILES
     srv/GetSearchLocations.srv
     srv/GetPatchPoints.srv
     srv/GetAprilTagId.srv
+    srv/SolveTSP.srv
 )
 
 rosidl_generate_interfaces(${PROJECT_NAME}

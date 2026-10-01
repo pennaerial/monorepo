@@ -1,0 +1,9 @@
+# Planar local x/y (meters). The path is open and starts at (start_x, start_y).
+float64 start_x
+float64 start_y
+float64[] x
+float64[] y
+---
+bool success
+# Indices into the request's x/y arrays, in visiting order.
+int32[] order

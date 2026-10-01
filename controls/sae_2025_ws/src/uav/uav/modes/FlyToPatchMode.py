@@ -3,7 +3,12 @@ from __future__ import annotations
 from typing import override
 
 from rclpy.node import Node
-from sim_interfaces.srv import GetAprilTagId, GetPatchPoints, GetSearchLocations
+from sim_interfaces.srv import (
+    GetAprilTagId,
+    GetPatchPoints,
+    GetSearchLocations,
+    SolveTSP,
+)
 from vehicle_common.mode import Mode
 from vehicle_common.mode_loader import ParamsBase, register_mode
 
@@ -33,7 +38,9 @@ class FlyToPatchParams(ParamsBase):
 )
 class FlyToPatch(Mode[UAV, FlyToPatchParams]):
     """Request a generated patch location, then sweep the target pts at low alt,
-    searching for target apriltag. infinitely loops until target found"""
+    searching for target apriltag. infinitely loops until target found.
+    Patches and the points within each patch are visited in a TSP-optimized
+    order, computed by the /solve_tsp service (open path from the current position)."""
 
     @override
     def initialize(self, node: Node, vehicle: UAV, params: FlyToPatchParams) -> None:
@@ -43,11 +50,15 @@ class FlyToPatch(Mode[UAV, FlyToPatchParams]):
         self.patch_client = self.node.create_client(GetSearchLocations, "/get_search_patches")
         self.point_client = self.node.create_client(GetPatchPoints, "/get_patch_points")
         self.tag_client = self.node.create_client(GetAprilTagId, "/get_apriltag_id")
+        self.tsp_client = self.node.create_client(SolveTSP, "/solve_tsp")
         self.patch_request_future = None
         self.point_request_future = None
         self.tag_request_future = None
+        self.tsp_future = None
         self.target_tag_id = None
         self.target_found = False
+        self.raw_patches = []
+        self.raw_points = []
         self.patch_locations = []
         self.patch_index = 0
         self.points = []
@@ -79,6 +90,10 @@ class FlyToPatch(Mode[UAV, FlyToPatchParams]):
             self._handle_request_patches()
             return
 
+        if self.stage == "solve_patch_tsp":
+            self._handle_solve_patch_tsp()
+            return
+
         if self.stage == "fly_patch":
             self._handle_fly_patch()
             return
@@ -89,6 +104,10 @@ class FlyToPatch(Mode[UAV, FlyToPatchParams]):
 
         if self.stage == "request_points":
             self._handle_request_points()
+            return
+
+        if self.stage == "solve_point_tsp":
+            self._handle_solve_point_tsp()
             return
 
         if self.stage == "fly_point":
@@ -115,7 +134,7 @@ class FlyToPatch(Mode[UAV, FlyToPatchParams]):
     # stage handlers
 
     def _handle_request_patches(self) -> None:
-        """Request a patch from the patch generator service, and set the target to fly over it."""
+        """Request patches from the patch generator service, then ask the TSP service to order them."""
         if self.patch_request_future is None or not self.patch_request_future.done():
             return
         try:
@@ -135,9 +154,25 @@ class FlyToPatch(Mode[UAV, FlyToPatchParams]):
             self.failed = True
             return
 
-        self.patch_locations = response.search_locations
+        # Need a GPS origin and a position fix to build the request; retry next tick.
+        if self.vehicle.gps_origin is None or self.vehicle.local_position is None:
+            return
+
+        self.raw_patches = list(response.search_locations)
         self.target_tag_id = int(response.target_tag_id)
-        self.log(f"Received {len(self.patch_locations)} patches")
+        self.tsp_future = self._call_tsp(
+            [(p.latitude_deg, p.longitude_deg) for p in self.raw_patches]
+        )
+        self.stage = "solve_patch_tsp"
+
+    def _handle_solve_patch_tsp(self) -> None:
+        """Wait for the TSP service, reorder the patches, and fly to the first one."""
+        order = self._tsp_result(len(self.raw_patches))
+        if order is None:
+            return
+        self.patch_locations = [self.raw_patches[i] for i in order]
+        self.patch_index = 0
+        self.log(f"Received {len(self.patch_locations)} patches (TSP-ordered)")
         self._set_patch_target()
 
     def _handle_fly_patch(self) -> None:
@@ -164,7 +199,7 @@ class FlyToPatch(Mode[UAV, FlyToPatchParams]):
             self.stage = "request_points"
 
     def _handle_request_points(self) -> None:
-        """Request the patch points from the patch point service and set the target to fly to the first point"""
+        """Request the patch points from the patch point service, then ask the TSP service to order them."""
         if self.point_request_future is None or not self.point_request_future.done():
             return
         try:
@@ -181,9 +216,22 @@ class FlyToPatch(Mode[UAV, FlyToPatchParams]):
             self.log("nothing returned")
             self.failed = True
             return
-        self.points = list(zip(response.latitude_deg, response.longitude_deg))
+
+        if self.vehicle.gps_origin is None or self.vehicle.local_position is None:
+            return
+
+        self.raw_points = list(zip(response.latitude_deg, response.longitude_deg))
+        self.tsp_future = self._call_tsp(self.raw_points)
+        self.stage = "solve_point_tsp"
+
+    def _handle_solve_point_tsp(self) -> None:
+        """Wait for the TSP service, reorder the points, and fly to the first one."""
+        order = self._tsp_result(len(self.raw_points))
+        if order is None:
+            return
+        self.points = [self.raw_points[i] for i in order]
         self.point_index = 0
-        self.log(f"Received {len(self.points)} points for patch {self.patch_index}")
+        self.log(f"Received {len(self.points)} points for patch {self.patch_index} (TSP-ordered)")
         self._set_point_target()
 
     def _handle_fly_point(self, time_delta: float) -> None:
@@ -275,6 +323,36 @@ class FlyToPatch(Mode[UAV, FlyToPatchParams]):
         if current < target:
             return min(target, current + max_delta)
         return max(target, current - max_delta)
+
+    def _call_tsp(self, latlons: list[tuple[float, float]]):
+        """Convert (lat, lon) pairs to local x/y and ask the TSP service for a visiting order,
+        starting from the vehicle's current position."""
+        origin_z = self.vehicle.gps_origin[2]
+        current = self.vehicle.local_position
+        xy = [self.vehicle.gps_to_local((lat, lon, origin_z))[:2] for lat, lon in latlons]
+        request = SolveTSP.Request()
+        request.start_x = float(current.x)
+        request.start_y = float(current.y)
+        request.x = [float(p[0]) for p in xy]
+        request.y = [float(p[1]) for p in xy]
+        return self.tsp_client.call_async(request)
+
+    def _tsp_result(self, expected: int) -> list[int] | None:
+        """Return the TSP order once the service replies, else None (or fail the mode)."""
+        if self.tsp_future is None or not self.tsp_future.done():
+            return None
+        try:
+            response = self.tsp_future.result()
+        except Exception as e:
+            self.log(f"TSP request failed: {e}")
+            self.failed = True
+            return None
+        self.tsp_future = None
+        if not response.success or len(response.order) != expected:
+            self.log("TSP service returned a bad ordering")
+            self.failed = True
+            return None
+        return list(response.order)
 
     def _set_patch_target(self) -> None:
         if self.vehicle.gps_origin is None:
