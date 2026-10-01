@@ -62,8 +62,13 @@ void Payload::motor_updates()
 
 void Payload::publish_sensor_debug()
 {
-  const sensor_msgs_msg_Imu latest = imu->get_latest();
+  sensor_msgs_msg_Imu latest{};
+  if (!imu->get_latest_if_updated(last_published_imu_update_, latest)) {
+    return;
+  }
+
   if (!DDSClient::instance().publish(TopicId::IMU_WRITER, &latest)) {
-    ESP_LOGW(TAG, "Failed to queue IMU DDS publish");
+    ESP_LOGW(TAG, "Failed to publish IMU DDS sample");
+    return;
   }
 }
