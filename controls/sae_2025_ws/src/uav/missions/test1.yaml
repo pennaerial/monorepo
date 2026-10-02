@@ -1,0 +1,15 @@
+modes:
+  start:
+    mode: uav.vtol.TakeoffMode
+    params:
+      takeoff_type: vertical
+    transitions:
+      complete: search
+
+  search:
+    mode: uav.SearchMode
+    transitions:
+      complete: land
+
+  land:
+    mode: uav.LandingMode
