@@ -13,6 +13,8 @@ from cv_bridge import CvBridge
 
 from uav.vehicles.UAV import UAV
 
+import pupil_apriltags
+
 import math
 import cv2 as cv
 
@@ -92,7 +94,6 @@ class SearchMode(Mode[UAV, SearchParams]):
         if self.stable_time < 0.5:
             return False
 
-        self.log(f"Stable: speed={speed:.2f} m/s, tilt={tilt:.3f} rad")
         return True
 
 
@@ -118,6 +119,9 @@ class SearchMode(Mode[UAV, SearchParams]):
         self.search_locations_goal = None
         self.star_targets = []
         self.index = 0
+        self.target_tag_id = None
+        self.tag_detector = pupil_apriltags.Detector(families="tag36h11")
+        self.target_found = False
 
         self.cv_bridge = CvBridge()
         self.cam_k = None
@@ -145,6 +149,8 @@ class SearchMode(Mode[UAV, SearchParams]):
 
     @override
     def on_update(self, time_delta: float) -> None:
+        if self.target_found:
+            return
         if self.debug_msg is not None:
             self.debug_pub.publish(self.debug_msg)
         if self.search_locations is None: 
@@ -152,7 +158,8 @@ class SearchMode(Mode[UAV, SearchParams]):
                 response = self.future.result()
                 if response.ready and len(response.search_locations) > 0:
                     self.search_locations = response.search_locations
-                    self.log(f"Received search locations: {self.search_locations}")
+                    self.target_tag_id = response.target_tag_id
+                    self.log(f"Received search locations and target tag ID: {self.search_locations}, {self.target_tag_id}")
                 else:
                     self.log("Search locations not ready yet.")
                     self.future = self.client.call_async(self.request)
@@ -160,14 +167,35 @@ class SearchMode(Mode[UAV, SearchParams]):
 
         if self.state == "stars":
             self.vehicle.publish_position_setpoint(self.star_targets[self.star_index], lock_yaw=False) 
-            dist = self.vehicle.distance_to_waypoint("LOCAL", self.star_targets[self.star_index])
-            if dist < 1.0:
+            target = self.star_targets[self.star_index]
+            dx = target[0] - self.vehicle.local_position.x
+            dy = target[1] - self.vehicle.local_position.y
+            horizontal_error = math.sqrt(dx**2 + dy**2)
+            vertical_error = abs(target[2] - self.vehicle.local_position.z)
+            if horizontal_error < 0.15 and vertical_error < 0.14:
                 if not self.check_stability(time_delta):
                     return
-                self.log(f"Arrived at star {self.star_index} at {self.star_targets[self.star_index]}")
+                self.log(f"\n\nhorizontal={horizontal_error:.2f}, vertical={vertical_error:.2f}\n\n")
+                self.log(f"\n\n*******************Arrived at star {self.star_index} at {self.star_targets[self.star_index]}*******************")
+                if self.latest_frame is not None:
+                    gray = self.cv_bridge.imgmsg_to_cv2(self.latest_frame, desired_encoding='mono8')
+                    tags = self.tag_detector.detect(gray)
+                    self.log(f"\nDetected {len(tags)} AprilTags at star {self.star_index}., current height: {self.vehicle.local_position.z:.2f}m)\n\n")
+                    if not tags:
+                        self.debug_msg = self.cv_bridge.cv2_to_imgmsg(gray, encoding="mono8")
+                    for tag in tags:
+                        if tag.tag_id == self.target_tag_id:
+                            self.log(f"Target tag {self.target_tag_id} found at star {self.star_index}!")
+                            self.target_found = True
+                            return
                 self.star_index += 1
+                self.stable_time = 0.0
+
                 if self.star_index >= len(self.star_targets):
                     self.state = "patch"
+                    self.index += 1
+                    self.star_targets = []
+                    self.stable_time = 0.0
             return
 
         if self.index >= len(self.search_locations):
@@ -182,6 +210,7 @@ class SearchMode(Mode[UAV, SearchParams]):
         if dist < 1.0:
             if not self.check_stability(time_delta):
                 return
+            self.star_targets = []
             if self.latest_frame is not None:
                 cv_image = self.cv_bridge.imgmsg_to_cv2(self.latest_frame, desired_encoding='bgr8')
 
@@ -194,7 +223,6 @@ class SearchMode(Mode[UAV, SearchParams]):
                     cv.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
 
                 self.debug_msg = self.cv_bridge.cv2_to_imgmsg(debug_frame, encoding="bgr8")
-                self.star_targets = []
                 if centroids:
                     for cx, cy in centroids:
                         x_m, y_m = pixel_to_offset(cx, cy, self.p.altitude, self.cam_fx, self.cam_fy, self.cx, self.cy)
@@ -206,7 +234,7 @@ class SearchMode(Mode[UAV, SearchParams]):
 
                         self.star_targets.append((north, east, -0.5))
 
-                self.log(f"Arrived at waypoint {self.index}, found {len(centroids)} gold stars.")
+                self.log(f"\n\n--------------------Arrived at waypoint {self.index}, found {len(centroids)} gold stars.--------------------")
            
             self.stable_time = 0.0
             if len(self.star_targets) > 0:
@@ -217,6 +245,8 @@ class SearchMode(Mode[UAV, SearchParams]):
 
     @override
     def check_status(self) -> str | None:
+        if self.target_found:
+            return "complete"
         if self.search_locations is not None and self.index >= len(self.search_locations):
             return "complete"
         return "continue"
