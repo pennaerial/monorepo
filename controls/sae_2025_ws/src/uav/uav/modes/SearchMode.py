@@ -76,7 +76,6 @@ class SearchMode(Mode[UAV, SearchParams]):
     A mode for searching for a target.
     """
 
-
     def check_stability(self, time_delta: float) -> bool:
         lp = self.vehicle.local_position
         roll, pitch = self.vehicle.roll, self.vehicle.pitch
