@@ -164,26 +164,6 @@ From monorepo root:
     sudo apt install ${APT_PACKAGES[@]}
 
 
-NPM Packages (Global)
-''''''''''''''''''''''
-
-Install NodeJS 24 with nvm:
-
-.. code-block:: bash
-
-    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.6/install.sh | bash
-    \. "$HOME/.nvm/nvm.sh"
-    nvm install 24
-
-    # verify installs
-    node -v
-    npm -v
-
-    # from monorepo root:
-    source ci/ci.conf
-    echo ${GLOBAL_NPM[@]}
-    npm install -g ${GLOBAL_NPM[@]}
-
 Build the Dependencies Submodule
 ``````````````````````````````````
 
