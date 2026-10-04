@@ -29,8 +29,6 @@ public:
 private:
   /// ClassLoader for dynamically creating VisionPlugins
   pluginlib::ClassLoader<VisionPlugin> plugin_loader_;
-  /// Defers plugin initialization until the component is owned by a shared_ptr.
-  rclcpp::TimerBase::SharedPtr initialization_timer_;
   /// Periodic status log for the manager component.
   rclcpp::TimerBase::SharedPtr heartbeat_timer_;
   /// VisionPlugin instance; key is the plugin name, value is the plugin instance

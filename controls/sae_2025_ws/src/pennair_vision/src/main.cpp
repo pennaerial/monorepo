@@ -8,6 +8,7 @@ int main(int argc, char* argv[])
 
   // make the video manager shared ptr
   auto vision_manager = std::make_shared<pennair_vision::VisionManager>();
+  vision_manager->init_plugins();
 
   // multithreaded executor lets callbacks run in parallel
   rclcpp::executors::MultiThreadedExecutor executor;

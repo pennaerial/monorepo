@@ -30,6 +30,10 @@ ament_target_dependencies(vision_manager_component
     pluginlib
 )
 
+rclcpp_components_register_nodes(vision_manager_component
+    "pennair_vision::VisionManager"
+)
+
 add_executable(vision_manager
     src/main.cpp
     src/vision_manager.cpp

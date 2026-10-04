@@ -13,11 +13,6 @@ namespace pennair_vision
 VisionManager::VisionManager(const rclcpp::NodeOptions& options)
     : rclcpp::Node("vision_manager", options), plugin_loader_("pennair_vision", "pennair_vision::VisionPlugin")
 {
-  initialization_timer_ = create_wall_timer(0ms, [this]() {
-    initialization_timer_->cancel();
-    init_plugins();
-  });
-
   // TEMP: continuous logging
   heartbeat_timer_ = create_wall_timer(0.67s, [this]() { RCLCPP_INFO(get_logger(), "VisionManager is running"); });
 }
@@ -46,5 +41,25 @@ void VisionManager::init_plugins()
 }
 
 }  // namespace pennair_vision
+
+namespace rclcpp_components
+{
+
+template <>
+class NodeFactoryTemplate<pennair_vision::VisionManager> : public NodeFactory
+{
+public:
+  NodeInstanceWrapper create_node_instance(const rclcpp::NodeOptions& options) override
+  {
+    auto node = std::make_shared<pennair_vision::VisionManager>(options);
+    node->init_plugins();
+
+    return NodeInstanceWrapper(node, [](const std::shared_ptr<void>& instance) {
+      return std::static_pointer_cast<pennair_vision::VisionManager>(instance)->get_node_base_interface();
+    });
+  }
+};
+
+}  // namespace rclcpp_components
 
 RCLCPP_COMPONENTS_REGISTER_NODE(pennair_vision::VisionManager)
