@@ -1,4 +1,3 @@
-#include <memory>
 #include <rclcpp/rclcpp.hpp>
 
 #include "pennair_vision/vision_manager.hpp"
@@ -7,13 +6,12 @@ int main(int argc, char* argv[])
 {
   rclcpp::init(argc, argv);
 
-  rclcpp::Node::SharedPtr node = rclcpp::Node::make_shared("vision_manager");
-  pennair_vision::VisionManager vision_manager(node);
-  vision_manager.init_plugins();
+  // make the video manager shared ptr
+  auto vision_manager = std::make_shared<pennair_vision::VisionManager>();
 
   // multithreaded executor lets callbacks run in parallel
   rclcpp::executors::MultiThreadedExecutor executor;
-  executor.add_node(node);
+  executor.add_node(vision_manager);
   executor.spin();
 
   rclcpp::shutdown();
