@@ -59,7 +59,7 @@ cleanall() {
 ctp() {
 # 1. runs colcon tests on selected packages
 # 2. merges xml test results into build/merged_results.xml
-# 3. Views merged_result.xml with xunit-viewer
+# 3. Prints test results for the selected packages
 # runs unit tests from the selected packages
     local pkgs=("$@")
     colcon test --packages-select "${pkgs[@]}"
@@ -80,7 +80,13 @@ ctp() {
 	fi
 
 	junitparser merge --glob "${paths[@]}" build/merged_results.xml
-    xunit-viewer -r build/merged_results.xml --console -C false -o build/merged_results.html
+    local result_status=0
+    for pkg in "${pkgs[@]}"; do
+        colcon test-result --test-result-base "build/${pkg}" --verbose || result_status=$?
+    done
+    if [[ "$test_status" -eq 0 ]]; then
+        test_status=$result_status
+    fi
     return "$test_status"
 }
 
