@@ -94,7 +94,7 @@ def launch_setup(context) -> list[Action]:
         composable_nodes.append(
             ComposableNode(
                 package="camera_ros",
-                plugin="camera_ros::CameraNode",
+                plugin="camera::CameraNode",
                 # camera_ros publishes <node_name>/image_raw, so naming the node after camera_topic
                 # is what makes the vision manager and the driver agree on a topic.
                 name=camera_topic,
