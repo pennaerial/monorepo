@@ -1,31 +1,18 @@
-
-#include "dds_client.hpp"
-#include "encoder.hpp"
-#include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "imu.hpp"
-
-const char* TAG{"APP_MAIN"};
+#include "payload.h"
 
 extern "C" void app_main(void)
 {
-  ESP_LOGI(TAG, "Hello world");
+  DDSClient::instance().init();
 
-  drivers::IMU* imu = drivers::IMU::instance();
-  imu->start();
-
-  drivers::Encoder* encoders = drivers::Encoder::instance();
-  encoders->start();
-
-  DDSClient dds_client("127.0.0.1", "7777");
-  dds_client.run();
-
+  Payload* payload = Payload::instance();
+  payload->init();
 
   while (1) {
-    dds_client.update(imu->get_latest());
-    encoders->publish_motor_left(10);
-    encoders->publish_motor_right(5);
+    payload->update();
+
+    DDSClient::instance().update();
 
     // Delays by 100 ms to avoid spamming
     vTaskDelay(pdMS_TO_TICKS(100));
