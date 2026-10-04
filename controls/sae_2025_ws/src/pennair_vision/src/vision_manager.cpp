@@ -11,8 +11,7 @@ namespace pennair_vision
 {
 
 VisionManager::VisionManager(const rclcpp::NodeOptions& options)
-    : rclcpp::Node("vision_manager", options),
-      plugin_loader_("pennair_vision", "pennair_vision::VisionPlugin")
+    : rclcpp::Node("vision_manager", options), plugin_loader_("pennair_vision", "pennair_vision::VisionPlugin")
 {
   initialization_timer_ = create_wall_timer(0ms, [this]() {
     initialization_timer_->cancel();
@@ -20,9 +19,7 @@ VisionManager::VisionManager(const rclcpp::NodeOptions& options)
   });
 
   // TEMP: continuous logging
-  heartbeat_timer_ = create_wall_timer(0.67s, [this]() {
-    RCLCPP_INFO(get_logger(), "VisionManager is running");
-  });
+  heartbeat_timer_ = create_wall_timer(0.67s, [this]() { RCLCPP_INFO(get_logger(), "VisionManager is running"); });
 }
 
 void VisionManager::init_plugins()
