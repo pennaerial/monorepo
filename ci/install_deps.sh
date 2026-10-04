@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/ci.conf"
 
 # quick install skips the heavy dependency building and only installs
-# additional ci.conf apt packages and global npm packages, pyproject.toml packages
+# additional ci.conf apt packages and pyproject.toml packages
 # Also installs additional rosdeps
 # A quick install is meant for a quick install step in case dependency lists change before the nightly build catches up
 QUICK=false
@@ -28,11 +28,6 @@ if [[ "$QUICK" == false ]]; then
 	#### install uv
 	echo "Installing uv..."
 	curl -LsSf https://astral.sh/uv/install.sh | sh
-
-	#### install Node.js LTS
-	echo "Installing Node.js LTS..."
-	curl -fsSL https://deb.nodesource.com/setup_lts.x | bash -
-	sudo apt-get install -y --no-install-recommends nodejs
 
     #### install PX4 dependencies (include gz, but no nuttx hardware compiler)
     echo "Running PX4 ubuntu.sh install script..."
@@ -64,10 +59,6 @@ fi
 #### install python dependencies into system using uv
 echo "Installing pyproject dependencies globally..."
 uv pip install --system --break-system-packages --no-cache -r ${PENNAIR_MONOREPO_PATH}/pyproject.toml
-
-#### install global npm packages
-echo "Installing ci.conf global npm packages... ${GLOBAL_NPM[@]}"
-npm install -g ${GLOBAL_NPM[@]}
 
 #### clean up any apt package caches to reduce image size
 sudo apt-get clean
