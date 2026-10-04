@@ -3,7 +3,8 @@ from enum import StrEnum
 
 from launch import Action, LaunchDescription
 from launch.actions import DeclareLaunchArgument, OpaqueFunction
-from launch_ros.actions import Node
+from launch_ros.actions import ComposableNodeContainer
+from launch_ros.descriptions import ComposableNode
 from vehicle_common.launch_utils import check_unknown_launch_args, get_logger, is_truthy
 
 logger = get_logger("vision.launch")
@@ -59,21 +60,6 @@ def launch_setup(context) -> list[Action]:
         logger.debug(f"Camera Orientation:  {camera_orientation}")
 
     ## create actions
-    vision_manager = Node(
-        package="pennair_vision",
-        executable="vision_manager",
-        name=node_name,
-        output="screen",
-        parameters=[
-            {
-                "camera_topic": camera_topic,
-                "debug": debug,
-            },
-            {"plugins": plugins} if plugins else {},
-        ],
-        arguments=["--ros-args", "--log-level", "debug" if debug else "info"],
-    )
-
     # camera_ros autodetects anything left unset, so only send the settings that were overridden.
     camera_params: dict = {
         "orientation": camera_orientation,
@@ -86,20 +72,46 @@ def launch_setup(context) -> list[Action]:
         camera_params["height"] = int(camera_height)
 
     # On real hardware nothing publishes camera frames, so run the libcamera driver.
-    camera = Node(
-        package="camera_ros",
-        executable="camera_node",
-        # camera_ros publishes <node_name>/image_raw, so naming the node after camera_topic
-        # is what makes the vision manager and the driver agree on a topic.
-        name=camera_topic,
-        output="screen",
-        parameters=[camera_params],
-    )
-
-    actions = [vision_manager]
+    composable_nodes = [
+        ComposableNode(
+            package="pennair_vision",
+            plugin="pennair_vision::VisionManager",
+            name=node_name,
+            parameters=[
+                {
+                    "camera_topic": camera_topic,
+                    "debug": debug,
+                },
+                {"plugins": plugins} if plugins else {},
+            ],
+            extra_arguments=[
+                {"use_intra_process_comms": True},
+                {"log_level": "debug" if debug else "info"},
+            ],
+        ),
+    ]
     if not sim:
-        actions.append(camera)
-    return actions
+        composable_nodes.append(
+            ComposableNode(
+                package="camera_ros",
+                plugin="camera::CameraNode",
+                # camera_ros publishes <node_name>/image_raw, so naming the node after camera_topic
+                # is what makes the vision manager and the driver agree on a topic.
+                name=camera_topic,
+                parameters=[camera_params],
+            )
+        )
+
+    return [
+        ComposableNodeContainer(
+            name="vision_container",
+            namespace="",
+            package="rclcpp_components",
+            executable="component_container_mt",
+            composable_node_descriptions=composable_nodes,
+            output="screen",
+        )
+    ]
 
 
 # camera_topic expects frames, will error out otherwise
