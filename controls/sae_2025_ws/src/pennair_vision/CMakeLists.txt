@@ -13,11 +13,27 @@ find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(pluginlib REQUIRED)
+find_package(rclcpp_components REQUIRED) # for vision_manager_component
 find_package(ament_cmake_python REQUIRED) # for pennair_vision python module
 
 include_directories(include)
 
-# VisionManager exe
+add_library(vision_manager_component SHARED
+    src/vision_manager.cpp
+)
+
+ament_target_dependencies(vision_manager_component
+    rclcpp
+    rclcpp_components
+    std_msgs
+    sensor_msgs
+    pluginlib
+)
+
+rclcpp_components_register_nodes(vision_manager_component
+    "pennair_vision::VisionManager"
+)
+
 add_executable(vision_manager
     src/main.cpp
     src/vision_manager.cpp
@@ -25,6 +41,7 @@ add_executable(vision_manager
 
 ament_target_dependencies(vision_manager
     rclcpp
+    rclcpp_components
     std_msgs
     sensor_msgs
     pluginlib
@@ -53,7 +70,15 @@ pluginlib_export_plugin_description_file(pennair_vision plugins.xml)
 
 
 install(TARGETS
+    vision_manager_component
     vision_manager
+    ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION lib
+    RUNTIME DESTINATION bin
+)
+
+install(PROGRAMS
+    $<TARGET_FILE:vision_manager>
     DESTINATION lib/${PROJECT_NAME}
 )
 
