@@ -120,11 +120,17 @@ impl FoxgloveClient {
         mut socket_reader: SocketReader,
     ) -> Result<(), FoxgloveClientError> {
         while let Some(msg) = socket_reader.next().await {
-            let msg = msg?;
+            let msg = msg?;  // errors out of loop if socket message fails
             match msg {
                 Message::Text(text) => println!("{text}"),
                 Message::Binary(bytes) => {
-                    let server_message = parse_binary_message(&bytes)?;
+                    let parse_result = parse_binary_message(&bytes);
+                    if parse_result.is_err() {
+                        println!("Failed to parse message: {:?}", bytes);
+                        continue;
+                    }
+                    let server_message = parse_result.unwrap();
+                    // cloning a Bytes object is cheap here bc of reference counting
                     let res = broadcaster.send(server_message.clone());
                     if res.is_err() {
                         println!("Warning: no active listeners to message {:?}", server_message);
@@ -165,7 +171,7 @@ impl FoxgloveClient {
         Ok(id)
     }
 
-    pub fn listen_to_events(&mut self) -> Result<ServerMessageReceiver, FoxgloveClientError> {
+    pub fn get_receiver(&mut self) -> Result<ServerMessageReceiver, FoxgloveClientError> {
         if !self.connected {
             return Err(FoxgloveClientError::NotConnected);
         }
