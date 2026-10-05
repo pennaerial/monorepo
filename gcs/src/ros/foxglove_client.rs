@@ -1,4 +1,5 @@
-use crate::ros::server_types::ServerMessage;
+use crate::ros::server_types::{ServerMessage, SubscriptionId};
+use crate::ros::parse::{parse_binary_message, ParseError};
 use futures_util::{
     stream::{SplitSink, SplitStream},
     SinkExt, StreamExt,
@@ -20,7 +21,6 @@ type Socket = WebSocketStream<MaybeTlsStream<TcpStream>>;
 type SocketReader = SplitStream<Socket>;
 type SocketWriter = SplitSink<Socket, Message>;
 
-type SubscriptionId = u32;
 
 const FOXGLOVE_SUBPROTOCOL: &str = "foxglove.sdk.v1";
 
@@ -28,6 +28,7 @@ const FOXGLOVE_SUBPROTOCOL: &str = "foxglove.sdk.v1";
 pub enum FoxgloveClientError {
     NotConnected,
     JsonError(serde_json::Error),
+    BinError(ParseError),
     WsError(tokio_tungstenite::tungstenite::Error),
 }
 
@@ -44,12 +45,19 @@ impl From<tokio_tungstenite::tungstenite::Error> for FoxgloveClientError {
     }
 }
 
+impl From<ParseError> for FoxgloveClientError {
+    fn from(error: ParseError) -> Self {
+        FoxgloveClientError::BinError(error)
+    }
+}
+
 // allows easy logging for debugging
 impl fmt::Display for FoxgloveClientError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::NotConnected => write!(f, "FoxgloveClient NotConnected Error: Operation not permitted if FoxgloveClient is not connected to a bridge"),
             Self::JsonError(error) => write!(f, "FoxgloveClient JSON Error: {}", error),
+            Self::BinError(error) => write!(f, "FoxgloveClient: {}", error),
             Self::WsError(error) => write!(f, "FoxgloveClient Websocket Error: {}", error),
         }
     }
@@ -90,7 +98,6 @@ impl FoxgloveClient {
             .unwrap_or("None");
 
         println!("Connection Success with subprotocol: {}", protocol);
-        // self.socket = Some(socket);
         let (socket_writer, socket_reader) = socket.split();
         self.socket_writer = Some(socket_writer);
 
@@ -113,11 +120,21 @@ impl FoxgloveClient {
         mut socket_reader: SocketReader,
     ) -> Result<(), FoxgloveClientError> {
         while let Some(msg) = socket_reader.next().await {
-            let msg = msg?;
+            let msg = msg?;  // errors out of loop if socket message fails
             match msg {
                 Message::Text(text) => println!("{text}"),
                 Message::Binary(bytes) => {
-                    println!("Lossy string: {}", String::from_utf8_lossy(&bytes))
+                    let parse_result = parse_binary_message(&bytes);
+                    if parse_result.is_err() {
+                        println!("Failed to parse message: {:?}", bytes);
+                        continue;
+                    }
+                    let server_message = parse_result.unwrap();
+                    // cloning a Bytes object is cheap here bc of reference counting
+                    let res = broadcaster.send(server_message.clone());
+                    if res.is_err() {
+                        println!("Warning: no active listeners to message {:?}", server_message);
+                    }
                 }
                 _ => (),
             }
@@ -154,7 +171,7 @@ impl FoxgloveClient {
         Ok(id)
     }
 
-    pub fn listen_to_events(&mut self) -> Result<ServerMessageReceiver, FoxgloveClientError> {
+    pub fn get_receiver(&mut self) -> Result<ServerMessageReceiver, FoxgloveClientError> {
         if !self.connected {
             return Err(FoxgloveClientError::NotConnected);
         }

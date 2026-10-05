@@ -1,7 +1,11 @@
 use serde::{Deserialize, Serialize};
+use tungstenite::Bytes;
 use std::collections::HashMap;
 
+use crate::ros::parse::ParseError;
+
 pub type ChannelId = u32;
+pub type SubscriptionId = u32;
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(tag = "op")]
@@ -13,7 +17,6 @@ pub enum ServerMessage {
     ServerInfo(ServerInfo),
     // Status,
     // RemoveStatus,
-    // Message,
     // Time,
     #[serde(rename = "advertise")]
     Advertise(Advertise),
@@ -25,6 +28,9 @@ pub enum ServerMessage {
     // ConnectionGraphUpdate,
     // FetchAssetResponse,
     // ServiceCallFailure,
+    // Binary ServerMessages
+    #[serde(skip)]
+    MessageData(MessageData),
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -52,4 +58,36 @@ pub struct Channel {
     pub schema: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub schema_encoding: Option<String>,
+}
+
+// Opcodes corresponding with each binary message
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BinaryOpcode {
+    MessageData = 1,
+    Time = 2,
+    ServiceCallResponse = 3,
+    FetchAssetResponse = 4,
+}
+
+impl BinaryOpcode {
+    pub fn from_byte(value: u8) -> Result<Self, ParseError> {
+        match value {
+            1 => Ok(Self::MessageData),
+            2 => Ok(Self::Time),
+            3 => Ok(Self::ServiceCallResponse),
+            4 => Ok(Self::FetchAssetResponse),
+            _ => Err(ParseError::InvalidOpcode(value))
+        }
+    }
+}
+
+// BINARY MESSAGES
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MessageData {
+    // op: BinaryOpcode.MESSAGE_DATA;
+    pub subscription_id: SubscriptionId,
+    pub timestamp: u64,
+    pub data: Bytes,  // bytes moved from TcpStream
 }
