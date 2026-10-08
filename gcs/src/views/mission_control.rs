@@ -3,7 +3,6 @@ use tokio::time::{sleep, Duration};
 use crate::components::Button;
 use crate::ros::server_types::ServerMessage;
 use crate::ros::FoxgloveClient;
-use cdr;
 use dioxus::prelude::*;
 use ros_interfaces::{geometry_msgs, std_msgs};
 
