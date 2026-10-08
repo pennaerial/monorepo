@@ -1,5 +1,3 @@
-use tokio::time::{sleep, Duration};
-
 use crate::components::Button;
 use crate::ros::server_types::ServerMessage;
 use crate::ros::FoxgloveClient;
@@ -39,8 +37,6 @@ async fn run_client(url: &str) {
                         Err(e) => println!("{e}"),
                         _ => (),
                     }
-                    sleep(Duration::from_secs(1)).await;
-                    println!("receiver loop");
                 }
             });
         }
