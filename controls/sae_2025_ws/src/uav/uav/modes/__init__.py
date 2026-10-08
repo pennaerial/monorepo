@@ -5,6 +5,7 @@ from . import LandingMode
 __all__ = [
     "LandingMode",
     "NavGPSMode",
+    "NextPatchMode",
 ]
 
 

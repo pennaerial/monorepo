@@ -1,0 +1,20 @@
+modes:
+  start:
+    mode: uav.VerticalTakeoffMode
+    params:
+      takeoff_height: 5.0
+      takeoff_method: OFFBOARD
+    transitions:
+      complete: next_patch
+
+  next_patch:
+    mode: uav.NextPatchMode
+    params:
+      altitude: 5.0
+      margin: 1.0
+    transitions:
+      complete: next_patch
+      no_patches: land
+
+  land:
+    mode: uav.LandingMode
