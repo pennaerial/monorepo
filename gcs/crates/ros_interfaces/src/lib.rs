@@ -4,6 +4,11 @@ pub mod std_msgs {
 
     pub mod msg {
         #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+        pub struct Float64 {
+            pub data: f64,
+        }
+
+        #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
         pub struct Int32 {
             pub data: i32,
         }
@@ -12,5 +17,7 @@ pub mod std_msgs {
         pub struct String {
             pub data: std::string::String,
         }
+
     }
+
 }
