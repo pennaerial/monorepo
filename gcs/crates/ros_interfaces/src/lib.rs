@@ -23,9 +23,7 @@ pub mod geometry_msgs {
             pub z: f64,
             pub w: f64,
         }
-
     }
-
 }
 
 pub mod std_msgs {
@@ -45,7 +43,5 @@ pub mod std_msgs {
         pub struct String {
             pub data: std::string::String,
         }
-
     }
-
 }

@@ -1,18 +1,16 @@
+mod components;
 mod ros;
 mod views;
-mod components;
 
 use dioxus::prelude::*;
 
 use views::MissionControl;
-
 
 const TAILWIND_CSS: Asset = asset!("/assets/tailwind.css");
 
 fn main() {
     dioxus::launch(App);
 }
-
 
 #[component]
 fn App() -> Element {

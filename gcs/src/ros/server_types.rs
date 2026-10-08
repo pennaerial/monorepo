@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
-use tungstenite::Bytes;
 use std::collections::HashMap;
+use tungstenite::Bytes;
 
 use crate::ros::parse::ParseError;
 
@@ -77,7 +77,7 @@ impl BinaryOpcode {
             2 => Ok(Self::Time),
             3 => Ok(Self::ServiceCallResponse),
             4 => Ok(Self::FetchAssetResponse),
-            _ => Err(ParseError::InvalidOpcode(value))
+            _ => Err(ParseError::InvalidOpcode(value)),
         }
     }
 }
@@ -89,5 +89,5 @@ pub struct MessageData {
     // op: BinaryOpcode.MESSAGE_DATA;
     pub subscription_id: SubscriptionId,
     pub timestamp: u64,
-    pub data: Bytes,  // bytes moved from TcpStream
+    pub data: Bytes, // bytes moved from TcpStream
 }
