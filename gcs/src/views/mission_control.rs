@@ -1,11 +1,14 @@
-use dioxus::prelude::*;
+use tokio::time::{Duration, sleep};
+
+use dioxus::{html::geometry, prelude::*};
 use crate::components::Button;
 use crate::ros::FoxgloveClient;
-use ros_interfaces::std_msgs;
+use ros_interfaces::{std_msgs, geometry_msgs};
+use crate::ros::server_types::ServerMessage;
+use cdr;
 
 
-
-/// * `url`: e.g. "localhost:8765"
+// / * `url`: e.g. "localhost:8765"
 async fn run_client(url: &str) {
     let mut client = FoxgloveClient::new();
     let string = std_msgs::msg::String { data: String::from("Hello") };
@@ -20,6 +23,31 @@ async fn run_client(url: &str) {
         Ok(id) => println!("SUCCESSFUL channel sub: {id}"),
         Err(err) => println!("SUBCRIBE ERROR: {err}"),
     }
+
+    match client.get_receiver() {
+        Ok(mut receiver) => {
+            tokio::spawn(async move {
+                loop {
+                    let msg = receiver.recv().await;
+                    match msg {
+                        Ok(ServerMessage::MessageData(data)) => {
+                            match cdr::deserialize::<geometry_msgs::msg::Pose>(data.data.as_ref()) {
+                                Ok(decoded) => println!("successful cdr: {:?}", decoded),
+                                Err(e) => println!("Failed cdr deserialization, {e}")
+                            }
+                        },
+                        Err(e) => println!("{e}"),
+                        _ => ()
+                    }
+                    sleep(Duration::from_secs(1)).await;
+                    println!("receiver loop");
+                }
+            });
+
+        },
+        Err(e) => println!("{e}")
+    }
+
 }
 
 #[component]
