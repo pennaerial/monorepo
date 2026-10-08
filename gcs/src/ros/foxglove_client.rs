@@ -1,5 +1,5 @@
-use crate::ros::server_types::{ServerMessage, SubscriptionId};
 use crate::ros::parse::{parse_binary_message, ParseError};
+use crate::ros::server_types::{ServerMessage, SubscriptionId};
 use futures_util::{
     stream::{SplitSink, SplitStream},
     SinkExt, StreamExt,
@@ -20,7 +20,6 @@ pub type ServerMessageReceiver = broadcast::Receiver<ServerMessage>;
 type Socket = WebSocketStream<MaybeTlsStream<TcpStream>>;
 type SocketReader = SplitStream<Socket>;
 type SocketWriter = SplitSink<Socket, Message>;
-
 
 const FOXGLOVE_SUBPROTOCOL: &str = "foxglove.sdk.v1";
 
@@ -120,7 +119,7 @@ impl FoxgloveClient {
         mut socket_reader: SocketReader,
     ) -> Result<(), FoxgloveClientError> {
         while let Some(msg) = socket_reader.next().await {
-            let msg = msg?;  // errors out of loop if socket message fails
+            let msg = msg?; // errors out of loop if socket message fails
             match msg {
                 Message::Text(text) => println!("{text}"),
                 Message::Binary(bytes) => {
@@ -133,7 +132,10 @@ impl FoxgloveClient {
                     // cloning a Bytes object is cheap here bc of reference counting
                     let res = broadcaster.send(server_message.clone());
                     if res.is_err() {
-                        println!("Warning: no active listeners to message {:?}", server_message);
+                        println!(
+                            "Warning: no active listeners to message {:?}",
+                            server_message
+                        );
                     }
                 }
                 _ => (),

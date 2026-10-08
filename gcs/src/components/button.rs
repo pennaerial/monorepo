@@ -1,10 +1,7 @@
 use dioxus::prelude::*;
 
 #[component]
-pub fn Button(
-    label: String,
-    onclick: EventHandler<MouseEvent>,
-) -> Element {
+pub fn Button(label: String, onclick: EventHandler<MouseEvent>) -> Element {
     rsx! {
         button {
             class: "\
