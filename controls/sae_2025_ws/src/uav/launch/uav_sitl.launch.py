@@ -39,6 +39,7 @@ class Args(StrEnum):
     STANDALONE = "standalone"
     HEADLESS = "headless"
     DEBUG = "debug"
+    VISION = "vision"
 
 
 def px4_sitl_action(
@@ -98,6 +99,7 @@ def launch_setup(context) -> list[Action]:
     run_mw: bool = standalone or is_truthy(config[Args.RUN_MW])
     launch_sim: bool = standalone or is_truthy(config[Args.LAUNCH_SIM])
     headless: str = config[Args.HEADLESS]
+    vision: bool = is_truthy(config[Args.VISION])
 
     # PRINTING HEADER
     logger.debug(f"ENV VAR DETECTED: PENNAIR_PX4_PATH={PENNAIR_PX4_PATH}")
@@ -111,6 +113,7 @@ def launch_setup(context) -> list[Action]:
     logger.debug(f"Launch Sim:          {launch_sim}")
     logger.debug(f"Headless Mode:       {headless}")
     logger.debug(f"Debug Mode:          {debug}")
+    logger.debug(f"Vision Nodes:        {vision}")
     logger.debug(f"Vehicle Camera Map:  {vehicle_camera_map}")
 
     ## create actions
@@ -178,6 +181,23 @@ def launch_setup(context) -> list[Action]:
         )
         actions.append(camera_bridge)
         logger.debug(f"Camera bridge launched for '{vehicle_ns}' on topic: /{vehicle_ns}/camera")
+
+        if vision:
+            apriltag_node = Node(
+                package="uav",
+                executable="apriltag_node",
+                name=f"{vehicle_ns}_apriltag_node",
+                parameters=[
+                    {
+                        "image_topic": f"/{vehicle_ns}/camera",
+                        "camera_info_topic": f"/{vehicle_ns}/camera_info",
+                    }
+                ],
+                output="screen",
+            )
+            actions.append(apriltag_node)
+    elif vision:
+        logger.warning(f"vision=true but '{vehicle_name}' has no camera. Use a camera airframe like mono_cam_down.")  # fmt: skip
     else:
         logger.debug(f"Vehicle model '{vehicle_name}' has no camera. Skipping camera bridge.")
 
@@ -239,6 +259,12 @@ def generate_launch_description():
                 Args.DEBUG,
                 default_value="false",
                 description="If true, sets the launch logger's log level to DEBUG.",
+                choices=["true", "false", "t", "f", "0", "1"],
+            ),
+            DeclareLaunchArgument(
+                Args.VISION,
+                default_value="false",
+                description="If true, launches the apriltag_node on the vehicle camera. Requires an airframe with a camera.",
                 choices=["true", "false", "t", "f", "0", "1"],
             ),
             OpaqueFunction(function=launch_setup),
