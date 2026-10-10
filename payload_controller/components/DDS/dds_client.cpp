@@ -164,54 +164,6 @@ void DDSClient::generate_readers(uint16_t requests[], std::size_t& request_count
   }
 }
 
-// Public publish API: validate the topic and serialize it into the XRCE reliable stream.
-bool DDSClient::publish(const TopicId topic_id, const void* msg)
-{
-  const Topic* topic = get_topic(topic_id);
-  if (topic == nullptr) {
-    ESP_LOGE(TAG, "Unknown DDS topic id %u", static_cast<unsigned>(topic_id));
-    return false;
-  }
-
-  if (topic->dir != Topic::Direction::WRITER) {
-    ESP_LOGE(TAG, "DDS topic %s is not configured as a writer", topic->name);
-    return false;
-  }
-
-  if (msg == nullptr) {
-    ESP_LOGE(TAG, "DDS publish called with null data for %s", topic->name);
-    return false;
-  }
-
-  const std::size_t topic_index = to_underlying(topic_id);
-  if (topic->size_of_topic == nullptr || topic->serialize_topic == nullptr) {
-    ESP_LOGE(TAG, "DDS topic %s is missing serializer hooks", topic->name);
-    return false;
-  }
-
-  ucdrBuffer ub;
-  const uint32_t topic_size = topic->size_of_topic(msg, 0);
-  if (topic_size + ESTIMATED_XRCE_WRITE_OVERHEAD > RELIABLE_STREAM_BLOCK_SIZE) {
-    ESP_LOGE(TAG, "DDS topic %s is too large for one XRCE reliable stream block", topic->name);
-    return false;
-  }
-
-  uint16_t request_id =
-      uxr_prepare_output_stream(&session_, reliable_out_, datawriter_id(topic_index), &ub, topic_size);
-  if (request_id == UXR_INVALID_REQUEST_ID) {
-    ESP_LOGW(TAG, "XRCE reliable output stream is full; dropping DDS topic %s", topic->name);
-    return false;
-  }
-
-  if (!topic->serialize_topic(&ub, msg)) {
-    ESP_LOGE(TAG, "Failed to serialize DDS topic %s", topic->name);
-    return false;
-  }
-
-  delivery_pending_ = true;
-  return true;
-}
-
 void DDSClient::update()
 {
   if (delivery_pending_) {
