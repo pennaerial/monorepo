@@ -167,12 +167,12 @@ constexpr auto TYPED_TOPICS = std::tuple{
         "rt/imu",
         "sensor_msgs::msg::dds_::Imu_",
         Topic::Direction::READER
-    ),
+    )
 };
 
 // Generates our nice TOPICS array from the tuple array
 template <typename... TopicTs>
-constexpr auto make_topic_array(const std::tuple<TopicTs...>& topics)
+constexpr std::array<Topic, sizeof...(TopicTs)> make_topic_array(const std::tuple<TopicTs...>& topics)
 {
   return std::apply(
       [](const auto&... topic) { return std::array<Topic, sizeof...(TopicTs)>{static_cast<const Topic&>(topic)...}; },
@@ -180,7 +180,8 @@ constexpr auto make_topic_array(const std::tuple<TopicTs...>& topics)
   );
 }
 
-constexpr auto TOPICS = make_topic_array(TYPED_TOPICS);
+constexpr std::size_t size_of_tuple = std::tuple_size_v<decltype(TYPED_TOPICS)>;
+constexpr std::array<Topic, size_of_tuple> TOPICS = make_topic_array(TYPED_TOPICS);
 constexpr std::size_t TOPIC_COUNT = TOPICS.size();
 
 template <TopicId Id>
