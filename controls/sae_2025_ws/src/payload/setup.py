@@ -8,7 +8,7 @@ package_name = "payload"
 
 generate_parameter_module(
     "payload_mission_parameters",
-    "payload/payload_mission_parameters.yaml",
+    "config/payload_mission_parameters.yaml",
 )
 
 setup(

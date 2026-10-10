@@ -25,7 +25,7 @@ package_name = "uav"
 
 generate_parameter_module(
     "uav_mission_parameters",
-    "uav/uav_mission_parameters.yaml",
+    "config/uav_mission_parameters.yaml",
 )
 
 setup(
