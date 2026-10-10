@@ -1,9 +1,15 @@
 import os
 from glob import glob
 
+from generate_parameter_library_py.setup_helper import generate_parameter_module
 from setuptools import find_packages, setup
 
 package_name = "payload"
+
+generate_parameter_module(
+    "payload_mission_parameters",
+    "payload/payload_mission_parameters.yaml",
+)
 
 setup(
     name=package_name,

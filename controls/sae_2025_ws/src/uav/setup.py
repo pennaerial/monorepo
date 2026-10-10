@@ -1,6 +1,7 @@
 import os
 from glob import glob
 
+from generate_parameter_library_py.setup_helper import generate_parameter_module
 from setuptools import find_packages, setup
 
 # Keeping these comments in case we want to micro optimize with static jsons at build time
@@ -21,6 +22,11 @@ from setuptools import find_packages, setup
 #
 
 package_name = "uav"
+
+generate_parameter_module(
+    "uav_mission_parameters",
+    "uav/uav_mission_parameters.yaml",
+)
 
 setup(
     name=package_name,

@@ -1,0 +1,19 @@
+payload_mission:
+  mode_map:
+    type: string
+    default_value: ""
+    description: "Path to the mission YAML. Empty uses the payload package's basic mission."
+    read_only: true
+
+  auto_launch:
+    type: bool
+    default_value: true
+    description: "Start the mission automatically once the drive service is available"
+    read_only: true
+
+  vehicle_name:
+    type: string
+    description: "Vehicle namespace used for topics and runtime state (required)"
+    read_only: true
+    validation:
+      not_empty<>: []
