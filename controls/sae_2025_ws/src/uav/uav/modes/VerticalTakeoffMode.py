@@ -1,12 +1,12 @@
+from enum import StrEnum
 from typing import override
 
 from px4_msgs.msg import VehicleStatus
 from rclpy.node import Node
-
-from uav.vehicles.UAV import UAV
 from vehicle_common.mode import Mode
 from vehicle_common.mode_loader import ParamsBase, register_mode
-from enum import StrEnum
+
+from uav.vehicles.UAV import UAV
 
 
 class TakeoffMethod(StrEnum):

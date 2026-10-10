@@ -140,11 +140,11 @@ From monorepo root:
 .. code-block:: bash
     :caption: Bash
 
-    sudo $(which uv) pip install --system --break-system-packages -r pyproject.toml
+    sudo $(which uv) pip install --system --break-system-packages -r pyproject.toml --group dev
 
 .. note::
 
-    This above command installs the listed dependencies as system-wide python packages.
+    The above command installs the listed dependencies and the ``dev`` dependency group.
     Unlike traditional uv/pip usage that uses a virtual environment, ROS setups use system wide packages
     which doesn't work too well with venvs.
 
@@ -164,26 +164,6 @@ From monorepo root:
     sudo apt install ${APT_PACKAGES[@]}
 
 
-NPM Packages (Global)
-''''''''''''''''''''''
-
-Install NodeJS 24 with nvm:
-
-.. code-block:: bash
-
-    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.6/install.sh | bash
-    \. "$HOME/.nvm/nvm.sh"
-    nvm install 24
-
-    # verify installs
-    node -v
-    npm -v
-
-    # from monorepo root:
-    source ci/ci.conf
-    echo ${GLOBAL_NPM[@]}
-    npm install -g ${GLOBAL_NPM[@]}
-
 Build the Dependencies Submodule
 ``````````````````````````````````
 
@@ -193,18 +173,9 @@ to build all of them.
 
 Run the install script:
 
+.. warning::
 
-
-.. code-block:: bash
-    :caption: Bash
-
-    # from monorepo root:
-    source dev_env.sh # exports environment variables that the build_all.sh script needs
-    ./Dependencies/build_all.sh
-
-.. danger::
-
-    Due to a gradle incompatiability, ensure you are on **Java 17** or **Java 11** before running the above. You can do the following to switch:
+    Due to a gradle incompatiability, ensure you are on **Java 17** or **Java 11** before running the below. You can do the following to switch:
 
     .. code-block:: bash
         :caption: Bash
@@ -214,6 +185,13 @@ Run the install script:
         sudo update-alternatives --config java
 
     Follow the command line prompt to switch to the correct version of Java, then run the above again.
+
+.. code-block:: bash
+    :caption: Bash
+
+    # from monorepo root:
+    source dev_env.sh # exports environment variables that the build_all.sh script needs
+    ./Dependencies/build_all.sh
 
 
 .. note::
@@ -247,6 +225,8 @@ Build and run the ROS workspace
 
 .. code-block:: bash
 
+   # dev_env.sh sets up environment variables necessary to run uav_sitl.launch.py
+   source ../../dev_env.sh  # path is monorepo/dev_env.sh.
    source install/setup.bash
    ros2 launch uav uav_sitl.launch.py
 

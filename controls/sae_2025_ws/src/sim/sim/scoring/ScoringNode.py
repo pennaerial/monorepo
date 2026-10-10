@@ -8,11 +8,13 @@ Each competition should have a corresponding ScoringNode subclass that:
 3. Monitors UAV state and competition progress
 """
 
-from typing import Optional
 from abc import ABC, abstractmethod
+from typing import Optional
+
 from rclpy.node import Node
-from sim.utils import camel_to_snake
 from std_msgs.msg import Float32, String
+
+from sim.utils import camel_to_snake
 
 
 class ScoringNode(Node, ABC):

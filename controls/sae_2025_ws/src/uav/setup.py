@@ -1,8 +1,7 @@
-from glob import glob
 import os
+from glob import glob
 
 from setuptools import find_packages, setup
-
 
 # Keeping these comments in case we want to micro optimize with static jsons at build time
 # UAV_MODE_REGISTRY_PATH = Path(__file__).parent / "uav" / "mode_registry.json"
@@ -71,12 +70,6 @@ setup(
     entry_points={
         "console_scripts": [
             "uav_mission = uav.uav_mission:main",
-            "payload_tracking_node = uav.vision_nodes.PayloadTrackingNode:main",
-            "payload_april_tag_node = uav.vision_nodes.PayloadAprilTagNode:main",
-            "payload_color_orbit_node = uav.vision_nodes.PayloadColorOrbitNode:main",
-            "payload_drive_out_node = uav.vision_nodes.PayloadDriveOutNode:main",
-            "payload_color_square_node = uav.vision_nodes.PayloadColorSquareNode:main",
-            "camera = uav.CameraNode:main",
         ],
     },
 )

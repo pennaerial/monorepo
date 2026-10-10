@@ -1,16 +1,13 @@
 import pytest
-from pydantic import ValidationError
 import yaml
-
-from vehicle_common.runtime.mission_loader import RuntimeMode, RuntimeMission
-from vehicle_common.mode_loader import ModeRegistry, ParamsBase
 from mock_classes import (
     MockParams,
     MockVehicle,
     MockVerticalTakeoffParams,
-    MockVisionNode,
 )
-
+from pydantic import ValidationError
+from vehicle_common.mode_loader import ModeRegistry, ParamsBase
+from vehicle_common.runtime.mission_loader import RuntimeMission, RuntimeMode
 
 mode_registry = ModeRegistry.get()
 
@@ -64,43 +61,6 @@ def test_runtime_mission_parses_modes():
     assert loiter.transitions == {}
     assert loiter._registered == mode_registry.get_registered_mode("mock.loiter")
     assert mission._targets == {MockVehicle}
-    assert mission._vision_nodes == {MockVisionNode}
-    assert mission._peer_vehicle_names == {"peer1"}
-    assert mission._requires_camera is True
-
-
-mock_mission_yaml_2 = """
-modes:
-  takeoff:
-    mode: mock.VerticalTakeoffMode
-    params: {}
-    transitions: {}
-  bare:
-    mode: mock
-    params: {}
-    transitions: {}
-"""
-
-
-def test_vision_nodes_union_across_modes():
-    mission = RuntimeMission.model_validate(yaml.safe_load(mock_mission_yaml_2))
-    print(mission._vision_nodes)
-    expected = {MockVisionNode}
-    assert mission._vision_nodes == expected
-
-
-mission_3 = """
-modes:
-  bare:
-    mode: mock
-    params: {}
-    transitions: {}
-"""
-
-
-def test_requires_camera_false_without_camera_modes():
-    mission = RuntimeMission.model_validate(yaml.safe_load(mission_3))
-    assert mission._requires_camera is False
 
 
 mission_no_params_field = """

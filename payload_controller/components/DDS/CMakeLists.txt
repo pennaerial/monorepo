@@ -4,9 +4,17 @@ set(srcs
     dds_client.cpp
 )
 
+set(priv_requires "")
+if(NOT IDF_TARGET STREQUAL "linux")
+    list(APPEND srcs uart_transport.cpp)
+    list(APPEND priv_requires esp_driver_gpio esp_driver_uart)
+endif()
+
 idf_component_register(
     SRCS ${srcs}
     INCLUDE_DIRS "."
+    REQUIRES util
+    PRIV_REQUIRES ${priv_requires}
 )
 
 foreach(_var PENNAIR_XRCE_DDS_CLIENT_PATH PENNAIR_XRCE_DDS_MICROCDR_PATH)
@@ -61,7 +69,6 @@ ExternalProject_Add(microcdr_project
 
 # Profiles shared by both targets.
 set(client_profile_args
-    -DUCLIENT_PROFILE_UDP:BOOL=OFF
     -DUCLIENT_PROFILE_TCP:BOOL=OFF
     -DUCLIENT_PROFILE_DISCOVERY:BOOL=OFF
     -DUCLIENT_PROFILE_SHARED_MEMORY:BOOL=OFF
@@ -70,12 +77,14 @@ set(client_profile_args
 
 if(IDF_TARGET STREQUAL "linux")
     list(APPEND client_profile_args
-        -DUCLIENT_PROFILE_SERIAL:BOOL=ON
+        -DUCLIENT_PROFILE_UDP:BOOL=ON
+        -DUCLIENT_PROFILE_SERIAL:BOOL=OFF
         -DUCLIENT_PROFILE_CUSTOM_TRANSPORT:BOOL=OFF
     )
 else()
     # Use the custom-transport profile with UART config supplied from dds_client.cpp.
     list(APPEND client_profile_args
+        -DUCLIENT_PROFILE_UDP:BOOL=OFF
         -DUCLIENT_PROFILE_SERIAL:BOOL=OFF
         -DUCLIENT_PROFILE_CUSTOM_TRANSPORT:BOOL=ON
     )
@@ -109,7 +118,7 @@ set_target_properties(microxrcedds_client_imported PROPERTIES
 )
 add_dependencies(microxrcedds_client_imported xrce_dds_client_project)
 
-target_include_directories(${COMPONENT_LIB} PRIVATE ${xrce_deps_install_dir}/include)
+target_include_directories(${COMPONENT_LIB} PUBLIC ${xrce_deps_install_dir}/include)
 target_link_libraries(${COMPONENT_LIB} PRIVATE microxrcedds_client_imported microcdr_imported)
 
 

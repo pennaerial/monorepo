@@ -3,10 +3,10 @@ from __future__ import annotations
 import rclpy
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
-
-from uav.vehicles.AirframeClass import AirframeClass
-from uav.UAVModeManager import UAVModeManager
 from vehicle_common.runtime.mission_loader import RuntimeMission, get_mission_path
+
+from uav.UAVModeManager import UAVModeManager
+from uav.vehicles.AirframeClass import AirframeClass
 
 
 class UAVMissionBootstrap(Node):
@@ -14,13 +14,10 @@ class UAVMissionBootstrap(Node):
         super().__init__("uav_mission_bootstrap")
         self.declare_parameter("mode_map", get_mission_path("basic", "uav"))
         self.declare_parameter("auto_launch", True)
-        self.declare_parameter("debug", False)
         self.declare_parameter("servo_only", False)
         self.declare_parameter("vehicle_name", "uav_0")
         self.declare_parameter("vehicle_class", AirframeClass.MULTICOPTER.name)
         self.declare_parameter("camera_mount_offsets", [0.0, 0.0, 0.0])
-        self.declare_parameter("peer_heartbeat_hz", 10.0)
-        self.declare_parameter("peer_stale_timeout_s", 0.5)
 
     def _string_parameter(self, name: str, default: str = "") -> str:
         try:
@@ -37,14 +34,6 @@ class UAVMissionBootstrap(Node):
             )
         return value
 
-    def _float_parameter(self, name: str) -> float:
-        value = self.get_parameter(name).value
-        if not isinstance(value, (int, float)) or isinstance(value, bool):
-            raise ValueError(
-                f"uav_mission requires numeric parameter '{name}', received {value!r}."
-            )
-        return float(value)
-
     def manager_kwargs(self) -> dict:
         mission_path = str(self.get_parameter("mode_map").value)
         if not mission_path:
@@ -55,13 +44,10 @@ class UAVMissionBootstrap(Node):
         return {
             "mission_spec": runtime_mission,
             "auto_launch": self._bool_parameter("auto_launch"),
-            "debug": bool(self.get_parameter("debug").value),
             "servo_only": bool(self.get_parameter("servo_only").value),
             "vehicle_name": str(self.get_parameter("vehicle_name").value).strip() or "uav",
             "vehicle_class": AirframeClass.parse(self.get_parameter("vehicle_class").value),
             "camera_offsets": list(self.get_parameter("camera_mount_offsets").value),
-            "peer_heartbeat_hz": self._float_parameter("peer_heartbeat_hz"),
-            "peer_stale_timeout_s": self._float_parameter("peer_stale_timeout_s"),
             "node_name": "mission",
         }
 

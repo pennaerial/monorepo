@@ -1,28 +1,27 @@
+import logging
 from enum import StrEnum
 from pathlib import Path
 
-from pydantic import ValidationError
 from launch import Action, LaunchDescription
-from launch_ros.actions import Node
 from launch.actions import (
     DeclareLaunchArgument,
-    OpaqueFunction,
     ExecuteProcess,
+    OpaqueFunction,
 )
-
+from launch_ros.actions import Node
+from pydantic import ValidationError
+from uav.utils import vehicle_camera_map
 from uav.vehicles.AirframeClass import PX4Airframe
-from vehicle_common.utils import get_available_missions
 from vehicle_common.env import require_env
-from vehicle_common.runtime.mission_loader import RuntimeMission, get_mission_path
 from vehicle_common.launch_utils import (
-    get_logger,
     LaunchError,
     check_unknown_launch_args,
+    get_logger,
     include_launch,
-    format_bullet_list,
     is_truthy,
 )
-
+from vehicle_common.runtime.mission_loader import RuntimeMission, get_mission_path
+from vehicle_common.utils import get_available_missions
 
 logger = get_logger("uav_sitl.launch")
 PENNAIR_PX4_PATH = require_env("PENNAIR_PX4_PATH")
@@ -39,6 +38,7 @@ class Args(StrEnum):
     LAUNCH_SIM = "launch_sim"
     STANDALONE = "standalone"
     HEADLESS = "headless"
+    DEBUG = "debug"
 
 
 def px4_sitl_action(
@@ -68,6 +68,8 @@ def px4_sitl_action(
 
 def launch_setup(context) -> list[Action]:
     config = context.launch_configurations  # dict containing declared launch arguments
+    debug: str = config[Args.DEBUG]
+    logger = get_logger("uav_sitl.launch", logging.DEBUG if is_truthy(debug) else logging.INFO)
     check_unknown_launch_args(Args, config, logger)  # warn for unknown args
 
     mission: str = config[Args.MISSION]  # validate mission
@@ -108,6 +110,8 @@ def launch_setup(context) -> list[Action]:
     logger.debug(f"Middleware:          {run_mw}")
     logger.debug(f"Launch Sim:          {launch_sim}")
     logger.debug(f"Headless Mode:       {headless}")
+    logger.debug(f"Debug Mode:          {debug}")
+    logger.debug(f"Vehicle Camera Map:  {vehicle_camera_map}")
 
     ## create actions
     actions = []
@@ -119,13 +123,14 @@ def launch_setup(context) -> list[Action]:
         namespace=vehicle_ns,
         parameters=[
             {
-                "mode_map": mission_path,
+                "mode_map": str(mission_path),
                 "vehicle_name": vehicle_ns,
                 "vehicle_class": airframe.airframe_class.name,
                 "auto_launch": True,
             }
         ],
         output="screen",
+        arguments=["--ros-args", "--log-level", "debug" if is_truthy(debug) else "info"],
     )
 
     middleware = ExecuteProcess(
@@ -141,8 +146,40 @@ def launch_setup(context) -> list[Action]:
         launch_arguments={
             "world": world,
             "headless": headless,
+            "debug": debug,
         },
     )
+
+    vehicle_name = airframe.model
+    if vehicle_camera_map.get(vehicle_name, False):
+        # TODO: make namespace integer not hardcoded to 0
+        vehicle_name_ns = f"{vehicle_name}_0"
+
+        gz_image_topic = (
+            f"/world/{world}/model/{vehicle_name_ns}/link/camera_link/sensor/camera/image"
+        )
+        gz_info_topic = (
+            f"/world/{world}/model/{vehicle_name_ns}/link/camera_link/sensor/camera/camera_info"
+        )
+
+        camera_bridge = Node(
+            package="ros_gz_bridge",
+            executable="parameter_bridge",
+            arguments=[
+                f"{gz_image_topic}@sensor_msgs/msg/Image[gz.msgs.Image",
+                f"{gz_info_topic}@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo",
+            ],
+            remappings=[
+                (gz_image_topic, f"/{vehicle_ns}/camera"),
+                (gz_info_topic, f"/{vehicle_ns}/camera_info"),
+            ],
+            output="screen",
+            name=f"{vehicle_ns}_camera_bridge",
+        )
+        actions.append(camera_bridge)
+        logger.debug(f"Camera bridge launched for '{vehicle_ns}' on topic: /{vehicle_ns}/camera")
+    else:
+        logger.debug(f"Vehicle model '{vehicle_name}' has no camera. Skipping camera bridge.")
 
     actions.append(mode_manager)
     actions.extend([middleware] if run_mw else [])
@@ -157,10 +194,7 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 Args.MISSION,
                 default_value="basic",
-                description=format_bullet_list(
-                    "Name of the mission to load.\n\tAvailable missions:",
-                    get_available_missions("uav"),
-                ),
+                description="Name of the mission to load. Run 'pennair mission uav' to see all available uav missions.",
             ),
             DeclareLaunchArgument(
                 Args.NS_ID,
@@ -170,10 +204,7 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 Args.AIRFRAME,
                 default_value="quadcopter",
-                description=format_bullet_list(
-                    "UAV airframe to load.\n\tAvailable airframes: (alias/id/model)",
-                    [str(a) for a in PX4Airframe.get_flying()],
-                ),
+                description="UAV airframe to load. Run 'pennair airframe ls' to see all available airframes.",
             ),
             DeclareLaunchArgument(
                 Args.WORLD,
@@ -188,7 +219,7 @@ def generate_launch_description():
             ),
             DeclareLaunchArgument(
                 Args.LAUNCH_SIM,
-                default_value="false",
+                default_value="true",
                 description="if this or standalone is true, runs sim.launch.py to launch gazebo with the specified world argument",
                 choices=["true", "false", "t", "f", "0", "1"],
             ),
@@ -202,6 +233,12 @@ def generate_launch_description():
                 Args.HEADLESS,
                 default_value="false",
                 description="If true, runs gz server in headless mode (no GUI). Only applies when standalone/launch_sim is true.",
+                choices=["true", "false", "t", "f", "0", "1"],
+            ),
+            DeclareLaunchArgument(
+                Args.DEBUG,
+                default_value="false",
+                description="If true, sets the launch logger's log level to DEBUG.",
                 choices=["true", "false", "t", "f", "0", "1"],
             ),
             OpaqueFunction(function=launch_setup),

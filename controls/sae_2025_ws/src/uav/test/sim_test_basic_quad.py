@@ -4,12 +4,11 @@
 import os
 import unittest
 
-import pytest
 import launch
 import launch_testing.actions
-
-from vehicle_common.launch_utils import include_launch
+import pytest
 from headless_ground_station import HeadlessGroundStation
+from vehicle_common.launch_utils import include_launch
 
 # Live marker prevents colcon test from running this test in non-sim CI
 pytestmark = pytest.mark.live
@@ -25,7 +24,7 @@ def generate_test_description():
     uav_sitl = include_launch(
         pkg="uav",
         launch_file="uav_sitl.launch.py",
-        launch_arguments={"airframe": "quadcopter", "mission": "basic"},
+        launch_arguments={"airframe": "quadcopter", "mission": "basic", "headless": "true"},
     )
     return launch.LaunchDescription(
         [

@@ -1,5 +1,6 @@
-from rclpy.node import Node
 import numpy as np
+from rclpy.node import Node
+
 from .UAV import UAV
 
 
@@ -11,14 +12,12 @@ class Multicopter(UAV):
     def __init__(
         self,
         node: Node,
-        DEBUG=False,
         camera_offsets=[0, 0, 0],
         vehicle_name: str = "uav",
     ):
         super().__init__(
             node,
-            DEBUG,
-            camera_offsets,
+            camera_offsets=camera_offsets,
             vehicle_name=vehicle_name,
         )
 

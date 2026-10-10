@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+import os
+from typing import Optional, Tuple
+
 import cv2
 import numpy as np
-from typing import Optional, Tuple
-import os
-
 from uav.utils import blue, green, pink, yellow
 
 from .dlz_color_regions import detect_focused_dlz_paper_masks

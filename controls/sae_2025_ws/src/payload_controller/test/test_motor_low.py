@@ -8,8 +8,9 @@ For SN754410 (PWM + IN1 + IN2), prefer `sn754410_test.py`.
 Requires the pigpiod daemon to be running (`sudo pigpiod`).
 """
 
-import pigpio  # pyright: ignore[reportMissingImports]
 import time
+
+import pigpio  # pyright: ignore[reportMissingImports]
 
 # --- Pin assignments (BCM numbering) ---
 A_IN1 = 16  # Motor A IN1 (PWM1)

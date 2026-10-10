@@ -17,8 +17,6 @@
 .idea
 
 .vscode/*
-!.vscode/extensions.json
-!.vscode/settings.json
 
 # colcon/CMake output
 build

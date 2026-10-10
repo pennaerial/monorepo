@@ -42,9 +42,14 @@ ExecStart=/usr/lib/systemd/systemd-networkd-wait-online --any --timeout=5
 
 ## First Run
 
+```{note}
+Please run ``git pull origin main`` and ``git submodule update --recursive`` to make sure monorepo is up-to-date prior to the first run.
+```
+
 0. Install QGroundControl on the MacOS host: `brew install --cask qgroundcontrol`
-1. Open a Terminal in the VM. `cd` into the `monorepo` and into `monorepo/controls/sae_2025_ws`
-2. Run `colcon build`, followed by `source install/setup.bash` and `ros2 launch uav main.launch.py`
+1. Open qgroundcontrol using `open -a QGroundControl`
+2. Open a Terminal in the VM. `cd` into the `monorepo` and into `monorepo/controls/sae_2025_ws`
+3. Run `colcon build`, followed by `source install/setup.bash` and `ros2 launch uav uav_sitl.launch.py`
 
 - Verify that the UAV is able to take off and land.
   ![UTM Simulation Takeoff](../../_static/utm_sim.png)

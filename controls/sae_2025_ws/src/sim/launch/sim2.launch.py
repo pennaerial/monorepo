@@ -1,21 +1,19 @@
+import logging
 from enum import StrEnum
 from pathlib import Path
 
-from launch import LaunchDescription, Action
-from launch_ros.actions import Node
+from launch import Action, LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
-    OpaqueFunction,
     ExecuteProcess,
+    OpaqueFunction,
 )
-
-from sim.utils import get_available_worlds
+from launch_ros.actions import Node
 from sim.simulation_params import SimulationParams
-from vehicle_common.env import require_env, prepend_env_path
+from vehicle_common.env import prepend_env_path, require_env
 from vehicle_common.launch_utils import (
     get_logger,
     is_truthy,
-    format_bullet_list,
 )
 
 logger = get_logger("sim.launch")
@@ -48,6 +46,7 @@ class Args(StrEnum):
     WORLD = "world"
     STAGE = "stage"
     HEADLESS = "headless"
+    DEBUG = "debug"
 
 
 def gz_sim_command(world: str, headless: bool) -> list[str]:
@@ -64,6 +63,9 @@ def launch_setup(context) -> list[Action]:
     headless: bool = is_truthy(config[Args.HEADLESS])
     world: str = config[Args.WORLD]
     stage: str = config[Args.STAGE]
+    debug: str = config[Args.DEBUG]
+
+    logger = get_logger("sim.launch", logging.DEBUG if is_truthy(debug) else logging.INFO)
 
     gz_env = {
         "GZ_SIM_RESOURCE_PATH": GZ_SIM_RESOURCE_PATH,
@@ -88,6 +90,16 @@ def launch_setup(context) -> list[Action]:
     )
 
     actions.append(gz_sim)
+
+    # Simulation time is shared by every ROS node using use_sim_time = True
+    clock_bridge = Node(
+        package="ros_gz_bridge",
+        executable="parameter_bridge",
+        arguments=["/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock"],
+        output="screen",
+        name="clock_bridge",
+    )
+    actions.append(clock_bridge)
     logger.info(f"Launching world: {world}")
     try:
         simulation_params = SimulationParams.load_from_stage(world, stage)
@@ -142,10 +154,7 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 Args.WORLD,
                 default_value="default",
-                description=format_bullet_list(
-                    "simulation world for gz to load. Looks under {PENNAIR_GZ_MODELS_PATH}/worlds/{world}.sdf\n\tAvailable Worlds:",
-                    options=get_available_worlds(GZ_WORLDS_PATH),
-                ),
+                description="simulation world for gz to load. Looks under {PENNAIR_GZ_MODELS_PATH}/worlds/{world}.sdf\n\tRun `pennair world ls` to see all available worlds.",
             ),
             DeclareLaunchArgument(
                 Args.STAGE,
@@ -156,6 +165,12 @@ def generate_launch_description():
                 Args.HEADLESS,
                 default_value="false",
                 description="If true, runs gz server in headless mode (no GUI)",
+                choices=["true", "false", "t", "f", "0", "1"],
+            ),
+            DeclareLaunchArgument(
+                Args.DEBUG,
+                default_value="false",
+                description="If true, sets the launch logger's log level to DEBUG.",
                 choices=["true", "false", "t", "f", "0", "1"],
             ),
             OpaqueFunction(function=launch_setup),

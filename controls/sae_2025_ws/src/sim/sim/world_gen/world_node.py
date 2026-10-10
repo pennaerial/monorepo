@@ -1,6 +1,6 @@
-from abc import ABC, abstractmethod
-import xml.etree.ElementTree as ET
 import random
+import xml.etree.ElementTree as ET
+from abc import ABC, abstractmethod
 
 from rclpy.node import Node
 from ros_gz_interfaces.srv import SpawnEntity

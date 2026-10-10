@@ -1,12 +1,12 @@
 from __future__ import annotations
-from pathlib import Path
+
 import os
 from math import cos, sin
+from pathlib import Path
 
-from pydantic import BaseModel, model_validator
-
-from ros_gz_interfaces.msg import EntityFactory
 from geometry_msgs.msg import Pose
+from pydantic import BaseModel, model_validator
+from ros_gz_interfaces.msg import EntityFactory
 
 
 def quaternion_from_euler(
@@ -39,6 +39,7 @@ class Entity(BaseModel):
     name: str
     path_to_model: str = ""
     model: str = ""
+    sdf: str | None = None
     position: tuple[float, float, float]
     rpy: tuple[float, float, float]
     world: str
@@ -98,7 +99,10 @@ class Entity(BaseModel):
 
         ent_fact = EntityFactory()
         ent_fact.name = self.name
-        ent_fact.sdf_filename = self.path_to_model
+        if self.sdf:
+            ent_fact.sdf = self.sdf
+        else:
+            ent_fact.sdf_filename = self.path_to_model
         ent_fact.pose = pose
         ent_fact.relative_to = self.world
         return ent_fact

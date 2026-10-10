@@ -1,9 +1,8 @@
 #include "pennair_vision/vision_manager.hpp"
 
-#include <chrono>
-#include <memory>
 #include <string>
 
+#include "rclcpp_components/register_node_macro.hpp"
 #include "std_msgs/msg/string.hpp"
 
 using namespace std::chrono_literals;
@@ -11,16 +10,56 @@ using namespace std::chrono_literals;
 namespace pennair_vision
 {
 
-VisionManager::VisionManager() : Node("vision_manager"), count_(0)
+VisionManager::VisionManager(const rclcpp::NodeOptions& options)
+    : rclcpp::Node("vision_manager", options), plugin_loader_("pennair_vision", "pennair_vision::VisionPlugin")
 {
-  publisher_ = this->create_publisher<std_msgs::msg::String>("topic", 10);
-  auto timer_callback = [this]() -> void {
-    auto message = std_msgs::msg::String();
-    message.data = "Hello, world! " + std::to_string(this->count_++);
-    RCLCPP_INFO(this->get_logger(), "Publishing: '%s'", message.data.c_str());
-    this->publisher_->publish(message);
+  // TEMP: continuous logging
+  heartbeat_timer_ = create_wall_timer(0.67s, [this]() { RCLCPP_INFO(get_logger(), "VisionManager is running"); });
+}
+
+void VisionManager::init_plugins()
+{
+  // TODO: read this list dynamically from ROS params
+  std::vector<std::string> plugin_names = {"pennair_vision::BasicVision"};
+
+  // this lambda function will be used to initialize each plugin in the list and
+  // add it to the plugin_map_
+
+  // TODO: add better error handling for plugins that don't exist or fail to initialize
+  auto initialize_plugin = [this](const std::string& plugin_name) {
+    try {
+      plugin_map_[plugin_name].plugin_instance_ = plugin_loader_.createUniqueInstance(plugin_name);
+      plugin_map_[plugin_name].plugin_instance_->initialize(shared_from_this());
+    } catch (const pluginlib::PluginlibException& ex) {
+      RCLCPP_ERROR(get_logger(), "Failed to create plugin: %s", ex.what());
+    }
   };
-  timer_ = this->create_wall_timer(500ms, timer_callback);
+
+  for (const std::string& plugin_name : plugin_names) {
+    initialize_plugin(plugin_name);
+  }
 }
 
 }  // namespace pennair_vision
+
+namespace rclcpp_components
+{
+
+template <>
+class NodeFactoryTemplate<pennair_vision::VisionManager> : public NodeFactory
+{
+public:
+  NodeInstanceWrapper create_node_instance(const rclcpp::NodeOptions& options) override
+  {
+    auto node = std::make_shared<pennair_vision::VisionManager>(options);
+    node->init_plugins();
+
+    return NodeInstanceWrapper(node, [](const std::shared_ptr<void>& instance) {
+      return std::static_pointer_cast<pennair_vision::VisionManager>(instance)->get_node_base_interface();
+    });
+  }
+};
+
+}  // namespace rclcpp_components
+
+RCLCPP_COMPONENTS_REGISTER_NODE(pennair_vision::VisionManager)

@@ -45,14 +45,6 @@ class Vehicle(ABC):
             return None
         return f"/{normalized}"
 
-    @staticmethod
-    def _vision_node_name(vision_node: object) -> str:
-        if hasattr(vision_node, "node_name"):
-            return vision_node.node_name()
-        if hasattr(vision_node, "__name__"):
-            return vision_node.__name__
-        return str(vision_node)
-
     def _default_camera_path(self, suffix: str) -> str | None:
         if not self.has_camera:
             return None
@@ -76,15 +68,6 @@ class Vehicle(ABC):
         if resolved_namespace.startswith("/"):
             return f"{resolved_namespace.rstrip('/')}/{clean_suffix}"
         return f"{resolved_namespace.strip('/')}/{clean_suffix}"
-
-    def vision_service_name(self, vision_node: object) -> str:
-        if not self.has_camera:
-            raise RuntimeError(
-                f"Vehicle '{self.name}' does not expose a namespaced camera contract."
-            )
-        if hasattr(vision_node, "service_name"):
-            return vision_node.service_name()
-        return self.namespaced_path(f"vision/{self._vision_node_name(vision_node)}")
 
     @abstractmethod
     def stop(self) -> None:
