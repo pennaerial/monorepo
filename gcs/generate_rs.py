@@ -281,6 +281,14 @@ def _render_raw_struct(message):
                 f"{constant_value_to_rs(constant.type, constant.value)};"
             )
         lines.append("}")
+    lines.extend([
+        "",
+        f"impl crate::RosMessage for {name} {{",
+        "    fn deserialize(bytes: &[u8]) -> Result<Self, cdr::Error> {",
+        "        cdr::deserialize(bytes)",
+        "    }",
+        "}",
+    ])
     return "\n".join(lines)
 
 
@@ -291,7 +299,15 @@ def _write_raw_crate(messages, crate_name, output_dir, package_version):
         package, namespace = namespaced_type.namespaces
         grouped.setdefault(package, {}).setdefault(namespace, []).append(message)
 
-    source = ["// Generated raw Rust structs. No ROS runtime is required.", ""]
+    source = [
+        "// Generated raw Rust structs. No ROS runtime is required.",
+        "",
+        "/// A ROS message that can be decoded from encapsulated CDR bytes.",
+        "pub trait RosMessage: Sized {",
+        "    fn deserialize(bytes: &[u8]) -> Result<Self, cdr::Error>;",
+        "}",
+        "",
+    ]
     for package in sorted(grouped):
         source.extend([f"pub mod {get_rs_name(package)} {{", ""])
         indent = "    "
@@ -325,6 +341,7 @@ def _write_raw_crate(messages, crate_name, output_dir, package_version):
         'edition = "2021"\n\n'
         "[dependencies]\n"
         'serde = { version = "1", features = ["derive"] }\n'
+        'cdr = "0.2.4"\n'
     )
     (crate_dir / "Cargo.toml").write_text(cargo_toml, encoding="utf-8")
 

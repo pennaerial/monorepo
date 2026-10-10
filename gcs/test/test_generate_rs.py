@@ -107,7 +107,7 @@ class NamespaceTests(unittest.TestCase):
             tests = crate / "tests"
             tests.mkdir()
             (tests / "shared.rs").write_text("""
-                use ros_interfaces::{builtin_interfaces, sensor_msgs, std_msgs};
+                use ros_interfaces::{builtin_interfaces, sensor_msgs, std_msgs, RosMessage};
                 #[test]
                 fn shared_types() {
                     let header = std_msgs::msg::Header {
@@ -118,6 +118,15 @@ class NamespaceTests(unittest.TestCase):
                         header: header.clone(), history: vec![header.clone()],
                         pair: [header.clone(), header.clone()],
                     };
+                    fn decode<T: RosMessage>(bytes: &[u8]) -> Result<T, cdr::Error> {
+                        T::deserialize(bytes)
+                    }
+                    let bytes = cdr::serialize::<_, _, cdr::CdrLe>(&image, cdr::Infinite).unwrap();
+                    assert_eq!(decode::<sensor_msgs::msg::Image>(&bytes).unwrap(), image);
+                    let bytes = cdr::serialize::<_, _, cdr::CdrBe>(&image, cdr::Infinite).unwrap();
+                    assert_eq!(decode::<sensor_msgs::msg::Image>(&bytes).unwrap(), image);
+                    assert!(decode::<std_msgs::msg::Int32>(&[]).is_err());
+                    assert!(decode::<sensor_msgs::msg::Image>(&bytes[..4]).is_err());
                     let shared: std_msgs::msg::Header = image.header;
                     assert_eq!(shared, header);
                     assert_eq!(std_msgs::msg::Int32 { data: 42 }.data, 42);
