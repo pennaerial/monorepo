@@ -1,12 +1,12 @@
 #pragma once
 
-#include "esp_log.h"
 #include <uxr/client/client.h>
 
 #include <array>
 #include <cstddef>
 #include <cstdint>
 
+#include "esp_log.h"
 #include "sdkconfig.h"
 #include "topics.h"
 
@@ -43,7 +43,7 @@ public:
   void init();
 
   /// Writes a sample for a writer topic matched by TopicId.
-  template<TopicId Id>
+  template <TopicId Id>
   bool publish(const typename TopicMsg<Id>::Message& msg);
 
   /// Services incoming data and reliable stream bookkeeping.
@@ -121,7 +121,7 @@ private:
   std::array<void*, TOPIC_COUNT> reader_callback_args_{};
 };
 
-template<TopicId Id>
+template <TopicId Id>
 bool DDSClient::publish(const typename TopicMsg<Id>::Message& msg)
 {
   constexpr const char* TAG = "DDSClient";
