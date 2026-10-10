@@ -17,21 +17,6 @@ find_package(rclcpp_components REQUIRED)
 # lets clangd / VS Code find headers (build/compile_commands.json)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-if(BUILD_TESTING)
-  find_package(ament_lint_auto REQUIRED)
-  # the following line skips the linter which checks for copyrights
-  # comment the line when a copyright and license is added to all source files
-  set(ament_cmake_copyright_FOUND TRUE)
-  # the following line skips cpplint (only works in a git repo)
-  # comment the line when this package is in a git repo and when
-  # a copyright and license is added to all source files
-  set(ament_cmake_cpplint_FOUND TRUE)
-  # the following line skips uncrustify, whose ROS style conflicts with the
-  # repo's .clang-format (enforced by cppfmt in the static checks)
-  set(ament_cmake_uncrustify_FOUND TRUE)
-  ament_lint_auto_find_test_dependencies()
-endif()
-
 rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/PlanPath.srv"
   DEPENDENCIES geometry_msgs nav_msgs
@@ -51,7 +36,7 @@ ament_target_dependencies(planner_service
 
 # Registers the component and also builds a standalone executable named planner_service_node
 rclcpp_components_register_node(planner_service
-  PLUGIN "PlannerService"
+  PLUGIN "pennair_planner::PlannerService"
   EXECUTABLE planner_service_node)
 
 install(DIRECTORY include/ DESTINATION include)

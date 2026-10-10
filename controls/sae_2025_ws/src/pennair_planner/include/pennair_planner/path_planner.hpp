@@ -9,8 +9,12 @@
 namespace pennair_planner
 {
 
-// Interface for path planning algorithms. The planner service only depends on this class,
-// so a new algorithm is added by subclassing it and constructing it in the service node.
+/**
+ * @brief Interface for path planning algorithms.
+ *
+ * The planner service only depends on this class, so a new algorithm is added by subclassing it
+ * and constructing it in the service node.
+ */
 class PathPlanner
 {
 public:
@@ -18,20 +22,43 @@ public:
 
   virtual ~PathPlanner() = default;
 
-  // Plans a path from start_pose to goal_pose.
-  // `path.header` must be set by the caller and is used for every pose in the path.
-  // Returns true if a path was found, false otherwise.
+  /**
+   * @brief Plans a path from start_pose to goal_pose.
+   *
+   * @param start_pose Pose the path starts at.
+   * @param goal_pose Pose the path ends at.
+   * @param[in,out] path Path the planned poses are appended to. `path.header` must be set by the
+   *   caller and is used for every pose in the path.
+   * @return true if a path was found, false otherwise.
+   */
   virtual bool plan(const Pose& start_pose, const Pose& goal_pose, nav_msgs::msg::Path& path) = 0;
 };
 
-// Placeholder planner: a straight line from start_pose to goal_pose.
-// Orientation is interpolated by taking the rotation from start to goal as an axis and an angle,
-// and rotating about that fixed axis by a fraction of the angle at each waypoint.
+/**
+ * @brief Placeholder planner: a straight line from start_pose to goal_pose.
+ *
+ * Orientation is interpolated by taking the rotation from start to goal as an axis and an angle,
+ * and rotating about that fixed axis by a fraction of the angle at each waypoint.
+ */
 class StraightLinePlanner : public PathPlanner
 {
 public:
+  /**
+   * @brief Constructs the planner.
+   *
+   * @param num_steps Number of segments the line is split into; the path has num_steps + 1 poses.
+   */
   explicit StraightLinePlanner(int num_steps = 10) : num_steps_(num_steps) {}
 
+  /**
+   * @brief Plans a straight line from start_pose to goal_pose with evenly spaced waypoints.
+   *
+   * @param start_pose Pose of the first waypoint.
+   * @param goal_pose Pose of the last waypoint.
+   * @param[in,out] path Path the waypoints are appended to. `path.header` must be set by the
+   *   caller and is used for every waypoint.
+   * @return Always true; a straight line can always be planned.
+   */
   bool plan(const Pose& start_pose, const Pose& goal_pose, nav_msgs::msg::Path& path) override
   {
     const auto& start = start_pose.position;
@@ -65,7 +92,12 @@ public:
   }
 
 private:
-  // Returns a unit quaternion. An all-zero quaternion (e.g. an unset field) becomes identity.
+  /**
+   * @brief Converts a quaternion message to a unit Eigen quaternion.
+   *
+   * @param q Quaternion message, not necessarily normalized.
+   * @return The normalized quaternion, or identity if q is all zeros (e.g. an unset field).
+   */
   static Eigen::Quaterniond to_eigen(const geometry_msgs::msg::Quaternion& q)
   {
     const Eigen::Quaterniond out(q.w, q.x, q.y, q.z);
