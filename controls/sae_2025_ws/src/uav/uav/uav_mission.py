@@ -2,72 +2,20 @@ from __future__ import annotations
 
 import rclpy
 from rclpy.executors import ExternalShutdownException
-from rclpy.node import Node
-from vehicle_common.runtime.mission_loader import RuntimeMission, get_mission_path
 
 from uav.UAVModeManager import UAVModeManager
-from uav.vehicles.AirframeClass import AirframeClass
-
-
-class UAVMissionBootstrap(Node):
-    def __init__(self) -> None:
-        super().__init__("uav_mission_bootstrap")
-        self.declare_parameter("mode_map", get_mission_path("basic", "uav"))
-        self.declare_parameter("auto_launch", True)
-        self.declare_parameter("servo_only", False)
-        self.declare_parameter("vehicle_name", "uav_0")
-        self.declare_parameter("vehicle_class", AirframeClass.MULTICOPTER.name)
-        self.declare_parameter("camera_mount_offsets", [0.0, 0.0, 0.0])
-
-    def _string_parameter(self, name: str, default: str = "") -> str:
-        try:
-            value = self.get_parameter(name).value
-        except (AttributeError, KeyError):
-            return default
-        return default if value is None else str(value).strip()
-
-    def _bool_parameter(self, name: str) -> bool:
-        value = self.get_parameter(name).value
-        if not isinstance(value, bool):
-            raise ValueError(
-                f"uav_mission requires boolean parameter '{name}', received {value!r}."
-            )
-        return value
-
-    def manager_kwargs(self) -> dict:
-        mission_path = str(self.get_parameter("mode_map").value)
-        if not mission_path:
-            raise ValueError("uav_mission requires a non-empty 'mode_map'.")
-
-        runtime_mission = RuntimeMission.load_from_path(mission_path)
-
-        return {
-            "mission_spec": runtime_mission,
-            "auto_launch": self._bool_parameter("auto_launch"),
-            "servo_only": bool(self.get_parameter("servo_only").value),
-            "vehicle_name": str(self.get_parameter("vehicle_name").value).strip() or "uav",
-            "vehicle_class": AirframeClass.parse(self.get_parameter("vehicle_class").value),
-            "camera_offsets": list(self.get_parameter("camera_mount_offsets").value),
-            "node_name": "mission",
-        }
 
 
 def main(args=None) -> None:
     rclpy.init(args=args)
-    bootstrap = UAVMissionBootstrap()
     mission_node = None
 
     try:
-        manager_kwargs = bootstrap.manager_kwargs()
-        bootstrap.destroy_node()
-        bootstrap = None
-        mission_node = UAVModeManager(**manager_kwargs)
+        mission_node = UAVModeManager()
         rclpy.spin(mission_node)
     except (KeyboardInterrupt, ExternalShutdownException):
         pass
     finally:
-        if bootstrap is not None:
-            bootstrap.destroy_node()
         if mission_node is not None:
             mission_node.destroy_node()
         if rclpy.ok():

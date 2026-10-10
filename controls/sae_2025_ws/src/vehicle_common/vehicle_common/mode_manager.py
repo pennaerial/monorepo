@@ -19,29 +19,31 @@ MISSION_STARTED_MARKER_ENV = "PENNAIR_MISSION_STARTED_MARKER_PATH"
 class ModeManager(Node, ABC):
     """Shared mission manager plumbing for a single bound vehicle."""
 
-    def __init__(
-        self,
-        node_name: str,
-        *,
-        vehicle_name: str = "",
-        auto_launch: bool = True,
-    ) -> None:
+    def __init__(self, node_name: str) -> None:
         super().__init__(node_name)
+        self.params = self.load_params()
         self.vehicle: Vehicle | None = None
         self.modes: dict[str, Mode] = {}
         self.transitions: dict[str, dict[str, str]] = {}
         self.active_mode: str | None = None
         self.last_update_time = time()
         self.timer = None
-        self.auto_launch = bool(auto_launch)
+        self.auto_launch = bool(self.params.auto_launch)
         self._auto_launch_timer = None
-        self._runtime_vehicle_name = str(vehicle_name or "").strip().strip("/")
+        self._runtime_vehicle_name = str(self.params.vehicle_name or "").strip().strip("/")
         self.start_mission_service = self.create_service(
             Trigger, "mode_manager/start_mission", self._start_mission_callback
         )
         self._clear_mission_started_marker()
         if self.auto_launch:
             self._auto_launch_timer = self.create_timer(0.1, self._maybe_auto_launch)
+
+    @abstractmethod
+    def load_params(self):
+        """Declare, validate, and return this manager's ROS parameters.
+
+        The returned object must expose at least ``vehicle_name`` and ``auto_launch``.
+        """
 
     @abstractmethod
     def spin_once(self) -> None:

@@ -7,6 +7,7 @@
   <maintainer email="yuzhiliu8@gmail.com">yuzhiliu8</maintainer>
   <license>TODO: License declaration</license>
 
+  <depend>generate_parameter_library_py</depend>
   <depend>cv_bridge</depend>
   <depend>python3-opencv</depend>
   <depend>vehicle_common</depend>
