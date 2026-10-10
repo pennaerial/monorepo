@@ -67,7 +67,7 @@ void Payload::publish_sensor_debug()
     return;
   }
 
-  if (!DDSClient::instance().publish(TopicId::IMU_WRITER, &latest)) {
+  if (!DDSClient::instance().publish<TopicId::IMU_WRITER>(latest)) {
     ESP_LOGW(TAG, "Failed to publish IMU DDS sample");
     return;
   }
