@@ -70,6 +70,7 @@ setup(
     entry_points={
         "console_scripts": [
             "uav_mission = uav.uav_mission:main",
+            "apriltag_node = uav.apriltag_vision.apriltag_node:main",
         ],
     },
 )
