@@ -24,9 +24,7 @@ class AprilTagNode(Node):
 
         self.bridge = CvBridge()
 
-        self.detector = apriltag.Detector(
-            apriltag.DetectorOptions(families="tag36h11")
-        )
+        self.detector = apriltag.Detector(apriltag.DetectorOptions(families="tag36h11"))
 
         self.camera_params = None
 
@@ -50,9 +48,7 @@ class AprilTagNode(Node):
             10,
         )
 
-        self.get_logger().info(
-            f"AprilTag node listening to {image_topic}"
-        )
+        self.get_logger().info(f"AprilTag node listening to {image_topic}")
 
     def camera_info_callback(self, msg: CameraInfo):
         self.camera_params = [
@@ -72,9 +68,7 @@ class AprilTagNode(Node):
                 desired_encoding="mono8",
             )
         except Exception as exc:
-            self.get_logger().error(
-                f"Could not convert image: {exc}"
-            )
+            self.get_logger().error(f"Could not convert image: {exc}")
             return
 
         detections = self.detector.detect(image)
@@ -89,14 +83,16 @@ class AprilTagNode(Node):
 
             translation = pose[:3, 3]
 
-            results.append({
-                "id": int(detection.tag_id),
-                "position": {
-                    "x": float(translation[0]),
-                    "y": float(translation[1]),
-                    "z": float(translation[2]),
-                },
-            })
+            results.append(
+                {
+                    "id": int(detection.tag_id),
+                    "position": {
+                        "x": float(translation[0]),
+                        "y": float(translation[1]),
+                        "z": float(translation[2]),
+                    },
+                }
+            )
 
         output = String()
         output.data = json.dumps(results)
