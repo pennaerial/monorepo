@@ -104,8 +104,9 @@ void DDSClient::init()
       uxr_buffer_create_subscriber_bin(&session_, reliable_out_, subscriber_id, participant_id, UXR_REPLACE);
 
   // Participant, one Publisher, one Subscriber, every Topic, every DataWriter,
-  // and each DataReader plus its request_data stream request.
-  constexpr std::size_t CREATE_REQUEST_COUNT = 3 + TOPIC_COUNT + datawriter_count() + (datareader_count() * 2);
+  // and every DataReader. REQUEST_DATA operations are sent alongside these
+  // requests but do not receive a CREATE-status response from the Agent.
+  constexpr std::size_t CREATE_REQUEST_COUNT = 3 + TOPIC_COUNT + datawriter_count() + datareader_count();
   uint16_t requests[CREATE_REQUEST_COUNT]{};
   uint8_t status[CREATE_REQUEST_COUNT]{};
   std::size_t request_count = 0;
@@ -183,8 +184,7 @@ void DDSClient::generate_readers(uint16_t requests[], std::size_t& request_count
     // delivered to on_topic_callback until we request it from the Agent.
     uxrDeliveryControl delivery_control{};
     delivery_control.max_samples = UXR_MAX_SAMPLES_UNLIMITED;
-    requests[request_count++] =
-        uxr_buffer_request_data(&session_, reliable_out_, reader_id, reliable_in_, &delivery_control);
+    (void)uxr_buffer_request_data(&session_, reliable_out_, reader_id, reliable_in_, &delivery_control);
   }
 }
 
