@@ -1,5 +1,6 @@
 #include "encoder_sitl.hpp"
 
+#include <cmath>
 #include <cstdio>
 
 #include "convert.hpp"
@@ -8,6 +9,20 @@
 #include "std_msgs/msg/Header.h"
 
 static const char* TAG = "Encoder_SITL";
+
+namespace
+{
+
+// Matches the current payload-controller output encoder configuration.
+constexpr double ENCODER_TICKS_PER_REVOLUTION = 617.0;
+constexpr double RADIANS_PER_REVOLUTION = 2 * std::numbers::pi;
+
+int64_t radians_to_encoder_ticks(const double radians)
+{
+  return static_cast<int64_t>(std::llround(radians * ENCODER_TICKS_PER_REVOLUTION / RADIANS_PER_REVOLUTION));
+}
+
+}  // namespace
 
 namespace drivers
 {
@@ -26,8 +41,11 @@ void Encoder_SITL::start()
   char poster_left[128];
   make_motor_advertiser_left(poster_left, sizeof(poster_left));
 
-  ESP_LOGI(TAG, "Subscribing to %s", topic);
-  gz_node_.Subscribe(topic, &Encoder_SITL::on_encoder_msg, this);
+  if (!gz_node_.Subscribe(topic, &Encoder_SITL::on_encoder_msg, this)) {
+    ESP_LOGE(TAG, "Failed to subscribe to encoder topic %s", topic);
+  } else {
+    ESP_LOGI(TAG, "Subscribed to encoder topic %s", topic);
+  }
 
   ESP_LOGI(TAG, "Enabling posting to %s", poster_right);
   right_motor_publisher = motor_node_.Advertise<gz::msgs::Actuators>(poster_right);
@@ -81,21 +99,36 @@ void Encoder_SITL::make_encoder_topic(char* buf, std::size_t size)
 
 void Encoder_SITL::on_encoder_msg(const gz::msgs::Model& gz_msg)
 {
-  // ESP_LOGI(TAG, "on_encoder_msg");
+  payload_interfaces_msg_MotorState msg = get_latest();
+  bool found_left_wheel = false;
+  bool found_right_wheel = false;
 
-  // // For each joint just print the position (which should be its rotation)
-  // for (int i = 0; i < gz_msg.joint_size(); ++i) {
-  //   const gz::msgs::Joint& jointMsg = gz_msg.joint(i);
-  //   std::string name = jointMsg.name();
-  //   ESP_LOGI(TAG, "Joint Name: %s", name.c_str());
-  //   if (jointMsg.has_axis1()) {
-  //     double position = jointMsg.axis1().position();
-  //     ESP_LOGI(TAG, "Joint Position: %f", position);
-  //   }
-  // }
+  for (int i = 0; i < gz_msg.joint_size(); ++i) {
+    const gz::msgs::Joint& joint = gz_msg.joint(i);
+    if (!joint.has_axis1()) {
+      continue;
+    }
 
-  //   [-]sensor_msgs_msg_encoder msg = gz_to_dds(gz_msg);
-  //   [-]write_latest(msg);  // update our latest encoder value
+    const int64_t ticks = radians_to_encoder_ticks(joint.axis1().position());
+    if (joint.name() == "front_left_wheel_joint") {
+      msg.left_encoder_count = ticks;
+      found_left_wheel = true;
+    } else if (joint.name() == "front_right_wheel_joint") {
+      msg.right_encoder_count = ticks;
+      found_right_wheel = true;
+    }
+  }
+
+  if (!found_left_wheel && !found_right_wheel) {
+    static uint32_t missing_wheel_joint_count = 0;
+    ++missing_wheel_joint_count;
+    if (missing_wheel_joint_count <= 3 || (missing_wheel_joint_count % 50) == 0) {
+      ESP_LOGW(TAG, "Joint-state message did not include either front wheel joint");
+    }
+    return;
+  }
+
+  write_latest(msg);
 }
 
 Encoder* Encoder::instance()
