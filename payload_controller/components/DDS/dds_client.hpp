@@ -11,7 +11,9 @@
 #include "topics.h"
 
 /// Number of reliable XRCE stream blocks kept in the output/input history.
-constexpr uint32_t STREAM_HISTORY = 8;
+// Startup creates 13 reliable XRCE requests with the current topic set.
+// Reliable-stream history must be a power of two and cover those requests.
+constexpr uint32_t STREAM_HISTORY = 16;
 
 #if defined(CONFIG_IDF_TARGET_LINUX)
 /// MTU used by the selected XRCE transport backend.

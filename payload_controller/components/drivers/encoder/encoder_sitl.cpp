@@ -41,8 +41,11 @@ void Encoder_SITL::start()
   char poster_left[128];
   make_motor_advertiser_left(poster_left, sizeof(poster_left));
 
-  ESP_LOGI(TAG, "Subscribing to %s", topic);
-  gz_node_.Subscribe(topic, &Encoder_SITL::on_encoder_msg, this);
+  if (!gz_node_.Subscribe(topic, &Encoder_SITL::on_encoder_msg, this)) {
+    ESP_LOGE(TAG, "Failed to subscribe to encoder topic %s", topic);
+  } else {
+    ESP_LOGI(TAG, "Subscribed to encoder topic %s", topic);
+  }
 
   ESP_LOGI(TAG, "Enabling posting to %s", poster_right);
   right_motor_publisher = motor_node_.Advertise<gz::msgs::Actuators>(poster_right);
@@ -97,7 +100,8 @@ void Encoder_SITL::make_encoder_topic(char* buf, std::size_t size)
 void Encoder_SITL::on_encoder_msg(const gz::msgs::Model& gz_msg)
 {
   payload_interfaces_msg_MotorState msg = get_latest();
-  bool found_wheel_joint = false;
+  bool found_left_wheel = false;
+  bool found_right_wheel = false;
 
   for (int i = 0; i < gz_msg.joint_size(); ++i) {
     const gz::msgs::Joint& joint = gz_msg.joint(i);
@@ -106,18 +110,25 @@ void Encoder_SITL::on_encoder_msg(const gz::msgs::Model& gz_msg)
     }
 
     const int64_t ticks = radians_to_encoder_ticks(joint.axis1().position());
-    if (joint.name() == "left_wheel_joint") {
+    if (joint.name() == "front_left_wheel_joint") {
       msg.left_encoder_count = ticks;
-      found_wheel_joint = true;
-    } else if (joint.name() == "right_wheel_joint") {
+      found_left_wheel = true;
+    } else if (joint.name() == "front_right_wheel_joint") {
       msg.right_encoder_count = ticks;
-      found_wheel_joint = true;
+      found_right_wheel = true;
     }
   }
 
-  if (found_wheel_joint) {
-    write_latest(msg);
+  if (!found_left_wheel && !found_right_wheel) {
+    static uint32_t missing_wheel_joint_count = 0;
+    ++missing_wheel_joint_count;
+    if (missing_wheel_joint_count <= 3 || (missing_wheel_joint_count % 50) == 0) {
+      ESP_LOGW(TAG, "Joint-state message did not include either front wheel joint");
+    }
+    return;
   }
+
+  write_latest(msg);
 }
 
 Encoder* Encoder::instance()

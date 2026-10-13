@@ -17,6 +17,24 @@ constexpr uint32_t SESSION_KEY = 0xABCDABCD;
 constexpr char DEFAULT_AGENT_IP[] = "127.0.0.1";
 constexpr char DEFAULT_AGENT_PORT[] = "7777";
 
+const char* status_name(const uint8_t status)
+{
+  switch (status) {
+    case UXR_STATUS_OK: return "OK";
+    case UXR_STATUS_OK_MATCHED: return "OK_MATCHED";
+    case UXR_STATUS_ERR_DDS_ERROR: return "DDS_ERROR";
+    case UXR_STATUS_ERR_MISMATCH: return "MISMATCH";
+    case UXR_STATUS_ERR_ALREADY_EXISTS: return "ALREADY_EXISTS";
+    case UXR_STATUS_ERR_DENIED: return "DENIED";
+    case UXR_STATUS_ERR_UNKNOWN_REFERENCE: return "UNKNOWN_REFERENCE";
+    case UXR_STATUS_ERR_INVALID_DATA: return "INVALID_DATA";
+    case UXR_STATUS_ERR_INCOMPATIBLE: return "INCOMPATIBLE";
+    case UXR_STATUS_ERR_RESOURCES: return "RESOURCES";
+    case UXR_STATUS_NONE: return "NONE";
+    default: return "UNKNOWN";
+  }
+}
+
 }  // namespace
 
 
@@ -104,6 +122,12 @@ void DDSClient::init()
   // Agent. Buffer-create calls only enqueue work; this drives the session.
   if (!uxr_run_session_until_all_status(&session_, 1000, requests, status, request_count)) {
     ESP_LOGE(TAG, "Error creating DDS entities");
+    for (std::size_t i = 0; i < request_count; ++i) {
+      ESP_LOGE(
+          TAG, "  request[%u]=%u status=0x%02X (%s)", static_cast<unsigned>(i), static_cast<unsigned>(requests[i]),
+          static_cast<unsigned>(status[i]), status_name(status[i])
+      );
+    }
     return;
   }
 
