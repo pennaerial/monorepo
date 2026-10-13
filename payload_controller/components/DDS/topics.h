@@ -9,6 +9,7 @@
 #include <tuple>
 #include <type_traits>
 
+#include "payload_interfaces/msg/MotorState.h"
 #include "sensor_msgs/msg/Imu.h"
 
 constexpr uxrQoS_t DEFAULT_QOS = {
@@ -136,6 +137,8 @@ constexpr SpecificTopic<MessageT> make_topic(
 enum class TopicId : uint16_t {
   IMU_WRITER = 0x00,
   IMU_READER,
+  MOTOR_STATE_WRITER,
+  MOTOR_STATE_READER
 };
 
 constexpr uint16_t to_underlying(TopicId topic_id)
@@ -166,6 +169,26 @@ constexpr auto TYPED_TOPICS = std::tuple{
         "IMU Reader",
         "rt/imu",
         "sensor_msgs::msg::dds_::Imu_",
+        Topic::Direction::READER
+    ), make_topic<
+        payload_interfaces_msg_MotorState,
+        payload_interfaces_msg_MotorState_size_of_topic,
+        payload_interfaces_msg_MotorState_serialize_topic,
+        payload_interfaces_msg_MotorState_deserialize_topic>(
+        TopicId::MOTOR_STATE_WRITER,
+        "Motor State Writer",
+        "rt/motor_state",
+        "payload_interfaces::msg::dds_::MotorState_",
+        Topic::Direction::WRITER
+    ), make_topic<
+        payload_interfaces_msg_MotorState,
+        payload_interfaces_msg_MotorState_size_of_topic,
+        payload_interfaces_msg_MotorState_serialize_topic,
+        payload_interfaces_msg_MotorState_deserialize_topic>(
+        TopicId::MOTOR_STATE_READER,
+        "Motor State Reader",
+        "rt/motor_state",
+        "payload_interfaces::msg::dds_::MotorState_",
         Topic::Direction::READER
     )
 };
