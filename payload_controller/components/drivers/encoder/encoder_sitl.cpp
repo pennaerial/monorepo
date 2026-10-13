@@ -15,7 +15,7 @@ namespace
 
 // Matches the current payload-controller output encoder configuration.
 constexpr double ENCODER_TICKS_PER_REVOLUTION = 617.0;
-constexpr double RADIANS_PER_REVOLUTION = 6.28318530717958647692;
+constexpr double RADIANS_PER_REVOLUTION = 2 * std::numbers::pi;
 
 int64_t radians_to_encoder_ticks(const double radians)
 {
