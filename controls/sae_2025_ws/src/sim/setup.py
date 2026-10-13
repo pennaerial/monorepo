@@ -71,7 +71,6 @@ setup(
             "hoop_course_node = sim.world_gen.hoop_course_node:main",
             "custom_world_node = sim.world_gen.custom_world_node:main",
             "sae_world_node = sim.world_gen.sae_world_node:main",
-            "hoop_score_node = sim.scoring.hoop_score_node:main",
             "in_house_2026_node = sim.world_gen.in_house_2026_node:main",
         ],
     },

@@ -12,6 +12,7 @@
   <depend>geometry_msgs</depend>
   <depend>px4_msgs</depend>
   <depend>vehicle_common</depend>
+  <depend>sim_interfaces</depend>
 
   <exec_depend>ros_gz</exec_depend>
   <exec_depend>ros_gz_bridge</exec_depend>

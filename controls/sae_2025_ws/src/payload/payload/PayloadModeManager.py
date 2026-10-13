@@ -3,7 +3,6 @@ from time import time
 
 from vehicle_common.mode_manager import ModeManager
 from vehicle_common.runtime.mission_loader import RuntimeMission
-from vehicle_common.runtime.vision_loader import canonical_vision_node_path
 
 from payload.payload import Payload
 
@@ -17,19 +16,13 @@ class PayloadModeManager(ModeManager):
         mission_spec: RuntimeMission,
         vehicle_name: str,
         auto_launch: bool = True,
-        vision_debug: bool = False,
-        peer_heartbeat_hz: float = 10.0,
-        peer_stale_timeout_s: float = 0.5,
         node_name: str = "mission",
     ) -> None:
         super().__init__(
             node_name,
             vehicle_name=vehicle_name,
             auto_launch=auto_launch,
-            peer_heartbeat_hz=peer_heartbeat_hz,
-            peer_stale_timeout_s=peer_stale_timeout_s,
         )
-        self.vision_debug = bool(vision_debug)
         if Payload not in mission_spec._targets:
             raise ValueError(
                 "PayloadModeManager requires a payload mission spec, received targets "
@@ -37,7 +30,6 @@ class PayloadModeManager(ModeManager):
             )
 
         self.vehicle = Payload(self, str(vehicle_name))
-        self.setup_vision([canonical_vision_node_path(vc) for vc in mission_spec._vision_nodes])
         self.setup_modes(mission_spec)
         self.timer = None
 

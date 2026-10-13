@@ -1,0 +1,5 @@
+# Empty Request
+---
+bool ready
+int32 target_tag_id
+SearchLocation[] search_locations

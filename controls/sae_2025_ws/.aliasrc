@@ -2,6 +2,11 @@
 
 # aliases for faster development
 
+# SOURCING
+alias sr='source /opt/ros/jazzy/setup.bash'
+alias si='source install/setup.bash'
+alias sri='source /opt/ros/jazzy/setup.bash && source install/setup.bash'
+
 # BUILDING
 alias cb='colcon build'
 alias cbcc="colcon build --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON && ln -s build/compile_commands.json compile_commands.json"
@@ -16,7 +21,37 @@ cleanp() {
     fi
 
     for pkg in "$@"; do
+        echo "Removing build/$pkg"
+        echo "Removing install/$pkg"
         rm -rf "build/$pkg" "install/$pkg"
+    done
+}
+
+cleanall() {
+    if [[ $# -gt 0 ]]; then
+        if [[ "$1" != "--except" && "$1" != "-e" ]] || [[ $# -lt 2 ]]; then
+            echo "Usage: cleanall [--except|-e package ...]" >&2
+            return 1
+        fi
+        shift
+    fi
+
+    if [[ ! -d src || ! -d build || ! -d install ]]; then
+        echo "Run cleanall from the ROS workspace root." >&2
+        return 1
+    fi
+
+    local dir pkg keep
+    for dir in build/* install/*; do
+        [[ -d "$dir" ]] || continue
+        pkg=${dir##*/}
+
+        for keep in "$@"; do
+            [[ "$pkg" == "$keep" ]] && continue 2
+        done
+
+        echo "Removing $dir"
+        rm -rf -- "$dir" || return
     done
 }
 
@@ -24,7 +59,7 @@ cleanp() {
 ctp() {
 # 1. runs colcon tests on selected packages
 # 2. merges xml test results into build/merged_results.xml
-# 3. Views merged_result.xml with xunit-viewer
+# 3. Prints test results for the selected packages
 # runs unit tests from the selected packages
     local pkgs=("$@")
     colcon test --packages-select "${pkgs[@]}"
@@ -45,7 +80,13 @@ ctp() {
 	fi
 
 	junitparser merge --glob "${paths[@]}" build/merged_results.xml
-    xunit-viewer -r build/merged_results.xml --console -C false -o build/merged_results.html
+    local result_status=0
+    for pkg in "${pkgs[@]}"; do
+        colcon test-result --test-result-base "build/${pkg}" --verbose || result_status=$?
+    done
+    if [[ "$test_status" -eq 0 ]]; then
+        test_status=$result_status
+    fi
     return "$test_status"
 }
 

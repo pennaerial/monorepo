@@ -267,7 +267,6 @@
 
   <gazebo>
     <self_collide>false</self_collide>
-
     <!-- Four-wheel skid-steer drive. Runtime model name selects cmd_vel. -->
     <plugin
       filename="gz-sim-diff-drive-system"
