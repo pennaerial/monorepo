@@ -1,5 +1,6 @@
 #include "encoder_sitl.hpp"
 
+#include <cmath>
 #include <cstdio>
 
 #include "convert.hpp"
@@ -8,6 +9,20 @@
 #include "std_msgs/msg/Header.h"
 
 static const char* TAG = "Encoder_SITL";
+
+namespace
+{
+
+// Matches the current payload-controller output encoder configuration.
+constexpr double ENCODER_TICKS_PER_REVOLUTION = 617.0;
+constexpr double RADIANS_PER_REVOLUTION = 6.28318530717958647692;
+
+int64_t radians_to_encoder_ticks(const double radians)
+{
+  return static_cast<int64_t>(std::llround(radians * ENCODER_TICKS_PER_REVOLUTION / RADIANS_PER_REVOLUTION));
+}
+
+}  // namespace
 
 namespace drivers
 {
@@ -81,21 +96,28 @@ void Encoder_SITL::make_encoder_topic(char* buf, std::size_t size)
 
 void Encoder_SITL::on_encoder_msg(const gz::msgs::Model& gz_msg)
 {
-  // ESP_LOGI(TAG, "on_encoder_msg");
+  payload_interfaces_msg_MotorState msg = get_latest();
+  bool found_wheel_joint = false;
 
-  // // For each joint just print the position (which should be its rotation)
-  // for (int i = 0; i < gz_msg.joint_size(); ++i) {
-  //   const gz::msgs::Joint& jointMsg = gz_msg.joint(i);
-  //   std::string name = jointMsg.name();
-  //   ESP_LOGI(TAG, "Joint Name: %s", name.c_str());
-  //   if (jointMsg.has_axis1()) {
-  //     double position = jointMsg.axis1().position();
-  //     ESP_LOGI(TAG, "Joint Position: %f", position);
-  //   }
-  // }
+  for (int i = 0; i < gz_msg.joint_size(); ++i) {
+    const gz::msgs::Joint& joint = gz_msg.joint(i);
+    if (!joint.has_axis1()) {
+      continue;
+    }
 
-  //   [-]sensor_msgs_msg_encoder msg = gz_to_dds(gz_msg);
-  //   [-]write_latest(msg);  // update our latest encoder value
+    const int64_t ticks = radians_to_encoder_ticks(joint.axis1().position());
+    if (joint.name() == "left_wheel_joint") {
+      msg.left_encoder_count = ticks;
+      found_wheel_joint = true;
+    } else if (joint.name() == "right_wheel_joint") {
+      msg.right_encoder_count = ticks;
+      found_wheel_joint = true;
+    }
+  }
+
+  if (found_wheel_joint) {
+    write_latest(msg);
+  }
 }
 
 Encoder* Encoder::instance()

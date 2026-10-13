@@ -1,6 +1,8 @@
 #pragma once
 
-// [-]#include "sensor_msgs/msg/encoder.h"
+#include <cstdint>
+
+#include "payload_interfaces/msg/MotorState.h"
 #include "static_mutex.hpp"
 
 namespace drivers
@@ -21,11 +23,12 @@ public:
 
   /// Starts the encoder. It should immediately start writing encoder messages to internal buffer
   virtual void start() = 0;
-  /// Writes a new incoming encoder reading to
-  //   [-]void write_latest(const sensor_msgs_msg_encoder& msg);
-  /// returns the latest Encoder reading
-
-  //   [-]sensor_msgs_msg_encoder get_latest();
+  /// Writes a new incoming encoder reading to the local cache.
+  void write_latest(const payload_interfaces_msg_MotorState& msg);
+  /// Returns the latest encoder reading.
+  payload_interfaces_msg_MotorState get_latest();
+  /// Returns true and copies the latest reading if it is newer than last_update_count.
+  bool get_latest_if_updated(uint32_t& last_update_count, payload_interfaces_msg_MotorState& msg);
 
   /// Gets singleton instance of encoder implementation (sitl, hardware). implemented in backend .cpp
   /// files, not encoder.cpp
@@ -49,7 +52,8 @@ protected:
   Encoder() = default;  // prevent public instantiation
 
 private:
-  //   [-]sensor_msgs_msg_encoder reading_;
+  payload_interfaces_msg_MotorState reading_{};
+  uint32_t update_count_ = 0;
   util::StaticMutex mtx_;
 };
 
