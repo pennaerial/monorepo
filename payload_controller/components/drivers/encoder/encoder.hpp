@@ -1,7 +1,9 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 
+#include "payload_corner.hpp"
 #include "payload_interfaces/msg/MotorState.h"
 #include "static_mutex.hpp"
 
@@ -30,28 +32,16 @@ public:
   /// Returns true and copies the latest reading if it is newer than last_update_count.
   bool get_latest_if_updated(uint32_t& last_update_count, payload_interfaces_msg_MotorState& msg);
 
-  /// Gets singleton instance of encoder implementation (sitl, hardware). implemented in backend .cpp
-  /// files, not encoder.cpp
-  static Encoder* instance();
+  /// Creates an encoder implementation (sitl, hardware). Implemented in backend .cpp files.
+  static std::unique_ptr<Encoder> create(PayloadCorner corner);
 
-  /**
-   * @brief Publishes the desired right motor velocity
-   *
-   * @param rad_s Desired velocity
-   */
-  virtual void publish_motor_right(double rad_s) = 0;
-
-  /**
-   * @brief Publishes the desired left motor velocity
-   *
-   * @param rad_s Desired velocity
-   */
-  virtual void publish_motor_left(double rad_s) = 0;
+  PayloadCorner corner() const;
 
 protected:
-  Encoder() = default;  // prevent public instantiation
+  explicit Encoder(PayloadCorner corner);
 
 private:
+  PayloadCorner corner_;
   payload_interfaces_msg_MotorState reading_{};
   uint32_t update_count_ = 0;
   util::StaticMutex mtx_;

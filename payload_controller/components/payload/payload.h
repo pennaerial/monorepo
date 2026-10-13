@@ -1,7 +1,6 @@
 #pragma once
 
 #include "dds_client.hpp"
-#include "encoder.hpp"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -29,7 +28,5 @@ private:
   Payload& operator=(Payload&&) = delete;
 
   drivers::IMU* imu;
-  drivers::Encoder* encoders;
   uint32_t last_published_imu_update_ = 0;
-  uint32_t last_published_encoder_update_ = 0;
 };
