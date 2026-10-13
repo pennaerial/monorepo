@@ -1,6 +1,11 @@
 mod foxglove_client;
-pub use foxglove_client::FoxgloveClient;
-
-pub mod server_types;
-
+mod node;
+mod subscription;
 mod parse;
+
+pub use foxglove_client::FoxgloveClient;
+pub use subscription::{SubscriptionBase, SubscriptionCallback, Subscription, SubscriptionId};
+pub mod server_types;
+pub use node::RosNode;
+
+

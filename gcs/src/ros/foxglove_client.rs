@@ -1,5 +1,6 @@
 use crate::ros::parse::{parse_binary_message, ParseError};
-use crate::ros::server_types::{ServerMessage, SubscriptionId};
+use crate::ros::server_types::ServerMessage;
+use crate::ros::SubscriptionId;
 use futures_util::{
     stream::{SplitSink, SplitStream},
     SinkExt, StreamExt,
@@ -121,7 +122,19 @@ impl FoxgloveClient {
         while let Some(msg) = socket_reader.next().await {
             let msg = msg?; // errors out of loop if socket message fails
             match msg {
-                Message::Text(text) => println!("{text}"),
+                Message::Text(text) => {
+                    let server_message: ServerMessage = match serde_json::from_str::<ServerMessage>(&text) {
+                        Ok(message) => message,
+                        Err(error) => {
+                            eprintln!("Failed to parse text server message: {error}");
+                            continue;
+                        }
+                    };
+
+                    if let Err(error) = broadcaster.send(server_message) {
+                        eprintln!("No active listeners for message: {:?}", error.0);
+                    }
+                },
                 Message::Binary(bytes) => {
                     let parse_result = parse_binary_message(&bytes);
                     if parse_result.is_err() {
@@ -173,10 +186,11 @@ impl FoxgloveClient {
         Ok(id)
     }
 
-    pub fn get_receiver(&mut self) -> Result<ServerMessageReceiver, FoxgloveClientError> {
-        if !self.connected {
-            return Err(FoxgloveClientError::NotConnected);
-        }
-        Ok(self.broadcaster.subscribe())
+    pub fn get_receiver(&mut self) -> ServerMessageReceiver {
+        self.broadcaster.subscribe()
+    }
+
+    pub fn is_connected(&self) -> bool {
+        return self.connected;
     }
 }

@@ -22,26 +22,25 @@ async fn run_client(url: &str) {
         Err(err) => println!("SUBCRIBE ERROR: {err}"),
     }
 
-    match client.get_receiver() {
-        Ok(mut receiver) => {
-            tokio::spawn(async move {
-                loop {
-                    let msg = receiver.recv().await;
-                    match msg {
-                        Ok(ServerMessage::MessageData(data)) => {
-                            match cdr::deserialize::<geometry_msgs::msg::Pose>(data.data.as_ref()) {
-                                Ok(decoded) => println!("successful cdr: {:?}", decoded),
-                                Err(e) => println!("Failed cdr deserialization, {e}"),
-                            }
-                        }
-                        Err(e) => println!("{e}"),
-                        _ => (),
+    let mut receiver = client.get_receiver();
+    tokio::spawn(async move {
+        loop {
+            let msg = receiver.recv().await;
+            match msg {
+                Ok(ServerMessage::MessageData(data)) => {
+                    match cdr::deserialize::<geometry_msgs::msg::Pose>(data.data.as_ref()) {
+                        Ok(decoded) => println!("successful cdr: {:?}", decoded),
+                        Err(e) => println!("Failed cdr deserialization, {e}"),
                     }
                 }
-            });
+                Ok(ServerMessage::Advertise(adv)) => {
+                    println!("Advertise: {:?}", adv)
+                }
+                Err(e) => println!("{e}"),
+                _ => (),
+            }
         }
-        Err(e) => println!("{e}"),
-    }
+    });
 }
 
 #[component]
