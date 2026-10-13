@@ -170,7 +170,8 @@ constexpr auto TYPED_TOPICS = std::tuple{
         "rt/imu",
         "sensor_msgs::msg::dds_::Imu_",
         Topic::Direction::READER
-    ), make_topic<
+    ),
+    make_topic<
         payload_interfaces_msg_MotorState,
         payload_interfaces_msg_MotorState_size_of_topic,
         payload_interfaces_msg_MotorState_serialize_topic,
@@ -180,7 +181,8 @@ constexpr auto TYPED_TOPICS = std::tuple{
         "rt/motor_state",
         "payload_interfaces::msg::dds_::MotorState_",
         Topic::Direction::WRITER
-    ), make_topic<
+    ),
+    make_topic<
         payload_interfaces_msg_MotorState,
         payload_interfaces_msg_MotorState_size_of_topic,
         payload_interfaces_msg_MotorState_serialize_topic,
