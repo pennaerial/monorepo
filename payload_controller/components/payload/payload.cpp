@@ -1,30 +1,8 @@
 #include "payload.h"
 
-#include <array>
 #include <cstring>
-#include <memory>
-
-#include "encoder.hpp"
-#include "motor.hpp"
-#include "payload_corner.hpp"
-#include "payload_interfaces/msg/MotorState.h"
 
 static const char* TAG = "Payload";
-
-namespace
-{
-
-constexpr std::array<PayloadCorner, 2> PAYLOAD_CORNERS = {
-    PayloadCorner::front_left,
-    PayloadCorner::front_right
-};
-
-std::array<std::unique_ptr<drivers::Encoder>, PAYLOAD_CORNERS.size()> encoders;
-std::array<std::unique_ptr<drivers::Motor>, PAYLOAD_CORNERS.size()> motors;
-std::array<uint32_t, PAYLOAD_CORNERS.size()> last_published_encoder_updates{};
-payload_interfaces_msg_MotorState latest_motor_state{};
-
-}  // namespace
 
 Payload::Payload() = default;
 
