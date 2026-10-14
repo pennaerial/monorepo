@@ -11,10 +11,10 @@ class BasicVision : public VisionPlugin
 {
 public:
   /// See VisionPlugin
-  void initialize(const rclcpp::Node::SharedPtr node) override;
+  void initialize(const rclcpp::Node::SharedPtr& node) override;
 
   /// See VisionPlugin
-  void process(sensor_msgs::msg::Image::ConstSharedPtr image) override;
+  void process(sensor_msgs::msg::Image::ConstSharedPtr& image) override;
 };
 
 };  // namespace pennair_vision
