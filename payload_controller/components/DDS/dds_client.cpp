@@ -17,6 +17,24 @@ constexpr uint32_t SESSION_KEY = 0xABCDABCD;
 constexpr char DEFAULT_AGENT_IP[] = "127.0.0.1";
 constexpr char DEFAULT_AGENT_PORT[] = "7777";
 
+const char* status_name(const uint8_t status)
+{
+  switch (status) {
+    case UXR_STATUS_OK: return "OK";
+    case UXR_STATUS_OK_MATCHED: return "OK_MATCHED";
+    case UXR_STATUS_ERR_DDS_ERROR: return "DDS_ERROR";
+    case UXR_STATUS_ERR_MISMATCH: return "MISMATCH";
+    case UXR_STATUS_ERR_ALREADY_EXISTS: return "ALREADY_EXISTS";
+    case UXR_STATUS_ERR_DENIED: return "DENIED";
+    case UXR_STATUS_ERR_UNKNOWN_REFERENCE: return "UNKNOWN_REFERENCE";
+    case UXR_STATUS_ERR_INVALID_DATA: return "INVALID_DATA";
+    case UXR_STATUS_ERR_INCOMPATIBLE: return "INCOMPATIBLE";
+    case UXR_STATUS_ERR_RESOURCES: return "RESOURCES";
+    case UXR_STATUS_NONE: return "NONE";
+    default: return "UNKNOWN";
+  }
+}
+
 }  // namespace
 
 
@@ -86,8 +104,9 @@ void DDSClient::init()
       uxr_buffer_create_subscriber_bin(&session_, reliable_out_, subscriber_id, participant_id, UXR_REPLACE);
 
   // Participant, one Publisher, one Subscriber, every Topic, every DataWriter,
-  // and each DataReader plus its request_data stream request.
-  constexpr std::size_t CREATE_REQUEST_COUNT = 3 + TOPIC_COUNT + datawriter_count() + (datareader_count() * 2);
+  // and every DataReader. REQUEST_DATA operations are sent alongside these
+  // requests but do not receive a CREATE-status response from the Agent.
+  constexpr std::size_t CREATE_REQUEST_COUNT = 3 + TOPIC_COUNT + datawriter_count() + datareader_count();
   uint16_t requests[CREATE_REQUEST_COUNT]{};
   uint8_t status[CREATE_REQUEST_COUNT]{};
   std::size_t request_count = 0;
@@ -104,6 +123,12 @@ void DDSClient::init()
   // Agent. Buffer-create calls only enqueue work; this drives the session.
   if (!uxr_run_session_until_all_status(&session_, 1000, requests, status, request_count)) {
     ESP_LOGE(TAG, "Error creating DDS entities");
+    for (std::size_t i = 0; i < request_count; ++i) {
+      ESP_LOGE(
+          TAG, "  request[%u]=%u status=0x%02X (%s)", static_cast<unsigned>(i), static_cast<unsigned>(requests[i]),
+          static_cast<unsigned>(status[i]), status_name(status[i])
+      );
+    }
     return;
   }
 
@@ -159,57 +184,8 @@ void DDSClient::generate_readers(uint16_t requests[], std::size_t& request_count
     // delivered to on_topic_callback until we request it from the Agent.
     uxrDeliveryControl delivery_control{};
     delivery_control.max_samples = UXR_MAX_SAMPLES_UNLIMITED;
-    requests[request_count++] =
-        uxr_buffer_request_data(&session_, reliable_out_, reader_id, reliable_in_, &delivery_control);
+    (void)uxr_buffer_request_data(&session_, reliable_out_, reader_id, reliable_in_, &delivery_control);
   }
-}
-
-// Public publish API: validate the topic and serialize it into the XRCE reliable stream.
-bool DDSClient::publish(const TopicId topic_id, const void* msg)
-{
-  const Topic* topic = get_topic(topic_id);
-  if (topic == nullptr) {
-    ESP_LOGE(TAG, "Unknown DDS topic id %u", static_cast<unsigned>(topic_id));
-    return false;
-  }
-
-  if (topic->dir != Topic::Direction::WRITER) {
-    ESP_LOGE(TAG, "DDS topic %s is not configured as a writer", topic->name);
-    return false;
-  }
-
-  if (msg == nullptr) {
-    ESP_LOGE(TAG, "DDS publish called with null data for %s", topic->name);
-    return false;
-  }
-
-  const std::size_t topic_index = to_underlying(topic_id);
-  if (topic->size_of_topic == nullptr || topic->serialize_topic == nullptr) {
-    ESP_LOGE(TAG, "DDS topic %s is missing serializer hooks", topic->name);
-    return false;
-  }
-
-  ucdrBuffer ub;
-  const uint32_t topic_size = topic->size_of_topic(msg, 0);
-  if (topic_size + ESTIMATED_XRCE_WRITE_OVERHEAD > RELIABLE_STREAM_BLOCK_SIZE) {
-    ESP_LOGE(TAG, "DDS topic %s is too large for one XRCE reliable stream block", topic->name);
-    return false;
-  }
-
-  uint16_t request_id =
-      uxr_prepare_output_stream(&session_, reliable_out_, datawriter_id(topic_index), &ub, topic_size);
-  if (request_id == UXR_INVALID_REQUEST_ID) {
-    ESP_LOGW(TAG, "XRCE reliable output stream is full; dropping DDS topic %s", topic->name);
-    return false;
-  }
-
-  if (!topic->serialize_topic(&ub, msg)) {
-    ESP_LOGE(TAG, "Failed to serialize DDS topic %s", topic->name);
-    return false;
-  }
-
-  delivery_pending_ = true;
-  return true;
 }
 
 void DDSClient::update()
