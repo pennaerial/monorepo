@@ -1,0 +1,609 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sdf version="1.9">
+    <model name="uuv_bluerov2_heavy">
+        <pose>0 0 -95.5 0 0 0</pose>
+        <link name="base_link">
+            <pose>0 0 0 0 -0 0</pose>
+            <inertial>
+                <mass>13</mass>
+                <inertia>
+                    <ixx>0.250</ixx>
+                    <ixy>0</ixy>
+                    <ixz>0</ixz>
+                    <iyy>0.221</iyy>
+                    <iyz>0</iyz>
+                    <izz>0.356</izz>
+                </inertia>
+            </inertial>
+            <collision name='base_link_collision'>
+                <pose>0 0 0.02 0 -0 0</pose>
+                <geometry>
+                    <box>
+                        <size>0.50 0.25 0.108</size>         <!-- V = 0.0135 m^3. Keep X=0.50, Y=0.25 and solve Z -->
+                    </box>
+                </geometry>
+                <surface>
+                    <contact>
+                        <ode>
+                            <min_depth>0.001</min_depth>
+                            <max_vel>0</max_vel>
+                        </ode>
+                    </contact>
+                    <friction>
+                        <ode/>
+                    </friction>
+                </surface>
+            </collision>
+            <visual name="base_link_visual">
+                <pose>0 0 -0.06 0 -0 0</pose>
+                <geometry>
+                    <mesh>
+                        <uri>model://uuv_bluerov2_heavy/meshes/BlueROV2heavy.dae</uri>
+                    </mesh>
+                </geometry>
+            </visual>
+            <sensor name="air_pressure_sensor" type="air_pressure">
+                <always_on>1</always_on>
+                <update_rate>50</update_rate>
+                <air_pressure>
+                    <pressure>
+                        <noise type="gaussian">
+                            <mean>0</mean>
+                            <stddev>0.01</stddev>
+                        </noise>
+                    </pressure>
+                </air_pressure>
+            </sensor>
+            <sensor name="imu_sensor" type="imu">
+                <always_on>1</always_on>
+                <update_rate>250</update_rate>
+                <imu>
+                    <angular_velocity>
+                        <x>
+                            <noise type="gaussian">
+                                <mean>0</mean>
+                                <stddev>0.00018665</stddev>
+                                <dynamic_bias_stddev>3.8785e-05</dynamic_bias_stddev>
+                                <dynamic_bias_correlation_time>1000</dynamic_bias_correlation_time>
+                            </noise>
+                        </x>
+                        <y>
+                            <noise type="gaussian">
+                                <mean>0</mean>
+                                <stddev>0.00018665</stddev>
+                                <dynamic_bias_stddev>3.8785e-05</dynamic_bias_stddev>
+                                <dynamic_bias_correlation_time>1000</dynamic_bias_correlation_time>
+                            </noise>
+                        </y>
+                        <z>
+                            <noise type="gaussian">
+                                <mean>0</mean>
+                                <stddev>0.00018665</stddev>
+                                <dynamic_bias_stddev>3.8785e-05</dynamic_bias_stddev>
+                                <dynamic_bias_correlation_time>1000</dynamic_bias_correlation_time>
+                            </noise>
+                        </z>
+                    </angular_velocity>
+                    <linear_acceleration>
+                        <x>
+                            <noise type="gaussian">
+                                <mean>0</mean>
+                                <stddev>0.00186</stddev>
+                                <dynamic_bias_stddev>0.006</dynamic_bias_stddev>
+                                <dynamic_bias_correlation_time>300</dynamic_bias_correlation_time>
+                            </noise>
+                        </x>
+                        <y>
+                            <noise type="gaussian">
+                                <mean>0</mean>
+                                <stddev>0.00186</stddev>
+                                <dynamic_bias_stddev>0.006</dynamic_bias_stddev>
+                                <dynamic_bias_correlation_time>300</dynamic_bias_correlation_time>
+                            </noise>
+                        </y>
+                        <z>
+                            <noise type="gaussian">
+                                <mean>0</mean>
+                                <stddev>0.00186</stddev>
+                                <dynamic_bias_stddev>0.006</dynamic_bias_stddev>
+                                <dynamic_bias_correlation_time>300</dynamic_bias_correlation_time>
+                            </noise>
+                        </z>
+                    </linear_acceleration>
+                </imu>
+            </sensor>
+            <sensor name="navsat_sensor" type="navsat">
+                <always_on>1</always_on>
+                <update_rate>30</update_rate>
+            </sensor>
+        </link>
+        <joint name="thruster0_joint" type="revolute">
+            <axis>
+                <xyz>0 0 1</xyz>
+                <limit>
+                    <lower>-1e+16</lower>
+                    <upper>1e+16</upper>
+                </limit>
+            </axis>
+            <parent>base_link</parent>
+            <child>thruster0</child>
+        </joint>
+        <link name="thruster0">
+            <pose>0.14 -0.10 -0.06 0 1.570796 0.785398</pose>
+            <inertial>
+                <mass>0.05</mass>
+                <inertia>
+                    <ixx>1e-04</ixx>
+                    <ixy>0</ixy>
+                    <ixz>0</ixz>
+                    <iyy>1e-04</iyy>
+                    <iyz>0</iyz>
+                    <izz>1e-04</izz>
+                </inertia>
+            </inertial>
+            <visual name="thruster0_visual">
+                <geometry>
+                    <mesh>
+                        <scale>1 1 1</scale>
+                        <uri>model://uuv_bluerov2_heavy/meshes/prop.dae</uri>
+                    </mesh>
+                </geometry>
+            </visual>
+        </link>
+
+        <joint name="thruster1_joint" type="revolute">
+            <axis>
+                <xyz>0 0 1</xyz>
+                <limit>
+                    <lower>-1e+16</lower>
+                    <upper>1e+16</upper>
+                </limit>
+            </axis>
+            <parent>base_link</parent>
+            <child>thruster1</child>
+        </joint>
+        <link name="thruster1">
+            <pose>0.14 0.10 -0.06 0 1.570796 -0.785398</pose>
+            <inertial>
+                <mass>0.05</mass>
+                <inertia>
+                    <ixx>1e-04</ixx>
+                    <ixy>0</ixy>
+                    <ixz>0</ixz>
+                    <iyy>1e-04</iyy>
+                    <iyz>0</iyz>
+                    <izz>1e-04</izz>
+                </inertia>
+            </inertial>
+            <visual name="thruster1_visual">
+                <geometry>
+                    <mesh>
+                        <scale>1 1 1</scale>
+                        <uri>model://uuv_bluerov2_heavy/meshes/prop.dae</uri>
+                    </mesh>
+                </geometry>
+
+            </visual>
+        </link>
+
+        <joint name="thruster2_joint" type="revolute">
+            <axis>
+                <xyz>0 0 1</xyz>
+                <limit>
+                    <lower>-1e+16</lower>
+                    <upper>1e+16</upper>
+                </limit>
+            </axis>
+            <parent>base_link</parent>
+            <child>thruster2</child>
+        </joint>
+        <link name="thruster2">
+            <pose>-0.14 -0.10 -0.06 0 1.570796 -0.785398</pose>
+            <inertial>
+                <mass>0.05</mass>
+                <inertia>
+                    <ixx>1e-04</ixx>
+                    <ixy>0</ixy>
+                    <ixz>0</ixz>
+                    <iyy>1e-04</iyy>
+                    <iyz>0</iyz>
+                    <izz>1e-04</izz>
+                </inertia>
+            </inertial>
+            <visual name="thruster2_visual">
+                <geometry>
+                    <mesh>
+                        <scale>1 1 1</scale>
+                        <uri>model://uuv_bluerov2_heavy/meshes/prop.dae</uri>
+                    </mesh>
+                </geometry>
+            </visual>
+        </link>
+
+        <joint name="thruster3_joint" type="revolute">
+            <axis>
+                <xyz>0 0 1</xyz>
+                <limit>
+                    <lower>-1e+16</lower>
+                    <upper>1e+16</upper>
+                </limit>
+            </axis>
+            <parent>base_link</parent>
+            <child>thruster3</child>
+        </joint>
+        <link name="thruster3">
+            <pose>-0.14 0.10 -0.06 0 1.570796 0.785398</pose>
+            <inertial>
+                <mass>0.05</mass>
+                <inertia>
+                    <ixx>1e-04</ixx>
+                    <ixy>0</ixy>
+                    <ixz>0</ixz>
+                    <iyy>1e-04</iyy>
+                    <iyz>0</iyz>
+                    <izz>1e-04</izz>
+                </inertia>
+            </inertial>
+            <visual name="thruster3_visual">
+                <geometry>
+                    <mesh>
+                        <scale>1 1 1</scale>
+                        <uri>model://uuv_bluerov2_heavy/meshes/prop.dae</uri>
+                    </mesh>
+                </geometry>
+            </visual>
+        </link>
+
+        <joint name="thruster4_joint" type="revolute">
+            <axis>
+                <xyz>0 0 1</xyz>
+                <limit>
+                    <lower>-1e+16</lower>
+                    <upper>1e+16</upper>
+                </limit>
+            </axis>
+            <parent>base_link</parent>
+            <child>thruster4</child>
+        </joint>
+        <link name="thruster4">
+            <pose>0.12 -0.22 0.0 0.0 0 0</pose>
+            <inertial>
+                <mass>0.05</mass>
+                <inertia>
+                    <ixx>1e-04</ixx>
+                    <ixy>0</ixy>
+                    <ixz>0</ixz>
+                    <iyy>1e-04</iyy>
+                    <iyz>0</iyz>
+                    <izz>1e-04</izz>
+                </inertia>
+            </inertial>
+            <visual name="thruster4_visual">
+                <geometry>
+                    <mesh>
+                        <scale>1 1 1</scale>
+                        <uri>model://uuv_bluerov2_heavy/meshes/prop.dae</uri>
+                    </mesh>
+                </geometry>
+
+            </visual>
+        </link>
+
+        <joint name="thruster5_joint" type="revolute">
+            <axis>
+                <xyz>0 0 1</xyz>
+                <limit>
+                    <lower>-1e+16</lower>
+                    <upper>1e+16</upper>
+                </limit>
+            </axis>
+            <parent>base_link</parent>
+            <child>thruster5</child>
+        </joint>
+        <link name="thruster5">
+            <pose>0.12 0.22 0.0 3.1415 0 0</pose>
+            <inertial>
+                <mass>0.05</mass>
+                <inertia>
+                    <ixx>1e-04</ixx>
+                    <ixy>0</ixy>
+                    <ixz>0</ixz>
+                    <iyy>1e-04</iyy>
+                    <iyz>0</iyz>
+                    <izz>1e-04</izz>
+                </inertia>
+            </inertial>
+            <visual name="thruster5_visual">
+                <geometry>
+                    <mesh>
+                        <scale>1 1 1</scale>
+                        <uri>model://uuv_bluerov2_heavy/meshes/prop.dae</uri>
+                    </mesh>
+                </geometry>
+            </visual>
+        </link>
+
+        <joint name="thruster6_joint" type="revolute">
+            <axis>
+                <xyz>0 0 1</xyz>
+                <limit>
+                    <lower>-1e+16</lower>
+                    <upper>1e+16</upper>
+                </limit>
+            </axis>
+            <parent>base_link</parent>
+            <child>thruster6</child>
+        </joint>
+        <link name="thruster6">
+            <pose>-0.12 -0.22 0.0 3.1415 0 0</pose>
+            <inertial>
+                <mass>0.05</mass>
+                <inertia>
+                    <ixx>1e-04</ixx>
+                    <ixy>0</ixy>
+                    <ixz>0</ixz>
+                    <iyy>1e-04</iyy>
+                    <iyz>0</iyz>
+                    <izz>1e-04</izz>
+                </inertia>
+            </inertial>
+            <visual name="thruster6_visual">
+                <geometry>
+                    <mesh>
+                        <scale>1 1 1</scale>
+                        <uri>model://uuv_bluerov2_heavy/meshes/prop.dae</uri>
+                    </mesh>
+                </geometry>
+            </visual>
+        </link>
+        <joint name="thruster7_joint" type="revolute">
+            <axis>
+                <xyz>0 0 1</xyz>
+                <limit>
+                    <lower>-1e+16</lower>
+                    <upper>1e+16</upper>
+                </limit>
+            </axis>
+            <parent>base_link</parent>
+            <child>thruster7</child>
+        </joint>
+        <link name="thruster7">
+            <pose>-0.12 0.22 0.0 0.0 0 0</pose>
+            <inertial>
+                <mass>0.05</mass>
+                <inertia>
+                    <ixx>1e-04</ixx>
+                    <ixy>0</ixy>
+                    <ixz>0</ixz>
+                    <iyy>1e-04</iyy>
+                    <iyz>0</iyz>
+                    <izz>1e-04</izz>
+                </inertia>
+            </inertial>
+            <visual name="thruster7_visual">
+                <geometry>
+                    <mesh>
+                        <scale>1 1 1</scale>
+                        <uri>model://uuv_bluerov2_heavy/meshes/prop.dae</uri>
+                    </mesh>
+                </geometry>
+
+            </visual>
+        </link>
+        <plugin filename="libGenericMotorModelPlugin.so" name="gz::sim::systems::GenericMotorModel">
+            <jointName>thruster0_joint</jointName>
+            <linkName>thruster0</linkName>
+            <motorNumber>0</motorNumber>
+            <turningDirection>ccw</turningDirection>
+            <timeConstantUp>0.0125</timeConstantUp>
+            <timeConstantDown>0.025</timeConstantDown>
+            <maxRotVelocity>1100.0</maxRotVelocity>
+            <motorConstant>10</motorConstant>
+            <momentConstant>0.01</momentConstant>
+            <commandSubTopic>command/motor_speed</commandSubTopic>
+            <rotorDragCoefficient>0</rotorDragCoefficient>
+            <rollingMomentCoefficient>0</rollingMomentCoefficient>
+            <rotorVelocitySlowdownSim>0.025</rotorVelocitySlowdownSim>
+            <motorType>force_polynomial</motorType>
+            <controlMethod>duty_cycle</controlMethod>
+            <minCommand>0.00</minCommand>
+            <minDutyCycle>1100</minDutyCycle>
+            <maxDutyCycle>1900</maxDutyCycle>
+            <bidirectionalMotor>1</bidirectionalMotor>
+            <positiveThrustPolynomial>[0.0, 2.37936891e+00, 1.49248519e+02, -3.27398031e+02, 4.36609803e+02, -1.94364029e+02]</positiveThrustPolynomial>
+            <negativeThrustPolynomial>[0.0, 3.42623942e-01, 1.34413692e+02, -2.84606487e+02, 3.51715475e+02, -1.52174269e+02]</negativeThrustPolynomial>
+        </plugin>
+        <plugin filename="libGenericMotorModelPlugin.so" name="gz::sim::systems::GenericMotorModel">
+            <jointName>thruster1_joint</jointName>
+            <linkName>thruster1</linkName>
+            <motorNumber>1</motorNumber>
+            <turningDirection>ccw</turningDirection>
+            <timeConstantUp>0.0125</timeConstantUp>
+            <timeConstantDown>0.025</timeConstantDown>
+            <maxRotVelocity>1100.0</maxRotVelocity>
+            <motorConstant>10</motorConstant>
+            <momentConstant>0.01</momentConstant>
+            <commandSubTopic>command/motor_speed</commandSubTopic>
+            <rotorDragCoefficient>0</rotorDragCoefficient>
+            <rollingMomentCoefficient>0</rollingMomentCoefficient>
+            <rotorVelocitySlowdownSim>0.025</rotorVelocitySlowdownSim>
+            <motorType>force_polynomial</motorType>
+            <controlMethod>duty_cycle</controlMethod>
+            <minCommand>0.00</minCommand>
+            <minDutyCycle>1100</minDutyCycle>
+            <maxDutyCycle>1900</maxDutyCycle>
+            <bidirectionalMotor>1</bidirectionalMotor>
+            <positiveThrustPolynomial>[0.0, 2.37936891e+00, 1.49248519e+02, -3.27398031e+02, 4.36609803e+02, -1.94364029e+02]</positiveThrustPolynomial>
+            <negativeThrustPolynomial>[0.0, 3.42623942e-01, 1.34413692e+02, -2.84606487e+02, 3.51715475e+02, -1.52174269e+02]</negativeThrustPolynomial>
+        </plugin>
+        <plugin filename="libGenericMotorModelPlugin.so" name="gz::sim::systems::GenericMotorModel">
+            <jointName>thruster2_joint</jointName>
+            <linkName>thruster2</linkName>
+            <motorNumber>2</motorNumber>
+            <turningDirection>cw</turningDirection>
+            <timeConstantUp>0.0125</timeConstantUp>
+            <timeConstantDown>0.025</timeConstantDown>
+            <maxRotVelocity>1100.0</maxRotVelocity>
+            <motorConstant>10</motorConstant>
+            <momentConstant>0.01</momentConstant>
+            <commandSubTopic>command/motor_speed</commandSubTopic>
+            <rotorDragCoefficient>0</rotorDragCoefficient>
+            <rollingMomentCoefficient>0</rollingMomentCoefficient>
+            <rotorVelocitySlowdownSim>0.025</rotorVelocitySlowdownSim>
+            <motorType>force_polynomial</motorType>
+            <controlMethod>duty_cycle</controlMethod>
+            <minCommand>0.00</minCommand>
+            <minDutyCycle>1100</minDutyCycle>
+            <maxDutyCycle>1900</maxDutyCycle>
+            <bidirectionalMotor>1</bidirectionalMotor>
+            <positiveThrustPolynomial>[0.0, 2.37936891e+00, 1.49248519e+02, -3.27398031e+02, 4.36609803e+02, -1.94364029e+02]</positiveThrustPolynomial>
+            <negativeThrustPolynomial>[0.0, 3.42623942e-01, 1.34413692e+02, -2.84606487e+02, 3.51715475e+02, -1.52174269e+02]</negativeThrustPolynomial>
+        </plugin>
+        <plugin filename="libGenericMotorModelPlugin.so" name="gz::sim::systems::GenericMotorModel">
+            <jointName>thruster3_joint</jointName>
+            <linkName>thruster3</linkName>
+            <motorNumber>3</motorNumber>
+            <turningDirection>cw</turningDirection>
+            <timeConstantUp>0.0125</timeConstantUp>
+            <timeConstantDown>0.025</timeConstantDown>
+            <maxRotVelocity>1100.0</maxRotVelocity>
+            <motorConstant>10</motorConstant>
+            <momentConstant>0.01</momentConstant>
+            <commandSubTopic>command/motor_speed</commandSubTopic>
+            <rotorDragCoefficient>0</rotorDragCoefficient>
+            <rollingMomentCoefficient>0</rollingMomentCoefficient>
+            <rotorVelocitySlowdownSim>0.025</rotorVelocitySlowdownSim>
+            <motorType>force_polynomial</motorType>
+            <controlMethod>duty_cycle</controlMethod>
+            <minCommand>0.00</minCommand>
+            <minDutyCycle>1100</minDutyCycle>
+            <maxDutyCycle>1900</maxDutyCycle>
+            <bidirectionalMotor>1</bidirectionalMotor>
+            <positiveThrustPolynomial>[0.0, 2.37936891e+00, 1.49248519e+02, -3.27398031e+02, 4.36609803e+02, -1.94364029e+02]</positiveThrustPolynomial>
+            <negativeThrustPolynomial>[0.0, 3.42623942e-01, 1.34413692e+02, -2.84606487e+02, 3.51715475e+02, -1.52174269e+02]</negativeThrustPolynomial>
+        </plugin>
+        <plugin filename="libGenericMotorModelPlugin.so" name="gz::sim::systems::GenericMotorModel">
+            <jointName>thruster4_joint</jointName>
+            <linkName>thruster4</linkName>
+            <motorNumber>4</motorNumber>
+            <turningDirection>ccw</turningDirection>
+            <timeConstantUp>0.0125</timeConstantUp>
+            <timeConstantDown>0.025</timeConstantDown>
+            <maxRotVelocity>1100.0</maxRotVelocity>
+            <motorConstant>10</motorConstant>
+            <momentConstant>0.01</momentConstant>
+            <commandSubTopic>command/motor_speed</commandSubTopic>
+            <rotorDragCoefficient>0</rotorDragCoefficient>
+            <rollingMomentCoefficient>0</rollingMomentCoefficient>
+            <rotorVelocitySlowdownSim>0.025</rotorVelocitySlowdownSim>
+            <motorType>force_polynomial</motorType>
+            <controlMethod>duty_cycle</controlMethod>
+            <minCommand>0.00</minCommand>
+            <minDutyCycle>1100</minDutyCycle>
+            <maxDutyCycle>1900</maxDutyCycle>
+            <bidirectionalMotor>1</bidirectionalMotor>
+            <positiveThrustPolynomial>[0.0, 2.37936891e+00, 1.49248519e+02, -3.27398031e+02, 4.36609803e+02, -1.94364029e+02]</positiveThrustPolynomial>
+            <negativeThrustPolynomial>[0.0, 3.42623942e-01, 1.34413692e+02, -2.84606487e+02, 3.51715475e+02, -1.52174269e+02]</negativeThrustPolynomial>
+        </plugin>
+        <plugin filename="libGenericMotorModelPlugin.so" name="gz::sim::systems::GenericMotorModel">
+            <jointName>thruster5_joint</jointName>
+            <linkName>thruster5</linkName>
+            <motorNumber>5</motorNumber>
+            <turningDirection>cw</turningDirection>
+            <timeConstantUp>0.0125</timeConstantUp>
+            <timeConstantDown>0.025</timeConstantDown>
+            <maxRotVelocity>1100.0</maxRotVelocity>
+            <motorConstant>10</motorConstant>
+            <momentConstant>0.01</momentConstant>
+            <commandSubTopic>command/motor_speed</commandSubTopic>
+            <rotorDragCoefficient>0</rotorDragCoefficient>
+            <rollingMomentCoefficient>0</rollingMomentCoefficient>
+            <rotorVelocitySlowdownSim>0.025</rotorVelocitySlowdownSim>
+            <motorType>force_polynomial</motorType>
+            <controlMethod>duty_cycle</controlMethod>
+            <minCommand>0.00</minCommand>
+            <minDutyCycle>1100</minDutyCycle>
+            <maxDutyCycle>1900</maxDutyCycle>
+            <bidirectionalMotor>1</bidirectionalMotor>
+            <positiveThrustPolynomial>[0.0, 2.37936891e+00, 1.49248519e+02, -3.27398031e+02, 4.36609803e+02, -1.94364029e+02]</positiveThrustPolynomial>
+            <negativeThrustPolynomial>[0.0, 3.42623942e-01, 1.34413692e+02, -2.84606487e+02, 3.51715475e+02, -1.52174269e+02]</negativeThrustPolynomial>
+        </plugin>
+        <plugin filename="libGenericMotorModelPlugin.so" name="gz::sim::systems::GenericMotorModel">
+            <jointName>thruster6_joint</jointName>
+            <linkName>thruster6</linkName>
+            <motorNumber>6</motorNumber>
+            <turningDirection>cw</turningDirection>
+            <timeConstantUp>0.0125</timeConstantUp>
+            <timeConstantDown>0.025</timeConstantDown>
+            <maxRotVelocity>1100.0</maxRotVelocity>
+            <motorConstant>10</motorConstant>
+            <momentConstant>0.01</momentConstant>
+            <commandSubTopic>command/motor_speed</commandSubTopic>
+            <rotorDragCoefficient>0</rotorDragCoefficient>
+            <rollingMomentCoefficient>0</rollingMomentCoefficient>
+            <rotorVelocitySlowdownSim>0.025</rotorVelocitySlowdownSim>
+            <motorType>force_polynomial</motorType>
+            <controlMethod>duty_cycle</controlMethod>
+            <minCommand>0.00</minCommand>
+            <minDutyCycle>1100</minDutyCycle>
+            <maxDutyCycle>1900</maxDutyCycle>
+            <bidirectionalMotor>1</bidirectionalMotor>
+            <positiveThrustPolynomial>[0.0, 2.37936891e+00, 1.49248519e+02, -3.27398031e+02, 4.36609803e+02, -1.94364029e+02]</positiveThrustPolynomial>
+            <negativeThrustPolynomial>[0.0, 3.42623942e-01, 1.34413692e+02, -2.84606487e+02, 3.51715475e+02, -1.52174269e+02]</negativeThrustPolynomial>
+        </plugin>
+        <plugin filename="libGenericMotorModelPlugin.so" name="gz::sim::systems::GenericMotorModel">
+            <jointName>thruster7_joint</jointName>
+            <linkName>thruster7</linkName>
+            <motorNumber>7</motorNumber>
+            <turningDirection>ccw</turningDirection>
+            <timeConstantUp>0.0125</timeConstantUp>
+            <timeConstantDown>0.025</timeConstantDown>
+            <maxRotVelocity>1100.0</maxRotVelocity>
+            <motorConstant>10</motorConstant>
+            <momentConstant>0.01</momentConstant>
+            <commandSubTopic>command/motor_speed</commandSubTopic>
+            <rotorDragCoefficient>0</rotorDragCoefficient>
+            <rollingMomentCoefficient>0</rollingMomentCoefficient>
+            <rotorVelocitySlowdownSim>0.025</rotorVelocitySlowdownSim>
+            <motorType>force_polynomial</motorType>
+            <controlMethod>duty_cycle</controlMethod>
+            <minCommand>0.00</minCommand>
+            <minDutyCycle>1100</minDutyCycle>
+            <maxDutyCycle>1900</maxDutyCycle>
+            <bidirectionalMotor>1</bidirectionalMotor>
+            <positiveThrustPolynomial>[0.0, 2.37936891e+00, 1.49248519e+02, -3.27398031e+02, 4.36609803e+02, -1.94364029e+02]</positiveThrustPolynomial>
+            <negativeThrustPolynomial>[0.0, 3.42623942e-01, 1.34413692e+02, -2.84606487e+02, 3.51715475e+02, -1.52174269e+02]</negativeThrustPolynomial>
+        </plugin>
+
+        <plugin filename="gz-sim-odometry-publisher-system" name="gz::sim::systems::OdometryPublisher">
+            <dimensions>3</dimensions>
+        </plugin>
+
+        <plugin filename="gz-sim-hydrodynamics-system" name="gz::sim::systems::Hydrodynamics">
+            <link_name>base_link</link_name>
+
+            <!-- Linear damping -->
+            <xU>-13.7</xU>
+            <yV>-1.0</yV>
+            <zW>-23.0</zW>
+            <kP>-0.5</kP>
+            <mQ>-0.8</mQ>
+            <nR>-0.1</nR>
+            <!-- Quadratic damping -->
+            <xUabsU>-14.1</xUabsU>
+            <yVabsV>-21.7</yVabsV>
+            <zWabsW>-19.0</zWabsW>
+            <kPabsP>-0.119</kPabsP>
+            <mQabsQ>-0.047</mQabsQ>
+            <nRabsR>-0.15</nRabsR>
+            <!-- Added mass -->
+            <xDotU>-1.272</xDotU>
+            <yDotV>-1.424</yDotV>
+            <zDotW>-3.736</zDotW>
+            <kDotP>-0.0378</kDotP>
+            <mDotQ>-0.027</mDotQ>
+            <nDotR>-0.0444</nDotR>
+        </plugin>
+
+    </model>
+</sdf>
