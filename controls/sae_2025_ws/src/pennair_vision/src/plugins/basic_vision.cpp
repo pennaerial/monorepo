@@ -12,8 +12,7 @@ void BasicVision::initialize(const rclcpp::Node::SharedPtr& node)
   RCLCPP_INFO(node->get_logger(), "BasicVision plugin started!");
 }
 
-void BasicVision::process(sensor_msgs::msg::Image::ConstSharedPtr image) {}
-
+void BasicVision::process(sensor_msgs::msg::Image::ConstSharedPtr& image) {}
 
 };  // namespace pennair_vision
 
