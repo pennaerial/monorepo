@@ -17,12 +17,12 @@ namespace pennair_vision
 class LazyCameraPublisher
 {
 public:
-  LazyCameraPublisher(const rclcpp::Node::SharedPtr& node) : vision_manager_(node)
+  LazyCameraPublisher(const rclcpp::Node::SharedPtr& node) : node_(node)
   {
-    it_ = std::make_shared<image_transport::ImageTransport>(vision_manager_->shared_from_this());
+    it_ = std::make_shared<image_transport::ImageTransport>(node_->shared_from_this());
     camera_pub_ = it_->advertiseCamera("camera/image_raw", 1);
 
-    callback_timer_ = vision_manager_->create_wall_timer(std::chrono::milliseconds(33), [this]() { timer_callback(); });
+    callback_timer_ = node_->create_wall_timer(std::chrono::milliseconds(33), [this]() { timer_callback(); });
   }
   virtual ~LazyCameraPublisher() = default;
 
@@ -40,7 +40,7 @@ private:
   sensor_msgs::msg::CameraInfo get_camera_calibration();
 
   // INVARIANT: vision manager will be valid for the lifetime of the plugin
-  const rclcpp::Node::SharedPtr& vision_manager_;
+  const rclcpp::Node::SharedPtr& node_;
 
   std::shared_ptr<image_transport::ImageTransport> it_;
   image_transport::CameraPublisher camera_pub_;
