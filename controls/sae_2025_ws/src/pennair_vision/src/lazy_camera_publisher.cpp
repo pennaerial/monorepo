@@ -19,7 +19,7 @@ sensor_msgs::msg::Image LazyCameraPublisher::capture_hardware_frame()
 {
   // NOTE: this is not complete, still need to use cv2 to get actual camera data
   sensor_msgs::msg::Image img;
-  img.header.stamp = vision_manager_->now();
+  img.header.stamp = node_->now();
   img.header.frame_id = "camera_optical_frame";
   return img;
 }
@@ -28,7 +28,7 @@ sensor_msgs::msg::CameraInfo LazyCameraPublisher::get_camera_calibration()
 {
   // NOTE: this is not complete, still need to use cv2 to get actual camera data
   sensor_msgs::msg::CameraInfo info;
-  info.header.stamp = vision_manager_->now();
+  info.header.stamp = node_->now();
   info.header.frame_id = "camera_optical_frame";
   return info;
 }
