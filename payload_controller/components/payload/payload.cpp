@@ -62,8 +62,13 @@ void Payload::init()
   imu = drivers::IMU::instance();
   imu->start();
 
-  encoders = drivers::Encoder::instance();
-  encoders->start();
+  for (std::size_t i = 0; i < PAYLOAD_CORNERS.size(); ++i) {
+    encoders[i] = drivers::Encoder::create(PAYLOAD_CORNERS[i]);
+    encoders[i]->start();
+
+    motors[i] = drivers::Motor::create(PAYLOAD_CORNERS[i]);
+    motors[i]->start();
+  }
 
   if (!DDSClient::instance().set_reader_callback(TopicId::IMU_READER, &testCallback, nullptr)) {
     ESP_LOGW(TAG, "Failed to bind IMU DDS reader callback");
@@ -82,8 +87,14 @@ void Payload::update()
 
 void Payload::motor_updates()
 {
-  encoders->publish_motor_left(10);
-  encoders->publish_motor_right(5);
+  for (auto& motor : motors) {
+    if (motor == nullptr) {
+      continue;
+    }
+
+    // temp for testing
+    motor->publish(payload_corner_is_left(motor->corner()) ? 10 : 5);
+  }
 }
 
 void Payload::publish_sensor_debug()
@@ -95,8 +106,26 @@ void Payload::publish_sensor_debug()
     }
   }
 
-  payload_interfaces_msg_MotorState latest_motor_state{};
-  if (!encoders->get_latest_if_updated(last_published_encoder_update_, latest_motor_state)) {
+  bool encoder_updated = false;
+  for (std::size_t i = 0; i < encoders.size(); ++i) {
+    if (encoders[i] == nullptr) {
+      continue;
+    }
+
+    payload_interfaces_msg_MotorState encoder_msg{};
+    if (!encoders[i]->get_latest_if_updated(last_published_encoder_updates[i], encoder_msg)) {
+      continue;
+    }
+
+    if (payload_corner_is_left(encoders[i]->corner())) {
+      latest_motor_state.left_encoder_count = encoder_msg.left_encoder_count;
+    } else {
+      latest_motor_state.right_encoder_count = encoder_msg.right_encoder_count;
+    }
+    encoder_updated = true;
+  }
+
+  if (!encoder_updated) {
     return;
   }
 
