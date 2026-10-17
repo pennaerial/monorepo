@@ -281,14 +281,16 @@ def _render_raw_struct(message):
                 f"{constant_value_to_rs(constant.type, constant.value)};"
             )
         lines.append("}")
-    lines.extend([
-        "",
-        f"impl crate::RosMessage for {name} {{",
-        "    fn deserialize(bytes: &[u8]) -> Result<Self, cdr::Error> {",
-        "        cdr::deserialize(bytes)",
-        "    }",
-        "}",
-    ])
+    lines.extend(
+        [
+            "",
+            f"impl crate::RosMessage for {name} {{",
+            "    fn deserialize(bytes: &[u8]) -> Result<Self, cdr::Error> {",
+            "        cdr::deserialize(bytes)",
+            "    }",
+            "}",
+        ]
+    )
     return "\n".join(lines)
 
 
