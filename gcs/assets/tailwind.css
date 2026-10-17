@@ -283,6 +283,51 @@
     }
   }
 }
+.app-layout {
+  display: flex;
+  min-height: 100vh;
+  background: #f3f5f9;
+  color: #1e293b;
+  font-family: Arial, sans-serif;
+}
+.main-content {
+  flex: 1;
+  min-width: 0;
+  padding: 32px;
+  box-sizing: border-box;
+}
+.page-title {
+  margin: 0 0 24px;
+  color: #0f172a;
+  font-size: 28px;
+  font-weight: 700;
+}
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  width: 250px;
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding: 24px 16px;
+  background: #111827;
+  color: #e5e7eb;
+}
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 28px;
+}
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 7px;
+  color: #cbd5e1;
+  text-decoration: none;
+}
 @property --tw-rotate-x {
   syntax: "*";
   inherits: false;
