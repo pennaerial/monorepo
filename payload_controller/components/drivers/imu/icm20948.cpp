@@ -7,9 +7,9 @@ static const char* TAG = "ICM20948";
 
 namespace {
 
-const uint8_t WHO_AM_I_REG = 0x00;
-const uint8_t PWR_MGMT_1_REG = 0x06;
-const uint8_t PWR_MGMT_2_REG = 0x07;
+const uint8_t B0_WHO_AM_I_REG = 0x00;
+const uint8_t B0_PWR_MGMT_1_REG = 0x06;
+const uint8_t B0_PWR_MGMT_2_REG = 0x07;
 
 const uint8_t REG_BANK_SEL_REG = 0x7F;
 const uint8_t BANK_0 = 0x00;
@@ -63,13 +63,13 @@ void ICM20948::start() {
 
 
     // Wake IMU & Accelerometer / Gyro
-    writeToRegister(PWR_MGMT_1_REG, 0x01); // Sets the sleep bit (bit 6) to 0 to turn it on
+    writeToRegister(B0_PWR_MGMT_1_REG, 0x01); // Sets the sleep bit (bit 6) to 0 to turn it on
 
-    writeToRegister(PWR_MGMT_2_REG, 0x00); // Sets the first 6 bits to 0 which enables all 3 axes of gyro & accelerometer
+    writeToRegister(B0_PWR_MGMT_2_REG, 0x00); // Sets the first 6 bits to 0 which enables all 3 axes of gyro & accelerometer
     
 
     // Implied that we are reading from bank 0 as its the default
-    uint8_t who = readFromRegister(WHO_AM_I_REG);
+    uint8_t who = readFromRegister(B0_WHO_AM_I_REG);
     ESP_LOGI(TAG, "Who is the device?: %i", who);
 }
     
