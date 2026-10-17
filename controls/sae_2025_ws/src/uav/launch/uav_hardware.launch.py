@@ -27,6 +27,7 @@ class Args(StrEnum):
     MISSION = "mission"
     NS_ID = "ns_id"
     AIRFRAME = "airframe"
+    SERIAL_DEVICE = "serial_device"
 
 
 def launch_setup(context) -> list[Action]:
@@ -81,8 +82,14 @@ def launch_setup(context) -> list[Action]:
 
     middleware = ExecuteProcess(
         # -b 921600 = baud rate of UART connection
-        # /dev/serial0 is the device name
-        cmd=["MicroXRCEAgent", "serial", "--dev", "/dev/serial0", "-b", "921600"],
+        cmd=[
+            "MicroXRCEAgent",
+            "serial",
+            "--dev",
+            config[Args.SERIAL_DEVICE],
+            "-b",
+            "921600",
+        ],
         output="screen",
         name="MicroXRCEAgent",
     )
@@ -111,6 +118,11 @@ def generate_launch_description():
                 Args.AIRFRAME,
                 default_value="quadcopter",
                 description="UAV airframe to load. Run 'pennair airframe ls' to see all available airframes.",
+            ),
+            DeclareLaunchArgument(
+                Args.SERIAL_DEVICE,
+                default_value="/dev/serial0",
+                description="Serial device connected to this vehicle's flight controller.",
             ),
             OpaqueFunction(function=launch_setup),
         ]
