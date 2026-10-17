@@ -2,7 +2,7 @@ import os
 from abc import ABC, abstractmethod
 from pathlib import Path
 from time import time
-from typing import cast
+from typing import Protocol, cast, runtime_checkable
 
 from pydantic import BaseModel
 from rclpy.node import Node
@@ -16,32 +16,51 @@ from vehicle_common.vehicle import Vehicle
 MISSION_STARTED_MARKER_ENV = "PENNAIR_MISSION_STARTED_MARKER_PATH"
 
 
+@runtime_checkable
+class ModeManagerParams(Protocol):
+    """Parameters every ModeManager subclass's schema must define.
+
+    generate_parameter_library schemas can't be composed, so each package's
+    *_mission_parameters.yaml repeats these fields. Keep them in sync.
+    """
+
+    vehicle_name: str
+    auto_launch: bool
+
+
 class ModeManager(Node, ABC):
     """Shared mission manager plumbing for a single bound vehicle."""
 
-    def __init__(
-        self,
-        node_name: str,
-        *,
-        vehicle_name: str = "",
-        auto_launch: bool = True,
-    ) -> None:
+    def __init__(self, node_name: str) -> None:
         super().__init__(node_name)
+        self.params = self.load_params()
+        if not isinstance(self.params, ModeManagerParams):
+            raise TypeError(
+                f"{type(self).__name__}.load_params() must return params defining "
+                "'vehicle_name' and 'auto_launch'; add them to the package's parameter schema."
+            )
         self.vehicle: Vehicle | None = None
         self.modes: dict[str, Mode] = {}
         self.transitions: dict[str, dict[str, str]] = {}
         self.active_mode: str | None = None
         self.last_update_time = time()
         self.timer = None
-        self.auto_launch = bool(auto_launch)
+        self.auto_launch = bool(self.params.auto_launch)
         self._auto_launch_timer = None
-        self._runtime_vehicle_name = str(vehicle_name or "").strip().strip("/")
+        self._runtime_vehicle_name = str(self.params.vehicle_name or "").strip().strip("/")
         self.start_mission_service = self.create_service(
             Trigger, "mode_manager/start_mission", self._start_mission_callback
         )
         self._clear_mission_started_marker()
         if self.auto_launch:
             self._auto_launch_timer = self.create_timer(0.1, self._maybe_auto_launch)
+
+    # TODO(#386): base-class params are only checked at runtime, since each subclass
+    # brings its own generated schema. Revisit whether shared params belong in a
+    # vehicle_common schema loaded here, with subclasses adding their own on top.
+    @abstractmethod
+    def load_params(self) -> ModeManagerParams:
+        """Declare, validate, and return this manager's ROS parameters."""
 
     @abstractmethod
     def spin_once(self) -> None:
