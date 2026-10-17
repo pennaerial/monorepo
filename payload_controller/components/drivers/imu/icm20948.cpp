@@ -5,14 +5,18 @@
 
 static const char* TAG = "ICM20948";
 
+namespace {
+
 const uint8_t WHO_AM_I_REG = 0x00;
 const uint8_t PWR_MGMT_1_REG = 0x06;
 const uint8_t PWR_MGMT_2_REG = 0x07;
+
 const uint8_t REG_BANK_SEL_REG = 0x7F;
 const uint8_t BANK_0 = 0x00;
 const uint8_t BANK_1 = 0x10;
 const uint8_t BANK_2 = 0x20;
 const uint8_t BANK_3 = 0x30;
+}
 
 namespace drivers
 {
