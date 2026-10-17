@@ -10,12 +10,19 @@ namespace {
 const uint8_t B0_WHO_AM_I_REG = 0x00;
 const uint8_t B0_PWR_MGMT_1_REG = 0x06;
 const uint8_t B0_PWR_MGMT_2_REG = 0x07;
+const uint8_t B0_ACCEL_XOUT_H_REG = 0x2D;
 
 const uint8_t REG_BANK_SEL_REG = 0x7F;
 const uint8_t BANK_0 = 0x00;
 const uint8_t BANK_1 = 0x10;
 const uint8_t BANK_2 = 0x20;
 const uint8_t BANK_3 = 0x30;
+
+// Possibly can be changed in the future to be configured via bank 2
+const float ACCEL_SENSITIVITY = 16384.0f;
+const float GYRO_SENSITIVITY = 131.0f;
+const float TEMP_SENSITIVITY = 333.87f;
+
 }
 
 namespace drivers
@@ -33,6 +40,9 @@ void ICM20948::start() {
     gpio_reset_pin(GPIO_NUM_7);
     gpio_set_direction(GPIO_NUM_7, GPIO_MODE_OUTPUT);
     gpio_set_level(GPIO_NUM_7, 1); // 1 = High
+
+    // Wait for power on
+    vTaskDelay(pdMS_TO_TICKS(100));
 
     // Setup the I2C port
     i2c_mst_config = {
@@ -58,17 +68,23 @@ void ICM20948::start() {
     };
 
     ESP_ERROR_CHECK(i2c_master_bus_add_device(bus_handle, &dev_cfg, &dev_handle));
+    
+    switchBank(BANK_0);
+    writeToRegister(B0_PWR_MGMT_1_REG, 0x80); // Device reset
+    vTaskDelay(pdMS_TO_TICKS(100));
 
-    ESP_LOGI(TAG, "Established connection to ICM20948");
-
-
+    switchBank(BANK_0);
     // Wake IMU & Accelerometer / Gyro
     writeToRegister(B0_PWR_MGMT_1_REG, 0x01); // Sets the sleep bit (bit 6) to 0 to turn it on
+    ESP_LOGI(TAG, "Established connection to ICM20948");
+
+    uint8_t pwr1 = readFromRegister(B0_PWR_MGMT_1_REG);
+    ESP_LOGI(TAG, "PWR MGMT 1: %i", pwr1);
 
     writeToRegister(B0_PWR_MGMT_2_REG, 0x00); // Sets the first 6 bits to 0 which enables all 3 axes of gyro & accelerometer
+    uint8_t pwr2 = readFromRegister(B0_PWR_MGMT_2_REG);
+    ESP_LOGI(TAG, "PWR MGMT 2: %i", pwr2);
     
-
-    // Implied that we are reading from bank 0 as its the default
     uint8_t who = readFromRegister(B0_WHO_AM_I_REG);
     ESP_LOGI(TAG, "Who is the device?: %i", who);
 }
@@ -88,7 +104,47 @@ uint8_t ICM20948::readFromRegister(uint8_t reg) {
 }
 
 void ICM20948::switchBank(uint8_t bankNum) {
-    
+    writeToRegister(REG_BANK_SEL_REG, bankNum);
+}
+
+void ICM20948::multiReadStartingAtRegister(uint8_t startReg, uint8_t* readBuffer, size_t count) {
+    ESP_ERROR_CHECK(i2c_master_transmit_receive(
+        dev_handle,
+        &startReg, 1,
+        readBuffer, count, 
+        -1            // Transaction timeout
+    ));
+}
+
+void ICM20948::update() {
+    getSensorData();
+}
+
+void ICM20948::getSensorData() {
+    // Read all consecutive sensor data for Accelerometer to Gyro to Temp readings
+    uint8_t readBuffer[14];
+    multiReadStartingAtRegister(B0_ACCEL_XOUT_H_REG, readBuffer, 14);
+
+    // Merge High and Low bytes
+    for (int i = 0; i < 7; i++) {
+        int j = 2*i;
+        int16_t mergedData = static_cast<int16_t>((readBuffer[j] << 8) | readBuffer[j + 1]);
+        
+        if (i <= 2) {
+            // Accelerometer data
+            accel[i] = mergedData / ACCEL_SENSITIVITY;
+            // ESP_LOGI(TAG, "Accel: %f", accel[i]);
+        } else if (i <= 5) {
+            // Gyro data
+            gyro[i - 3] = mergedData / GYRO_SENSITIVITY;
+            // ESP_LOGI(TAG, "Gyro: %f", gyro[i - 3]);
+        } else {
+            // Temp data
+            tempC = mergedData / TEMP_SENSITIVITY + 21.0f;
+            // ESP_LOGI(TAG, "Temp: %f", tempC);
+        }
+    }
+
 }
 
 };
