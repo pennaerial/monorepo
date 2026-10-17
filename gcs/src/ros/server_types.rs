@@ -3,9 +3,9 @@ use std::collections::HashMap;
 use tungstenite::Bytes;
 
 use crate::ros::parse::ParseError;
+use crate::ros::subscription::SubscriptionId;
 
 pub type ChannelId = u32;
-pub type SubscriptionId = u32;
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(tag = "op")]
@@ -40,7 +40,7 @@ pub struct ServerInfo {
     pub capabilities: Vec<String>,
     pub supported_encodings: Vec<String>,
     pub metadata: HashMap<String, String>,
-    pub session_id: i32,
+    pub session_id: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

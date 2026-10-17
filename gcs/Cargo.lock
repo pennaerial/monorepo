@@ -4477,6 +4477,7 @@ dependencies = [
 name = "ros_interfaces"
 version = "0.0.0"
 dependencies = [
+ "cdr",
  "serde",
 ]
 
