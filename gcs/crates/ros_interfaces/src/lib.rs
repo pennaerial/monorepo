@@ -46,9 +46,7 @@ pub mod geometry_msgs {
                 cdr::deserialize(bytes)
             }
         }
-
     }
-
 }
 
 pub mod std_msgs {
@@ -86,7 +84,5 @@ pub mod std_msgs {
                 cdr::deserialize(bytes)
             }
         }
-
     }
-
 }

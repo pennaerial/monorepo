@@ -1,25 +1,25 @@
 use crate::components::Button;
 use crate::ros::server_types::ServerMessage;
-use crate::ros::FoxgloveClient;
+use crate::ros::{FoxgloveClient, NodeHandle};
 use dioxus::prelude::*;
-use ros_interfaces::{geometry_msgs, std_msgs};
+use ros_interfaces::geometry_msgs;
 
 // / * `url`: e.g. "localhost:8765"
 async fn run_client(url: &str) {
     let mut client = FoxgloveClient::new();
-    let string = std_msgs::msg::String {
-        data: String::from("Hello"),
-    };
-    println!("std_msgs::msg::String: {}", string.data);
-    match client.connect(url).await {
-        Ok(()) => (),
-        Err(error) => eprintln!("connection failed! {error}"),
+
+    info!(%url, "Connecting to Foxglove bridge");
+    if let Err(error) = client.connect(url).await {
+        error!(%url, error = %error, "Foxglove connection failed");
+        return;
     }
+
+    info!(%url, "Connected to Foxglove bridge");
 
     // testing a hardcoded 4 id
     match client.subscribe(4).await {
-        Ok(id) => println!("SUCCESSFUL channel sub: {id}"),
-        Err(err) => println!("SUBCRIBE ERROR: {err}"),
+        Ok(id) => info!(subscription_id = id, "Subscribed to channel 4"),
+        Err(err) => error!(error = %err, "Subscription failed"),
     }
 
     let mut receiver = client.get_receiver();
@@ -29,14 +29,20 @@ async fn run_client(url: &str) {
             match msg {
                 Ok(ServerMessage::MessageData(data)) => {
                     match cdr::deserialize::<geometry_msgs::msg::Pose>(data.data.as_ref()) {
-                        Ok(decoded) => println!("successful cdr: {:?}", decoded),
-                        Err(e) => println!("Failed cdr deserialization, {e}"),
+                        Ok(decoded) => trace!(?decoded, "Received pose"),
+                        Err(error) => warn!(%error, "Failed to deserialize pose"),
                     }
                 }
                 Ok(ServerMessage::Advertise(adv)) => {
-                    println!("Advertise: {:?}", adv)
+                    debug!(?adv, "Received channel advertisement")
                 }
-                Err(e) => println!("{e}"),
+                Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                    debug!("Message channel closed; stopping receiver");
+                    break;
+                }
+                Err(tokio::sync::broadcast::error::RecvError::Lagged(count)) => {
+                    warn!(count, "Receiver missed messages");
+                }
                 _ => (),
             }
         }
@@ -45,12 +51,21 @@ async fn run_client(url: &str) {
 
 #[component]
 pub fn MissionControl() -> Element {
+    let node = use_context::<NodeHandle>();
+
     rsx! {
         h1 { "Mission Control Page" }
         Button {
             label: "Connect",
-            onclick:  |_| async move {
-                run_client("ws://localhost:8765").await
+            onclick: move |_| {
+                let mut node = node.clone();
+                async move {
+                    if let Err(e) = node.connect("ws://localhost:8765").await {
+                        info!("Failed: {:?},", e);
+                    } else {
+                        info!("Successful connect")
+                    }
+                }
             }
         }
     }

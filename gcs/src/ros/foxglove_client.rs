@@ -123,18 +123,19 @@ impl FoxgloveClient {
             let msg = msg?; // errors out of loop if socket message fails
             match msg {
                 Message::Text(text) => {
-                    let server_message: ServerMessage = match serde_json::from_str::<ServerMessage>(&text) {
-                        Ok(message) => message,
-                        Err(error) => {
-                            eprintln!("Failed to parse text server message: {error}");
-                            continue;
-                        }
-                    };
+                    let server_message: ServerMessage =
+                        match serde_json::from_str::<ServerMessage>(&text) {
+                            Ok(message) => message,
+                            Err(error) => {
+                                eprintln!("Failed to parse text server message: {error}");
+                                continue;
+                            }
+                        };
 
                     if let Err(error) = broadcaster.send(server_message) {
                         eprintln!("No active listeners for message: {:?}", error.0);
                     }
-                },
+                }
                 Message::Binary(bytes) => {
                     let parse_result = parse_binary_message(&bytes);
                     if parse_result.is_err() {
