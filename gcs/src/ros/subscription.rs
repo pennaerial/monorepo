@@ -1,42 +1,76 @@
 use ros_interfaces::RosMessage;
+use tokio::sync::mpsc;
 
-pub type SubscriptionCallback<T> = Box<dyn FnMut(T)>;
 pub type SubscriptionId = u32;
 
-// allows RosNode to dynamically point to any subscription that implements subscription base
-pub trait SubscriptionBase {
+#[derive(Debug)]
+pub enum DeliveryError {
+    Decode(cdr::Error),
+    Full,
+    Closed,
+}
+
+// allows RosNode to dynamically store SubscriptionBase trait objects
+pub trait SubscriptionSinkBase: Send {
     fn topic_name(&self) -> &str;
-
-    // run the callback for a SubscriptionBase interface
-    fn handle_callback(&mut self, bytes: &[u8]) -> Result<(), cdr::Error>;
+    fn send(&mut self, bytes: &[u8]) -> Result<(), DeliveryError>;
 }
 
-pub struct Subscription<T> {
+/// Type for sending data to a Subscription<T>'s receiver pair
+pub struct SubscriptionSink<T> {
+    subscription_id: SubscriptionId,
     topic_name: String,
-    // subscription_id: SubscriptionId, // does this need to be here?
-    callback: SubscriptionCallback<T>,
+    sender: mpsc::Sender<T>,
 }
 
-impl<T> Subscription<T> {
-    pub fn new(topic_name: String, callback: SubscriptionCallback<T>) -> Self {
+impl<T: RosMessage> SubscriptionSink<T> {
+    pub fn new(
+        subscription_id: SubscriptionId,
+        topic_name: String,
+        sender: mpsc::Sender<T>,
+    ) -> Self {
         Self {
+            subscription_id,
             topic_name,
-            callback,
+            sender,
         }
     }
 }
 
-impl<T: RosMessage> SubscriptionBase for Subscription<T> {
+impl<T: RosMessage + Send> SubscriptionSinkBase for SubscriptionSink<T> {
     fn topic_name(&self) -> &str {
         &self.topic_name
     }
 
-    fn handle_callback(&mut self, bytes: &[u8]) -> Result<(), cdr::Error> {
-        let message = T::deserialize(bytes)?;
-        (self.callback)(message);
+    fn send(&mut self, bytes: &[u8]) -> Result<(), DeliveryError> {
+        let message = T::deserialize(bytes).map_err(DeliveryError::Decode)?;
+        self.sender.try_send(message).map_err(|error| match error {
+            tokio::sync::mpsc::error::TrySendError::Full(_) => DeliveryError::Full,
+            tokio::sync::mpsc::error::TrySendError::Closed(_) => DeliveryError::Closed,
+        })?;
         Ok(())
     }
-
 }
-//
-// type TopicName = String;
+
+// Caller side
+
+/// Type for receiving data from a SubscriptionSink
+pub struct SubscriptionHandle<T> {
+    subscription_id: SubscriptionId,
+    topic_name: String,
+    receiver: mpsc::Receiver<T>,
+}
+
+impl<T: RosMessage> SubscriptionHandle<T> {
+    pub fn new(
+        subscription_id: SubscriptionId,
+        topic_name: String,
+        receiver: mpsc::Receiver<T>,
+    ) -> Self {
+        Self {
+            subscription_id,
+            topic_name,
+            receiver,
+        }
+    }
+}
