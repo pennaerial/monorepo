@@ -3,16 +3,29 @@
 namespace drivers
 {
 
-// void Encoder::write_latest(const sensor_msgs_msg_encoder& msg)
-// {
-//   util::StaticMutexGuard lock(mtx_);
-//   reading_ = msg;
-// }
+void Encoder::write_latest(const payload_interfaces_msg_MotorState& msg)
+{
+  util::StaticMutexGuard lock(mtx_);
+  reading_ = msg;
+  ++update_count_;
+}
 
-// sensor_msgs_msg_Imu Encoder::get_latest()
-// {
-//   util::StaticMutexGuard lock(mtx_);
-//   return reading_;
-// }
+payload_interfaces_msg_MotorState Encoder::get_latest()
+{
+  util::StaticMutexGuard lock(mtx_);
+  return reading_;
+}
+
+bool Encoder::get_latest_if_updated(uint32_t& last_update_count, payload_interfaces_msg_MotorState& msg)
+{
+  util::StaticMutexGuard lock(mtx_);
+  if (update_count_ == last_update_count) {
+    return false;
+  }
+
+  msg = reading_;
+  last_update_count = update_count_;
+  return true;
+}
 
 }  // namespace drivers
