@@ -49,16 +49,10 @@ void Payload::init()
 
 void Payload::update()
 {
-  #if defined(CONFIG_IDF_TARGET_LINUX)
   publish_sensor_debug();
 
   motor_updates();
-  # else
-  update_pose();
-  #endif
 }
-
-void update_pose();
 
 void Payload::motor_updates()
 {
