@@ -77,13 +77,12 @@ void ICM20948::start()
   vTaskDelay(pdMS_TO_TICKS(100));
 
   switchBank(BANK_0);
-  // Wake IMU & Accelerometer / Gyro
   writeToRegister(B0_PWR_MGMT_1_REG, 0x01);  // Sets the sleep bit (bit 6) to 0 to turn it on
-  ESP_LOGI(TAG, "Established connection to ICM20948");
 
   uint8_t pwr1 = readFromRegister(B0_PWR_MGMT_1_REG);
   ESP_LOGI(TAG, "PWR MGMT 1: %i", pwr1);
 
+  // Wake IMU & Accelerometer / Gyro
   writeToRegister(
       B0_PWR_MGMT_2_REG, 0x00
   );  // Sets the first 6 bits to 0 which enables all 3 axes of gyro & accelerometer
