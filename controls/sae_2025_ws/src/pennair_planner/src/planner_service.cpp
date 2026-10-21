@@ -38,6 +38,10 @@ public:
     //Creating publisher for path
     path_pub_ = this->create_publisher<nav_msgs::msg::Path>(
     "/planned_path", 10
+
+    //Copy this line and customize endpoints to change displayed path
+    /*ros2 service call /plan_path pennair_planner/srv/PlanPath \
+    "{start_pose: {position: {x: 0.0, y: 0.0, z: 0.0}, orientation: {w: 1.0}}, goal_pose: {position: {x: 5.0, y: 3.0, z: 0.0}, orientation: {w: 1.0}}}"*/
 );
   }
 
