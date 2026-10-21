@@ -34,11 +34,18 @@ public:
     this->service_ = this->create_service<PlanPath>(
         "plan_path", std::bind(&PlannerService::handle_plan_path, this, std::placeholders::_1, std::placeholders::_2)
     );
+
+    //Creating publisher for path
+    path_pub_ = this->create_publisher<nav_msgs::msg::Path>(
+    "/planned_path", 10
+);
   }
 
 private:
   rclcpp::Service<PlanPath>::SharedPtr service_;
   std::unique_ptr<PathPlanner> planner_;
+  //Publisher pointer so the path can actually be sent to RViz
+  rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_pub_;
 
   /**
    * @brief Runs the planner and fills in the response.
@@ -59,10 +66,13 @@ private:
 
     nav_msgs::msg::Path& path = response->path;
     path.header.stamp = this->now();
-    path.header.frame_id = "map";
+    //Changed header to "world" in order to display path more easily in RViz
+    path.header.frame_id = "world";
 
     if (planner_->plan(request->start_pose, request->goal_pose, path)) {
       RCLCPP_INFO(this->get_logger(), "Planned path with %zu poses", path.poses.size());
+      //Publishing path if the response succeeded
+      path_pub_->publish(path);
     } else {
       // The response has no success flag, so a failed plan is reported as an empty path
       path.poses.clear();
