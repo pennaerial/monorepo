@@ -34,6 +34,8 @@ public:
   /// Gets singleton instance of imu implementation (sitl, hardware). implemented in backend .cpp
   /// files, not imu.cpp
   static IMU* instance();
+  /// Polls the sensor; backends receiving samples asynchronously need no work here.
+  virtual void update() {}
 
 protected:
   IMU() = default;  // prevent public instantiation

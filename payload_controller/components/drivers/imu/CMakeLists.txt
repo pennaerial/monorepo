@@ -3,13 +3,13 @@ set(priv_requires DDS)
 set(requires util)
 
 # TODO: Remove these cmake defined args for kconfig later
-set(IMU_MODEL "hw" CACHE STRING "Hardware IMU model")
-set_property(CACHE IMU_MODEL PROPERTY STRINGS hw lsm6dso)
+set(IMU_MODEL "icm20948" CACHE STRING "Hardware IMU model")
+set_property(CACHE IMU_MODEL PROPERTY STRINGS icm20948 lsm6dso)
 
 if(IDF_TARGET STREQUAL "linux")
     list(APPEND srcs "imu_sitl.cpp")
-elseif(IMU_MODEL STREQUAL "hw")
-    list(APPEND srcs "imu_hw.cpp")
+elseif(IMU_MODEL STREQUAL "icm20948")
+    list(APPEND srcs "icm20948.cpp")
 elseif(IMU_MODEL STREQUAL "lsm6dso")
     list(APPEND srcs "lsm6dso.cpp")
 else()
