@@ -10,13 +10,20 @@ namespace drivers
 class ICM20948 : public IMU
 {
 public:
+  // The general update loop grabbing the sensor data and doing minor processing
   void update() override;
-  void getSensorData();
+  // Actually fetching the sensor data from the registers on the IMU
+  void get_sensor_data();
+  // Setting up the I2C communication and enabling the IMU & its individual sensors
   void start() override;
-  void switchBank(uint8_t bankNum);
-  void writeToRegister(uint8_t reg, uint8_t data);
-  uint8_t readFromRegister(uint8_t reg);
-  void multiReadStartingAtRegister(uint8_t startReg, uint8_t* readBuffer, size_t count);
+  // Swaps the bank to which we are sending our reads / writes to
+  void switch_bank(uint8_t bankNum);
+  // Writes one byte of data to one specific register in the current selected bank
+  void write_to_register(uint8_t reg, uint8_t data);
+  // Reads one byte of data from one specific register in the current selected bank
+  uint8_t read_from_register(uint8_t reg);
+  // Reads <count> bytes of data starting at one register and getting the consecutive registers in the current bank
+  void multi_read_starting_at_register(uint8_t startReg, uint8_t* readBuffer, size_t count);
 
 private:
   double tempC;

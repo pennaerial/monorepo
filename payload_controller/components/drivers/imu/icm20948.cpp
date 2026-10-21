@@ -25,6 +25,10 @@ const float ACCEL_SENSITIVITY = 16384.0f;
 const float GYRO_SENSITIVITY = 131.0f;
 const float TEMP_SENSITIVITY = 333.87f;
 
+const gpio_num_t IMU_SDA_PIN = GPIO_NUM_3;
+const gpio_num_t IMU_SCL_PIN = GPIO_NUM_4;
+const gpio_num_t IMU_I2C_POWER = GPIO_NUM_7;
+
 }  // namespace
 
 namespace drivers
@@ -40,9 +44,9 @@ IMU* IMU::instance()
 void ICM20948::start()
 {
   // Apparently necessary as the I2C port is initially unpowered
-  gpio_reset_pin(GPIO_NUM_7);
-  gpio_set_direction(GPIO_NUM_7, GPIO_MODE_OUTPUT);
-  gpio_set_level(GPIO_NUM_7, 1);  // 1 = High
+  gpio_reset_pin(IMU_I2C_POWER);
+  gpio_set_direction(IMU_I2C_POWER, GPIO_MODE_OUTPUT);
+  gpio_set_level(IMU_I2C_POWER, 1);  // 1 = High
 
   // Wait for power on
   vTaskDelay(pdMS_TO_TICKS(100));
@@ -50,8 +54,8 @@ void ICM20948::start()
   // Setup the I2C port
   i2c_mst_config = {
       .i2c_port = I2C_NUM_0,  // Us defining it
-      .sda_io_num = GPIO_NUM_3,
-      .scl_io_num = GPIO_NUM_4,
+      .sda_io_num = IMU_SDA_PIN,
+      .scl_io_num = IMU_SCL_PIN,
       .clk_source = I2C_CLK_SRC_DEFAULT,
       .glitch_ignore_cnt = 7,
       .intr_priority = 0,
@@ -72,35 +76,35 @@ void ICM20948::start()
 
   ESP_ERROR_CHECK(i2c_master_bus_add_device(bus_handle, &dev_cfg, &dev_handle));
 
-  switchBank(BANK_0);
-  writeToRegister(B0_PWR_MGMT_1_REG, 0x80);  // Device reset
+  switch_bank(BANK_0);
+  write_to_register(B0_PWR_MGMT_1_REG, 0x80);  // Device reset
   vTaskDelay(pdMS_TO_TICKS(100));
 
-  switchBank(BANK_0);
-  writeToRegister(B0_PWR_MGMT_1_REG, 0x01);  // Sets the sleep bit (bit 6) to 0 to turn it on
+  switch_bank(BANK_0);
+  write_to_register(B0_PWR_MGMT_1_REG, 0x01);  // Sets the sleep bit (bit 6) to 0 to turn it on
 
-  uint8_t pwr1 = readFromRegister(B0_PWR_MGMT_1_REG);
+  uint8_t pwr1 = read_from_register(B0_PWR_MGMT_1_REG);
   ESP_LOGI(TAG, "PWR MGMT 1: %i", pwr1);
 
   // Wake IMU & Accelerometer / Gyro
-  writeToRegister(
+  write_to_register(
       B0_PWR_MGMT_2_REG, 0x00
   );  // Sets the first 6 bits to 0 which enables all 3 axes of gyro & accelerometer
-  uint8_t pwr2 = readFromRegister(B0_PWR_MGMT_2_REG);
+  uint8_t pwr2 = read_from_register(B0_PWR_MGMT_2_REG);
   ESP_LOGI(TAG, "PWR MGMT 2: %i", pwr2);
 
-  uint8_t who = readFromRegister(B0_WHO_AM_I_REG);
+  uint8_t who = read_from_register(B0_WHO_AM_I_REG);
   ESP_LOGI(TAG, "Who is the device?: %i", who);
 }
 
-void ICM20948::writeToRegister(uint8_t reg, uint8_t data)
+void ICM20948::write_to_register(uint8_t reg, uint8_t data)
 {
   const uint8_t wr_buffer[2] = {reg, data};
   // 2 indicates a 2 byte write, -1 indicates infinite timeout (ms)
   ESP_ERROR_CHECK(i2c_master_transmit(dev_handle, wr_buffer, 2, -1));
 }
 
-uint8_t ICM20948::readFromRegister(uint8_t reg)
+uint8_t ICM20948::read_from_register(uint8_t reg)
 {
   uint8_t rd_buffer;
   // First 1 indicates 1 byte write, Second 1 indicates 1 byte read, -1 indicates infinite timeout (ms)
@@ -109,12 +113,12 @@ uint8_t ICM20948::readFromRegister(uint8_t reg)
   return rd_buffer;
 }
 
-void ICM20948::switchBank(uint8_t bankNum)
+void ICM20948::switch_bank(uint8_t bankNum)
 {
-  writeToRegister(REG_BANK_SEL_REG, bankNum);
+  write_to_register(REG_BANK_SEL_REG, bankNum);
 }
 
-void ICM20948::multiReadStartingAtRegister(uint8_t startReg, uint8_t* readBuffer, size_t count)
+void ICM20948::multi_read_starting_at_register(uint8_t startReg, uint8_t* readBuffer, size_t count)
 {
   ESP_ERROR_CHECK(i2c_master_transmit_receive(
       dev_handle, &startReg, 1, readBuffer, count,
@@ -124,14 +128,14 @@ void ICM20948::multiReadStartingAtRegister(uint8_t startReg, uint8_t* readBuffer
 
 void ICM20948::update()
 {
-  getSensorData();
+  get_sensor_data();
 }
 
-void ICM20948::getSensorData()
+void ICM20948::get_sensor_data()
 {
   // Read all consecutive sensor data for Accelerometer to Gyro to Temp readings
   uint8_t readBuffer[14];
-  multiReadStartingAtRegister(B0_ACCEL_XOUT_H_REG, readBuffer, 14);
+  multi_read_starting_at_register(B0_ACCEL_XOUT_H_REG, readBuffer, 14);
 
   // Merge High and Low bytes
   for (int i = 0; i < 7; i++) {
