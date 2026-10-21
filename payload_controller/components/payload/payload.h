@@ -15,6 +15,7 @@ public:
   void update();
   void publish_sensor_debug();
   void motor_updates();
+  void update_pose();
 
   static Payload* instance();
 
