@@ -50,27 +50,29 @@ impl<T: RosMessage + Send> SubscriptionSinkBase for SubscriptionSink<T> {
 
 // Caller side
 
-/// Type for receiving data from a SubscriptionSink
-pub struct SubscriptionHandle<T> {
+/// Keeps a subscription callback running until this handle is dropped.
+pub struct SubscriptionHandle {
     subscription_id: SubscriptionId,
     topic_name: String,
-    receiver: mpsc::Receiver<T>,
+    task: tokio::task::JoinHandle<()>,
 }
 
-impl<T: RosMessage> SubscriptionHandle<T> {
+impl SubscriptionHandle {
     pub fn new(
         subscription_id: SubscriptionId,
         topic_name: String,
-        receiver: mpsc::Receiver<T>,
+        task: tokio::task::JoinHandle<()>,
     ) -> Self {
         Self {
             subscription_id,
             topic_name,
-            receiver,
+            task,
         }
     }
+}
 
-    pub async fn recv(&mut self) -> Option<T> {
-        self.receiver.recv().await
+impl Drop for SubscriptionHandle {
+    fn drop(&mut self) {
+        self.task.abort();
     }
 }

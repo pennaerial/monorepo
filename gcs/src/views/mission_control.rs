@@ -1,6 +1,6 @@
 use crate::components::{Button, SideBar};
 use crate::ros::server_types::ServerMessage;
-use crate::ros::{FoxgloveClient, NodeHandle};
+use crate::ros::{FoxgloveClient, NodeHandle, SubscriptionHandle};
 use dioxus::prelude::*;
 use ros_interfaces::{geometry_msgs, std_msgs};
 
@@ -56,7 +56,10 @@ pub fn MissionControl() -> Element {
     // TODO: need to figure out a way to avoid all of these clones...
     let connect_node = node.clone();
     let sub_node = node.clone();
-    let mut string_msg = use_signal(String::new);
+    let mut string_msg = use_signal_sync(String::new);
+
+    // use a signal here keep SubscriptionHandle alive
+    let mut subscription = use_signal(|| None::<SubscriptionHandle>);
 
     rsx! {
 
@@ -93,19 +96,16 @@ pub fn MissionControl() -> Element {
                 let node = sub_node.clone();
 
                 async move {
-                    let mut sub = match node
-                        .create_subscription::<std_msgs::msg::String>("/chatter", 10)
+                    match node
+                        .create_subscription::<std_msgs::msg::String, _>(
+                            "/chatter",
+                            10,
+                            move |message| string_msg.set(message.data),
+                        )
                         .await
                     {
-                        Ok(sub) => sub,
-                        Err(e) => {
-                            error!("Subscription failed: {e:?}");
-                            return;
-                        }
-                    };
-
-                    while let Some(message) = sub.recv().await {
-                        string_msg.set(message.data);
+                        Ok(sub) => subscription.set(Some(sub)),
+                        Err(e) => error!("Subscription failed: {e:?}"),
                     }
 
                 }
