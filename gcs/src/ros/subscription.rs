@@ -13,6 +13,7 @@ pub enum DeliveryError {
 // allows RosNode to dynamically store SubscriptionBase trait objects
 pub trait SubscriptionSinkBase: Send {
     fn topic_name(&self) -> &str;
+    fn is_closed(&self) -> bool;
     fn send(&mut self, bytes: &[u8]) -> Result<(), DeliveryError>;
 }
 
@@ -31,6 +32,10 @@ impl<T: RosMessage> SubscriptionSink<T> {
 impl<T: RosMessage + Send> SubscriptionSinkBase for SubscriptionSink<T> {
     fn topic_name(&self) -> &str {
         &self.topic_name
+    }
+
+    fn is_closed(&self) -> bool {
+        self.sender.is_closed()
     }
 
     fn send(&mut self, bytes: &[u8]) -> Result<(), DeliveryError> {
