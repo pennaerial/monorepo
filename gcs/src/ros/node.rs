@@ -170,24 +170,34 @@ pub struct NodeHandle {
 }
 
 impl NodeHandle {
-    pub async fn create_subscription<T: RosMessage + Send + 'static>(
+    /// Creates a subscription whose callback runs on a Tokio task.
+    /// Keep the returned handle alive to continue receiving messages.
+    pub async fn create_subscription<T, F>(
         &self,
         topic: &str,
         depth: usize,
-    ) -> Result<SubscriptionHandle<T>, NodeError> {
-        let (sender, receiver) = mpsc::channel::<T>(depth);
-
-        let subscription_sink: SubscriptionSink<T> =
-            SubscriptionSink::new(topic.to_owned(), sender);
-        let id_result = self
+        mut callback: F,
+    ) -> Result<SubscriptionHandle, NodeError>
+    where
+        T: RosMessage + Send + 'static,
+        F: FnMut(T) + Send + 'static,
+    {
+        let (sender, mut receiver) = mpsc::channel::<T>(depth);
+        let sink = SubscriptionSink::new(topic.to_owned(), sender);
+        let id = self
             .send_request(|reply| NodeCommand::CreateSubscription {
-                sink: Box::new(subscription_sink),
+                sink: Box::new(sink),
                 reply,
             })
-            .await;
+            .await?;
 
-        let id = id_result?;
-        Ok(SubscriptionHandle::new(id, topic.to_owned(), receiver))
+        let task = tokio::spawn(async move {
+            while let Some(message) = receiver.recv().await {
+                callback(message);
+            }
+        });
+
+        Ok(SubscriptionHandle::new(id, topic.to_owned(), task))
     }
 
     pub async fn connect(&self, url: &str) -> Result<(), NodeError> {
