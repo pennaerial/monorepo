@@ -71,7 +71,7 @@ def launch_setup(context) -> list[Action]:
     ## create actions
     actions = []
 
-    #Adding container so that the planner service launches by itself
+    # Adding container so that the planner service launches by itself
     planner_container = ComposableNodeContainer(
         name="planner_container",
         namespace="",
