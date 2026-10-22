@@ -7,12 +7,13 @@
 namespace pennair_vision
 {
 
-void BasicVision::initialize(const rclcpp::Node::SharedPtr& node)
+ProcessResult<std_msgs::msg::Int32> BasicVision::process(
+    const CameraImage image,
+    const CameraInfo /* info */
+)
 {
-  RCLCPP_INFO(node->get_logger(), "BasicVision plugin started!");
+  return {std_msgs::msg::Int32{}, nullptr};
 }
-
-void BasicVision::process(sensor_msgs::msg::Image::ConstSharedPtr& image) {}
 
 };  // namespace pennair_vision
 
