@@ -5,10 +5,10 @@ from ament_index_python import get_package_share_path
 from launch import Action, LaunchDescription
 from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.substitutions import Command, FindExecutable
-from launch_ros.actions import Node, ComposableNodeContainer
+from launch_ros.actions import ComposableNodeContainer, Node
+from launch_ros.descriptions import ComposableNode
 from launch_ros.parameter_descriptions import ParameterValue
 from pydantic import ValidationError
-from launch_ros.descriptions import ComposableNode
 from vehicle_common.launch_utils import (
     LaunchError,
     check_unknown_launch_args,
