@@ -30,7 +30,7 @@ void VisionManager::init_plugins()
     try {
       plugin_map_[plugin_name].plugin_instance_ = plugin_loader_.createUniqueInstance(plugin_name);
       plugin_map_[plugin_name].plugin_instance_->initialize(
-          shared_from_this(), "/camera/raw"
+          shared_from_this(), "/camera/image_raw"
       );  // TODO: camera topic is hardcoded for now
     } catch (const pluginlib::PluginlibException& ex) {
       RCLCPP_ERROR(get_logger(), "Failed to create plugin: %s", ex.what());

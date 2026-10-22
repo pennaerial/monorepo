@@ -2,6 +2,8 @@
 
 #include "pennair_vision/vision_plugin.hpp"
 #include "rclcpp/logger.hpp"
+#include "sensor_msgs/msg/image.h"
+#include "sensor_msgs/msg/image.hpp"
 
 
 namespace pennair_vision
@@ -9,10 +11,15 @@ namespace pennair_vision
 
 ProcessResult<std_msgs::msg::Int32> BasicVision::process(
     const CameraImage image,
-    const CameraInfo /* info */
+    const CameraInfo /* info */,
+    bool generate_debug
 )
 {
-  return {std_msgs::msg::Int32{}, nullptr};
+  ProcessResult<std_msgs::msg::Int32> result;
+  if (generate_debug) {
+    result.debug_image = cv_bridge::toCvCopy(image, "bgr8")->image;
+  }
+  return result;
 }
 
 };  // namespace pennair_vision

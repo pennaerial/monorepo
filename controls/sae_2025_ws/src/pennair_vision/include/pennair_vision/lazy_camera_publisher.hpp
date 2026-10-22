@@ -3,6 +3,8 @@
 #include <image_transport/camera_publisher.hpp>
 #include <image_transport/camera_subscriber.hpp>
 #include <memory>
+#include <cv_bridge/cv_bridge.hpp>
+#include <opencv2/core/mat.hpp>
 #include <rclcpp/publisher.hpp>
 #include <string>
 
@@ -18,7 +20,8 @@ using CameraInfo = sensor_msgs::msg::CameraInfo::ConstSharedPtr;
 template <typename MessageT>
 struct ProcessResult {
   MessageT message;
-  sensor_msgs::msg::Image::SharedPtr debug_image;
+  /// Optional BGR8 image; leave empty when debug output is not requested.
+  cv::Mat debug_image;
 };
 
 namespace pennair_vision
@@ -38,7 +41,7 @@ public:
   void start() override;
 
   /// Runs the CV alg implementation and returns the ProcessResult type
-  virtual ProcessResult<MessageT> process(const CameraImage image, const CameraInfo info) = 0;
+  virtual ProcessResult<MessageT> process(const CameraImage image, const CameraInfo info, bool generate_debug) = 0;
 
 
 private:
@@ -64,6 +67,7 @@ void LazyCameraPublisher<MessageT>::initialize(const rclcpp::Node::SharedPtr& no
   node_ = node;
   it_ = std::make_shared<image_transport::ImageTransport>(node_->shared_from_this());
   cv_debug_pub_ = it_->advertise("/cv/debug", 1);
+  cv_result_pub_ = node_->create_publisher<MessageT>("/cv/result", 10);
 
   start();
 }
@@ -73,10 +77,12 @@ template <typename MessageT>
 void LazyCameraPublisher<MessageT>::start()
 {
   camera_sub_ = it_->subscribeCamera(camera_topic_, 1, [this](const CameraImage image, const CameraInfo info) {
-    if (cv_result_pub_->get_subscription_count() > 0 || cv_debug_pub_.getNumSubscribers() > 0) {
-      ProcessResult<MessageT> result = process(image, info);
-      if (cv_debug_pub_.getNumSubscribers() > 0) {
-        cv_debug_pub_.publish(result.debug_image);
+    const bool generate_debug = cv_debug_pub_.getNumSubscribers() > 0;
+    if (cv_result_pub_->get_subscription_count() > 0 || generate_debug) {
+      ProcessResult<MessageT> result = process(image, info, generate_debug);
+      if (generate_debug && !result.debug_image.empty()) {
+        cv_debug_pub_.publish(
+            cv_bridge::CvImage(image->header, "bgr8", result.debug_image).toImageMsg());
       }
       cv_result_pub_->publish(result.message);
     }
