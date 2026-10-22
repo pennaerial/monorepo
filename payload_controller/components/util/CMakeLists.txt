@@ -1,5 +1,5 @@
 idf_component_register(
-    SRCS ""
+    SRCS "pid.cpp"
     INCLUDE_DIRS "."
     REQUIRES freertos
 )
