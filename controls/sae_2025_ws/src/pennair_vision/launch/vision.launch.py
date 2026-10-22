@@ -86,7 +86,6 @@ def launch_setup(context) -> list[Action]:
             ],
             extra_arguments=[
                 {"use_intra_process_comms": True},
-                {"log_level": "debug" if debug else "info"},
             ],
         ),
     ]
@@ -108,6 +107,11 @@ def launch_setup(context) -> list[Action]:
             namespace="",
             package="rclcpp_components",
             executable="component_container_mt",
+            arguments=[
+                "--ros-args",
+                "--log-level",
+                f"{node_name}:={'debug' if debug else 'info'}",
+            ],
             composable_node_descriptions=composable_nodes,
             output="screen",
         )
