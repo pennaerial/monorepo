@@ -15,6 +15,7 @@ find_package(sensor_msgs REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(rclcpp_components REQUIRED) # for vision_manager_component
 find_package(ament_cmake_python REQUIRED) # for pennair_vision python module
+find_package(image_transport REQUIRED) # for pennair_vision lazy publisher
 
 include_directories(include)
 
@@ -52,8 +53,16 @@ add_library(vision_plugins SHARED
     src/plugins/basic_vision.cpp
 )
 
+add_library(lazy_camera_publisher SHARED
+    src/lazy_camera_publisher.cpp
+)
 
 target_include_directories(vision_plugins PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
+
+target_include_directories(lazy_camera_publisher PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
@@ -66,8 +75,11 @@ ament_target_dependencies(vision_plugins
 
 pluginlib_export_plugin_description_file(pennair_vision plugins.xml)
 
-
-
+ament_target_dependencies(lazy_camera_publisher
+    rclcpp
+    sensor_msgs
+    image_transport
+)
 
 install(TARGETS
     vision_manager_component

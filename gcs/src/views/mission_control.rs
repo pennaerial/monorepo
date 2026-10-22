@@ -1,4 +1,4 @@
-use crate::components::Button;
+use crate::components::{Button, SideBar};
 use crate::ros::server_types::ServerMessage;
 use crate::ros::{FoxgloveClient, NodeHandle};
 use dioxus::prelude::*;
@@ -54,19 +54,35 @@ pub fn MissionControl() -> Element {
     let node = use_context::<NodeHandle>();
 
     rsx! {
-        h1 { "Mission Control Page" }
-        Button {
-            label: "Connect",
-            onclick: move |_| {
-                let mut node = node.clone();
-                async move {
-                    if let Err(e) = node.connect("ws://localhost:8765").await {
-                        info!("Failed: {:?},", e);
-                    } else {
-                        info!("Successful connect")
-                    }
+
+        div {
+            class: "app-layout",
+            SideBar {}
+
+            main {
+                class: "main-content",
+
+                h1 { class: "page-title",
+                "Mission Control Page" 
                 }
+
+
+                Button {
+                    label: "Connect",
+                    onclick: move |_| {
+                        let mut node = node.clone();
+                        async move {
+                            if let Err(e) = node.connect("ws://localhost:8765").await {
+                                info!("Failed: {:?},", e);
+                            } else {
+                                info!("Successful connect")
+                            }
+                        }
+                    }
+                }        
             }
         }
     }
 }
+        
+

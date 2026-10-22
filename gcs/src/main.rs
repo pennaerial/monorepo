@@ -1,11 +1,12 @@
 mod components;
 mod ros;
 mod views;
+mod routes;
 
 use dioxus::prelude::*;
 use dioxus::{logger, logger::tracing};
 
-use views::MissionControl;
+use routes::Route;
 
 use crate::ros::RosNode;
 
@@ -33,6 +34,6 @@ fn App() -> Element {
 
     rsx! {
         document::Link { rel: "stylesheet", href: TAILWIND_CSS }
-        MissionControl {}
+        Router::<Route> {}
     }
 }
