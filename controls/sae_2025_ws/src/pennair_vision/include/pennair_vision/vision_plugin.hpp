@@ -3,6 +3,7 @@
 #include <rclcpp/node.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/image.hpp>
+#include <pennair_vision/lazy_camera_publisher.hpp>
 
 namespace pennair_vision
 {
@@ -13,11 +14,9 @@ public:
   virtual ~VisionPlugin() = default;
 
   /// Initialize the plugin by passing in ROS node
-  virtual void initialize(const rclcpp::Node::SharedPtr& node) = 0;
+  virtual void initialize(const rclcpp::Node::SharedPtr& node, const std::string& topic) = 0;
 
-  /// Run the VisionPlugin impl and publish the results
-  virtual void process(sensor_msgs::msg::Image::ConstSharedPtr& image) = 0;
+  virtual void start() = 0;
 };
-
 
 }  // namespace pennair_vision

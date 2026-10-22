@@ -13,6 +13,7 @@
   <depend>rclcpp</depend>
   <depend>std_msgs</depend>
   <depend>sensor_msgs</depend>
+  <depend>image_transport</depend>
   <depend>pluginlib</depend>
   <depend>rclcpp_components</depend>
 
