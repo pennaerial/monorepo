@@ -1,10 +1,11 @@
 #pragma once
 
+#include <cv_bridge/cv_bridge.hpp>
 #include <image_transport/camera_publisher.hpp>
 #include <image_transport/camera_subscriber.hpp>
 #include <memory>
-#include <cv_bridge/cv_bridge.hpp>
 #include <opencv2/core/mat.hpp>
+#include <rclcpp/logging.hpp>
 #include <rclcpp/publisher.hpp>
 #include <string>
 
@@ -81,9 +82,10 @@ void LazyCameraPublisher<MessageT>::start()
     if (cv_result_pub_->get_subscription_count() > 0 || generate_debug) {
       ProcessResult<MessageT> result = process(image, info, generate_debug);
       if (generate_debug && !result.debug_image.empty()) {
-        cv_debug_pub_.publish(
-            cv_bridge::CvImage(image->header, "bgr8", result.debug_image).toImageMsg());
+        RCLCPP_DEBUG(node_->get_logger(), "publishing debug image!");
+        cv_debug_pub_.publish(cv_bridge::CvImage(image->header, "bgr8", result.debug_image).toImageMsg());
       }
+      RCLCPP_DEBUG(node_->get_logger(), "publishing image result!");
       cv_result_pub_->publish(result.message);
     }
   });
