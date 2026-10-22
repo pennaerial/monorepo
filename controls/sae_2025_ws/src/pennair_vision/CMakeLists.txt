@@ -29,6 +29,7 @@ ament_target_dependencies(vision_manager_component
     std_msgs
     sensor_msgs
     pluginlib
+    image_transport
 )
 
 rclcpp_components_register_nodes(vision_manager_component
@@ -46,6 +47,7 @@ ament_target_dependencies(vision_manager
     std_msgs
     sensor_msgs
     pluginlib
+    image_transport
 )
 
 # Dynamically loaded plugins
@@ -71,6 +73,7 @@ ament_target_dependencies(vision_plugins
     rclcpp
     pluginlib
     sensor_msgs
+    image_transport
 )
 
 pluginlib_export_plugin_description_file(pennair_vision plugins.xml)
@@ -121,6 +124,6 @@ install_python_entry_point(basic_vision_py pennair_vision.basic_vision main)
 
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
 ament_export_include_directories(include)
-ament_export_dependencies(rclcpp std_msgs sensor_msgs pluginlib)
+ament_export_dependencies(rclcpp std_msgs sensor_msgs pluginlib image_transport)
 
 ament_package()
