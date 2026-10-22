@@ -5,7 +5,8 @@ from ament_index_python import get_package_share_path
 from launch import Action, LaunchDescription
 from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.substitutions import Command, FindExecutable
-from launch_ros.actions import Node
+from launch_ros.actions import ComposableNodeContainer, Node
+from launch_ros.descriptions import ComposableNode
 from launch_ros.parameter_descriptions import ParameterValue
 from pydantic import ValidationError
 from vehicle_common.launch_utils import (
@@ -69,6 +70,25 @@ def launch_setup(context) -> list[Action]:
 
     ## create actions
     actions = []
+
+    # Adding container so that the planner service launches by itself
+    planner_container = ComposableNodeContainer(
+        name="planner_container",
+        namespace="",
+        package="rclcpp_components",
+        executable="component_container",
+        composable_node_descriptions=[
+            ComposableNode(
+                package="pennair_planner",
+                plugin="pennair_planner::PlannerService",
+                name="planner_service",
+                parameters=[{"use_sim_time": True}],
+            )
+        ],
+        output="screen",
+    )
+
+    actions.append(planner_container)
 
     payload_mode_manager = Node(
         executable="payload_mission",
