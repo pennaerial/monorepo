@@ -1,6 +1,5 @@
 #pragma once
 
-#include <chrono>
 #include <image_transport/camera_publisher.hpp>
 #include <image_transport/camera_subscriber.hpp>
 #include <memory>
@@ -8,8 +7,8 @@
 #include <string>
 
 #include "image_transport/image_transport.hpp"
-#include "rclcpp/node.hpp"
 #include "pennair_vision/vision_plugin.hpp"
+#include "rclcpp/node.hpp"
 #include "sensor_msgs/msg/camera_info.hpp"
 #include "sensor_msgs/msg/image.hpp"
 
@@ -24,6 +23,7 @@ struct ProcessResult {
 
 namespace pennair_vision
 {
+
 template <typename MessageT>
 class LazyCameraPublisher : public VisionPlugin
 {
@@ -58,8 +58,7 @@ private:
 };
 
 template <typename MessageT>
-void LazyCameraPublisher<MessageT>::initialize(
-    const rclcpp::Node::SharedPtr& node, const std::string& camera_topic)
+void LazyCameraPublisher<MessageT>::initialize(const rclcpp::Node::SharedPtr& node, const std::string& camera_topic)
 {
   camera_topic_ = camera_topic;
   node_ = node;
@@ -73,20 +72,15 @@ void LazyCameraPublisher<MessageT>::initialize(
 template <typename MessageT>
 void LazyCameraPublisher<MessageT>::start()
 {
-  camera_sub_ = it_->subscribeCamera(
-      camera_topic_, 1,
-      [this](
-          const CameraImage image, const CameraInfo info
-      ) {
-        if (cv_result_pub_->get_subscription_count() > 0 || cv_debug_pub_.getNumSubscribers() > 0) {
-          ProcessResult<MessageT> result = process(image, info);
-          if (cv_debug_pub_.getNumSubscribers() > 0) {
-            cv_debug_pub_.publish(result.debug_image);
-          }
-          cv_result_pub_->publish(result.message);
-        }
+  camera_sub_ = it_->subscribeCamera(camera_topic_, 1, [this](const CameraImage image, const CameraInfo info) {
+    if (cv_result_pub_->get_subscription_count() > 0 || cv_debug_pub_.getNumSubscribers() > 0) {
+      ProcessResult<MessageT> result = process(image, info);
+      if (cv_debug_pub_.getNumSubscribers() > 0) {
+        cv_debug_pub_.publish(result.debug_image);
       }
-  );
+      cv_result_pub_->publish(result.message);
+    }
+  });
 }
 
 }  // namespace pennair_vision

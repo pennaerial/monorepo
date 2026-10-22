@@ -3,7 +3,6 @@
 #include <rclcpp/node.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/image.hpp>
-#include <pennair_vision/lazy_camera_publisher.hpp>
 
 namespace pennair_vision
 {
