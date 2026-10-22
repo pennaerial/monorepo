@@ -28,7 +28,10 @@ namespace drivers
 {
 
 
-Encoder_SITL::Encoder_SITL(PayloadCorner corner) : Encoder(corner), sitl_config_(sitl::get_config()) {}
+Encoder_SITL::Encoder_SITL(const EncoderConfig& config)
+    : sitl_config_(sitl::get_config()), joint_name_(config.sitl_joint_name)
+{
+}
 
 void Encoder_SITL::start()
 {
@@ -38,7 +41,7 @@ void Encoder_SITL::start()
   if (!gz_node_.Subscribe(topic, &Encoder_SITL::on_encoder_msg, this)) {
     ESP_LOGE(TAG, "Failed to subscribe to encoder topic %s", topic);
   } else {
-    ESP_LOGI(TAG, "Subscribed %s encoder to topic %s", payload_corner_name(corner()), topic);
+    ESP_LOGI(TAG, "Subscribed %s encoder to topic %s", joint_name_, topic);
   }
 }
 
@@ -49,42 +52,20 @@ void Encoder_SITL::make_encoder_topic(char* buf, std::size_t size)
 
 void Encoder_SITL::on_encoder_msg(const gz::msgs::Model& gz_msg)
 {
-  payload_interfaces_msg_MotorState msg = get_latest();
-  bool found_wheel = false;
-  const char* joint_name = payload_corner_wheel_joint_name(corner());
-
   for (int i = 0; i < gz_msg.joint_size(); ++i) {
     const gz::msgs::Joint& joint = gz_msg.joint(i);
-    if (!joint.has_axis1()) {
+    if (!joint.has_axis1() || joint.name() != joint_name_) {
       continue;
     }
 
-    const int64_t ticks = radians_to_encoder_ticks(joint.axis1().position());
-    if (joint.name() == joint_name) {
-      if (payload_corner_is_left(corner())) {
-        msg.left_encoder_count = ticks;
-      } else {
-        msg.right_encoder_count = ticks;
-      }
-      found_wheel = true;
-      break;
-    }
-  }
-
-  if (!found_wheel) {
-    ++missing_wheel_joint_count_;
-    if (missing_wheel_joint_count_ <= 3 || (missing_wheel_joint_count_ % 50) == 0) {
-      ESP_LOGW(TAG, "Joint-state message did not include %s", joint_name);
-    }
+    write_latest(radians_to_encoder_ticks(joint.axis1().position()));
     return;
   }
 
-  write_latest(msg);
-}
-
-std::unique_ptr<Encoder> Encoder::create(PayloadCorner corner)
-{
-  return std::make_unique<Encoder_SITL>(corner);
+  ++missing_wheel_joint_count_;
+  if (missing_wheel_joint_count_ <= 3 || (missing_wheel_joint_count_ % 50) == 0) {
+    ESP_LOGW(TAG, "Joint-state message did not include %s", joint_name_);
+  }
 }
 
 }  // namespace drivers

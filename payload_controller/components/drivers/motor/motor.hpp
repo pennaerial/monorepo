@@ -1,11 +1,12 @@
 #pragma once
 
-#include <memory>
-
-#include "payload_corner.hpp"
-
 namespace drivers
 {
+
+struct MotorConfig {
+  /// Gazebo command topic under /model/<model>/ that this motor publishes to (SITL only).
+  const char* sitl_command_topic;
+};
 
 class Motor
 {
@@ -15,15 +16,8 @@ public:
   virtual void start() = 0;
   virtual void publish(double rad_s) = 0;
 
-  static std::unique_ptr<Motor> create(PayloadCorner corner);
-
-  PayloadCorner corner() const;
-
 protected:
-  explicit Motor(PayloadCorner corner);
-
-private:
-  PayloadCorner corner_;
+  Motor() = default;
 };
 
 }  // namespace drivers

@@ -8,7 +8,7 @@ namespace drivers
 class Encoder_HW : public Encoder
 {
 public:
-  explicit Encoder_HW(PayloadCorner corner);
+  explicit Encoder_HW(const EncoderConfig& config);
   /// See encoder.hpp
   void start() override;
 };

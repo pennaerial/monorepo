@@ -3,16 +3,14 @@
 namespace drivers
 {
 
-Encoder_HW::Encoder_HW(PayloadCorner corner) : Encoder(corner) {}
+Encoder_HW::Encoder_HW(const EncoderConfig&)
+{
+  // TODO read hardware pins from EncoderConfig once they exist
+}
 
 void Encoder_HW::start()
 {
   // TODO
-}
-
-std::unique_ptr<Encoder> Encoder::create(PayloadCorner corner)
-{
-  return std::make_unique<Encoder_HW>(corner);
 }
 
 }  // namespace drivers

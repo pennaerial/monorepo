@@ -8,7 +8,7 @@ namespace drivers
 class Motor_HW : public Motor
 {
 public:
-  explicit Motor_HW(PayloadCorner corner);
+  explicit Motor_HW(const MotorConfig& config);
 
   void start() override;
   void publish(double rad_s) override;

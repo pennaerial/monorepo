@@ -15,7 +15,7 @@ namespace drivers
 class Encoder_SITL : public Encoder
 {
 public:
-  explicit Encoder_SITL(PayloadCorner corner);
+  explicit Encoder_SITL(const EncoderConfig& config);
 
   void start() override;
 
@@ -49,6 +49,7 @@ private:
   gz::transport::Node gz_node_;
   /// Contains Simulation Configuration (e.g. entity and world name)
   const sitl::SimConfig sitl_config_;
+  const char* joint_name_;
   uint32_t missing_wheel_joint_count_ = 0;
 };
 

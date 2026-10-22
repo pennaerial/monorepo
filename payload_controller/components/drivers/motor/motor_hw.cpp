@@ -3,7 +3,10 @@
 namespace drivers
 {
 
-Motor_HW::Motor_HW(PayloadCorner corner) : Motor(corner) {}
+Motor_HW::Motor_HW(const MotorConfig&)
+{
+  // TODO read hardware pins from MotorConfig once they exist
+}
 
 void Motor_HW::start()
 {
@@ -13,11 +16,6 @@ void Motor_HW::start()
 void Motor_HW::publish(double)
 {
   // TODO
-}
-
-std::unique_ptr<Motor> Motor::create(PayloadCorner corner)
-{
-  return std::make_unique<Motor_HW>(corner);
 }
 
 }  // namespace drivers
