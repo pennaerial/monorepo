@@ -2,62 +2,20 @@ from __future__ import annotations
 
 import rclpy
 from rclpy.executors import ExternalShutdownException
-from rclpy.node import Node
-from vehicle_common.runtime.mission_loader import RuntimeMission, get_mission_path
 
 from .PayloadModeManager import PayloadModeManager
 
 
-class PayloadMissionBootstrap(Node):
-    def __init__(self) -> None:
-        super().__init__("payload_mission_bootstrap")
-        self.declare_parameter("mode_map", get_mission_path("basic", "payload"))
-        self.declare_parameter("auto_launch", True)
-        self.declare_parameter("vehicle_name", "")
-
-    def _bool_parameter(self, name: str) -> bool:
-        value = self.get_parameter(name).value
-        if not isinstance(value, bool):
-            raise ValueError(
-                f"payload_mission requires boolean parameter '{name}', received {value!r}."
-            )
-        return value
-
-    def manager_kwargs(self) -> dict:
-        mission_path = str(self.get_parameter("mode_map").value)
-        if not mission_path:
-            raise ValueError("payload_mission requires a non-empty 'mode_map'.")
-
-        vehicle_name = str(self.get_parameter("vehicle_name").value).strip()
-        if not vehicle_name:
-            raise ValueError("payload_mission requires a non-empty 'vehicle_name'.")
-
-        runtime_mission = RuntimeMission.load_from_path(mission_path)
-
-        return {
-            "mission_spec": runtime_mission,
-            "auto_launch": self._bool_parameter("auto_launch"),
-            "vehicle_name": vehicle_name,
-            "node_name": "mission",
-        }
-
-
 def main(args=None) -> None:
     rclpy.init(args=args)
-    bootstrap = PayloadMissionBootstrap()
     mission_node = None
 
     try:
-        manager_kwargs = bootstrap.manager_kwargs()
-        bootstrap.destroy_node()
-        bootstrap = None
-        mission_node = PayloadModeManager(**manager_kwargs)
+        mission_node = PayloadModeManager()
         rclpy.spin(mission_node)
     except (KeyboardInterrupt, ExternalShutdownException):
         pass
     finally:
-        if bootstrap is not None:
-            bootstrap.destroy_node()
         if mission_node is not None:
             mission_node.destroy_node()
         if rclpy.ok():
