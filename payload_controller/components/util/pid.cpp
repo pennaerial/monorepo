@@ -1,6 +1,10 @@
 #include "pid.hpp"
 
 float PID::update(float deltaT, float reading) {
+    if (deltaT <= 0) {
+        return 0;
+    }
+
     float error = setPoint - reading;
     float p = kP * error;
     
@@ -8,8 +12,7 @@ float PID::update(float deltaT, float reading) {
     if (!secondReading) {
         secondReading = true;
         pastReading = reading;
-        
-    } else if (deltaT >= 0) {
+    } else {
         float der = (pastReading - reading) / deltaT;
         d = kD * der;
         pastReading = reading;
