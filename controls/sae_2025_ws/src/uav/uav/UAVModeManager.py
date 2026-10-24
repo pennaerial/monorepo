@@ -3,9 +3,10 @@ from time import time
 from px4_msgs.msg import VehicleStatus
 from std_srvs.srv import Trigger
 from vehicle_common.mode_manager import ModeManager
-from vehicle_common.runtime.mission_loader import RuntimeMission
+from vehicle_common.runtime.mission_loader import RuntimeMission, get_mission_path
 
 from uav.modes.LandingMode import LandingMode
+from uav.uav_mission_parameters import uav_mission
 from uav.vehicles.AirframeClass import AirframeClass
 from uav.vehicles.Multicopter import Multicopter
 from uav.vehicles.UAV import UAV
@@ -17,21 +18,10 @@ class UAVModeManager(ModeManager):
 
     vehicle: UAV
 
-    def __init__(
-        self,
-        *,
-        mission_spec: RuntimeMission,
-        servo_only: bool = False,
-        vehicle_name: str = "uav",
-        vehicle_class: AirframeClass = AirframeClass.MULTICOPTER,
-        camera_offsets=None,
-        auto_launch: bool = True,
-        node_name: str = "mission",
-    ) -> None:
-        super().__init__(
-            node_name,
-            vehicle_name=vehicle_name,
-            auto_launch=auto_launch,
+    def __init__(self, node_name: str = "mission") -> None:
+        super().__init__(node_name)
+        mission_spec = RuntimeMission.load_from_path(
+            self.params.mode_map or get_mission_path("basic", "uav")
         )
         if UAV not in mission_spec._targets:
             raise ValueError(
@@ -39,14 +29,10 @@ class UAVModeManager(ModeManager):
                 f"{sorted(t.__name__ for t in mission_spec._targets)}."
             )
 
-        camera_offsets = list(camera_offsets or [0.0, 0.0, 0.0])
-        if len(camera_offsets) != 3:
-            raise ValueError(
-                f"'camera_mount_offsets' must have exactly 3 values. Received: {camera_offsets}"
-            )
-
-        self.servo_only = bool(servo_only)
-        vehicle_class = AirframeClass.parse(vehicle_class)
+        camera_offsets = list(self.params.camera_mount_offsets)
+        vehicle_name = self.params.vehicle_name.strip()
+        self.servo_only = self.params.servo_only
+        vehicle_class = AirframeClass.parse(self.params.vehicle_class)
 
         self.failsafe_trigger_service = self.create_service(
             Trigger, "mode_manager/failsafe", self.trigger_failsafe
@@ -65,6 +51,9 @@ class UAVModeManager(ModeManager):
 
         self.get_logger().info("Mission Node has started.")
         self.setup_modes(mission_spec)
+
+    def load_params(self) -> uav_mission.Params:
+        return uav_mission.ParamListener(self).get_params()
 
     def _auto_launch_ready(self) -> bool:
         if self.vehicle is None:
