@@ -15,6 +15,7 @@ public:
   void update();
   void publish_sensor_debug();
   void motor_updates();
+  void update_pose();
 
   static Payload* instance();
 
@@ -30,4 +31,5 @@ private:
   drivers::IMU* imu;
   drivers::Encoder* encoders;
   uint32_t last_published_imu_update_ = 0;
+  uint32_t last_published_encoder_update_ = 0;
 };

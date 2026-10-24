@@ -1,11 +1,12 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fmt;
 use tungstenite::Bytes;
 
 use crate::ros::parse::ParseError;
+use crate::ros::subscription::SubscriptionId;
 
 pub type ChannelId = u32;
-pub type SubscriptionId = u32;
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(tag = "op")]
@@ -40,7 +41,7 @@ pub struct ServerInfo {
     pub capabilities: Vec<String>,
     pub supported_encodings: Vec<String>,
     pub metadata: HashMap<String, String>,
-    pub session_id: i32,
+    pub session_id: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -58,6 +59,16 @@ pub struct Channel {
     pub schema: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub schema_encoding: Option<String>,
+}
+
+impl fmt::Display for Channel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Channel ID: {:?}, Topic: {}, Schema: {}",
+            self.id, self.topic, self.schema_name,
+        )
+    }
 }
 
 // Opcodes corresponding with each binary message

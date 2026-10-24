@@ -134,6 +134,7 @@ set(IDL_FILES
     "${IDL_PATH}/builtin_interfaces/msg/Time.idl"
     "${IDL_PATH}/geometry_msgs/msg/Quaternion.idl"
     "${IDL_PATH}/geometry_msgs/msg/Vector3.idl"
+    "${IDL_PATH}/payload_interfaces/msg/MotorState.idl"
     "${IDL_PATH}/sensor_msgs/msg/Imu.idl"
     "${IDL_PATH}/std_msgs/msg/Header.idl"
 )
@@ -171,6 +172,7 @@ set(GENERATED_SOURCES
     "${GENERATED_DIR}/builtin_interfaces/msg/Time.c"
     "${GENERATED_DIR}/geometry_msgs/msg/Quaternion.c"
     "${GENERATED_DIR}/geometry_msgs/msg/Vector3.c"
+    "${GENERATED_DIR}/payload_interfaces/msg/MotorState.c"
     "${GENERATED_DIR}/sensor_msgs/msg/Imu.c"
     "${GENERATED_DIR}/std_msgs/msg/Header.c"
 )
