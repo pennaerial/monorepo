@@ -59,6 +59,9 @@ void encoderCallback(const Topic& topic, const void* msg, uint16_t length, void*
 
 void Payload::init()
 {
+  EKF ekf = EKF();
+  ekf.init();
+
   imu = drivers::IMU::instance();
   imu->start();
 

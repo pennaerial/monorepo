@@ -6,6 +6,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "imu.hpp"
+#include "ekf.hpp"
 #include "topics.h"
 
 class Payload

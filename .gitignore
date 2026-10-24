@@ -43,3 +43,6 @@ site/
 # AutoAPI-generated docs (kept only when AUTOAPI_KEEP_FILES=1)
 docs/autoapi/
 doxygen
+
+managed_components
+
