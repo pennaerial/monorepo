@@ -30,6 +30,9 @@ public:
   int64_t get_latest();
   /// Returns true and copies the latest tick count if it is newer than last_update_count.
   bool get_latest_if_updated(uint32_t& last_update_count, int64_t& ticks);
+  /// Gets the encoder instance for the given side (sitl, hardware). implemented in backend .cpp
+  /// files, not encoder.cpp
+  static Encoder& instance(Side side);
 
 protected:
   Encoder() = default;  // only backends construct the base
@@ -39,8 +42,5 @@ private:
   uint32_t update_count_ = 0;
   util::StaticMutex mtx_;
 };
-
-/// Returns this build's encoder for the given side. Defined by the backend CMake compiles.
-Encoder& get_encoder(Side side);
 
 }  // namespace drivers

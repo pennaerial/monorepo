@@ -14,7 +14,7 @@
 /// Pairs a low-level encoder with the payload side it measures.
 struct EncoderWrapper {
   EncoderWrapper(Side side, const char* debug_name)
-      : side(side), debug_name(debug_name), encoder(drivers::get_encoder(side))
+      : side(side), debug_name(debug_name), encoder(drivers::Encoder::instance(side))
   {
   }
 
@@ -27,7 +27,8 @@ struct EncoderWrapper {
 
 /// Pairs a low-level motor with the payload side it drives.
 struct MotorWrapper {
-  MotorWrapper(Side side, const char* debug_name) : side(side), debug_name(debug_name), motor(drivers::get_motor(side))
+  MotorWrapper(Side side, const char* debug_name)
+      : side(side), debug_name(debug_name), motor(drivers::Motor::instance(side))
   {
   }
 

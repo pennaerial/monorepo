@@ -45,7 +45,7 @@ void Motor_SITL::publish(double rad_s)
   motor_publisher_.Publish(msg);
 }
 
-Motor& get_motor(Side side)
+Motor& Motor::instance(Side side)
 {
   static Motor_SITL left(Side::LEFT);
   static Motor_SITL right(Side::RIGHT);

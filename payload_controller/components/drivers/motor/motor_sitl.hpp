@@ -14,7 +14,7 @@ namespace drivers
 class Motor_SITL : public Motor
 {
 public:
-  explicit Motor_SITL(Side side);
+  Motor_SITL(Side side);
 
   void start() override;
   void publish(double rad_s) override;

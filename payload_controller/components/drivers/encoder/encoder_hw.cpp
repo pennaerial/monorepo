@@ -14,7 +14,7 @@ void Encoder_HW::start()
   // TODO
 }
 
-Encoder& get_encoder(Side side)
+Encoder& Encoder::instance(Side side)
 {
   static Encoder_HW left(Side::LEFT);
   static Encoder_HW right(Side::RIGHT);

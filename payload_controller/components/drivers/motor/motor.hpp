@@ -11,12 +11,12 @@ public:
 
   virtual void start() = 0;
   virtual void publish(double rad_s) = 0;
+  /// Gets the motor instance for the given side (sitl, hardware). implemented in backend .cpp
+  /// files, not motor.cpp
+  static Motor& instance(Side side);
 
 protected:
   Motor() = default;
 };
-
-/// Returns this build's motor for the given side. Defined by the backend CMake compiles.
-Motor& get_motor(Side side);
 
 }  // namespace drivers

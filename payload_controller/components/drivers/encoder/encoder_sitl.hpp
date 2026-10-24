@@ -15,7 +15,7 @@ namespace drivers
 class Encoder_SITL : public Encoder
 {
 public:
-  explicit Encoder_SITL(Side side);
+  Encoder_SITL(Side side);
 
   void start() override;
 

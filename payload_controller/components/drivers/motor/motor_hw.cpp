@@ -18,7 +18,7 @@ void Motor_HW::publish(double)
   // TODO
 }
 
-Motor& get_motor(Side side)
+Motor& Motor::instance(Side side)
 {
   static Motor_HW left(Side::LEFT);
   static Motor_HW right(Side::RIGHT);
