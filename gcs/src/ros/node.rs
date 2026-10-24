@@ -146,6 +146,7 @@ impl RosNode {
                         Err(DeliveryError::Closed) => false,
                         Err(DeliveryError::Full) => {
                             // drop this message because queue depth is full
+                            debug!("topic {} dropping message", sink.topic_name());
                             true
                         }
                         Err(DeliveryError::Decode(e)) => {
