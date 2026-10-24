@@ -1,7 +1,7 @@
 mod components;
 mod ros;
-mod views;
 mod routes;
+mod views;
 
 use dioxus::prelude::*;
 use dioxus::{logger, logger::tracing};

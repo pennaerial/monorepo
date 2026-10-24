@@ -96,23 +96,20 @@ pub fn MissionControl() -> Element {
                 let node = sub_node.clone();
 
                 async move {
-                    match node
+                    let result = node
                         .create_subscription::<std_msgs::msg::String, _>(
                             "/chatter",
                             10,
                             move |message| string_msg.set(message.data),
                         )
-                        .await
-                    {
-                        Ok(sub) => subscription.set(Some(sub)),
-                        Err(e) => error!("Subscription failed: {e:?}"),
+                        .await;
+                    match result {
+                        Ok(handle) => subscription.set(Some(handle)),
+                        Err(error) => error!(?error, "Failed to subscribe to /chatter"),
                     }
-
                 }
             }
         }
         p { "{string_msg}" }
     }
 }
-
-

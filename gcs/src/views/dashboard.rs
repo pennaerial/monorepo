@@ -1,5 +1,5 @@
+use crate::components::SideBar;
 use dioxus::prelude::*;
-use crate::components::{SideBar};
 
 #[component]
 pub fn Dashboard() -> Element {
@@ -20,5 +20,4 @@ pub fn Dashboard() -> Element {
             }
         }
     }
-    
 }

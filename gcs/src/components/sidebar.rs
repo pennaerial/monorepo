@@ -1,12 +1,11 @@
-use dioxus::prelude::*;
 use crate::routes::Route;
+use dioxus::prelude::*;
 
 #[component]
 pub fn SideBar() -> Element {
-    
-    rsx!{
+    rsx! {
         aside {
-            class: "sidebar", 
+            class: "sidebar",
 
         div {
             class: "sidebar-header",
