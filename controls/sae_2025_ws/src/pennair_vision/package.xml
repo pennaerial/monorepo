@@ -11,6 +11,7 @@
   <buildtool_depend>ament_cmake_python</buildtool_depend>
 
   <depend>rclcpp</depend>
+  <depend>rosidl_runtime_cpp</depend>
   <depend>std_msgs</depend>
   <depend>sensor_msgs</depend>
   <depend>image_transport</depend>

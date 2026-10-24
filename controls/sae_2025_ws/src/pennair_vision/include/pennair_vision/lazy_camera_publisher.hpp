@@ -11,6 +11,7 @@
 
 #include "image_transport/image_transport.hpp"
 #include "pennair_vision/vision_plugin.hpp"
+#include "pennair_vision/ros_message.hpp"
 #include "rclcpp/node.hpp"
 #include "sensor_msgs/msg/camera_info.hpp"
 #include "sensor_msgs/msg/image.hpp"
@@ -18,7 +19,7 @@
 using CameraImage = sensor_msgs::msg::Image::ConstSharedPtr;
 using CameraInfo = sensor_msgs::msg::CameraInfo::ConstSharedPtr;
 
-template <typename MessageT>
+template <pennair_vision::RosMessage MessageT>
 struct ProcessResult {
   MessageT message;
   /// Optional BGR8 image; leave empty when debug output is not requested.
@@ -28,7 +29,7 @@ struct ProcessResult {
 namespace pennair_vision
 {
 
-template <typename MessageT>
+template <RosMessage MessageT>
 class LazyCameraPublisher : public VisionPlugin
 {
 public:
@@ -59,7 +60,7 @@ private:
   rclcpp::TimerBase::SharedPtr callback_timer_;
 };
 
-template <typename MessageT>
+template <RosMessage MessageT>
 void LazyCameraPublisher<MessageT>::initialize(rclcpp::Node& node, const std::string& camera_topic)
 {
   camera_topic_ = camera_topic;
@@ -71,7 +72,7 @@ void LazyCameraPublisher<MessageT>::initialize(rclcpp::Node& node, const std::st
 }
 
 /// Subscribes to camera frames and processes them when output subscribers exist
-template <typename MessageT>
+template <RosMessage MessageT>
 void LazyCameraPublisher<MessageT>::start()
 {
   camera_sub_ = image_transport::create_camera_subscription(
