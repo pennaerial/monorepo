@@ -3,23 +3,16 @@
 namespace drivers
 {
 
+Encoder_HW::Encoder_HW(PayloadCorner corner) : Encoder(corner) {}
+
 void Encoder_HW::start()
 {
   // TODO
 }
-void Encoder_HW::publish_motor_right(double)
-{
-  // TODO
-}
-void Encoder_HW::publish_motor_left(double)
-{
-  // TODO
-}
 
-Encoder* Encoder::instance()
+std::unique_ptr<Encoder> Encoder::create(PayloadCorner corner)
 {
-  static Encoder_HW instance;
-  return &instance;
+  return std::make_unique<Encoder_HW>(corner);
 }
 
 }  // namespace drivers

@@ -3,6 +3,13 @@
 namespace drivers
 {
 
+Encoder::Encoder(PayloadCorner corner) : corner_(corner) {}
+
+PayloadCorner Encoder::corner() const
+{
+  return corner_;
+}
+
 void Encoder::write_latest(const payload_interfaces_msg_MotorState& msg)
 {
   util::StaticMutexGuard lock(mtx_);
