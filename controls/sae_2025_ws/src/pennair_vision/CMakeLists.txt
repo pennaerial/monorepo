@@ -15,6 +15,7 @@ find_package(sensor_msgs REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(rclcpp_components REQUIRED) # for vision_manager_component
 find_package(ament_cmake_python REQUIRED) # for pennair_vision python module
+find_package(cv_bridge REQUIRED)
 find_package(image_transport REQUIRED) # for pennair_vision lazy publisher
 
 include_directories(include)
@@ -29,6 +30,8 @@ ament_target_dependencies(vision_manager_component
     std_msgs
     sensor_msgs
     pluginlib
+    image_transport
+    cv_bridge
 )
 
 rclcpp_components_register_nodes(vision_manager_component
@@ -46,6 +49,8 @@ ament_target_dependencies(vision_manager
     std_msgs
     sensor_msgs
     pluginlib
+    image_transport
+    cv_bridge
 )
 
 # Dynamically loaded plugins
@@ -71,6 +76,8 @@ ament_target_dependencies(vision_plugins
     rclcpp
     pluginlib
     sensor_msgs
+    image_transport
+    cv_bridge
 )
 
 pluginlib_export_plugin_description_file(pennair_vision plugins.xml)
@@ -79,6 +86,7 @@ ament_target_dependencies(lazy_camera_publisher
     rclcpp
     sensor_msgs
     image_transport
+    cv_bridge
 )
 
 install(TARGETS
@@ -121,6 +129,6 @@ install_python_entry_point(basic_vision_py pennair_vision.basic_vision main)
 
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
 ament_export_include_directories(include)
-ament_export_dependencies(rclcpp std_msgs sensor_msgs pluginlib)
+ament_export_dependencies(rclcpp std_msgs sensor_msgs pluginlib image_transport cv_bridge)
 
 ament_package()

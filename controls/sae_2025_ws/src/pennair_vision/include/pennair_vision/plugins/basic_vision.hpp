@@ -2,19 +2,18 @@
 
 #include <rclcpp/rclcpp.hpp>
 
-#include "pennair_vision/vision_plugin.hpp"
+#include "pennair_vision/lazy_camera_publisher.hpp"
+#include "std_msgs/msg/int32.hpp"
 
 namespace pennair_vision
 {
 
-class BasicVision : public VisionPlugin
+class BasicVision : public LazyCameraPublisher<std_msgs::msg::Int32>
 {
 public:
-  /// See VisionPlugin
-  void initialize(const rclcpp::Node::SharedPtr& node) override;
-
-  /// See VisionPlugin
-  void process(sensor_msgs::msg::Image::ConstSharedPtr& image) override;
+  /// See LazyCameraPublisher
+  ProcessResult<std_msgs::msg::Int32> process(const CameraImage image, const CameraInfo info, bool generate_debug)
+      override;
 };
 
 };  // namespace pennair_vision

@@ -2,17 +2,22 @@
 
 #include "pennair_vision/vision_plugin.hpp"
 #include "rclcpp/logger.hpp"
+#include "sensor_msgs/msg/image.h"
+#include "sensor_msgs/msg/image.hpp"
 
 
 namespace pennair_vision
 {
 
-void BasicVision::initialize(const rclcpp::Node::SharedPtr& node)
+ProcessResult<std_msgs::msg::Int32>
+BasicVision::process(const CameraImage image, const CameraInfo /* info */, bool generate_debug)
 {
-  RCLCPP_INFO(node->get_logger(), "BasicVision plugin started!");
+  ProcessResult<std_msgs::msg::Int32> result;
+  if (generate_debug) {
+    result.debug_image = cv_bridge::toCvCopy(image, "bgr8")->image;
+  }
+  return result;
 }
-
-void BasicVision::process(sensor_msgs::msg::Image::ConstSharedPtr& image) {}
 
 };  // namespace pennair_vision
 
