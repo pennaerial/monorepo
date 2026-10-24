@@ -1,7 +1,4 @@
 #pragma once
-
-#include <memory>
-
 #include "payload_corner.hpp"
 
 namespace drivers
@@ -14,16 +11,12 @@ public:
 
   virtual void start() = 0;
   virtual void publish(double rad_s) = 0;
-
-  static std::unique_ptr<Motor> create(PayloadCorner corner);
-
-  PayloadCorner corner() const;
+  /// Gets the motor instance for the given side (sitl, hardware). implemented in backend .cpp
+  /// files, not motor.cpp
+  static Motor& instance(Side side);
 
 protected:
-  explicit Motor(PayloadCorner corner);
-
-private:
-  PayloadCorner corner_;
+  Motor() = default;
 };
 
 }  // namespace drivers

@@ -3,7 +3,10 @@
 namespace drivers
 {
 
-Motor_HW::Motor_HW(PayloadCorner corner) : Motor(corner) {}
+Motor_HW::Motor_HW(Side)
+{
+  // TODO
+}
 
 void Motor_HW::start()
 {
@@ -15,9 +18,11 @@ void Motor_HW::publish(double)
   // TODO
 }
 
-std::unique_ptr<Motor> Motor::create(PayloadCorner corner)
+Motor& Motor::instance(Side side)
 {
-  return std::make_unique<Motor_HW>(corner);
+  static Motor_HW left(Side::LEFT);
+  static Motor_HW right(Side::RIGHT);
+  return side == Side::LEFT ? left : right;
 }
 
 }  // namespace drivers

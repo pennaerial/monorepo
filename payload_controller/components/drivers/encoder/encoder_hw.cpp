@@ -3,16 +3,22 @@
 namespace drivers
 {
 
-Encoder_HW::Encoder_HW(PayloadCorner corner) : Encoder(corner) {}
+Encoder_HW::Encoder_HW(Side)
+{
+  // TODO
+}
+
 
 void Encoder_HW::start()
 {
   // TODO
 }
 
-std::unique_ptr<Encoder> Encoder::create(PayloadCorner corner)
+Encoder& Encoder::instance(Side side)
 {
-  return std::make_unique<Encoder_HW>(corner);
+  static Encoder_HW left(Side::LEFT);
+  static Encoder_HW right(Side::RIGHT);
+  return side == Side::LEFT ? left : right;
 }
 
 }  // namespace drivers

@@ -1,10 +1,8 @@
 #pragma once
 
 #include <cstdint>
-#include <memory>
 
 #include "payload_corner.hpp"
-#include "payload_interfaces/msg/MotorState.h"
 #include "static_mutex.hpp"
 
 namespace drivers
@@ -18,6 +16,7 @@ namespace drivers
  * Encoder_sitl.hpp
  *
  */
+
 class Encoder
 {
 public:
@@ -25,24 +24,21 @@ public:
 
   /// Starts the encoder. It should immediately start writing encoder messages to internal buffer
   virtual void start() = 0;
-  /// Writes a new incoming encoder reading to the local cache.
-  void write_latest(const payload_interfaces_msg_MotorState& msg);
-  /// Returns the latest encoder reading.
-  payload_interfaces_msg_MotorState get_latest();
-  /// Returns true and copies the latest reading if it is newer than last_update_count.
-  bool get_latest_if_updated(uint32_t& last_update_count, payload_interfaces_msg_MotorState& msg);
-
-  /// Creates an encoder implementation (sitl, hardware). Implemented in backend .cpp files.
-  static std::unique_ptr<Encoder> create(PayloadCorner corner);
-
-  PayloadCorner corner() const;
+  /// Writes a new incoming encoder tick count to the local cache.
+  void write_latest(int64_t ticks);
+  /// Returns the latest encoder tick count.
+  int64_t get_latest();
+  /// Returns true and copies the latest tick count if it is newer than last_update_count.
+  bool get_latest_if_updated(uint32_t& last_update_count, int64_t& ticks);
+  /// Gets the encoder instance for the given side (sitl, hardware). implemented in backend .cpp
+  /// files, not encoder.cpp
+  static Encoder& instance(Side side);
 
 protected:
-  explicit Encoder(PayloadCorner corner);
+  Encoder() = default;  // only backends construct the base
 
 private:
-  PayloadCorner corner_;
-  payload_interfaces_msg_MotorState reading_{};
+  int64_t ticks_ = 0;
   uint32_t update_count_ = 0;
   util::StaticMutex mtx_;
 };
