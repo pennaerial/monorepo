@@ -10,7 +10,7 @@ namespace pennair_vision
 {
 
 ProcessResult<std_msgs::msg::Int32>
-BasicVision::process(const CameraImage image, const CameraInfo /* info */, bool generate_debug)
+BasicVision::process(const CameraImage& image, const CameraInfo& /* info */, bool generate_debug)
 {
   ProcessResult<std_msgs::msg::Int32> result;
   if (generate_debug) {

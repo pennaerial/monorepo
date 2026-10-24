@@ -36,7 +36,7 @@ public:
   virtual ~LazyCameraPublisher() = default;
 
   /// Check VisionPlugin
-  void initialize(const rclcpp::Node::SharedPtr& node, const std::string& camera_topic) override;
+  void initialize(rclcpp::Node& node, const std::string& camera_topic) override;
 
   /// Subscribes to camera frames and processes them when output subscribers exist. See VisionPlugin
   void start() override;
@@ -48,8 +48,8 @@ public:
 private:
   /// Camera topic to subscribe to
   std::string camera_topic_;
-  // INVARIANT: vision manager will be valid for the lifetime of the plugin
-  rclcpp::Node::SharedPtr node_;
+  // INVARIANT: vision manager node will be valid for the lifetime of the plugin
+  rclcpp::Node* node_{nullptr};
   /// Publishes result of cv object
   typename rclcpp::Publisher<MessageT>::SharedPtr cv_result_pub_;
   /// Object for lazily publishing debug camera images
@@ -60,11 +60,11 @@ private:
 };
 
 template <typename MessageT>
-void LazyCameraPublisher<MessageT>::initialize(const rclcpp::Node::SharedPtr& node, const std::string& camera_topic)
+void LazyCameraPublisher<MessageT>::initialize(rclcpp::Node& node, const std::string& camera_topic)
 {
   camera_topic_ = camera_topic;
-  node_ = node;
-  cv_debug_pub_ = image_transport::create_publisher(node_.get(), "/cv/debug", rclcpp::QoS(1).get_rmw_qos_profile());
+  node_ = &node;
+  cv_debug_pub_ = image_transport::create_publisher(node_, "/cv/debug", rclcpp::QoS(1).get_rmw_qos_profile());
   cv_result_pub_ = node_->create_publisher<MessageT>("/cv/result", 10);
 
   start();
@@ -75,7 +75,7 @@ template <typename MessageT>
 void LazyCameraPublisher<MessageT>::start()
 {
   camera_sub_ = image_transport::create_camera_subscription(
-      node_.get(), camera_topic_,
+      node_, camera_topic_,
       [this](const CameraImage image, const CameraInfo info) {
         const bool generate_debug = cv_debug_pub_.getNumSubscribers() > 0;
         if (cv_result_pub_->get_subscription_count() > 0 || generate_debug) {
