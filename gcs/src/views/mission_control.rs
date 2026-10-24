@@ -1,6 +1,7 @@
 use crate::components::{Button, SideBar};
+use crate::hooks::use_ros_node;
 use crate::ros::server_types::ServerMessage;
-use crate::ros::{FoxgloveClient, NodeHandle, SubscriptionHandle};
+use crate::ros::{FoxgloveClient, SubscriptionHandle};
 use dioxus::prelude::*;
 use ros_interfaces::{geometry_msgs, std_msgs};
 
@@ -51,11 +52,7 @@ async fn run_client(url: &str) {
 
 #[component]
 pub fn MissionControl() -> Element {
-    let node = use_context::<NodeHandle>();
-
-    // TODO: need to figure out a way to avoid all of these clones...
-    let connect_node = node.clone();
-    let sub_node = node.clone();
+    let node = use_ros_node();
     let mut string_msg = use_signal_sync(String::new);
 
     // use a signal here keep SubscriptionHandle alive
@@ -73,7 +70,7 @@ pub fn MissionControl() -> Element {
                 Button {
                     label: "Connect",
                     onclick: move |_| {
-                        let node = connect_node.clone();
+                        let node = node.read().clone();
                         async move {
                             if let Err(e) = node.connect("ws://localhost:8765").await {
                                 info!("Failed: {:?},", e);
@@ -89,7 +86,7 @@ pub fn MissionControl() -> Element {
         Button {
             label: "Subscribe",
             onclick: move |_| {
-                let node = sub_node.clone();
+                let node = node.read().clone();
 
                 async move {
                     let result = node
