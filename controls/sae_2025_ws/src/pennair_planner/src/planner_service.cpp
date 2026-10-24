@@ -37,7 +37,7 @@ public:
 
     /// Creating publisher for path
     path_pub_ = this->create_publisher<nav_msgs::msg::Path>(
-        "planned_path", rclcpp::QoS(10).transiet_local()
+        "planned_path", rclcpp::QoS(10).transient_local()
 
         /// Copy this line and customize endpoints to change displayed path
         /*ros2 service call /plan_path pennair_planner/srv/PlanPath \
