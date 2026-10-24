@@ -45,11 +45,4 @@ void Motor_SITL::publish(double rad_s)
   motor_publisher_.Publish(msg);
 }
 
-Motor& get_motor(Side side)
-{
-  static Motor_SITL left(Side::LEFT);
-  static Motor_SITL right(Side::RIGHT);
-  return side == Side::LEFT ? left : right;
-}
-
 }  // namespace drivers

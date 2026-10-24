@@ -1,5 +1,16 @@
 #include "encoder.hpp"
 
+#include "sdkconfig.h"
+
+#if defined(CONFIG_IDF_TARGET_LINUX)
+#include "encoder_sitl.hpp"
+using EncoderBackend = drivers::Encoder_SITL;
+#else
+#include "encoder_hw.hpp"
+using EncoderBackend = drivers::Encoder_HW;
+#endif
+
+
 namespace drivers
 {
 
@@ -27,5 +38,14 @@ bool Encoder::get_latest_if_updated(uint32_t& last_update_count, int64_t& ticks)
   last_update_count = update_count_;
   return true;
 }
+
+
+Encoder& get_encoder(Side side)
+{
+  static EncoderBackend left(Side::LEFT);
+  static EncoderBackend right(Side::RIGHT);
+  return side == Side::LEFT ? left : right;
+}
+
 
 }  // namespace drivers

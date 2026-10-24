@@ -18,11 +18,4 @@ void Motor_HW::publish(double)
   // TODO
 }
 
-Motor& get_motor(Side side)
-{
-  static Motor_HW left(Side::LEFT);
-  static Motor_HW right(Side::RIGHT);
-  return side == Side::LEFT ? left : right;
-}
-
 }  // namespace drivers

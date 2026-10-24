@@ -70,11 +70,4 @@ void Encoder_SITL::on_encoder_msg(const gz::msgs::Model& gz_msg)
   }
 }
 
-Encoder& get_encoder(Side side)
-{
-  static Encoder_SITL left(Side::LEFT);
-  static Encoder_SITL right(Side::RIGHT);
-  return side == Side::LEFT ? left : right;
-}
-
 }  // namespace drivers
