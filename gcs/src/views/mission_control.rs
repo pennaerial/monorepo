@@ -2,7 +2,7 @@ use crate::components::{Button, SideBar};
 use crate::ros::server_types::ServerMessage;
 use crate::ros::{FoxgloveClient, NodeHandle};
 use dioxus::prelude::*;
-use ros_interfaces::geometry_msgs;
+use ros_interfaces::{geometry_msgs, std_msgs};
 
 // / * `url`: e.g. "localhost:8765"
 async fn run_client(url: &str) {
@@ -53,6 +53,11 @@ async fn run_client(url: &str) {
 pub fn MissionControl() -> Element {
     let node = use_context::<NodeHandle>();
 
+    // TODO: need to figure out a way to avoid all of these clones...
+    let connect_node = node.clone();
+    let sub_node = node.clone();
+    let mut string_msg = use_signal(String::new);
+
     rsx! {
 
         div {
@@ -63,26 +68,51 @@ pub fn MissionControl() -> Element {
                 class: "main-content",
 
                 h1 { class: "page-title",
-                "Mission Control Page" 
+                "Mission Control Page"
                 }
 
-
-                Button {
-                    label: "Connect",
-                    onclick: move |_| {
-                        let mut node = node.clone();
-                        async move {
-                            if let Err(e) = node.connect("ws://localhost:8765").await {
-                                info!("Failed: {:?},", e);
-                            } else {
-                                info!("Successful connect")
-                            }
-                        }
+        Button {
+            label: "Connect",
+            onclick: move |_| {
+                let node = connect_node.clone();
+                async move {
+                    if let Err(e) = node.connect("ws://localhost:8765").await {
+                        info!("Failed: {:?},", e);
+                    } else {
+                        info!("Successful connect")
                     }
-                }        
+                }
             }
         }
+            }
+        }
+
+        Button {
+            label: "Subscribe",
+            onclick: move |_| {
+                let node = sub_node.clone();
+
+                async move {
+                    let mut sub = match node
+                        .create_subscription::<std_msgs::msg::String>("/chatter", 10)
+                        .await
+                    {
+                        Ok(sub) => sub,
+                        Err(e) => {
+                            error!("Subscription failed: {e:?}");
+                            return;
+                        }
+                    };
+
+                    while let Some(message) = sub.recv().await {
+                        string_msg.set(message.data);
+                    }
+
+                }
+            }
+        }
+        p { "{string_msg}" }
     }
 }
-        
+
 

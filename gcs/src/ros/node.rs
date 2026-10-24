@@ -1,4 +1,6 @@
-use crate::ros::server_types::ServerMessage;
+use crate::ros::server_types::{Channel, ChannelId, ServerMessage};
+use crate::ros::subscription::DeliveryError;
+use crate::ros::SubscriptionSink;
 use crate::ros::{
     foxglove_client::FoxgloveClientError, node_command::NodeCommand, FoxgloveClient,
     SubscriptionHandle, SubscriptionId, SubscriptionSinkBase,
@@ -6,6 +8,7 @@ use crate::ros::{
 use dioxus::logger::tracing::{debug, error, info};
 use ros_interfaces::RosMessage;
 use std::collections::HashMap;
+use std::process::id;
 use tokio::sync::{mpsc, oneshot};
 
 pub type NodeCommandReceiver = mpsc::Receiver<NodeCommand>;
@@ -20,9 +23,14 @@ pub enum NodeError {
 
 pub struct RosNode {
     foxglove_client: FoxgloveClient,
-    // client allows only one subscription per channelId, so fan out into a Vec of callbacks
+    /// client allows only one subscription per channelId, so fan out into a Vec of callbacks
     subscriptions: HashMap<SubscriptionId, Vec<Box<dyn SubscriptionSinkBase>>>,
+    /// for subscription on topics that haven't been advertised yet
+    pending_subscribes: HashMap<SubscriptionId, Vec<Box<dyn SubscriptionSinkBase>>>,
+    /// for receiving NodeCommands sent from a NodeHandle
     node_command_receiver: NodeCommandReceiver,
+    /// Tracked advertised channels from FoxgloveClient
+    advertised_channels: HashMap<ChannelId, Channel>,
 }
 
 impl RosNode {
@@ -34,7 +42,9 @@ impl RosNode {
         let node = Self {
             foxglove_client: FoxgloveClient::new(),
             subscriptions: HashMap::new(),
+            pending_subscribes: HashMap::new(),
             node_command_receiver: receiver,
+            advertised_channels: HashMap::new(),
         };
         (handle, node)
     }
@@ -79,12 +89,78 @@ impl RosNode {
                     debug!("Connect caller dropped response receiver");
                 }
             }
+            NodeCommand::CreateSubscription { sink, reply } => {
+                let topic = sink.topic_name();
+                let mut subscription_id_result = Err(NodeError::NodeStopped);
+                for channel in self.advertised_channels.values() {
+                    if channel.topic == topic {
+                        subscription_id_result = self
+                            .foxglove_client
+                            .subscribe(channel.id)
+                            .await
+                            .map_err(NodeError::Foxglove)
+                            .inspect(|id| {
+                                debug!(
+                                    "Channel: {} subscribing with SubscriptionId: {}",
+                                    channel, id
+                                )
+                            });
+                        // add subscription sink if subscription was successful
+                        if let Ok(id) = subscription_id_result {
+                            self.add_sink(id, sink);
+                        }
+                        break;
+                    }
+                }
+                // TODO: handle case where requested topic is not yet advertised
+                if reply.send(subscription_id_result).is_err() {
+                    debug!("Connect caller dropped CreateSubscription response receiver");
+                }
+            }
             _ => (),
         }
     }
 
+    fn add_sink(&mut self, id: SubscriptionId, sink: Box<dyn SubscriptionSinkBase>) {
+        self.subscriptions.entry(id).or_default().push(sink);
+    }
+
     async fn handle_server_message(&mut self, message: ServerMessage) {
-        info!("{:?}", message);
+        match message {
+            ServerMessage::ServerInfo(server_info) => info!(?server_info),
+            ServerMessage::Advertise(advertise) => {
+                for channel in advertise.channels {
+                    debug!("Advertised channel: {}", channel);
+                    self.advertised_channels.insert(channel.id, channel);
+                }
+            }
+            ServerMessage::MessageData(message_data) => {
+                let Some(sinks) = self.subscriptions.get_mut(&message_data.subscription_id) else {
+                    return;
+                };
+
+                sinks.retain_mut(|sink| {
+                    match sink.send(&message_data.data) {
+                        Ok(()) => true,
+                        // caller dropped receiver, so delete sink
+                        Err(DeliveryError::Closed) => false,
+                        Err(DeliveryError::Full) => {
+                            // drop this message because queue depth is full
+                            true
+                        }
+                        Err(DeliveryError::Decode(e)) => {
+                            error!(
+                                topic = sink.topic_name(),
+                                ?e,
+                                "Failed to decode subscription message"
+                            );
+                            true
+                        }
+                    }
+                });
+            }
+            _ => (),
+        }
     }
 }
 
@@ -94,17 +170,27 @@ pub struct NodeHandle {
 }
 
 impl NodeHandle {
-    pub fn create_subscription<T: RosMessage>(
-        &mut self,
+    pub async fn create_subscription<T: RosMessage + Send + 'static>(
+        &self,
         topic: &str,
         depth: usize,
-    ) -> SubscriptionHandle<T> {
-        let (_, receiver) = mpsc::channel::<T>(depth);
+    ) -> Result<SubscriptionHandle<T>, NodeError> {
+        let (sender, receiver) = mpsc::channel::<T>(depth);
 
-        SubscriptionHandle::new(0, topic.to_owned(), receiver) // TODO: Make this actually work
+        let subscription_sink: SubscriptionSink<T> =
+            SubscriptionSink::new(topic.to_owned(), sender);
+        let id_result = self
+            .send_request(|reply| NodeCommand::CreateSubscription {
+                sink: Box::new(subscription_sink),
+                reply,
+            })
+            .await;
+
+        let id = id_result?;
+        Ok(SubscriptionHandle::new(id, topic.to_owned(), receiver))
     }
 
-    pub async fn connect(&mut self, url: &str) -> Result<(), NodeError> {
+    pub async fn connect(&self, url: &str) -> Result<(), NodeError> {
         debug!("connect requested");
         self.send_request(|reply| NodeCommand::Connect {
             url: url.to_owned(),
@@ -115,7 +201,7 @@ impl NodeHandle {
 
     /// Generic helper for sending node commands
     async fn send_request<T>(
-        &mut self,
+        &self,
         command_builder: impl FnOnce(oneshot::Sender<Result<T, NodeError>>) -> NodeCommand,
     ) -> Result<T, NodeError> {
         let (reply, response) = oneshot::channel::<Result<T, NodeError>>();

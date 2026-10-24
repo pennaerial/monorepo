@@ -18,22 +18,13 @@ pub trait SubscriptionSinkBase: Send {
 
 /// Type for sending data to a Subscription<T>'s receiver pair
 pub struct SubscriptionSink<T> {
-    subscription_id: SubscriptionId,
     topic_name: String,
     sender: mpsc::Sender<T>,
 }
 
 impl<T: RosMessage> SubscriptionSink<T> {
-    pub fn new(
-        subscription_id: SubscriptionId,
-        topic_name: String,
-        sender: mpsc::Sender<T>,
-    ) -> Self {
-        Self {
-            subscription_id,
-            topic_name,
-            sender,
-        }
+    pub fn new(topic_name: String, sender: mpsc::Sender<T>) -> Self {
+        Self { topic_name, sender }
     }
 }
 
@@ -72,5 +63,9 @@ impl<T: RosMessage> SubscriptionHandle<T> {
             topic_name,
             receiver,
         }
+    }
+
+    pub async fn recv(&mut self) -> Option<T> {
+        self.receiver.recv().await
     }
 }

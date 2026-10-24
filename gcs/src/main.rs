@@ -20,7 +20,6 @@ fn main() {
 
 #[component]
 fn App() -> Element {
-    debug!("Rendering App");
     use_context_provider(|| {
         let (node_handle, mut node) = RosNode::new(64); // channel depth 64
 
