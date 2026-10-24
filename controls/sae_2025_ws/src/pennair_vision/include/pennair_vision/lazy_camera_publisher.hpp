@@ -42,7 +42,7 @@ public:
   void start() override;
 
   /// Runs the CV alg implementation and returns the ProcessResult type
-  virtual ProcessResult<MessageT> process(const CameraImage image, const CameraInfo info, bool generate_debug) = 0;
+  virtual ProcessResult<MessageT> process(const CameraImage& image, const CameraInfo& info, bool generate_debug) = 0;
 
 
 private:
@@ -52,8 +52,6 @@ private:
   rclcpp::Node::SharedPtr node_;
   /// Publishes result of cv object
   typename rclcpp::Publisher<MessageT>::SharedPtr cv_result_pub_;
-  /// image transport object, creates CameraPublisher and CameraSubscriber
-  std::shared_ptr<image_transport::ImageTransport> it_;
   /// Object for lazily publishing debug camera images
   image_transport::Publisher cv_debug_pub_;
   /// Object for subscribing to raw camera frames
@@ -66,8 +64,7 @@ void LazyCameraPublisher<MessageT>::initialize(const rclcpp::Node::SharedPtr& no
 {
   camera_topic_ = camera_topic;
   node_ = node;
-  it_ = std::make_shared<image_transport::ImageTransport>(node_->shared_from_this());
-  cv_debug_pub_ = it_->advertise("/cv/debug", 1);
+  cv_debug_pub_ = image_transport::create_publisher(node_.get(), "/cv/debug", rclcpp::QoS(1).get_rmw_qos_profile());
   cv_result_pub_ = node_->create_publisher<MessageT>("/cv/result", 10);
 
   start();
@@ -77,18 +74,22 @@ void LazyCameraPublisher<MessageT>::initialize(const rclcpp::Node::SharedPtr& no
 template <typename MessageT>
 void LazyCameraPublisher<MessageT>::start()
 {
-  camera_sub_ = it_->subscribeCamera(camera_topic_, 1, [this](const CameraImage image, const CameraInfo info) {
-    const bool generate_debug = cv_debug_pub_.getNumSubscribers() > 0;
-    if (cv_result_pub_->get_subscription_count() > 0 || generate_debug) {
-      ProcessResult<MessageT> result = process(image, info, generate_debug);
-      if (generate_debug && !result.debug_image.empty()) {
-        RCLCPP_DEBUG(node_->get_logger(), "publishing debug image!");
-        cv_debug_pub_.publish(cv_bridge::CvImage(image->header, "bgr8", result.debug_image).toImageMsg());
-      }
-      RCLCPP_DEBUG(node_->get_logger(), "publishing image result!");
-      cv_result_pub_->publish(result.message);
-    }
-  });
+  camera_sub_ = image_transport::create_camera_subscription(
+      node_.get(), camera_topic_,
+      [this](const CameraImage image, const CameraInfo info) {
+        const bool generate_debug = cv_debug_pub_.getNumSubscribers() > 0;
+        if (cv_result_pub_->get_subscription_count() > 0 || generate_debug) {
+          ProcessResult<MessageT> result = process(image, info, generate_debug);
+          if (generate_debug && !result.debug_image.empty()) {
+            RCLCPP_DEBUG(node_->get_logger(), "publishing debug image!");
+            cv_debug_pub_.publish(cv_bridge::CvImage(image->header, "bgr8", result.debug_image).toImageMsg());
+          }
+          RCLCPP_DEBUG(node_->get_logger(), "publishing image result!");
+          cv_result_pub_->publish(result.message);
+        }
+      },
+      "raw", rclcpp::QoS(1).get_rmw_qos_profile()
+  );
 }
 
 }  // namespace pennair_vision
