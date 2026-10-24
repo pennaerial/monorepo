@@ -2,26 +2,19 @@
 from time import time
 
 from vehicle_common.mode_manager import ModeManager
-from vehicle_common.runtime.mission_loader import RuntimeMission
+from vehicle_common.runtime.mission_loader import RuntimeMission, get_mission_path
 
 from payload.payload import Payload
+from payload.payload_mission_parameters import payload_mission
 
 
 class PayloadModeManager(ModeManager):
     """Mission manager for a single payload vehicle."""
 
-    def __init__(
-        self,
-        *,
-        mission_spec: RuntimeMission,
-        vehicle_name: str,
-        auto_launch: bool = True,
-        node_name: str = "mission",
-    ) -> None:
-        super().__init__(
-            node_name,
-            vehicle_name=vehicle_name,
-            auto_launch=auto_launch,
+    def __init__(self, node_name: str = "mission") -> None:
+        super().__init__(node_name)
+        mission_spec = RuntimeMission.load_from_path(
+            self.params.mode_map or get_mission_path("basic", "payload")
         )
         if Payload not in mission_spec._targets:
             raise ValueError(
@@ -29,9 +22,12 @@ class PayloadModeManager(ModeManager):
                 f"{sorted(t.__name__ for t in mission_spec._targets)}."
             )
 
-        self.vehicle = Payload(self, str(vehicle_name))
+        self.vehicle = Payload(self, self.params.vehicle_name.strip())
         self.setup_modes(mission_spec)
         self.timer = None
+
+    def load_params(self) -> payload_mission.Params:
+        return payload_mission.ParamListener(self).get_params()
 
     def spin_once(self) -> None:
         current_time = time()
