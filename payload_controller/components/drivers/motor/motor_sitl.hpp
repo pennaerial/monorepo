@@ -14,7 +14,7 @@ namespace drivers
 class Motor_SITL : public Motor
 {
 public:
-  explicit Motor_SITL(PayloadCorner corner);
+  explicit Motor_SITL(Side side);
 
   void start() override;
   void publish(double rad_s) override;
@@ -25,6 +25,8 @@ private:
   gz::transport::Node gz_node_;
   gz::transport::Node::Publisher motor_publisher_;
   const sitl::SimConfig sitl_config_;
+  /// Command topic under /model/<model>/ that this motor publishes to.
+  const char* command_topic_;
 };
 
 }  // namespace drivers

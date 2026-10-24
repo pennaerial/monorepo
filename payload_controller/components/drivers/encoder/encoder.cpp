@@ -3,34 +3,27 @@
 namespace drivers
 {
 
-Encoder::Encoder(PayloadCorner corner) : corner_(corner) {}
-
-PayloadCorner Encoder::corner() const
-{
-  return corner_;
-}
-
-void Encoder::write_latest(const payload_interfaces_msg_MotorState& msg)
+void Encoder::write_latest(const int64_t ticks)
 {
   util::StaticMutexGuard lock(mtx_);
-  reading_ = msg;
+  ticks_ = ticks;
   ++update_count_;
 }
 
-payload_interfaces_msg_MotorState Encoder::get_latest()
+int64_t Encoder::get_latest()
 {
   util::StaticMutexGuard lock(mtx_);
-  return reading_;
+  return ticks_;
 }
 
-bool Encoder::get_latest_if_updated(uint32_t& last_update_count, payload_interfaces_msg_MotorState& msg)
+bool Encoder::get_latest_if_updated(uint32_t& last_update_count, int64_t& ticks)
 {
   util::StaticMutexGuard lock(mtx_);
   if (update_count_ == last_update_count) {
     return false;
   }
 
-  msg = reading_;
+  ticks = ticks_;
   last_update_count = update_count_;
   return true;
 }
