@@ -1,12 +1,8 @@
 #pragma once
+#include "payload_corner.hpp"
 
 namespace drivers
 {
-
-struct MotorConfig {
-  /// Gazebo command topic under /model/<model>/ that this motor publishes to (SITL only).
-  const char* sitl_command_topic;
-};
 
 class Motor
 {
@@ -19,5 +15,8 @@ public:
 protected:
   Motor() = default;
 };
+
+/// Returns this build's motor for the given side. Defined by the backend CMake compiles.
+Motor& get_motor(Side side);
 
 }  // namespace drivers

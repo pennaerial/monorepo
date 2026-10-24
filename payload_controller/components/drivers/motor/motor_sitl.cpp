@@ -9,10 +9,15 @@ static const char* TAG = "Motor_SITL";
 namespace drivers
 {
 
-Motor_SITL::Motor_SITL(const MotorConfig& config)
-    : sitl_config_(sitl::get_config()), command_topic_(config.sitl_command_topic)
+namespace
 {
+const char* command_topic_for(Side side)
+{
+  return side == Side::LEFT ? "command/motor_speed_left" : "command/motor_speed_right";
 }
+}  // namespace
+
+Motor_SITL::Motor_SITL(Side side) : sitl_config_(sitl::get_config()), command_topic_(command_topic_for(side)) {}
 
 void Motor_SITL::start()
 {
@@ -38,6 +43,13 @@ void Motor_SITL::publish(double rad_s)
   gz::msgs::Actuators msg;
   msg.add_velocity(rad_s);
   motor_publisher_.Publish(msg);
+}
+
+Motor& get_motor(Side side)
+{
+  static Motor_SITL left(Side::LEFT);
+  static Motor_SITL right(Side::RIGHT);
+  return side == Side::LEFT ? left : right;
 }
 
 }  // namespace drivers

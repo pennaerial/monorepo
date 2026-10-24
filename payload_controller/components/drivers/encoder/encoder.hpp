@@ -2,16 +2,11 @@
 
 #include <cstdint>
 
+#include "payload_corner.hpp"
 #include "static_mutex.hpp"
 
 namespace drivers
 {
-
-// Backend-specific settings for one encoder. Each backend reads only the fields it needs.
-struct EncoderConfig {
-  // Gazebo joint whose angle this encoder reports (SITL only).
-  const char* sitl_joint_name;
-};
 
 /**
  * @class Encoder
@@ -29,7 +24,6 @@ public:
 
   /// Starts the encoder. It should immediately start writing encoder messages to internal buffer
   virtual void start() = 0;
-  /// Writes a new incoming encoder reading to the local cache.
   /// Writes a new incoming encoder tick count to the local cache.
   void write_latest(int64_t ticks);
   /// Returns the latest encoder tick count.
@@ -45,5 +39,8 @@ private:
   uint32_t update_count_ = 0;
   util::StaticMutex mtx_;
 };
+
+/// Returns this build's encoder for the given side. Defined by the backend CMake compiles.
+Encoder& get_encoder(Side side);
 
 }  // namespace drivers

@@ -6,10 +6,10 @@
 static const char* TAG = "Payload";
 
 Payload::Payload()
-    : left_encoder_(Side::LEFT, "left", {.sitl_joint_name = "front_left_wheel_joint"}),
-      right_encoder_(Side::RIGHT, "right", {.sitl_joint_name = "front_right_wheel_joint"}),
-      left_motor_(Side::LEFT, "left", {.sitl_command_topic = "command/motor_speed_left"}),
-      right_motor_(Side::RIGHT, "right", {.sitl_command_topic = "command/motor_speed_right"})
+    : left_encoder_(Side::LEFT, "left"),
+      right_encoder_(Side::RIGHT, "right"),
+      left_motor_(Side::LEFT, "left"),
+      right_motor_(Side::RIGHT, "right")
 {
 }
 

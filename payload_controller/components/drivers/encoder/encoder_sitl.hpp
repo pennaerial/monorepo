@@ -15,7 +15,7 @@ namespace drivers
 class Encoder_SITL : public Encoder
 {
 public:
-  explicit Encoder_SITL(const EncoderConfig& config);
+  explicit Encoder_SITL(Side side);
 
   void start() override;
 

@@ -3,14 +3,22 @@
 namespace drivers
 {
 
-Encoder_HW::Encoder_HW(const EncoderConfig&)
+Encoder_HW::Encoder_HW(Side)
 {
-  // TODO read hardware pins from EncoderConfig once they exist
+  // TODO
 }
+
 
 void Encoder_HW::start()
 {
   // TODO
+}
+
+Encoder& get_encoder(Side side)
+{
+  static Encoder_HW left(Side::LEFT);
+  static Encoder_HW right(Side::RIGHT);
+  return side == Side::LEFT ? left : right;
 }
 
 }  // namespace drivers

@@ -3,9 +3,9 @@
 namespace drivers
 {
 
-Motor_HW::Motor_HW(const MotorConfig&)
+Motor_HW::Motor_HW(Side)
 {
-  // TODO read hardware pins from MotorConfig once they exist
+  // TODO
 }
 
 void Motor_HW::start()
@@ -16,6 +16,13 @@ void Motor_HW::start()
 void Motor_HW::publish(double)
 {
   // TODO
+}
+
+Motor& get_motor(Side side)
+{
+  static Motor_HW left(Side::LEFT);
+  static Motor_HW right(Side::RIGHT);
+  return side == Side::LEFT ? left : right;
 }
 
 }  // namespace drivers
