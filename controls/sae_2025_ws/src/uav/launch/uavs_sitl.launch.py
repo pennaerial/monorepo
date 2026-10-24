@@ -136,22 +136,22 @@ def generate_launch_description() -> LaunchDescription:
             ),
             DeclareLaunchArgument(
                 Args.MISSION_0,
-                default_value="basic",
+                default_value="iarc_circle",
                 description="Mission for uav_0. LOCAL coordinates are relative to uav_0's origin.",
             ),
             DeclareLaunchArgument(
                 Args.MISSION_1,
-                default_value="basic_waypoints",
+                default_value="iarc_circle",
                 description="Mission for uav_1. LOCAL coordinates are relative to uav_1's origin.",
             ),
             DeclareLaunchArgument(
                 Args.MISSION_2,
-                default_value="basic",
+                default_value="iarc_circle",
                 description="Mission for uav_2. LOCAL coordinates are relative to uav_2's origin.",
             ),
             DeclareLaunchArgument(
                 Args.MISSION_3,
-                default_value="basic_waypoints",
+                default_value="iarc_circle",
                 description="Mission for uav_3. LOCAL coordinates are relative to uav_3's origin.",
             ),
             OpaqueFunction(function=launch_setup),
