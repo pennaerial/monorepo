@@ -31,7 +31,7 @@ Reading an Existing Mission
 ```````````````````````````
 
 Before writing your own mission, read an example one to see how it's structured.
-Here is ``controls/sae_2025_ws/src/uav/missions/basic.yaml``, a
+Here is ``controls/sae_2025_ws/src/common/uav/missions/basic.yaml``, a
 mission that takes off, flies to a waypoint, and then lands:
 
 .. code-block:: yaml
@@ -100,7 +100,7 @@ Create a new YAML file in the UAV missions directory and name it accordingly:
 
 .. code-block:: text
 
-    monorepo/controls/sae_2025_ws/src/uav/missions/<mission-name>.yaml
+    monorepo/controls/sae_2025_ws/src/common/uav/missions/<mission-name>.yaml
 
 You should attempt to create a mission that takes off, calls the mode you created in the previous tutorial ``uav.FlyToPointMode``,
 passing in a required 3-tuple target argument and optionally a margin argument, then lands.
@@ -109,7 +109,7 @@ Use the above ``basic.yaml`` as a  template, replacing ``uav.NavGPSMode`` with t
 .. note::
 
     To see what parameters a mode accepts, read its params model next to the mode itself. For example, you had ``FlyToPointMode`` declare
-    ``FlyToPointParams`` at the top of ``controls/sae_2025_ws/src/uav/uav/modes/fly_to_point_mode.py`` in the mode tutorial,
+    ``FlyToPointParams`` at the top of ``controls/sae_2025_ws/src/common/uav/uav/modes/fly_to_point_mode.py`` in the mode tutorial,
     which provides the schema the ``params:`` block is checked against.
 
 Here is a completed version of the mission:
@@ -169,7 +169,7 @@ To save your progress locally, stage and commit your changes to the branch you c
     :caption: Bash
 
     # from monorepo/controls/sae_2025_ws
-    git add src/uav/uav/missions/<mission-name>.yaml
+    git add src/common/uav/uav/missions/<mission-name>.yaml
     git commit -m "created first mission"
 
 Congrats, You Did It!

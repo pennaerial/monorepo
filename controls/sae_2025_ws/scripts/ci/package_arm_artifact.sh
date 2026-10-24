@@ -52,7 +52,7 @@ ci_log "Preparing runtime files"
 rm -rf "$DEPLOY_DIR"
 mkdir -p "$DEPLOY_DIR"
 cp -a "$INSTALL_DIR" "$DEPLOY_DIR/"
-cp "$WORKSPACE_ROOT/src/uav/launch/launch_params_hardware.yaml" \
+cp "$WORKSPACE_ROOT/src/common/uav/launch/launch_params_hardware.yaml" \
     "$DEPLOY_DIR/install/uav/share/uav/launch/launch_params.yaml"
 if [[ -f "$WORKSPACE_ROOT/scripts/deploy.sh" ]]; then
     cp "$WORKSPACE_ROOT/scripts/deploy.sh" "$DEPLOY_DIR/"

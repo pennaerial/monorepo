@@ -76,12 +76,12 @@ Replace ``<github-username>`` with your GitHub username:
 Create the Mode File
 --------------------
 
-UAV modes live under ``controls/sae_2025_ws/src/uav/uav/modes/``. From the
+UAV modes live under ``controls/sae_2025_ws/src/common/uav/uav/modes/``. From the
 monorepo root, create:
 
 .. code-block:: text
 
-   controls/sae_2025_ws/src/uav/uav/modes/fly_to_point_mode.py
+   controls/sae_2025_ws/src/common/uav/uav/modes/fly_to_point_mode.py
 
 Start the file with these imports:
 
@@ -367,7 +367,7 @@ To save your progress locally, stage and commit your changes to the branch you c
     :caption: Bash
 
     # from monorepo/controls/sae_2025_ws
-    git add src/uav/uav/modes/fly_to_point_mode.py
+    git add src/common/uav/uav/modes/fly_to_point_mode.py
     git commit -m "created first mode"
 
 Next Step

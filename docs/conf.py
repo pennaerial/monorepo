@@ -68,10 +68,10 @@ add_module_names = False  # object names don't show full header path so its not 
 # =============================================================================
 if not SKIP_AUTOAPI_BUILD:
     autoapi_dirs = [  # python only
-        f"{SAE_WS_PATH}/src/uav/uav",
-        f"{SAE_WS_PATH}/src/payload/payload",
-        f"{SAE_WS_PATH}/src/sim/sim",
-        f"{SAE_WS_PATH}/src/vehicle_common/vehicle_common",
+        f"{SAE_WS_PATH}/src/common/uav/uav",
+        f"{SAE_WS_PATH}/src/sae/payload/payload",
+        f"{SAE_WS_PATH}/src/common/sim/sim",
+        f"{SAE_WS_PATH}/src/common/vehicle_common/vehicle_common",
     ]
     # Custom templates dir (only overrides python/module.rst). Used to customize names (favoring displaying short names over full module path names)
     autoapi_template_dir = "../sphinx/_templates/autoapi"

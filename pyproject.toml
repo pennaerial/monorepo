@@ -16,7 +16,7 @@ dev = [
 exclude = [
     "controls/sae_2025_ws/src/ros_gz",
     "controls/sae_2025_ws/src/actuator_msgs",
-    "controls/sae_2025_ws/src/px4_msgs",
+    "controls/sae_2025_ws/src/common/px4_msgs",
     "PX4-Autopilot",
     "gz-models",
     "Dependencies"
