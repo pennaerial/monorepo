@@ -1,35 +1,27 @@
-use dioxus::prelude::*;
 use crate::routes::Route;
+use dioxus::prelude::*;
 
 #[component]
 pub fn SideBar() -> Element {
-    
-    rsx!{
-        aside {
-            class: "sidebar", 
+    rsx! {
+        aside { class: "sidebar",
 
-        div {
-            class: "sidebar-header",
-            h2 {"PennAiR Control"}
-        }
-
-        nav {
-            class: "sidebar-nav",
-
-            Link {
-                to: Route::Dashboard {},
-                class: "sidebar-link",
-                span { class: "nav-icon", "-" },
-                "Dashboard"
+            div { class: "sidebar-header",
+                h2 { "PennAiR Control" }
             }
 
-            Link {
-                to: Route::MissionControl {},
-                class: "sidebar-link",
-                span { class: "nav-icon", "-" },
-                "Mission Control"
+            nav { class: "sidebar-nav",
+
+                Link { to: Route::Dashboard {}, class: "sidebar-link",
+                    span { class: "nav-icon", "-" }
+                    "Dashboard"
+                }
+
+                Link { to: Route::MissionControl {}, class: "sidebar-link",
+                    span { class: "nav-icon", "-" }
+                    "Mission Control"
+                }
             }
-        }
         }
     }
 }

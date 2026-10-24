@@ -1,8 +1,9 @@
 use crate::components::{Button, SideBar};
+use crate::hooks::use_ros_node;
 use crate::ros::server_types::ServerMessage;
-use crate::ros::{FoxgloveClient, NodeHandle};
+use crate::ros::{FoxgloveClient, SubscriptionHandle};
 use dioxus::prelude::*;
-use ros_interfaces::geometry_msgs;
+use ros_interfaces::{geometry_msgs, std_msgs};
 
 // / * `url`: e.g. "localhost:8765"
 async fn run_client(url: &str) {
@@ -51,26 +52,25 @@ async fn run_client(url: &str) {
 
 #[component]
 pub fn MissionControl() -> Element {
-    let node = use_context::<NodeHandle>();
+    let node = use_ros_node();
+    let mut string_msg = use_signal_sync(String::new);
+
+    // use a signal here keep SubscriptionHandle alive
+    let mut subscription = use_signal(|| None::<SubscriptionHandle>);
 
     rsx! {
 
-        div {
-            class: "app-layout",
+        div { class: "app-layout",
             SideBar {}
 
-            main {
-                class: "main-content",
+            main { class: "main-content",
 
-                h1 { class: "page-title",
-                "Mission Control Page" 
-                }
-
+                h1 { class: "page-title", "Mission Control Page" }
 
                 Button {
                     label: "Connect",
                     onclick: move |_| {
-                        let mut node = node.clone();
+                        let node = node.read().clone();
                         async move {
                             if let Err(e) = node.connect("ws://localhost:8765").await {
                                 info!("Failed: {:?},", e);
@@ -78,11 +78,30 @@ pub fn MissionControl() -> Element {
                                 info!("Successful connect")
                             }
                         }
-                    }
-                }        
+                    },
+                }
             }
         }
+
+        Button {
+            label: "Subscribe",
+            onclick: move |_| {
+                let node = node.read().clone();
+
+                async move {
+                    let result = node
+                        .create_subscription::<
+                            std_msgs::msg::String,
+                            _,
+                        >("/chatter", 10, move |message| string_msg.set(message.data))
+                        .await;
+                    match result {
+                        Ok(handle) => subscription.set(Some(handle)),
+                        Err(error) => error!(? error, "Failed to subscribe to /chatter"),
+                    }
+                }
+            },
+        }
+        p { "{string_msg}" }
     }
 }
-        
-
