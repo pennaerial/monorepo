@@ -4,19 +4,15 @@ use dioxus::prelude::*;
 #[component]
 pub fn Dashboard() -> Element {
     rsx! {
-        div {
-            class: "app-layout",
+        div { class: "app-layout",
 
-            SideBar{}
+            SideBar {}
 
-            main {
-                class: "main-content",
+            main { class: "main-content",
 
-                h1 {class: "page-title",
-                "Dashboard"
-                }
+                h1 { class: "page-title", "Dashboard" }
 
-                p {"Welcome to PennAir Control Dashboard"}
+                p { "Welcome to PennAir Control Dashboard" }
             }
         }
     }

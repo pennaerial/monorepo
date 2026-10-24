@@ -63,30 +63,26 @@ pub fn MissionControl() -> Element {
 
     rsx! {
 
-        div {
-            class: "app-layout",
+        div { class: "app-layout",
             SideBar {}
 
-            main {
-                class: "main-content",
+            main { class: "main-content",
 
-                h1 { class: "page-title",
-                "Mission Control Page"
-                }
+                h1 { class: "page-title", "Mission Control Page" }
 
-        Button {
-            label: "Connect",
-            onclick: move |_| {
-                let node = connect_node.clone();
-                async move {
-                    if let Err(e) = node.connect("ws://localhost:8765").await {
-                        info!("Failed: {:?},", e);
-                    } else {
-                        info!("Successful connect")
-                    }
+                Button {
+                    label: "Connect",
+                    onclick: move |_| {
+                        let node = connect_node.clone();
+                        async move {
+                            if let Err(e) = node.connect("ws://localhost:8765").await {
+                                info!("Failed: {:?},", e);
+                            } else {
+                                info!("Successful connect")
+                            }
+                        }
+                    },
                 }
-            }
-        }
             }
         }
 
@@ -97,18 +93,17 @@ pub fn MissionControl() -> Element {
 
                 async move {
                     let result = node
-                        .create_subscription::<std_msgs::msg::String, _>(
-                            "/chatter",
-                            10,
-                            move |message| string_msg.set(message.data),
-                        )
+                        .create_subscription::<
+                            std_msgs::msg::String,
+                            _,
+                        >("/chatter", 10, move |message| string_msg.set(message.data))
                         .await;
                     match result {
                         Ok(handle) => subscription.set(Some(handle)),
-                        Err(error) => error!(?error, "Failed to subscribe to /chatter"),
+                        Err(error) => error!(? error, "Failed to subscribe to /chatter"),
                     }
                 }
-            }
+            },
         }
         p { "{string_msg}" }
     }
