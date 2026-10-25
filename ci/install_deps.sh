@@ -43,7 +43,7 @@ echo "Installing rosdeps..."
 sudo rosdep init || true # || true guards against already initialized rosdep
 rosdep update --rosdistro "$ROS_DISTRO"
 rosdep install -r -i -y --rosdistro "$ROS_DISTRO" \
-	--from-paths ${PENNAIR_SAE_WS_PATH}/src
+	--from-paths ${PENNAIR_ROS_WS_PATH}/src
 
 #### Install all apt packages (non rosdep)
 echo "Installing ci.conf apt packages... ${APT_PACKAGES[@]}"

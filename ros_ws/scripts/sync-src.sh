@@ -132,7 +132,7 @@ _rsync_to() {
 		"${RSYNC_EXCLUDES[@]}" \
 		${rsync_ssh_opt[@]+"${rsync_ssh_opt[@]}"} \
 		"${SOURCES[@]}" \
-		"$remote:~/monorepo/controls/sae_2025_ws/src/"
+		"$remote:~/monorepo/ros_ws/src/"
 }
 
 _sync_time_to() {

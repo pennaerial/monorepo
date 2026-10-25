@@ -1,5 +1,5 @@
 # Doxyfile for payload_controller (ESP-IDF firmware, not the ROS2 package of
-# the same name under controls/sae_2025_ws/src/sae/payload_controller).
+# the same name under ros_ws/src/sae/payload_controller).
 #
 # Only generates XML (GENERATE_HTML=NO) - this feeds Breathe/Sphinx, which is
 # the actual doc site; Doxygen's own HTML output isn't needed alongside it.

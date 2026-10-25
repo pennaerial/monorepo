@@ -36,7 +36,7 @@ html_theme_options = {
 # if 1, skips autoapi build for faster local iteration on handwritten docs
 SKIP_AUTOAPI_BUILD = os.environ.get("SKIP_AUTOAPI_BUILD") == "1"
 
-SAE_WS_PATH = os.environ["PENNAIR_SAE_WS_PATH"]
+ROS_WS_PATH = os.environ["PENNAIR_ROS_WS_PATH"]
 
 sys.path.insert(0, str(Path(__file__).parent / "_ext"))  # make _ext modules discoverable
 
@@ -68,10 +68,10 @@ add_module_names = False  # object names don't show full header path so its not 
 # =============================================================================
 if not SKIP_AUTOAPI_BUILD:
     autoapi_dirs = [  # python only
-        f"{SAE_WS_PATH}/src/common/uav/uav",
-        f"{SAE_WS_PATH}/src/sae/payload/payload",
-        f"{SAE_WS_PATH}/src/common/sim/sim",
-        f"{SAE_WS_PATH}/src/common/vehicle_common/vehicle_common",
+        f"{ROS_WS_PATH}/src/common/uav/uav",
+        f"{ROS_WS_PATH}/src/sae/payload/payload",
+        f"{ROS_WS_PATH}/src/common/sim/sim",
+        f"{ROS_WS_PATH}/src/common/vehicle_common/vehicle_common",
     ]
     # Custom templates dir (only overrides python/module.rst). Used to customize names (favoring displaying short names over full module path names)
     autoapi_template_dir = "../sphinx/_templates/autoapi"

@@ -14,9 +14,9 @@ dev = [
 
 [tool.ruff]
 exclude = [
-    "controls/sae_2025_ws/src/ros_gz",
-    "controls/sae_2025_ws/src/actuator_msgs",
-    "controls/sae_2025_ws/src/common/px4_msgs",
+    "ros_ws/src/ros_gz",
+    "ros_ws/src/actuator_msgs",
+    "ros_ws/src/common/px4_msgs",
     "PX4-Autopilot",
     "gz-models",
     "Dependencies"

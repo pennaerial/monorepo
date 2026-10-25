@@ -85,7 +85,7 @@ sudo apt-get upgrade
 1. Build the workspace using `colcon`:
 
     ```bash
-    cd ~/{path_to_monorepo}/controls/sae_2025_ws
+    cd ~/{path_to_monorepo}/ros_ws
     export GZ_VERSION=harmonic
     colcon build
     ```

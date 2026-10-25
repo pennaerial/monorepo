@@ -47,12 +47,12 @@ ros_ci_conf="${SCRIPT_DIR}/ros_ci.conf"
 source ${ros_ci_conf} # imports configuration constants
 echo "[build_ros.sh] using conf file: ${ros_ci_conf}"
 
-SRC_DIR="${PENNAIR_SAE_WS_PATH}/src"
-BUILD_DIR="${PENNAIR_SAE_WS_PATH}/build"
-INSTALL_DIR="${PENNAIR_SAE_WS_PATH}/install"
+SRC_DIR="${PENNAIR_ROS_WS_PATH}/src"
+BUILD_DIR="${PENNAIR_ROS_WS_PATH}/build"
+INSTALL_DIR="${PENNAIR_ROS_WS_PATH}/install"
 
 # --- Get the full list of package names in the workspace ---
-mapfile -t all_packages < <(colcon list -n --base-paths "${PENNAIR_SAE_WS_PATH}")
+mapfile -t all_packages < <(colcon list -n --base-paths "${PENNAIR_ROS_WS_PATH}")
 
 # --- Precompute the list of non-third-party packages ---
 non_third_party_packages=()
@@ -109,7 +109,7 @@ elif [[ "$BUILD_MODE" == "quick" ]]; then
 	done
 fi
 
-cd "${PENNAIR_SAE_WS_PATH}"
+cd "${PENNAIR_ROS_WS_PATH}"
 set +u
 source "/opt/ros/$ROS_DISTRO/setup.bash"
 set -u
@@ -117,20 +117,20 @@ set -u
 if [[ "${BUILD_THIRD}" == "true" ]]; then
 	echo "[build_ros.sh] Building only third-party packages: ${THIRD_ROS_PACKAGES[*]}"
     colcon \
-        --log-base "${PENNAIR_SAE_WS_PATH}/log" \
+        --log-base "${PENNAIR_ROS_WS_PATH}/log" \
         build \
-        --base-paths "${PENNAIR_SAE_WS_PATH}/src" \
-        --build-base "${PENNAIR_SAE_WS_PATH}/build" \
-        --install-base "${PENNAIR_SAE_WS_PATH}/install" \
+        --base-paths "${PENNAIR_ROS_WS_PATH}/src" \
+        --build-base "${PENNAIR_ROS_WS_PATH}/build" \
+        --install-base "${PENNAIR_ROS_WS_PATH}/install" \
         --packages-select "${THIRD_ROS_PACKAGES[@]}"
 else
 	echo "[build_ros.sh] Building All Packages..."
     colcon \
-        --log-base "${PENNAIR_SAE_WS_PATH}/log" \
+        --log-base "${PENNAIR_ROS_WS_PATH}/log" \
         build \
-        --base-paths "${PENNAIR_SAE_WS_PATH}/src" \
-        --build-base "${PENNAIR_SAE_WS_PATH}/build" \
-        --install-base "${PENNAIR_SAE_WS_PATH}/install"
+        --base-paths "${PENNAIR_ROS_WS_PATH}/src" \
+        --build-base "${PENNAIR_ROS_WS_PATH}/build" \
+        --install-base "${PENNAIR_ROS_WS_PATH}/install"
 fi
 
 if [[ ${#THIRD_ROS_PACKAGES[@]} -gt 0 ]]; then
