@@ -10,8 +10,8 @@
 #include <string>
 
 #include "image_transport/image_transport.hpp"
-#include "pennair_vision/vision_plugin.hpp"
 #include "pennair_vision/ros_message.hpp"
+#include "pennair_vision/vision_plugin.hpp"
 #include "rclcpp/node.hpp"
 #include "sensor_msgs/msg/camera_info.hpp"
 #include "sensor_msgs/msg/image.hpp"
