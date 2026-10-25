@@ -86,7 +86,9 @@ void LazyCameraPublisher<MessageT>::start()
           ProcessResult<MessageT> result = process(image, info, generate_debug);
           if (generate_debug && !result.debug_image.empty()) {
             RCLCPP_DEBUG(node_->get_logger(), "publishing debug image!");
-            cv_debug_pub_.publish(cv_bridge::CvImage(image->header, result.debug_encoding, result.debug_image).toImageMsg());
+            cv_debug_pub_.publish(
+                cv_bridge::CvImage(image->header, result.debug_encoding, result.debug_image).toImageMsg()
+            );
           }
           RCLCPP_DEBUG(node_->get_logger(), "publishing image result!");
           cv_result_pub_->publish(result.message);
