@@ -13,8 +13,12 @@ ProcessResult<std_msgs::msg::Int32>
 BasicVision::process(const CameraImage& image, const CameraInfo& /* info */, bool generate_debug)
 {
   ProcessResult<std_msgs::msg::Int32> result;
+  result.message.data = ++count_;
   if (generate_debug) {
-    result.debug_image = cv_bridge::toCvCopy(image, "bgr8")->image;
+    const auto frame = cv_bridge::toCvShare(image, "bgr8");
+    cv::Mat gray;
+    cv::cvtColor(frame->image, result.debug_image, cv::COLOR_BGR2GRAY);
+    result.debug_encoding = sensor_msgs::image_encodings::MONO8;
   }
   return result;
 }

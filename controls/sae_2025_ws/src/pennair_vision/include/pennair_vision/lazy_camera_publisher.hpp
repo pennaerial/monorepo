@@ -7,6 +7,7 @@
 #include <opencv2/core/mat.hpp>
 #include <rclcpp/logging.hpp>
 #include <rclcpp/publisher.hpp>
+#include <sensor_msgs/image_encodings.hpp>
 #include <string>
 
 #include "image_transport/image_transport.hpp"
@@ -22,8 +23,10 @@ using CameraInfo = sensor_msgs::msg::CameraInfo::ConstSharedPtr;
 template <pennair_vision::RosMessage MessageT>
 struct ProcessResult {
   MessageT message;
-  /// Optional BGR8 image; leave empty when debug output is not requested.
+  /// Optional debug image; leave empty when debug output is not requested.
   cv::Mat debug_image;
+  /// ROS image encoding matching the debug image pixels.
+  std::string debug_encoding{sensor_msgs::image_encodings::BGR8};
 };
 
 namespace pennair_vision
@@ -77,13 +80,13 @@ void LazyCameraPublisher<MessageT>::start()
 {
   camera_sub_ = image_transport::create_camera_subscription(
       node_, camera_topic_,
-      [this](const CameraImage image, const CameraInfo info) {
+      [this](const CameraImage& image, const CameraInfo& info) {
         const bool generate_debug = cv_debug_pub_.getNumSubscribers() > 0;
         if (cv_result_pub_->get_subscription_count() > 0 || generate_debug) {
           ProcessResult<MessageT> result = process(image, info, generate_debug);
           if (generate_debug && !result.debug_image.empty()) {
             RCLCPP_DEBUG(node_->get_logger(), "publishing debug image!");
-            cv_debug_pub_.publish(cv_bridge::CvImage(image->header, "bgr8", result.debug_image).toImageMsg());
+            cv_debug_pub_.publish(cv_bridge::CvImage(image->header, result.debug_encoding, result.debug_image).toImageMsg());
           }
           RCLCPP_DEBUG(node_->get_logger(), "publishing image result!");
           cv_result_pub_->publish(result.message);
