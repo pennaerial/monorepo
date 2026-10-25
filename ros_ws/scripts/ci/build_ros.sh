@@ -51,6 +51,12 @@ SRC_DIR="${PENNAIR_ROS_WS_PATH}/src"
 BUILD_DIR="${PENNAIR_ROS_WS_PATH}/build"
 INSTALL_DIR="${PENNAIR_ROS_WS_PATH}/install"
 
+# Packages live one folder down, e.g. src/common/px4_msgs
+third_party_src_dir() {
+	local matches=("${SRC_DIR}"/*/"$1")
+	echo "${matches[0]}"
+}
+
 # --- Get the full list of package names in the workspace ---
 mapfile -t all_packages < <(colcon list -n --base-paths "${PENNAIR_ROS_WS_PATH}")
 
@@ -77,7 +83,7 @@ if [[ "$BUILD_MODE" == "clean" ]]; then
 elif [[ "$BUILD_MODE" == "quick" ]]; then
 	# --- Handle third-party packages: only wipe build/install if commit SHA changed ---
 	for pkg in "${THIRD_ROS_PACKAGES[@]}"; do
-		pkg_src_dir="${SRC_DIR}/${pkg}"
+		pkg_src_dir="$(third_party_src_dir "${pkg}")"
 		commit_tag_file="${BUILD_DIR}/${pkg}/COMMIT_TAG"
 		stale="false"
 		if [[ ! -d "${pkg_src_dir}" ]]; then # 3rd-party pkg doesn't exist
@@ -136,7 +142,7 @@ fi
 if [[ ${#THIRD_ROS_PACKAGES[@]} -gt 0 ]]; then
 	# --- Write COMMIT_TAG for each third-party package after a successful build ---
 	for pkg in "${THIRD_ROS_PACKAGES[@]}"; do
-		pkg_src_dir="${SRC_DIR}/${pkg}"
+		pkg_src_dir="$(third_party_src_dir "${pkg}")"
 		pkg_build_dir="${BUILD_DIR}/${pkg}"
 		if [[ -d "${pkg_build_dir}" ]]; then
 			echo "[build_ros.sh] Writing COMMIT_TAG at ${pkg_build_dir}/COMMIT_TAG"
