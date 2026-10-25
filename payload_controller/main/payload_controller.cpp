@@ -4,7 +4,6 @@
 #include "payload.hpp"
 
 
-
 extern "C" void app_main(void)
 {
 // Temporary for esp testing
