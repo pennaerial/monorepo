@@ -71,7 +71,7 @@ Options:
 
 Examples:
   $0 --hostname air-01 --authorized-key-file ~/.ssh/pennair_pi_ed25519.pub
-  $0 --hostname air-02 --authorized-key-url https://raw.githubusercontent.com/pennaerial/monorepo/main/controls/sae_2025_ws/ops/keys/pennair_pi_ed25519.pub
+  $0 --hostname air-02 --authorized-key-url https://raw.githubusercontent.com/pennaerial/monorepo/main/ros_ws/ops/keys/pennair_pi_ed25519.pub
   $0 --hostname payload-01 --user penn --no-bootstrap
   $0 --hostname air-0x --allow-placeholder-hostname --no-bootstrap
 EOF

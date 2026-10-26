@@ -39,7 +39,7 @@ jobs:
               - '.github/workflows/mergebuild.yml'
               - 'dev_env.sh'
             ros_ws:
-              - 'controls/sae_2025_ws/**'
+              - 'ros_ws/**'
             docs:
               - 'docs/**'
               - '.github/actions/build-docs/action.yaml'
@@ -51,6 +51,9 @@ jobs:
     needs: detect_changes
     runs-on: ubuntu-latest
     if: needs.detect_changes.outputs.ros_ws == 'true' || needs.detect_changes.outputs.all == 'true'
+    env:
+      # TODO: remove once the nightly image sets PENNAIR_ROS_WS_PATH
+      PENNAIR_ROS_WS_PATH: /root/monorepo/ros_ws
 
     container:
       image: ghcr.io/pennaerial/monorepo:latest
@@ -72,16 +75,16 @@ jobs:
 
       - name: Build ROS Packages
         run: |
-          "$PENNAIR_SAE_WS_PATH/scripts/ci/build_ros.sh" --quick
+          "$PENNAIR_ROS_WS_PATH/scripts/ci/build_ros.sh" --quick
 
       - name: Run Unit Tests
         shell: bash
         run: |
           # shellcheck disable=SC1090
           source "/opt/ros/$ROS_DISTRO/setup.bash"
-          source "$PENNAIR_SAE_WS_PATH/install/setup.bash"
-          source "$PENNAIR_SAE_WS_PATH/.aliasrc" # imports the bash testing functions
-          cd "$PENNAIR_SAE_WS_PATH"
+          source "$PENNAIR_ROS_WS_PATH/install/setup.bash"
+          source "$PENNAIR_ROS_WS_PATH/.aliasrc" # imports the bash testing functions
+          cd "$PENNAIR_ROS_WS_PATH"
           ct
 
       - name: Run Sim Tests
@@ -90,9 +93,9 @@ jobs:
         run: |
           # shellcheck disable=SC1090
           source "/opt/ros/$ROS_DISTRO/setup.bash"
-          source "$PENNAIR_SAE_WS_PATH/install/setup.bash"
-          source "$PENNAIR_SAE_WS_PATH/.aliasrc" # imports the bash testing functions
-          cd "$PENNAIR_SAE_WS_PATH"
+          source "$PENNAIR_ROS_WS_PATH/install/setup.bash"
+          source "$PENNAIR_ROS_WS_PATH/.aliasrc" # imports the bash testing functions
+          cd "$PENNAIR_ROS_WS_PATH"
           colcon test-result --delete-yes # clear unit test results so only sim results are checked
           ctsim
           colcon test-result --verbose # ctsim exits 0 on test failures, so fail the step here
@@ -116,6 +119,9 @@ jobs:
     needs: detect_changes
     runs-on: ubuntu-latest
     if: needs.detect_changes.outputs.payload_controller == 'true' || needs.detect_changes.outputs.all == 'true'
+    env:
+      # TODO: remove once the nightly image sets PENNAIR_ROS_WS_PATH
+      PENNAIR_ROS_WS_PATH: /root/monorepo/ros_ws
 
     container:
       image: ghcr.io/pennaerial/monorepo:latest

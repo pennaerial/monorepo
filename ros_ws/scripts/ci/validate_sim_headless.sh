@@ -43,5 +43,5 @@ export PX4_PATH
 
 ci_log "Running headless sim launch_testing gate"
 # xvfb-run gives gz's ogre render engine an X display in this headless env.
-xvfb-run -a python3 -m pytest -sx "$WORKSPACE_ROOT/src/uav/test/test_sim_headless.py"
-xvfb-run -a python3 -m pytest -sx "$WORKSPACE_ROOT/src/uav/test/test_sim_headless_tailsitter.py"
+xvfb-run -a python3 -m pytest -sx "$WORKSPACE_ROOT/src/common/uav/test/test_sim_headless.py"
+xvfb-run -a python3 -m pytest -sx "$WORKSPACE_ROOT/src/common/uav/test/test_sim_headless_tailsitter.py"

@@ -106,12 +106,16 @@ fi
 # Build source list, verifying each package exists locally.
 SOURCES=()
 for pkg in "${PACKAGES[@]}"; do
-	pkg_path="$SRC_DIR/$pkg"
+	# Packages live one folder down, e.g. src/common/uav
+	pkg_matches=("$SRC_DIR"/*/"$pkg")
+	pkg_path="${pkg_matches[0]}"
 	if [[ ! -d "$pkg_path" ]]; then
-		echo "Package not found: $pkg_path" >&2
+		echo "Package not found: $SRC_DIR/*/$pkg" >&2
 		exit 1
 	fi
-	SOURCES+=("$pkg_path")
+	group="$(basename "$(dirname "$pkg_path")")"
+	# The "/./" marker makes rsync --relative keep the group folder on the remote
+	SOURCES+=("$SRC_DIR/./$group/$pkg")
 done
 
 # Build rsync command prefix (with or without sshpass)
@@ -122,13 +126,13 @@ _rsync_to() {
 		rsync_ssh_opt=(-e "sshpass -p '$SSH_PASS' ssh")
 	fi
 
-	rsync -rvc \
+	rsync -rvc --relative \
 		--no-perms --no-owner --no-group \
 		--delete \
 		"${RSYNC_EXCLUDES[@]}" \
 		${rsync_ssh_opt[@]+"${rsync_ssh_opt[@]}"} \
 		"${SOURCES[@]}" \
-		"$remote:~/monorepo/controls/sae_2025_ws/src/"
+		"$remote:~/monorepo/ros_ws/src/"
 }
 
 _sync_time_to() {

@@ -3,7 +3,7 @@
 Live plotter for payload motor state RPM traces.
 
 Usage:
-  python3 src/payload/test/plot_motor_state.py --topic /payload_0/motor_state
+  python3 src/sae/payload_controller/test/plot_motor_state.py --topic /payload_0/motor_state
 """
 
 import argparse

@@ -85,7 +85,7 @@ sudo apt-get upgrade
 1. Build the workspace using `colcon`:
 
     ```bash
-    cd ~/{path_to_monorepo}/controls/sae_2025_ws
+    cd ~/{path_to_monorepo}/ros_ws
     export GZ_VERSION=harmonic
     colcon build
     ```
@@ -109,7 +109,7 @@ sudo apt-get upgrade
 
     Original instructions from [gazebosim/ros_gz](https://github.com/gazebosim/ros_gz/tree/jazzy).
 
-4. If you are running payload hardware on a Raspberry Pi, also complete the one-time `pigpio` / `pigpiod` setup in [src/payload/README.md](src/payload/README.md). The payload GPIO controller will not start unless `pigpiod` is running.
+4. If you are running payload hardware on a Raspberry Pi, also complete the one-time `pigpio` / `pigpiod` setup in [src/sae/payload/README.md](src/sae/payload/README.md). The payload GPIO controller will not start unless `pigpiod` is running.
 ---
 
 ## Solving Common Issues

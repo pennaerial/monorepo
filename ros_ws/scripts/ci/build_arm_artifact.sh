@@ -18,8 +18,8 @@ ci_log "Installing workspace dependencies via rosdep"
 ci_refresh_apt_lists
 rosdep update --rosdistro "$ROS_DISTRO"
 rosdep install -r -i -y --rosdistro "$ROS_DISTRO" \
-    --from-paths src/uav src/uav_interfaces src/px4_msgs \
-    src/payload src/payload_interfaces src/tools src/vehicle_common src/payload_controller
+    --from-paths src/common/uav src/sae/uav_interfaces src/common/px4_msgs \
+    src/sae/payload src/sae/payload_interfaces src/common/tools src/common/vehicle_common src/sae/payload_controller
 
 ci_log "Building shared hardware dependencies"
 colcon build \

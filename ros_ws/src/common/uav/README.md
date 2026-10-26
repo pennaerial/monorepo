@@ -6,9 +6,9 @@ This package owns mission launch, mission runtime, vehicle wrappers, and camera 
 
 | Path | What it is |
 | --- | --- |
-| `src/uav/launch/` | Launch entrypoints |
-| `src/uav/missions/` | Bundled mission YAMLs |
-| `src/uav/uav/vehicles/` | UAV vehicle adapters |
+| `src/common/uav/launch/` | Launch entrypoints |
+| `src/common/uav/missions/` | Bundled mission YAMLs |
+| `src/common/uav/uav/vehicles/` | UAV vehicle adapters |
 
 ## First Read
 
