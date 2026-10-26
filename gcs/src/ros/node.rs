@@ -179,7 +179,7 @@ impl NodeHandle {
         mut callback: impl FnMut(T) + Send + 'static,
     ) -> Result<SubscriptionHandle, NodeError>
     where
-        T: RosMessage + Send + 'static,
+        T: RosMessage,
     {
         let (sender, mut receiver) = mpsc::channel::<T>(depth);
         let sink = SubscriptionSink::new(topic.to_owned(), sender);
