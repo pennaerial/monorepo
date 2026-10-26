@@ -91,7 +91,11 @@ def launch_setup(context) -> list[Action]:
     ]
     if not sim:
         # CameraSubscriber expects camera_info alongside the image topic.
-        camera_info_topic = camera_topic.rpartition("/")[0] + "/camera_info" if "/" in camera_topic else "camera_info"
+        camera_info_topic = (
+            camera_topic.rpartition("/")[0] + "/camera_info"
+            if "/" in camera_topic
+            else "camera_info"
+        )
         composable_nodes.append(
             ComposableNode(
                 package="camera_ros",
