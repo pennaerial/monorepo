@@ -5,8 +5,8 @@
 #include <rclcpp/node.hpp>
 #include <rclcpp/rclcpp.hpp>
 
-#include "pennair_vision/vision_plugin.hpp"
 #include "pennair_vision/vision_manager_parameters.hpp"
+#include "pennair_vision/vision_plugin.hpp"
 
 struct VisionPluginStruct {
   // add more relevant fields when necessary

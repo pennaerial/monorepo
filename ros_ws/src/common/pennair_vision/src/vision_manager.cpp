@@ -14,7 +14,7 @@ VisionManager::VisionManager(const rclcpp::NodeOptions& options)
     : rclcpp::Node("vision_manager", options), plugin_loader_("pennair_vision", "pennair_vision::VisionPlugin")
 {
   param_listener_ = std::make_shared<vision_manager::ParamListener>(this);
-  params_ = param_listener_->get_params(); // initialize params
+  params_ = param_listener_->get_params();  // initialize params
 }
 
 void VisionManager::init_plugins()
@@ -24,10 +24,8 @@ void VisionManager::init_plugins()
     try {
       RCLCPP_DEBUG(this->get_logger(), "Initializing plugin: %s", plugin_name.c_str());
       plugin_map_[plugin_name].plugin_instance_ = plugin_loader_.createUniqueInstance(plugin_name);
-      plugin_map_[plugin_name].plugin_instance_->initialize(
-          *this, params_.camera_topic
-      );
-    // TODO: add better error handling for plugins that don't exist or fail to initialize
+      plugin_map_[plugin_name].plugin_instance_->initialize(*this, params_.camera_topic);
+      // TODO: add better error handling for plugins that don't exist or fail to initialize
     } catch (const pluginlib::PluginlibException& ex) {
       RCLCPP_ERROR(get_logger(), "Failed to create plugin: %s", ex.what());
     }
