@@ -90,14 +90,19 @@ def launch_setup(context) -> list[Action]:
         ),
     ]
     if not sim:
+        # CameraSubscriber expects camera_info alongside the image topic.
+        camera_info_topic = camera_topic.rpartition("/")[0] + "/camera_info" if "/" in camera_topic else "camera_info"
         composable_nodes.append(
             ComposableNode(
                 package="camera_ros",
                 plugin="camera::CameraNode",
-                # camera_ros publishes <node_name>/image_raw, so naming the node after camera_topic
-                # is what makes the vision manager and the driver agree on a topic.
-                name=camera_topic,
+                name="camera",
                 parameters=[camera_params],
+                remappings=[
+                    ("~/image_raw", camera_topic),
+                    ("~/image_raw/compressed", camera_topic + "/compressed"),
+                    ("~/camera_info", camera_info_topic),
+                ],
             )
         )
 
@@ -135,8 +140,8 @@ def generate_launch_description():
             ),
             DeclareLaunchArgument(
                 Args.CAMERA_TOPIC,
-                default_value="camera",
-                description="topic the vision manager reads camera frames from, relative to the namespace it is launched into",
+                default_value="camera/image_raw",
+                description="Image topic used by the vision manager and hardware camera driver. Relative names use the node namespace; names starting with / are absolute.",
             ),
             DeclareLaunchArgument(
                 Args.PLUGINS,
