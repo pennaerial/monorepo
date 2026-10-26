@@ -34,6 +34,7 @@ class Args(StrEnum):
     NS_ID = "ns_id"
     AIRFRAME = "airframe"
     WORLD = "world"
+    MODEL_POSE = "model_pose"
     RUN_MW = "run_mw"
     LAUNCH_SIM = "launch_sim"
     STANDALONE = "standalone"
@@ -44,20 +45,24 @@ class Args(StrEnum):
 def px4_sitl_action(
     autostart_id: int,
     vehicle_ns: str,  # e.g. uav_0
+    instance_id: int,
     world: str,
+    model_pose: str,
     sim_model: str = "x500",  # TOOD: Make uav_sitl know whether or not to auto spawn a model
 ) -> Action:
     env_export = {
         # "PX4_GZ_MODEL_NAME": vehicle_ns,
         "PX4_SIM_MODEL": sim_model,
         "PX4_GZ_WORLD": world,
+        "PX4_GZ_MODEL_POSE": model_pose,
         "PX4_GZ_STANDALONE": "1",
         "PX4_SYS_AUTOSTART": str(autostart_id),
         "PX4_UXRCE_DDS_NS": vehicle_ns,
     }
 
     return ExecuteProcess(
-        cmd=["./build/px4_sitl_default/bin/px4"],
+        # -i gives each PX4 instance its own ports, MAVLink system id and rootfs/<id> dir
+        cmd=["./build/px4_sitl_default/bin/px4", "-i", str(instance_id)],
         cwd=PENNAIR_PX4_PATH,
         output="screen",
         name=f"{vehicle_ns}_px4_sitl",
@@ -94,6 +99,7 @@ def launch_setup(context) -> list[Action]:
     ns_id = int(config[Args.NS_ID])
     vehicle_ns = f"uav_{ns_id}"
     world = config[Args.WORLD]
+    model_pose = config[Args.MODEL_POSE]
     standalone: bool = is_truthy(config[Args.STANDALONE])
     run_mw: bool = standalone or is_truthy(config[Args.RUN_MW])
     launch_sim: bool = standalone or is_truthy(config[Args.LAUNCH_SIM])
@@ -106,6 +112,7 @@ def launch_setup(context) -> list[Action]:
     logger.debug(f"Vehicle Namespace:   {vehicle_ns}")
     logger.debug(f"PX4 Airframe:        {airframe}")
     logger.debug(f"Sim World:           {world}")
+    logger.debug(f"Model Pose:          {model_pose}")
     logger.debug(f"Standalone Mode:     {standalone}")
     logger.debug(f"Middleware:          {run_mw}")
     logger.debug(f"Launch Sim:          {launch_sim}")
@@ -139,7 +146,9 @@ def launch_setup(context) -> list[Action]:
         name="MicroXRCEAgent",
     )
 
-    px4_sitl = px4_sitl_action(airframe.id, vehicle_ns, world, sim_model=airframe.model)
+    px4_sitl = px4_sitl_action(
+        airframe.id, vehicle_ns, ns_id, world, model_pose, sim_model=airframe.model
+    )
     include_sim_launch = include_launch(
         "sim",
         "sim2.launch.py",
@@ -152,8 +161,8 @@ def launch_setup(context) -> list[Action]:
 
     vehicle_name = airframe.model
     if vehicle_camera_map.get(vehicle_name, False):
-        # TODO: make namespace integer not hardcoded to 0
-        vehicle_name_ns = f"{vehicle_name}_0"
+        # PX4 names the spawned model <model>_<instance id>
+        vehicle_name_ns = f"{vehicle_name}_{ns_id}"
 
         gz_image_topic = (
             f"/world/{world}/model/{vehicle_name_ns}/link/camera_link/sensor/camera/image"
@@ -199,7 +208,7 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 Args.NS_ID,
                 default_value="0",
-                description="Integer namespace id for the vehicle. An id of 0 makes the namespace uav_0. Correponds to the ROS node namespace and PX4 SITL namespace",
+                description="Integer namespace id for the vehicle. An id of 0 makes the namespace uav_0. Correponds to the ROS node namespace, PX4 SITL namespace and PX4 instance id",
             ),
             DeclareLaunchArgument(
                 Args.AIRFRAME,
@@ -210,6 +219,11 @@ def generate_launch_description():
                 Args.WORLD,
                 default_value="default",
                 description="name of the simulation world that this uav instance belongs to. If standalone=true, then it launches this world using sim package.",
+            ),
+            DeclareLaunchArgument(
+                Args.MODEL_POSE,
+                default_value="",
+                description="Spawn pose in the Gazebo world as x,y or x,y,z,roll,pitch,yaw. Empty uses the model's default pose.",
             ),
             DeclareLaunchArgument(
                 Args.RUN_MW,
