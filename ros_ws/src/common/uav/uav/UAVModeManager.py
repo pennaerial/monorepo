@@ -2,8 +2,8 @@ from time import time
 
 from px4_msgs.msg import VehicleStatus
 from std_srvs.srv import Trigger
+from vehicle_common.mission_loader import RuntimeMission, get_mission_path
 from vehicle_common.mode_manager import ModeManager
-from vehicle_common.runtime.mission_loader import RuntimeMission, get_mission_path
 
 from uav.modes.LandingMode import LandingMode
 from uav.uav_mission_parameters import uav_mission

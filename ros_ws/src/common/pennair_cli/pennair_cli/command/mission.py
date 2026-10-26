@@ -4,7 +4,7 @@ from typing import override
 from ament_index_python.packages import PackageNotFoundError, get_packages_with_prefixes
 from pennair_cli.extension import CommandExtension
 from pydantic import ValidationError
-from vehicle_common.runtime.mission_loader import RuntimeMission, get_mission_path
+from vehicle_common.mission_loader import RuntimeMission, get_mission_path
 from vehicle_common.utils import get_available_missions
 
 

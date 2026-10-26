@@ -83,7 +83,7 @@ jobs:
           # shellcheck disable=SC1090
           source "/opt/ros/$ROS_DISTRO/setup.bash"
           source "$PENNAIR_ROS_WS_PATH/install/setup.bash"
-          source "$PENNAIR_ROS_WS_PATH/.aliasrc" # imports the bash testing functions
+          source "$PENNAIR_MONOREPO_PATH/.aliasrc" # imports the bash testing functions
           cd "$PENNAIR_ROS_WS_PATH"
           ct
 
@@ -94,7 +94,7 @@ jobs:
           # shellcheck disable=SC1090
           source "/opt/ros/$ROS_DISTRO/setup.bash"
           source "$PENNAIR_ROS_WS_PATH/install/setup.bash"
-          source "$PENNAIR_ROS_WS_PATH/.aliasrc" # imports the bash testing functions
+          source "$PENNAIR_MONOREPO_PATH/.aliasrc" # imports the bash testing functions
           cd "$PENNAIR_ROS_WS_PATH"
           colcon test-result --delete-yes # clear unit test results so only sim results are checked
           ctsim

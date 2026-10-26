@@ -20,7 +20,7 @@ from vehicle_common.launch_utils import (
     include_launch,
     is_truthy,
 )
-from vehicle_common.runtime.mission_loader import RuntimeMission, get_mission_path
+from vehicle_common.mission_loader import RuntimeMission, get_mission_path
 from vehicle_common.utils import get_available_missions
 
 logger = get_logger("uav_sitl.launch")

@@ -6,8 +6,8 @@ from mock_classes import (
     MockVerticalTakeoffParams,
 )
 from pydantic import ValidationError
+from vehicle_common.mission_loader import RuntimeMission, RuntimeMode
 from vehicle_common.mode_loader import ModeRegistry, ParamsBase
-from vehicle_common.runtime.mission_loader import RuntimeMission, RuntimeMode
 
 mode_registry = ModeRegistry.get()
 
