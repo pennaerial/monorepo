@@ -2,7 +2,7 @@
 from time import time
 
 from vehicle_common.mode_manager import ModeManager
-from vehicle_common.runtime.mission_loader import RuntimeMission, get_mission_path
+from vehicle_common.mission_loader import RuntimeMission, get_mission_path
 
 from payload.payload import Payload
 from payload.payload_mission_parameters import payload_mission

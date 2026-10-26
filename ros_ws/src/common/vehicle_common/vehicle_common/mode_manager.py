@@ -10,7 +10,7 @@ from std_srvs.srv import Trigger
 
 from vehicle_common.mode import Mode
 from vehicle_common.mode_loader import ModeRegistry
-from vehicle_common.runtime.mission_loader import RuntimeMission
+from vehicle_common.mission_loader import RuntimeMission
 from vehicle_common.vehicle import Vehicle
 
 MISSION_STARTED_MARKER_ENV = "PENNAIR_MISSION_STARTED_MARKER_PATH"
