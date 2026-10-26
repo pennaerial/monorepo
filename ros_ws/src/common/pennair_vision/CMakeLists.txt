@@ -12,6 +12,7 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
+find_package(generate_parameter_library REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rosidl_runtime_cpp REQUIRED)
 find_package(std_msgs REQUIRED)
@@ -24,8 +25,17 @@ find_package(image_transport REQUIRED) # for pennair_vision lazy publisher
 
 include_directories(include)
 
+generate_parameter_library(
+    vision_manager_parameters
+    config/vision_manager_params.schema.yaml
+)
+
 add_library(vision_manager_component SHARED
     src/vision_manager.cpp
+)
+
+target_link_libraries(vision_manager_component
+    vision_manager_parameters
 )
 
 ament_target_dependencies(vision_manager_component
@@ -46,6 +56,10 @@ rclcpp_components_register_nodes(vision_manager_component
 add_executable(vision_manager
     src/main.cpp
     src/vision_manager.cpp
+)
+
+target_link_libraries(vision_manager
+    vision_manager_parameters
 )
 
 ament_target_dependencies(vision_manager

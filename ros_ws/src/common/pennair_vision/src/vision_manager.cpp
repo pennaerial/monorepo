@@ -13,31 +13,31 @@ namespace pennair_vision
 VisionManager::VisionManager(const rclcpp::NodeOptions& options)
     : rclcpp::Node("vision_manager", options), plugin_loader_("pennair_vision", "pennair_vision::VisionPlugin")
 {
-  // TEMP: continuous logging
-  heartbeat_timer_ = create_wall_timer(0.67s, [this]() { RCLCPP_INFO(get_logger(), "VisionManager is running"); });
+  param_listener_ = std::make_shared<vision_manager::ParamListener>(this);
+  params_ = param_listener_->get_params(); // initialize params
 }
 
 void VisionManager::init_plugins()
 {
-  // TODO: read this list dynamically from ROS params
-  std::vector<std::string> plugin_names = {"pennair_vision::BasicVision"};
-
-  // this lambda function will be used to initialize each plugin in the list and
-  // add it to the plugin_map_
-
-  // TODO: add better error handling for plugins that don't exist or fail to initialize
+  // initialize a single plugin by name (e.g. pennair_vision::BasicVision) and add it to the plugin_map_
   auto initialize_plugin = [this](const std::string& plugin_name) {
     try {
+      RCLCPP_DEBUG(this->get_logger(), "Initializing plugin: %s", plugin_name.c_str());
       plugin_map_[plugin_name].plugin_instance_ = plugin_loader_.createUniqueInstance(plugin_name);
       plugin_map_[plugin_name].plugin_instance_->initialize(
-          *this, "/camera/image_raw"
-      );  // TODO: camera topic is hardcoded for now
+          *this, params_.camera_topic
+      );
+    // TODO: add better error handling for plugins that don't exist or fail to initialize
     } catch (const pluginlib::PluginlibException& ex) {
       RCLCPP_ERROR(get_logger(), "Failed to create plugin: %s", ex.what());
     }
   };
 
-  for (const std::string& plugin_name : plugin_names) {
+  if (params_.plugins.empty()) {
+    RCLCPP_WARN(this->get_logger(), "No plugins specified at startup!");
+  }
+
+  for (const std::string& plugin_name : params_.plugins) {
     initialize_plugin(plugin_name);
   }
 }

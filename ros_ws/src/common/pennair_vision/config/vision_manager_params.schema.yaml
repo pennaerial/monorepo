@@ -1,0 +1,10 @@
+vision_manager:
+  camera_topic:
+    type: string
+    default_value: "/camera/image_raw"
+    description: "Image topic used by the vision plugins."
+
+  plugins:
+    type: string_array
+    default_value: []
+    description: "Vision plugin class names to load at startup."
