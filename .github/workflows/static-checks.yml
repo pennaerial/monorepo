@@ -70,5 +70,5 @@ jobs:
         if: ${{ steps.filter.outputs.cpp == 'true' }}
         run: |
           source dev_env.sh
-          source "$PENNAIR_ROS_WS_PATH/.aliasrc" # imports the bash testing functions
+          source "$PENNAIR_MONOREPO_PATH/.aliasrc" # imports the bash testing functions
           cppfmt --check
