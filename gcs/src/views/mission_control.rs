@@ -1,5 +1,5 @@
 use crate::components::{Button, SideBar};
-use crate::hooks::use_ros_node;
+use crate::hooks::{use_ros_node, use_subscription};
 use crate::ros::server_types::ServerMessage;
 use crate::ros::{FoxgloveClient, SubscriptionHandle};
 use dioxus::prelude::*;
@@ -54,9 +54,8 @@ async fn run_client(url: &str) {
 pub fn MissionControl() -> Element {
     let node = use_ros_node();
     let mut string_msg = use_signal_sync(String::new);
-
-    // use a signal here keep SubscriptionHandle alive
-    let mut subscription = use_signal(|| None::<SubscriptionHandle>);
+    let chatter_sub =
+        use_subscription::<std_msgs::msg::String>(node.read().clone(), "/chatter", 10);
 
     rsx! {
 
@@ -80,28 +79,22 @@ pub fn MissionControl() -> Element {
                         }
                     },
                 }
+                Button {
+                    label: "Subscribe",
+                    onclick: move |_| {
+                        let mut sub = chatter_sub.clone();
+                        async move {
+                            if let Err(e) = sub.subscribe(move |msg| { string_msg.set(msg.data) }).await
+                            {
+                                error!("failed to subscribe to chatter!: {:?}", e);
+                            }
+                        }
+                    },
+                }
+                p { "{string_msg}" }
+
             }
         }
 
-        Button {
-            label: "Subscribe",
-            onclick: move |_| {
-                let node = node.read().clone();
-
-                async move {
-                    let result = node
-                        .create_subscription::<
-                            std_msgs::msg::String,
-                            _,
-                        >("/chatter", 10, move |message| string_msg.set(message.data))
-                        .await;
-                    match result {
-                        Ok(handle) => subscription.set(Some(handle)),
-                        Err(error) => error!(? error, "Failed to subscribe to /chatter"),
-                    }
-                }
-            },
-        }
-        p { "{string_msg}" }
     }
 }

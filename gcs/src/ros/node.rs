@@ -8,7 +8,6 @@ use crate::ros::{
 use dioxus::logger::tracing::{debug, error, info};
 use ros_interfaces::RosMessage;
 use std::collections::HashMap;
-use std::process::id;
 use tokio::sync::{mpsc, oneshot};
 
 pub type NodeCommandReceiver = mpsc::Receiver<NodeCommand>;
@@ -173,15 +172,14 @@ pub struct NodeHandle {
 impl NodeHandle {
     /// Creates a subscription whose callback runs on a Tokio task.
     /// Keep the returned handle alive to continue receiving messages.
-    pub async fn create_subscription<T, F>(
+    pub async fn create_subscription<T>(
         &self,
         topic: &str,
         depth: usize,
-        mut callback: F,
+        mut callback: impl FnMut(T) + Send + 'static,
     ) -> Result<SubscriptionHandle, NodeError>
     where
-        T: RosMessage + Send + 'static,
-        F: FnMut(T) + Send + 'static,
+        T: RosMessage,
     {
         let (sender, mut receiver) = mpsc::channel::<T>(depth);
         let sink = SubscriptionSink::new(topic.to_owned(), sender);
