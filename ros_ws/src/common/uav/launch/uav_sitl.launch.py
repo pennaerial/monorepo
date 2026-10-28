@@ -58,6 +58,9 @@ def px4_sitl_action(
         "PX4_GZ_STANDALONE": "1",
         "PX4_SYS_AUTOSTART": str(autostart_id),
         "PX4_UXRCE_DDS_NS": vehicle_ns,
+        # Localhost-only DDS participant. The default one can take over PX4's 1 s setup timeout when several UAVs start
+        # at once, leaving a UAV with no ROS topics
+        "PX4_PARAM_UXRCE_DDS_PTCFG": "1",
     }
 
     return ExecuteProcess(
