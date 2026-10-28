@@ -13,33 +13,29 @@ pub enum DeliveryError {
 // allows RosNode to dynamically store SubscriptionBase trait objects
 pub trait SubscriptionSinkBase: Send {
     fn topic_name(&self) -> &str;
+    fn is_closed(&self) -> bool;
     fn send(&mut self, bytes: &[u8]) -> Result<(), DeliveryError>;
 }
 
 /// Type for sending data to a Subscription<T>'s receiver pair
 pub struct SubscriptionSink<T> {
-    subscription_id: SubscriptionId,
     topic_name: String,
     sender: mpsc::Sender<T>,
 }
 
 impl<T: RosMessage> SubscriptionSink<T> {
-    pub fn new(
-        subscription_id: SubscriptionId,
-        topic_name: String,
-        sender: mpsc::Sender<T>,
-    ) -> Self {
-        Self {
-            subscription_id,
-            topic_name,
-            sender,
-        }
+    pub fn new(topic_name: String, sender: mpsc::Sender<T>) -> Self {
+        Self { topic_name, sender }
     }
 }
 
-impl<T: RosMessage + Send> SubscriptionSinkBase for SubscriptionSink<T> {
+impl<T: RosMessage> SubscriptionSinkBase for SubscriptionSink<T> {
     fn topic_name(&self) -> &str {
         &self.topic_name
+    }
+
+    fn is_closed(&self) -> bool {
+        self.sender.is_closed()
     }
 
     fn send(&mut self, bytes: &[u8]) -> Result<(), DeliveryError> {
@@ -54,23 +50,29 @@ impl<T: RosMessage + Send> SubscriptionSinkBase for SubscriptionSink<T> {
 
 // Caller side
 
-/// Type for receiving data from a SubscriptionSink
-pub struct SubscriptionHandle<T> {
+/// Keeps a subscription callback running until this handle is dropped.
+pub struct SubscriptionHandle {
     subscription_id: SubscriptionId,
     topic_name: String,
-    receiver: mpsc::Receiver<T>,
+    task: tokio::task::JoinHandle<()>,
 }
 
-impl<T: RosMessage> SubscriptionHandle<T> {
+impl SubscriptionHandle {
     pub fn new(
         subscription_id: SubscriptionId,
         topic_name: String,
-        receiver: mpsc::Receiver<T>,
+        task: tokio::task::JoinHandle<()>,
     ) -> Self {
         Self {
             subscription_id,
             topic_name,
-            receiver,
+            task,
         }
+    }
+}
+
+impl Drop for SubscriptionHandle {
+    fn drop(&mut self) {
+        self.task.abort();
     }
 }

@@ -1,0 +1,81 @@
+import os
+from glob import glob
+
+from generate_parameter_library_py.setup_helper import generate_parameter_module
+from setuptools import find_packages, setup
+
+# Keeping these comments in case we want to micro optimize with static jsons at build time
+# UAV_MODE_REGISTRY_PATH = Path(__file__).parent / "uav" / "mode_registry.json"
+
+
+# class BuildUAVModeRegistry(build_py):
+#     def run(self):
+#         print("RUNNING UAV CUSTOM BUILD STEP")
+#         try:
+#             # plain instance, not the imported single that uses json
+#             mode_registry = ModeRegistry(modes=dict())
+#             mode_registry.discover_modes(["uav.modes"])
+#             mode_registry.write_json(UAV_MODE_REGISTRY_PATH)
+#         except Exception as e:
+#             sys.exit(f"uav mode registry build failed: {e}")
+#         build_py.run(self)  # continue normal build
+#
+
+package_name = "uav"
+
+generate_parameter_module(
+    "uav_mission_parameters",
+    "config/uav_mission_parameters.yaml",
+)
+
+setup(
+    name=package_name,
+    version="0.0.0",
+    packages=find_packages(exclude=["test"]),
+    # cmdclass={"build_py": BuildUAVModeRegistry},  # define our custom build step here
+    package_data={package_name: ["missions/*.yaml", "fleets/*.yaml"]},
+    data_files=[
+        ("share/ament_index/resource_index/packages", ["resource/" + package_name]),
+        ("share/" + package_name, ["package.xml"]),
+        (
+            os.path.join("share", package_name, "launch"),
+            glob(os.path.join("launch", "*launch.[pxy][yma]*")),
+        ),
+        (
+            os.path.join("share", package_name, "launch"),
+            glob(os.path.join("launch", "*.yaml")),
+        ),
+        (
+            os.path.join("share", package_name, "launch", "ci"),
+            glob(os.path.join("launch", "ci", "*.yaml")),
+        ),
+        (
+            os.path.join("share", package_name, "config", "camera_calibrations"),
+            glob(os.path.join("config", "camera_calibrations", "*.yaml")),
+        ),
+        (
+            os.path.join("share", package_name, "missions"),
+            glob(os.path.join("missions", "*.yaml")),
+        ),
+        (
+            os.path.join("share", package_name, "fleets"),
+            glob(os.path.join("fleets", "*.yaml")),
+        ),
+        # (
+        #     os.path.join("share", package_name),
+        #     [str(UAV_MODE_REGISTRY_PATH)],
+        # ),
+    ],
+    install_requires=["setuptools", "apriltag", "pydantic>=2,<3"],
+    zip_safe=True,
+    maintainer="ubuntu",
+    maintainer_email="ubuntu@todo.todo",
+    description="TODO: Package description",
+    license="TODO: License declaration",
+    extras_require={"test": ["pytest"]},
+    entry_points={
+        "console_scripts": [
+            "uav_mission = uav.uav_mission:main",
+        ],
+    },
+)

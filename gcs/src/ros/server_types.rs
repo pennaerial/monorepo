@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fmt;
 use tungstenite::Bytes;
 
 use crate::ros::parse::ParseError;
@@ -58,6 +59,16 @@ pub struct Channel {
     pub schema: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub schema_encoding: Option<String>,
+}
+
+impl fmt::Display for Channel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Channel ID: {:?}, Topic: {}, Schema: {}",
+            self.id, self.topic, self.schema_name,
+        )
+    }
 }
 
 // Opcodes corresponding with each binary message
