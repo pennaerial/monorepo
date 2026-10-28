@@ -104,7 +104,7 @@ class ModeRegistry(BaseModel):
     def write_json(self, path: Path) -> None:
         path.write_text(self.model_dump_json(indent=2))
 
-    def discover_modes(self, modules: list[str] = ["uav.modes", "payload.modes"]):
+    def discover_modes(self, modules: list[str] = ["uav.modes", "payload.modes", "iarc.modes"]):
         """Import every submodule under the given packages to trigger mode registration.
 
         Recursively imports the passed in modules. Importing a file with `@register_mode(...)`-decorated
