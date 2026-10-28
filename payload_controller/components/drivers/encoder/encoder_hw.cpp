@@ -3,23 +3,22 @@
 namespace drivers
 {
 
-void Encoder_HW::start()
-{
-  // TODO
-}
-void Encoder_HW::publish_motor_right(double)
-{
-  // TODO
-}
-void Encoder_HW::publish_motor_left(double)
+Encoder_HW::Encoder_HW(Side)
 {
   // TODO
 }
 
-Encoder* Encoder::instance()
+
+void Encoder_HW::start()
 {
-  static Encoder_HW instance;
-  return &instance;
+  // TODO
+}
+
+Encoder& Encoder::instance(Side side)
+{
+  static Encoder_HW left(Side::LEFT);
+  static Encoder_HW right(Side::RIGHT);
+  return side == Side::LEFT ? left : right;
 }
 
 }  // namespace drivers
