@@ -1,0 +1,18 @@
+modes:
+  start:
+    mode: uav.VerticalTakeoffMode
+    params:
+      takeoff_height: 5.0
+      takeoff_method: OFFBOARD
+    transitions:
+      complete: mpc
+
+  mpc:
+    mode: iarc.MPCTrackMode
+    params:
+      duration: 8.0
+    transitions:
+      complete: land
+
+  land:
+    mode: uav.LandingMode
