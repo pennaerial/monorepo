@@ -9,4 +9,4 @@ pub use subscription::{
     SubscriptionHandle, SubscriptionId, SubscriptionSink, SubscriptionSinkBase,
 };
 pub mod server_types;
-pub use node::{NodeHandle, RosNode};
+pub use node::{NodeError, NodeHandle, RosNode};

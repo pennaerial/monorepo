@@ -48,7 +48,7 @@ Please run ``git pull origin main`` and ``git submodule update --recursive`` to 
 
 0. Install QGroundControl on the MacOS host: `brew install --cask qgroundcontrol`
 1. Open qgroundcontrol using `open -a QGroundControl`
-2. Open a Terminal in the VM. `cd` into the `monorepo` and into `monorepo/controls/sae_2025_ws`
+2. Open a Terminal in the VM. `cd` into the `monorepo` and into `monorepo/ros_ws`
 3. Run `colcon build`, followed by `source install/setup.bash` and `ros2 launch uav uav_sitl.launch.py`
 
 - Verify that the UAV is able to take off and land.

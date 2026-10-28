@@ -1,7 +1,7 @@
 // Generated raw Rust structs. No ROS runtime is required.
 
 /// A ROS message that can be decoded from encapsulated CDR bytes.
-pub trait RosMessage: Sized {
+pub trait RosMessage: Sized + Send + 'static {
     fn deserialize(bytes: &[u8]) -> Result<Self, cdr::Error>;
 }
 
