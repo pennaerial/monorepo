@@ -8,13 +8,19 @@ public:
   {
   }
 
+  // Generates a command based on an input delta time
   float update(float deltaT);
+  // Updates the setpoint
   void new_set_point(float new_set_point);
 
 private:
+  // Quantity of output to compensate for friction
   float out_for_fric;
+  // Quantity of output per amount of input (setpoint)
   float out_per_in;
 
+  // The set point
   float set_point;
+  // The approximate maximum of the set point to normalize it
   float set_point_scale;
 };

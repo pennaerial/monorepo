@@ -17,8 +17,11 @@ public:
   void change_set_point(float new_set_point);
 
 private:
+  // PID controller for feedback control (reactive)
   PID pi_controller;
+  // FF controller for feedforward control (predictive)
   FeedForward ff_controller;
 
+  // The target set point
   float setPoint;
 };
