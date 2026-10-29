@@ -127,7 +127,7 @@ ci_install_pigpio() {
 }
 
 ci_py_files() {
-    find src/common/uav src/sae/payload src/common/vehicle_common src/common/sim src/common/tools src/iarc/iarc -name '*.py' | sort
+    find src/common/uav src/sae/payload src/common/vehicle_common src/common/sim src/common/tools src/iarc/iarc_flight -name '*.py' | sort
 }
 
 ci_px4_msgs_prefix() {

@@ -7,14 +7,18 @@ modes:
       complete: circle
 
   circle:
-    mode: iarc.CircleMode
+    mode: iarc_flight.TrackMode
     params:
-      radius: 5
-      initial_speed: 0
-      tangential_accel: 0.2
-      max_speed: 4
-      altitude: 3
-      laps: 2
+      trajectory:
+        type: circle
+        radius: 5
+        initial_speed: 0
+        tangential_accel: 0.2
+        max_speed: 4
+        altitude: 3
+        laps: 2
+      controller:
+        type: feedforward
     transitions:
       complete: land
 

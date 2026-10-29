@@ -1,0 +1,24 @@
+from __future__ import annotations
+
+from typing import Literal
+
+import numpy as np
+from pydantic import BaseModel
+
+from iarc_flight.trajectories import Trajectory, TrajectoryPoint
+
+from .base import Controller
+
+
+class FeedforwardConfig(BaseModel):
+    type: Literal["feedforward"] = "feedforward"
+
+    def build(self) -> FeedforwardController:
+        return FeedforwardController()
+
+
+class FeedforwardController(Controller):
+    """Sends the trajectory's position, velocity and acceleration straight to PX4, which tracks it."""
+
+    def step(self, state: np.ndarray, trajectory: Trajectory, t: float) -> TrajectoryPoint:
+        return trajectory.sample(t)

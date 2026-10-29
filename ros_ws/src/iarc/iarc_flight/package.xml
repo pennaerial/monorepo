@@ -1,9 +1,9 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>iarc</name>
+  <name>iarc_flight</name>
   <version>0.0.0</version>
-  <description>IARC flight modes and path planning</description>
+  <description>IARC trajectories, controllers and flight modes</description>
   <maintainer email="ubuntu@todo.todo">ubuntu</maintainer>
   <license>TODO: License declaration</license>
 
@@ -11,6 +11,7 @@
   <depend>px4_msgs</depend>
   <depend>uav</depend>
   <depend>vehicle_common</depend>
+  <depend>python3-numpy</depend>
 
   <test_depend>python3-pytest</test_depend>
   <export>

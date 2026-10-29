@@ -1,7 +1,8 @@
 import math
 
+import numpy as np
 import pytest
-from iarc.planning import circle_state
+from iarc_flight.trajectories import CircleConfig, circle_state
 
 
 def test_starts_at_start_angle():
@@ -58,3 +59,22 @@ def test_finite_difference_matches_velocity_and_acceleration():
 def test_yaw_points_along_velocity():
     s = circle_state(1.7, radius=5.0)
     assert s.yaw == pytest.approx(math.atan2(s.velocity[1], s.velocity[0]))
+
+
+def test_circle_starts_at_drone():
+    circle = CircleConfig(radius=5.0).build(np.array([1.0, 2.0, -3.0]), start_yaw=0.0)
+    assert circle.sample(0.0).position == pytest.approx([1.0, 2.0, -3.0])
+
+
+def test_circle_holds_end_point_when_done():
+    circle = CircleConfig(radius=2.0, initial_speed=1.0, tangential_accel=0.0, laps=1.0).build(
+        np.zeros(3), start_yaw=0.0
+    )
+    lap_time = 2 * math.pi * 2.0
+    assert not circle.done(lap_time - 0.1)
+    assert circle.done(lap_time + 0.1)
+    end = circle.sample(lap_time + 5.0)
+    assert end.position == pytest.approx(
+        [0.0, 0.0, 0.0], abs=1e-9
+    )  # one full lap returns to the start
+    assert end.velocity == pytest.approx([0.0, 0.0, 0.0])

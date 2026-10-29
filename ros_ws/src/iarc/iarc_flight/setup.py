@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-package_name = "iarc"
+package_name = "iarc_flight"
 
 setup(
     name=package_name,
@@ -14,7 +14,7 @@ setup(
     zip_safe=True,
     maintainer="ubuntu",
     maintainer_email="ubuntu@todo.todo",
-    description="IARC flight modes and path planning",
+    description="IARC trajectories, controllers and flight modes",
     license="TODO: License declaration",
     extras_require={"test": ["pytest"]},
 )
