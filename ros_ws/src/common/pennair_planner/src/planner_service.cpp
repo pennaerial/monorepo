@@ -1,14 +1,13 @@
 #include <functional>
 #include <memory>
+#include <mutex>
 
+#include "nav_msgs/msg/occupancy_grid.hpp"
 #include "nav_msgs/msg/path.hpp"
 #include "pennair_planner/path_planner.hpp"
 #include "pennair_planner/srv/plan_path.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_components/register_node_macro.hpp"
-
-#include <mutex>
-#include "nav_msgs/msg/occupancy_grid.hpp"
 
 namespace pennair_planner
 {
@@ -48,16 +47,16 @@ public:
         y: 3.0, z: 0.0}, orientation: {w: 1.0}}}"*/
 
         /* ros2 service call /plan_path pennair_planner/srv/PlanPath \
-"{start_pose: {position: {x: 1.25, y: 1.25, z: 0.0}, orientation: {w: 1.0}}, goal_pose: {position: {x: 4.25, y: 1.25, z: 0.0}, orientation: {w: 1.0}}}" */
+"{start_pose: {position: {x: 1.25, y: 1.25, z: 0.0}, orientation: {w: 1.0}}, goal_pose: {position: {x: 4.25, y: 1.25, z:
+0.0}, orientation: {w: 1.0}}}" */
     );
 
     costmap_sub_ = this->create_subscription<nav_msgs::msg::OccupancyGrid>(
-      "costmap",
-      rclcpp::QoS(1).reliable().transient_local(),
-      [this](nav_msgs::msg::OccupancyGrid::ConstSharedPtr msg) {
-        std::lock_guard<std::mutex> lock(costmap_mutex_);
-        latest_costmap_ = msg;
-      }
+        "costmap", rclcpp::QoS(1).reliable().transient_local(),
+        [this](nav_msgs::msg::OccupancyGrid::ConstSharedPtr msg) {
+          std::lock_guard<std::mutex> lock(costmap_mutex_);
+          latest_costmap_ = msg;
+        }
     );
   }
 
@@ -89,26 +88,26 @@ private:
     );
 
     nav_msgs::msg::Path& path = response->path;
-    
+
     path.header.stamp = this->now();
 
-  nav_msgs::msg::OccupancyGrid::ConstSharedPtr costmap;
+    nav_msgs::msg::OccupancyGrid::ConstSharedPtr costmap;
 
-  {
-    std::lock_guard<std::mutex> lock(costmap_mutex_);
-    costmap = latest_costmap_;
-  }
+    {
+      std::lock_guard<std::mutex> lock(costmap_mutex_);
+      costmap = latest_costmap_;
+    }
 
-  if (!costmap || costmap->header.frame_id.empty()) {
-    RCLCPP_WARN(this->get_logger(), "Cannot plan: no valid costmap received");
-    path.poses.clear();
-    return;
-  }
+    if (!costmap || costmap->header.frame_id.empty()) {
+      RCLCPP_WARN(this->get_logger(), "Cannot plan: no valid costmap received");
+      path.poses.clear();
+      return;
+    }
 
-  path.header.frame_id = costmap->header.frame_id;
+    path.header.frame_id = costmap->header.frame_id;
 
-  auto* astar = static_cast<AStarPlanner*>(planner_.get());
-  astar->set_costmap(costmap);
+    auto* astar = static_cast<AStarPlanner*>(planner_.get());
+    astar->set_costmap(costmap);
 
     if (planner_->plan(request->start_pose, request->goal_pose, path)) {
       RCLCPP_INFO(this->get_logger(), "Planned path with %zu poses", path.poses.size());

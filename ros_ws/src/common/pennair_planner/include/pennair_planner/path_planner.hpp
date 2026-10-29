@@ -1,11 +1,6 @@
 #pragma once
 
 #include <Eigen/Geometry>
-
-#include "geometry_msgs/msg/pose.hpp"
-#include "geometry_msgs/msg/pose_stamped.hpp"
-#include "nav_msgs/msg/path.hpp"
-
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -16,7 +11,10 @@
 #include <utility>
 #include <vector>
 
+#include "geometry_msgs/msg/pose.hpp"
+#include "geometry_msgs/msg/pose_stamped.hpp"
 #include "nav_msgs/msg/occupancy_grid.hpp"
+#include "nav_msgs/msg/path.hpp"
 
 namespace pennair_planner
 {
@@ -135,8 +133,7 @@ class AStarPlanner : public PathPlanner
 public:
   using OccupancyGrid = nav_msgs::msg::OccupancyGrid;
 
-  struct Config
-  {
+  struct Config {
     int occupied_threshold = 65;
     double unknown_cost = 3.0;
     double occupancy_cost_scale = 2.0;
@@ -165,11 +162,7 @@ public:
    *
    * @return true if a path was found, false otherwise.
    */
-  bool plan(
-      const Pose& start_pose,
-      const Pose& goal_pose,
-      nav_msgs::msg::Path& path
-  ) override
+  bool plan(const Pose& start_pose, const Pose& goal_pose, nav_msgs::msg::Path& path) override
   {
     if (!costmap_) {
       return false;
@@ -183,43 +176,32 @@ public:
       return false;
     }
 
-    const size_t count =
-        static_cast<size_t>(width) * static_cast<size_t>(height);
+    const size_t count = static_cast<size_t>(width) * static_cast<size_t>(height);
 
     if (costmap_->data.size() != count) {
       return false;
     }
 
     const auto& q = info.origin.orientation;
-    const double norm = std::sqrt(
-        q.x*q.x + q.y*q.y + q.z*q.z + q.w*q.w
-    );
+    const double norm = std::sqrt(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w);
 
     if (norm < 1e-9) {
       return false;
     }
 
-    const double yaw = std::atan2(
-        2.0 * (q.w*q.z + q.x*q.y),
-        1.0 - 2.0 * (q.y*q.y + q.z*q.z)
-    );
+    const double yaw = std::atan2(2.0 * (q.w * q.z + q.x * q.y), 1.0 - 2.0 * (q.y * q.y + q.z * q.z));
 
-    if (std::abs(yaw) > 1e-6 ||
-        std::abs(q.x) > 1e-6 ||
-        std::abs(q.y) > 1e-6) {
+    if (std::abs(yaw) > 1e-6 || std::abs(q.x) > 1e-6 || std::abs(q.y) > 1e-6) {
       return false;
     }
 
     /// Convert world coords to grid coords
     const auto to_cell = [&](double x, double y, int& cx, int& cy) {
-      const double grid_x =
-          (x - info.origin.position.x) / info.resolution;
-      const double grid_y =
-          (y - info.origin.position.y) / info.resolution;
+      const double grid_x = (x - info.origin.position.x) / info.resolution;
+      const double grid_y = (y - info.origin.position.y) / info.resolution;
 
-      if (!std::isfinite(grid_x) || !std::isfinite(grid_y) ||
-          grid_x < 0.0 || grid_y < 0.0 ||
-          grid_x >= width || grid_y >= height) {
+      if (!std::isfinite(grid_x) || !std::isfinite(grid_y) || grid_x < 0.0 || grid_y < 0.0 || grid_x >= width ||
+          grid_y >= height) {
         return false;
       }
 
@@ -235,21 +217,14 @@ public:
       return false;
     }
 
-    const auto index = [&](int x, int y) {
-      return y * width + x;
-    };
+    const auto index = [&](int x, int y) { return y * width + x; };
 
-    const auto in_bounds = [&](int x, int y) {
-      return x >= 0 && x < width && y >= 0 && y < height;
-    };
+    const auto in_bounds = [&](int x, int y) { return x >= 0 && x < width && y >= 0 && y < height; };
 
     /// Expanding blocked cells for clearance
     std::vector<bool> blocked(count, false);
 
-    const int radius_cells = static_cast<int>(
-        std::ceil(std::max(0.0, config_.inflation_radius) /
-                  info.resolution)
-    );
+    const int radius_cells = static_cast<int>(std::ceil(std::max(0.0, config_.inflation_radius) / info.resolution));
 
     for (int y = 0; y < height; ++y) {
       for (int x = 0; x < width; ++x) {
@@ -261,8 +236,7 @@ public:
 
         for (int dy = -radius_cells; dy <= radius_cells; ++dy) {
           for (int dx = -radius_cells; dx <= radius_cells; ++dx) {
-            if (std::hypot(dx, dy) * info.resolution >
-                config_.inflation_radius) {
+            if (std::hypot(dx, dy) * info.resolution > config_.inflation_radius) {
               continue;
             }
 
@@ -284,9 +258,8 @@ public:
       return false;
     }
 
-    ///For each entry, we have total cost and index of the cell
-    struct QueueEntry
-    {
+    /// For each entry, we have total cost and index of the cell
+    struct QueueEntry {
       double f;
       int cell;
 
@@ -296,14 +269,9 @@ public:
       }
     };
 
-    std::priority_queue<
-        QueueEntry,
-        std::vector<QueueEntry>,
-        std::greater<QueueEntry>
-    > open;
+    std::priority_queue<QueueEntry, std::vector<QueueEntry>, std::greater<QueueEntry> > open;
 
-    const double infinity =
-        std::numeric_limits<double>::infinity();
+    const double infinity = std::numeric_limits<double>::infinity();
 
     std::vector<double> g_score(count, infinity);
     std::vector<int> parent(count, -1);
@@ -314,12 +282,10 @@ public:
       const double dy = std::abs(y - gy);
       const double diagonal = std::min(dx, dy);
 
-      return (dx + dy +
-              (std::sqrt(2.0) - 2.0) * diagonal)
-             * info.resolution;
+      return (dx + dy + (std::sqrt(2.0) - 2.0) * diagonal) * info.resolution;
     };
 
-    ///Unknown cells more expensive (maybe obscured by plane, idk)
+    /// Unknown cells more expensive (maybe obscured by plane, idk)
     const auto traversal_multiplier = [&](int cell) {
       const int value = costmap_->data[cell];
 
@@ -327,16 +293,13 @@ public:
         return std::max(1.0, config_.unknown_cost);
       }
 
-      return 1.0 +
-          std::max(0.0, config_.occupancy_cost_scale) *
-          static_cast<double>(value) /
-          std::max(1, config_.occupied_threshold);
+      return 1.0 + std::max(0.0, config_.occupancy_cost_scale) * static_cast<double>(value) /
+                       std::max(1, config_.occupied_threshold);
     };
 
-    constexpr std::array<std::pair<int, int>, 8> directions{{
-        {-1, 0}, {1, 0}, {0, -1}, {0, 1},
-        {-1, -1}, {-1, 1}, {1, -1}, {1, 1}
-    }};
+    constexpr std::array<std::pair<int, int>, 8> directions{
+        {{-1, 0}, {1, 0}, {0, -1}, {0, 1}, {-1, -1}, {-1, 1}, {1, -1}, {1, 1}}
+    };
 
     g_score[start] = 0.0;
     open.push({heuristic(sx, sy), start});
@@ -351,9 +314,8 @@ public:
       const int x = current.cell % width;
       const int y = current.cell / width;
 
-      ///Discard outdated entries in the queue
-      if (current.f > g_score[current.cell] +
-                          heuristic(x, y) + 1e-9) {
+      /// Discard outdated entries in the queue
+      if (current.f > g_score[current.cell] + heuristic(x, y) + 1e-9) {
         continue;
       }
 
@@ -381,27 +343,20 @@ public:
 
         /// Prevent diagonal movement through blocked corners
         if (dx != 0 && dy != 0) {
-          if (blocked[index(x + dx, y)] ||
-              blocked[index(x, y + dy)]) {
+          if (blocked[index(x + dx, y)] || blocked[index(x, y + dy)]) {
             continue;
           }
         }
 
-        const double distance =
-            std::hypot(dx, dy) * info.resolution;
+        const double distance = std::hypot(dx, dy) * info.resolution;
 
-        const double tentative =
-            g_score[current.cell] +
-            distance * traversal_multiplier(next);
+        const double tentative = g_score[current.cell] + distance * traversal_multiplier(next);
 
         if (tentative < g_score[next]) {
           g_score[next] = tentative;
           parent[next] = current.cell;
 
-          open.push({
-              tentative + heuristic(nx, ny),
-              next
-          });
+          open.push({tentative + heuristic(nx, ny), next});
         }
       }
     }
@@ -413,8 +368,7 @@ public:
     /// Rebuild path
     std::vector<int> cells;
 
-    for (int current = goal; current != -1;
-         current = parent[current]) {
+    for (int current = goal; current != -1; current = parent[current]) {
       cells.push_back(current);
     }
 
@@ -431,13 +385,9 @@ public:
       geometry_msgs::msg::PoseStamped waypoint;
       waypoint.header = path.header;
 
-      waypoint.pose.position.x =
-          info.origin.position.x +
-          (x + 0.5) * info.resolution;
+      waypoint.pose.position.x = info.origin.position.x + (x + 0.5) * info.resolution;
 
-      waypoint.pose.position.y =
-          info.origin.position.y +
-          (y + 0.5) * info.resolution;
+      waypoint.pose.position.y = info.origin.position.y + (y + 0.5) * info.resolution;
 
       waypoint.pose.position.z = start_pose.position.z;
       waypoint.pose.orientation.w = 1.0;
@@ -473,11 +423,7 @@ public:
     /// Rover ends with desired orientation
     waypoints.back().pose.orientation = goal_pose.orientation;
 
-    path.poses.insert(
-        path.poses.end(),
-        waypoints.begin(),
-        waypoints.end()
-    );
+    path.poses.insert(path.poses.end(), waypoints.begin(), waypoints.end());
 
     return true;
   }
