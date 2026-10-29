@@ -5,6 +5,7 @@
 #include <rclcpp/node.hpp>
 #include <rclcpp/rclcpp.hpp>
 
+#include "pennair_vision/vision_manager_parameters.hpp"
 #include "pennair_vision/vision_plugin.hpp"
 
 struct VisionPluginStruct {
@@ -29,10 +30,13 @@ public:
 private:
   /// ClassLoader for dynamically creating VisionPlugins
   pluginlib::ClassLoader<VisionPlugin> plugin_loader_;
-  /// Periodic status log for the manager component.
-  rclcpp::TimerBase::SharedPtr heartbeat_timer_;
   /// VisionPlugin instance; key is the plugin name, value is the plugin instance
   VisionPluginMap plugin_map_;
+
+  /// param listener from generate_parameter_library
+  std::shared_ptr<vision_manager::ParamListener> param_listener_;
+  /// loaded params object. See vision_manager_params.schema.yaml
+  vision_manager::Params params_;
 };
 
 }  // namespace pennair_vision

@@ -10,6 +10,7 @@
   <buildtool_depend>ament_cmake</buildtool_depend>
   <buildtool_depend>ament_cmake_python</buildtool_depend>
 
+  <depend>generate_parameter_library</depend>
   <depend>rclcpp</depend>
   <depend>rosidl_runtime_cpp</depend>
   <depend>std_msgs</depend>
