@@ -1,6 +1,7 @@
 from enum import StrEnum
 from pathlib import Path
 
+from ament_index_python.packages import get_package_share_directory
 from launch import Action, LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
@@ -18,7 +19,6 @@ from vehicle_common.launch_utils import (
 )
 from vehicle_common.mission_loader import RuntimeMission, get_mission_path
 from vehicle_common.utils import get_available_missions
-from ament_index_python.packages import get_package_share_directory
 
 logger = get_logger("uav_sitl.launch")
 
@@ -98,16 +98,17 @@ def launch_setup(context) -> list[Action]:
     ]
 
     if enable_ulog:
-        ulog_script = Path(get_package_share_directory("uav")) / "scripts" / "mavlink_ulog_streaming.py"
-        ulog_output_dir = Path.home() / "px4-logs"
-        ulog_output_dir.mkdir(parents=True, exist_ok=True)
+        ulog_script = (
+            Path(get_package_share_directory("uav")) / "scripts" / "mavlink_ulog_streaming.py"
+        )
+        ulog_dir = Path.home() / "px4-logs"
+        ulog_dir.mkdir(parents=True, exist_ok=True)
         ulog_logger = ExecuteProcess(
-            cmd=["/usr/bin/python3", "-u", str(ulog_script), "/dev/ttyACM0", "-o", str(ulog_output_dir)],
+            cmd=["/usr/bin/python3", "-u", str(ulog_script), "/dev/ttyACM0", "-o", str(ulog_dir)],
             output="screen",
             name="ulog_logger",
         )
         actions.append(ulog_logger)
-    
     return actions
 
 
@@ -132,7 +133,7 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 Args.ENABLE_ULOG,
                 default_value="false",
-                description="Enables px4 ulog transfer over MAVLink from flight controller to Pi. Needs a usb(Pi) to usb-c(FC) connection."
+                description="Enables px4 ulog transfer over MAVLink from flight controller to Pi. Needs a usb(Pi) to usb-c(FC) connection.",
             ),
             OpaqueFunction(function=launch_setup),
         ]
