@@ -1,6 +1,5 @@
 import numpy as np
 import cvxpy as cp
-from scipy.interpolate import make_interp_spline
 
 # TODO: get these from params/yaml
 # TODO: change dt and px4 rate to higher Hz maybe
@@ -9,7 +8,7 @@ N = 20 # 2s horizon
 g = 9.81
 a_xy_max = g * np.tan(np.deg2rad(30)) # max horizontal accel from tilting 30 deg (~5.7 m/s^2)
 a_z_max = 4.0 # max vertical accel [m/s^2]
-v_max = 3.0 # max speed per axis [m/s]
+v_max = 6.0 # max speed per axis [m/s]
 
 I3 = np.eye(3)
 Z3 = np.zeros((3, 3))
@@ -24,10 +23,14 @@ x = cp.Variable((6, N + 1))
 u = cp.Variable((3, N))
 
 q_weights = np.array([10, 10, 10, 1, 1, 1]) # weights for pos & vel error in cost
-r_weight = 0.1 # weight for control effort in cost
+qf_weights = np.array([20, 20, 20, 2, 2, 2]) # terminal-state weights for pos & vel error
+r_weight = 0.5 # weight for control effort in cost
 wq = np.sqrt(q_weights).reshape(6, 1)
+wqf = np.sqrt(qf_weights)
 wr = np.sqrt(r_weight)
-cost = cp.sum_squares(cp.multiply(wq, x - xref)) + cp.sum_squares(wr * u)
+running_cost = cp.sum_squares(cp.multiply(wq, x[:, :-1] - xref[:, :-1]))
+terminal_cost = cp.sum_squares(cp.multiply(wqf, x[:, -1] - xref[:, -1]))
+cost = running_cost + terminal_cost + cp.sum_squares(wr * u)
 
 constraints: list[cp.Constraint] = [x[:, 0] == x0]
 for k in range(N):
@@ -65,12 +68,3 @@ def make_reference(spline, T, t_now):
     ref[3:6, :] = spline.derivative(1)(s).T / T # ds/dt = ds/dt * dx/ds = 1/T * dx/ds
     ref[3:6, t >= T] = 0.0 # stop at end of spline, hold pos
     return ref
-
-
-def build_demo_spline(p0):
-    """4-point demo path, offset to start at p0 (NED)"""
-    pts = np.array([[0, 0, 0], [0, 0, -2], [4, 0, -2], [4, 3, -2.5]], dtype=float) + p0
-    zero = np.zeros(3)
-    return make_interp_spline(
-        np.linspace(0, 1, len(pts)), pts, k=3, bc_type=([(1, zero)], [(1, zero)])
-    )

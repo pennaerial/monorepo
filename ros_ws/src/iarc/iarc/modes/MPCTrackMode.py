@@ -6,6 +6,7 @@ from typing import override
 import numpy as np
 from px4_msgs.msg import TrajectorySetpoint
 from rclpy.node import Node
+from scipy.interpolate import make_interp_spline
 from vehicle_common.mode import Mode
 from vehicle_common.mode_loader import ParamsBase, register_mode
 
@@ -13,6 +14,26 @@ from iarc import mpc as mpc # linear mpc tracking bspline impl
 from uav.vehicles.UAV import UAV
 
 
+def demo_spline(p0):
+    """Large horizontal figure-eight path, offset to start at p0 (NED)."""
+    pts = np.array(
+        [
+            [0, 0, 0],
+            [6, 4, 0],
+            [12, 0, 0],
+            [6, -4, 0],
+            [0, 0, 0],
+            [-6, 4, 0],
+            [-12, 0, 0],
+            [-6, -4, 0],
+            [0, 0, 0],
+        ],
+        dtype=float,
+    ) + p0
+    zero = np.zeros(3)
+    return make_interp_spline(
+        np.linspace(0, 1, len(pts)), pts, k=3, bc_type=([(1, zero)], [(1, zero)])
+    )
 
 class MPCTrackParams(ParamsBase):
     """ duration (s) of bspline tracking, hold_time (s) to settle"""
@@ -29,7 +50,7 @@ class MPCTrackParams(ParamsBase):
 class MPCTrackMode(Mode[UAV, MPCTrackParams]):
     """Track a bspline with linear mpc\\
     publishing pos/vel/acc as px4_msgs/TrajectorySetpoint\\
-    Using a time-paramed demo spline (mpc.build_demo_spline)
+    Using a time-paramed demo_spline
     """
 
     @override
@@ -75,7 +96,7 @@ class MPCTrackMode(Mode[UAV, MPCTrackParams]):
 
         if self.t_start is None:  # first tick in this mode, set spline to drone pos
             self.hold_yaw = float(self.vehicle.yaw if self.vehicle.yaw is not None else lp.heading)
-            self.spline = mpc.build_demo_spline(x_now[:3])
+            self.spline = demo_spline(x_now[:3])
             self.t_start = self._now()
             self.log(f"MPC track start at {x_now[:3]}, T={self.p.duration}s")
 
@@ -93,6 +114,7 @@ class MPCTrackMode(Mode[UAV, MPCTrackParams]):
         if self.last_sp is None:  # nothing solved yet
             self.last_sp = (x_now[:3], np.zeros(3), np.zeros(3))
         self._publish(self.last_sp[0], self.last_sp[1], self.last_sp[2])  # on a failed solve this uses last good one
+        # self._publish(ref[0:3, 1], ref[3:6, 1], np.zeros(3)) # skip the mpc
 
         self.tick += 1
         #log error

@@ -10,7 +10,7 @@ modes:
   mpc:
     mode: iarc.MPCTrackMode
     params:
-      duration: 8.0
+      duration: 25.0
     transitions:
       complete: land
 
