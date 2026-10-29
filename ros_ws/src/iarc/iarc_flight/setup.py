@@ -16,5 +16,4 @@ setup(
     maintainer_email="ubuntu@todo.todo",
     description="IARC trajectories, controllers and flight modes",
     license="TODO: License declaration",
-    extras_require={"test": ["pytest"]},
 )
