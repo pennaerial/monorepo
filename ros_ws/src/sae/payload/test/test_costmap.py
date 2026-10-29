@@ -1,24 +1,20 @@
 import rclpy
-from rclpy.node import Node
-from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
 from nav_msgs.msg import OccupancyGrid
+from rclpy.node import Node
+from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 
 
 class TestCostmap(Node):
     def __init__(self):
-        super().__init__('test_costmap')
+        super().__init__("test_costmap")
 
         qos = QoSProfile(
             depth=1,
             reliability=ReliabilityPolicy.RELIABLE,
-            durability=DurabilityPolicy.TRANSIENT_LOCAL
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
         )
 
-        self.publisher = self.create_publisher(
-            OccupancyGrid,
-            '/costmap',
-            qos
-        )
+        self.publisher = self.create_publisher(OccupancyGrid, "/costmap", qos)
 
         self.timer = self.create_timer(1.0, self.publish_map)
 
@@ -26,7 +22,7 @@ class TestCostmap(Node):
         msg = OccupancyGrid()
 
         msg.header.stamp = self.get_clock().now().to_msg()
-        msg.header.frame_id = 'map'
+        msg.header.frame_id = "map"
 
         msg.info.resolution = 0.5
         msg.info.width = 10
