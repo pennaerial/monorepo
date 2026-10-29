@@ -7,6 +7,9 @@
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_components/register_node_macro.hpp"
 
+#include <mutex>
+#include "nav_msgs/msg/occupancy_grid.hpp"
+
 namespace pennair_planner
 {
 
@@ -29,7 +32,7 @@ public:
    */
   explicit PlannerService(const rclcpp::NodeOptions& options = rclcpp::NodeOptions())
       : Node("planner_service", options),
-        planner_(std::make_unique<StraightLinePlanner>())  // swap in a different PathPlanner here
+        planner_(std::make_unique<AStarPlanner>())  // swap in a different PathPlanner here
   {
     this->service_ = this->create_service<PlanPath>(
         "plan_path", std::bind(&PlannerService::handle_plan_path, this, std::placeholders::_1, std::placeholders::_2)
@@ -43,6 +46,18 @@ public:
         /*ros2 service call /plan_path pennair_planner/srv/PlanPath \
         "{start_pose: {position: {x: 0.0, y: 0.0, z: 0.0}, orientation: {w: 1.0}}, goal_pose: {position: {x: 5.0,
         y: 3.0, z: 0.0}, orientation: {w: 1.0}}}"*/
+
+        /* ros2 service call /plan_path pennair_planner/srv/PlanPath \
+"{start_pose: {position: {x: 1.25, y: 1.25, z: 0.0}, orientation: {w: 1.0}}, goal_pose: {position: {x: 4.25, y: 1.25, z: 0.0}, orientation: {w: 1.0}}}" */
+    );
+
+    costmap_sub_ = this->create_subscription<nav_msgs::msg::OccupancyGrid>(
+      "costmap",
+      rclcpp::QoS(1).reliable().transient_local(),
+      [this](nav_msgs::msg::OccupancyGrid::ConstSharedPtr msg) {
+        std::lock_guard<std::mutex> lock(costmap_mutex_);
+        latest_costmap_ = msg;
+      }
     );
   }
 
@@ -51,6 +66,10 @@ private:
   std::unique_ptr<PathPlanner> planner_;
   // Publisher pointer so the path can actually be sent to RViz
   rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_pub_;
+
+  rclcpp::Subscription<nav_msgs::msg::OccupancyGrid>::SharedPtr costmap_sub_;
+  nav_msgs::msg::OccupancyGrid::ConstSharedPtr latest_costmap_;
+  std::mutex costmap_mutex_;
 
   /**
    * @brief Runs the planner and fills in the response.
@@ -70,9 +89,26 @@ private:
     );
 
     nav_msgs::msg::Path& path = response->path;
+    
     path.header.stamp = this->now();
-    /// Changed header to "world" in order to display path more easily in RViz
-    path.header.frame_id = "world";
+
+  nav_msgs::msg::OccupancyGrid::ConstSharedPtr costmap;
+
+  {
+    std::lock_guard<std::mutex> lock(costmap_mutex_);
+    costmap = latest_costmap_;
+  }
+
+  if (!costmap || costmap->header.frame_id.empty()) {
+    RCLCPP_WARN(this->get_logger(), "Cannot plan: no valid costmap received");
+    path.poses.clear();
+    return;
+  }
+
+  path.header.frame_id = costmap->header.frame_id;
+
+  auto* astar = static_cast<AStarPlanner*>(planner_.get());
+  astar->set_costmap(costmap);
 
     if (planner_->plan(request->start_pose, request->goal_pose, path)) {
       RCLCPP_INFO(this->get_logger(), "Planned path with %zu poses", path.poses.size());
@@ -81,6 +117,7 @@ private:
     } else {
       /// The response has no success flag, so a failed plan is reported as an empty path
       path.poses.clear();
+      path_pub_->publish(path);
       RCLCPP_WARN(this->get_logger(), "Planning failed, returning an empty path");
     }
   }
