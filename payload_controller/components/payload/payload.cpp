@@ -98,8 +98,8 @@ void Payload::update()
 void Payload::motor_updates()
 {
   // Temporary test torques in N*m; these are not wheel-speed setpoints.
-  left_motor_.motor.publish(10);
-  right_motor_.motor.publish(5);
+  left_motor_.motor.publish(1);
+  right_motor_.motor.publish(0.5);
 }
 
 void Payload::publish_sensor_debug()
