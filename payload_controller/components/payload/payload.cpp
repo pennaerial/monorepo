@@ -97,7 +97,7 @@ void Payload::update()
 
 void Payload::motor_updates()
 {
-  // Temporary test torques in N*m; these are not wheel-speed setpoints.
+  // Temporary normalized PWM duties: 100% left and 50% right.
   left_motor_.motor.publish(1);
   right_motor_.motor.publish(0.5);
 }
