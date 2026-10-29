@@ -20,6 +20,7 @@ class Args(StrEnum):
 
     NUM_UAVS = "num_uavs"
     MISSION = "mission"
+    MISSION_PACKAGE = "mission_package"
     AIRFRAME = "airframe"
     WORLD = "world"
     SPACING = "spacing"
@@ -67,6 +68,7 @@ def launch_setup(context) -> list[Action]:
                 launch_arguments={
                     "ns_id": str(i),
                     "mission": missions[i].strip(),
+                    "mission_package": config[Args.MISSION_PACKAGE],
                     "airframe": config[Args.AIRFRAME],
                     "world": world,
                     "model_pose": f"{i * spacing},0",
@@ -96,6 +98,11 @@ def generate_launch_description():
                 default_value="basic",
                 description="Mission for every UAV, or a comma-separated list with one per UAV (uav_0 first). "
                 "Each UAV's LOCAL frame starts at its own spawn point.",
+            ),
+            DeclareLaunchArgument(
+                Args.MISSION_PACKAGE,
+                default_value="uav",
+                description="Package the missions are installed in, e.g. uav or iarc_bringup.",
             ),
             DeclareLaunchArgument(
                 Args.AIRFRAME,
