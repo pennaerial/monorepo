@@ -1,6 +1,6 @@
 #pragma once
 
-#include <gz/msgs/actuators.pb.h>
+#include <gz/msgs/double.pb.h>
 
 #include <cstddef>
 #include <gz/transport/Node.hh>
@@ -17,10 +17,13 @@ public:
   Motor_SITL(Side side);
 
   void start() override;
-  void publish(double rad_s) override;
+  void publish(double torque_nm) override;
 
 private:
   void make_motor_advertiser(char* buf, std::size_t size);
+
+  // Generates a motor torque for gazebo from an input PWM command
+  float generate_motor_torque(float pwm);
 
   gz::transport::Node gz_node_;
   gz::transport::Node::Publisher motor_publisher_;

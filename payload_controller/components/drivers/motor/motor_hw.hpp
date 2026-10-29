@@ -11,7 +11,7 @@ public:
   Motor_HW(Side side);
 
   void start() override;
-  void publish(double rad_s) override;
+  void publish(double torque_nm) override;
 };
 
 }  // namespace drivers
