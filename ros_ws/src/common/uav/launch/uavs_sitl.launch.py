@@ -102,7 +102,7 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 Args.MISSION_PACKAGE,
                 default_value="uav",
-                description="Package the missions are installed in, e.g. uav or iarc_bringup.",
+                description="Package the missions are installed in, e.g. uav or iarc_flight.",
             ),
             DeclareLaunchArgument(
                 Args.AIRFRAME,

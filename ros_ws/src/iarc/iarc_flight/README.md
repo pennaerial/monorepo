@@ -18,13 +18,13 @@ When the trajectory is done it logs the position error and controller step time.
 
 ## Run in sim
 
-IARC missions live in `iarc_bringup/missions` (`pennair mission iarc_bringup` lists them).
+IARC missions live in `iarc_flight/missions` (`pennair mission iarc_flight` lists them).
 
 Start QGroundControl first, then four UAVs flying the circle in the `iarc` world:
 
 ```bash
-ros2 launch uav uavs_sitl.launch.py world:=iarc mission_package:=iarc_bringup mission:=iarc_circle      # feedforward
-ros2 launch uav uavs_sitl.launch.py world:=iarc mission_package:=iarc_bringup mission:=iarc_circle_mpc  # MPC
+ros2 launch uav uavs_sitl.launch.py world:=iarc mission_package:=iarc_flight mission:=iarc_circle      # feedforward
+ros2 launch uav uavs_sitl.launch.py world:=iarc mission_package:=iarc_flight mission:=iarc_circle_mpc  # MPC
 ```
 
 `num_uavs:=N` changes the number of UAVs. To give each UAV its own mission, pass a comma-separated list in uav order, e.g. `mission:=iarc_circle_mpc,iarc_circle,iarc_circle,iarc_circle`. Each UAV's LOCAL frame starts at its own spawn point.
