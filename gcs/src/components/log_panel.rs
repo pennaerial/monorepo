@@ -10,8 +10,8 @@ use std::collections::VecDeque;
 const MAX_LOG_MESSAGES_DISPLAY: usize = 10_000;
 
 struct LogEntry {
-    id: u64,
-    log: Log
+    id: u64, // want stable indexing/ids to avoid re-rendering
+    log: Log,
 }
 
 struct LogHistory {
@@ -22,21 +22,27 @@ struct LogHistory {
 
 impl LogHistory {
     fn new() -> Self {
-        LogHistory { logs: VecDeque::new(), next_id: 0, cap: MAX_LOG_MESSAGES_DISPLAY }
+        LogHistory {
+            logs: VecDeque::new(),
+            next_id: 0,
+            cap: MAX_LOG_MESSAGES_DISPLAY,
+        }
     }
 
     fn add_log(&mut self, log: Log) {
         if self.logs.len() == self.cap {
             self.logs.pop_front();
         }
-        self.logs.push_back(LogEntry { id: self.next_id, log });
+        self.logs.push_back(LogEntry {
+            id: self.next_id,
+            log,
+        });
         self.next_id += 1;
     }
 
     fn logs_ref(&self) -> &VecDeque<LogEntry> {
         &self.logs
     }
-
 }
 
 #[component]
