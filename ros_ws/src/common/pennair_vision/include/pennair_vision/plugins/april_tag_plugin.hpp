@@ -1,13 +1,13 @@
 #pragma once
 
+#include <apriltag/apriltag.h>
+#include <apriltag/tag36h11.h>
+
 #include <cstdint>
 #include <rclcpp/rclcpp.hpp>
 
 #include "pennair_vision/lazy_camera_publisher.hpp"
 #include "std_msgs/msg/string.hpp"
-
-#include <apriltag/apriltag.h>
-#include <apriltag/tag36h11.h>
 
 namespace pennair_vision
 {
@@ -21,8 +21,8 @@ public:
       override;
 
 private:
-  ::apriltag_detector_t *td_{nullptr};
-  ::apriltag_family_t *tf_{nullptr};  
+  ::apriltag_detector_t* td_{nullptr};
+  ::apriltag_family_t* tf_{nullptr};
   int count_ = 0;
 };
 
