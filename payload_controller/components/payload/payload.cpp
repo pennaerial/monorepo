@@ -103,8 +103,8 @@ void encoderCallback(const Topic& topic, const void* msg, uint16_t length, void*
 void Payload::init()
 {
   ESP_LOGI(
-      TAG, "Speed config: left=%.3f right=%.3f full_duty=%.3f rad/s kp=%.3f ki=%.3f",
-      LEFT_SETPOINT_RAD_S, RIGHT_SETPOINT_RAD_S, FULL_DUTY_SPEED_RAD_S, SPEED_KP, SPEED_KI
+      TAG, "Speed config: left=%.3f right=%.3f full_duty=%.3f rad/s kp=%.3f ki=%.3f", LEFT_SETPOINT_RAD_S,
+      RIGHT_SETPOINT_RAD_S, FULL_DUTY_SPEED_RAD_S, SPEED_KP, SPEED_KI
   );
   imu_ = drivers::IMU::instance();
   imu_->start();
