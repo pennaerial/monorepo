@@ -45,12 +45,16 @@ private:
    */
   void on_encoder_msg(const gz::msgs::Model& gz_msg);
 
-  /// gz node instance for receiving encoder feedback from Gazebo.
-  gz::transport::Node gz_node_;
   /// Contains Simulation Configuration (e.g. entity and world name)
   const sitl::SimConfig sitl_config_;
   const char* joint_name_;
   uint32_t missing_wheel_joint_count_ = 0;
+  bool has_previous_sample_ = false;
+  int64_t previous_ticks_ = 0;
+  /// Gazebo simulation time at the start of the velocity measurement window.
+  int64_t previous_sample_time_ns_ = 0;
+  /// Declared last so callbacks stop before the state above is destroyed.
+  gz::transport::Node gz_node_;
 };
 
 }  // namespace drivers
