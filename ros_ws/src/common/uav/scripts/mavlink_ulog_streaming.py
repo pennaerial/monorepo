@@ -149,7 +149,7 @@ class MavlinkLogStreaming:
                         measure_time_start = measure_time_cur
                         measured_data = 0
 
-            if not self.logging_started and timer() - self.start_time > 4:
+            if not self.logging_started and timer() - self.start_time > 15:
                 raise Exception("Start timed out. Is the logger running in MAVLink mode?")
 
     def read_message(self):
