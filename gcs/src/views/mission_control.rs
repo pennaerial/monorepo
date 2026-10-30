@@ -1,4 +1,4 @@
-use crate::components::{Button, SideBar, LogPanel};
+use crate::components::{Button, LogPanel, SideBar};
 use crate::hooks::{use_ros_node, use_subscription};
 use crate::ros::server_types::ServerMessage;
 use crate::ros::FoxgloveClient;
