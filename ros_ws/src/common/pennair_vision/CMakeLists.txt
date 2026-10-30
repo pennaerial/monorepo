@@ -22,6 +22,7 @@ find_package(rclcpp_components REQUIRED) # for vision_manager_component
 find_package(ament_cmake_python REQUIRED) # for pennair_vision python module
 find_package(cv_bridge REQUIRED)
 find_package(image_transport REQUIRED) # for pennair_vision lazy publisher
+find_package(apriltag REQUIRED) 
 
 include_directories(include)
 
@@ -76,6 +77,8 @@ ament_target_dependencies(vision_manager
 # Dynamically loaded plugins
 add_library(vision_plugins SHARED
     src/plugins/basic_vision.cpp
+    src/plugins/april_tag_plugin.cpp
+    
 )
 
 add_library(lazy_camera_publisher SHARED
@@ -85,6 +88,7 @@ add_library(lazy_camera_publisher SHARED
 target_include_directories(vision_plugins PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
+    ${cv_bridge_INCLUDE_DIRS}
 )
 
 target_include_directories(lazy_camera_publisher PUBLIC
@@ -99,6 +103,7 @@ ament_target_dependencies(vision_plugins
     sensor_msgs
     image_transport
     cv_bridge
+    apriltag 
 )
 
 target_compile_features(vision_plugins PUBLIC cxx_std_20)
@@ -154,6 +159,6 @@ install_python_entry_point(basic_vision_py pennair_vision.basic_vision main)
 
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
 ament_export_include_directories(include)
-ament_export_dependencies(rosidl_runtime_cpp rclcpp std_msgs sensor_msgs pluginlib image_transport cv_bridge)
+ament_export_dependencies(rosidl_runtime_cpp rclcpp std_msgs sensor_msgs pluginlib image_transport cv_bridge apriltag)
 
 ament_package()
