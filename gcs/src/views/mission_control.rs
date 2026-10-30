@@ -92,7 +92,7 @@ pub fn MissionControl() -> Element {
                     },
                 }
                 p { "{string_msg}" }
-                LogPanel {  }
+                LogPanel {}
 
             }
         }
