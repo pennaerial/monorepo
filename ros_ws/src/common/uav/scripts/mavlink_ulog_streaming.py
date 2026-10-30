@@ -102,7 +102,6 @@ class MavlinkLogStreaming:
         measure_time_start = timer()
         measured_data = 0
 
-        next_heartbeat_time = timer()
         old_handler = signal.signal(signal.SIGINT, self._int_handler)
 
         while True:
@@ -112,15 +111,6 @@ class MavlinkLogStreaming:
                 print("\nStopping log...")
                 self.stop_log()
                 # Continue reading until we get an ACK
-
-            # handle heartbeat sending
-            heartbeat_time = timer()
-            if heartbeat_time > next_heartbeat_time:
-                self.debug("sending heartbeat")
-                self.mav.mav.heartbeat_send(
-                    mavutil.mavlink.MAV_TYPE_GCS, mavutil.mavlink.MAV_AUTOPILOT_GENERIC, 0, 0, 0
-                )
-                next_heartbeat_time = heartbeat_time + 1
 
             m, first_msg_start, num_drops = self.read_message()
             if m is not None:
@@ -154,19 +144,24 @@ class MavlinkLogStreaming:
             self.debug(m, 3)
 
             if m.get_type() == "COMMAND_ACK":
+                # acknowledgement from px4 of command that we sent
                 if (
                     m.command == mavutil.mavlink.MAV_CMD_LOGGING_START
                     and not self.got_header_section
                 ):
+                    # we sent a logging command but header hasn't started yet
                     if m.result == 0:
+                        # logging start command accepted by px4
                         self.logging_started = True
                         print("Logging started. Waiting for Header...")
                     else:
+                        # logging start command not accepted
                         raise Exception("Logging start failed", m.result)
                 elif (
                     m.command == mavutil.mavlink.MAV_CMD_LOGGING_STOP
                     and m.result == mavutil.mavlink.MAV_RESULT_ACCEPTED
                 ):
+                    # we sent stop logging command and it was accepted
                     raise LoggingCompleted()
                 return None, 0, 0
 
