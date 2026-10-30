@@ -3,6 +3,7 @@
 #include <gz/msgs/actuators.pb.h>
 #include <gz/msgs/model.pb.h>
 
+#include <chrono>
 #include <cstddef>
 #include <gz/transport/Node.hh>
 
@@ -45,12 +46,16 @@ private:
    */
   void on_encoder_msg(const gz::msgs::Model& gz_msg);
 
-  /// gz node instance for receiving encoder feedback from Gazebo.
-  gz::transport::Node gz_node_;
   /// Contains Simulation Configuration (e.g. entity and world name)
   const sitl::SimConfig sitl_config_;
   const char* joint_name_;
   uint32_t missing_wheel_joint_count_ = 0;
+  bool has_previous_sample_ = false;
+  int64_t previous_ticks_ = 0;
+  /// Private local receipt time, needed only to differentiate encoder ticks.
+  std::chrono::steady_clock::time_point previous_sample_time_;
+  /// Declared last so callbacks stop before the state above is destroyed.
+  gz::transport::Node gz_node_;
 };
 
 }  // namespace drivers

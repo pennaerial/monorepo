@@ -2,11 +2,9 @@
 
 #include <cmath>
 #include <cstdio>
+#include <numbers>
 
-#include "convert.hpp"
 #include "esp_log.h"
-// [-]#include "sensor_msgs/msg/encoder.h"
-#include "std_msgs/msg/Header.h"
 
 static const char* TAG = "Encoder_SITL";
 
@@ -19,12 +17,11 @@ const char* joint_name_for(Side side)
 }
 
 // Matches the current payload-controller output encoder configuration.
-constexpr double ENCODER_TICKS_PER_REVOLUTION = 617.0;
 constexpr double RADIANS_PER_REVOLUTION = 2 * std::numbers::pi;
 
 int64_t radians_to_encoder_ticks(const double radians)
 {
-  return static_cast<int64_t>(std::llround(radians * ENCODER_TICKS_PER_REVOLUTION / RADIANS_PER_REVOLUTION));
+  return static_cast<int64_t>(std::llround(radians * drivers::Encoder::TICKS_PER_REVOLUTION / RADIANS_PER_REVOLUTION));
 }
 
 }  // namespace
@@ -60,7 +57,20 @@ void Encoder_SITL::on_encoder_msg(const gz::msgs::Model& gz_msg)
       continue;
     }
 
-    write_latest(radians_to_encoder_ticks(joint.axis1().position()));
+    const int64_t ticks = radians_to_encoder_ticks(joint.axis1().position());
+    const auto now = std::chrono::steady_clock::now();
+    const double delta_s = std::chrono::duration<double>(now - previous_sample_time_).count();
+    if (has_previous_sample_ && delta_s > 0.0) {
+      const double angular_velocity_rad_s =
+          (static_cast<double>(ticks) - previous_ticks_) * RADIANS_PER_REVOLUTION / (TICKS_PER_REVOLUTION * delta_s);
+      write_latest(ticks, angular_velocity_rad_s);
+    } else {
+      // The first count seeds the difference; it is not a velocity measurement.
+      write_latest(ticks);
+    }
+    previous_ticks_ = ticks;
+    previous_sample_time_ = now;
+    has_previous_sample_ = true;
     return;
   }
 
