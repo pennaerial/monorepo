@@ -44,8 +44,27 @@ class MavlinkLogStreaming:
         self.buf = ""
         self.debug("Connecting with MAVLink to %s ..." % portname)
         self.mav = mavutil.mavlink_connection(portname, autoreconnect=True, baud=baudrate)
-        self.mav.wait_heartbeat()
-        self.debug("HEARTBEAT OK\n")
+        # PX4 can forward other components' heartbeats over this connection.
+        # A GCS heartbeat satisfies wait_heartbeat() without setting a vehicle target.
+        while True:
+            heartbeat = self.mav.wait_heartbeat()
+            if (
+                heartbeat is not None
+                and heartbeat.autopilot == mavutil.mavlink.MAV_AUTOPILOT_PX4
+                # Reject zero IDs so commands target PX4, not a broadcast.
+                and heartbeat.get_srcSystem() != 0
+                and heartbeat.get_srcComponent() != 0
+            ):
+                self.target_system = heartbeat.get_srcSystem()
+                self.target_component = heartbeat.get_srcComponent()
+                self.mav.target_system = self.target_system
+                self.mav.target_component = self.target_component
+                break
+        print(
+            "Connected to PX4: system {}, component {}".format(
+                self.target_system, self.target_component
+            )
+        )
         self.debug("Locked serial device\n")
 
         self.got_ulog_header = False
@@ -56,7 +75,6 @@ class MavlinkLogStreaming:
         self.last_sequence = -1
         self.logging_started = False
         self.num_dropouts = 0
-        self.target_component = 1
         self.got_sig_int = False
 
     def debug(self, s, level=1):
@@ -66,7 +84,7 @@ class MavlinkLogStreaming:
 
     def start_log(self):
         self.mav.mav.command_long_send(
-            self.mav.target_system,
+            self.target_system,
             self.target_component,
             mavutil.mavlink.MAV_CMD_LOGGING_START,
             0,
@@ -81,7 +99,7 @@ class MavlinkLogStreaming:
 
     def stop_log(self):
         self.mav.mav.command_long_send(
-            self.mav.target_system,
+            self.target_system,
             self.target_component,
             mavutil.mavlink.MAV_CMD_LOGGING_STOP,
             0,
@@ -171,9 +189,7 @@ class MavlinkLogStreaming:
             # return an ack, even we already sent it for the same sequence,
             # because the ack could have been dropped
             if m.get_type() == "LOGGING_DATA_ACKED":
-                self.mav.mav.logging_ack_send(
-                    self.mav.target_system, self.target_component, m.sequence
-                )
+                self.mav.mav.logging_ack_send(self.target_system, self.target_component, m.sequence)
 
             if is_newer:
                 if num_drops > 0:
