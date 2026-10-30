@@ -1,5 +1,6 @@
 #include "motor_sitl.hpp"
 
+#include <algorithm>
 #include <cstdio>
 
 #include "esp_log.h"
@@ -78,7 +79,7 @@ float Motor_SITL::generate_motor_torque(float pwm)
 
   float motorVelocity = wheel_angular_velocity_rad_s_.load(std::memory_order_relaxed) * GEAR_RATIO;
 
-  float voltage = pwm * BATTERY_VOLTAGE;
+  float voltage = std::clamp(pwm, -1.0f, 1.0f) * BATTERY_VOLTAGE;
 
   float current = (voltage - BACK_EMF_CONSTANT * motorVelocity) / MOTOR_WINDING_RESISTANCE;
 

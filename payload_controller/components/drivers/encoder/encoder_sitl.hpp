@@ -3,7 +3,6 @@
 #include <gz/msgs/actuators.pb.h>
 #include <gz/msgs/model.pb.h>
 
-#include <chrono>
 #include <cstddef>
 #include <gz/transport/Node.hh>
 
@@ -52,8 +51,8 @@ private:
   uint32_t missing_wheel_joint_count_ = 0;
   bool has_previous_sample_ = false;
   int64_t previous_ticks_ = 0;
-  /// Private local receipt time, needed only to differentiate encoder ticks.
-  std::chrono::steady_clock::time_point previous_sample_time_;
+  /// Gazebo simulation time at the start of the velocity measurement window.
+  int64_t previous_sample_time_ns_ = 0;
   /// Declared last so callbacks stop before the state above is destroyed.
   gz::transport::Node gz_node_;
 };

@@ -10,7 +10,7 @@ public:
   virtual ~Motor() = default;
 
   virtual void start() = 0;
-  /// Commands a pwm command to the motors
+  /// Commands normalized PWM duty in [-1, 1] to the motors.
   virtual void publish(double pwm) = 0;
   /// Gets the motor instance for the given side (sitl, hardware). implemented in backend .cpp
   /// files, not motor.cpp

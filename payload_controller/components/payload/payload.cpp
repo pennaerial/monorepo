@@ -9,15 +9,18 @@ static const char* TAG = "Payload";
 namespace
 {
 // Output-shaft/wheel speed, not the motor rotor speed before the gearbox.
-constexpr float LEFT_SETPOINT_RAD_S = 5.0f;
-constexpr float RIGHT_SETPOINT_RAD_S = 5.0f;
+constexpr float LEFT_SETPOINT_RAD_S = 2.0f;
+constexpr float RIGHT_SETPOINT_RAD_S = 2.0f;
 constexpr float SPEED_KP = 0.05f;  // PWM duty per rad/s of error.
-constexpr float SPEED_KI = 0.15f;  // PWM duty per radian of accumulated error.
+constexpr float SPEED_KI = 0.05f;  // PWM duty per radian of accumulated error.
 constexpr float MAX_INTEGRAL_DUTY = 0.3f;
 constexpr float FRICTION_DUTY = 0.05f;
-// The SITL motor constants and joint damping predict ~0.68 duty at 5 rad/s.
-constexpr float VELOCITY_DUTY = 0.68f;
-constexpr float FEEDFORWARD_SCALE_RAD_S = 5.0f;
+// Measured output speed at full duty under the current test load. This is a
+// feedforward calibration, not a guarantee of speed under other loads.
+constexpr float FULL_DUTY_SPEED_RAD_S = 4.0f;
+// Friction plus velocity feedforward reaches duty 1 at the calibrated speed:
+// duty = sign(speed) * 0.05 + (0.95 / 4) * speed.
+constexpr float VELOCITY_DUTY = 1.0f - FRICTION_DUTY;
 }  // namespace
 
 Payload::Payload()
@@ -28,7 +31,7 @@ Payload::Payload()
           MAX_INTEGRAL_DUTY,
           FRICTION_DUTY,
           VELOCITY_DUTY,
-          FEEDFORWARD_SCALE_RAD_S
+          FULL_DUTY_SPEED_RAD_S
       ),
       right_motor_controller(
           SPEED_KP,
@@ -37,7 +40,7 @@ Payload::Payload()
           MAX_INTEGRAL_DUTY,
           FRICTION_DUTY,
           VELOCITY_DUTY,
-          FEEDFORWARD_SCALE_RAD_S
+          FULL_DUTY_SPEED_RAD_S
       ),
       left_encoder_(Side::LEFT, "left"),
       right_encoder_(Side::RIGHT, "right"),
@@ -130,9 +133,6 @@ void Payload::update()
 
 void Payload::motor_updates()
 {
-  left_motor_.motor.publish(10);
-  right_motor_.motor.publish(5);
-
   const auto now = std::chrono::steady_clock::now().time_since_epoch();
   const int64_t now_us = std::chrono::duration_cast<std::chrono::microseconds>(now).count();
   update_motor(left_motor_, left_encoder_, left_motor_controller, LEFT_SETPOINT_RAD_S, now_us);
@@ -153,7 +153,7 @@ void Payload::update_motor(
       const float delta_s = (now_us - motor.last_control_timestamp_us) * 1e-6;
       motor.pwm = controller.command(delta_s, angular_velocity_rad_s);
 
-      // Once per payload-clock second; the controller still runs on each new sample.
+      // Every 100 ms; the controller still runs on each new sample.
       if (now_us - motor.last_debug_timestamp_us >= 100000) {
         ESP_LOGI(
             TAG, "%s motor: setpoint=%.3f rad/s measured=%.3f rad/s error=%.3f rad/s pwm=%.3f", motor.debug_name,
