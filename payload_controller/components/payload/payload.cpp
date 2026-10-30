@@ -9,17 +9,17 @@ static const char* TAG = "Payload";
 namespace
 {
 // Output-shaft/wheel speed, not the motor rotor speed before the gearbox.
-constexpr float LEFT_SETPOINT_RAD_S = 2.0f;
-constexpr float RIGHT_SETPOINT_RAD_S = 2.0f;
-constexpr float SPEED_KP = 0.05f;  // PWM duty per rad/s of error.
-constexpr float SPEED_KI = 0.05f;  // PWM duty per radian of accumulated error.
+constexpr float LEFT_SETPOINT_RAD_S = 7.0f;
+constexpr float RIGHT_SETPOINT_RAD_S = 7.0f;
+constexpr float SPEED_KP = 0.08f;  // PWM duty per rad/s of error.
+constexpr float SPEED_KI = 0.15f;  // PWM duty per radian of accumulated error.
 constexpr float MAX_INTEGRAL_DUTY = 0.3f;
 constexpr float FRICTION_DUTY = 0.05f;
-// Measured output speed at full duty under the current test load. This is a
-// feedforward calibration, not a guarantee of speed under other loads.
-constexpr float FULL_DUTY_SPEED_RAD_S = 4.0f;
+// Feedforward calibration: measured speed at full duty under the test load.
+// This scales the duty estimate; it does not configure the simulated motor.
+constexpr float FULL_DUTY_SPEED_RAD_S = 7.434f;
 // Friction plus velocity feedforward reaches duty 1 at the calibrated speed:
-// duty = sign(speed) * 0.05 + (0.95 / 4) * speed.
+// duty = sign(speed) * FRICTION_DUTY + VELOCITY_DUTY * speed / FULL_DUTY_SPEED_RAD_S.
 constexpr float VELOCITY_DUTY = 1.0f - FRICTION_DUTY;
 }  // namespace
 
@@ -102,6 +102,10 @@ void encoderCallback(const Topic& topic, const void* msg, uint16_t length, void*
 
 void Payload::init()
 {
+  ESP_LOGI(
+      TAG, "Speed config: left=%.3f right=%.3f full_duty=%.3f rad/s kp=%.3f ki=%.3f",
+      LEFT_SETPOINT_RAD_S, RIGHT_SETPOINT_RAD_S, FULL_DUTY_SPEED_RAD_S, SPEED_KP, SPEED_KI
+  );
   imu_ = drivers::IMU::instance();
   imu_->start();
 
