@@ -48,19 +48,19 @@ public:
   /// Runs the CV alg implementation and returns the ProcessResult type
   virtual ProcessResult<MessageT> process(const CameraImage& image, const CameraInfo& info, bool generate_debug) = 0;
 
-
-private:
+protected:
   /// Camera topic to subscribe to
   std::string camera_topic_;
   // INVARIANT: vision manager node will be valid for the lifetime of the plugin
   rclcpp::Node* node_{nullptr};
+
+private:
   /// Publishes result of cv object
   typename rclcpp::Publisher<MessageT>::SharedPtr cv_result_pub_;
   /// Object for lazily publishing debug camera images
   image_transport::Publisher cv_debug_pub_;
   /// Object for subscribing to raw camera frames
   image_transport::CameraSubscriber camera_sub_;
-  rclcpp::TimerBase::SharedPtr callback_timer_;
 };
 
 template <RosMessage MessageT>
@@ -85,12 +85,10 @@ void LazyCameraPublisher<MessageT>::start()
         if (cv_result_pub_->get_subscription_count() > 0 || generate_debug) {
           ProcessResult<MessageT> result = process(image, info, generate_debug);
           if (generate_debug && !result.debug_image.empty()) {
-            RCLCPP_DEBUG(node_->get_logger(), "publishing debug image!");
             cv_debug_pub_.publish(
                 cv_bridge::CvImage(image->header, result.debug_encoding, result.debug_image).toImageMsg()
             );
           }
-          RCLCPP_DEBUG(node_->get_logger(), "publishing image result!");
           cv_result_pub_->publish(result.message);
         }
       },

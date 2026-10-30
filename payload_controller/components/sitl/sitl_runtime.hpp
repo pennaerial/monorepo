@@ -16,4 +16,6 @@ struct SimConfig {
 };
 
 const SimConfig& get_config();
+/// Initialize Gazebo workers with the FreeRTOS tick signal blocked. Call before constructing drivers.
+void initialize_transport();
 }  // namespace sitl
