@@ -29,7 +29,7 @@ impl<T: RosMessage> SubscriptionSink<T> {
     }
 }
 
-impl<T: RosMessage + Send> SubscriptionSinkBase for SubscriptionSink<T> {
+impl<T: RosMessage> SubscriptionSinkBase for SubscriptionSink<T> {
     fn topic_name(&self) -> &str {
         &self.topic_name
     }

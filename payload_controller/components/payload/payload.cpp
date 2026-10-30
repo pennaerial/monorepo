@@ -1,10 +1,17 @@
-#include "payload.h"
+#include "payload.hpp"
 
 #include <cstring>
+#include <initializer_list>
 
 static const char* TAG = "Payload";
 
-Payload::Payload() = default;
+Payload::Payload()
+    : left_encoder_(Side::LEFT, "left"),
+      right_encoder_(Side::RIGHT, "right"),
+      left_motor_(Side::LEFT, "left"),
+      right_motor_(Side::RIGHT, "right")
+{
+}
 
 Payload* Payload::instance()
 {
@@ -62,11 +69,19 @@ void Payload::init()
   EKF ekf = EKF();
   ekf.init();
 
-  imu = drivers::IMU::instance();
-  imu->start();
+  imu_ = drivers::IMU::instance();
+  imu_->start();
 
-  encoders = drivers::Encoder::instance();
-  encoders->start();
+  for (EncoderWrapper* wrapper : {&left_encoder_, &right_encoder_}) {
+    ESP_LOGI(TAG, "Starting %s encoder", wrapper->debug_name);
+    wrapper->encoder.start();
+  }
+
+  for (MotorWrapper* wrapper : {&left_motor_, &right_motor_}) {
+    ESP_LOGI(TAG, "Starting %s motor", wrapper->debug_name);
+    wrapper->motor.start();
+  }
+
 
   if (!DDSClient::instance().set_reader_callback(TopicId::IMU_READER, &testCallback, nullptr)) {
     ESP_LOGW(TAG, "Failed to bind IMU DDS reader callback");
@@ -85,25 +100,45 @@ void Payload::update()
 
 void Payload::motor_updates()
 {
-  encoders->publish_motor_left(10);
-  encoders->publish_motor_right(5);
+  // temp for testing
+  left_motor_.motor.publish(10);
+  right_motor_.motor.publish(5);
 }
 
 void Payload::publish_sensor_debug()
 {
   sensor_msgs_msg_Imu latest_imu{};
-  if (imu->get_latest_if_updated(last_published_imu_update_, latest_imu)) {
+  if (imu_->get_latest_if_updated(last_published_imu_update_, latest_imu)) {
     if (!DDSClient::instance().publish<TopicId::IMU_WRITER>(latest_imu)) {
       ESP_LOGW(TAG, "Failed to publish IMU DDS sample");
     }
   }
 
-  payload_interfaces_msg_MotorState latest_motor_state{};
-  if (!encoders->get_latest_if_updated(last_published_encoder_update_, latest_motor_state)) {
+  // Read both sides every time; `||` would skip the right encoder when the left one updated.
+  const bool left_updated = read_encoder(left_encoder_);
+  const bool right_updated = read_encoder(right_encoder_);
+  const bool encoder_updated = left_updated || right_updated;
+
+  if (!encoder_updated) {
     return;
   }
 
-  if (!DDSClient::instance().publish<TopicId::MOTOR_STATE_WRITER>(latest_motor_state)) {
+  if (!DDSClient::instance().publish<TopicId::MOTOR_STATE_WRITER>(latest_motor_state_)) {
     ESP_LOGW(TAG, "Failed to publish motor-state DDS sample");
   }
+}
+
+bool Payload::read_encoder(EncoderWrapper& wrapper)
+{
+  int64_t ticks = 0;
+  if (!wrapper.encoder.get_latest_if_updated(wrapper.last_published_update, ticks)) {
+    return false;
+  }
+
+  if (wrapper.side == Side::LEFT) {
+    latest_motor_state_.left_encoder_count = ticks;
+  } else {
+    latest_motor_state_.right_encoder_count = ticks;
+  }
+  return true;
 }
