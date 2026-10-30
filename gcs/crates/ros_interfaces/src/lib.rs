@@ -19,9 +19,7 @@ pub mod builtin_interfaces {
                 cdr::deserialize(bytes)
             }
         }
-
     }
-
 }
 
 pub mod geometry_msgs {
@@ -65,9 +63,7 @@ pub mod geometry_msgs {
                 cdr::deserialize(bytes)
             }
         }
-
     }
-
 }
 
 pub mod rcl_interfaces {
@@ -97,9 +93,7 @@ pub mod rcl_interfaces {
                 cdr::deserialize(bytes)
             }
         }
-
     }
-
 }
 
 pub mod std_msgs {
@@ -137,7 +131,5 @@ pub mod std_msgs {
                 cdr::deserialize(bytes)
             }
         }
-
     }
-
 }
