@@ -55,6 +55,76 @@ Eigen::Matrix3f skew(const Eigen::Ref<Eigen::Vector3f> v) {
     return M;
 }
 
+void EKF::camera_adjustment() {
+    Eigen::Vector3f camera_pos;
+
+    Eigen::Matrix<float, 3, 15> H = Eigen::Matrix<float, 3, 15>::Zero();
+    H.block<3, 3>(0, 0) = I;
+
+    Eigen::Matrix<float, 3, 15> residual = Eigen::Matrix<float, 3, 15>::Zero();
+
+    // TODO check all matrix dimensions
+    
+}
+
+void EKF::encoder_adjustment() {
+
+
+    Eigen::Matrix<float, 3, 15> H = Eigen::Matrix<float, 3, 15>::Zero();
+    H.block<3, 3>(0, 0) = I;
+
+}
+
+void EKF::magnetometer_adjustment() {
+
+
+    Eigen::Matrix<float, 3, 15> H = Eigen::Matrix<float, 3, 15>::Zero();
+    H.block<3, 3>(0, 0) = I;
+
+}
+
+void EKF::compute_gain(Eigen::Ref<Eigen::MatrixXf> sensor_jacobian, Eigen::Ref<Eigen::MatrixXf> sensor_noise, Eigen::Ref<Eigen::MatrixXf> residual) {
+    Eigen::MatrixXf innovation_covariance = sensor_jacobian * covariance * sensor_jacobian.transpose() + sensor_noise;
+
+
+    // TODO CHECK Solve the linear system instead of explicitly inverting S.
+    // Eigen::LDLT<Eigen::MatrixXd> solver(S);
+
+    // if (solver.info() != Eigen::Success) {
+    //     return; // Handle invalid measurement update
+    // }
+
+    // Eigen::MatrixXd K =
+    //     solver.solve(H * P).transpose();
+    Eigen::MatrixXf kalman_gain = covariance * sensor_jacobian.transpose() * innovation_covariance.inverse();
+
+    // Update pose
+    Eigen::MatrixXf dx = kalman_gain * residual;
+    position += dx.segment<3>(0);
+    velocity += dx.segment<3>(3);
+    Eigen::Vector3f dtheta = dx.segment<3>(6);
+    apply_rotation_vector(dtheta);
+    gyro_bias  += dx.segment<3>(9);
+    accelerometer_bias += dx.segment<3>(12);
+
+    // Update covariance
+    Eigen::Matrix<float, 15, 15> intermediate = Eigen::Matrix<float, 15, 15>::Identity() - kalman_gain * sensor_jacobian;
+    
+    covariance = intermediate * covariance * intermediate.transpose() + kalman_gain * sensor_noise * kalman_gain.transpose();
+    Eigen::Matrix<float, 15, 15> gamma = Eigen::Matrix<float, 15, 15>::Identity();
+    gamma.block<3,3>(6, 6) = I - 0.5 * skew(dtheta);
+
+    covariance = gamma * covariance * gamma.transpose();
+}
+
+void EKF::apply_rotation_vector(Eigen::Ref<Eigen::Vector3f> rot_vec) {
+    float angle = rot_vec.norm();
+    // Handle the edge case of a zero-rotation vector to avoid division-by-zero
+    Eigen::Vector3f axis = (angle > 1e-7f) ? rot_vec.normalized() : Eigen::Vector3d::UnitX();
+    rotation = rotation * Eigen::Quaternionf(Eigen::AngleAxisf(angle, axis));
+    rotation.normalize();
+}
+
 void EKF::predict_next_state(float deltaT) {
     // TODO Collect measurements
     Eigen::Vector3f raw_gyro;
@@ -75,11 +145,7 @@ void EKF::predict_next_state(float deltaT) {
     position = position + velocity * deltaT + 0.5f * accel * deltaT * deltaT;
     velocity = velocity + accel * deltaT;
     Eigen::Vector3f rot_vec = angular_velo * deltaT;
-    float angle = rot_vec.norm();
-    // Handle the edge case of a zero-rotation vector to avoid division-by-zero
-    Eigen::Vector3f axis = (angle > 1e-7f) ? rot_vec.normalized() : Eigen::Vector3d::UnitX();
-    rotation = rotation * Eigen::Quaternionf(Eigen::AngleAxisf(angle, axis));
-    rotation.normalize();
+    apply_rotation_vector(rot_vec);
 
 
     // Update covariance //
@@ -114,3 +180,5 @@ void EKF::predict_next_state(float deltaT) {
     // Reduce floating-point asymmetry
     covariance = 0.5 * (covariance + covariance.transpose());
 }
+
+// TODO camera, encoder, imu offsets
