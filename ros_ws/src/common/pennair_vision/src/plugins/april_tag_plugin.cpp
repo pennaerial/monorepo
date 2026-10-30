@@ -1,13 +1,14 @@
 #include "pennair_vision/plugins/april_tag_plugin.hpp"
 
-#include "pennair_vision/vision_plugin.hpp"
-#include "rclcpp/logger.hpp"
-#include "sensor_msgs/msg/image.hpp"
+#include <apriltag/apriltag.h>
+#include <apriltag/tag36h11.h>
+
 #include <cv_bridge/cv_bridge.hpp>
 #include <opencv2/opencv.hpp>
 
-#include <apriltag/apriltag.h>
-#include <apriltag/tag36h11.h>
+#include "pennair_vision/vision_plugin.hpp"
+#include "rclcpp/logger.hpp"
+#include "sensor_msgs/msg/image.hpp"
 
 using namespace cv;
 
@@ -20,16 +21,18 @@ AprilTagPlugin::AprilTagPlugin()
   td_ = apriltag_detector_create();
   apriltag_detector_add_family(td_, tf_);
 
-  td_->quad_decimate = 2.0; 
-  td_->quad_sigma    = 0.0; 
-  td_->nthreads      = 2;   
-  td_->refine_edges  = 1;   
+  td_->quad_decimate = 2.0;
+  td_->quad_sigma = 0.0;
+  td_->nthreads = 2;
+  td_->refine_edges = 1;
 }
 
 AprilTagPlugin::~AprilTagPlugin()
 {
-  if (td_) apriltag_detector_destroy(td_);
-  if (tf_) tag36h11_destroy(tf_);
+  if (td_)
+    apriltag_detector_destroy(td_);
+  if (tf_)
+    tag36h11_destroy(tf_);
 }
 
 ProcessResult<std_msgs::msg::String>
@@ -42,12 +45,7 @@ AprilTagPlugin::process(const CameraImage& image, const CameraInfo& /* info */, 
   cv::Mat gray;
   cv::cvtColor(frame->image, gray, cv::COLOR_BGR2GRAY);
 
-  image_u8_t apriltag_img = {
-    .width  = gray.cols,
-    .height = gray.rows,
-    .stride = gray.cols,
-    .buf    = gray.data
-  };
+  image_u8_t apriltag_img = {.width = gray.cols, .height = gray.rows, .stride = gray.cols, .buf = gray.data};
 
   zarray_t* detections = apriltag_detector_detect(td_, &apriltag_img);
   int num_tags = zarray_size(detections);
@@ -60,15 +58,15 @@ AprilTagPlugin::process(const CameraImage& image, const CameraInfo& /* info */, 
   }
 
   result.message.data = std::format("Frame #{}, Tags Number: [{}]", count_, detected_ids);
-   
-   if (generate_debug) {
-        result.debug_image = gray.clone();
-        result.debug_encoding = sensor_msgs::image_encodings::MONO8;
-    }
 
-    apriltag_detections_destroy(detections);
+  if (generate_debug) {
+    result.debug_image = gray.clone();
+    result.debug_encoding = sensor_msgs::image_encodings::MONO8;
+  }
 
-    return result;
+  apriltag_detections_destroy(detections);
+
+  return result;
 }
 
 };  // namespace pennair_vision
