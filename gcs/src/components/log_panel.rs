@@ -54,14 +54,16 @@ pub fn LogPanel() -> Element {
     let mut logs = use_signal_sync(LogHistory::new);
 
     rsx! {
-        Button   {
+        Button {
             label: "see logs",
             onclick: move |_| {
                 let mut sub = rosout_sub.clone();
                 async move {
-                    let _ = sub.subscribe(move |msg| {
-                        logs.write().add_log(msg);
-                    }).await;
+                    let _ = sub
+                        .subscribe(move |msg| {
+                            logs.write().add_log(msg);
+                        })
+                        .await;
                 }
             },
         }
@@ -70,10 +72,7 @@ pub fn LogPanel() -> Element {
                 p { "Waiting for log messages" }
             }
             for entry in logs.read().logs_ref().iter() {
-                p {
-                    key: "{entry.id}",
-                    "[{entry.log.name}] {entry.log.msg} [{entry.id}]"
-                }
+                p { key: "{entry.id}", "[{entry.log.name}] {entry.log.msg} [{entry.id}]" }
             }
         }
         // if let Some(log) = log.read().as_ref() {
