@@ -2,18 +2,20 @@
 
 #include <Eigen/Geometry>
 
-// TODO Measurement Collection (including frequency limiting of that)
+// TODO Measurement Collection  & GPS fake camera position gen for gazebo sitl
 // TODO Delta T calculation
 // TODO Magnetometer updates (with proper offset/junk)
-// TODO no-movement updates (with proper offset/junk)
-// TODO for kalman gain S^-1 calculation see if there is more efficient way
-
+// Update loop setup (including frequency limiting of sensor updates)
+// ==================================================================
 // TODO later: One important detail: Since the predicted axle velocity uses the gyroscope measurement, gyro noise also enters this measurement model. A more complete \(R_z\) includes the contribution:
 // \[
 // E[\boldsymbol\ell^B]_\times
 // \Sigma_g
 // [\boldsymbol\ell^B]_\times^TE^T
 // \]
+// TODO later add invertability check
+// TODO later for kalman gain S^-1 calculation see if there is more efficient way
+// TODO later no-movement updates (with proper offset/junk)
 
 static const char* TAG = "Kalman Filter";
 
@@ -140,7 +142,7 @@ void EKF::compute_gain(Eigen::Ref<Eigen::MatrixXf> sensor_jacobian, Eigen::Ref<E
     Eigen::MatrixXf innovation_covariance = sensor_jacobian * covariance * sensor_jacobian.transpose() + sensor_noise;
 
 
-    // TODO CHECK Solve the linear system instead of explicitly inverting S.
+    // TODO In the future solve the linear system instead of explicitly inverting S.
     // Eigen::LDLT<Eigen::MatrixXd> solver(S);
 
     // if (solver.info() != Eigen::Success) {
@@ -149,6 +151,8 @@ void EKF::compute_gain(Eigen::Ref<Eigen::MatrixXf> sensor_jacobian, Eigen::Ref<E
 
     // Eigen::MatrixXd K =
     //     solver.solve(H * P).transpose();
+
+    // TODO add invertability check with computeInverseWithCheck
     Eigen::MatrixXf kalman_gain = covariance * sensor_jacobian.transpose() * innovation_covariance.inverse();
 
     // Update pose
