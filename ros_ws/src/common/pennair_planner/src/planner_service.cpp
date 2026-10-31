@@ -1,6 +1,7 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <pluginlib/class_loader.hpp>
 
 #include "nav_msgs/msg/occupancy_grid.hpp"
 #include "nav_msgs/msg/path.hpp"
@@ -31,7 +32,7 @@ public:
    */
   explicit PlannerService(const rclcpp::NodeOptions& options = rclcpp::NodeOptions())
       : Node("planner_service", options),
-        planner_(std::make_unique<AStarPlanner>())  // swap in a different PathPlanner here
+        planner_loader_("pennair_planner", "pennair_planner::PathPlanner")  // swap in a different PathPlanner here
   {
     this->service_ = this->create_service<PlanPath>(
         "plan_path", std::bind(&PlannerService::handle_plan_path, this, std::placeholders::_1, std::placeholders::_2)
@@ -42,10 +43,6 @@ public:
         "planned_path", rclcpp::QoS(10).transient_local()
 
         /// Copy this line and customize endpoints to change displayed path
-        /*ros2 service call /plan_path pennair_planner/srv/PlanPath \
-        "{start_pose: {position: {x: 0.0, y: 0.0, z: 0.0}, orientation: {w: 1.0}}, goal_pose: {position: {x: 5.0,
-        y: 3.0, z: 0.0}, orientation: {w: 1.0}}}"*/
-
         /* ros2 service call /plan_path pennair_planner/srv/PlanPath \
 "{start_pose: {position: {x: 1.25, y: 1.25, z: 0.0}, orientation: {w: 1.0}}, goal_pose: {position: {x: 4.25, y: 1.25, z:
 0.0}, orientation: {w: 1.0}}}" */
@@ -58,11 +55,21 @@ public:
           latest_costmap_ = msg;
         }
     );
+
+    try {
+      const std::string planner_name = this->declare_parameter<std::string>("planner_plugin", "AStarPlanner");
+
+      planner_ = planner_loader_.createUniqueInstance(planner_name);
+    } catch (const pluginlib::PluginlibException& ex) {
+      RCLCPP_ERROR(this->get_logger(), "Failed to load planner: %s", ex.what());
+      throw;
+    }
   }
 
 private:
   rclcpp::Service<PlanPath>::SharedPtr service_;
-  std::unique_ptr<PathPlanner> planner_;
+  pluginlib::ClassLoader<PathPlanner> planner_loader_;
+  pluginlib::UniquePtr<PathPlanner> planner_;
   // Publisher pointer so the path can actually be sent to RViz
   rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_pub_;
 
@@ -106,8 +113,7 @@ private:
 
     path.header.frame_id = costmap->header.frame_id;
 
-    auto* astar = static_cast<AStarPlanner*>(planner_.get());
-    astar->set_costmap(costmap);
+    planner_->set_costmap(costmap);
 
     if (planner_->plan(request->start_pose, request->goal_pose, path)) {
       RCLCPP_INFO(this->get_logger(), "Planned path with %zu poses", path.poses.size());
