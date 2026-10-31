@@ -2,11 +2,9 @@
 
 #include <cmath>
 #include <cstdio>
+#include <numbers>
 
-#include "convert.hpp"
 #include "esp_log.h"
-// [-]#include "sensor_msgs/msg/encoder.h"
-#include "std_msgs/msg/Header.h"
 
 static const char* TAG = "Encoder_SITL";
 
@@ -19,12 +17,13 @@ const char* joint_name_for(Side side)
 }
 
 // Matches the current payload-controller output encoder configuration.
-constexpr double ENCODER_TICKS_PER_REVOLUTION = 617.0;
 constexpr double RADIANS_PER_REVOLUTION = 2 * std::numbers::pi;
+// The window for which to calculate average velocity
+constexpr int64_t VELOCITY_WINDOW_NS = 100000000;  // At least 0.1s s of simulation time.
 
 int64_t radians_to_encoder_ticks(const double radians)
 {
-  return static_cast<int64_t>(std::llround(radians * ENCODER_TICKS_PER_REVOLUTION / RADIANS_PER_REVOLUTION));
+  return static_cast<int64_t>(std::llround(radians * drivers::Encoder::TICKS_PER_REVOLUTION / RADIANS_PER_REVOLUTION));
 }
 
 }  // namespace
@@ -60,7 +59,36 @@ void Encoder_SITL::on_encoder_msg(const gz::msgs::Model& gz_msg)
       continue;
     }
 
-    write_latest(radians_to_encoder_ticks(joint.axis1().position()));
+    const int64_t ticks = radians_to_encoder_ticks(joint.axis1().position());
+    if (!gz_msg.has_header() || !gz_msg.header().has_stamp()) {
+      // Counts remain available, but velocity requires simulation timestamps.
+      write_latest(ticks);
+      return;
+    }
+
+    const auto& stamp = gz_msg.header().stamp();
+    const int64_t now_ns = static_cast<int64_t>(stamp.sec()) * 1000000000LL + stamp.nsec();
+    if (!has_previous_sample_ || now_ns < previous_sample_time_ns_) {
+      // Seed the window on startup or after the simulation clock resets.
+      previous_ticks_ = ticks;
+      previous_sample_time_ns_ = now_ns;
+      has_previous_sample_ = true;
+      write_latest(ticks);
+      return;
+    }
+
+    const int64_t elapsed_ns = now_ns - previous_sample_time_ns_;
+    if (elapsed_ns >= VELOCITY_WINDOW_NS) {
+      const double delta_s = elapsed_ns * 1e-9;
+      const double angular_velocity_rad_s =
+          (static_cast<double>(ticks) - previous_ticks_) * RADIANS_PER_REVOLUTION / (TICKS_PER_REVOLUTION * delta_s);
+      write_latest(ticks, angular_velocity_rad_s);
+      previous_ticks_ = ticks;
+      previous_sample_time_ns_ = now_ns;
+    } else {
+      // Keep counts current without publishing a new velocity from a short interval.
+      write_latest(ticks);
+    }
     return;
   }
 
