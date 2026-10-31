@@ -4,7 +4,7 @@
 
 // TODO Measurement Collection  & GPS fake camera position gen for gazebo sitl
 // TODO Delta T calculation
-// TODO Magnetometer updates (with proper offset/junk)
+
 // Update loop setup (including frequency limiting of sensor updates)
 // ==================================================================
 // TODO later: One important detail: Since the predicted axle velocity uses the gyroscope measurement, gyro noise also enters this measurement model. A more complete \(R_z\) includes the contribution:
@@ -13,6 +13,7 @@
 // \Sigma_g
 // [\boldsymbol\ell^B]_\times^TE^T
 // \]
+// TODO Magnetometer updates (with proper offset/junk)
 // TODO later add invertability check
 // TODO later for kalman gain S^-1 calculation see if there is more efficient way
 // TODO later no-movement updates (with proper offset/junk)
@@ -67,6 +68,12 @@ void EKF::update() {
     // Here we need to determine the frequency with which we collect sensor measurements
     // Calculate delta time
     // Determine when to execute each part of the filter
+
+    // Get latest data
+    // calculate deltaT
+    // general adjustment
+    // specific adjustments based on frequency
+
 
 }
 
