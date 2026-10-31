@@ -253,6 +253,23 @@ class UAV(Vehicle):
 
         self.trajectory_publisher.publish(msg)
 
+    def publish_trajectory_setpoint(self, position, velocity, acceleration, yaw: float) -> None:
+        """Publish a full trajectory setpoint, with velocity and acceleration as feedforward.
+
+        Args:
+            position: (x, y, z) in the local NED frame, meters.
+            velocity: (vx, vy, vz) in the local NED frame, m/s.
+            acceleration: (ax, ay, az) in the local NED frame, m/s^2.
+            yaw (float): Desired heading in radians.
+        """
+        msg = TrajectorySetpoint()
+        msg.timestamp = int(self.node.get_clock().now().nanoseconds / 1000)
+        msg.position = [float(v) for v in position]
+        msg.velocity = [float(v) for v in velocity]
+        msg.acceleration = [float(v) for v in acceleration]
+        msg.yaw = float(yaw)
+        self.trajectory_publisher.publish(msg)
+
     def calculate_yaw(self, x: float, y: float) -> float:
         """Calculate the yaw angle to point towards the next waypoint."""
         # Calculate relative position

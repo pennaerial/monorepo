@@ -2,7 +2,6 @@ import time
 from typing import Annotated, override
 
 import numpy as np
-from px4_msgs.msg import TrajectorySetpoint
 from pydantic import Field
 from rclpy.node import Node
 from uav.vehicles.UAV import UAV
@@ -64,17 +63,12 @@ class TrackMode(Mode[UAV, TrackParams]):
         # Ask the controller for a setpoint, timing it and recording distance from the ideal path
         start = time.perf_counter()
         setpoint = self.controller.step(state, self.trajectory, self.t)
-        self.step_ms.append((time.perf_counter() - start) * 1e3)
+        self.step_ms.append((time.perf_counter() - start) * 1000.0)
         self.errors.append(np.linalg.norm(state[:3] - self.trajectory.sample(self.t).position))
 
-        # Send position with velocity and acceleration as feedforward
-        msg = TrajectorySetpoint()
-        msg.timestamp = int(self.node.get_clock().now().nanoseconds / 1000)
-        msg.position = setpoint.position.tolist()
-        msg.velocity = setpoint.velocity.tolist()
-        msg.acceleration = setpoint.acceleration.tolist()
-        msg.yaw = float(setpoint.yaw)
-        self.vehicle.trajectory_publisher.publish(msg)
+        self.vehicle.publish_trajectory_setpoint(
+            setpoint.position, setpoint.velocity, setpoint.acceleration, setpoint.yaw
+        )
 
     @override
     def on_exit(self) -> None:
