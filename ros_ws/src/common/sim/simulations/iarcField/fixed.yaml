@@ -1,0 +1,16 @@
+world:
+  name: iarcField
+  node: iarc_field_node
+
+  config:
+    # Pre-written layout; relative paths resolve inside simulations/iarcField/.
+    # Make one with: iarc_field_gen --count 50 --seed 1 -o my_layout.yaml
+    layout: layouts/example.yaml
+
+    style:
+      mesh: low
+      markings:
+        border: true
+        grid: false                # draw the 2 ft cell lines
+
+    output_dir: ~/.ros/iarcField
