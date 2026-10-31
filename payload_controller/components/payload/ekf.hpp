@@ -1,5 +1,7 @@
 #pragma once
 
+#include <chrono>
+
 #include "esp_log.h"
 #include "Eigen/Dense"
 #include "Eigen/Geometry"
@@ -22,6 +24,12 @@ class EKF {
         void apply_rotation_vector(Eigen::Ref<Eigen::Vector3f> rot_vec);
     
     private:
+        using Clock = std::chrono::steady_clock;
+        Clock::time_point last_update;
+        Clock::time_point last_camera_update;
+        Clock::time_point last_encoder_update;
+        bool first_update = true;
+
         const Eigen::Matrix3f I = Eigen::Matrix3f::Identity();
 
         // Position and velocity are defined at IMU position
@@ -33,6 +41,7 @@ class EKF {
         Eigen::Vector3f accelerometer_bias;
         Eigen::Vector3f gyro_bias;
 
+        // Error state: position, velocity, local attitude error, gyro bias, accel bias.
         Eigen::Matrix<float, 15, 15> covariance;
 
 
