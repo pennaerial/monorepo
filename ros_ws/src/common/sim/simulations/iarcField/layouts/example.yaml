@@ -1,0 +1,48 @@
+version: 1
+field:
+  rows: 150
+  cols: 40
+  cell_size: 0.6096
+seed: 1
+obstacles: []
+mines:
+  - {row: 0, col: 23, dx: 0.1238, dy: 0.2062, yaw: 0.3321, face: down}
+  - {row: 2, col: 7, dx: 0.083, dy: 0.1225, yaw: 2.8415, face: up}
+  - {row: 4, col: 38, dx: -0.0394, dy: 0.1955, yaw: 2.6527, face: down}
+  - {row: 5, col: 24, dx: 0.0607, dy: 0.105, yaw: -1.2793, face: up}
+  - {row: 6, col: 8, dx: 0.1858, dy: 0.2222, yaw: 0.005, face: up}
+  - {row: 6, col: 13, dx: 0.0036, dy: 0.1926, yaw: -1.9487, face: down}
+  - {row: 6, col: 26, dx: 0.2223, dy: -0.0003, yaw: 2.7703, face: down}
+  - {row: 13, col: 12, dx: 0.1659, dy: -0.0093, yaw: 1.5314, face: down}
+  - {row: 19, col: 24, dx: 0.0774, dy: -0.0624, yaw: 2.4048, face: up}
+  - {row: 21, col: 13, dx: 0.1119, dy: -0.1942, yaw: 1.0289, face: down}
+  - {row: 24, col: 21, dx: -0.1579, dy: 0.1596, yaw: -0.8135, face: up}
+  - {row: 27, col: 36, dx: -0.0144, dy: -0.0899, yaw: 2.1884, face: up}
+  - {row: 43, col: 15, dx: 0.0367, dy: 0.0691, yaw: -2.0823, face: down}
+  - {row: 44, col: 30, dx: -0.229, dy: -0.1411, yaw: 2.6395, face: up}
+  - {row: 45, col: 32, dx: -0.0449, dy: -0.0733, yaw: 2.1832, face: down}
+  - {row: 47, col: 10, dx: 0.1924, dy: 0.0748, yaw: 0.6845, face: up}
+  - {row: 52, col: 25, dx: -0.0546, dy: 0.1676, yaw: 2.8566, face: up}
+  - {row: 54, col: 37, dx: 0.0059, dy: -0.1741, yaw: 1.7429, face: down}
+  - {row: 65, col: 16, dx: 0.2112, dy: -0.0089, yaw: -0.8499, face: up}
+  - {row: 78, col: 5, dx: 0.2071, dy: -0.0407, yaw: 1.9688, face: down}
+  - {row: 78, col: 18, dx: -0.2341, dy: 0.0188, yaw: 1.7998, face: down}
+  - {row: 80, col: 9, dx: 0.0469, dy: 0.143, yaw: 0.8506, face: up}
+  - {row: 86, col: 33, dx: -0.1499, dy: -0.1918, yaw: 0.3206, face: up}
+  - {row: 89, col: 1, dx: 0.2024, dy: -0.2196, yaw: 2.787, face: down}
+  - {row: 91, col: 24, dx: 0.1728, dy: -0.0221, yaw: 1.5968, face: down}
+  - {row: 92, col: 18, dx: -0.1086, dy: 0.1396, yaw: -1.9817, face: down}
+  - {row: 97, col: 4, dx: -0.1562, dy: -0.115, yaw: 2.8397, face: up}
+  - {row: 100, col: 12, dx: 0.0696, dy: -0.0965, yaw: 1.2731, face: down}
+  - {row: 101, col: 34, dx: -0.1812, dy: -0.0883, yaw: -0.9843, face: up}
+  - {row: 108, col: 18, dx: -0.1134, dy: -0.1158, yaw: 1.4461, face: up}
+  - {row: 111, col: 11, dx: 0.2186, dy: -0.0321, yaw: 2.988, face: down}
+  - {row: 116, col: 38, dx: -0.0482, dy: -0.2182, yaw: 2.8896, face: down}
+  - {row: 121, col: 18, dx: 0.003, dy: -0.0344, yaw: 2.0876, face: up}
+  - {row: 124, col: 32, dx: 0.0614, dy: 0.0916, yaw: -0.3088, face: up}
+  - {row: 133, col: 17, dx: -0.2204, dy: 0.0821, yaw: 1.9062, face: up}
+  - {row: 133, col: 33, dx: -0.0346, dy: 0.1115, yaw: -2.3519, face: down}
+  - {row: 140, col: 39, dx: -0.2125, dy: -0.2016, yaw: -2.6613, face: up}
+  - {row: 142, col: 36, dx: -0.0949, dy: -0.1605, yaw: 0.408, face: down}
+  - {row: 148, col: 6, dx: 0.0285, dy: 0.1646, yaw: 0.5692, face: down}
+  - {row: 149, col: 2, dx: 0.1882, dy: -0.0184, yaw: 2.0603, face: up}
