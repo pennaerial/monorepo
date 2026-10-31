@@ -15,6 +15,7 @@ setup(
     ],
     install_requires=["setuptools", "pydantic>=2,<3"],
     zip_safe=True,
+    extras_require={"test": ["pytest"]},
     maintainer="ubuntu",
     maintainer_email="ubuntu@todo.todo",
     description="IARC trajectories, controllers and flight modes",
