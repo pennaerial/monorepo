@@ -18,6 +18,7 @@ const char* joint_name_for(Side side)
 
 // Matches the current payload-controller output encoder configuration.
 constexpr double RADIANS_PER_REVOLUTION = 2 * std::numbers::pi;
+// The window for which to calculate average velocity
 constexpr int64_t VELOCITY_WINDOW_NS = 100000000;  // At least 0.1s s of simulation time.
 
 int64_t radians_to_encoder_ticks(const double radians)
