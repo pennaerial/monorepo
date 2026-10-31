@@ -61,6 +61,10 @@ setup(
             os.path.join("share", package_name, "fleets"),
             glob(os.path.join("fleets", "*.yaml")),
         ),
+        (
+            "share/uav/scripts",
+            ["scripts/mavlink_ulog_streaming.py"],
+        ),
         # (
         #     os.path.join("share", package_name),
         #     [str(UAV_MODE_REGISTRY_PATH)],
