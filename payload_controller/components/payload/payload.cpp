@@ -4,6 +4,8 @@
 #include <cstring>
 #include <initializer_list>
 
+#include "ekf.hpp"
+
 static const char* TAG = "Payload";
 
 namespace
@@ -102,6 +104,9 @@ void encoderCallback(const Topic& topic, const void* msg, uint16_t length, void*
 
 void Payload::init()
 {
+  EKF ekf = EKF();
+  ekf.init();
+
   ESP_LOGI(
       TAG, "Speed config: left=%.3f right=%.3f full_duty=%.3f rad/s kp=%.3f ki=%.3f", LEFT_SETPOINT_RAD_S,
       RIGHT_SETPOINT_RAD_S, FULL_DUTY_SPEED_RAD_S, SPEED_KP, SPEED_KI
