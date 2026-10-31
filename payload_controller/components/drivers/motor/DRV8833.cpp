@@ -15,16 +15,12 @@ namespace
 
 // All four inputs share one PWM timer. 20 kHz is above hearing range (no motor whine) and well
 // within what the DRV8833 inputs can switch at.
-const ledc_mode_t PWM_SPEED_MODE = LEDC_LOW_SPEED_MODE;  // The only mode on ESP32-S3 / C3
+const ledc_mode_t PWM_SPEED_MODE = LEDC_LOW_SPEED_MODE;  // The only mode on ESP32-C3
 const ledc_timer_t PWM_TIMER = LEDC_TIMER_0;
 const ledc_timer_bit_t PWM_RESOLUTION = LEDC_TIMER_10_BIT;
 const uint32_t PWM_FREQUENCY_HZ = 20000;
 // LEDC duty runs from 0 to 2^resolution inclusive, where 2^resolution holds the pin high
 const uint32_t PWM_FULL_DUTY = 1u << PWM_RESOLUTION;
-
-// Wheel speed at 100% duty. Used to turn rad/s commands into duty cycles.
-// TODO: Placeholder value, measure on the real payload (run at full duty and read the encoders) and update
-const double MAX_WHEEL_SPEED_RAD_S = 30.0;
 
 /// The ESP pins and PWM channels wired to one of the DRV8833's two H-bridges.
 struct BridgeConfig {
@@ -36,12 +32,12 @@ struct BridgeConfig {
   bool inverted;
 };
 
-// Payload v2 wiring: AIN1 = 6, AIN2 = 7, BIN1 = 10, BIN2 = 8
-// TODO: Confirm these pins on the real board, and that the board is an ESP32-S3. The v2 diagram's Tx 21 / Rx 20
-// labels match an ESP32-C3, which would need a different build target.
+// Payload v7 wiring:
+//   Left motor (bridge B): M1 = BOUT2 / BIN2 = 8, M2 = BOUT1 / BIN1 = 10
+//   Right motor (bridge A): M1 = AOUT1 / AIN1 = 6, M2 = AOUT2 / AIN2 = 7
 // TODO: Set inverted per side once we can check which way each wheel spins for a positive command
-const BridgeConfig LEFT_BRIDGE = {GPIO_NUM_6, GPIO_NUM_7, LEDC_CHANNEL_0, LEDC_CHANNEL_1, false};
-const BridgeConfig RIGHT_BRIDGE = {GPIO_NUM_10, GPIO_NUM_8, LEDC_CHANNEL_2, LEDC_CHANNEL_3, false};
+const BridgeConfig LEFT_BRIDGE = {GPIO_NUM_10, GPIO_NUM_8, LEDC_CHANNEL_0, LEDC_CHANNEL_1, false};
+const BridgeConfig RIGHT_BRIDGE = {GPIO_NUM_6, GPIO_NUM_7, LEDC_CHANNEL_2, LEDC_CHANNEL_3, false};
 
 const BridgeConfig& bridge_for(Side side)
 {
@@ -100,20 +96,20 @@ void DRV8833::start()
   ESP_LOGI(TAG, "Started %s motor on IN1: GPIO %i, IN2: GPIO %i", side_name(side_), bridge.in1_pin, bridge.in2_pin);
 }
 
-void DRV8833::publish(double rad_s)
+void DRV8833::publish(double pwm)
 {
   // Writing to channels that haven't been configured would trip ESP_ERROR_CHECK
   if (!started_) {
     return;
   }
 
-  if (!std::isfinite(rad_s)) {
-    rad_s = 0.0;
+  if (!std::isfinite(pwm)) {
+    pwm = 0.0;
   }
 
   const BridgeConfig& bridge = bridge_for(side_);
-  const bool reverse = (rad_s < 0.0) != bridge.inverted;
-  const double drive_fraction = std::min(std::abs(rad_s) / MAX_WHEEL_SPEED_RAD_S, 1.0);
+  const bool reverse = (pwm < 0.0) != bridge.inverted;
+  const double drive_fraction = std::min(std::abs(pwm), 1.0);
 
   // Slow decay mode (datasheet Table 2): hold one input high and PWM the other. While the PWM input
   // is low the motor is driven, while it is high both inputs are high and the motor brakes. So the
