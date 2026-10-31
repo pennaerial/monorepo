@@ -27,7 +27,7 @@ class Args(StrEnum):
 
     MISSION = "mission"
     NS_ID = "ns_id"
-    LAUNCH_RVIZ = "launch_rviz"
+    LAUNCH_FOXGLOVE = "launch_foxglove"
     WORLD = "world"
     LAUNCH_SIM = "launch_sim"
     HEADLESS = "headless"
@@ -54,7 +54,7 @@ def launch_setup(context) -> list[Action]:
 
     ns_id = int(config[Args.NS_ID])
     vehicle_ns = f"payload_{ns_id}"
-    launch_rviz = is_truthy(config[Args.LAUNCH_RVIZ])
+    launch_foxglove = is_truthy(config[Args.LAUNCH_FOXGLOVE])
     world = config[Args.WORLD]
     launch_sim = is_truthy(config[Args.LAUNCH_SIM])
     headless = config[Args.HEADLESS]
@@ -155,8 +155,8 @@ def launch_setup(context) -> list[Action]:
     )
     actions.append(payload_state_bridge)
 
-    # Connect the payload's odometry to RViz's world frame:
-    # - `world` is the fixed frame used by RViz.
+    # Connect the payload's odometry to Foxglove's world frame:
+    # - `world` is the fixed frame used by Foxglove.
     # - `odom` stays where the payload started measuring its movement.
     # - `base_link` moves with the payload.
     #
@@ -214,21 +214,23 @@ def launch_setup(context) -> list[Action]:
     )
     actions.append(robot_state_publisher)
 
-    # Spin up RViz
-    rviz_config_path = payload_share / "rviz" / "payload.rviz"
-    rviz = Node(
-        package="rviz2",
-        executable="rviz2",
-        name="rviz2",
+    # Spin up Foxglove
+    foxglove_bridge = Node(
+        package="foxglove_bridge",
+        executable="foxglove_bridge",
+        name="foxglove_bridge",
+        namespace=vehicle_ns,
         parameters=[
             {
+                "port": 8765,
+                "address": "0.0.0.0",
                 "use_sim_time": True,
+                "send_buffer_limit": 104857600,
             }
         ],
         output="screen",
-        arguments=["-d", str(rviz_config_path)],
     )
-    actions.extend([rviz] if launch_rviz else [])
+    actions.extend([foxglove_bridge] if launch_foxglove else [])
 
     return actions
 
@@ -247,9 +249,9 @@ def generate_launch_description():
                 description="Integer namespace id for the vehicle. An id of 0 makes the namespace payload_0. Correponds to the ROS node namespace and payload_controller namespace",
             ),
             DeclareLaunchArgument(
-                Args.LAUNCH_RVIZ,
+                Args.LAUNCH_FOXGLOVE,
                 default_value="true",
-                description="If true, launch RViz.",
+                description="If true, launch Foxglove.",
                 choices=["true", "false", "t", "f", "0", "1"],
             ),
             DeclareLaunchArgument(

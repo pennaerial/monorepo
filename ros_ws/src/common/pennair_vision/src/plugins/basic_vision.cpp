@@ -1,9 +1,6 @@
 #include "pennair_vision/plugins/basic_vision.hpp"
 
 #include "pennair_vision/vision_plugin.hpp"
-#include "rclcpp/logger.hpp"
-#include "sensor_msgs/msg/image.h"
-#include "sensor_msgs/msg/image.hpp"
 
 
 namespace pennair_vision
@@ -15,6 +12,7 @@ BasicVision::process(const CameraImage& image, const CameraInfo& /* info */, boo
   ProcessResult<std_msgs::msg::Int32> result;
   result.message.data = ++count_;
   if (generate_debug) {
+    RCLCPP_DEBUG(node_->get_logger(), "BasicVision: generating debug image!");
     const auto frame = cv_bridge::toCvShare(image, "bgr8");
     cv::Mat gray;
     cv::cvtColor(frame->image, result.debug_image, cv::COLOR_BGR2GRAY);

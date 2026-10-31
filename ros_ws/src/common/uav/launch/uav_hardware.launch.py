@@ -1,6 +1,7 @@
 from enum import StrEnum
 from pathlib import Path
 
+from ament_index_python.packages import get_package_share_directory
 from launch import Action, LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
@@ -14,6 +15,7 @@ from vehicle_common.launch_utils import (
     LaunchError,
     check_unknown_launch_args,
     get_logger,
+    is_truthy,
 )
 from vehicle_common.mission_loader import RuntimeMission, get_mission_path
 from vehicle_common.utils import get_available_missions
@@ -28,6 +30,7 @@ class Args(StrEnum):
     MISSION_PACKAGE = "mission_package"
     NS_ID = "ns_id"
     AIRFRAME = "airframe"
+    ENABLE_ULOG = "enable_ulog"
 
 
 def launch_setup(context) -> list[Action]:
@@ -57,12 +60,15 @@ def launch_setup(context) -> list[Action]:
     ns_id = int(config[Args.NS_ID])
     vehicle_ns = f"uav_{ns_id}"
 
+    enable_ulog = is_truthy(config[Args.ENABLE_ULOG])
+
     # PRINTING HEADER
     # logger.debug(f"ENV VAR DETECTED: PENNAIR_PX4_PATH={PENNAIR_PX4_PATH}")
     logger.debug("LAUNCH PARAMS")
     logger.debug(f"Mission:             {mission}")
     logger.debug(f"Vehicle Namespace:   {vehicle_ns}")
     logger.debug(f"PX4 Airframe:        {airframe}")
+    logger.debug(f"Enable ULOG:         {enable_ulog}")
     ## create actions
 
     mode_manager = Node(
@@ -88,11 +94,23 @@ def launch_setup(context) -> list[Action]:
         output="screen",
         name="MicroXRCEAgent",
     )
-
     actions = [
         mode_manager,
         middleware,
     ]
+
+    if enable_ulog:
+        ulog_script = (
+            Path(get_package_share_directory("uav")) / "scripts" / "mavlink_ulog_streaming.py"
+        )
+        ulog_dir = Path.home() / "px4-logs"
+        ulog_dir.mkdir(parents=True, exist_ok=True)
+        ulog_logger = ExecuteProcess(
+            cmd=["/usr/bin/python3", "-u", str(ulog_script), "/dev/ttyACM0", "-o", str(ulog_dir)],
+            output="screen",
+            name="ulog_logger",
+        )
+        actions.append(ulog_logger)
     return actions
 
 
@@ -118,6 +136,11 @@ def generate_launch_description():
                 Args.AIRFRAME,
                 default_value="quadcopter",
                 description="UAV airframe to load. Run 'pennair airframe ls' to see all available airframes.",
+            ),
+            DeclareLaunchArgument(
+                Args.ENABLE_ULOG,
+                default_value="false",
+                description="Enables px4 ulog transfer over MAVLink from flight controller to Pi. Needs a usb(Pi) to usb-c(FC) connection.",
             ),
             OpaqueFunction(function=launch_setup),
         ]
