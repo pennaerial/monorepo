@@ -134,7 +134,7 @@ void EKF::camera_adjustment()
 
 void EKF::encoder_adjustment()
 {
-  float left_encoder_velo = 0; // TEMP
+  float left_encoder_velo = 0;  // TEMP
   float right_encoder_velo = 0;
   Eigen::Vector3f raw_gyro;
 

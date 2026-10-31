@@ -1,9 +1,10 @@
 #include "payload.hpp"
-#include "ekf.hpp"
 
 #include <chrono>
 #include <cstring>
 #include <initializer_list>
+
+#include "ekf.hpp"
 
 static const char* TAG = "Payload";
 
