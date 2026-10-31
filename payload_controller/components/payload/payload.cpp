@@ -1,12 +1,48 @@
 #include "payload.hpp"
 
+#include <chrono>
 #include <cstring>
 #include <initializer_list>
 
 static const char* TAG = "Payload";
 
+namespace
+{
+// Output-shaft/wheel speed, not the motor rotor speed before the gearbox.
+constexpr float LEFT_SETPOINT_RAD_S = 7.0f;
+constexpr float RIGHT_SETPOINT_RAD_S = 7.0f;
+constexpr float SPEED_KP = 0.08f;  // PWM duty per rad/s of error.
+constexpr float SPEED_KI = 0.15f;  // PWM duty per radian of accumulated error.
+constexpr float MAX_INTEGRAL_DUTY = 0.3f;
+constexpr float FRICTION_DUTY = 0.05f;
+// Feedforward calibration: measured speed at full duty under the test load.
+// This scales the duty estimate; it does not configure the simulated motor.
+constexpr float FULL_DUTY_SPEED_RAD_S = 7.434f;
+// Friction plus velocity feedforward reaches duty 1 at the calibrated speed:
+// duty = sign(speed) * FRICTION_DUTY + VELOCITY_DUTY * speed / FULL_DUTY_SPEED_RAD_S.
+constexpr float VELOCITY_DUTY = 1.0f - FRICTION_DUTY;
+}  // namespace
+
 Payload::Payload()
-    : left_encoder_(Side::LEFT, "left"),
+    : left_motor_controller(
+          SPEED_KP,
+          SPEED_KI,
+          LEFT_SETPOINT_RAD_S,
+          MAX_INTEGRAL_DUTY,
+          FRICTION_DUTY,
+          VELOCITY_DUTY,
+          FULL_DUTY_SPEED_RAD_S
+      ),
+      right_motor_controller(
+          SPEED_KP,
+          SPEED_KI,
+          RIGHT_SETPOINT_RAD_S,
+          MAX_INTEGRAL_DUTY,
+          FRICTION_DUTY,
+          VELOCITY_DUTY,
+          FULL_DUTY_SPEED_RAD_S
+      ),
+      left_encoder_(Side::LEFT, "left"),
       right_encoder_(Side::RIGHT, "right"),
       left_motor_(Side::LEFT, "left"),
       right_motor_(Side::RIGHT, "right")
@@ -69,6 +105,10 @@ void Payload::init()
   EKF ekf = EKF();
   ekf.init();
 
+  ESP_LOGI(
+      TAG, "Speed config: left=%.3f right=%.3f full_duty=%.3f rad/s kp=%.3f ki=%.3f", LEFT_SETPOINT_RAD_S,
+      RIGHT_SETPOINT_RAD_S, FULL_DUTY_SPEED_RAD_S, SPEED_KP, SPEED_KI
+  );
   imu_ = drivers::IMU::instance();
   imu_->start();
 
@@ -100,9 +140,46 @@ void Payload::update()
 
 void Payload::motor_updates()
 {
-  // temp for testing
-  left_motor_.motor.publish(10);
-  right_motor_.motor.publish(5);
+  const auto now = std::chrono::steady_clock::now().time_since_epoch();
+  const int64_t now_us = std::chrono::duration_cast<std::chrono::microseconds>(now).count();
+  update_motor(left_motor_, left_encoder_, left_motor_controller, LEFT_SETPOINT_RAD_S, now_us);
+  update_motor(right_motor_, right_encoder_, right_motor_controller, RIGHT_SETPOINT_RAD_S, now_us);
+}
+
+void Payload::update_motor(
+    MotorWrapper& motor,
+    EncoderWrapper& encoder,
+    PWMController& controller,
+    float setpoint_rad_s,
+    int64_t now_us
+)
+{
+  double angular_velocity_rad_s;
+  if (encoder.encoder.get_latest_angular_velocity_if_updated(encoder.last_control_update, angular_velocity_rad_s)) {
+    if (motor.last_control_timestamp_us != 0 && now_us > motor.last_control_timestamp_us) {
+      const float delta_s = (now_us - motor.last_control_timestamp_us) * 1e-6;
+      motor.pwm = controller.command(delta_s, angular_velocity_rad_s);
+
+      // Every 100 ms; the controller still runs on each new sample.
+      if (now_us - motor.last_debug_timestamp_us >= 100000) {
+        ESP_LOGI(
+            TAG, "%s motor: setpoint=%.3f rad/s measured=%.3f rad/s error=%.3f rad/s pwm=%.3f", motor.debug_name,
+            setpoint_rad_s, angular_velocity_rad_s, setpoint_rad_s - angular_velocity_rad_s, motor.pwm
+        );
+        motor.last_debug_timestamp_us = now_us;
+      }
+    } else {
+      // Seed the controller clock before its first update.
+      motor.pwm = 0.0f;
+      controller.change_set_point(0.0f);
+      controller.change_set_point(setpoint_rad_s);
+      motor.last_debug_timestamp_us = now_us;
+    }
+    motor.last_control_timestamp_us = now_us;
+  }
+
+  // Keep publishing the last duty between encoder samples; do not integrate stale feedback.
+  motor.motor.publish(motor.pwm);
 }
 
 void Payload::publish_sensor_debug()
