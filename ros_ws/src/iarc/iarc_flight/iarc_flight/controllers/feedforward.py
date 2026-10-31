@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import Literal
 
 import numpy as np
@@ -10,7 +12,7 @@ from iarc_flight.trajectories.base import Trajectory, TrajectoryPoint
 class FeedforwardConfig(BaseModel):
     type: Literal["feedforward"] = "feedforward"
 
-    def build(self) -> "FeedforwardController":
+    def build(self) -> FeedforwardController:
         return FeedforwardController()
 
 

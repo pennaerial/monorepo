@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import math
 from typing import Literal
 
@@ -18,7 +20,7 @@ class CircleConfig(BaseModel):
     laps: float = 1.0
     face_velocity: bool = True  # yaw along the path, otherwise hold the starting yaw
 
-    def build(self, start: np.ndarray, yaw: float) -> "Circle":
+    def build(self, start: np.ndarray, yaw: float) -> Circle:
         return Circle(self, start, yaw)
 
 

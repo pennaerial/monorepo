@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import Literal
 
 import numpy as np
@@ -18,7 +20,7 @@ class MPCConfig(BaseModel):
     velocity_weight: float = 1.0
     accel_weight: float = 0.1
 
-    def build(self) -> "MPCController":
+    def build(self) -> MPCController:
         return MPCController(self)
 
 
