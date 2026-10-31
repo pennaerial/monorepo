@@ -21,6 +21,6 @@ private:
 
   // The set point
   float set_point;
-  // The approximate maximum of the set point to normalize it
+  // Measured speed at full duty under the calibration load, not a speed command.
   float set_point_scale;
 };

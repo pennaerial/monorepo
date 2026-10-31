@@ -9,6 +9,7 @@
 #include "motor.hpp"
 #include "payload_corner.hpp"
 #include "payload_interfaces/msg/MotorState.h"
+#include "pwmcontroller.hpp"
 #include "topics.h"
 
 /// Pairs a low-level encoder with the payload side it measures.
@@ -23,6 +24,8 @@ struct EncoderWrapper {
   drivers::Encoder& encoder;
   /// Encoder update count at the last motor-state publish.
   uint32_t last_published_update = 0;
+  /// Separate cursor so debug publishing cannot consume controller feedback.
+  uint32_t last_control_update = 0;
 };
 
 /// Pairs a low-level motor with the payload side it drives.
@@ -35,6 +38,9 @@ struct MotorWrapper {
   const Side side;
   const char* const debug_name;
   drivers::Motor& motor;
+  float pwm = 0.0f;
+  int64_t last_control_timestamp_us = 0;
+  int64_t last_debug_timestamp_us = 0;
 };
 
 class Payload
@@ -58,6 +64,16 @@ private:
 
   /// Copies a new encoder reading into latest_motor_state_. Returns true if it was new.
   bool read_encoder(EncoderWrapper& wrapper);
+  void update_motor(
+      MotorWrapper& motor,
+      EncoderWrapper& encoder,
+      PWMController& controller,
+      float setpoint_rad_s,
+      int64_t now_us
+  );
+
+  PWMController left_motor_controller;
+  PWMController right_motor_controller;
 
   drivers::IMU* imu_;
   EncoderWrapper left_encoder_;

@@ -3,7 +3,7 @@ set(srcs
     ekf.cpp
 )
 
-set(requires DDS encoder imu log freertos motor)
+set(requires DDS encoder imu log freertos motor util)
 
 idf_component_register(
     SRCS ${srcs}
