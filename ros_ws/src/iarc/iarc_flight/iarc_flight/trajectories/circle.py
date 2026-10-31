@@ -39,6 +39,7 @@ class Circle(Trajectory):
     def _progress(self, t: float) -> tuple[float, float, float]:
         """Speed, tangential acceleration and distance flown at time t."""
         v0, a = self.c.initial_speed, self.c.tangential_accel
+        # Time when the speed stops changing: speeding up hits max_speed, slowing down hits 0
         if a > 0 and self.c.max_speed is not None:
             t_limit = max(0.0, (self.c.max_speed - v0) / a)
         elif a < 0:
@@ -46,8 +47,10 @@ class Circle(Trajectory):
         else:
             t_limit = math.inf
 
+        # Still accelerating: v = v0 + a*t, d = v0*t + a*t^2/2
         if t <= t_limit:
             return v0 + a * t, a, v0 * t + 0.5 * a * t**2
+        # Past the limit: distance covered while accelerating, then constant speed v after that
         v = v0 + a * t_limit
         return v, 0.0, v0 * t_limit + 0.5 * a * t_limit**2 + v * (t - t_limit)
 

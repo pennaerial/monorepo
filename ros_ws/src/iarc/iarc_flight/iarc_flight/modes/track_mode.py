@@ -46,9 +46,14 @@ class TrackMode(Mode[UAV, TrackParams]):
     def on_update(self, time_delta: float) -> None:
         pos = self.vehicle.local_position
         if pos is None:
+            self.node.get_logger().warning(
+                "TrackMode not updating: no valid position", throttle_duration_sec=1.0
+            )
             return
+        # Local NED position and velocity
         state = np.array([pos.x, pos.y, pos.z, pos.vx, pos.vy, pos.vz])
 
+        # First update places the trajectory at the drone, later ones advance time along it
         if self.trajectory is None:
             yaw = self.vehicle.yaw if self.vehicle.yaw is not None else pos.heading
             self.trajectory = self.p.trajectory.build(state[:3], yaw)
@@ -56,11 +61,13 @@ class TrackMode(Mode[UAV, TrackParams]):
         else:
             self.t += time_delta
 
+        # Ask the controller for a setpoint, timing it and recording distance from the ideal path
         start = time.perf_counter()
         setpoint = self.controller.step(state, self.trajectory, self.t)
         self.step_ms.append((time.perf_counter() - start) * 1e3)
         self.errors.append(np.linalg.norm(state[:3] - self.trajectory.sample(self.t).position))
 
+        # Send position with velocity and acceleration as feedforward
         msg = TrajectorySetpoint()
         msg.timestamp = int(self.node.get_clock().now().nanoseconds / 1000)
         msg.position = setpoint.position.tolist()
