@@ -303,9 +303,9 @@ class UAV(Vehicle):
     def publish_offboard_control_heartbeat_signal(self):
         """Publish the offboard control mode."""
         msg = OffboardControlMode()
-        msg.position = True # Position control uses position, velocity, and acceleration setpoints
-        msg.velocity = False # Velocity control uses velocity and acceleration setpoints
-        msg.acceleration = False # Acceleration control uses acceleration setpoints
+        msg.position = True # Uses position, velocity, and acceleration
+        msg.velocity = False # Uses velocity and acceleration
+        msg.acceleration = False # Uses only acceleration 
         msg.attitude = False
         msg.body_rate = False
         msg.timestamp = int(self.node.get_clock().now().nanoseconds / 1000)
