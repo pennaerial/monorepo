@@ -17,7 +17,7 @@ columns along y (col 0 at y = -12.192). Cell `(row, col)` is centred at
 
 ## Stages
 
-- `base.yaml`: random layout of 10 mines to start (`count` or `density`, seed, face-down
+- `base.yaml`: random layout of 300 mines (`count` or `density`, seed, face-down
   probability, keep-out around the spawn).
 - `fixed.yaml`: loads `layouts/example.yaml`.
 
