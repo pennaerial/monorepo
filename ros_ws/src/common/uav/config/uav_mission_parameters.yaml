@@ -1,0 +1,42 @@
+uav_mission:
+  mode_map:
+    type: string
+    default_value: ""
+    description: "Path to the mission YAML. Empty uses the uav package's basic mission."
+    read_only: true
+
+  auto_launch:
+    type: bool
+    default_value: true
+    description: "Start the mission automatically once the vehicle reports ready"
+    read_only: true
+
+  servo_only:
+    type: bool
+    default_value: false
+    description: "Run modes without arming, takeoff, or offboard control"
+    read_only: true
+
+  vehicle_name:
+    type: string
+    default_value: "uav_0"
+    description: "Vehicle namespace used for topics and runtime state"
+    read_only: true
+    validation:
+      not_empty<>: []
+
+  vehicle_class:
+    type: string
+    default_value: "MULTICOPTER"
+    description: "PX4 airframe class used to pick the UAV implementation"
+    read_only: true
+    validation:
+      one_of<>: [["MULTICOPTER", "PLANE", "VTOL", "OTHER", "UNKNOWN"]]
+
+  camera_mount_offsets:
+    type: double_array
+    default_value: [0.0, 0.0, 0.0]
+    description: "Camera mount offset from the vehicle body frame [x, y, z] in meters"
+    read_only: true
+    validation:
+      fixed_size<>: [3]

@@ -1,0 +1,161 @@
+#!/usr/bin/env bash
+
+# aliases for faster development
+
+# SOURCING
+alias sr='source /opt/ros/jazzy/setup.bash'
+alias si='source install/setup.bash'
+alias sri='source /opt/ros/jazzy/setup.bash && source install/setup.bash'
+
+# BUILDING
+alias cb='colcon build'
+alias cbcc="colcon build --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON && ln -s build/compile_commands.json compile_commands.json"
+alias cbp='colcon build --packages-select'
+alias cbpsi='colcon build --symlink-install --packages-select'
+
+# rm -rf's the build and install of each specified package
+cleanp() {
+    if [[ $# -eq 0 ]]; then
+        echo "Usage: cleanp <package> [package ...]"
+        return 1
+    fi
+
+    for pkg in "$@"; do
+        echo "Removing build/$pkg"
+        echo "Removing install/$pkg"
+        rm -rf "build/$pkg" "install/$pkg"
+    done
+}
+
+cleanall() {
+    if [[ $# -gt 0 ]]; then
+        if [[ "$1" != "--except" && "$1" != "-e" ]] || [[ $# -lt 2 ]]; then
+            echo "Usage: cleanall [--except|-e package ...]" >&2
+            return 1
+        fi
+        shift
+    fi
+
+    if [[ ! -d src || ! -d build || ! -d install ]]; then
+        echo "Run cleanall from the ROS workspace root." >&2
+        return 1
+    fi
+
+    local dir pkg keep
+    for dir in build/* install/*; do
+        [[ -d "$dir" ]] || continue
+        pkg=${dir##*/}
+
+        for keep in "$@"; do
+            [[ "$pkg" == "$keep" ]] && continue 2
+        done
+
+        echo "Removing $dir"
+        rm -rf -- "$dir" || return
+    done
+}
+
+# TESTING
+ctp() {
+# 1. runs colcon tests on selected packages
+# 2. merges xml test results into build/merged_results.xml
+# 3. Prints test results for the selected packages
+# runs unit tests from the selected packages
+    local pkgs=("$@")
+    colcon test --packages-select "${pkgs[@]}"
+    local test_status=$?
+
+    local paths=()
+    for pkg in "${pkgs[@]}"; do
+	    local pytest_xml="build/${pkg}/pytest.xml"
+	    local gtest_glob="build/${pkg}/test_results/${pkg}/*.gtest.xml"
+
+	    [[ -f "$pytest_xml" ]] && paths+=("$pytest_xml")
+	    compgen -G "$gtest_glob" >/dev/null 2>&1 && paths+=("$gtest_glob")
+	done
+
+	if [[ ${#paths[@]} -eq 0 ]]; then
+		echo "ctp: no test result files found for: ${pkgs[*]}" >&2
+		return 1
+	fi
+
+	junitparser merge --glob "${paths[@]}" build/merged_results.xml
+    local result_status=0
+    for pkg in "${pkgs[@]}"; do
+        colcon test-result --test-result-base "build/${pkg}" --verbose || result_status=$?
+    done
+    if [[ "$test_status" -eq 0 ]]; then
+        test_status=$result_status
+    fi
+    return "$test_status"
+}
+
+# Runs unit tests from ALL packages
+ct() {
+    mapfile -t pkgs < <(colcon list -n)
+    ctp "${pkgs[@]}"
+}
+
+# Runs all sim tests from ALL packages. Only supports ament_python packages so far.
+ctsim() {
+    mapfile -t pkgs < <(colcon list | grep 'ament_python' | awk '{print $1}')
+    colcon test --packages-select "${pkgs[@]}" --event-handlers console_direct+ --pytest-args -s -o python_files="sim_test_*.py"
+}
+
+# Runs all sim tests from the selected/specified packages
+alias ctpsim='colcon test --pytest-args -s -o python_files="sim_test_*.py" --event-handlers console_direct+ --packages-select'
+
+
+
+# Clang-format shortcut
+cppfmt() {
+    local check=false
+
+    case "${1:-}" in
+        "")
+            ;;
+        --check)
+            check=true
+            ;;
+        *)
+            echo "Usage: cppfmt [--check]"
+            echo "  cppfmt          Apply clang-format"
+            echo "  cppfmt --check  Check formatting without modifying files"
+            return 1
+            ;;
+    esac
+
+    local files
+    files=$(git ls-files | grep -E '\.(cpp|cc|h|hh|hpp)$')
+
+    if [[ -z "$files" ]]; then
+        echo "No matching C/C++ files found."
+        return 0
+    fi
+
+    if $check; then
+        echo "Checking C++ formatting..."
+
+        local failed=false
+
+        while IFS= read -r file; do
+            if ! clang-format --dry-run --Werror "$file" 2>/dev/null; then
+                echo "  ✗ $file"
+                failed=true
+            fi
+        done <<< "$files"
+
+        if $failed; then
+            echo
+            echo "C++ formatting check failed."
+            echo "Run 'cppfmt' to fix formatting errors."
+            return 1
+        fi
+
+        echo "C++ formatting check passed."
+    else
+        echo "Applying C++ formatting..."
+        echo "$files" | xargs clang-format -i --style=file
+        echo "C++ formatting complete."
+    fi
+}

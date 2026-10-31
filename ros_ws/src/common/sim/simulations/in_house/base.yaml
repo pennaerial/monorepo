@@ -1,0 +1,21 @@
+# Simulation Configuration
+world:
+  name: in_house
+  node: hoop_course_node
+
+  physics:
+    friction: 0.0
+
+  config: # world node specific config
+    course: ascent
+    dlz: [10, 5, 0]
+    uav: [0, 0, 0]
+    num_hoops: 2
+    height: 5
+    max_dist: 1
+
+  controllables:
+    - name: uav_0
+      model: x500_mono_cam
+      position: [0, 0, 0]
+      rpy: [0.0, 0.0, 0.0]

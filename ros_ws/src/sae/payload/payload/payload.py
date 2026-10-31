@@ -1,0 +1,60 @@
+from payload_interfaces.msg import DriveCommand, ServoCommand
+from payload_interfaces.srv import DeadReckon, TimedDrive
+from rclpy.node import Node
+from vehicle_common.vehicle import Vehicle
+
+
+class Payload(Vehicle):
+    """Mission-side adapter for one payload node namespace."""
+
+    def __init__(
+        self,
+        node: Node,
+        vehicle_name: str,
+    ):
+        super().__init__(
+            node,
+            vehicle_name,
+            has_camera=True,
+            camera_namespace=f"/{vehicle_name}",
+            image_topic="camera",
+            camera_info_topic="camera_info",
+            camera_service_name="camera_data",
+        )
+
+        self.drive_publisher = self.node.create_publisher(
+            DriveCommand, self.namespaced_path("cmd_drive"), 10
+        )
+        self.servo_publisher = self.node.create_publisher(
+            ServoCommand, self.namespaced_path("servo"), 10
+        )
+        self.timed_drive_client = self.node.create_client(
+            TimedDrive, self.namespaced_path("timed_drive")
+        )
+        self.dead_reckon_client = self.node.create_client(
+            DeadReckon, self.namespaced_path("dead_reckon")
+        )
+
+    def drive(self, linear: float, angular: float) -> None:
+        self.drive_publisher.publish(DriveCommand(linear=float(linear), angular=float(angular)))
+
+    def stop(self) -> None:
+        self.drive(0.0, 0.0)
+
+    def set_servo(self, degree: float) -> None:
+        self.servo_publisher.publish(ServoCommand(degree=float(degree)))
+
+    def dead_reckon(self, linear: float, angular: float, speed: float, timeout_sec: float = 30.0):
+        request = DeadReckon.Request()
+        request.linear = float(linear)
+        request.angular = float(angular)
+        request.speed = float(speed)
+        request.timeout_sec = float(timeout_sec)
+        return self.dead_reckon_client.call_async(request)
+
+    def timed_drive(self, linear: float, angular: float, duration_sec: float):
+        request = TimedDrive.Request()
+        request.linear = float(linear)
+        request.angular = float(angular)
+        request.duration_sec = float(duration_sec)
+        return self.timed_drive_client.call_async(request)

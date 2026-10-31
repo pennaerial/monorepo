@@ -17,8 +17,6 @@
 .idea
 
 .vscode/*
-!.vscode/extensions.json
-!.vscode/settings.json
 
 # colcon/CMake output
 build
@@ -45,3 +43,6 @@ site/
 # AutoAPI-generated docs (kept only when AUTOAPI_KEEP_FILES=1)
 docs/autoapi/
 doxygen
+
+managed_components
+

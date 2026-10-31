@@ -1,0 +1,50 @@
+// generated from rosidl_adapter/resource/msg.idl.em
+// with input from payload_interfaces/msg/MotorState.msg
+// generated code does not contain a copyright notice
+
+
+module payload_interfaces {
+  module msg {
+    struct MotorState {
+      double linear_setpoint_mps;
+
+      double angular_setpoint_rad_s;
+
+      double left_setpoint_rpm;
+
+      double right_setpoint_rpm;
+
+      double left_measured_rpm;
+
+      double right_measured_rpm;
+
+      double left_pid_error_rpm;
+
+      double right_pid_error_rpm;
+
+      double left_pid_p;
+
+      double left_pid_i;
+
+      double left_pid_d;
+
+      double right_pid_p;
+
+      double right_pid_i;
+
+      double right_pid_d;
+
+      double left_output_norm;
+
+      double right_output_norm;
+
+      double left_pwm_percent;
+
+      double right_pwm_percent;
+
+      int64 left_encoder_count;
+
+      int64 right_encoder_count;
+    };
+  };
+};

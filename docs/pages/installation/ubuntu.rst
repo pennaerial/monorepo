@@ -102,7 +102,7 @@ Then, navigate to the root of our ROS workspace, initialize and update ``rosdep`
 .. code-block:: bash
     :caption: Bash
 
-    cd controls/sae_2025_ws # root of ros workspace
+    cd ros_ws # root of ros workspace
     sudo rosdep init
     rosdep update
     rosdep install -r -i -y --rosdistro jazzy --from-paths src
@@ -164,26 +164,6 @@ From monorepo root:
     sudo apt install ${APT_PACKAGES[@]}
 
 
-NPM Packages (Global)
-''''''''''''''''''''''
-
-Install NodeJS 24 with nvm:
-
-.. code-block:: bash
-
-    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.6/install.sh | bash
-    \. "$HOME/.nvm/nvm.sh"
-    nvm install 24
-
-    # verify installs
-    node -v
-    npm -v
-
-    # from monorepo root:
-    source ci/ci.conf
-    echo ${GLOBAL_NPM[@]}
-    npm install -g ${GLOBAL_NPM[@]}
-
 Build the Dependencies Submodule
 ``````````````````````````````````
 
@@ -238,7 +218,7 @@ Build and run the ROS workspace
 .. code-block:: bash
 
    # from monorepo root
-   cd controls/sae_2025_ws
+   cd ros_ws
    colcon build
 
 3. source local install and run basic UAV mission.

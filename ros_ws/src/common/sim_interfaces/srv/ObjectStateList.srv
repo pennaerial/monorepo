@@ -1,0 +1,9 @@
+#Request has no fields
+
+---
+string world           # Gazebo world name, e.g. "in_house_2026"
+string stage           # stage yaml that was loaded, e.g. "base"
+string generated_at    # UTC ISO-8601 of world generation; empty until it has run
+string tag_family      # AprilTag dictionary the decals come from
+float64 tag_size_m     # side of the black square; pass straight to a detector
+ObjectState[] objects  # one entry per spawned shape
