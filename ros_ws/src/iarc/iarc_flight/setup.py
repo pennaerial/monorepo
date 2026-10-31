@@ -1,0 +1,23 @@
+from glob import glob
+
+from setuptools import find_packages, setup
+
+package_name = "iarc_flight"
+
+setup(
+    name=package_name,
+    version="0.0.0",
+    packages=find_packages(exclude=["test"]),
+    data_files=[
+        ("share/ament_index/resource_index/packages", ["resource/" + package_name]),
+        ("share/" + package_name, ["package.xml"]),
+        ("share/" + package_name + "/missions", glob("missions/*.yaml")),
+    ],
+    install_requires=["setuptools", "pydantic>=2,<3"],
+    zip_safe=True,
+    extras_require={"test": ["pytest"]},
+    maintainer="ubuntu",
+    maintainer_email="ubuntu@todo.todo",
+    description="IARC trajectories, controllers and flight modes",
+    license="TODO: License declaration",
+)

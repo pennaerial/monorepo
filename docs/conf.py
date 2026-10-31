@@ -72,6 +72,7 @@ if not SKIP_AUTOAPI_BUILD:
         f"{ROS_WS_PATH}/src/sae/payload/payload",
         f"{ROS_WS_PATH}/src/common/sim/sim",
         f"{ROS_WS_PATH}/src/common/vehicle_common/vehicle_common",
+        f"{ROS_WS_PATH}/src/iarc/iarc_flight/iarc_flight",
     ]
     # Custom templates dir (only overrides python/module.rst). Used to customize names (favoring displaying short names over full module path names)
     autoapi_template_dir = "../sphinx/_templates/autoapi"

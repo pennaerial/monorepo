@@ -27,6 +27,7 @@ class Args(StrEnum):
     """Maps constants to launch argument keyords"""
 
     MISSION = "mission"
+    MISSION_PACKAGE = "mission_package"
     NS_ID = "ns_id"
     AIRFRAME = "airframe"
     ENABLE_ULOG = "enable_ulog"
@@ -37,13 +38,14 @@ def launch_setup(context) -> list[Action]:
     check_unknown_launch_args(Args, config, logger)  # warn for unknown args
 
     mission: str = config[Args.MISSION]  # validate mission
-    if mission not in get_available_missions("uav"):
+    mission_package: str = config[Args.MISSION_PACKAGE]
+    if mission not in get_available_missions(mission_package):
         logger.warning( f"{mission} is not an installed mission. Using filepath as fallback...")  # fmt: skip
         mission_path = Path(mission).expanduser().resolve()
         if not mission_path.is_file() or mission_path.suffix != ".yaml":
             raise LaunchError(f"{mission} is not installed or a valid path to a mission yaml file")
     else:
-        mission_path = get_mission_path(mission, "uav")
+        mission_path = get_mission_path(mission, mission_package)
     try:
         _ = RuntimeMission.load_from_path(mission_path)  # run this step only for mission validation
     except ValidationError as e:
@@ -118,7 +120,12 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 Args.MISSION,
                 default_value="basic",
-                description="Name of the mission to load. Run 'pennair mission uav' to see all available uav missions.",
+                description="Name of the mission to load. Run 'pennair mission <mission_package>' to see the available missions.",
+            ),
+            DeclareLaunchArgument(
+                Args.MISSION_PACKAGE,
+                default_value="uav",
+                description="Package the mission is installed in, e.g. uav or iarc_flight.",
             ),
             DeclareLaunchArgument(
                 Args.NS_ID,
