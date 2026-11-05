@@ -7,6 +7,7 @@
 
 #include "camera.hpp"
 #include "esp_log.h"
+#include "log_rate_limiter.hpp"
 #include "sitl_runtime.hpp"
 
 namespace
@@ -30,6 +31,11 @@ public:
     const std::string topic = std::string("/world/") + config.gz_world + "/pose/info";
     if (!node_.Subscribe(topic, &SimCamera::on_pose, this)) {
       ESP_LOGE("CAMERA_SITL", "Failed to subscribe to %s", topic.c_str());
+    } else {
+      ESP_LOGI(
+          "CAMERA_SITL", "Subscribed to %s: 10 Hz, noise SD=%.3f m, fixed bias XYZ [m]=[%.3f, %.3f, %.3f]",
+          topic.c_str(), NOISE_SD_M, bias_.x, bias_.y, bias_.z
+      );
     }
   }
 
@@ -56,6 +62,13 @@ private:
       geometry_msgs_msg_Vector3 position{
           p.x() + bias_.x + noise_(random_), p.y() + bias_.y + noise_(random_), p.z() + bias_.z + noise_(random_)
       };
+      if (position_debug_rate_.ready()) {
+        ESP_LOGI(
+            "CAMERA_SITL",
+            "sim_t=%.3f s ground truth world XYZ [m]: [%.6f, %.6f, %.6f] camera XYZ [m]: [%.6f, %.6f, %.6f]",
+            now_ns * 1e-9, p.x(), p.y(), p.z(), position.x, position.y, position.z
+        );
+      }
       drivers::Camera::instance().write_latest(position);
       has_sample_ = true;
       last_sample_ns_ = now_ns;
@@ -69,6 +82,8 @@ private:
   geometry_msgs_msg_Vector3 bias_{};
   bool has_sample_ = false;
   int64_t last_sample_ns_ = 0;
+  // Limit paired ground-truth/camera logs without changing sensor sampling.
+  util::LogRateLimiter position_debug_rate_;
   // Declared last so subscriptions stop before callback state is destroyed.
   gz::transport::Node node_;
 };

@@ -58,6 +58,11 @@ EKF& EKF::instance()
 
 void EKF::init(const Eigen::Vector3f& start_position)
 {
+  debug_rate_ = {};
+  warning_rate_ = {};
+  ESP_LOGI(
+      TAG, "Initialized world XYZ [m]: [%.3f, %.3f, %.3f]", start_position.x(), start_position.y(), start_position.z()
+  );
   first_update = true;
   position = start_position;
   velocity = Eigen::Vector3f::Zero();
@@ -102,6 +107,16 @@ void EKF::update(const Measurements& measurements)
   // Camera corrections are independent of IMU/encoder arrival and have no rate gate.
   if (measurements.camera_position && measurements.camera_position->allFinite()) {
     camera_adjustment(*measurements.camera_position);
+  }
+  if ((measurements.imu || measurements.encoders || measurements.camera_position) && debug_rate_.ready()) {
+    ESP_LOGI(
+        TAG,
+        "State p[m]: [%.3f, %.3f, %.3f] v[m/s]: [%.3f, %.3f, %.3f] q[wxyz]: [%.3f, %.3f, %.3f, %.3f] "
+        "input[imu,enc,cam]=[%d,%d,%d]",
+        position.x(), position.y(), position.z(), velocity.x(), velocity.y(), velocity.z(), rotation.w(), rotation.x(),
+        rotation.y(), rotation.z(), measurements.imu.has_value(), measurements.encoders.has_value(),
+        measurements.camera_position.has_value()
+    );
   }
 }
 
@@ -179,7 +194,9 @@ void EKF::compute_gain(
   Eigen::MatrixXf innovation_covariance = sensor_jacobian * PHt + sensor_noise;
   innovation_covariance = (0.5f * (innovation_covariance + innovation_covariance.transpose())).eval();
   if (!innovation_covariance.allFinite() || !residual.allFinite()) {
-    ESP_LOGW(TAG, "Skipping correction: non-finite innovation or residual");
+    if (warning_rate_.ready()) {
+      ESP_LOGW(TAG, "Skipping correction: non-finite innovation or residual");
+    }
     return;
   }
 
@@ -188,13 +205,17 @@ void EKF::compute_gain(
   if (solver.info() != Eigen::Success || !solver.isPositive() || !solver.vectorD().allFinite() ||
       solver.vectorD().minCoeff() <=
           std::numeric_limits<float>::epsilon() * innovation_covariance.cwiseAbs().maxCoeff()) {
-    ESP_LOGW(TAG, "Skipping correction: singular or invalid innovation covariance");
+    if (warning_rate_.ready()) {
+      ESP_LOGW(TAG, "Skipping correction: singular or invalid innovation covariance");
+    }
     return;
   }
   Eigen::MatrixXf kalman_gain = solver.solve(PHt.transpose()).transpose();
   Eigen::Matrix<float, 15, 1> dx = kalman_gain * residual;
   if (solver.info() != Eigen::Success || !kalman_gain.allFinite() || !dx.allFinite()) {
-    ESP_LOGW(TAG, "Skipping correction: innovation solve failed");
+    if (warning_rate_.ready()) {
+      ESP_LOGW(TAG, "Skipping correction: innovation solve failed");
+    }
     return;
   }
 

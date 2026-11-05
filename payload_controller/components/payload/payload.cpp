@@ -2,7 +2,6 @@
 
 #include <chrono>
 #include <cmath>
-#include <cstring>
 #include <initializer_list>
 
 #include "ekf.hpp"
@@ -13,7 +12,7 @@ namespace
 {
 // Output-shaft/wheel speed, not the motor rotor speed before the gearbox.
 constexpr float LEFT_SETPOINT_RAD_S = 7.0f;
-constexpr float RIGHT_SETPOINT_RAD_S = 7.0f;
+constexpr float RIGHT_SETPOINT_RAD_S = 3.0f;
 constexpr float SPEED_KP = 0.08f;  // PWM duty per rad/s of error.
 constexpr float SPEED_KI = 0.15f;  // PWM duty per radian of accumulated error.
 constexpr float MAX_INTEGRAL_DUTY = 0.3f;
@@ -58,51 +57,6 @@ Payload* Payload::instance()
   return &instance;
 }
 
-void testCallback(const Topic& topic, const void* msg, uint16_t length, void* args)
-{
-  (void)length;
-  (void)args;
-
-  if (std::strcmp(topic.type_name, "sensor_msgs::msg::dds_::Imu_") != 0) {
-    ESP_LOGW(TAG, "Unexpected DDS callback type: %s", topic.type_name);
-    return;
-  }
-
-  static uint32_t callback_count = 0;
-  ++callback_count;
-
-  const sensor_msgs_msg_Imu* imu_msg = static_cast<const sensor_msgs_msg_Imu*>(msg);
-  if (callback_count <= 3 || (callback_count % 10) == 0) {
-    ESP_LOGI(
-        TAG, "DDS IMU callback #%u orientation: [%f, %f, %f, %f]", callback_count, imu_msg->orientation.x,
-        imu_msg->orientation.y, imu_msg->orientation.z, imu_msg->orientation.w
-    );
-  }
-}
-
-void encoderCallback(const Topic& topic, const void* msg, uint16_t length, void* args)
-{
-  (void)length;
-  (void)args;
-
-  if (std::strcmp(topic.type_name, "payload_interfaces::msg::dds_::MotorState_") != 0) {
-    ESP_LOGW(TAG, "Unexpected DDS callback type: %s", topic.type_name);
-    return;
-  }
-
-  static uint32_t callback_count = 0;
-  ++callback_count;
-
-  const payload_interfaces_msg_MotorState* motor_state = static_cast<const payload_interfaces_msg_MotorState*>(msg);
-  if ((callback_count % 10) == 0) {
-    ESP_LOGI(
-        TAG, "DDS encoder callback #%u ticks: left=%lld right=%lld", callback_count,
-        static_cast<long long>(motor_state->left_encoder_count),
-        static_cast<long long>(motor_state->right_encoder_count)
-    );
-  }
-}
-
 void Payload::init(const Eigen::Vector3f& start_position)
 {
   EKF::instance().init(start_position);
@@ -123,14 +77,6 @@ void Payload::init(const Eigen::Vector3f& start_position)
   for (MotorWrapper* wrapper : {&left_motor_, &right_motor_}) {
     ESP_LOGI(TAG, "Starting %s motor", wrapper->debug_name);
     wrapper->motor.start();
-  }
-
-
-  if (!DDSClient::instance().set_reader_callback(TopicId::IMU_READER, &testCallback, nullptr)) {
-    ESP_LOGW(TAG, "Failed to bind IMU DDS reader callback");
-  }
-  if (!DDSClient::instance().set_reader_callback(TopicId::MOTOR_STATE_READER, &encoderCallback, nullptr)) {
-    ESP_LOGW(TAG, "Failed to bind motor-state DDS reader callback");
   }
 }
 
@@ -181,6 +127,11 @@ void Payload::update_estimator()
   geometry_msgs_msg_Vector3 camera_position{};
   if (drivers::Camera::instance().get_latest_if_updated(last_ekf_camera_update_, camera_position)) {
     measurements.camera_position = Eigen::Vector3f(camera_position.x, camera_position.y, camera_position.z);
+    if (camera_debug_rate_.ready()) {
+      ESP_LOGI(
+          TAG, "Camera world XYZ [m]: [%.3f, %.3f, %.3f]", camera_position.x, camera_position.y, camera_position.z
+      );
+    }
   }
   EKF::instance().update(measurements);
 }
@@ -207,20 +158,18 @@ void Payload::update_motor(
       const float delta_s = (now_us - motor.last_control_timestamp_us) * 1e-6;
       motor.pwm = controller.command(delta_s, angular_velocity_rad_s);
 
-      // Every 100 ms; the controller still runs on each new sample.
-      if (now_us - motor.last_debug_timestamp_us >= 100000) {
-        ESP_LOGI(
+      // Debug output is capped independently of controller sample processing.
+      if (motor.debug_rate.ready()) {
+        ESP_LOGD(
             TAG, "%s motor: setpoint=%.3f rad/s measured=%.3f rad/s error=%.3f rad/s pwm=%.3f", motor.debug_name,
             setpoint_rad_s, angular_velocity_rad_s, setpoint_rad_s - angular_velocity_rad_s, motor.pwm
         );
-        motor.last_debug_timestamp_us = now_us;
       }
     } else {
       // Seed the controller clock before its first update.
       motor.pwm = 0.0f;
       controller.change_set_point(0.0f);
       controller.change_set_point(setpoint_rad_s);
-      motor.last_debug_timestamp_us = now_us;
     }
     motor.last_control_timestamp_us = now_us;
   }
@@ -233,7 +182,16 @@ void Payload::publish_sensor_debug()
 {
   sensor_msgs_msg_Imu latest_imu{};
   if (imu_->get_latest_if_updated(last_published_imu_update_, latest_imu)) {
-    if (!DDSClient::instance().publish<TopicId::IMU_WRITER>(latest_imu)) {
+    if (imu_debug_rate_.ready()) {
+      ESP_LOGI(
+          TAG,
+          "IMU accel [m/s^2]: [%.3f, %.3f, %.3f] gyro [rad/s]: [%.3f, %.3f, %.3f] q[wxyz]: [%.3f, %.3f, %.3f, %.3f]",
+          latest_imu.linear_acceleration.x, latest_imu.linear_acceleration.y, latest_imu.linear_acceleration.z,
+          latest_imu.angular_velocity.x, latest_imu.angular_velocity.y, latest_imu.angular_velocity.z,
+          latest_imu.orientation.w, latest_imu.orientation.x, latest_imu.orientation.y, latest_imu.orientation.z
+      );
+    }
+    if (!DDSClient::instance().publish<TopicId::IMU_WRITER>(latest_imu) && publish_warning_rate_.ready()) {
       ESP_LOGW(TAG, "Failed to publish IMU DDS sample");
     }
   }
@@ -247,7 +205,17 @@ void Payload::publish_sensor_debug()
     return;
   }
 
-  if (!DDSClient::instance().publish<TopicId::MOTOR_STATE_WRITER>(latest_motor_state_)) {
+  if (encoder_debug_rate_.ready()) {
+    ESP_LOGI(
+        TAG, "Encoder ticks: left=%lld right=%lld speed [rad/s]: left=%.3f right=%.3f new[left,right]=[%d,%d]",
+        static_cast<long long>(latest_motor_state_.left_encoder_count),
+        static_cast<long long>(latest_motor_state_.right_encoder_count),
+        left_encoder_.encoder.get_latest_angular_velocity(), right_encoder_.encoder.get_latest_angular_velocity(),
+        left_updated, right_updated
+    );
+  }
+  if (!DDSClient::instance().publish<TopicId::MOTOR_STATE_WRITER>(latest_motor_state_) &&
+      publish_warning_rate_.ready()) {
     ESP_LOGW(TAG, "Failed to publish motor-state DDS sample");
   }
 }
