@@ -125,7 +125,7 @@ void Payload::drive_callback(const payload_interfaces::msg::DriveCommand::Shared
   if (shutdown_actuators_requested_.load() || timed_override_active_.load() || !controller_) {
     return;
   }
-  controller_->drive_command(msg->linear, msg->angular);
+  controller_->drive_command(msg->left_velocity, msg->right_velocity);
 }
 
 void Payload::servo_callback(const payload_interfaces::msg::ServoCommand::SharedPtr msg)
