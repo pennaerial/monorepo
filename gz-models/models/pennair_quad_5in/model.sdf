@@ -1,0 +1,301 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  pennair_quad_5in: PennAiR 5-inch X quadcopter.
+  PX4 airframe: 4023_gz_pennair_quad_5in (PX4-Autopilot submodule). Keep in sync:
+    rotor x/y          <-> CA_ROTORn_PX/PY (PY = -y, PX4 is FRD)
+    maxRotVelocity     <-> SIM_GZ_EC_MAX1-4
+    motorConstant/mass <-> MPC_THR_HOVER
+    turningDirection   <-> CA_ROTORn_KM sign (ccw = +)
+  Tags: [HW] hardware-derived, [CAD] measured from the Onshape STL exports, [ASM] assumption, [EST] unvalidated estimate.
+  Meshes are Onshape STL exports in meters with origin at the body center (x forward, y left, z up).
+-->
+<sdf version="1.9">
+  <model name="pennair_quad_5in">
+    <pose>0 0 0.12 0 0 0</pose>
+    <self_collide>false</self_collide>
+    <static>false</static>
+
+    <link name="base_link">
+      <inertial>
+        <!-- [CAD] centre of mass = volume centroid of body.stl (uniform density assumed) -->
+        <pose>0 0 0.032 0 0 0</pose>
+        <!-- [ASM] total 0.4536 kg (1 lb) = base 0.3944 + 4 x 0.0148 rotors [HW] -->
+        <mass>0.3944</mass>
+        <inertia>
+          <!-- [EST] body only; Gazebo adds the rotor links itself. Replace with Onshape Mass Properties. -->
+          <ixx>4.2e-04</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>4.2e-04</iyy><iyz>0</iyz>
+          <izz>6.4e-04</izz>
+        </inertia>
+      </inertial>
+      <gravity>true</gravity>
+      <velocity_decay/>
+
+      <visual name="body_visual">
+        <geometry><mesh><uri>model://pennair_quad_5in/meshes/body.stl</uri></mesh></geometry>
+        <material>
+          <ambient>0.15 0.15 0.15 1</ambient>
+          <diffuse>0.15 0.15 0.15 1</diffuse>
+          <specular>0.3 0.3 0.3 1</specular>
+        </material>
+      </visual>
+
+      <!-- [CAD] one box over the body's bounding box (x/y +-0.07, z -0.011 to 0.116). Bottom face is the ground contact. -->
+      <collision name="body_collision">
+        <pose>0 0 0.0525 0 0 0</pose>
+        <geometry><box><size>0.14 0.14 0.127</size></box></geometry>
+      </collision>
+
+      <!-- PX4's gz_bridge subscribes to these sensors by name. Do not rename. Noise copied from x500_base. -->
+      <sensor name="air_pressure_sensor" type="air_pressure">
+        <gz_frame_id>base_link</gz_frame_id>
+        <always_on>1</always_on>
+        <update_rate>50</update_rate>
+        <air_pressure>
+          <pressure><noise type="gaussian"><mean>0</mean><stddev>3</stddev></noise></pressure>
+        </air_pressure>
+      </sensor>
+      <sensor name="magnetometer_sensor" type="magnetometer">
+        <gz_frame_id>base_link</gz_frame_id>
+        <always_on>1</always_on>
+        <update_rate>100</update_rate>
+        <magnetometer>
+          <x><noise type="gaussian"><stddev>0.0001</stddev></noise></x>
+          <y><noise type="gaussian"><stddev>0.0001</stddev></noise></y>
+          <z><noise type="gaussian"><stddev>0.0001</stddev></noise></z>
+        </magnetometer>
+      </sensor>
+      <sensor name="imu_sensor" type="imu">
+        <gz_frame_id>base_link</gz_frame_id>
+        <always_on>1</always_on>
+        <update_rate>250</update_rate>
+        <imu>
+          <angular_velocity>
+            <x><noise type="gaussian"><mean>0</mean><stddev>0.0008726646</stddev></noise></x>
+            <y><noise type="gaussian"><mean>0</mean><stddev>0.0008726646</stddev></noise></y>
+            <z><noise type="gaussian"><mean>0</mean><stddev>0.0008726646</stddev></noise></z>
+          </angular_velocity>
+          <linear_acceleration>
+            <x><noise type="gaussian"><mean>0</mean><stddev>0.00637</stddev></noise></x>
+            <y><noise type="gaussian"><mean>0</mean><stddev>0.00637</stddev></noise></y>
+            <z><noise type="gaussian"><mean>0</mean><stddev>0.00686</stddev></noise></z>
+          </linear_acceleration>
+        </imu>
+      </sensor>
+      <sensor name="navsat_sensor" type="navsat">
+        <gz_frame_id>base_link</gz_frame_id>
+        <always_on>1</always_on>
+        <update_rate>30</update_rate>
+      </sensor>
+
+      <!-- Not used by PX4; for the ROS 2 image pipeline. [ASM] just ahead of the body bounding box (x = 0.071), facing forward. -->
+      <sensor name="fpv_camera" type="camera">
+        <gz_frame_id>base_link</gz_frame_id>
+        <pose>0.075 0 0.04 0 0 0</pose>
+        <camera>
+          <horizontal_fov>1.74</horizontal_fov>
+          <image><width>1280</width><height>960</height></image>
+          <clip><near>0.05</near><far>3000</far></clip>
+        </camera>
+        <always_on>1</always_on>
+        <update_rate>30</update_rate>
+        <visualize>true</visualize>
+      </sensor>
+    </link>
+
+    <!-- rotor_0: front-right, ccw -->
+    <link name="rotor_0">
+      <pose>0.061 -0.061 0.076 0 0 0</pose>
+      <inertial>
+        <!-- [HW] motor + prop mass. [EST] inertia: motor bell as a solid cylinder plus prop blades as rods -->
+        <mass>0.0148</mass>
+        <inertia>
+          <ixx>2.0e-06</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>2.0e-06</iyy><iyz>0</iyz>
+          <izz>4.1e-06</izz>
+        </inertia>
+      </inertial>
+      <visual name="rotor_0_visual">
+        <geometry><mesh><uri>model://pennair_quad_5in/meshes/prop_ccw.stl</uri></mesh></geometry>
+        <material>
+          <ambient>0.8 0.1 0.1 1</ambient>
+          <diffuse>0.8 0.1 0.1 1</diffuse>
+        </material>
+      </visual>
+      <gravity>true</gravity>
+      <velocity_decay/>
+    </link>
+    <!-- rotor_1: back-left, ccw -->
+    <link name="rotor_1">
+      <pose>-0.061 0.061 0.076 0 0 0</pose>
+      <inertial>
+        <!-- [HW] motor + prop mass. [EST] inertia: motor bell as a solid cylinder plus prop blades as rods -->
+        <mass>0.0148</mass>
+        <inertia>
+          <ixx>2.0e-06</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>2.0e-06</iyy><iyz>0</iyz>
+          <izz>4.1e-06</izz>
+        </inertia>
+      </inertial>
+      <visual name="rotor_1_visual">
+        <geometry><mesh><uri>model://pennair_quad_5in/meshes/prop_ccw.stl</uri></mesh></geometry>
+        <material>
+          <ambient>0.8 0.1 0.1 1</ambient>
+          <diffuse>0.8 0.1 0.1 1</diffuse>
+        </material>
+      </visual>
+      <gravity>true</gravity>
+      <velocity_decay/>
+    </link>
+    <!-- rotor_2: front-left, cw -->
+    <link name="rotor_2">
+      <pose>0.061 0.061 0.076 0 0 0</pose>
+      <inertial>
+        <!-- [HW] motor + prop mass. [EST] inertia: motor bell as a solid cylinder plus prop blades as rods -->
+        <mass>0.0148</mass>
+        <inertia>
+          <ixx>2.0e-06</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>2.0e-06</iyy><iyz>0</iyz>
+          <izz>4.1e-06</izz>
+        </inertia>
+      </inertial>
+      <visual name="rotor_2_visual">
+        <geometry><mesh><uri>model://pennair_quad_5in/meshes/prop_cw.stl</uri></mesh></geometry>
+        <material>
+          <ambient>0.8 0.1 0.1 1</ambient>
+          <diffuse>0.8 0.1 0.1 1</diffuse>
+        </material>
+      </visual>
+      <gravity>true</gravity>
+      <velocity_decay/>
+    </link>
+    <!-- rotor_3: back-right, cw -->
+    <link name="rotor_3">
+      <pose>-0.061 -0.061 0.076 0 0 0</pose>
+      <inertial>
+        <!-- [HW] motor + prop mass. [EST] inertia: motor bell as a solid cylinder plus prop blades as rods -->
+        <mass>0.0148</mass>
+        <inertia>
+          <ixx>2.0e-06</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>2.0e-06</iyy><iyz>0</iyz>
+          <izz>4.1e-06</izz>
+        </inertia>
+      </inertial>
+      <visual name="rotor_3_visual">
+        <geometry><mesh><uri>model://pennair_quad_5in/meshes/prop_cw.stl</uri></mesh></geometry>
+        <material>
+          <ambient>0.8 0.1 0.1 1</ambient>
+          <diffuse>0.8 0.1 0.1 1</diffuse>
+        </material>
+      </visual>
+      <gravity>true</gravity>
+      <velocity_decay/>
+    </link>
+
+    <joint name="rotor_0_joint" type="revolute">
+      <parent>base_link</parent>
+      <child>rotor_0</child>
+      <axis>
+        <xyz>0 0 1</xyz>
+        <limit><lower>-1e+16</lower><upper>1e+16</upper></limit>
+        <dynamics><spring_reference>0</spring_reference><spring_stiffness>0</spring_stiffness></dynamics>
+      </axis>
+    </joint>
+    <joint name="rotor_1_joint" type="revolute">
+      <parent>base_link</parent>
+      <child>rotor_1</child>
+      <axis>
+        <xyz>0 0 1</xyz>
+        <limit><lower>-1e+16</lower><upper>1e+16</upper></limit>
+        <dynamics><spring_reference>0</spring_reference><spring_stiffness>0</spring_stiffness></dynamics>
+      </axis>
+    </joint>
+    <joint name="rotor_2_joint" type="revolute">
+      <parent>base_link</parent>
+      <child>rotor_2</child>
+      <axis>
+        <xyz>0 0 1</xyz>
+        <limit><lower>-1e+16</lower><upper>1e+16</upper></limit>
+        <dynamics><spring_reference>0</spring_reference><spring_stiffness>0</spring_stiffness></dynamics>
+      </axis>
+    </joint>
+    <joint name="rotor_3_joint" type="revolute">
+      <parent>base_link</parent>
+      <child>rotor_3</child>
+      <axis>
+        <xyz>0 0 1</xyz>
+        <limit><lower>-1e+16</lower><upper>1e+16</upper></limit>
+        <dynamics><spring_reference>0</spring_reference><spring_stiffness>0</spring_stiffness></dynamics>
+      </axis>
+    </joint>
+
+    <!-- [EST] thrust = motorConstant * w^2: 6e-7 * 2900^2 = 5.05 N per motor, T/W ~4.5, hover ~47% speed -->
+
+    <plugin filename="gz-sim-multicopter-motor-model-system" name="gz::sim::systems::MulticopterMotorModel">
+      <jointName>rotor_0_joint</jointName>
+      <linkName>rotor_0</linkName>
+      <turningDirection>ccw</turningDirection>
+      <timeConstantUp>0.0125</timeConstantUp>
+      <timeConstantDown>0.025</timeConstantDown>
+      <maxRotVelocity>2900.0</maxRotVelocity>
+      <motorConstant>6.0e-07</motorConstant>
+      <momentConstant>0.016</momentConstant>
+      <commandSubTopic>command/motor_speed</commandSubTopic>
+      <motorNumber>0</motorNumber>
+      <rotorDragCoefficient>8.06428e-05</rotorDragCoefficient>
+      <rollingMomentCoefficient>1e-06</rollingMomentCoefficient>
+      <rotorVelocitySlowdownSim>10</rotorVelocitySlowdownSim>
+      <motorType>velocity</motorType>
+    </plugin>
+    <plugin filename="gz-sim-multicopter-motor-model-system" name="gz::sim::systems::MulticopterMotorModel">
+      <jointName>rotor_1_joint</jointName>
+      <linkName>rotor_1</linkName>
+      <turningDirection>ccw</turningDirection>
+      <timeConstantUp>0.0125</timeConstantUp>
+      <timeConstantDown>0.025</timeConstantDown>
+      <maxRotVelocity>2900.0</maxRotVelocity>
+      <motorConstant>6.0e-07</motorConstant>
+      <momentConstant>0.016</momentConstant>
+      <commandSubTopic>command/motor_speed</commandSubTopic>
+      <motorNumber>1</motorNumber>
+      <rotorDragCoefficient>8.06428e-05</rotorDragCoefficient>
+      <rollingMomentCoefficient>1e-06</rollingMomentCoefficient>
+      <rotorVelocitySlowdownSim>10</rotorVelocitySlowdownSim>
+      <motorType>velocity</motorType>
+    </plugin>
+    <plugin filename="gz-sim-multicopter-motor-model-system" name="gz::sim::systems::MulticopterMotorModel">
+      <jointName>rotor_2_joint</jointName>
+      <linkName>rotor_2</linkName>
+      <turningDirection>cw</turningDirection>
+      <timeConstantUp>0.0125</timeConstantUp>
+      <timeConstantDown>0.025</timeConstantDown>
+      <maxRotVelocity>2900.0</maxRotVelocity>
+      <motorConstant>6.0e-07</motorConstant>
+      <momentConstant>0.016</momentConstant>
+      <commandSubTopic>command/motor_speed</commandSubTopic>
+      <motorNumber>2</motorNumber>
+      <rotorDragCoefficient>8.06428e-05</rotorDragCoefficient>
+      <rollingMomentCoefficient>1e-06</rollingMomentCoefficient>
+      <rotorVelocitySlowdownSim>10</rotorVelocitySlowdownSim>
+      <motorType>velocity</motorType>
+    </plugin>
+    <plugin filename="gz-sim-multicopter-motor-model-system" name="gz::sim::systems::MulticopterMotorModel">
+      <jointName>rotor_3_joint</jointName>
+      <linkName>rotor_3</linkName>
+      <turningDirection>cw</turningDirection>
+      <timeConstantUp>0.0125</timeConstantUp>
+      <timeConstantDown>0.025</timeConstantDown>
+      <maxRotVelocity>2900.0</maxRotVelocity>
+      <motorConstant>6.0e-07</motorConstant>
+      <momentConstant>0.016</momentConstant>
+      <commandSubTopic>command/motor_speed</commandSubTopic>
+      <motorNumber>3</motorNumber>
+      <rotorDragCoefficient>8.06428e-05</rotorDragCoefficient>
+      <rollingMomentCoefficient>1e-06</rollingMomentCoefficient>
+      <rotorVelocitySlowdownSim>10</rotorVelocitySlowdownSim>
+      <motorType>velocity</motorType>
+    </plugin>
+
+    <plugin filename="MotorFailurePlugin" name="gz::sim::systems::MotorFailureSystem"/>
+  </model>
+</sdf>
