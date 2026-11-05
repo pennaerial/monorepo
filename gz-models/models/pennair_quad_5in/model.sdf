@@ -107,11 +107,11 @@
     <link name="rotor_0">
       <pose>0.061 -0.061 0.076 0 0 0</pose>
       <inertial>
-        <!-- [HW] motor + prop mass. [EST] inertia: motor bell as a solid cylinder plus prop blades as rods -->
+        <!-- [HW] motor + prop mass. [EST] inertia: motor bell as a solid cylinder plus prop blades as rods; must satisfy ixx + iyy >= izz -->
         <mass>0.0148</mass>
         <inertia>
-          <ixx>2.0e-06</ixx><ixy>0</ixy><ixz>0</ixz>
-          <iyy>2.0e-06</iyy><iyz>0</iyz>
+          <ixx>2.5e-06</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>2.5e-06</iyy><iyz>0</iyz>
           <izz>4.1e-06</izz>
         </inertia>
       </inertial>
@@ -129,11 +129,11 @@
     <link name="rotor_1">
       <pose>-0.061 0.061 0.076 0 0 0</pose>
       <inertial>
-        <!-- [HW] motor + prop mass. [EST] inertia: motor bell as a solid cylinder plus prop blades as rods -->
+        <!-- [HW] motor + prop mass. [EST] inertia: motor bell as a solid cylinder plus prop blades as rods; must satisfy ixx + iyy >= izz -->
         <mass>0.0148</mass>
         <inertia>
-          <ixx>2.0e-06</ixx><ixy>0</ixy><ixz>0</ixz>
-          <iyy>2.0e-06</iyy><iyz>0</iyz>
+          <ixx>2.5e-06</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>2.5e-06</iyy><iyz>0</iyz>
           <izz>4.1e-06</izz>
         </inertia>
       </inertial>
@@ -151,11 +151,11 @@
     <link name="rotor_2">
       <pose>0.061 0.061 0.076 0 0 0</pose>
       <inertial>
-        <!-- [HW] motor + prop mass. [EST] inertia: motor bell as a solid cylinder plus prop blades as rods -->
+        <!-- [HW] motor + prop mass. [EST] inertia: motor bell as a solid cylinder plus prop blades as rods; must satisfy ixx + iyy >= izz -->
         <mass>0.0148</mass>
         <inertia>
-          <ixx>2.0e-06</ixx><ixy>0</ixy><ixz>0</ixz>
-          <iyy>2.0e-06</iyy><iyz>0</iyz>
+          <ixx>2.5e-06</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>2.5e-06</iyy><iyz>0</iyz>
           <izz>4.1e-06</izz>
         </inertia>
       </inertial>
@@ -173,11 +173,11 @@
     <link name="rotor_3">
       <pose>-0.061 -0.061 0.076 0 0 0</pose>
       <inertial>
-        <!-- [HW] motor + prop mass. [EST] inertia: motor bell as a solid cylinder plus prop blades as rods -->
+        <!-- [HW] motor + prop mass. [EST] inertia: motor bell as a solid cylinder plus prop blades as rods; must satisfy ixx + iyy >= izz -->
         <mass>0.0148</mass>
         <inertia>
-          <ixx>2.0e-06</ixx><ixy>0</ixy><ixz>0</ixz>
-          <iyy>2.0e-06</iyy><iyz>0</iyz>
+          <ixx>2.5e-06</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>2.5e-06</iyy><iyz>0</iyz>
           <izz>4.1e-06</izz>
         </inertia>
       </inertial>
