@@ -11,6 +11,9 @@ find_package(generate_parameter_library REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(payload_interfaces REQUIRED)
 find_package(pluginlib REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_ros REQUIRED)
 
 set(PAYLOAD_BUILD_SIM_CONTROLLER "AUTO" CACHE STRING
   "Build the SimController backend (AUTO, ON, OFF)")
@@ -167,6 +170,24 @@ install(TARGETS ${payload_controller_targets}
 )
 
 install(TARGETS payload_controller
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+# --- Path follower executable ---
+add_executable(path_follower_node
+  src/path_follower.cpp
+  src/path_follower_main.cpp
+)
+
+ament_target_dependencies(path_follower_node
+  rclcpp
+  nav_msgs
+  payload_interfaces
+  tf2
+  tf2_ros
+)
+
+install(TARGETS path_follower_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
