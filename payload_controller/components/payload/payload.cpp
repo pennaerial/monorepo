@@ -1,6 +1,7 @@
 #include "payload.hpp"
 
 #include <chrono>
+#include <cmath>
 #include <cstring>
 #include <initializer_list>
 
@@ -102,10 +103,10 @@ void encoderCallback(const Topic& topic, const void* msg, uint16_t length, void*
   }
 }
 
-void Payload::init()
+void Payload::init(const Eigen::Vector3f& start_position)
 {
-  EKF ekf = EKF();
-  ekf.init();
+  EKF::instance().init(start_position);
+  drivers::Camera::instance().start();
 
   ESP_LOGI(
       TAG, "Speed config: left=%.3f right=%.3f full_duty=%.3f rad/s kp=%.3f ki=%.3f", LEFT_SETPOINT_RAD_S,
@@ -135,9 +136,53 @@ void Payload::init()
 
 void Payload::update()
 {
+  update_estimator();
   publish_sensor_debug();
 
   motor_updates();
+}
+
+void Payload::update_estimator()
+{
+  EKF::Measurements measurements;
+  sensor_msgs_msg_Imu imu{};
+  if (imu_->get_latest_if_updated(last_ekf_imu_update_, imu)) {
+    EKF::ImuSample sample{
+        static_cast<int64_t>(imu.header.stamp.sec) * 1000000000LL + imu.header.stamp.nanosec,
+        Eigen::Vector3f(imu.angular_velocity.x, imu.angular_velocity.y, imu.angular_velocity.z),
+        Eigen::Vector3f(imu.linear_acceleration.x, imu.linear_acceleration.y, imu.linear_acceleration.z)
+    };
+    if (sample.angular_velocity.allFinite() && sample.specific_force.allFinite()) {
+      measurements.imu = sample;
+      ekf_gyro_ = sample.angular_velocity;
+      ekf_has_gyro_ = true;
+    }
+  }
+
+  // Independent cursors: motor feedback and debug reads cannot consume EKF data.
+  double speed;
+  if (left_encoder_.encoder.get_latest_angular_velocity_if_updated(last_ekf_left_update_, speed) &&
+      std::isfinite(speed)) {
+    ekf_left_rad_s_ = speed;
+    ekf_left_pending_ = true;
+  }
+  if (right_encoder_.encoder.get_latest_angular_velocity_if_updated(last_ekf_right_update_, speed) &&
+      std::isfinite(speed)) {
+    ekf_right_rad_s_ = speed;
+    ekf_right_pending_ = true;
+  }
+  // Wait for both sides, even when their callbacks arrive on different iterations.
+  if (ekf_left_pending_ && ekf_right_pending_ && ekf_has_gyro_) {
+    measurements.encoders =
+        EKF::EncoderSample{static_cast<float>(ekf_left_rad_s_), static_cast<float>(ekf_right_rad_s_), ekf_gyro_};
+    ekf_left_pending_ = ekf_right_pending_ = false;
+  }
+
+  geometry_msgs_msg_Vector3 camera_position{};
+  if (drivers::Camera::instance().get_latest_if_updated(last_ekf_camera_update_, camera_position)) {
+    measurements.camera_position = Eigen::Vector3f(camera_position.x, camera_position.y, camera_position.z);
+  }
+  EKF::instance().update(measurements);
 }
 
 void Payload::motor_updates()

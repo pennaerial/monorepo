@@ -1,6 +1,7 @@
 #pragma once
 
-#include <chrono>
+#include <cstdint>
+#include <optional>
 
 #include "Eigen/Dense"
 #include "Eigen/Geometry"
@@ -9,15 +10,46 @@
 class EKF
 {
 public:
+  struct ImuSample {
+    int64_t timestamp_ns;
+    Eigen::Vector3f angular_velocity;  // body frame, rad/s
+    Eigen::Vector3f specific_force;    // body frame, m/s^2
+  };
+
+  struct EncoderSample {
+    float left_rad_s;
+    float right_rad_s;
+    Eigen::Vector3f angular_velocity;  // latest measured body gyro, rad/s
+  };
+
+  // Each populated field represents a new measurement; empty fields are skipped.
+  // A batch is a value snapshot, independent of the sensor threads/caches.
+  struct Measurements {
+    std::optional<ImuSample> imu;
+    std::optional<EncoderSample> encoders;
+    std::optional<Eigen::Vector3f> camera_position;  // world XYZ, metres, Z-up
+  };
+
+  static EKF& instance();
+  EKF(const EKF&) = delete;
+  EKF& operator=(const EKF&) = delete;
+
+  // init/update and state reads must have a single owner (currently Payload's loop).
+  void update(const Measurements& measurements);
+  void init(const Eigen::Vector3f& start_position);
+
+  const Eigen::Vector3f& get_position() const
+  {
+    return position;
+  }
+
+private:
   EKF() = default;
 
-  void update();
-  void init();
-
-  void base_adjustment(float deltaT);
-  void camera_adjustment();
+  void base_adjustment(float deltaT, const Eigen::Vector3f& raw_gyro, const Eigen::Vector3f& raw_accelero);
+  void camera_adjustment(const Eigen::Vector3f& camera_pos);
   void magnetometer_adjustment();
-  void encoder_adjustment();
+  void encoder_adjustment(const EncoderSample& sample);
   void stationary_adjustment();
 
   void compute_gain(
@@ -28,11 +60,7 @@ public:
 
   void apply_rotation_vector(Eigen::Ref<Eigen::Vector3f> rot_vec);
 
-private:
-  using Clock = std::chrono::steady_clock;
-  Clock::time_point last_update;
-  Clock::time_point last_camera_update;
-  Clock::time_point last_encoder_update;
+  int64_t last_imu_timestamp_ns_ = 0;
   bool first_update = true;
 
   const Eigen::Matrix3f I = Eigen::Matrix3f::Identity();
