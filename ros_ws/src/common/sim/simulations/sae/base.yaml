@@ -24,6 +24,7 @@ world:
 
     - name: payload_2
       model: payload_pwm
-      position: [-5.0, 0.0, 0.0]
+      # Start above the ground so the wheels settle without initial penetration.
+      position: [-5.0, 0.0, 1.0]
       rpy: [0.0, 0.0, 0.0]
       # TODO: Temporary to get payload spawning

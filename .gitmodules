@@ -10,3 +10,7 @@
 	path = Dependencies
 	url = https://github.com/pennaerial/Dependencies.git
     branch = main
+[submodule "ros_ws/src/common/camera_ros"]
+	path = ros_ws/src/common/camera_ros
+	url = https://github.com/pennaerial/camera_ros.git
+    branch = main
