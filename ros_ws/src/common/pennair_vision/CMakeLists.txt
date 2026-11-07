@@ -12,7 +12,6 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
-find_package(generate_parameter_library REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rosidl_runtime_cpp REQUIRED)
 find_package(std_msgs REQUIRED)
@@ -23,6 +22,8 @@ find_package(ament_cmake_python REQUIRED) # for pennair_vision python module
 find_package(cv_bridge REQUIRED)
 find_package(image_transport REQUIRED) # for pennair_vision lazy publisher
 find_package(apriltag REQUIRED) 
+
+find_package(generate_parameter_library REQUIRED)
 
 include_directories(include)
 
@@ -88,7 +89,6 @@ add_library(lazy_camera_publisher SHARED
 target_include_directories(vision_plugins PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
-    ${cv_bridge_INCLUDE_DIRS}
 )
 
 target_include_directories(lazy_camera_publisher PUBLIC
@@ -108,6 +108,7 @@ ament_target_dependencies(vision_plugins
 
 target_compile_features(vision_plugins PUBLIC cxx_std_20)
 target_compile_features(lazy_camera_publisher PUBLIC cxx_std_20)
+target_link_libraries(vision_plugins PRIVATE apriltag::apriltag)
 
 pluginlib_export_plugin_description_file(pennair_vision plugins.xml)
 
