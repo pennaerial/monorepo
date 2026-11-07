@@ -4,10 +4,7 @@ _Last updated: 2026-11-07_
 
 Connect a laptop to any Raspberry Pi over a direct ethernet cable and SSH in, so you can work from the laptop instead of the Pi's monitor.
 
-Throughout this guide, replace:
-
-- `<user>` with the Pi's login username (check with `whoami` on the Pi)
-- `air-##` with the name of the Pi you're connecting to (e.g. `air-01`, `air-02`; check with `hostname` on the Pi)
+Every PennAiR Pi uses the login username **`penn`**. Pis are named `air-##` (e.g. `air-01`, `air-02`). Replace `air-##` below with the one you're connecting to (check with `hostname` on the Pi).
 
 The addresses below are the same for every Pi. That's fine because only one Pi is plugged into your laptop at a time.
 
@@ -15,7 +12,7 @@ The addresses below are the same for every Pi. That's fine because only one Pi i
 
 | Device | Interface | Address | Notes |
 |---|---|---|---|
-| Pi (`air-##`) | `eth0` | `192.168.50.2/24` | user: `<user>` |
+| Pi (`air-##`) | `eth0` | `192.168.50.2/24` | user: `penn` |
 | Laptop | built-in ethernet port or USB adapter | `192.168.50.1/24` | gateway: blank |
 
 Nothing on the cable hands out addresses automatically, so both ends are set by hand.
@@ -116,10 +113,10 @@ System Settings → Network → ethernet/USB adapter → Details → TCP/IP → 
 
 ```bash
 ping 192.168.50.2
-ssh <user>@192.168.50.2
+ssh penn@192.168.50.2
 ```
 
-First time: type `yes` at the fingerprint prompt, then that user's password.
+First time: type `yes` at the fingerprint prompt, then the `penn` password.
 
 If you've connected to a different Pi at `192.168.50.2` before, SSH will warn that the host key changed. Clear the old entry, then connect again:
 
@@ -127,14 +124,12 @@ If you've connected to a different Pi at `192.168.50.2` before, SSH will warn th
 ssh-keygen -R 192.168.50.2
 ```
 
-**Optional — VS Code:** install the "Remote - SSH" extension, connect to `<user>@192.168.50.2`, and open Pi folders as if they were local.
-
 **Optional — short name:** add this to `~/.ssh/config` on the laptop (Windows: `C:\Users\<you>\.ssh\config`), then just run `ssh air-##`. Add one block per Pi you use:
 
 ```
 Host air-##
     HostName 192.168.50.2
-    User <user>
+    User penn
 ```
 
 ## Troubleshooting
@@ -145,14 +140,5 @@ Host air-##
 | eth0 stuck on "connecting (getting IP configuration)" | Waiting for an automatic address that nothing provides | Part 1 step 2 (manual address) |
 | `ip link show eth0` says `NO-CARRIER` or `DOWN` | No live device on the other end of the cable | Reseat/swap cable or adapter; the Pi's port lights should blink |
 | `ping` times out | Laptop address missing / on the wrong adapter, or a stray address on the Pi | Laptop: `ipconfig`; Pi: `ip -4 addr show eth0`. Each side should show exactly one `192.168.50.x` address |
-| `ping` fails but everything looks right | Windows Firewall blocks ping replies | Try `ssh` anyway |
 | `Permission denied (publickey)` | Password login disabled on the Pi | `sudo nano /etc/ssh/sshd_config.d/50-cloud-init.conf`, set `PasswordAuthentication yes`, then `sudo systemctl restart ssh` |
 | Address gone after a reboot | Set with `ip addr add`, which isn't saved | Part 1 step 2 |
-| `Device "..." does not exist` | Typo (`eht0`) or an adapter name from another machine | Use `eth0` on the Pi; `eno...`/`enp...`/`enx...` names only exist on a Linux laptop. Run `ip -br link` to see the real names |
-
-### Common typos from first setup
-
-- `systemctrl` → `systemctl`
-- `ncmli` → `nmcli`
-- `dev dev` → `dev`
-- Running laptop commands on the Pi (laptop commands go on the laptop!)
