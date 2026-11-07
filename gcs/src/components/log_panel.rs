@@ -1,7 +1,4 @@
-use crate::{
-    components::Button,
-    hooks::{use_ros_node, use_subscription},
-};
+use crate::hooks::{use_ros_node, use_subscription};
 use dioxus::prelude::*;
 use ros_interfaces::rcl_interfaces::msg::Log;
 use std::collections::VecDeque;
@@ -38,7 +35,6 @@ impl LogHistory {
             log,
         });
         self.next_id += 1;
-        info!("log size: {}, msg: {}", self.logs.len(), self.logs.back().unwrap().log.msg);
     }
 
     fn logs_ref(&self) -> &VecDeque<LogEntry> {
@@ -50,26 +46,25 @@ impl LogHistory {
 pub fn LogPanel() -> Element {
     let node = use_ros_node();
     let rosout_sub = use_subscription::<Log>(node.read().clone(), "/rosout", 10);
-
-    // let mut log = use_signal_sync(|| None::<Log>);
     let mut logs = use_signal_sync(LogHistory::new);
 
-    rsx! {
-        Button {
-            label: "see logs",
-            onclick: move |_| {
-                let mut sub = rosout_sub.clone();
-                async move {
-                    let _ = sub
-                        .subscribe(move |msg| {
-                            logs.write().add_log(msg);
-                        })
-                        .await;
-                }
-            },
+    use_future(move || {
+        let mut sub = rosout_sub.clone();
+        async move {
+            let res = sub
+                .subscribe(move |msg| {
+                    logs.write().add_log(msg);
+                })
+                .await;
+
+            if let Err(error) = res {
+                error!("Failed to subscribe to /rosout: {error:?}");
+            }
         }
-        div {
-            class: "h-96 overflow-auto break-words rounded-md border border-zinc-400 p-3",
+    });
+
+    rsx! {
+        div { class: "h-96 overflow-auto break-words rounded-md border border-zinc-400 p-3",
             if logs.read().logs_ref().is_empty() {
                 p { "Waiting for log messages" }
             }

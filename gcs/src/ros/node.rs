@@ -20,12 +20,18 @@ pub enum NodeError {
     // Add node-specific failures as they become necessary.
 }
 
+/// stores all necessary data for a pending subscription
+struct PendingSubscription {
+    sink: Box<dyn SubscriptionSinkBase>,
+    reply: oneshot::Sender<Result<SubscriptionId, NodeError>>,
+}
+
 pub struct RosNode {
     foxglove_client: FoxgloveClient,
-    /// client allows only one subscription per channelId, so fan out into a Vec of callbacks
+    /// client allows only one subscription per channelId
     subscriptions: HashMap<SubscriptionId, Vec<Box<dyn SubscriptionSinkBase>>>,
     /// for subscription on topics that haven't been advertised yet
-    pending_subscribes: HashMap<SubscriptionId, Vec<Box<dyn SubscriptionSinkBase>>>,
+    pending_subscribes: HashMap<String, Vec<PendingSubscription>>,
     /// for receiving NodeCommands sent from a NodeHandle
     node_command_receiver: NodeCommandReceiver,
     /// Tracked advertised channels from FoxgloveClient
@@ -90,33 +96,54 @@ impl RosNode {
             }
             NodeCommand::CreateSubscription { sink, reply } => {
                 let topic = sink.topic_name();
-                let mut subscription_id_result = Err(NodeError::NodeStopped);
-                for channel in self.advertised_channels.values() {
-                    if channel.topic == topic {
-                        subscription_id_result = self
-                            .foxglove_client
-                            .subscribe(channel.id)
-                            .await
-                            .map_err(NodeError::Foxglove)
-                            .inspect(|id| {
-                                debug!(
-                                    "Channel: {} subscribing with SubscriptionId: {}",
-                                    channel, id
-                                )
-                            });
-                        // add subscription sink if subscription was successful
-                        if let Ok(id) = subscription_id_result {
-                            self.add_sink(id, sink);
-                        }
-                        break;
-                    }
-                }
-                // TODO: handle case where requested topic is not yet advertised
-                if reply.send(subscription_id_result).is_err() {
-                    debug!("Connect caller dropped CreateSubscription response receiver");
+
+                // None if no corresponding channel_id exists for the topic name
+                let channel_id = self
+                    .advertised_channels
+                    .values()
+                    .find(|channel| channel.topic == topic)
+                    .map(|channel| channel.id);
+
+                // If channel exists, then send subscribe request through foxglove client
+                if let Some(channel_id) = channel_id {
+                    self.activate_subscription(channel_id, sink, reply).await;
+                } else {
+                    debug!(
+                        "no channel detected for {}, creating pending subscription",
+                        topic
+                    );
+                    // if no channel_id matches, save it to pending_subscribes for later
+                    // don't send the reply yet bc no channel_id has been detected
+                    self.pending_subscribes
+                        .entry(topic.to_owned())
+                        .or_default()
+                        .push(PendingSubscription { sink, reply });
                 }
             }
             _ => (),
+        }
+    }
+
+    /// subscribes over foxglove, storing sink and sending result
+    async fn activate_subscription(
+        &mut self,
+        channel_id: ChannelId,
+        sink: Box<dyn SubscriptionSinkBase>,
+        reply: oneshot::Sender<Result<SubscriptionId, NodeError>>,
+    ) {
+        let result = self
+            .foxglove_client
+            .subscribe(channel_id)
+            .await
+            .map_err(NodeError::Foxglove);
+
+        // Keep the sink alive if subscription creation succeeded.
+        if let Ok(id) = &result {
+            self.add_sink(*id, sink);
+        }
+
+        if reply.send(result).is_err() {
+            debug!("Caller dropped CreateSubscription response receiver");
         }
     }
 
@@ -130,7 +157,25 @@ impl RosNode {
             ServerMessage::Advertise(advertise) => {
                 for channel in advertise.channels {
                     debug!("Advertised channel: {}", channel);
-                    self.advertised_channels.insert(channel.id, channel);
+
+                    // use channel.topic before insert() moves it
+                    let opt_pendings = self.pending_subscribes.remove(&channel.topic);
+                    let id = channel.id;
+                    self.advertised_channels.insert(id, channel);
+
+                    if let Some(mut pendings) = opt_pendings {
+                        // remove all pending subscribes who's requester has dropped reply
+                        pendings.retain(|pending| !pending.reply.is_closed());
+
+                        // consume entire removed vector
+                        for PendingSubscription { sink, reply } in pendings {
+                            debug!(
+                                "activating subscription for pending subscription on {}",
+                                sink.topic_name()
+                            );
+                            self.activate_subscription(id, sink, reply).await;
+                        }
+                    }
                 }
             }
             ServerMessage::MessageData(message_data) => {
