@@ -60,30 +60,6 @@ Nothing on the cable hands out addresses automatically, so both ends are set by 
 
 Plug the ethernet cable from the Pi into the laptop, either straight into its ethernet port or through a USB ethernet adapter. Then give the laptop's **wired** adapter `192.168.50.1/24`.
 
-### Windows (PowerShell → right-click → "Run as administrator")
-
-1. Find the wired adapter's name. Its Status must be `Up`.
-
-   ```powershell
-   Get-NetAdapter
-   ```
-
-2. Set the address (replace `"Ethernet"` with the name from step 1):
-
-   ```powershell
-   New-NetIPAddress -InterfaceAlias "Ethernet" -IPAddress 192.168.50.1 -PrefixLength 24
-   ```
-
-3. Check it:
-
-   ```powershell
-   ipconfig
-   ```
-
-   You should see `IPv4 Address: 192.168.50.1` under that adapter. If you see `169.254.x.x` instead, the setting didn't apply — redo step 2.
-
-**GUI alternative:** Settings → Network & internet → Ethernet → IP assignment → Edit → Manual → IPv4 on. IP `192.168.50.1`, mask `255.255.255.0`, gateway blank.
-
 ### Linux
 
 Wired adapters have different names depending on how you're plugged in:
@@ -124,7 +100,7 @@ If you've connected to a different Pi at `192.168.50.2` before, SSH will warn th
 ssh-keygen -R 192.168.50.2
 ```
 
-**Optional — short name:** add this to `~/.ssh/config` on the laptop (Windows: `C:\Users\<you>\.ssh\config`), then just run `ssh air-##`. Add one block per Pi you use:
+**Optional — short name:** add this to `~/.ssh/config` on the laptop, then just run `ssh air-##`. Add one block per Pi you use:
 
 ```
 Host air-##
@@ -139,6 +115,6 @@ Host air-##
 | `nmcli device status` shows eth0 "unmanaged" | | Part 1 step 2, or `sudo nmcli device set eth0 managed yes` |
 | eth0 stuck on "connecting (getting IP configuration)" | Waiting for an automatic address that nothing provides | Part 1 step 2 (manual address) |
 | `ip link show eth0` says `NO-CARRIER` or `DOWN` | No live device on the other end of the cable | Reseat/swap cable or adapter; the Pi's port lights should blink |
-| `ping` times out | Laptop address missing / on the wrong adapter, or a stray address on the Pi | Laptop: `ipconfig`; Pi: `ip -4 addr show eth0`. Each side should show exactly one `192.168.50.x` address |
+| `ping` times out | Laptop address missing / on the wrong adapter, or a stray address on the Pi | Laptop: `ip -4 addr show <adapter>` (Linux) or System Settings → Network (Mac); Pi: `ip -4 addr show eth0`. Each side should show exactly one `192.168.50.x` address |
 | `Permission denied (publickey)` | Password login disabled on the Pi | `sudo nano /etc/ssh/sshd_config.d/50-cloud-init.conf`, set `PasswordAuthentication yes`, then `sudo systemctl restart ssh` |
 | Address gone after a reboot | Set with `ip addr add`, which isn't saved | Part 1 step 2 |
