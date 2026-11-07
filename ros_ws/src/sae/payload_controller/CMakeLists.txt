@@ -173,24 +173,6 @@ install(TARGETS payload_controller
   DESTINATION lib/${PROJECT_NAME}
 )
 
-# --- Path follower executable ---
-add_executable(path_follower_node
-  src/path_follower.cpp
-  src/path_follower_main.cpp
-)
-
-ament_target_dependencies(path_follower_node
-  rclcpp
-  nav_msgs
-  payload_interfaces
-  tf2
-  tf2_ros
-)
-
-install(TARGETS path_follower_node
-  DESTINATION lib/${PROJECT_NAME}
-)
-
 # Install include, launch, config directories
 install(DIRECTORY include/
   DESTINATION include
