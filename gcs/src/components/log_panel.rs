@@ -1,4 +1,5 @@
 use crate::hooks::{use_ros_node, use_subscription};
+use chrono::{DateTime, Local};
 use dioxus::prelude::*;
 use ros_interfaces::rcl_interfaces::msg::Log;
 use std::collections::VecDeque;
@@ -9,6 +10,48 @@ const MAX_LOG_MESSAGES_DISPLAY: usize = 10_000;
 struct LogEntry {
     id: u64, // want stable indexing/ids to avoid re-rendering
     log: Log,
+}
+
+impl LogEntry {
+    fn display_timestamp(&self) -> String {
+        DateTime::from_timestamp(i64::from(self.log.stamp.sec), self.log.stamp.nanosec)
+            .map(|timestamp| {
+                timestamp
+                    .with_timezone(&Local)
+                    .format("%H:%M:%S%.3f")
+                    .to_string()
+            })
+            .unwrap_or_else(|| format!("{}.{:09}", self.log.stamp.sec, self.log.stamp.nanosec))
+    }
+
+    fn level_color_class(&self) -> &'static str {
+        match self.log.level {
+            Log::DEBUG => "text-sky-300",
+            Log::INFO => "text-zinc-100",
+            Log::WARN => "text-amber-300",
+            Log::ERROR => "text-red-400",
+            Log::FATAL => "text-red-400 font-semibold",
+            _ => "text-zinc-200",
+        }
+    }
+
+    fn display_line(&self) -> String {
+        let level = match self.log.level {
+            Log::DEBUG => "DEBUG",
+            Log::INFO => "INFO",
+            Log::WARN => "WARN",
+            Log::ERROR => "ERROR",
+            Log::FATAL => "FATAL",
+            _ => "UNKNOWN",
+        };
+
+        format!(
+            "[{level}] [{}] [{}]: {}",
+            self.display_timestamp(),
+            self.log.name,
+            self.log.msg
+        )
+    }
 }
 
 struct LogHistory {
@@ -64,12 +107,21 @@ pub fn LogPanel() -> Element {
     });
 
     rsx! {
-        div { class: "h-96 overflow-auto break-words rounded-md border border-zinc-400 p-3",
-            if logs.read().logs_ref().is_empty() {
-                p { "Waiting for log messages" }
+        div { class: "flex h-96 min-h-32 min-w-64 resize flex-col overflow-hidden pb-3 rounded-md border border-zinc-800 bg-[#111827] font-mono text-xs leading-5 text-zinc-200",
+            h2 { class: "shrink-0 border-b border-zinc-600 px-4 py-2 font-medium text-zinc-100",
+                "/rosout"
             }
-            for entry in logs.read().logs_ref().iter() {
-                p { key: "{entry.id}", "[{entry.log.name}] {entry.log.msg} [{entry.id}]" }
+            div { class: "min-h-0 flex-1 overflow-auto p-4",
+                if logs.read().logs_ref().is_empty() {
+                    p { class: "text-zinc-500", "Waiting for log messages" }
+                }
+                for entry in logs.read().logs_ref().iter() {
+                    p {
+                        key: "{entry.id}",
+                        class: "whitespace-pre-wrap break-words {entry.level_color_class()}",
+                        "{entry.display_line()}"
+                    }
+                }
             }
         }
     }
