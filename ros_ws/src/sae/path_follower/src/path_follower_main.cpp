@@ -1,4 +1,4 @@
-#include "payload_controller/path_follower.hpp"
+#include "path_follower/path_follower.hpp"
 
 int main(int argc, char** argv)
 {

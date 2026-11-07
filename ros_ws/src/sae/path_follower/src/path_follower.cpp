@@ -1,4 +1,4 @@
-#include "payload_controller/path_follower.hpp"
+#include "path_follower/path_follower.hpp"
 
 #include <tf2/LinearMath/Matrix3x3.h>
 #include <tf2/LinearMath/Quaternion.h>
