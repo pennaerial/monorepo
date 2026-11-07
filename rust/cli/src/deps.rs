@@ -3,12 +3,14 @@ use std::error::Error;
 
 pub fn run_deps(args: DepsArgs) -> Result<(), Box<dyn Error>> {
     match args.command {
-        DepsCommand::Check => {
-            println!("checking dependencies");
+        DepsCommand::Check { dev, prod }=> {
+            let m = if dev {"dev"} else {"prod"};
+            println!("checking {m} dependencies");
             Ok(())
         }
-        DepsCommand::Sync => {
-            println!("syncing dependencies");
+        DepsCommand::Sync { dev, prod }=> {
+            let m = if dev {"dev"} else {"prod"};
+            println!("syncing {m} dependencies");
             Ok(())
         }
     }
@@ -23,7 +25,19 @@ pub struct DepsArgs {
 #[derive(Subcommand, Debug)]
 pub enum DepsCommand {
     /// Check installed dependencies against monorepo manifest
-    Check,
+    Check {
+        #[arg(long, conflicts_with = "prod", required_unless_present = "prod")]
+        dev: bool,
+
+        #[arg(long)]
+        prod: bool
+    },
     /// Sync system dependencies with monorepo.toml configuration
-    Sync,
+    Sync {
+        #[arg(long, conflicts_with = "prod", required_unless_present = "prod")]
+        dev: bool,
+
+        #[arg(long)]
+        prod: bool
+    },
 }
