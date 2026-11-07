@@ -179,7 +179,7 @@ class UAV(Vehicle):
         )
         self.node.get_logger().info("Switching to offboard mode")
 
-    def takeoff(self, takeoff_height=5.0):
+    def takeoff(self, takeoff_height=10.0):
         """
         Command the UAV to take off to the specified altitude.
         This uses a NAV_TAKEOFF command; actual behavior depends on PX4 mode.

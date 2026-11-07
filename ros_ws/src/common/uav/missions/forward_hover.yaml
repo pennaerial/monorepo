@@ -1,0 +1,27 @@
+modes:
+  start:
+    mode: uav.vtol.TakeoffMode
+    params:
+      takeoff_type: vertical
+    transitions:
+      complete: forward
+
+  forward:
+    mode: uav.NavGPSMode
+    params:
+      coordinates:
+        # LOCAL NED: 10 m north, 0 m east, 10 m above the local origin.
+        # Keep z aligned with your manually configured takeoff height.
+        - [[10, 0, -10], 1, LOCAL]
+    transitions:
+      complete: hover
+
+  hover:
+    mode: uav.HoverMode
+    params:
+      duration: 5.0
+    transitions:
+      complete: land
+
+  land:
+    mode: uav.LandingMode

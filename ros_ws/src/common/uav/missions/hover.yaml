@@ -4,14 +4,12 @@ modes:
     params:
       takeoff_type: vertical
     transitions:
-      complete: GPS
+      complete: hover
 
-  GPS:
-    mode: uav.NavGPSMode
+  hover:
+    mode: uav.HoverMode
     params:
-      coordinates:
-        - [[0, 0, -3], 5, LOCAL]
-        - [[0, 0, -6], 5, LOCAL]
+      duration: 420.0
     transitions:
       complete: land
 
