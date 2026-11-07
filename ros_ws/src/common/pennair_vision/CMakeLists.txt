@@ -108,7 +108,7 @@ ament_target_dependencies(vision_plugins
 
 target_compile_features(vision_plugins PUBLIC cxx_std_20)
 target_compile_features(lazy_camera_publisher PUBLIC cxx_std_20)
-target_link_libraries(vision_plugins PRIVATE apriltag::apriltag)
+target_link_libraries(vision_plugins apriltag::apriltag)
 
 pluginlib_export_plugin_description_file(pennair_vision plugins.xml)
 
