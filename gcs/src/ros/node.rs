@@ -108,6 +108,10 @@ impl RosNode {
                 if let Some(channel_id) = channel_id {
                     self.activate_subscription(channel_id, sink, reply).await;
                 } else {
+                    debug!(
+                        "no channel detected for {}, creating pending subscription",
+                        topic
+                    );
                     // if no channel_id matches, save it to pending_subscribes for later
                     // don't send the reply yet bc no channel_id has been detected
                     self.pending_subscribes
@@ -165,6 +169,10 @@ impl RosNode {
 
                         // consume entire removed vector
                         for PendingSubscription { sink, reply } in pendings {
+                            debug!(
+                                "activating subscription for pending publish on {}",
+                                sink.topic_name()
+                            );
                             self.activate_subscription(id, sink, reply).await;
                         }
                     }
