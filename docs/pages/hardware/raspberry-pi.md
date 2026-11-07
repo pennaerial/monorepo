@@ -63,19 +63,10 @@ card before removing it.
 ## 2. Boot and connect over Ethernet
 
 Keep the other Pis powered off until setup is complete. Insert the card into the
-new Pi, leave its USB Wi-Fi adapter unplugged, and connect it to your laptop with
-Ethernet. Power on the Pi.
+new Pi and leave its USB Wi-Fi adapter unplugged.
 
-For this direct connection, your laptop's Ethernet IPv4 address should be
-`192.168.50.1`, with subnet mask `255.255.255.0` and no gateway.
-
-From your laptop, connect using the password supplied with the image:
-
-```bash
-ssh penn@192.168.50.2
-```
-
-Run the next two steps inside this Pi SSH session.
+Follow [Ethernet and SSH](ethernet.md) to connect from your laptop, then return
+here. Run the next two steps inside the Pi SSH session.
 
 ## 3. Give the Pi a unique name
 
@@ -116,11 +107,7 @@ host keys.
 
 ## 5. Check the mesh
 
-Reconnect from your laptop:
-
-```bash
-ssh penn@192.168.50.2
-```
+Reconnect to the Pi using [Ethernet and SSH](ethernet.md).
 
 Plug in the USB Wi-Fi adapter. On the Pi, run:
 

@@ -10,3 +10,4 @@ Hardware Setup
    :caption: Setup Guides
 
    Raspberry Pi Setup <raspberry-pi>
+   Ethernet and SSH <ethernet>
