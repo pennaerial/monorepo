@@ -73,6 +73,8 @@ impl SubscriptionHandle {
 
 impl Drop for SubscriptionHandle {
     fn drop(&mut self) {
+        // TODO: Notify RosNode to remove this subscription and unsubscribe from the
+        // server when no listeners remain, so remounting does not leak subscriptions.
         self.task.abort();
     }
 }

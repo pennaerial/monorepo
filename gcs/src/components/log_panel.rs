@@ -38,6 +38,7 @@ impl LogHistory {
             log,
         });
         self.next_id += 1;
+        info!("log size: {}, msg: {}", self.logs.len(), self.logs.back().unwrap().log.msg);
     }
 
     fn logs_ref(&self) -> &VecDeque<LogEntry> {
@@ -68,6 +69,7 @@ pub fn LogPanel() -> Element {
             },
         }
         div {
+            class: "h-96 overflow-auto break-words rounded-md border border-zinc-400 p-3",
             if logs.read().logs_ref().is_empty() {
                 p { "Waiting for log messages" }
             }
@@ -75,10 +77,5 @@ pub fn LogPanel() -> Element {
                 p { key: "{entry.id}", "[{entry.log.name}] {entry.log.msg} [{entry.id}]" }
             }
         }
-        // if let Some(log) = log.read().as_ref() {
-        //     p { "{log.msg}" }
-        // } else {
-        //     p { "waiting for rosout messages" }
-        // }
     }
 }
