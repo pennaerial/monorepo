@@ -9,6 +9,7 @@
     monospace;
     --color-zinc-50: oklch(98.5% 0 0);
     --color-zinc-200: oklch(92% 0.004 286.32);
+    --color-zinc-400: oklch(70.5% 0.015 286.067);
     --color-zinc-800: oklch(27.4% 0.006 286.033);
     --color-zinc-900: oklch(21% 0.006 285.885);
     --color-zinc-950: oklch(14.1% 0.005 285.823);
@@ -182,6 +183,9 @@
   .inline-flex {
     display: inline-flex;
   }
+  .h-96 {
+    height: calc(var(--spacing) * 96);
+  }
   .transform {
     transform: var(--tw-rotate-x,) var(--tw-rotate-y,) var(--tw-rotate-z,) var(--tw-skew-x,) var(--tw-skew-y,);
   }
@@ -191,11 +195,24 @@
   .justify-center {
     justify-content: center;
   }
+  .overflow-auto {
+    overflow: auto;
+  }
   .rounded-md {
     border-radius: var(--radius-md);
   }
+  .border {
+    border-style: var(--tw-border-style);
+    border-width: 1px;
+  }
+  .border-zinc-400 {
+    border-color: var(--color-zinc-400);
+  }
   .bg-zinc-900 {
     background-color: var(--color-zinc-900);
+  }
+  .p-3 {
+    padding: calc(var(--spacing) * 3);
   }
   .px-4 {
     padding-inline: calc(var(--spacing) * 4);
@@ -210,6 +227,9 @@
   .font-medium {
     --tw-font-weight: var(--font-weight-medium);
     font-weight: var(--font-weight-medium);
+  }
+  .break-words {
+    overflow-wrap: break-word;
   }
   .text-white {
     color: var(--color-white);
@@ -348,6 +368,11 @@
   syntax: "*";
   inherits: false;
 }
+@property --tw-border-style {
+  syntax: "*";
+  inherits: false;
+  initial-value: solid;
+}
 @property --tw-font-weight {
   syntax: "*";
   inherits: false;
@@ -425,6 +450,7 @@
       --tw-rotate-z: initial;
       --tw-skew-x: initial;
       --tw-skew-y: initial;
+      --tw-border-style: solid;
       --tw-font-weight: initial;
       --tw-shadow: 0 0 #0000;
       --tw-shadow-color: initial;

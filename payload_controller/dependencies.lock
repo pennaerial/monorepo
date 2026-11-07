@@ -1,0 +1,21 @@
+dependencies:
+  espressif/eigen:
+    component_hash: e0a3caf2aec4e34406fab66e2b455867497e42a101988cf18dfdb2cd3dcadb82
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=5.0'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 5.0.1
+  idf:
+    source:
+      type: idf
+    version: 6.0.2
+direct_dependencies:
+- espressif/eigen
+- idf
+manifest_hash: 35c31dd2abef4d8e8004a896c6459ffa925fb3f7510aed6cc0fad9784eb843f1
+target: linux
+version: 3.0.0

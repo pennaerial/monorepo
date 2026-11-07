@@ -1,7 +1,7 @@
-use crate::components::{Button, SideBar};
+use crate::components::{Button, LogPanel, SideBar};
 use crate::hooks::{use_ros_node, use_subscription};
 use crate::ros::server_types::ServerMessage;
-use crate::ros::{FoxgloveClient, SubscriptionHandle};
+use crate::ros::FoxgloveClient;
 use dioxus::prelude::*;
 use ros_interfaces::{geometry_msgs, std_msgs};
 
@@ -92,6 +92,7 @@ pub fn MissionControl() -> Element {
                     },
                 }
                 p { "{string_msg}" }
+                LogPanel {}
 
             }
         }
