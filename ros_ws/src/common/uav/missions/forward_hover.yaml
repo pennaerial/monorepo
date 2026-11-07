@@ -12,7 +12,7 @@ modes:
       coordinates:
         # LOCAL NED: 10 m north, 0 m east, 10 m above the local origin.
         # Keep z aligned with your manually configured takeoff height.
-        - [[10, 0, -10], 1, LOCAL]
+        - [[5, 0, -10], 1, LOCAL]
     transitions:
       complete: hover
 
