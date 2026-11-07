@@ -98,6 +98,7 @@ AIRFRAMES: list[PX4Airframe] = [
     PX4Airframe(4019,  "",              "x500_gimbal",        AirframeClass.MULTICOPTER),
     PX4Airframe(4020,  "",              "tiltrotor",          AirframeClass.VTOL),
     PX4Airframe(4021,  "",              "x500_flow",          AirframeClass.MULTICOPTER),
+    PX4Airframe(4023,  "quad_5in",      "pennair_quad_5in",   AirframeClass.MULTICOPTER),
     PX4Airframe(50000, "",              "rover_differential", AirframeClass.OTHER),
     PX4Airframe(51000, "",              "rover_ackermann",    AirframeClass.OTHER),
     PX4Airframe(52000, "",              "rover_mecanum",      AirframeClass.OTHER),

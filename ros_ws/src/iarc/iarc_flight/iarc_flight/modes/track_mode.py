@@ -11,12 +11,14 @@ from vehicle_common.mode_loader import ParamsBase, register_mode
 from iarc_flight.controllers.feedforward import FeedforwardConfig
 from iarc_flight.controllers.mpc import MPCConfig
 from iarc_flight.trajectories.circle import CircleConfig
+from iarc_flight.trajectories.min_snap import MinSnapConfig
 
 ControllerConfig = Annotated[FeedforwardConfig | MPCConfig, Field(discriminator="type")]
+TrajectoryConfig = Annotated[CircleConfig | MinSnapConfig, Field(discriminator="type")]
 
 
 class TrackParams(ParamsBase):
-    trajectory: CircleConfig
+    trajectory: TrajectoryConfig
     controller: ControllerConfig = FeedforwardConfig()
 
 
@@ -40,6 +42,7 @@ class TrackMode(Mode[UAV, TrackParams]):
         self.t = 0.0
         self.errors: list[float] = []
         self.step_ms: list[float] = []
+        self.speeds: list[float] = []
 
     @override
     def on_update(self, time_delta: float) -> None:
@@ -57,6 +60,11 @@ class TrackMode(Mode[UAV, TrackParams]):
             yaw = self.vehicle.yaw if self.vehicle.yaw is not None else pos.heading
             self.trajectory = self.p.trajectory.build(state[:3], yaw)
             self.log(f"Tracking {self.p.trajectory.type} with {self.p.controller.type}")
+            if hasattr(self.trajectory, "max_speed"):
+                self.log(
+                    f"Planned {self.trajectory.total_time:.1f} s, max speed {self.trajectory.max_speed:.2f} m/s, "
+                    f"max accel {self.trajectory.max_accel:.2f} m/s^2"
+                )
         else:
             self.t += time_delta
 
@@ -64,7 +72,9 @@ class TrackMode(Mode[UAV, TrackParams]):
         start = time.perf_counter()
         setpoint = self.controller.step(state, self.trajectory, self.t)
         self.step_ms.append((time.perf_counter() - start) * 1000.0)
-        self.errors.append(np.linalg.norm(state[:3] - self.trajectory.sample(self.t).position))
+        planned = self.trajectory.sample(self.t).position
+        self.errors.append(np.linalg.norm(state[:3] - planned))
+        self.speeds.append(float(np.linalg.norm(state[3:])))
 
         self.vehicle.publish_trajectory_setpoint(
             setpoint.position, setpoint.velocity, setpoint.acceleration, setpoint.yaw
@@ -76,7 +86,7 @@ class TrackMode(Mode[UAV, TrackParams]):
             e = np.array(self.errors)
             self.log(
                 f"Tracking error rms {np.sqrt(np.mean(e**2)):.2f} m, max {e.max():.2f} m, "
-                f"controller step max {max(self.step_ms):.1f} ms"
+                f"controller step max {max(self.step_ms):.1f} ms, flown max speed {max(self.speeds):.2f} m/s"
             )
 
     @override

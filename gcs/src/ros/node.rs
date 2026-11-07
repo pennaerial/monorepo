@@ -5,7 +5,7 @@ use crate::ros::{
     foxglove_client::FoxgloveClientError, node_command::NodeCommand, FoxgloveClient,
     SubscriptionHandle, SubscriptionId, SubscriptionSinkBase,
 };
-use dioxus::logger::tracing::{debug, error, info};
+use dioxus::logger::tracing::{debug, error, info, warn};
 use ros_interfaces::RosMessage;
 use std::collections::HashMap;
 use tokio::sync::{mpsc, oneshot};
@@ -145,7 +145,11 @@ impl RosNode {
                         Err(DeliveryError::Closed) => false,
                         Err(DeliveryError::Full) => {
                             // drop this message because queue depth is full
-                            debug!("topic {} dropping message", sink.topic_name());
+                            warn!(
+                                topic = sink.topic_name(),
+                                subscription_id = message_data.subscription_id,
+                                "Dropped message: subscription queue is full"
+                            );
                             true
                         }
                         Err(DeliveryError::Decode(e)) => {
