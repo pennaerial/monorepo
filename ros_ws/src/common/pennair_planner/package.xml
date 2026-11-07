@@ -15,6 +15,7 @@
   <depend>nav_msgs</depend>
   <depend>rclcpp</depend>
   <depend>rclcpp_components</depend>
+  <depend>pluginlib</depend>
 
   <exec_depend>rosidl_default_runtime</exec_depend>
 
