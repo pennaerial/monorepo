@@ -167,5 +167,4 @@ void PathFollower::control_loop()
 }
 
 /// This is how you run this file (because i forget)
-/* ros2 run payload_controller path_follower_node \
-  --ros-args -p use_sim_time:=true */
+/* ros2 run payload_controller path_follower_node \ --ros-args -p use_sim_time:=true */
