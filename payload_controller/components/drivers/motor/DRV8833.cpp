@@ -85,9 +85,6 @@ void DRV8833::start()
     timer_configured = true;
   }
 
-  // nSLEEP and nFAULT are left unconnected, so this relies on the breakout pulling nSLEEP high
-  // TODO: Check the breakout's schematic. nSLEEP has an internal pulldown, so if the breakout doesn't pull it
-  // high the motors never move. Wiring it to a GPIO would also let us sleep the driver to save battery.
   const BridgeConfig& bridge = bridge_for(side_);
   configure_pwm_channel(bridge.in1_pin, bridge.in1_channel);
   configure_pwm_channel(bridge.in2_pin, bridge.in2_channel);
