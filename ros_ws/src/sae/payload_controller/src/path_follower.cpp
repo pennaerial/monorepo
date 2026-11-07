@@ -88,12 +88,12 @@ bool PathFollower::get_robot_pose(double& x, double& y, double& yaw)
 
 void PathFollower::publish_drive(double linear, double angular)
 {
-  /// Replace with actual measurement IN METERS
-  constexpr double wheel_separation = 0.1;
-  constexpr double wheel_radius = 0.02;
+  /// These are actual measurements now
+  constexpr double wheel_separation = 0.112;
+  constexpr double wheel_radius = 0.017;
 
-  // Kinematic equation for tank drive velocities from linear/angular velocities
-  // Also divided by wheel radius for speed in rad/s instead of m/s
+  /// Kinematic equation for tank drive velocities from linear/angular velocities
+  /// Also divided by wheel radius for speed in rad/s instead of m/s
   double left_velocity = (linear - angular * wheel_separation / 2.0) / wheel_radius;
   double right_velocity = (linear + angular * wheel_separation / 2.0) / wheel_radius;
 
