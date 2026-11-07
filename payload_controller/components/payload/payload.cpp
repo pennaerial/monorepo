@@ -121,7 +121,7 @@ void Payload::update_estimator()
   if (ekf_left_pending_ && ekf_right_pending_ && ekf_has_gyro_) {
     measurements.encoders =
         EKF::EncoderSample{static_cast<float>(ekf_left_rad_s_), static_cast<float>(ekf_right_rad_s_), ekf_gyro_};
-    ekf_left_pending_ = ekf_right_pending_ = false;
+    ekf_left_pending_ = ekf_right_pending_ = ekf_has_gyro_ = false;
   }
 
   geometry_msgs_msg_Vector3 camera_position{};
