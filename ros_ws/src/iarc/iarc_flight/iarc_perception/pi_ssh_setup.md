@@ -1,16 +1,23 @@
-# Pi SSH Setup — air-01
+# Pi SSH Setup
 
-_Last updated: 2026-11-04_
+_Last updated: 2026-11-06_
 
-Connect a laptop to the Pi over a direct ethernet cable and SSH in, so you can work from the laptop instead of the Pi's monitor.
+Connect a laptop to any Raspberry Pi over a direct ethernet cable and SSH in, so you can work from the laptop instead of the Pi's monitor.
+
+Throughout this guide, replace:
+
+- `<user>` with the Pi's login username (check with `whoami` on the Pi)
+- `<pi-name>` with a short nickname for that Pi (e.g. its hostname, from `hostname` on the Pi)
+
+The addresses below are the same for every Pi. That's fine because only one Pi is plugged into your laptop at a time.
 
 ## Addresses
 
 | Device | Interface | Address | Notes |
 |---|---|---|---|
-| Pi (air-01) | `eth0` | `192.168.50.2/24` | user: `penn` |
+| Pi | `eth0` | `192.168.50.2/24` | user: `<user>` |
 | Laptop | wired/USB adapter | `192.168.50.1/24` | gateway: blank |
-| Pi hotspot | `wlan0` | `10.42.0.1` | backup route |
+| Pi hotspot (if set up) | `wlan0` | `10.42.0.1` | backup route |
 
 Nothing on the cable hands out addresses automatically, so both ends are set by hand.
 
@@ -24,6 +31,8 @@ Nothing on the cable hands out addresses automatically, so both ends are set by 
    ```
 
 2. **Set the ethernet address permanently** (once per Pi; survives reboot).
+
+   The connection is usually called `Wired connection 1`. If that name doesn't work, find the one on `eth0` with `nmcli con show` and use it instead.
 
    ```bash
    sudo nmcli con modify "Wired connection 1" ipv4.method manual ipv4.addresses 192.168.50.2/24
@@ -103,19 +112,25 @@ System Settings → Network → ethernet/USB adapter → Details → TCP/IP → 
 
 ```bash
 ping 192.168.50.2
-ssh penn@192.168.50.2
+ssh <user>@192.168.50.2
 ```
 
-First time: type `yes` at the fingerprint prompt, then the `penn` password.
+First time: type `yes` at the fingerprint prompt, then that user's password.
 
-**Optional — VS Code:** install the "Remote - SSH" extension, connect to `penn@192.168.50.2`, and open Pi folders as if they were local.
+If you've connected to a different Pi at `192.168.50.2` before, SSH will warn that the host key changed. Clear the old entry, then connect again:
 
-**Optional — short name:** add this to `~/.ssh/config` on the laptop (Windows: `C:\Users\<you>\.ssh\config`), then just run `ssh air01`:
+```bash
+ssh-keygen -R 192.168.50.2
+```
+
+**Optional — VS Code:** install the "Remote - SSH" extension, connect to `<user>@192.168.50.2`, and open Pi folders as if they were local.
+
+**Optional — short name:** add this to `~/.ssh/config` on the laptop (Windows: `C:\Users\<you>\.ssh\config`), then just run `ssh <pi-name>`:
 
 ```
-Host air01
+Host <pi-name>
     HostName 192.168.50.2
-    User penn
+    User <user>
 ```
 
 ## Troubleshooting
@@ -141,5 +156,5 @@ Host air01
 ### Last resort — hotspot
 
 - **On the Pi:** `nmcli dev wifi show-password` (shows Wi-Fi name + password)
-- **On the laptop:** join that Wi-Fi, then `ssh penn@10.42.0.1`
+- **On the laptop:** join that Wi-Fi, then `ssh <user>@10.42.0.1`
 - The laptop loses internet while on the hotspot.
