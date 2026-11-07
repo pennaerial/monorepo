@@ -28,7 +28,7 @@ struct PendingSubscription {
 
 pub struct RosNode {
     foxglove_client: FoxgloveClient,
-    /// client allows only one subscription per channelId, so fan out into a Vec of callbacks
+    /// client allows only one subscription per channelId
     subscriptions: HashMap<SubscriptionId, Vec<Box<dyn SubscriptionSinkBase>>>,
     /// for subscription on topics that haven't been advertised yet
     pending_subscribes: HashMap<String, Vec<PendingSubscription>>,
@@ -170,7 +170,7 @@ impl RosNode {
                         // consume entire removed vector
                         for PendingSubscription { sink, reply } in pendings {
                             debug!(
-                                "activating subscription for pending publish on {}",
+                                "activating subscription for pending subscription on {}",
                                 sink.topic_name()
                             );
                             self.activate_subscription(id, sink, reply).await;

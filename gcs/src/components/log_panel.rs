@@ -1,7 +1,4 @@
-use crate::{
-    components::Button,
-    hooks::{use_ros_node, use_subscription},
-};
+use crate::hooks::{use_ros_node, use_subscription};
 use dioxus::prelude::*;
 use ros_interfaces::rcl_interfaces::msg::Log;
 use std::collections::VecDeque;
@@ -54,11 +51,15 @@ pub fn LogPanel() -> Element {
     use_future(move || {
         let mut sub = rosout_sub.clone();
         async move {
-            let _ = sub
+            let res = sub
                 .subscribe(move |msg| {
                     logs.write().add_log(msg);
                 })
                 .await;
+
+            if let Err(error) = res {
+                error!("Failed to subscribe to /rosout: {error:?}");
+            }
         }
     });
 
