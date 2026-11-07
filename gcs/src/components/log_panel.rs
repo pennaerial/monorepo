@@ -38,11 +38,6 @@ impl LogHistory {
             log,
         });
         self.next_id += 1;
-        info!(
-            "log size: {}, msg: {}",
-            self.logs.len(),
-            self.logs.back().unwrap().log.msg
-        );
     }
 
     fn logs_ref(&self) -> &VecDeque<LogEntry> {
