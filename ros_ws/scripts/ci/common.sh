@@ -70,6 +70,7 @@ ci_refresh_apt_lists() {
 
 ci_install_apriltag() {
     ci_log "Installing apriltag Python package"
+    ci_install_system_packages libapriltag-dev
     python3 -m pip install --no-cache-dir apriltag
     python3 -c "import apriltag; print(apriltag.__file__)"
 }
