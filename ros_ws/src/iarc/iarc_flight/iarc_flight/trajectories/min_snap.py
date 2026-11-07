@@ -21,10 +21,10 @@ from iarc_flight.trajectories.base import Trajectory, TrajectoryPoint
 
 
 class Keyframe(BaseModel):
-    x: float # m
+    x: float  # m
     y: float
     z: float
-    yaw: float # rad
+    yaw: float  # rad
     T: float = Field(gt=0)  # s, time from prev
 
 
@@ -114,13 +114,17 @@ class MinSnap(Trajectory):
         durations = np.array([kf.T for kf in kfs])
 
         self.keyframes = np.vstack([start[:3], [[kf.x, kf.y, kf.z] for kf in kfs]])  # (M+1, 3)
-        self.position = PiecewisePolynomial(solve_min_derivative(self.keyframes, durations, 4), durations)
+        self.position = PiecewisePolynomial(
+            solve_min_derivative(self.keyframes, durations, 4), durations
+        )
 
         # Unwrap so each keyframe's yaw is within pi of the previous one (no spinning the long way)
         yaws = [yaw]
         for kf in kfs:
             yaws.append(yaws[-1] + (kf.yaw - yaws[-1] + math.pi) % (2 * math.pi) - math.pi)
-        self.yaw = PiecewisePolynomial(solve_min_derivative(np.array(yaws)[:, None], durations, 2), durations)
+        self.yaw = PiecewisePolynomial(
+            solve_min_derivative(np.array(yaws)[:, None], durations, 2), durations
+        )
 
         self.total_time = self.position.total_time
 
