@@ -1,4 +1,5 @@
 import time
+from concurrent.futures import Future, ThreadPoolExecutor, wait
 from typing import Annotated, override
 
 import numpy as np
@@ -12,9 +13,12 @@ from iarc_flight.controllers.feedforward import FeedforwardConfig
 from iarc_flight.controllers.mpc import MPCConfig
 from iarc_flight.trajectories.circle import CircleConfig
 from iarc_flight.trajectories.min_snap import MinSnapConfig
+from iarc_flight.trajectories.min_time import MinTimeConfig
 
 ControllerConfig = Annotated[FeedforwardConfig | MPCConfig, Field(discriminator="type")]
-TrajectoryConfig = Annotated[CircleConfig | MinSnapConfig, Field(discriminator="type")]
+TrajectoryConfig = Annotated[
+    CircleConfig | MinSnapConfig | MinTimeConfig, Field(discriminator="type")
+]
 
 
 class TrackParams(ParamsBase):
@@ -39,6 +43,12 @@ class TrackMode(Mode[UAV, TrackParams]):
         # Built at startup so the MPC's slow first solve isn't mid-flight
         self.controller = params.controller.build()
         self.trajectory = None  # placed at the drone on the first update
+        # Building can take a while (min_time solves an optimization), so it runs off the
+        # update thread while the drone holds position. PX4 leaves offboard after ~1 s
+        # without setpoints, which a blocking solve could trigger.
+        self._builder = ThreadPoolExecutor(max_workers=1)
+        self._build: Future | None = None
+        self._hold: tuple[np.ndarray, float] | None = None
         self.t = 0.0
         self.errors: list[float] = []
         self.step_ms: list[float] = []
@@ -55,11 +65,29 @@ class TrackMode(Mode[UAV, TrackParams]):
         # Local NED position and velocity
         state = np.array([pos.x, pos.y, pos.z, pos.vx, pos.vy, pos.vz])
 
-        # First update places the trajectory at the drone, later ones advance time along it
+        # First update starts building the trajectory at the drone. Until it's ready, hold
+        # position; after that, advance time along it.
         if self.trajectory is None:
-            yaw = self.vehicle.yaw if self.vehicle.yaw is not None else pos.heading
-            self.trajectory = self.p.trajectory.build(state[:3], yaw)
-            self.log(f"Tracking {self.p.trajectory.type} with {self.p.controller.type}")
+            if self._build is None:
+                yaw = self.vehicle.yaw if self.vehicle.yaw is not None else pos.heading
+                self._hold = (state[:3].copy(), yaw)
+                self._build_start = time.perf_counter()
+                self._build = self._builder.submit(self.p.trajectory.build, state[:3].copy(), yaw)
+                wait([self._build], timeout=0.05)  # quick builds (circle, min_snap) start this tick
+            if not self._build.done():
+                hold_pos, hold_yaw = self._hold
+                self.vehicle.publish_trajectory_setpoint(
+                    hold_pos, np.zeros(3), np.zeros(3), hold_yaw
+                )
+                return
+            self.trajectory = self._build.result()  # re-raises if the build failed
+            build_ms = (time.perf_counter() - self._build_start) * 1000.0
+            self.log(
+                f"Tracking {self.p.trajectory.type} with {self.p.controller.type} "
+                f"(built in {build_ms:.0f} ms while holding)"
+            )
+            for line in getattr(self.trajectory, "summary", []):
+                self.log(line)
             if hasattr(self.trajectory, "max_speed"):
                 self.log(
                     f"Planned {self.trajectory.total_time:.1f} s, max speed {self.trajectory.max_speed:.2f} m/s, "
@@ -82,6 +110,7 @@ class TrackMode(Mode[UAV, TrackParams]):
 
     @override
     def on_exit(self) -> None:
+        self._builder.shutdown(wait=False, cancel_futures=True)
         if self.errors:
             e = np.array(self.errors)
             self.log(

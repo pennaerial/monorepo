@@ -1,0 +1,55 @@
+# Lawnmower square with leg times solved for minimum total time (trajectories/min_time.py),
+# then flown as min snap. The solve runs when the square starts, while the drone holds
+# position, and the report (solve time, per-leg peaks) goes to the log.
+# Offline: python3 -m iarc_flight.trajectories.min_time missions/iarc_min_time.yaml
+#
+# Per waypoint (all optional, they apply to the leg arriving at that waypoint):
+#   v_max, a_max   limits for that leg (default: the trajectory-level values below)
+#   T              initial guess for that leg's time, only the split between legs matters.
+#                  (default: distance / v_max)
+#   T_min, T_max   bounds on that leg's time
+modes:
+  start:
+    mode: uav.VerticalTakeoffMode
+    params:
+      takeoff_height: 3.0
+    transitions:
+      complete: square
+
+  square:
+    mode: iarc_flight.TrackMode
+    params:
+      trajectory:
+        type: min_time
+        v_max: 5.0  # m/s, default for waypoints that don't set their own
+        a_max: 3.0  # m/s^2
+        T_min: 0.2  # s
+        T_max: 60.0  # s
+        samples: 30  # points per leg the solver checks
+        # Mixed limits to see the solver trade them off: fast straights, slow careful turns,
+        # one gentle crawl row, and a sprint row. Limits apply to the leg arriving at a waypoint.
+        waypoints:
+          - {x: 0, y: 0, z: -3, yaw: 0.0, v_max: 2.0, a_max: 1.5}         # ease in from takeoff
+          - {x: 5, y: 0, z: -3, yaw: 0.0, v_max: 5.0, a_max: 3.0}         # straight, fast
+          - {x: 10, y: 0, z: -3, yaw: 0.0, v_max: 5.0, a_max: 3.0}        # straight, punchy
+          - {x: 15, y: 0, z: -3, yaw: 1.5708, v_max: 3.0, a_max: 2.0}     # braking into turn
+          - {x: 15, y: 5, z: -3, yaw: 3.1416, v_max: 2.0, a_max: 1.5}     # tight turn, slow
+          - {x: 10, y: 5, z: -3, yaw: 3.1416, v_max: 1.5, a_max: 1.0}     # crawl row (inspection)
+          - {x: 5, y: 5, z: -3, yaw: 3.1416, v_max: 1.5, a_max: 1.0}
+          - {x: 0, y: 5, z: -3, yaw: 1.5708, v_max: 2.5, a_max: 2.0}
+          - {x: 0, y: 10, z: -3, yaw: 0.0, v_max: 3.0, a_max: 2.5}        # turn
+          - {x: 5, y: 10, z: -3, yaw: 0.0, v_max: 5.0, a_max: 3.0}        # sprint row
+          - {x: 10, y: 10, z: -3, yaw: 0.0, v_max: 5.0, a_max: 3.0}
+          - {x: 15, y: 10, z: -3, yaw: 1.5708, v_max: 4.0, a_max: 3.0}
+          - {x: 15, y: 15, z: -3, yaw: 3.1416, v_max: 2.0, a_max: 1.5}    # turn
+          - {x: 10, y: 15, z: -4.5, yaw: 3.1416, v_max: 4.0, a_max: 2.5}  # dip down
+          - {x: 5, y: 15, z: -3, yaw: 3.1416, v_max: 4.0, a_max: 2.5}     # and back up
+          - {x: 0, y: 15, z: -3, yaw: 3.1416, v_max: 2.0, a_max: 1.0}     # gentle stop
+      controller:
+        type: mpc
+        max_speed: 6.0
+    transitions:
+      complete: land
+
+  land:
+    mode: uav.LandingMode
