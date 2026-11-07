@@ -83,7 +83,7 @@ void EKF::init(const Eigen::Vector3f& start_position)
 void EKF::update(const Measurements& measurements)
 {
   if (measurements.imu) {
-    const auto& imu = *measurements.imu;
+    const ImuSample imu = *measurements.imu;
     if (imu.angular_velocity.allFinite() && imu.specific_force.allFinite()) {
       if (first_update) {
         last_imu_timestamp_ns_ = imu.timestamp_ns;
@@ -99,7 +99,7 @@ void EKF::update(const Measurements& measurements)
     }
   }
   if (measurements.encoders) {
-    const auto& sample = *measurements.encoders;
+    const EncoderSample sample = *measurements.encoders;
     if (std::isfinite(sample.left_rad_s) && std::isfinite(sample.right_rad_s) && sample.angular_velocity.allFinite()) {
       encoder_adjustment(sample);
     }
