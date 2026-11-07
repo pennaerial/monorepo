@@ -1,0 +1,15 @@
+<library path="planner_plugins">
+  <class
+    name="AStarPlanner"
+    type="pennair_planner::AStarPlanner"
+    base_class_type="pennair_planner::PathPlanner">
+    <description>A* path planning algorithm.</description>
+  </class>
+
+  <class
+    name="StraightLinePlanner"
+    type="pennair_planner::StraightLinePlanner"
+    base_class_type="pennair_planner::PathPlanner">
+    <description>Straight line path planning algorithm.</description>
+  </class>
+</library>
