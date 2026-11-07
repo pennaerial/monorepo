@@ -1,13 +1,13 @@
 # Pi SSH Setup
 
-_Last updated: 2026-11-06_
+_Last updated: 2026-11-07_
 
 Connect a laptop to any Raspberry Pi over a direct ethernet cable and SSH in, so you can work from the laptop instead of the Pi's monitor.
 
 Throughout this guide, replace:
 
 - `<user>` with the Pi's login username (check with `whoami` on the Pi)
-- `<pi-name>` with a short nickname for that Pi (e.g. its hostname, from `hostname` on the Pi)
+- `air-##` with the name of the Pi you're connecting to (e.g. `air-01`, `air-02`; check with `hostname` on the Pi)
 
 The addresses below are the same for every Pi. That's fine because only one Pi is plugged into your laptop at a time.
 
@@ -15,9 +15,8 @@ The addresses below are the same for every Pi. That's fine because only one Pi i
 
 | Device | Interface | Address | Notes |
 |---|---|---|---|
-| Pi | `eth0` | `192.168.50.2/24` | user: `<user>` |
-| Laptop | wired/USB adapter | `192.168.50.1/24` | gateway: blank |
-| Pi hotspot (if set up) | `wlan0` | `10.42.0.1` | backup route |
+| Pi (`air-##`) | `eth0` | `192.168.50.2/24` | user: `<user>` |
+| Laptop | built-in ethernet port or USB adapter | `192.168.50.1/24` | gateway: blank |
 
 Nothing on the cable hands out addresses automatically, so both ends are set by hand.
 
@@ -62,7 +61,7 @@ Nothing on the cable hands out addresses automatically, so both ends are set by 
 
 ## Part 2 — On the laptop
 
-Plug the ethernet cable from the Pi into the laptop (a USB ethernet adapter is fine). Then give the laptop's **wired** adapter `192.168.50.1/24`.
+Plug the ethernet cable from the Pi into the laptop, either straight into its ethernet port or through a USB ethernet adapter. Then give the laptop's **wired** adapter `192.168.50.1/24`.
 
 ### Windows (PowerShell → right-click → "Run as administrator")
 
@@ -90,7 +89,12 @@ Plug the ethernet cable from the Pi into the laptop (a USB ethernet adapter is f
 
 ### Linux
 
-USB adapters have names like `enx00e04c3d8b48`. Find yours:
+Wired adapters have different names depending on how you're plugged in:
+
+- **Built-in ethernet port** (no adapter): a short name like `eno2`, `enp3s0` or `eth0`
+- **USB ethernet adapter:** a long name starting with `enx`, like `enx00e04c3d8b48`
+
+Find yours (it's the one that shows `UP` once the cable is plugged in):
 
 ```bash
 ip -br link
@@ -125,10 +129,10 @@ ssh-keygen -R 192.168.50.2
 
 **Optional — VS Code:** install the "Remote - SSH" extension, connect to `<user>@192.168.50.2`, and open Pi folders as if they were local.
 
-**Optional — short name:** add this to `~/.ssh/config` on the laptop (Windows: `C:\Users\<you>\.ssh\config`), then just run `ssh <pi-name>`:
+**Optional — short name:** add this to `~/.ssh/config` on the laptop (Windows: `C:\Users\<you>\.ssh\config`), then just run `ssh air-##`. Add one block per Pi you use:
 
 ```
-Host <pi-name>
+Host air-##
     HostName 192.168.50.2
     User <user>
 ```
@@ -144,7 +148,7 @@ Host <pi-name>
 | `ping` fails but everything looks right | Windows Firewall blocks ping replies | Try `ssh` anyway |
 | `Permission denied (publickey)` | Password login disabled on the Pi | `sudo nano /etc/ssh/sshd_config.d/50-cloud-init.conf`, set `PasswordAuthentication yes`, then `sudo systemctl restart ssh` |
 | Address gone after a reboot | Set with `ip addr add`, which isn't saved | Part 1 step 2 |
-| `Device "..." does not exist` | Typo (`eht0`) or an adapter name from another machine | Use `eth0` on the Pi; `enx...` names only exist on a Linux laptop |
+| `Device "..." does not exist` | Typo (`eht0`) or an adapter name from another machine | Use `eth0` on the Pi; `eno...`/`enp...`/`enx...` names only exist on a Linux laptop. Run `ip -br link` to see the real names |
 
 ### Common typos from first setup
 
@@ -152,9 +156,3 @@ Host <pi-name>
 - `ncmli` → `nmcli`
 - `dev dev` → `dev`
 - Running laptop commands on the Pi (laptop commands go on the laptop!)
-
-### Last resort — hotspot
-
-- **On the Pi:** `nmcli dev wifi show-password` (shows Wi-Fi name + password)
-- **On the laptop:** join that Wi-Fi, then `ssh <user>@10.42.0.1`
-- The laptop loses internet while on the hotspot.
