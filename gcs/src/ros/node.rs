@@ -1,4 +1,4 @@
-use crate::ros::server_types::{Channel, ChannelId, ServerMessage};
+use crate::ros::server_types::{Channel, ChannelId, ServerMessage, Service, ServiceId};
 use crate::ros::subscription::DeliveryError;
 use crate::ros::SubscriptionSink;
 use crate::ros::{
@@ -36,6 +36,8 @@ pub struct RosNode {
     node_command_receiver: NodeCommandReceiver,
     /// Tracked advertised channels from FoxgloveClient
     advertised_channels: HashMap<ChannelId, Channel>,
+    /// Tracked advertised services from FoxgloveClient
+    advertised_services: HashMap<ServiceId, Service>,
 }
 
 impl RosNode {
@@ -50,6 +52,7 @@ impl RosNode {
             pending_subscribes: HashMap::new(),
             node_command_receiver: receiver,
             advertised_channels: HashMap::new(),
+            advertised_services: HashMap::new(),
         };
         (handle, node)
     }
@@ -178,6 +181,18 @@ impl RosNode {
                     }
                 }
             }
+            ServerMessage::AdvertiseServices(advertise_services) => {
+                for service in advertise_services.services {
+                    debug!("Advertised service: {}", service);
+                    self.advertised_services.insert(service.id, service);
+                }
+            }
+            ServerMessage::UnadvertiseServices(unadvertise_services) => {
+                for service_id in unadvertise_services.service_ids {
+                    debug!("Unadvertised service: {}", service_id);
+                    self.advertised_services.remove(&service_id);
+                }
+            }
             ServerMessage::MessageData(message_data) => {
                 let Some(sinks) = self.subscriptions.get_mut(&message_data.subscription_id) else {
                     return;
@@ -210,6 +225,12 @@ impl RosNode {
             }
             _ => (),
         }
+    }
+
+    fn find_service(&self, service_name: &str) -> Option<&Service> {
+        self.advertised_services
+            .values()
+            .find(|service| service.name == service_name)
     }
 }
 

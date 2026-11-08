@@ -1,6 +1,6 @@
 """Regression tests; run in the ROS Python environment with Cargo available.
 
-python3 -m unittest discover -s experimental/gcs/test -p test_generate_rs.py
+python3 -m unittest discover -s gcs/test -p test_generate_rs.py
 """
 
 import pathlib
@@ -57,6 +57,10 @@ class NamespaceTests(unittest.TestCase):
             script_dir.mkdir()
             script = script_dir / "generate_rs.py"
             shutil.copyfile(generate_rs.__file__, script)
+            shutil.copyfile(
+                pathlib.Path(generate_rs.__file__).with_name("interface_sources.py"),
+                script_dir / "interface_sources.py",
+            )
             shutil.copytree(idl_root, script_dir / "idl")
             elsewhere = root / "elsewhere"
             elsewhere.mkdir()
@@ -160,6 +164,100 @@ class NamespaceTests(unittest.TestCase):
                     output,
                     idl_files=["msg/Image.idl"],
                 )
+
+
+class ServiceAndMonorepoTests(unittest.TestCase):
+    def test_services_from_vendored_and_install_space(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            idl_root = root / "idl"
+            install = root / "install"
+            fixtures = {
+                idl_root / "builtin_interfaces/msg/Time.idl": """
+                    module builtin_interfaces { module msg {
+                        struct Time { int32 sec; uint32 nanosec; };
+                    }; };
+                """,
+                idl_root / "example_interfaces/srv/AddTwoInts.idl": """
+                    module example_interfaces { module srv {
+                        struct AddTwoInts_Request { int64 a; int64 b; };
+                        struct AddTwoInts_Response { int64 sum; };
+                    }; };
+                """,
+                # Monorepo package in colcon's isolated install layout.
+                install / "payload_interfaces/share/payload_interfaces/srv/TimedDrive.idl": """
+                    #include "builtin_interfaces/msg/Time.idl"
+                    module payload_interfaces { module srv {
+                        struct TimedDrive_Request { builtin_interfaces::msg::Time stop; double speed; };
+                        struct TimedDrive_Response { boolean success; };
+                    }; };
+                """,
+            }
+            for path, content in fixtures.items():
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(content)
+
+            output = root / "generated"
+            generate_rs.generate_rs(
+                idl_root=idl_root,
+                output_dir=output,
+                install_base=install,
+                monorepo_packages=["payload_interfaces"],
+            )
+            source = (output / "src/lib.rs").read_text()
+            for name in ["AddTwoInts", "TimedDrive"]:
+                self.assertEqual(source.count(f"pub struct {name};"), 1)
+                self.assertEqual(source.count(f"pub struct {name}_Request {{"), 1)
+                self.assertEqual(source.count(f"pub struct {name}_Response {{"), 1)
+            self.assertIn(
+                'const TYPE_NAME: &\'static str = "example_interfaces/srv/AddTwoInts";', source
+            )
+            self.assertIn("pub stop: crate::builtin_interfaces::msg::Time", source)
+
+            # Vendoring a monorepo package as well is ambiguous.
+            vendored_copy = idl_root / "payload_interfaces/srv/TimedDrive.idl"
+            vendored_copy.parent.mkdir(parents=True)
+            vendored_copy.write_text("")
+            with self.assertRaisesRegex(ValueError, "also vendored"):
+                generate_rs.generate_rs(
+                    idl_root=idl_root,
+                    output_dir=output,
+                    install_base=install,
+                    monorepo_packages=["payload_interfaces"],
+                )
+            vendored_copy.unlink()
+
+            # Missing dependencies point at the helper script.
+            (idl_root / "builtin_interfaces/msg/Time.idl").unlink()
+            with self.assertRaisesRegex(ValueError, "add_interface.py builtin_interfaces/msg/Time"):
+                generate_rs.generate_rs(
+                    "payload_interfaces",
+                    idl_root=idl_root,
+                    output_dir=output,
+                    install_base=install,
+                    monorepo_packages=["payload_interfaces"],
+                )
+
+            tests = output / "tests"
+            tests.mkdir()
+            (tests / "services.rs").write_text("""
+                use ros_interfaces::{example_interfaces::srv, RosMessage, RosService};
+                fn round_trip<S: RosService>(request: &S::Request) -> S::Request
+                where S::Request: serde::Serialize {
+                    let bytes = cdr::serialize::<_, _, cdr::CdrLe>(request, cdr::Infinite).unwrap();
+                    S::Request::deserialize(&bytes).unwrap()
+                }
+                #[test]
+                fn add_two_ints() {
+                    let request = srv::AddTwoInts_Request { a: 2, b: 3 };
+                    assert_eq!(round_trip::<srv::AddTwoInts>(&request), request);
+                    assert_eq!(srv::AddTwoInts::TYPE_NAME, "example_interfaces/srv/AddTwoInts");
+                }
+            """)
+            subprocess.run(
+                ["cargo", "test", "--offline", "--manifest-path", str(output / "Cargo.toml")],
+                check=True,
+            )
 
 
 if __name__ == "__main__":
