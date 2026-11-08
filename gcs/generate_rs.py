@@ -21,13 +21,7 @@ import shutil
 
 from pathlib import Path
 
-from interface_sources import (
-    DEFAULT_IDL_ROOT,
-    DEFAULT_ROS_WS_INSTALL,
-    ROS_WS,
-    build_sources,
-)
-
+DEFAULT_IDL_ROOT = Path(__file__).resolve().parent / "idl"
 DEFAULT_OUTPUT_DIR = Path(__file__).resolve().parent / "crates" / "ros_interfaces"
 
 if os.environ["ROS_DISTRO"] <= "humble":
@@ -239,11 +233,7 @@ def _namespaced_types(type_):
         yield from _namespaced_types(type_.value_type)
 
 
-def _load_referenced_messages(messages, sources):
-    """Add every message type transitively referenced by `messages`.
-
-    `sources` maps package name -> root directory containing <package>/.
-    """
+def _load_referenced_messages(messages, idl_root):
     result = list(messages)
     known = {tuple(message.structure.namespaced_type.namespaced_name()) for message in result}
     index = 0
@@ -255,21 +245,11 @@ def _load_referenced_messages(messages, sources):
                 key = tuple(named_type.namespaced_name())
                 if key in known:
                     continue
-                type_name = "/".join(key)
                 idl_path = pathlib.Path(*key[:-1]) / f"{key[-1]}.idl"
-                referenced_by = "/".join(message.structure.namespaced_type.namespaced_name())
-                hint = f"Vendor it with: python3 gcs/scripts/add_interface.py {type_name}"
-                if key[0] not in sources:
-                    raise ValueError(
-                        f"IDL for {type_name} (referenced by {referenced_by}) not found: "
-                        f"package '{key[0]}' is not vendored or built. {hint}"
-                    )
-                idl_root = sources[key[0]]
                 full_path = idl_root / idl_path
                 if not full_path.is_file():
                     raise ValueError(
-                        f"IDL for {type_name} (referenced by {referenced_by}) not found: "
-                        f"{full_path}. {hint}"
+                        f"IDL for referenced type {'::'.join(key)} not found: {full_path}"
                     )
                 parsed = parse_idl_file(IdlLocator(str(idl_root), str(idl_path)))
                 for dependency in parsed.content.get_elements_of_type(Message):
@@ -351,9 +331,8 @@ def _write_raw_crate(messages, crate_name, output_dir, package_version, services
 
     source = [
         "// Generated raw Rust structs. No ROS runtime is required.",
-        "// Regenerate with gcs/generate_rs.py; do not edit by hand.",
         "",
-        "// Service structs follow ROS naming (e.g. AddTwoInts_Request).",
+        "// Service structs follow ROS naming (e.g. Trigger_Request).",
         "#![allow(non_camel_case_types)]",
         "",
         "/// A ROS message that can be decoded from encapsulated CDR bytes.",
@@ -365,7 +344,7 @@ def _write_raw_crate(messages, crate_name, output_dir, package_version, services
         "pub trait RosService {",
         "    type Request: RosMessage;",
         "    type Response: RosMessage;",
-        "    /// Full ROS type name, e.g. `example_interfaces/srv/AddTwoInts`.",
+        "    /// Full ROS type name, e.g. `std_srvs/srv/Trigger`.",
         "    const TYPE_NAME: &'static str;",
         "}",
         "",
@@ -412,35 +391,22 @@ def generate_rs(
     package_version="0.0.0",
     idl_files=None,
     crate_name="ros_interfaces",
-    install_base=None,
-    monorepo_packages=None,
 ):
     """Generate one Serde-based crate from one or more ROS IDL packages.
 
     All types retain their package/namespace modules, including transitively
-    referenced types. Messages (msg/) and services (srv/) are supported; a
-    service becomes <Name>_Request / <Name>_Response structs plus a <Name>
-    marker implementing RosService.
-
-    Packages come from two places (see interface_sources.py):
-      * vendored packages under idl_root
-      * when install_base is given, the monorepo's own interface packages, read
-        from that colcon install space (monorepo_packages overrides discovery)
-
-    Omit package to generate every known package. Explicit idl_files apply to a
-    single input package.
+    referenced types. Omit package to discover all package directories with
+    IDLs under idl_root. Explicit idl_files apply to a single input package.
     """
     idl_root = pathlib.Path(idl_root).expanduser().resolve()
     if not idl_root.is_dir():
         raise ValueError(f"IDL root is not a directory: {idl_root}")
-    if install_base is not None:
-        install_base = pathlib.Path(install_base).expanduser().resolve()
-
-    sources = build_sources(idl_root, install_base, monorepo_packages)
 
     packages = [package] if isinstance(package, str) else list(package or [])
     if not packages:
-        packages = list(sources)
+        packages = [
+            path.name for path in idl_root.iterdir() if path.is_dir() and any(path.rglob("*.idl"))
+        ]
     packages = sorted(set(packages))
     if not packages:
         raise ValueError(f"No ROS interface packages containing IDL files found under {idl_root}")
@@ -458,13 +424,9 @@ def generate_rs(
     for package in packages:
         if not package.isascii() or not package.isidentifier():
             raise ValueError(f"Invalid ROS package name: {package!r}")
-        if package not in sources:
-            raise ValueError(
-                f"Unknown interface package {package!r}: not vendored under {idl_root}"
-                + ("" if install_base is None else f" or built in {install_base}")
-            )
-        package_idl_root = sources[package]
-        package_root = package_idl_root / package
+        package_root = idl_root / package
+        if not package_root.is_dir():
+            raise ValueError(f"IDL package directory not found: {package_root}")
         paths = (
             sorted(path.relative_to(package_root) for path in package_root.rglob("*.idl"))
             if idl_files is None
@@ -475,24 +437,20 @@ def generate_rs(
         for path in sorted(set(paths)):
             if path.is_absolute() or ".." in path.parts:
                 raise ValueError(f"IDL path must be relative to {package_root}: {path}")
-            locator, _ = _idl_locator(f"{package_root}:{path}", package, package_idl_root)
+            locator, _ = _idl_locator(f"{package_root}:{path}", package, idl_root)
             parsed = parse_idl_file(locator)
             for message in parsed.content.get_elements_of_type(Message):
                 key = tuple(message.structure.namespaced_type.namespaced_name())
                 messages[key] = message
+            # A service becomes <Name>_Request / <Name>_Response structs plus a
+            # <Name> marker implementing RosService.
             for service in parsed.content.get_elements_of_type(Service):
                 services[tuple(service.namespaced_type.namespaced_name())] = service
                 for message in (service.request_message, service.response_message):
                     key = tuple(message.structure.namespaced_type.namespaced_name())
                     messages[key] = message
-            for action in parsed.content.get_elements_of_type(Action):
-                name = "/".join(action.namespaced_type.namespaced_name())
-                print(
-                    f"warning: skipping action {name}: actions are not supported yet",
-                    file=sys.stderr,
-                )
 
-    messages = _load_referenced_messages(messages.values(), sources)
+    messages = _load_referenced_messages(messages.values(), idl_root)
     _write_raw_crate(
         messages, crate_name, output_dir, package_version, services=list(services.values())
     )
@@ -765,19 +723,7 @@ def main(argv=None):
         "--idl-root",
         type=pathlib.Path,
         default=DEFAULT_IDL_ROOT,
-        help="Vendored IDL package root (default: idl/ beside this script).",
-    )
-    parser.add_argument(
-        "--ros-ws-install",
-        type=pathlib.Path,
-        default=DEFAULT_ROS_WS_INSTALL,
-        help="colcon install space holding the monorepo's interface packages "
-        "(default: ros_ws/install).",
-    )
-    parser.add_argument(
-        "--no-monorepo",
-        action="store_true",
-        help="Only use vendored IDLs; skip the monorepo's ros_ws interface packages.",
+        help="IDL package root (default: idl/ beside this script).",
     )
     parser.add_argument(
         "--output-dir",
@@ -804,8 +750,6 @@ def main(argv=None):
         package_version=args.package_version,
         idl_files=args.idl_files,
         crate_name=args.crate_name,
-        # Outside the monorepo (e.g. the generator copied elsewhere) there is no ros_ws.
-        install_base=None if args.no_monorepo or not ROS_WS.is_dir() else args.ros_ws_install,
     )
 
 
