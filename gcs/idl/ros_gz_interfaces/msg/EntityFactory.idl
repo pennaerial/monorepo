@@ -1,0 +1,43 @@
+// generated from rosidl_adapter/resource/msg.idl.em
+// with input from ros_gz_interfaces/msg/EntityFactory.msg
+// generated code does not contain a copyright notice
+
+#include "geometry_msgs/msg/Pose.idl"
+
+module ros_gz_interfaces {
+  module msg {
+    struct EntityFactory {
+      @verbatim (language="comment", text=
+        "New name for the entity, overrides the name on the SDF")
+      string name;
+
+      @verbatim (language="comment", text=
+        "Whether the server is allowed to rename the entity in case of" "\n"
+        "overlap with existing entities.")
+      @default (value=FALSE)
+      boolean allow_renaming;
+
+      @verbatim (language="comment", text=
+        "Only one method is supported at a time (sdf,sdf_filename,clone_name)" "\n"
+        "SDF description in string format")
+      string sdf;
+
+      @verbatim (language="comment", text=
+        "Full path to SDF file.")
+      string sdf_filename;
+
+      @verbatim (language="comment", text=
+        "Name of entity to clone")
+      string clone_name;
+
+      @verbatim (language="comment", text=
+        "Pose where the entity will be spawned in the world.")
+      geometry_msgs::msg::Pose pose;
+
+      @verbatim (language="comment", text=
+        "Pose is defined relative to the frame of this entity.")
+      @default (value="world")
+      string relative_to;
+    };
+  };
+};

@@ -1,0 +1,60 @@
+// generated from rosidl_adapter/resource/msg.idl.em
+// with input from sensor_msgs/msg/CompressedImage.msg
+// generated code does not contain a copyright notice
+
+#include "std_msgs/msg/Header.idl"
+
+module sensor_msgs {
+  module msg {
+    @verbatim (language="comment", text=
+      "This message contains a compressed image.")
+    struct CompressedImage {
+      @verbatim (language="comment", text=
+        "Header timestamp should be acquisition time of image" "\n"
+        "Header frame_id should be optical frame of camera" "\n"
+        "origin of frame should be optical center of cameara" "\n"
+        "+x should point to the right in the image" "\n"
+        "+y should point down in the image" "\n"
+        "+z should point into to plane of the image")
+      std_msgs::msg::Header header;
+
+      @verbatim (language="comment", text=
+        "Specifies the format of the data" "\n"
+        "Acceptable values differ by the image transport used:" "\n"
+        "- compressed_image_transport:" "\n"
+        "    ORIG_PIXFMT; CODEC compressed" "\n"
+        "  where:" "\n"
+        "  - ORIG_PIXFMT is pixel format of the raw image, i.e." "\n"
+        "    the content of sensor_msgs/Image/encoding with" "\n"
+        "    values from include/sensor_msgs/image_encodings.h" "\n"
+        "  - CODEC is one of [jpeg, png, tiff]" "\n"
+        "  - COMPRESSED_PIXFMT is only appended for color images" "\n"
+        "    and is the pixel format used by the compression" "\n"
+        "    algorithm. Valid values for jpeg encoding are:" "\n"
+        "    [bgr8, rgb8]. Valid values for png encoding are:" "\n"
+        "    [bgr8, rgb8, bgr16, rgb16]." "\n"
+        "  If the field is empty or does not correspond to the" "\n"
+        "  above pattern, the image is treated as bgr8 or mono8" "\n"
+        "  jpeg image (depending on the number of channels)." "\n"
+        "- compressed_depth_image_transport:" "\n"
+        "    ORIG_PIXFMT; compressedDepth CODEC" "\n"
+        "  where:" "\n"
+        "  - ORIG_PIXFMT is pixel format of the raw image, i.e." "\n"
+        "    the content of sensor_msgs/Image/encoding with" "\n"
+        "    values from include/sensor_msgs/image_encodings.h" "\n"
+        "    It is usually one of [16UC1, 32FC1]." "\n"
+        "  - CODEC is one of [png, rvl]" "\n"
+        "  If the field is empty or does not correspond to the" "\n"
+        "  above pattern, the image is treated as png image." "\n"
+        "- Other image transports can store whatever values they" "\n"
+        "  need for successful decoding of the image. Refer to" "\n"
+        "  documentation of the other transports for details.")
+      @unit (value="COMPRESSED_PIXFMT")
+      string format;
+
+      @verbatim (language="comment", text=
+        "Compressed image buffer")
+      sequence<uint8> data;
+    };
+  };
+};
