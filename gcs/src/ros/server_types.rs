@@ -8,6 +8,8 @@ use crate::ros::subscription::SubscriptionId;
 
 pub type ChannelId = u32;
 pub type ServiceId = u32;
+/// Client-chosen id that pairs a service call request with its response
+pub type CallId = u32;
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(tag = "op")]
@@ -23,18 +25,20 @@ pub enum ServerMessage {
     #[serde(rename = "advertise")]
     Advertise(Advertise),
     // Unadvertise,
-    #[serde(rename="advertiseServices")]
+    #[serde(rename = "advertiseServices")]
     AdvertiseServices(AdvertiseServices),
-    #[serde(rename="unadvertiseServices")]
+    #[serde(rename = "unadvertiseServices")]
     UnadvertiseServices(UnadvertiseServices),
     // ParameterValues,
-    // ServiceCallResponse,
     // ConnectionGraphUpdate,
     // FetchAssetResponse,
-    // ServiceCallFailure,
+    #[serde(rename = "serviceCallFailure")]
+    ServiceCallFailure(ServiceCallFailure),
     // Binary ServerMessages
     #[serde(skip)]
     MessageData(MessageData),
+    #[serde(skip)]
+    ServiceCallResponse(ServiceCallResponse),
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -96,6 +100,14 @@ impl BinaryOpcode {
     }
 }
 
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ClientBinaryOpcode {
+    #[allow(dead_code)] // client publishing is not implemented yet
+    MessageData = 1,
+    ServiceCallRequest = 2,
+}
+
 // BINARY MESSAGES
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -146,6 +158,26 @@ pub struct AdvertiseServices {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UnadvertiseServices {
     pub service_ids: Vec<ServiceId>,
+}
+
+/// Sent by the server when a service call could not be completed
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServiceCallFailure {
+    pub service_id: ServiceId,
+    pub call_id: CallId,
+    pub message: String,
+}
+
+/// Binary response to a service call request
+#[derive(Debug, Clone)]
+pub struct ServiceCallResponse {
+    // op: BinaryOpcode.SERVICE_CALL_RESPONSE;
+    pub service_id: ServiceId,
+    pub call_id: CallId,
+    pub encoding: String,
+    pub data: Bytes, // CDR-encoded response
 }
