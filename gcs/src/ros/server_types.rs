@@ -123,7 +123,7 @@ pub struct MessageData {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ServiceDefinition {
-    pub encoding: String,
+    pub encoding: String, // always use cdr for now
     pub schema_name: String,
     pub schema: String,
     #[serde(skip_serializing_if = "Option::is_none")]

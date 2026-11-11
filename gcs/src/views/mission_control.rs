@@ -8,6 +8,7 @@ use std::time::Duration;
 
 const SERVICE_TIMEOUT: Duration = Duration::from_secs(5);
 
+// TODO: Remove run_client code
 // / * `url`: e.g. "localhost:8765"
 async fn run_client(url: &str) {
     let mut client = FoxgloveClient::new();
@@ -97,7 +98,9 @@ pub fn MissionControl() -> Element {
                 }
                 p { "{string_msg}" }
 
-                // Service call demos 
+                // TODO: Think about creating some ServiceClient abstraction on top such that you
+                // can repeat service calls to an initiailzed service, similar to create_client in ROS
+                // Service call demos
                 Button {
                     label: "Add 2 + 3",
                     onclick: move |_| {
