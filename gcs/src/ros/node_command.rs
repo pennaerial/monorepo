@@ -7,6 +7,7 @@ pub enum NodeCommand {
         url: String,
         reply: oneshot::Sender<Result<(), NodeError>>,
     },
+    // TODO: Plz implement this
     Disconnect {
         reply: oneshot::Sender<Result<(), NodeError>>,
     },
