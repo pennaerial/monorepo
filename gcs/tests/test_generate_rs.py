@@ -1,6 +1,6 @@
 """Regression tests; run in the ROS Python environment with Cargo available.
 
-python3 -m unittest discover -s experimental/gcs/test -p test_generate_rs.py
+python3 -m unittest discover -s gcs/tests -p test_generate_rs.py
 """
 
 import pathlib
