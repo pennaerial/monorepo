@@ -449,6 +449,7 @@ impl NodeHandle {
         S::Response::deserialize(&response).map_err(NodeError::Decode)
     }
 
+    // TODO: Merge into call_service<S>() because we may not need expected_type to be an Option<>
     async fn call_service_bytes(
         &self,
         service_name: &str,
