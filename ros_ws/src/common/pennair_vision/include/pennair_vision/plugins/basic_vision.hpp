@@ -13,8 +13,8 @@ class BasicVision : public LazyCameraPublisher<std_msgs::msg::Int32>
 {
 public:
   /// See LazyCameraPublisher
-  ProcessResult<std_msgs::msg::Int32> process(const CameraImage& image, const CameraInfo& info, bool generate_debug)
-      override;
+  ProcessResult<std_msgs::msg::Int32>
+  process(const CameraImage& image, const CameraInfo& info, bool generate_debug) override;
 
 private:
   std::uint32_t count_{0};

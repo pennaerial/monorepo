@@ -2,7 +2,8 @@
 #include "sim_interfaces/srv/attach_detach.hpp"
 
 
-inline pennair_gz::msgs::AttachDetachRequest convert_to_gz(sim_interfaces::srv::AttachDetach::Request::SharedPtr ros_req
+inline pennair_gz::msgs::AttachDetachRequest convert_to_gz(
+    sim_interfaces::srv::AttachDetach::Request::SharedPtr ros_req
 )
 {
   pennair_gz::msgs::AttachDetachRequest gz_req;
