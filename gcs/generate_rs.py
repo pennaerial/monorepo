@@ -286,7 +286,7 @@ def _render_raw_struct(message):
         [
             "",
             f"impl crate::RosMessage for {name} {{",
-            f"    const TYPE_NAME: &'static str = \"{type_name}\";",
+            f'    const TYPE_NAME: &\'static str = "{type_name}";',
             "",
             "    fn serialize(&self) -> Result<Vec<u8>, cdr::Error> {",
             "        cdr::serialize::<_, _, cdr::CdrLe>(self, cdr::Infinite)",
