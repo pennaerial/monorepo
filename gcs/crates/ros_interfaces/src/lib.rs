@@ -3,8 +3,9 @@
 // Service structs follow ROS naming (e.g. Trigger_Request).
 #![allow(non_camel_case_types)]
 
-/// A ROS message that can be decoded from encapsulated CDR bytes.
-pub trait RosMessage: Sized + Send + 'static {
+/// A ROS message that can be encoded to and decoded from encapsulated CDR bytes.
+pub trait RosMessage: serde::Serialize + Sized + Send + 'static {
+    fn serialize(&self) -> Result<Vec<u8>, cdr::Error>;
     fn deserialize(bytes: &[u8]) -> Result<Self, cdr::Error>;
 }
 
@@ -26,11 +27,17 @@ pub mod builtin_interfaces {
         }
 
         impl crate::RosMessage for Time {
+            fn serialize(&self) -> Result<Vec<u8>, cdr::Error> {
+                cdr::serialize::<_, _, cdr::CdrLe>(self, cdr::Infinite)
+            }
+
             fn deserialize(bytes: &[u8]) -> Result<Self, cdr::Error> {
                 cdr::deserialize(bytes)
             }
         }
+
     }
+
 }
 
 pub mod example_interfaces {
@@ -52,6 +59,10 @@ pub mod example_interfaces {
         }
 
         impl crate::RosMessage for AddTwoInts_Request {
+            fn serialize(&self) -> Result<Vec<u8>, cdr::Error> {
+                cdr::serialize::<_, _, cdr::CdrLe>(self, cdr::Infinite)
+            }
+
             fn deserialize(bytes: &[u8]) -> Result<Self, cdr::Error> {
                 cdr::deserialize(bytes)
             }
@@ -63,11 +74,17 @@ pub mod example_interfaces {
         }
 
         impl crate::RosMessage for AddTwoInts_Response {
+            fn serialize(&self) -> Result<Vec<u8>, cdr::Error> {
+                cdr::serialize::<_, _, cdr::CdrLe>(self, cdr::Infinite)
+            }
+
             fn deserialize(bytes: &[u8]) -> Result<Self, cdr::Error> {
                 cdr::deserialize(bytes)
             }
         }
+
     }
+
 }
 
 pub mod geometry_msgs {
@@ -81,6 +98,10 @@ pub mod geometry_msgs {
         }
 
         impl crate::RosMessage for Point {
+            fn serialize(&self) -> Result<Vec<u8>, cdr::Error> {
+                cdr::serialize::<_, _, cdr::CdrLe>(self, cdr::Infinite)
+            }
+
             fn deserialize(bytes: &[u8]) -> Result<Self, cdr::Error> {
                 cdr::deserialize(bytes)
             }
@@ -93,6 +114,10 @@ pub mod geometry_msgs {
         }
 
         impl crate::RosMessage for Pose {
+            fn serialize(&self) -> Result<Vec<u8>, cdr::Error> {
+                cdr::serialize::<_, _, cdr::CdrLe>(self, cdr::Infinite)
+            }
+
             fn deserialize(bytes: &[u8]) -> Result<Self, cdr::Error> {
                 cdr::deserialize(bytes)
             }
@@ -107,11 +132,17 @@ pub mod geometry_msgs {
         }
 
         impl crate::RosMessage for Quaternion {
+            fn serialize(&self) -> Result<Vec<u8>, cdr::Error> {
+                cdr::serialize::<_, _, cdr::CdrLe>(self, cdr::Infinite)
+            }
+
             fn deserialize(bytes: &[u8]) -> Result<Self, cdr::Error> {
                 cdr::deserialize(bytes)
             }
         }
+
     }
+
 }
 
 pub mod rcl_interfaces {
@@ -137,11 +168,17 @@ pub mod rcl_interfaces {
         }
 
         impl crate::RosMessage for Log {
+            fn serialize(&self) -> Result<Vec<u8>, cdr::Error> {
+                cdr::serialize::<_, _, cdr::CdrLe>(self, cdr::Infinite)
+            }
+
             fn deserialize(bytes: &[u8]) -> Result<Self, cdr::Error> {
                 cdr::deserialize(bytes)
             }
         }
+
     }
+
 }
 
 pub mod std_msgs {
@@ -153,6 +190,10 @@ pub mod std_msgs {
         }
 
         impl crate::RosMessage for Float64 {
+            fn serialize(&self) -> Result<Vec<u8>, cdr::Error> {
+                cdr::serialize::<_, _, cdr::CdrLe>(self, cdr::Infinite)
+            }
+
             fn deserialize(bytes: &[u8]) -> Result<Self, cdr::Error> {
                 cdr::deserialize(bytes)
             }
@@ -164,6 +205,10 @@ pub mod std_msgs {
         }
 
         impl crate::RosMessage for Int32 {
+            fn serialize(&self) -> Result<Vec<u8>, cdr::Error> {
+                cdr::serialize::<_, _, cdr::CdrLe>(self, cdr::Infinite)
+            }
+
             fn deserialize(bytes: &[u8]) -> Result<Self, cdr::Error> {
                 cdr::deserialize(bytes)
             }
@@ -175,9 +220,15 @@ pub mod std_msgs {
         }
 
         impl crate::RosMessage for String {
+            fn serialize(&self) -> Result<Vec<u8>, cdr::Error> {
+                cdr::serialize::<_, _, cdr::CdrLe>(self, cdr::Infinite)
+            }
+
             fn deserialize(bytes: &[u8]) -> Result<Self, cdr::Error> {
                 cdr::deserialize(bytes)
             }
         }
+
     }
+
 }

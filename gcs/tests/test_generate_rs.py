@@ -121,7 +121,7 @@ class NamespaceTests(unittest.TestCase):
                     fn decode<T: RosMessage>(bytes: &[u8]) -> Result<T, cdr::Error> {
                         T::deserialize(bytes)
                     }
-                    let bytes = cdr::serialize::<_, _, cdr::CdrLe>(&image, cdr::Infinite).unwrap();
+                    let bytes = image.serialize().unwrap();
                     assert_eq!(decode::<sensor_msgs::msg::Image>(&bytes).unwrap(), image);
                     let bytes = cdr::serialize::<_, _, cdr::CdrBe>(&image, cdr::Infinite).unwrap();
                     assert_eq!(decode::<sensor_msgs::msg::Image>(&bytes).unwrap(), image);
@@ -207,17 +207,23 @@ class ServiceTests(unittest.TestCase):
             tests.mkdir()
             (tests / "services.rs").write_text("""
                 use ros_interfaces::{std_srvs::srv, RosMessage, RosService};
-                fn round_trip<M: RosMessage + serde::Serialize>(message: &M) -> M {
-                    let bytes = cdr::serialize::<_, _, cdr::CdrLe>(message, cdr::Infinite).unwrap();
+                fn round_trip<M: RosMessage>(message: &M) -> M {
+                    let bytes = RosMessage::serialize(message).unwrap();
+                    assert_eq!(bytes, cdr::serialize::<_, _, cdr::CdrLe>(message, cdr::Infinite).unwrap());
                     M::deserialize(&bytes).unwrap()
                 }
                 fn type_name<S: RosService>() -> &'static str { S::TYPE_NAME }
+                fn service_round_trip<S: RosService>(request: &S::Request, response: &S::Response) {
+                    round_trip(request);
+                    round_trip(response);
+                }
                 #[test]
                 fn trigger() {
                     let response = srv::Trigger_Response { success: true, message: "ok".into() };
                     assert_eq!(round_trip(&response), response);
                     let request = srv::Trigger_Request { structure_needs_at_least_one_member: 0 };
                     assert_eq!(round_trip(&request), request);
+                    service_round_trip::<srv::Trigger>(&request, &response);
                     assert_eq!(type_name::<srv::Trigger>(), "std_srvs/srv/Trigger");
                 }
             """)
