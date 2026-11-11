@@ -4,7 +4,7 @@
 #![allow(non_camel_case_types)]
 
 /// A ROS message that can be encoded to and decoded from encapsulated CDR bytes.
-pub trait RosMessage: serde::Serialize + Sized + Send + 'static {
+pub trait RosMessage: Sized + Send + 'static {
     /// Full ROS message type name, e.g. `std_msgs/msg/Int32`.
     const TYPE_NAME: &'static str;
     fn serialize(&self) -> Result<Vec<u8>, cdr::Error>;
@@ -39,7 +39,9 @@ pub mod builtin_interfaces {
                 cdr::deserialize(bytes)
             }
         }
+
     }
+
 }
 
 pub mod example_interfaces {
@@ -88,7 +90,9 @@ pub mod example_interfaces {
                 cdr::deserialize(bytes)
             }
         }
+
     }
+
 }
 
 pub mod geometry_msgs {
@@ -150,7 +154,9 @@ pub mod geometry_msgs {
                 cdr::deserialize(bytes)
             }
         }
+
     }
+
 }
 
 pub mod rcl_interfaces {
@@ -186,7 +192,9 @@ pub mod rcl_interfaces {
                 cdr::deserialize(bytes)
             }
         }
+
     }
+
 }
 
 pub mod std_msgs {
@@ -242,5 +250,7 @@ pub mod std_msgs {
                 cdr::deserialize(bytes)
             }
         }
+
     }
+
 }

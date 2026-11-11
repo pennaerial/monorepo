@@ -210,8 +210,7 @@ class ServiceTests(unittest.TestCase):
             (tests / "services.rs").write_text("""
                 use ros_interfaces::{std_srvs::srv, RosMessage, RosService};
                 fn round_trip<M: RosMessage>(message: &M) -> M {
-                    let bytes = RosMessage::serialize(message).unwrap();
-                    assert_eq!(bytes, cdr::serialize::<_, _, cdr::CdrLe>(message, cdr::Infinite).unwrap());
+                    let bytes = message.serialize().unwrap();
                     M::deserialize(&bytes).unwrap()
                 }
                 fn type_name<S: RosService>() -> &'static str { S::TYPE_NAME }

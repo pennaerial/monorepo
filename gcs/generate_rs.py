@@ -343,7 +343,7 @@ def _write_raw_crate(messages, crate_name, output_dir, package_version, services
         "#![allow(non_camel_case_types)]",
         "",
         "/// A ROS message that can be encoded to and decoded from encapsulated CDR bytes.",
-        "pub trait RosMessage: serde::Serialize + Sized + Send + 'static {",
+        "pub trait RosMessage: Sized + Send + 'static {",
         "    /// Full ROS message type name, e.g. `std_msgs/msg/Int32`.",
         "    const TYPE_NAME: &'static str;",
         "    fn serialize(&self) -> Result<Vec<u8>, cdr::Error>;",
