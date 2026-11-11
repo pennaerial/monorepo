@@ -1,7 +1,6 @@
 use dioxus::prelude::*;
 use ros_interfaces::RosMessage;
 use std::marker::PhantomData;
-use std::sync::Arc;
 
 use crate::ros::{NodeError, NodeHandle, SubscriptionHandle};
 
