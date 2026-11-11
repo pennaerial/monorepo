@@ -1,6 +1,6 @@
 mod components;
 mod hooks;
-mod ros;
+use gcs::ros;
 mod routes;
 mod views;
 
