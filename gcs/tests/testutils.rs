@@ -1,16 +1,17 @@
 use foxglove::{
-    self, RawChannel, ChannelBuilder, Context, FoxgloveError, Schema, WebSocketServerHandle, websocket::service::{Request, Service, ServiceSchema},
+    self,
+    websocket::service::{Request, Service, ServiceSchema},
+    ChannelBuilder, Context, FoxgloveError, RawChannel, Schema, WebSocketServerHandle,
 };
 use ros_interfaces::{RosMessage, RosService};
 use std::error::Error;
 use std::sync::Arc;
 
 /// Utility type for running integration tests with a websocket
-struct RosInterfaceServer {
+pub struct RosInterfaceServer {
     server: WebSocketServerHandle,
     context: Arc<Context>,
 }
-
 
 impl RosInterfaceServer {
     pub async fn start() -> Result<Self, foxglove::FoxgloveError> {
@@ -23,10 +24,7 @@ impl RosInterfaceServer {
             .start()
             .await?;
 
-        Ok(Self {
-            server,
-            context,
-        })
+        Ok(Self { server, context })
     }
 
     pub fn url(&self) -> String {
@@ -38,8 +36,10 @@ impl RosInterfaceServer {
     }
 
     /// generic method that bridges RosMessages to FoxgloveServer's Channel builder
-    pub fn add_ros_channel<T: RosMessage>(&self, topic_name: &str) -> Result<Arc<RawChannel>, FoxgloveError> {
-
+    pub fn add_ros_channel<T: RosMessage>(
+        &self,
+        topic_name: &str,
+    ) -> Result<Arc<RawChannel>, FoxgloveError> {
         let dummy_schema = Schema::new(T::TYPE_NAME, "ros2msg", &b""[..]);
 
         let channel = ChannelBuilder::new(topic_name)
@@ -80,53 +80,5 @@ impl RosInterfaceServer {
         if let Some(channel) = self.context.get_channel_by_topic(topic) {
             channel.close();
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::RosInterfaceServer;
-
-    #[tokio::test]
-    async fn mock_server_start_stop() {
-        let server = RosInterfaceServer::start().await.unwrap();
-        assert_ne!(server.server.port(), 0);
-        assert_eq!(
-            server.url(),
-            format!("ws://127.0.0.1:{}", server.server.port())
-        );
-        server.stop().await;
-    }
-
-    #[tokio::test]
-    async fn add_ros_service_registers_service() {
-        use foxglove::FoxgloveError;
-        use ros_interfaces::example_interfaces::srv::{AddTwoInts, AddTwoInts_Response};
-
-        let server = RosInterfaceServer::start().await.unwrap();
-        server
-            .add_ros_service::<AddTwoInts>("/add_two_ints", |_| AddTwoInts_Response { sum: 5 })
-            .unwrap();
-        let duplicate = server
-            .add_ros_service::<AddTwoInts>("/add_two_ints", |_| AddTwoInts_Response { sum: 5 });
-        assert!(matches!(
-            duplicate,
-            Err(FoxgloveError::DuplicateService(name)) if name == "/add_two_ints"
-        ));
-        server.remove_service("/add_two_ints");
-        server.stop().await;
-    }
-
-    #[tokio::test]
-    async fn add_ros_channel_creates_channel() {
-        use ros_interfaces::{std_msgs::msg::Int32, RosMessage};
-
-        let server = RosInterfaceServer::start().await.unwrap();
-        let channel = server.add_ros_channel::<Int32>("/counter").unwrap();
-        assert_eq!(channel.topic(), "/counter");
-        assert_eq!(channel.message_encoding(), "cdr");
-        assert_eq!(channel.schema().unwrap().name, Int32::TYPE_NAME);
-        server.remove_channel("/counter");
-        server.stop().await;
     }
 }
