@@ -162,5 +162,70 @@ class NamespaceTests(unittest.TestCase):
                 )
 
 
+class ServiceTests(unittest.TestCase):
+    def test_service_generates_request_response_and_marker(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            idl_root = root / "idl"
+            fixtures = {
+                "builtin_interfaces/msg/Time.idl": """
+                    module builtin_interfaces { module msg {
+                        struct Time { int32 sec; uint32 nanosec; };
+                    }; };
+                """,
+                "std_srvs/srv/Trigger.idl": """
+                    module std_srvs { module srv {
+                        struct Trigger_Request { uint8 structure_needs_at_least_one_member; };
+                        struct Trigger_Response { boolean success; string message; };
+                    }; };
+                """,
+                "demo_srvs/srv/Stamp.idl": """
+                    #include "builtin_interfaces/msg/Time.idl"
+                    module demo_srvs { module srv {
+                        struct Stamp_Request { int32 id; };
+                        struct Stamp_Response { builtin_interfaces::msg::Time stamp; };
+                    }; };
+                """,
+            }
+            for relative, content in fixtures.items():
+                path = idl_root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(content)
+
+            output = root / "generated"
+            generate_rs.generate_rs(idl_root=idl_root, output_dir=output)
+            source = (output / "src/lib.rs").read_text()
+            for name in ["Trigger", "Stamp"]:
+                self.assertEqual(source.count(f"pub struct {name};"), 1)
+                self.assertEqual(source.count(f"pub struct {name}_Request {{"), 1)
+                self.assertEqual(source.count(f"pub struct {name}_Response {{"), 1)
+            self.assertIn('const TYPE_NAME: &\'static str = "std_srvs/srv/Trigger";', source)
+            # Service dependencies resolve like message dependencies.
+            self.assertIn("pub stamp: crate::builtin_interfaces::msg::Time", source)
+
+            tests = output / "tests"
+            tests.mkdir()
+            (tests / "services.rs").write_text("""
+                use ros_interfaces::{std_srvs::srv, RosMessage, RosService};
+                fn round_trip<M: RosMessage + serde::Serialize>(message: &M) -> M {
+                    let bytes = cdr::serialize::<_, _, cdr::CdrLe>(message, cdr::Infinite).unwrap();
+                    M::deserialize(&bytes).unwrap()
+                }
+                fn type_name<S: RosService>() -> &'static str { S::TYPE_NAME }
+                #[test]
+                fn trigger() {
+                    let response = srv::Trigger_Response { success: true, message: "ok".into() };
+                    assert_eq!(round_trip(&response), response);
+                    let request = srv::Trigger_Request { structure_needs_at_least_one_member: 0 };
+                    assert_eq!(round_trip(&request), request);
+                    assert_eq!(type_name::<srv::Trigger>(), "std_srvs/srv/Trigger");
+                }
+            """)
+            subprocess.run(
+                ["cargo", "test", "--offline", "--manifest-path", str(output / "Cargo.toml")],
+                check=True,
+            )
+
+
 if __name__ == "__main__":
     unittest.main()
