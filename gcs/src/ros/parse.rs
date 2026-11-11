@@ -185,7 +185,10 @@ mod tests {
     fn read_u32_with_short_input_returns_too_short() {
         let bytes = Bytes::from_static(&[0x12, 0x34, 0x56]);
         let mut offset = 0;
-        assert!(matches!(read_u32(&bytes, &mut offset), Err(ParseError::TooShort)));
+        assert!(matches!(
+            read_u32(&bytes, &mut offset),
+            Err(ParseError::TooShort)
+        ));
     }
 
     #[test]
@@ -238,7 +241,7 @@ mod tests {
         let bytes = Bytes::from_static(&[
             1, 0, 0, 0, // service ID = 1
             2, 0, 0, 0, // call ID = 2
-            1, 0, 0, 0, // encoding length = 1 byte
+            1, 0, 0, 0,    // encoding length = 1 byte
             0xff, // invalid UTF-8: 0xff is never a valid UTF-8 byte
         ]);
         assert!(matches!(
@@ -256,7 +259,8 @@ mod tests {
             3, 0, 0, 0, b'c', b'd', b'r', // encoding length and encoding
             0xaa, 0xbb, // payload
         ]);
-        let ServerMessage::ServiceCallResponse(response) = parse_binary_message(&bytes).unwrap() else {
+        let ServerMessage::ServiceCallResponse(response) = parse_binary_message(&bytes).unwrap()
+        else {
             panic!("expected ServiceCallResponse");
         };
         assert_eq!(response.service_id, 0x78563412);
@@ -268,12 +272,15 @@ mod tests {
     #[test]
     fn encode_service_request_frame() {
         let frame = encode_service_call_request(0x78563412, 0x67452301, "cdr", &[0xaa, 0xbb]);
-        assert_eq!(frame, [
-            2, // ServiceCallRequest opcode
-            0x12, 0x34, 0x56, 0x78, // service ID
-            0x01, 0x23, 0x45, 0x67, // call ID
-            3, 0, 0, 0, b'c', b'd', b'r', // encoding length and encoding
-            0xaa, 0xbb, // payload
-        ]);
+        assert_eq!(
+            frame,
+            [
+                2, // ServiceCallRequest opcode
+                0x12, 0x34, 0x56, 0x78, // service ID
+                0x01, 0x23, 0x45, 0x67, // call ID
+                3, 0, 0, 0, b'c', b'd', b'r', // encoding length and encoding
+                0xaa, 0xbb, // payload
+            ]
+        );
     }
 }
