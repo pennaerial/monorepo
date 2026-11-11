@@ -5,6 +5,8 @@
 
 /// A ROS message that can be encoded to and decoded from encapsulated CDR bytes.
 pub trait RosMessage: serde::Serialize + Sized + Send + 'static {
+    /// Full ROS message type name, e.g. `std_msgs/msg/Int32`.
+    const TYPE_NAME: &'static str;
     fn serialize(&self) -> Result<Vec<u8>, cdr::Error>;
     fn deserialize(bytes: &[u8]) -> Result<Self, cdr::Error>;
 }
@@ -27,6 +29,8 @@ pub mod builtin_interfaces {
         }
 
         impl crate::RosMessage for Time {
+            const TYPE_NAME: &'static str = "builtin_interfaces/msg/Time";
+
             fn serialize(&self) -> Result<Vec<u8>, cdr::Error> {
                 cdr::serialize::<_, _, cdr::CdrLe>(self, cdr::Infinite)
             }
@@ -59,6 +63,8 @@ pub mod example_interfaces {
         }
 
         impl crate::RosMessage for AddTwoInts_Request {
+            const TYPE_NAME: &'static str = "example_interfaces/srv/AddTwoInts_Request";
+
             fn serialize(&self) -> Result<Vec<u8>, cdr::Error> {
                 cdr::serialize::<_, _, cdr::CdrLe>(self, cdr::Infinite)
             }
@@ -74,6 +80,8 @@ pub mod example_interfaces {
         }
 
         impl crate::RosMessage for AddTwoInts_Response {
+            const TYPE_NAME: &'static str = "example_interfaces/srv/AddTwoInts_Response";
+
             fn serialize(&self) -> Result<Vec<u8>, cdr::Error> {
                 cdr::serialize::<_, _, cdr::CdrLe>(self, cdr::Infinite)
             }
@@ -98,6 +106,8 @@ pub mod geometry_msgs {
         }
 
         impl crate::RosMessage for Point {
+            const TYPE_NAME: &'static str = "geometry_msgs/msg/Point";
+
             fn serialize(&self) -> Result<Vec<u8>, cdr::Error> {
                 cdr::serialize::<_, _, cdr::CdrLe>(self, cdr::Infinite)
             }
@@ -114,6 +124,8 @@ pub mod geometry_msgs {
         }
 
         impl crate::RosMessage for Pose {
+            const TYPE_NAME: &'static str = "geometry_msgs/msg/Pose";
+
             fn serialize(&self) -> Result<Vec<u8>, cdr::Error> {
                 cdr::serialize::<_, _, cdr::CdrLe>(self, cdr::Infinite)
             }
@@ -132,6 +144,8 @@ pub mod geometry_msgs {
         }
 
         impl crate::RosMessage for Quaternion {
+            const TYPE_NAME: &'static str = "geometry_msgs/msg/Quaternion";
+
             fn serialize(&self) -> Result<Vec<u8>, cdr::Error> {
                 cdr::serialize::<_, _, cdr::CdrLe>(self, cdr::Infinite)
             }
@@ -168,6 +182,8 @@ pub mod rcl_interfaces {
         }
 
         impl crate::RosMessage for Log {
+            const TYPE_NAME: &'static str = "rcl_interfaces/msg/Log";
+
             fn serialize(&self) -> Result<Vec<u8>, cdr::Error> {
                 cdr::serialize::<_, _, cdr::CdrLe>(self, cdr::Infinite)
             }
@@ -190,6 +206,8 @@ pub mod std_msgs {
         }
 
         impl crate::RosMessage for Float64 {
+            const TYPE_NAME: &'static str = "std_msgs/msg/Float64";
+
             fn serialize(&self) -> Result<Vec<u8>, cdr::Error> {
                 cdr::serialize::<_, _, cdr::CdrLe>(self, cdr::Infinite)
             }
@@ -205,6 +223,8 @@ pub mod std_msgs {
         }
 
         impl crate::RosMessage for Int32 {
+            const TYPE_NAME: &'static str = "std_msgs/msg/Int32";
+
             fn serialize(&self) -> Result<Vec<u8>, cdr::Error> {
                 cdr::serialize::<_, _, cdr::CdrLe>(self, cdr::Infinite)
             }
@@ -220,6 +240,8 @@ pub mod std_msgs {
         }
 
         impl crate::RosMessage for String {
+            const TYPE_NAME: &'static str = "std_msgs/msg/String";
+
             fn serialize(&self) -> Result<Vec<u8>, cdr::Error> {
                 cdr::serialize::<_, _, cdr::CdrLe>(self, cdr::Infinite)
             }

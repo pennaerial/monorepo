@@ -110,6 +110,8 @@ class NamespaceTests(unittest.TestCase):
                 use ros_interfaces::{builtin_interfaces, sensor_msgs, std_msgs, RosMessage};
                 #[test]
                 fn shared_types() {
+                    assert_eq!(std_msgs::msg::Int32::TYPE_NAME, "std_msgs/msg/Int32");
+                    assert_eq!(builtin_interfaces::msg::Time::TYPE_NAME, "builtin_interfaces/msg/Time");
                     let header = std_msgs::msg::Header {
                         stamp: builtin_interfaces::msg::Time { sec: 0, nanosec: 0 },
                         frame_id: String::new(),
@@ -225,6 +227,8 @@ class ServiceTests(unittest.TestCase):
                     assert_eq!(round_trip(&request), request);
                     service_round_trip::<srv::Trigger>(&request, &response);
                     assert_eq!(type_name::<srv::Trigger>(), "std_srvs/srv/Trigger");
+                    assert_eq!(srv::Trigger_Request::TYPE_NAME, "std_srvs/srv/Trigger_Request");
+                    assert_eq!(srv::Trigger_Response::TYPE_NAME, "std_srvs/srv/Trigger_Response");
                 }
             """)
             subprocess.run(
