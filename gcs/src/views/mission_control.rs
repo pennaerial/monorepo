@@ -1,9 +1,7 @@
 use crate::components::{Button, LogPanel, SideBar};
 use crate::hooks::{use_ros_node, use_subscription};
-use crate::ros::server_types::ServerMessage;
-use crate::ros::FoxgloveClient;
 use dioxus::prelude::*;
-use ros_interfaces::{example_interfaces, geometry_msgs, std_msgs};
+use ros_interfaces::{example_interfaces, std_msgs};
 use std::time::Duration;
 
 const SERVICE_TIMEOUT: Duration = Duration::from_secs(5);
