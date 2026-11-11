@@ -72,6 +72,12 @@ pub struct FoxgloveClient {
     next_call_id: CallId,
 }
 
+impl Default for FoxgloveClient {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FoxgloveClient {
     pub fn new() -> FoxgloveClient {
         let (broadcaster, _) = broadcast::channel(100); // 100 max buffer
@@ -215,6 +221,6 @@ impl FoxgloveClient {
     }
 
     pub fn is_connected(&self) -> bool {
-        return self.connected;
+        self.connected
     }
 }
