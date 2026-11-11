@@ -17,8 +17,8 @@ class AprilTagPlugin : public LazyCameraPublisher<pennair_vision::msg::AprilTagA
 public:
   AprilTagPlugin();
   ~AprilTagPlugin() override;
-  ProcessResult<pennair_vision::msg::AprilTagArray> process(const CameraImage& image, const CameraInfo& info, bool generate_debug)
-      override;
+  ProcessResult<pennair_vision::msg::AprilTagArray>
+  process(const CameraImage& image, const CameraInfo& info, bool generate_debug) override;
 
 private:
   apriltag_detector_t* td_{nullptr};
