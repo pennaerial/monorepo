@@ -1,6 +1,6 @@
 """Regression tests; run in the ROS Python environment with Cargo available.
 
-python3 -m unittest discover -s gcs/tests -p test_generate_rs.py
+python3 -m unittest discover -s rust/ros_interfaces/tests -p test_generate_rs.py
 """
 
 import pathlib
@@ -53,7 +53,7 @@ class NamespaceTests(unittest.TestCase):
                 path.write_text(content)
 
             # Exercise the real CLI from a directory unrelated to the script.
-            script_dir = root / "gcs"
+            script_dir = root / "ros_interfaces"
             script_dir.mkdir()
             script = script_dir / "generate_rs.py"
             shutil.copyfile(generate_rs.__file__, script)
@@ -68,7 +68,7 @@ class NamespaceTests(unittest.TestCase):
                 cwd=elsewhere,
                 check=True,
             )
-            default_crate = script_dir / "crates/ros_interfaces"
+            default_crate = script_dir
             self.assertTrue((default_crate / "Cargo.toml").is_file())
             self.assertTrue((default_crate / "src/lib.rs").is_file())
             self.assertFalse((default_crate / "rust").exists())
