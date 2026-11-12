@@ -27,6 +27,7 @@ double normalize_angle(double angle)
 
 PathFollower::PathFollower() : rclcpp::Node("path_follower")
 {
+  /// TODO: remove hardcoded payload_0
   drive_publisher_ = this->create_publisher<payload_interfaces::msg::DriveCommand>("/payload_0/cmd_drive", 10);
 
   tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
@@ -70,8 +71,7 @@ std::optional<RobotPose> PathFollower::get_robot_pose()
   }
 
   try {
-    const auto transform = tf_buffer_->lookupTransform(
-        current_path_.header.frame_id, "base_link", tf2::TimePointZero);
+    const auto transform = tf_buffer_->lookupTransform(current_path_.header.frame_id, "base_link", tf2::TimePointZero);
 
     const auto& translation = transform.transform.translation;
     const auto& rotation = transform.transform.rotation;
@@ -91,7 +91,6 @@ std::optional<RobotPose> PathFollower::get_robot_pose()
 
 void PathFollower::publish_drive(double linear, double angular)
 {
-
   /// Kinematic equation for tank drive velocities from linear/angular velocities
   /// Also divided by wheel radius for speed in rad/s instead of m/s
   double left_velocity = (linear - angular * WHEEL_SEPARATION / 2.0) / WHEEL_RADIUS;
