@@ -1,8 +1,19 @@
 // Generated raw Rust structs. No ROS runtime is required.
 
+// Service structs follow ROS naming (e.g. Trigger_Request).
+#![allow(non_camel_case_types)]
+
 /// A ROS message that can be decoded from encapsulated CDR bytes.
 pub trait RosMessage: Sized + Send + 'static {
     fn deserialize(bytes: &[u8]) -> Result<Self, cdr::Error>;
+}
+
+/// A ROS service type, tying its request and response messages together.
+pub trait RosService {
+    type Request: RosMessage;
+    type Response: RosMessage;
+    /// Full ROS type name, e.g. `std_srvs/srv/Trigger`.
+    const TYPE_NAME: &'static str;
 }
 
 pub mod builtin_interfaces {
@@ -19,7 +30,48 @@ pub mod builtin_interfaces {
                 cdr::deserialize(bytes)
             }
         }
+
     }
+
+}
+
+pub mod example_interfaces {
+
+    pub mod srv {
+        /// Marker type for the `example_interfaces/srv/AddTwoInts` service.
+        pub struct AddTwoInts;
+
+        impl crate::RosService for AddTwoInts {
+            type Request = AddTwoInts_Request;
+            type Response = AddTwoInts_Response;
+            const TYPE_NAME: &'static str = "example_interfaces/srv/AddTwoInts";
+        }
+
+        #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+        pub struct AddTwoInts_Request {
+            pub a: i64,
+            pub b: i64,
+        }
+
+        impl crate::RosMessage for AddTwoInts_Request {
+            fn deserialize(bytes: &[u8]) -> Result<Self, cdr::Error> {
+                cdr::deserialize(bytes)
+            }
+        }
+
+        #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+        pub struct AddTwoInts_Response {
+            pub sum: i64,
+        }
+
+        impl crate::RosMessage for AddTwoInts_Response {
+            fn deserialize(bytes: &[u8]) -> Result<Self, cdr::Error> {
+                cdr::deserialize(bytes)
+            }
+        }
+
+    }
+
 }
 
 pub mod geometry_msgs {
@@ -63,7 +115,9 @@ pub mod geometry_msgs {
                 cdr::deserialize(bytes)
             }
         }
+
     }
+
 }
 
 pub mod rcl_interfaces {
@@ -93,7 +147,9 @@ pub mod rcl_interfaces {
                 cdr::deserialize(bytes)
             }
         }
+
     }
+
 }
 
 pub mod std_msgs {
@@ -131,5 +187,7 @@ pub mod std_msgs {
                 cdr::deserialize(bytes)
             }
         }
+
     }
+
 }

@@ -1,5 +1,5 @@
-use crate::ros::parse::{parse_binary_message, ParseError};
-use crate::ros::server_types::ServerMessage;
+use crate::ros::parse::{encode_service_call_request, parse_binary_message, ParseError};
+use crate::ros::server_types::{CallId, ServerMessage, ServiceId};
 use crate::ros::SubscriptionId;
 use futures_util::{
     stream::{SplitSink, SplitStream},
@@ -69,6 +69,7 @@ pub struct FoxgloveClient {
     socket_writer: Option<SocketWriter>,
     broadcaster: ServerMessageBroadcaster,
     next_subscription_id: SubscriptionId,
+    next_call_id: CallId,
 }
 
 impl FoxgloveClient {
@@ -79,6 +80,7 @@ impl FoxgloveClient {
             socket_writer: None,
             broadcaster,
             next_subscription_id: 0,
+            next_call_id: 0,
         }
     }
 
@@ -185,6 +187,27 @@ impl FoxgloveClient {
             .send(msg)
             .await?; // return WsError if fails
         Ok(id)
+    }
+
+    /// Sends a service call request and returns the call id its response will carry.
+    pub async fn call_service(
+        &mut self,
+        service_id: ServiceId,
+        encoding: &str,
+        payload: &[u8],
+    ) -> Result<CallId, FoxgloveClientError> {
+        if !self.connected {
+            return Err(FoxgloveClientError::NotConnected);
+        }
+        let call_id = self.next_call_id;
+        self.next_call_id = self.next_call_id.wrapping_add(1);
+        let frame = encode_service_call_request(service_id, call_id, encoding, payload);
+        self.socket_writer
+            .as_mut()
+            .expect("Must be connected() before call_service()")
+            .send(Message::Binary(frame.into()))
+            .await?; // return WsError if fails
+        Ok(call_id)
     }
 
     pub fn get_receiver(&mut self) -> ServerMessageReceiver {
