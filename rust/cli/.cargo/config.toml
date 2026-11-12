@@ -1,2 +1,0 @@
-[alias]
-install-local = "install --path ."
