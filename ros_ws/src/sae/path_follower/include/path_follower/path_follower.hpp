@@ -1,12 +1,19 @@
 #pragma once
 
 #include <cstddef>
+#include <optional>
 #include <memory>
 #include <nav_msgs/msg/path.hpp>
 #include <payload_interfaces/msg/drive_command.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <tf2_ros/buffer.hpp>
 #include <tf2_ros/transform_listener.hpp>
+
+struct RobotPose {
+  double x;
+  double y;
+  double yaw;
+};
 
 class PathFollower : public rclcpp::Node
 {
@@ -16,14 +23,18 @@ public:
 private:
   /// Gets and stores current path to follow
   void path_callback(nav_msgs::msg::Path::SharedPtr msg);
+  /// Control loop for path following
   void control_loop();
-  bool get_robot_pose(double& x, double& y, double& yaw);
+  /// Uses ros2 tf to get robot pose
+  std::optional<RobotPose> get_robot_pose();
+  /// Publishes drive command to topic
   void publish_drive(double linear, double angular);
 
   rclcpp::Subscription<nav_msgs::msg::Path>::SharedPtr path_subscriber_;
   rclcpp::Publisher<payload_interfaces::msg::DriveCommand>::SharedPtr drive_publisher_;
   rclcpp::TimerBase::SharedPtr control_timer_;
 
+  /// Used to transform from payload frame to world frame
   std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
 

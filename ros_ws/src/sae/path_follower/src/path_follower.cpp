@@ -15,6 +15,10 @@ using namespace std::chrono_literals;
 
 namespace
 {
+/// Both in meters
+constexpr double WHEEL_SEPARATION = 0.112;
+constexpr double WHEEL_RADIUS = 0.017;
+
 double normalize_angle(double angle)
 {
   return std::atan2(std::sin(angle), std::cos(angle));
@@ -37,7 +41,7 @@ PathFollower::PathFollower() : rclcpp::Node("path_follower")
 
   control_timer_ = this->create_wall_timer(100ms, std::bind(&PathFollower::control_loop, this));
 
-  RCLCPP_INFO(this->get_logger(), "Path follower initialized");
+  RCLCPP_INFO(this->get_logger(), "Path follower initialized for payload_0");
 }
 
 /// Just stores current path being published
@@ -59,43 +63,39 @@ void PathFollower::path_callback(nav_msgs::msg::Path::SharedPtr msg)
   RCLCPP_INFO(this->get_logger(), "Received path with %zu poses", current_path_.poses.size());
 }
 
-bool PathFollower::get_robot_pose(double& x, double& y, double& yaw)
+std::optional<RobotPose> PathFollower::get_robot_pose()
 {
   if (current_path_.header.frame_id.empty()) {
-    return false;
+    return std::nullopt;
   }
 
   try {
-    const auto transform = tf_buffer_->lookupTransform(current_path_.header.frame_id, "base_link", tf2::TimePointZero);
+    const auto transform = tf_buffer_->lookupTransform(
+        current_path_.header.frame_id, "base_link", tf2::TimePointZero);
 
-    x = transform.transform.translation.x;
-    y = transform.transform.translation.y;
-
+    const auto& translation = transform.transform.translation;
     const auto& rotation = transform.transform.rotation;
 
     tf2::Quaternion quaternion(rotation.x, rotation.y, rotation.z, rotation.w);
 
-    double roll, pitch;
+    double roll, pitch, yaw;
     tf2::Matrix3x3(quaternion).getRPY(roll, pitch, yaw);
 
-    return true;
+    return RobotPose{translation.x, translation.y, yaw};
 
   } catch (const tf2::TransformException& ex) {
     RCLCPP_WARN(this->get_logger(), "TF lookup failed: %s", ex.what());
-    return false;
+    return std::nullopt;
   }
 }
 
 void PathFollower::publish_drive(double linear, double angular)
 {
-  /// These are actual measurements now
-  constexpr double wheel_separation = 0.112;
-  constexpr double wheel_radius = 0.017;
 
   /// Kinematic equation for tank drive velocities from linear/angular velocities
   /// Also divided by wheel radius for speed in rad/s instead of m/s
-  double left_velocity = (linear - angular * wheel_separation / 2.0) / wheel_radius;
-  double right_velocity = (linear + angular * wheel_separation / 2.0) / wheel_radius;
+  double left_velocity = (linear - angular * WHEEL_SEPARATION / 2.0) / WHEEL_RADIUS;
+  double right_velocity = (linear + angular * WHEEL_SEPARATION / 2.0) / WHEEL_RADIUS;
 
   /// Custom DriveCommand message I changed to be left/right instead of linear/angular
   payload_interfaces::msg::DriveCommand command;
@@ -112,12 +112,16 @@ void PathFollower::control_loop()
     return;
   }
 
-  double x, y, yaw;
+  auto pose = get_robot_pose();
 
-  if (!get_robot_pose(x, y, yaw)) {
+  if (!pose) {
     publish_drive(0.0, 0.0);
     return;
   }
+
+  const double x = pose->x;
+  const double y = pose->y;
+  const double yaw = pose->yaw;
 
   /// Perform this as long as we haven't completed the path
   while (waypoint_index_ < current_path_.poses.size()) {
@@ -156,7 +160,7 @@ void PathFollower::control_loop()
 
   const double angular_velocity = std::clamp(angular_gain_ * heading_error, -max_angular_speed_, max_angular_speed_);
 
-  /// Only drive once the drone is within a certain heading of its desired heading.
+  /// Only drive once the payload is within a certain heading of its desired heading.
   /// Turns in place until it reaches roughly desired heading
   if (std::abs(heading_error) > heading_tolerance_) {
     publish_drive(0.0, angular_velocity);
