@@ -1,0 +1,6 @@
+[workspace]
+members = ["cli", "gcs", "ros_interfaces"]
+resolver = "3"
+
+[workspace.dependencies]
+ros_interfaces = { path = "ros_interfaces" }
