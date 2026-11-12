@@ -7,6 +7,7 @@ pub enum NodeCommand {
         url: String,
         reply: oneshot::Sender<Result<(), NodeError>>,
     },
+    // TODO: Plz implement this
     Disconnect {
         reply: oneshot::Sender<Result<(), NodeError>>,
     },
@@ -15,7 +16,6 @@ pub enum NodeCommand {
         reply: oneshot::Sender<Result<SubscriptionId, NodeError>>,
     },
     // DestroySubscription,
-
     /// `reply` is held until the server answers the call
     CallService {
         service_name: String,

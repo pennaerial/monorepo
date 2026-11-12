@@ -263,6 +263,7 @@ def _load_referenced_messages(messages, idl_root):
 def _render_raw_struct(message):
     structure = message.structure
     name = get_rs_name(structure.namespaced_type.name)
+    type_name = "/".join(structure.namespaced_type.namespaced_name())
     lines = [
         "#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]",
         f"pub struct {name} {{",
@@ -285,6 +286,12 @@ def _render_raw_struct(message):
         [
             "",
             f"impl crate::RosMessage for {name} {{",
+            f'    const TYPE_NAME: &\'static str = "{type_name}";',
+            "",
+            "    fn serialize(&self) -> Result<Vec<u8>, cdr::Error> {",
+            "        cdr::serialize::<_, _, cdr::CdrLe>(self, cdr::Infinite)",
+            "    }",
+            "",
             "    fn deserialize(bytes: &[u8]) -> Result<Self, cdr::Error> {",
             "        cdr::deserialize(bytes)",
             "    }",
@@ -335,8 +342,11 @@ def _write_raw_crate(messages, crate_name, output_dir, package_version, services
         "// Service structs follow ROS naming (e.g. Trigger_Request).",
         "#![allow(non_camel_case_types)]",
         "",
-        "/// A ROS message that can be decoded from encapsulated CDR bytes.",
+        "/// A ROS message that can be encoded to and decoded from encapsulated CDR bytes.",
         "pub trait RosMessage: Sized + Send + 'static {",
+        "    /// Full ROS message type name, e.g. `std_msgs/msg/Int32`.",
+        "    const TYPE_NAME: &'static str;",
+        "    fn serialize(&self) -> Result<Vec<u8>, cdr::Error>;",
         "    fn deserialize(bytes: &[u8]) -> Result<Self, cdr::Error>;",
         "}",
         "",

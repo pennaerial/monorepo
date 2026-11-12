@@ -1,6 +1,6 @@
 """Regression tests; run in the ROS Python environment with Cargo available.
 
-python3 -m unittest discover -s experimental/gcs/test -p test_generate_rs.py
+python3 -m unittest discover -s gcs/tests -p test_generate_rs.py
 """
 
 import pathlib
@@ -110,6 +110,8 @@ class NamespaceTests(unittest.TestCase):
                 use ros_interfaces::{builtin_interfaces, sensor_msgs, std_msgs, RosMessage};
                 #[test]
                 fn shared_types() {
+                    assert_eq!(std_msgs::msg::Int32::TYPE_NAME, "std_msgs/msg/Int32");
+                    assert_eq!(builtin_interfaces::msg::Time::TYPE_NAME, "builtin_interfaces/msg/Time");
                     let header = std_msgs::msg::Header {
                         stamp: builtin_interfaces::msg::Time { sec: 0, nanosec: 0 },
                         frame_id: String::new(),
@@ -121,7 +123,7 @@ class NamespaceTests(unittest.TestCase):
                     fn decode<T: RosMessage>(bytes: &[u8]) -> Result<T, cdr::Error> {
                         T::deserialize(bytes)
                     }
-                    let bytes = cdr::serialize::<_, _, cdr::CdrLe>(&image, cdr::Infinite).unwrap();
+                    let bytes = image.serialize().unwrap();
                     assert_eq!(decode::<sensor_msgs::msg::Image>(&bytes).unwrap(), image);
                     let bytes = cdr::serialize::<_, _, cdr::CdrBe>(&image, cdr::Infinite).unwrap();
                     assert_eq!(decode::<sensor_msgs::msg::Image>(&bytes).unwrap(), image);
@@ -207,18 +209,25 @@ class ServiceTests(unittest.TestCase):
             tests.mkdir()
             (tests / "services.rs").write_text("""
                 use ros_interfaces::{std_srvs::srv, RosMessage, RosService};
-                fn round_trip<M: RosMessage + serde::Serialize>(message: &M) -> M {
-                    let bytes = cdr::serialize::<_, _, cdr::CdrLe>(message, cdr::Infinite).unwrap();
+                fn round_trip<M: RosMessage>(message: &M) -> M {
+                    let bytes = message.serialize().unwrap();
                     M::deserialize(&bytes).unwrap()
                 }
                 fn type_name<S: RosService>() -> &'static str { S::TYPE_NAME }
+                fn service_round_trip<S: RosService>(request: &S::Request, response: &S::Response) {
+                    round_trip(request);
+                    round_trip(response);
+                }
                 #[test]
                 fn trigger() {
                     let response = srv::Trigger_Response { success: true, message: "ok".into() };
                     assert_eq!(round_trip(&response), response);
                     let request = srv::Trigger_Request { structure_needs_at_least_one_member: 0 };
                     assert_eq!(round_trip(&request), request);
+                    service_round_trip::<srv::Trigger>(&request, &response);
                     assert_eq!(type_name::<srv::Trigger>(), "std_srvs/srv/Trigger");
+                    assert_eq!(srv::Trigger_Request::TYPE_NAME, "std_srvs/srv/Trigger_Request");
+                    assert_eq!(srv::Trigger_Response::TYPE_NAME, "std_srvs/srv/Trigger_Response");
                 }
             """)
             subprocess.run(

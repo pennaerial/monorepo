@@ -1,4 +1,4 @@
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::collections::HashMap;
 use std::fmt;
 use tungstenite::Bytes;
@@ -51,12 +51,12 @@ pub struct ServerInfo {
     pub session_id: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Advertise {
     pub channels: Vec<Channel>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Channel {
     pub id: ChannelId,
@@ -64,7 +64,6 @@ pub struct Channel {
     pub encoding: String,
     pub schema_name: String,
     pub schema: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub schema_encoding: Option<String>,
 }
 
@@ -110,7 +109,7 @@ pub enum ClientBinaryOpcode {
 
 // BINARY MESSAGES
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct MessageData {
     // op: BinaryOpcode.MESSAGE_DATA;
     pub subscription_id: SubscriptionId,
@@ -120,17 +119,16 @@ pub struct MessageData {
 
 // SERVICES
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ServiceDefinition {
     pub encoding: String, // always use cdr for now
     pub schema_name: String,
     pub schema: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub schema_encoding: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Service {
     pub id: ServiceId,
@@ -152,19 +150,19 @@ impl fmt::Display for Service {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct AdvertiseServices {
     pub services: Vec<Service>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UnadvertiseServices {
     pub service_ids: Vec<ServiceId>,
 }
 
 /// Sent by the server when a service call could not be completed
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ServiceCallFailure {
     pub service_id: ServiceId,
