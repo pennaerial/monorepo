@@ -2,4 +2,8 @@
   <class type="pennair_vision::BasicVision" base_class_type="pennair_vision::VisionPlugin">
     <description>Basic VisionPlugin example</description>
   </class>
+
+   <class type="pennair_vision::AprilTagPlugin" base_class_type="pennair_vision::VisionPlugin">
+    <description>AprilTag Vision Plugin</description>
+  </class>
 </library>
