@@ -116,7 +116,10 @@ def launch_setup(context) -> list[Action]:
                     ("~/image_raw/compressed", camera_topic + "/compressed"),
                     ("~/camera_info", camera_info_topic),
                 ],
-            )
+                extra_arguments=[
+                    {"use_intra_process_comms": True},
+                ],
+            ),
         )
 
     # type hint stops type-checking error about actions containing both ComposableNodeContainer and Node
