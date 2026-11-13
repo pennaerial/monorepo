@@ -4,10 +4,9 @@ modes:
     params:
       takeoff_height: 3.0
     transitions:
-      complete: square
+      complete: boustrophedon
 
-  
-  square:
+  boustrophedon:
     mode: iarc_flight.TrackMode
     params:
       trajectory:
