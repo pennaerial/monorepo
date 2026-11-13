@@ -1,4 +1,4 @@
-//! Push source to Pis and build it there, and pull edits made on a Pi back.
+//! Pushes source to Pis and builds it there. Pulls edits made on a Pi back into this checkout.
 
 use crate::config::{MonorepoConfig, load_config};
 use crate::{deps, sh};
@@ -12,7 +12,7 @@ use std::{
 /// Where pushed source lives on a Pi, relative to the user's home.
 const REMOTE_ROOT: &str = "monorepo";
 const SERVICE: &str = "pennair-autonomy.service";
-/// -R keeps paths relative to the monorepo root; -a keeps mtimes so colcon only rebuilds what changed.
+/// -R keeps paths relative to the monorepo root. -a keeps file times, so colcon only rebuilds changed packages.
 const RSYNC: &str = "rsync -aR --delete --exclude=.git --exclude=__pycache__";
 
 pub fn push(
@@ -23,7 +23,7 @@ pub fn push(
     let config = load(manifest)?;
     let paths = config.deploy.paths.join(" ");
     let record = push_record(&paths)?;
-    // only build pushed packages, even if the Pi has other source in ros_ws/src
+    // build only the pushed packages, even if the Pi has a full clone in ros_ws/src
     let packages: Vec<&str> = config
         .deploy
         .paths
@@ -35,7 +35,7 @@ pub fn push(
         println!("== {h}");
         deps::check(&config, "prod", Some(h))?;
 
-        // Pis have no RTC, and make needs sane timestamps
+        // Pis have no hardware clock, and make compares file times to decide what to rebuild
         let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
         sh::run(
             Some(h),
@@ -47,7 +47,7 @@ pub fn push(
 
         sh::run(None, &format!("{RSYNC} {paths} {h}:{REMOTE_ROOT}/"))?;
 
-        // save what was pushed, plus file hashes so `status` can spot edits made on the Pi
+        // save the push record and file hashes, so `status` can find files edited on the Pi
         sh::run(
             Some(h),
             &format!(
@@ -78,7 +78,7 @@ pub fn pull(manifest: Option<&Path>, host: &str, force: bool) -> Result<(), Box<
     let config = load(manifest)?;
     let paths = config.deploy.paths.join(" ");
 
-    // the pull overwrites these paths, so only git can get local edits back
+    // pull overwrites these paths, so uncommitted local edits would be lost
     let changes = sh::output(None, &format!("git status --porcelain -- {paths}"))?;
     if !changes.is_empty() && !force {
         return Err(format!(
@@ -121,7 +121,7 @@ fn load(manifest: Option<&Path>) -> Result<MonorepoConfig, Box<dyn Error>> {
     Ok(config)
 }
 
-/// Commit, author, and time of a push, saved on the Pi for `status`.
+/// Builds the push record (commit, author, time) that `status` prints.
 fn push_record(paths: &str) -> Result<String, Box<dyn Error>> {
     let commit = sh::output(None, "git rev-parse --short HEAD")?;
     let dirty = !sh::output(None, &format!("git status --porcelain -- {paths}"))?.is_empty();

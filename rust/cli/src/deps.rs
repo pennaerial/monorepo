@@ -61,7 +61,7 @@ pub fn sync(
         )?;
     }
     if !missing.python.is_empty() {
-        // pin numpy to the apt version, since pip would otherwise pull numpy 2, which breaks ROS
+        // pin numpy to the apt version. Without the pin, pip installs numpy 2, which breaks ROS.
         let requirements: Vec<String> = missing.python.iter().map(|r| format!("'{r}'")).collect();
         sh::run(
             host,
@@ -153,7 +153,7 @@ pub struct DepsArgs {
 
 #[derive(Subcommand, Debug)]
 pub enum DepsCommand {
-    /// Check installed dependencies against monorepo manifest
+    /// Check that everything monorepo.toml lists is installed
     Check {
         #[arg(long, conflicts_with = "prod", required_unless_present = "prod")]
         dev: bool,

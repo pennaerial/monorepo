@@ -6,7 +6,7 @@ use std::{collections::HashSet, error::Error};
 /// Names of fully installed apt packages.
 pub fn apt(host: Option<&str>) -> Result<HashSet<String>, Box<dyn Error>> {
     let out = sh::output(host, r"dpkg-query -W -f='${Package} ${db:Status-Abbrev}\n'")?;
-    // "ii" means installed; skips removed packages that left config files behind
+    // "ii" means installed. Removed packages that left config files behind show "rc" and are skipped.
     Ok(out
         .lines()
         .filter_map(|line| line.split_once(' '))

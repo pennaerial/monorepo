@@ -22,15 +22,15 @@ pub struct ConfigArgs {
 
 #[derive(Subcommand, Debug)]
 pub enum ConfigCommand {
-    /// Validates monorepo.toml manifest validation
+    /// Check that monorepo.toml parses and its [deploy] paths exist
     Check,
 }
 
-/// checks if monorepo.toml file validates correctly
+/// Fails if monorepo.toml doesn't parse or a [deploy] path doesn't exist.
 pub fn check_config(manifest: Option<&Path>) -> Result<(), Box<dyn Error>> {
     let (path, config) = load_config(manifest)?;
 
-    // catches packages that were moved or renamed without updating [deploy]
+    // fails if a package was moved or renamed without updating [deploy]
     let root = path.parent().unwrap();
     let missing: Vec<&str> = config
         .deploy
@@ -57,7 +57,7 @@ pub fn load_config(manifest: Option<&Path>) -> Result<(PathBuf, MonorepoConfig),
             Path::new(&root).join("monorepo.toml")
         }
     };
-    // absolute, so push/pull can run from the manifest's directory
+    // make it absolute, so push and pull can cd to the manifest's directory
     let path =
         fs::canonicalize(&path).map_err(|e| format!("failed to read {}: {e}", path.display()))?;
     let contents = fs::read_to_string(&path)?;
@@ -117,7 +117,7 @@ pub struct Apt {
     pub repositories: BTreeMap<String, AptRepository>,
 }
 
-/// Source pushed to Pis, from `[deploy]`.
+/// Source that `pennair push` copies to Pis, from `[deploy]`.
 #[derive(Debug, Deserialize)]
 pub struct Deploy {
     /// Paths relative to the monorepo root

@@ -18,9 +18,9 @@ pub struct PennairCli {
 
 #[derive(Subcommand, Debug)]
 pub enum Commands {
-    /// Subcommand for managing dependencies
+    /// Check or install the dependencies listed in monorepo.toml
     Deps(DepsArgs),
-    /// Subcommand for managing monorepo.toml config
+    /// Check monorepo.toml
     Config(ConfigArgs),
     /// Push source to Pis, build it there, and restart the autonomy service
     Push {
