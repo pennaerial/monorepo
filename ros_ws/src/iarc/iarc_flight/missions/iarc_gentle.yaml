@@ -1,0 +1,28 @@
+modes:
+  start:
+    mode: uav.VerticalTakeoffMode
+    params:
+      takeoff_height: 4.0
+    transitions:
+      complete: gentle
+  gentle:
+    mode: iarc_flight.TrackMode
+    params:
+      trajectory:
+        type: min_snap
+        time_optimal: true
+        v_max: {standard: 1.0}
+        a_max: {standard: 0.5}
+        keyframes:
+          - {x: 0, y: 0, z: -4, yaw: 0.0, mode: standard}
+          - {x: 3, y: 0, z: -4, yaw: 0.0, mode: standard}
+          - {x: 3, y: 3, z: -4, yaw: 0.0, mode: standard}
+      controller:
+        type: mpc
+        max_speed: 3.0
+        max_vertical_accel: 3.0
+    transitions:
+      complete: land
+
+  land:
+    mode: uav.LandingMode

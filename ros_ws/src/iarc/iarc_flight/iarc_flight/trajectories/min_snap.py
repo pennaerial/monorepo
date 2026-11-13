@@ -1,11 +1,16 @@
-"""min snap based on the paper
+"""Minimum-snap trajectory through keyframes.
 
-Minimum Snap Trajectory Generation and Control for Quadrotors
-Daniel Mellinger and Vijay Kumar (ICRA 2011)
+Makes a smooth path through keyframes (x, y, z, yaw), starting and ending at rest
+Position is one 7-deg polynomial per leg minimizing the integral of snap^2
+yaw is cubic per leg minimizing (d^2/dt^2 yaw)^2
+Leg times T come from the mission or min_snap_time.optimize_times
 
-not including corridor or temporal scaling
+This QP has no inequality constraints and has an exact cost Hessian, so it can be solved
+in one np.linalg.solve.
 
-M keyframes -> O(M) linalg system, solved in O(M^3) time, O(M log M) sampling
+Adapted from:
+D. Mellinger, V. Kumar, "Minimum Snap Trajectory Generation and Control for
+Quadrotors", ICRA 2011.
 """
 
 from __future__ import annotations
@@ -15,132 +20,129 @@ from typing import Literal
 
 import numpy as np
 from numpy.polynomial import polynomial as P
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, PositiveFloat, model_validator
+from scipy.linalg import block_diag
 
 from iarc_flight.trajectories.base import Trajectory, TrajectoryPoint
 
 
 class Keyframe(BaseModel):
+    """Local NED target, T and mode describe the leg flown to reach it."""
+
     x: float  # m
-    y: float
-    z: float
+    y: float  # m
+    z: float  # m
     yaw: float  # rad
-    T: float = Field(gt=0)  # s, time from prev
+    T: float | None = Field(default=None, gt=0)  # s, required unless time_optimal
+    mode: str | None = None  # key into v_max / a_max; required if time_optimal
 
 
 class MinSnapConfig(BaseModel):
     type: Literal["min_snap"] = "min_snap"
     keyframes: list[Keyframe] = Field(min_length=1)
+    time_optimal: bool = False  # choose T as short as v_max / a_max allow
+    v_max: dict[str, PositiveFloat] = {}  # m/s per mode, e.g. {move: 4, scan: 1.5}
+    a_max: dict[str, PositiveFloat] = {}  # m/s^2 per mode
+    yaw_rate_max: float = Field(default=math.pi / 2, gt=0)  # rad/s, lower-bounds each T
+
+    @model_validator(mode="after")
+    def _check(self) -> MinSnapConfig:
+        if self.time_optimal:
+            self.limits()
+        elif any(kf.T is None for kf in self.keyframes):
+            raise ValueError("every keyframe needs T unless time_optimal: true")
+        return self
+
+    def limits(self) -> tuple[np.ndarray, np.ndarray]:
+        """Per-leg limits"""
+        for i, kf in enumerate(self.keyframes):
+            mode = kf.mode
+            if mode is None or mode not in self.v_max or mode not in self.a_max:
+                raise ValueError(f"keyframe {i} mode {mode!r} needs an entry in v_max and a_max")
+        v_max = np.array([self.v_max[kf.mode] for kf in self.keyframes if kf.mode is not None])
+        a_max = np.array([self.a_max[kf.mode] for kf in self.keyframes if kf.mode is not None])
+        return v_max, a_max
 
     def build(self, start: np.ndarray, yaw: float) -> MinSnap:
         return MinSnap(self, start, yaw)
 
 
-def solve_min_derivative(waypoints: np.ndarray, durations: np.ndarray, r: int) -> np.ndarray:
-    """Piecewise polynomial through the waypoints minimizing the integral of ||d^r p/dt^r||^2.
-
-    waypoints is (M+1, D), durations is (M,), r is 4 for snap and 2 for acceleration.
-    Starts and ends with derivatives 1..r-1 at zero.
-
-    Returns coeffs (M, 2r, D): segment k is sum_i coeffs[k, i] * s^i with s = (t - t_k) / T_k
-    in [0, 1]. Normalizing time per segment keeps the numbers well scaled.
-    """
-    M, D = len(durations), waypoints.shape[1]
-    n = 2 * r  # coefficients per segment (degree 2r - 1)
-
-    # Cost: integral over t of (d^r p/dt^r)^2. On [0, 1] in s the exact Hessian is
-    # Q_ij = i!/(i-r)! * j!/(j-r)! / (i + j - 2r + 1). Since d^r/dt^r = T^-r d^r/ds^r and
-    # dt = T ds, each segment's block is Q scaled by T^(1 - 2r).
+def min_derivative_kkt(w: np.ndarray, T: np.ndarray, r: int):
+    """KKT matrix for min-derivative problem"""
+    M, D, n = len(T), w.shape[1], 2 * r
+    i = np.arange(r, n)  # exact Hessian on s in [0, 1], scaled by T^(1-2r) per leg
+    f = np.array([math.perm(k, r) for k in i])
     Q = np.zeros((n, n))
-    for i in range(r, n):
-        for j in range(r, n):
-            Q[i, j] = math.perm(i, r) * math.perm(j, r) / (i + j - 2 * r + 1)
-    H = np.zeros((M * n, M * n))
-    for k, T in enumerate(durations):
-        H[k * n : (k + 1) * n, k * n : (k + 1) * n] = Q * T ** (1 - 2 * r)
+    Q[r:, r:] = np.outer(f, f) / (i[:, None] + i - 2 * r + 1)
+    H = block_diag(*(Q * Tk ** (1 - 2 * r) for Tk in T))
 
-    def deriv(k: int, m: int, s: float) -> np.ndarray:
-        """Row giving the m-th time derivative of segment k at local s."""
+    def d(k: int, m: int, s: float) -> np.ndarray:  # row giving the m-th time derivative of leg k
         row = np.zeros(M * n)
-        for i in range(m, n):
-            row[k * n + i] = math.perm(i, m) * s ** (i - m) / durations[k] ** m
+        row[k * n + m : k * n + n] = [
+            math.perm(j, m) * s ** (j - m) / T[k] ** m for j in range(m, n)
+        ]
         return row
 
-    rows, rhs = [], []
-    # Each segment starts and ends at its keyframes
-    for k in range(M):
-        rows += [deriv(k, 0, 0.0), deriv(k, 0, 1.0)]
-        rhs += [waypoints[k], waypoints[k + 1]]
-    # Start and end at rest
-    for m in range(1, r):
-        rows += [deriv(0, m, 0.0), deriv(M - 1, m, 1.0)]
-        rhs += [np.zeros(D), np.zeros(D)]
-    # Derivatives 1..r continuous at interior keyframes, values left free
-    for k in range(M - 1):
-        for m in range(1, r + 1):
-            rows.append(deriv(k, m, 1.0) - deriv(k + 1, m, 0.0))
-            rhs.append(np.zeros(D))
-    A, b = np.array(rows), np.array(rhs)
+    z, ends = np.zeros(D), ((0, 0), (M - 1, 1))
+    rows = [(d(k, 0, e), w[k + e], 0) for k in range(M) for e in (0, 1)]  # through keyframes
+    rows += [(d(k, m, e), z, m) for m in range(1, r) for k, e in ends]  # at rest at both ends
+    rows += [(d(k, m, 1) - d(k + 1, m, 0), z, m) for k in range(M - 1) for m in range(1, r + 1)]
+    A, b, order = (np.array(x) for x in zip(*rows))
+    K = np.block([[2 * H, A.T], [A, np.zeros((len(A), len(A)))]])
+    return K, np.vstack([np.zeros((M * n, D)), b]), order
 
-    # KKT system for min c^T H c subject to A c = b, one right-hand side per axis
-    KKT = np.block([[2 * H, A.T], [A, np.zeros((len(A), len(A)))]])
-    c = np.linalg.solve(KKT, np.vstack([np.zeros((M * n, D)), b]))[: M * n]
-    return c.reshape(M, n, D)
+
+def solve_min_derivative(w: np.ndarray, T: np.ndarray, r: int) -> np.ndarray:
+    """Coeffs (M, 2r, D); leg k is sum_i c[k, i] s^i with s = (t - t_k) / T_k. r=4: snap."""
+    K, rhs, _ = min_derivative_kkt(w, T, r)
+    # Exact: equality constraints only. K is symmetric indefinite (saddle point), so plain solve
+    return np.linalg.solve(K, rhs)[: len(T) * 2 * r].reshape(len(T), 2 * r, -1)
+
+
+def unwrap_yaws(yaws: list[float]) -> np.ndarray:
+    """Shift each yaw by 2 pi to within pi of the previous one (never turn the long way)."""
+    out = [yaws[0]]
+    for y in yaws[1:]:
+        out.append(out[-1] + (y - out[-1] + math.pi) % (2 * math.pi) - math.pi)
+    return np.array(out)
 
 
 class PiecewisePolynomial:
-    """Evaluates the output of solve_min_derivative in real time."""
-
-    def __init__(self, coeffs: np.ndarray, durations: np.ndarray) -> None:
-        self.coeffs = coeffs  # (M, n, D)
-        self.durations = durations
-        self.times = np.concatenate([[0.0], np.cumsum(durations)])
-        self.total_time = float(self.times[-1])
+    def __init__(self, coeffs: np.ndarray, T: np.ndarray) -> None:
+        self.c, self.T, self.knots = coeffs, T, np.r_[0.0, np.cumsum(T)]
 
     def __call__(self, t: float, m: int = 0) -> np.ndarray:
-        """m-th time derivative at t. Times outside [0, total_time] are clamped."""
-        t = min(max(t, 0.0), self.total_time)
-        k = min(int(np.searchsorted(self.times, t, side="right")) - 1, len(self.durations) - 1)
-        T = self.durations[k]
-        c = P.polyder(self.coeffs[k], m, axis=0) if m else self.coeffs[k]
-        return P.polyval((t - self.times[k]) / T, c) / T**m
+        """m-th time derivative at t (clamped to the trajectory)."""
+        t = min(max(t, 0.0), self.knots[-1])
+        k = min(np.searchsorted(self.knots, t, side="right") - 1, len(self.T) - 1)
+        s = (t - self.knots[k]) / self.T[k]
+        return P.polyval(s, P.polyder(self.c[k], m, axis=0)) / self.T[k] ** m
 
 
 class MinSnap(Trajectory):
-    """Minimum-snap trajectory starting at the drone and passing through each keyframe on schedule."""
-
     def __init__(self, c: MinSnapConfig, start: np.ndarray, yaw: float) -> None:
         kfs = c.keyframes
-        durations = np.array([kf.T for kf in kfs])
-
         self.keyframes = np.vstack([start[:3], [[kf.x, kf.y, kf.z] for kf in kfs]])  # (M+1, 3)
-        self.position = PiecewisePolynomial(
-            solve_min_derivative(self.keyframes, durations, 4), durations
-        )
+        yaws = unwrap_yaws([yaw] + [kf.yaw for kf in kfs])
+        self.time_allocation = None
+        if c.time_optimal:
+            from iarc_flight.trajectories.min_snap_time import optimize_times  # needs pydrake
 
-        # Unwrap so each keyframe's yaw is within pi of the previous one (no spinning the long way)
-        yaws = [yaw]
-        for kf in kfs:
-            yaws.append(yaws[-1] + (kf.yaw - yaws[-1] + math.pi) % (2 * math.pi) - math.pi)
-        self.yaw = PiecewisePolynomial(
-            solve_min_derivative(np.array(yaws)[:, None], durations, 2), durations
-        )
-
-        self.total_time = self.position.total_time
-
-        # Peak speed and acceleration, logged by TrackMode to check T against vehicle limits
-        ts = np.linspace(0.0, self.total_time, 50 * len(kfs) + 1)
-        self.max_speed = max(float(np.linalg.norm(self.position(t, 1))) for t in ts)
-        self.max_accel = max(float(np.linalg.norm(self.position(t, 2))) for t in ts)
+            pts = np.column_stack([self.keyframes, yaws])
+            self.time_allocation = optimize_times(pts, *c.limits(), c.yaw_rate_max)
+            T = self.durations = self.time_allocation.durations
+        else:
+            T = self.durations = np.array([kf.T for kf in kfs])
+        self.position = PiecewisePolynomial(solve_min_derivative(self.keyframes, T, 4), T)
+        self.yaw = PiecewisePolynomial(solve_min_derivative(yaws[:, None], T, 2), T)
+        self.total_time = float(self.position.knots[-1])
+        ts = np.linspace(0.0, self.total_time, 50 * len(kfs) + 1)  # peaks, for TrackMode's log
+        peak = lambda m: max(float(np.linalg.norm(self.position(t, m))) for t in ts)  # noqa: E731
+        self.max_speed, self.max_accel = peak(1), peak(2)
 
     def done(self, t: float) -> bool:
         return t >= self.total_time
 
-    def sample(self, t: float) -> TrajectoryPoint:
-        # Past the end this holds the last keyframe at rest, because time is clamped
-        return TrajectoryPoint(
-            position=self.position(t, 0),
-            velocity=self.position(t, 1),
-            acceleration=self.position(t, 2),
-            yaw=float(self.yaw(t, 0)[0]),
-        )
+    def sample(self, t: float) -> TrajectoryPoint:  # past the end: last keyframe, at rest
+        p = self.position
+        return TrajectoryPoint(p(t), p(t, 1), p(t, 2), float(self.yaw(t)[0]))

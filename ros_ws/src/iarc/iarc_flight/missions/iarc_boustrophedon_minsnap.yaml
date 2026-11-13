@@ -1,0 +1,47 @@
+modes:
+  start:
+    mode: uav.VerticalTakeoffMode
+    params:
+      takeoff_height: 3.0
+    transitions:
+      complete: square
+
+  
+  square:
+    mode: iarc_flight.TrackMode
+    params:
+      trajectory:
+        type: min_snap
+        time_optimal: true
+        v_max:
+          move: 5
+          scan: 2
+        a_max:
+          move: 3
+          scan: 1.5
+        keyframes:
+          - {x: 0, y: 0, z: -3, yaw: 0.0, mode: move}
+          - {x: 5, y: 0, z: -3, yaw: 0.0, mode: scan}
+          - {x: 10, y: 0, z: -3, yaw: 0.0, mode: scan}
+          - {x: 15, y: 0, z: -3, yaw: 1.5708, mode: scan}
+          - {x: 15, y: 5, z: -3, yaw: 3.1416, mode: move}
+          - {x: 10, y: 5, z: -3, yaw: 3.1416, mode: scan}
+          - {x: 5, y: 5, z: -3, yaw: 3.1416, mode: scan}
+          - {x: 0, y: 5, z: -3, yaw: 1.5708, mode: scan}
+          - {x: 0, y: 10, z: -3, yaw: 0.0, mode: move}
+          - {x: 5, y: 10, z: -3, yaw: 0.0, mode: scan}
+          - {x: 10, y: 10, z: -3, yaw: 0.0, mode: scan}
+          - {x: 15, y: 10, z: -3, yaw: 1.5708, mode: scan}
+          - {x: 15, y: 15, z: -3, yaw: 3.1416, mode: move}
+          - {x: 10, y: 15, z: -3, yaw: 3.1416, mode: scan}
+          - {x: 5, y: 15, z: -3, yaw: 3.1416, mode: scan}
+          - {x: 0, y: 15, z: -3, yaw: 3.1416, mode: scan}
+      controller:
+        type: mpc
+        max_speed: 7.0
+        max_vertical_accel: 5.0
+    transitions:
+      complete: land
+
+  land:
+    mode: uav.LandingMode
