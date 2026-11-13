@@ -24,7 +24,7 @@ void VisionManager::init_plugins()
     try {
       RCLCPP_DEBUG(this->get_logger(), "Initializing plugin: %s", plugin_name.c_str());
       plugin_map_[plugin_name].plugin_instance_ = plugin_loader_.createUniqueInstance(plugin_name);
-      plugin_map_[plugin_name].plugin_instance_->initialize(*this, params_.camera_topic, params_.debug_rate);
+      plugin_map_[plugin_name].plugin_instance_->initialize(*this, params_.camera_topic, params_.debug_image_rate);
       // TODO: add better error handling for plugins that don't exist or fail to initialize
     } catch (const pluginlib::PluginlibException& ex) {
       RCLCPP_ERROR(get_logger(), "Failed to create plugin: %s", ex.what());

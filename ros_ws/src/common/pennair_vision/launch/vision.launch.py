@@ -1,10 +1,11 @@
 import ast
-import math
+from datetime import datetime
 from enum import StrEnum
+from pathlib import Path
 
 from launch import Action, LaunchDescription
 from launch.actions import DeclareLaunchArgument, OpaqueFunction
-from launch_ros.actions import ComposableNodeContainer
+from launch_ros.actions import ComposableNodeContainer, Node
 from launch_ros.descriptions import ComposableNode
 from vehicle_common.launch_utils import check_unknown_launch_args, get_logger, is_truthy
 
@@ -18,8 +19,8 @@ class Args(StrEnum):
     """Maps constants to launch argument keyords"""
 
     NODE_NAME = "node_name"
-    DEBUG = "debug"
-    DEBUG_RATE = "debug_rate"
+    DEBUG_LOGS = "debug_logs"
+    DEBUG_IMAGE_RATE = "debug_image_rate"
     CAMERA_TOPIC = "camera_topic"
     PLUGINS = "plugins"
     SIM = "sim"
@@ -27,6 +28,7 @@ class Args(StrEnum):
     CAMERA_WIDTH = "camera_width"
     CAMERA_HEIGHT = "camera_height"
     CAMERA_ORIENTATION = "camera_orientation"
+    RECORD_TOPICS = "record_topics"
 
 
 def launch_setup(context) -> list[Action]:
@@ -34,8 +36,8 @@ def launch_setup(context) -> list[Action]:
     check_unknown_launch_args(Args, config, logger)  # warn for unknown args
 
     node_name = config[Args.NODE_NAME]
-    debug: bool = is_truthy(config[Args.DEBUG])
-    debug_rate = float(config[Args.DEBUG_RATE])
+    debug_logs: bool = is_truthy(config[Args.DEBUG_LOGS])
+    debug_image_rate = float(config[Args.DEBUG_IMAGE_RATE])
     camera_topic = config[Args.CAMERA_TOPIC]
     sim: bool = is_truthy(config[Args.SIM])
     # "auto" means leave the setting to camera_ros, which picks whatever the sensor reports.
@@ -49,14 +51,16 @@ def launch_setup(context) -> list[Action]:
     # Otherwise the parameter would be typed as a string rather than a string array.
     plugins_arg = config[Args.PLUGINS].strip()
     plugins: list[str] = ast.literal_eval(plugins_arg) if plugins_arg else []
+    record_topics_arg = config[Args.RECORD_TOPICS].strip()
+    record_topics = ast.literal_eval(record_topics_arg) if record_topics_arg else []
 
     # PRINTING HEADER
     logger.debug("LAUNCH PARAMS")
     logger.debug(f"Node Name:           {node_name}")
     logger.debug(f"Camera Topic:        {camera_topic}")
     logger.debug(f"Vision Plugins:      {plugins}")
-    logger.debug(f"Debug:               {debug}")
-    logger.debug(f"Debug Rate (Hz):     {debug_rate}")
+    logger.debug(f"Debug:               {debug_logs}")
+    logger.debug(f"Image Debug Rate (Hz):     {debug_image_rate}")
     logger.debug(f"Sim:                 {sim}")
     if not sim:
         logger.debug(f"Camera Format:       {camera_format}")
@@ -84,8 +88,8 @@ def launch_setup(context) -> list[Action]:
             parameters=[
                 {
                     "camera_topic": camera_topic,
-                    "debug": debug,
-                    "debug_rate": debug_rate,
+                    "debug_logs": debug_logs,
+                    "debug_image_rate": debug_image_rate,
                 },
                 {"plugins": plugins} if plugins else {},
             ],
@@ -115,7 +119,8 @@ def launch_setup(context) -> list[Action]:
             )
         )
 
-    return [
+    # type hint stops type-checking error about actions containing both ComposableNodeContainer and Node
+    actions: list[Action] = [
         ComposableNodeContainer(
             name="vision_container",
             namespace="",
@@ -124,12 +129,33 @@ def launch_setup(context) -> list[Action]:
             arguments=[
                 "--ros-args",
                 "--log-level",
-                f"{node_name}:={'debug' if debug else 'info'}",
+                f"{node_name}:={'debug' if debug_logs else 'info'}",
             ],
             composable_node_descriptions=composable_nodes,
             output="screen",
-        )
+        ),
     ]
+
+    if record_topics:
+        bag_output = str(Path.home() / "bags" / f"vision_{datetime.now():%Y%m%d_%H%M%S_%f}")
+
+        rosbagger = Node(
+            package="rosbag2_transport",
+            executable="recorder",
+            name="vision_recorder",
+            output="screen",
+            parameters=[
+                {
+                    "record.topics": record_topics,
+                    "record.disable_keyboard_controls": True,
+                    "storage.uri": bag_output,
+                    "storage.storage_id": "mcap",
+                }
+            ],
+        )
+        actions.append(rosbagger)
+
+    return actions
 
 
 # camera_topic expects frames, will error out otherwise
@@ -142,13 +168,13 @@ def generate_launch_description():
                 description="Node name for the vision manager. Override to run multiple instances in one namespace.",
             ),
             DeclareLaunchArgument(
-                Args.DEBUG,
+                Args.DEBUG_LOGS,
                 default_value="false",
                 description="if true, runs the vision manager at debug log level. otherwise info.",
                 choices=["true", "false", "t", "f", "0", "1"],
             ),
             DeclareLaunchArgument(
-                Args.DEBUG_RATE,
+                Args.DEBUG_IMAGE_RATE,
                 default_value="5.0",
                 description="Maximum debug image rate per plugin in Hz; 0 means unlimited. Also limits processing when only debug has subscribers. Algorithm output subscribers always request full-speed processing. Independent of the debug log-level flag.",
             ),
@@ -188,6 +214,11 @@ def generate_launch_description():
                 default_value="0",
                 description="clockwise rotation applied to the camera image, in degrees. set this to match how the camera is physically mounted. ignored when sim is true.",
                 choices=["0", "90", "180", "270"],
+            ),
+            DeclareLaunchArgument(
+                Args.RECORD_TOPICS,
+                default_value="[]",
+                description="List of topics to record in a rosbag",
             ),
             OpaqueFunction(function=launch_setup),
         ]

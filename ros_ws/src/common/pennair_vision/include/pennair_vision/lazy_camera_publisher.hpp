@@ -44,7 +44,7 @@ public:
   virtual ~LazyCameraPublisher() = default;
 
   /// Check VisionPlugin
-  void initialize(rclcpp::Node& node, const std::string& camera_topic, double debug_rate) override;
+  void initialize(rclcpp::Node& node, const std::string& camera_topic, double debug_image_rate) override;
 
   /// Subscribes to camera frames and processes them when output subscribers exist. See VisionPlugin
   /// Processes at full speed for result subscribers, or at the debug rate for debug-only subscribers
@@ -72,10 +72,10 @@ private:
 };
 
 template <RosMessage MessageT>
-void LazyCameraPublisher<MessageT>::initialize(rclcpp::Node& node, const std::string& camera_topic, double debug_rate)
+void LazyCameraPublisher<MessageT>::initialize(rclcpp::Node& node, const std::string& camera_topic, double debug_image_rate)
 {
   /// convert hz to seconds
-  debug_period_ = std::chrono::duration<double>(debug_rate > 0.0 ? 1.0 / debug_rate : 0.0);
+  debug_period_ = std::chrono::duration<double>(debug_image_rate > 0.0 ? 1.0 / debug_image_rate : 0.0);
   last_debug_time_.reset();
   camera_topic_ = camera_topic;
   node_ = &node;

@@ -4,7 +4,7 @@ vision_manager:
     default_value: "/camera/image_raw"
     description: "Image topic used by the vision plugins."
 
-  debug_rate:
+  debug_image_rate:
     type: double
     default_value: 5.0
     read_only: true
