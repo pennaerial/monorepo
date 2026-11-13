@@ -28,7 +28,21 @@ pub enum ConfigCommand {
 
 /// checks if monorepo.toml file validates correctly
 pub fn check_config(manifest: Option<&Path>) -> Result<(), Box<dyn Error>> {
-    let (path, _) = load_config(manifest)?;
+    let (path, config) = load_config(manifest)?;
+
+    // catches packages that were moved or renamed without updating [deploy]
+    let root = path.parent().unwrap();
+    let missing: Vec<&str> = config
+        .deploy
+        .paths
+        .iter()
+        .filter(|p| !root.join(p).exists())
+        .map(String::as_str)
+        .collect();
+    if !missing.is_empty() {
+        return Err(format!("[deploy] paths not found: {}", missing.join(", ")).into());
+    }
+
     println!("{} loaded successfully", path.display());
     Ok(())
 }
