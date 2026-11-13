@@ -22,11 +22,11 @@ pub struct ConfigArgs {
 
 #[derive(Subcommand, Debug)]
 pub enum ConfigCommand {
-    /// Check that monorepo.toml parses and its [deploy] paths exist
+    /// Validates monorepo.toml manifest validation
     Check,
 }
 
-/// Fails if monorepo.toml doesn't parse or a [deploy] path doesn't exist.
+/// checks if monorepo.toml file validates correctly
 pub fn check_config(manifest: Option<&Path>) -> Result<(), Box<dyn Error>> {
     let (path, config) = load_config(manifest)?;
 
