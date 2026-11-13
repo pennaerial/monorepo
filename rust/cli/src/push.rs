@@ -23,6 +23,13 @@ pub fn push(
     let config = load(manifest)?;
     let paths = config.deploy.paths.join(" ");
     let record = push_record(&paths)?;
+    // only build pushed packages, even if the Pi has other source in ros_ws/src
+    let packages: Vec<&str> = config
+        .deploy
+        .paths
+        .iter()
+        .filter_map(|p| p.strip_prefix("ros_ws/"))
+        .collect();
 
     for h in hosts {
         println!("== {h}");
@@ -30,7 +37,13 @@ pub fn push(
 
         // Pis have no RTC, and make needs sane timestamps
         let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
-        sh::run(Some(h), &format!("sudo -n date -s @{now} > /dev/null"))?;
+        sh::run(
+            Some(h),
+            &format!(
+                "sudo -n date -s @{now} > /dev/null || \
+                 echo 'warning: no passwordless sudo, so the clock was not set'"
+            ),
+        )?;
 
         sh::run(None, &format!("{RSYNC} {paths} {h}:{REMOTE_ROOT}/"))?;
 
@@ -48,7 +61,8 @@ pub fn push(
             Some(h),
             &format!(
                 "cd {REMOTE_ROOT}/ros_ws && . /opt/ros/jazzy/setup.sh && \
-                 colcon build --cmake-args -DBUILD_TESTING=OFF"
+                 colcon build --base-paths {} --cmake-args -DBUILD_TESTING=OFF",
+                packages.join(" ")
             ),
         )?;
 
