@@ -1,4 +1,5 @@
 import ast
+import math
 from enum import StrEnum
 
 from launch import Action, LaunchDescription
@@ -18,6 +19,7 @@ class Args(StrEnum):
 
     NODE_NAME = "node_name"
     DEBUG = "debug"
+    DEBUG_RATE = "debug_rate"
     CAMERA_TOPIC = "camera_topic"
     PLUGINS = "plugins"
     SIM = "sim"
@@ -33,6 +35,7 @@ def launch_setup(context) -> list[Action]:
 
     node_name = config[Args.NODE_NAME]
     debug: bool = is_truthy(config[Args.DEBUG])
+    debug_rate = float(config[Args.DEBUG_RATE])
     camera_topic = config[Args.CAMERA_TOPIC]
     sim: bool = is_truthy(config[Args.SIM])
     # "auto" means leave the setting to camera_ros, which picks whatever the sensor reports.
@@ -53,6 +56,7 @@ def launch_setup(context) -> list[Action]:
     logger.debug(f"Camera Topic:        {camera_topic}")
     logger.debug(f"Vision Plugins:      {plugins}")
     logger.debug(f"Debug:               {debug}")
+    logger.debug(f"Debug Rate (Hz):     {debug_rate}")
     logger.debug(f"Sim:                 {sim}")
     if not sim:
         logger.debug(f"Camera Format:       {camera_format}")
@@ -81,6 +85,7 @@ def launch_setup(context) -> list[Action]:
                 {
                     "camera_topic": camera_topic,
                     "debug": debug,
+                    "debug_rate": debug_rate,
                 },
                 {"plugins": plugins} if plugins else {},
             ],
@@ -141,6 +146,11 @@ def generate_launch_description():
                 default_value="false",
                 description="if true, runs the vision manager at debug log level. otherwise info.",
                 choices=["true", "false", "t", "f", "0", "1"],
+            ),
+            DeclareLaunchArgument(
+                Args.DEBUG_RATE,
+                default_value="5.0",
+                description="Maximum debug image rate per plugin in Hz; 0 means unlimited. Also limits processing when only debug has subscribers. Algorithm output subscribers always request full-speed processing. Independent of the debug log-level flag.",
             ),
             DeclareLaunchArgument(
                 Args.CAMERA_TOPIC,
