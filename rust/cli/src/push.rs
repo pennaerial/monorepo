@@ -33,7 +33,7 @@ pub fn push(
 
     for h in hosts {
         println!("== {h}");
-        deps::check(&config, "prod", Some(h))?;
+        deps::sync(&config, "prod", Some(h))?;
 
         // Pis have no RTC, and make needs sane timestamps
         let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();

@@ -92,6 +92,7 @@ packages = [
     "build-essential",
     "cmake",
     "python3-colcon-common-extensions",
+    "python3-pip",  # deps sync installs python packages with it
     "rsync",
 ]
 python_packages = [
