@@ -1,5 +1,5 @@
 use crate::config::{MonorepoConfig, load_config};
-use crate::{apt, python};
+use crate::installed;
 use clap::{Args, Subcommand};
 use std::collections::BTreeSet;
 use std::error::Error;
@@ -7,11 +7,9 @@ use std::path::Path;
 
 pub fn run_deps(args: DepsArgs, manifest: Option<&Path>) -> Result<(), Box<dyn Error>> {
     match args.command {
-        DepsCommand::Check { dev, .. } => {
-            let (path, config) = load_config(manifest)?;
-            let env = if dev { "dev" } else { "prod" };
-            println!("checking {env} dependencies against {}", path.display());
-            check(&config, env)
+        DepsCommand::Check { dev, host, .. } => {
+            let (_, config) = load_config(manifest)?;
+            check(&config, if dev { "dev" } else { "prod" }, host.as_deref())
         }
         DepsCommand::Sync { dev, .. } => {
             let m = if dev { "dev" } else { "prod" };
@@ -21,42 +19,43 @@ pub fn run_deps(args: DepsArgs, manifest: Option<&Path>) -> Result<(), Box<dyn E
     }
 }
 
-/// Reports apt and python packages from the environment's groups that aren't installed.
+/// Reports packages and libraries from the environment's groups that aren't installed.
 /// Versions aren't checked yet.
-fn check(config: &MonorepoConfig, env_name: &str) -> Result<(), Box<dyn Error>> {
+pub fn check(
+    config: &MonorepoConfig,
+    env_name: &str,
+    host: Option<&str>,
+) -> Result<(), Box<dyn Error>> {
+    println!(
+        "checking {env_name} dependencies on {}",
+        host.unwrap_or("this machine")
+    );
     let env = config
         .environments
         .get(env_name)
         .ok_or(format!("no [environments.{env_name}] in manifest"))?;
 
-    let mut apt_wanted = BTreeSet::new();
-    let mut python_wanted = BTreeSet::new();
+    let (mut packages, mut python, mut libraries) =
+        (BTreeSet::new(), BTreeSet::new(), BTreeSet::new());
     for name in &env.groups {
         let group = config.groups.get(name).ok_or(format!(
             "environment '{env_name}' uses unknown group '{name}'"
         ))?;
-        apt_wanted.extend(group.packages.iter().map(String::as_str));
-        python_wanted.extend(group.python_packages.iter().map(String::as_str));
+        packages.extend(&group.packages);
+        python.extend(&group.python_packages);
+        libraries.extend(&group.libraries);
     }
 
-    let apt_installed = apt::installed_packages()?;
-    let apt_missing: Vec<&str> = apt_wanted
-        .iter()
-        .filter(|p| !apt_installed.contains(**p))
-        .copied()
-        .collect();
+    let apt_installed = installed::apt(host)?;
+    let python_installed = installed::python(host)?;
+    let libraries_installed = installed::libraries(host)?;
 
-    let python_installed = python::installed_packages()?;
-    let python_missing: Vec<&str> = python_wanted
-        .iter()
-        .filter(|r| !python_installed.contains(&python::requirement_name(r)))
-        .copied()
-        .collect();
+    let missing = report("apt", &packages, |p| apt_installed.contains(p))
+        + report("python", &python, |r| {
+            python_installed.contains(&installed::requirement_name(r))
+        })
+        + report("libraries", &libraries, |l| libraries_installed.contains(l));
 
-    report("apt", apt_wanted.len(), &apt_missing);
-    report("python", python_wanted.len(), &python_missing);
-
-    let missing = apt_missing.len() + python_missing.len();
     if missing > 0 {
         return Err(format!("{missing} missing dependencies").into());
     }
@@ -64,11 +63,18 @@ fn check(config: &MonorepoConfig, env_name: &str) -> Result<(), Box<dyn Error>> 
     Ok(())
 }
 
-fn report(kind: &str, wanted: usize, missing: &[&str]) {
-    println!("{kind}: {}/{wanted} installed", wanted - missing.len());
-    for name in missing {
+/// Prints how many of `wanted` are installed and returns the number missing.
+fn report(kind: &str, wanted: &BTreeSet<&String>, installed: impl Fn(&str) -> bool) -> usize {
+    let missing: Vec<_> = wanted.iter().filter(|w| !installed(w)).collect();
+    println!(
+        "{kind}: {}/{} installed",
+        wanted.len() - missing.len(),
+        wanted.len()
+    );
+    for name in &missing {
         println!("  missing: {name}");
     }
+    missing.len()
 }
 
 #[derive(Args, Debug)]
@@ -86,6 +92,10 @@ pub enum DepsCommand {
 
         #[arg(long)]
         prod: bool,
+
+        /// Check a remote machine over ssh, e.g. penn@air-03.local
+        #[arg(long)]
+        host: Option<String>,
     },
     /// Sync system dependencies with monorepo.toml configuration
     Sync {

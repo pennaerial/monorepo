@@ -43,8 +43,10 @@ pub fn load_config(manifest: Option<&Path>) -> Result<(PathBuf, MonorepoConfig),
             Path::new(&root).join("monorepo.toml")
         }
     };
-    let contents =
-        fs::read_to_string(&path).map_err(|e| format!("failed to read {}: {e}", path.display()))?;
+    // absolute, so push/pull can run from the manifest's directory
+    let path =
+        fs::canonicalize(&path).map_err(|e| format!("failed to read {}: {e}", path.display()))?;
+    let contents = fs::read_to_string(&path)?;
     let config = toml::from_str(&contents)
         .map_err(|e| format!("failed to parse {}: {e}", path.display()))?;
     Ok((path, config))
@@ -63,6 +65,9 @@ pub struct DependencyGroup {
     pub repositories: Option<Vec<String>>,
     pub packages: Vec<String>,
     pub python_packages: Vec<String>,
+    /// Shared libraries installed outside apt, e.g. "libpigpiod_if2.so"
+    #[serde(default)]
+    pub libraries: Vec<String>,
 }
 
 /// Platform constraints and dependency selection from `[environments.<name>]`.
@@ -98,6 +103,13 @@ pub struct Apt {
     pub repositories: BTreeMap<String, AptRepository>,
 }
 
+/// Source pushed to Pis, from `[deploy]`.
+#[derive(Debug, Deserialize)]
+pub struct Deploy {
+    /// Paths relative to the monorepo root
+    pub paths: Vec<String>,
+}
+
 /// The complete `monorepo.toml` manifest.
 #[derive(Debug, Deserialize)]
 pub struct MonorepoConfig {
@@ -105,4 +117,5 @@ pub struct MonorepoConfig {
     pub groups: BTreeMap<String, DependencyGroup>,
     pub environments: BTreeMap<String, Environment>,
     pub apt: Apt,
+    pub deploy: Deploy,
 }

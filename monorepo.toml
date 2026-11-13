@@ -86,9 +86,35 @@ python_packages = [
     "ruff==0.16.7",
 ]
 
+# Pis build the source pushed by `pennair push`, so prod needs build tools too.
 [groups.prod]
-packages = []
-python_packages = []
+packages = [
+    "build-essential",
+    "cmake",
+    "python3-colcon-common-extensions",
+    "rsync",
+    "python3-matplotlib",
+]
+python_packages = [
+    "pymavlink",  # uav ulog streaming
+]
+# Built from source and installed by hand for now; checked with `ldconfig -p`.
+libraries = [
+    "libpigpiod_if2.so",  # payload_controller GPIO
+    "libmicroxrcedds_agent.so",  # MicroXRCEAgent
+]
+
+# Source that `pennair push` copies to ~/monorepo on each Pi and builds there.
+[deploy]
+paths = [
+    "monorepo.toml",
+    "ros_ws/src/common/px4_msgs",
+    "ros_ws/src/common/vehicle_common",
+    "ros_ws/src/common/uav",
+    "ros_ws/src/iarc/iarc_flight",
+    "ros_ws/src/sae/payload_interfaces",
+    "ros_ws/src/sae/payload_controller",
+]
 
 [environments.dev]
 os = ["linux", "macos"]

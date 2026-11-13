@@ -5,7 +5,9 @@ mod apt;
 mod cli;
 mod config;
 mod deps;
-mod python;
+mod installed;
+mod push;
+mod sh;
 use cli::PennairCli;
 
 fn main() -> ExitCode {
