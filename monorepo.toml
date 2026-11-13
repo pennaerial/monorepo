@@ -93,15 +93,15 @@ packages = [
     "cmake",
     "python3-colcon-common-extensions",
     "rsync",
-    "python3-matplotlib",
 ]
 python_packages = [
     "pymavlink",  # uav ulog streaming
 ]
-# Built from source and installed by hand for now; checked with `ldconfig -p`.
+# Built from source and installed by hand for now. Checked against `ldconfig -p`,
+# so a versioned name like "libfoo.so.2.4" also checks the version.
 libraries = [
     "libpigpiod_if2.so",  # payload_controller GPIO
-    "libmicroxrcedds_agent.so",  # MicroXRCEAgent
+    "libmicroxrcedds_agent.so.2.4",  # MicroXRCEAgent, must match PX4 1.17's client
 ]
 
 # Source that `pennair push` copies to ~/monorepo on each Pi and builds there.

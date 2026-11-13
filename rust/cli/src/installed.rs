@@ -24,15 +24,15 @@ pub fn python(host: Option<&str>) -> Result<HashSet<String>, Box<dyn Error>> {
     Ok(out.lines().map(normalize).collect())
 }
 
-/// Shared libraries known to the dynamic linker, as "libfoo.so".
+/// Shared libraries known to the dynamic linker, e.g. "libfoo.so" and "libfoo.so.2.4".
 pub fn libraries(host: Option<&str>) -> Result<HashSet<String>, Box<dyn Error>> {
     let out = sh::output(host, "ldconfig -p")?;
-    // lines look like "\tlibfoo.so.1 (libc6,AArch64) => /usr/lib/libfoo.so.1"
+    // lines look like "\tlibfoo.so.2.4 (libc6,AArch64) => /usr/lib/libfoo.so.2.4"
     Ok(out
         .lines()
         .skip(1)
-        .filter_map(|line| line.trim().split(".so").next())
-        .map(|name| format!("{name}.so"))
+        .filter_map(|line| line.split_whitespace().next())
+        .map(String::from)
         .collect())
 }
 
