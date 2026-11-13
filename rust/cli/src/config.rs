@@ -1,12 +1,16 @@
 use clap::{Args, Subcommand};
 use serde::Deserialize;
 use std::collections::BTreeMap;
-use std::{env, error::Error, fs, path::Path};
-use toml;
+use std::{
+    env,
+    error::Error,
+    fs,
+    path::{Path, PathBuf},
+};
 
-pub fn run_config(args: ConfigArgs) -> Result<(), Box<dyn Error>> {
+pub fn run_config(args: ConfigArgs, manifest: Option<&Path>) -> Result<(), Box<dyn Error>> {
     match args.command {
-        ConfigCommand::Check => check_config(),
+        ConfigCommand::Check => check_config(manifest),
     }
 }
 
@@ -23,21 +27,27 @@ pub enum ConfigCommand {
 }
 
 /// checks if monorepo.toml file validates correctly
-pub fn check_config() -> Result<(), Box<dyn Error>> {
-    let monorepo_path_str = env::var("PENNAIR_MONOREPO_PATH")
-        .inspect_err(|_| eprintln!("PENNAIR_MONOREPO_PATH is not set!"))?;
-    let toml_path = Path::new(&monorepo_path_str).join("monorepo.toml");
-
-    if !toml_path.is_file() {
-        return Err("monorepo.toml not found".into());
-    }
-
-    // try toml validation
-    let contents = fs::read_to_string(toml_path)?;
-    let _: MonorepoConfig = toml::from_str(&contents)?;
-
-    println!("monorepo.toml loaded successfully");
+pub fn check_config(manifest: Option<&Path>) -> Result<(), Box<dyn Error>> {
+    let (path, _) = load_config(manifest)?;
+    println!("{} loaded successfully", path.display());
     Ok(())
+}
+
+/// Loads the manifest from `--manifest`, or `$PENNAIR_MONOREPO_PATH/monorepo.toml` if not given.
+pub fn load_config(manifest: Option<&Path>) -> Result<(PathBuf, MonorepoConfig), Box<dyn Error>> {
+    let path = match manifest {
+        Some(p) => p.to_path_buf(),
+        None => {
+            let root = env::var("PENNAIR_MONOREPO_PATH")
+                .map_err(|_| "PENNAIR_MONOREPO_PATH is not set; pass --manifest")?;
+            Path::new(&root).join("monorepo.toml")
+        }
+    };
+    let contents =
+        fs::read_to_string(&path).map_err(|e| format!("failed to read {}: {e}", path.display()))?;
+    let config = toml::from_str(&contents)
+        .map_err(|e| format!("failed to parse {}: {e}", path.display()))?;
+    Ok((path, config))
 }
 
 /// Target Ubuntu release and supported architectures from `[target]`.
