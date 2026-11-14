@@ -89,8 +89,9 @@ def launch_setup(context) -> list[Action]:
 
     middleware = ExecuteProcess(
         # -b 921600 = baud rate of UART connection
-        # /dev/serial0 is the device name
-        cmd=["MicroXRCEAgent", "serial", "--dev", "/dev/serial0", "-b", "921600"],
+        # /dev/ttyAMA0 is the UART on GPIO pins 14/15 when the Pi's config.txt has
+        # dtoverlay=disable-bt. Without that line, ttyAMA0 is the Bluetooth chip.
+        cmd=["MicroXRCEAgent", "serial", "--dev", "/dev/ttyAMA0", "-b", "921600"],
         output="screen",
         name="MicroXRCEAgent",
     )

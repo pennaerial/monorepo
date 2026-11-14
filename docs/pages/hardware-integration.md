@@ -29,7 +29,7 @@ We use UXRCE-DDS/MicroXRCEAgent over a wired serial UART connection from Pi to P
 
 
 - Make sure that uxrce_dds_client is running properly on the FC. You can do this by running `uxrce_dds_client status` in QGC MavLink Console. If not started, run `uxrce_dds_client start -t serial -d /dev/ttyS3 -b 921600`. If PX4 somehow doesn't start the middleware client on startup, you can create a startup script in the Pixhawk SD Card
-- Run the middleware on a Pi ssh session. It should be something like `MicroXRCEAgent serial --dev /dev/serial0 -b 921600`
+- Run the middleware on a Pi ssh session. It should be something like `MicroXRCEAgent serial --dev /dev/ttyAMA0 -b 921600`
 
 
 **If it doesn't work, double check these things:**
