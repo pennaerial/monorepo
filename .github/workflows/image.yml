@@ -1,0 +1,58 @@
+name: Pi image
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'image/**'
+      - 'monorepo.toml'
+      - '.github/workflows/image.yml'
+  pull_request:
+    paths:
+      - 'image/**'
+      - 'monorepo.toml'
+      - '.github/workflows/image.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: image-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build_image:
+    name: Build Pi image
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build pennair
+        working-directory: rust/cli
+        run: cargo build --release --locked
+
+      - name: Build image
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cloud-guest-utils
+          sudo image/build.sh rust/cli/target/release/pennair pennair-pi.img.xz
+
+      # GitHub rejects release files over 2 GB
+      - name: Check image size
+        run: test "$(stat -c %s pennair-pi.img.xz)" -lt 2000000000
+
+      - name: Publish releases
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          for tag in "image-${GITHUB_SHA}" image-latest; do
+            gh release view "$tag" >/dev/null 2>&1 ||
+              gh release create "$tag" --target "$GITHUB_SHA" --latest=false \
+                --title "Pi image ($tag)" --notes "Built from ${GITHUB_SHA}."
+            gh release upload "$tag" pennair-pi.img.xz pennair-pi.img.xz.sha256 --clobber
+          done

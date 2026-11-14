@@ -61,12 +61,13 @@ pub fn sync(
         sh::run(host, &cmd)?;
     }
     if !missing.python.is_empty() {
+        // pip installs for the current user, or system-wide when run as root (the image build).
         // pin numpy to the apt version. Without the pin, pip installs numpy 2, which breaks ROS.
         let requirements: Vec<String> = missing.python.iter().map(|r| format!("'{r}'")).collect();
         sh::run(
             host,
             &format!(
-                "python3 -m pip install --user --break-system-packages {} \
+                "python3 -m pip install --break-system-packages {} \
                  \"numpy==$(python3 -c 'import numpy; print(numpy.__version__)')\"",
                 requirements.join(" ")
             ),

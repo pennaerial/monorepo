@@ -4,6 +4,8 @@ use std::process::ExitCode;
 mod cli;
 mod config;
 mod deps;
+mod flash;
+mod gateway;
 mod installed;
 mod push;
 mod sh;

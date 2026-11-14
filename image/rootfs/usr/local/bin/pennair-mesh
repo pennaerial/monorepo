@@ -1,0 +1,33 @@
+#!/bin/bash
+# Joins the 802.11s mesh on a USB Wi-Fi adapter and routes it with batman-adv.
+# The mesh IP comes from the hostname: air-06 gets 10.10.0.6.
+set -e
+
+WIFI="${1:?Interface name required}"
+
+if [[ ! "$(hostname)" =~ ^air-([0-9]{2})$ ]]; then
+    echo "Expected a hostname like air-06 (exactly two digits)."
+    exit 1
+fi
+# 10# reads the digits as decimal: 06 -> 6, 08 -> 8.
+NODE_ID=$((10#${BASH_REMATCH[1]}))
+
+rfkill unblock wifi
+iw reg set US
+ip link set "$WIFI" down
+iw dev "$WIFI" set type mp
+ip link set "$WIFI" mtu 1532
+ip link set "$WIFI" up
+iw dev "$WIFI" set power_save off
+iw dev "$WIFI" mesh join rosmesh freq 2437 HT20
+iw dev "$WIFI" set mesh_param mesh_fwding 0
+
+ip link show bat0 > /dev/null 2>&1 || ip link add bat0 type batadv
+ip link set "$WIFI" master bat0
+ip link set bat0 up
+ip addr replace "10.10.0.${NODE_ID}/24" dev bat0
+
+# The laptop (10.10.0.254) is the last choice for internet, after Wi-Fi (metric 600)
+# and Ethernet (metric 700).
+ip route replace default via 10.10.0.254 dev bat0 metric 800
+resolvectl dns bat0 1.1.1.1 1.0.0.1
