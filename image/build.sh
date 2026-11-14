@@ -84,7 +84,10 @@ camera_auto_detect=0
 dtoverlay=imx219
 EOF
 
-rm -rf "$root/usr/sbin/policy-rc.d" "$root/tmp/monorepo.toml" "$root/run/systemd"
+rm -rf "$root/usr/sbin/policy-rc.d" "$root/run/systemd" "$root/root/.cache" \
+	"$root"/tmp/* "$root"/var/lib/apt/lists/*
+# Deleted files leave their data in the free space. Trimming zeroes it so it compresses away.
+fstrim "$root"
 umount -R "$root"
 losetup -d "$loop"
 

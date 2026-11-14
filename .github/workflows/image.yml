@@ -40,9 +40,9 @@ jobs:
           sudo apt-get install -y cloud-guest-utils
           sudo image/build.sh rust/cli/target/release/pennair pennair-pi.img.xz
 
-      # GitHub rejects release files over 2 GB
+      # GitHub rejects release files over 2 GiB
       - name: Check image size
-        run: test "$(stat -c %s pennair-pi.img.xz)" -lt 2000000000
+        run: test "$(stat -c %s pennair-pi.img.xz)" -lt 2147483648
 
       - name: Publish releases
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
