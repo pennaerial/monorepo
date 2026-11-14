@@ -88,6 +88,7 @@ class UAV(Vehicle):
         self.roll = None
         self.pitch = None
         self.yaw = None
+        self._locked_yaw: float | None = None
         self.attempted_takeoff = False
 
         # Initialize drone position
@@ -230,7 +231,7 @@ class UAV(Vehicle):
         Args:
             coordinate (tuple): (x, y, z) in the local frame.
             relative (bool): If True, the position is relative to the current local position.
-            lock_yaw (bool): If True, maintain current yaw instead of recalculating (prevents spinning when hovering).
+            lock_yaw (bool): If True, capture heading once and hold it until navigation resumes.
         """
         x, y, z = coordinate
         if relative:
@@ -242,11 +243,7 @@ class UAV(Vehicle):
         msg.position = [float(x), float(y), float(z)]
         msg.timestamp = int(self.node.get_clock().now().nanoseconds / 1000)
 
-        # Lock yaw when hovering to prevent spinning from position noise
-        if lock_yaw and self.yaw is not None:
-            msg.yaw = float(self.yaw)
-        else:
-            msg.yaw = float(self.calculate_yaw(x, y))
+        msg.yaw = float(self.calculate_yaw(x, y, lock_yaw=lock_yaw))
 
         # Delegate velocity calculation to subclass (VTOL or Multicopter)
         # msg.velocity = self._calculate_velocity((x, y, z), lock_yaw) #TODO: Tune this later but for now let px4 handle
@@ -268,20 +265,23 @@ class UAV(Vehicle):
         msg.velocity = [float(v) for v in velocity]
         msg.acceleration = [float(v) for v in acceleration]
         msg.yaw = float(yaw)
+        # An explicit yaw target ends the previous automatic heading hold.
+        self._locked_yaw = None
         self.trajectory_publisher.publish(msg)
 
-    def calculate_yaw(self, x: float, y: float) -> float:
-        """Calculate the yaw angle to point towards the next waypoint."""
+    def calculate_yaw(self, x: float, y: float, lock_yaw: bool = False) -> float:
+        """Face the waypoint while traveling; hold a fixed heading near it or when requested."""
         # Calculate relative position
         dx = x - self.local_position.x
         dy = y - self.local_position.y
 
-        # If very close to target (hovering), maintain current yaw to prevent spinning
-        # caused by noisy position estimates when dx/dy are near zero
-        if np.linalg.norm([dx, dy]) < 3.0 and self.yaw is not None:
-            return self.yaw
+        # Capture once so disturbances don't move the heading target while hovering.
+        if (lock_yaw or np.linalg.norm([dx, dy]) < 3.0) and self.yaw is not None:
+            if self._locked_yaw is None:
+                self._locked_yaw = float(self.yaw)
+            return self._locked_yaw
 
-        # Calculate yaw angle
+        self._locked_yaw = None
         yaw = np.arctan2(dy, dx)
         return yaw
 

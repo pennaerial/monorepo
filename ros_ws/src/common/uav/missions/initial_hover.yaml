@@ -1,0 +1,17 @@
+modes:
+  start:
+    mode: uav.vtol.TakeoffMode
+    params:
+      takeoff_type: vertical
+    transitions:
+      complete: hover
+
+  hover:
+    mode: uav.HoverMode
+    params:
+      duration: 5.0
+    transitions:
+      complete: land
+
+  land:
+    mode: uav.LandingMode

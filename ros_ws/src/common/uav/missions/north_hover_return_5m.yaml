@@ -1,0 +1,50 @@
+# LOCAL NED coordinates: +X north, +Y east, -Z up (meters).
+# Assumes takeoff near the local origin, as in the default SITL spawn.
+modes:
+  start:
+    mode: uav.vtol.TakeoffMode
+    params:
+      takeoff_type: vertical
+    transitions:
+      complete: initial
+  
+  initial:
+    mode: uav.NavGPSMode
+    params:
+      coordinates:
+        - [[5, 0, -5], 1, LOCAL]
+    transitions:
+      complete: hover1
+  
+  hover1:
+    mode: uav.HoverMode
+    params:
+      duration: 15.0
+    transitions:
+      complete: north
+
+  north:
+    mode: uav.NavGPSMode
+    params:
+      coordinates:
+        - [[10, 0, -5], 1, LOCAL]
+    transitions:
+      complete: hover2
+
+  hover2:
+    mode: uav.HoverMode
+    params:
+      duration: 15.0
+    transitions:
+      complete: return_home
+
+  return_home:
+    mode: uav.NavGPSMode
+    params:
+      coordinates:
+        - [[0, 0, -5], 0, LOCAL]
+    transitions:
+      complete: land
+
+  land:
+    mode: uav.LandingMode
