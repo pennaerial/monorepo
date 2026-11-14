@@ -15,7 +15,7 @@ modes:
         v_max: # max speed for each leg in given mode
           standard: 1.0
         a_max: # max acceleration
-            standard: 0.5
+          standard: 0.5
         keyframes: # points the curve must pass through, mode defines constraints for the preceeding leg to that point
           - {x: 0, y: 0, z: -4, yaw: 0.0, mode: standard}
           - {x: 3, y: 0, z: -4, yaw: 0.0, mode: standard}
