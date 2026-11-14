@@ -154,7 +154,7 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 Args.WORLD,
                 default_value="default",
-                description="simulation world for gz to load. Looks under {PENNAIR_GZ_MODELS_PATH}/worlds/{world}.sdf\n\tRun `pennair world ls` to see all available worlds.",
+                description="simulation world for gz to load. Looks under {PENNAIR_GZ_MODELS_PATH}/worlds/{world}.sdf\n\tRun `ros2 run pennair_cli pennair world ls` to see all available worlds.",
             ),
             DeclareLaunchArgument(
                 Args.STAGE,

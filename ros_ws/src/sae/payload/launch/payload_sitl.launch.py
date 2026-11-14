@@ -241,7 +241,7 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 Args.MISSION,
                 default_value="basic",
-                description="Name of the mission to load. Run 'pennair mission payload' to see all available payload missions.",
+                description="Name of the mission to load. Run 'ros2 run pennair_cli pennair mission payload' to see all available payload missions.",
             ),
             DeclareLaunchArgument(
                 Args.NS_ID,
