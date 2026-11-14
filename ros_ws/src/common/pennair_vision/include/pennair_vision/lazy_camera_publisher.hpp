@@ -78,6 +78,7 @@ void LazyCameraPublisher<MessageT>::initialize(
     std::optional<double> debug_image_rate
 )
 {
+  // convert hz to seconds
   if (debug_image_rate) {
     debug_period_ = std::chrono::duration<double>(1.0 / *debug_image_rate);
   } else {
