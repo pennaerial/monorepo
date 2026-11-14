@@ -4,7 +4,9 @@ use std::process::ExitCode;
 mod cli;
 mod config;
 mod deps;
-mod apt;
+mod installed;
+mod push;
+mod sh;
 use cli::PennairCli;
 
 fn main() -> ExitCode {

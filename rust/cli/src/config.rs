@@ -1,12 +1,16 @@
 use clap::{Args, Subcommand};
 use serde::Deserialize;
 use std::collections::BTreeMap;
-use std::{env, error::Error, fs, path::Path};
-use toml;
+use std::{
+    env,
+    error::Error,
+    fs,
+    path::{Path, PathBuf},
+};
 
-pub fn run_config(args: ConfigArgs) -> Result<(), Box<dyn Error>> {
+pub fn run_config(args: ConfigArgs, manifest: Option<&Path>) -> Result<(), Box<dyn Error>> {
     match args.command {
-        ConfigCommand::Check => check_config(),
+        ConfigCommand::Check => check_config(manifest),
     }
 }
 
@@ -23,21 +27,43 @@ pub enum ConfigCommand {
 }
 
 /// checks if monorepo.toml file validates correctly
-pub fn check_config() -> Result<(), Box<dyn Error>> {
-    let monorepo_path_str = env::var("PENNAIR_MONOREPO_PATH")
-        .inspect_err(|_| eprintln!("PENNAIR_MONOREPO_PATH is not set!"))?;
-    let toml_path = Path::new(&monorepo_path_str).join("monorepo.toml");
+pub fn check_config(manifest: Option<&Path>) -> Result<(), Box<dyn Error>> {
+    let (path, config) = load_config(manifest)?;
 
-    if !toml_path.is_file() {
-        return Err("monorepo.toml not found".into());
+    // fails if a package was moved or renamed without updating [deploy]
+    let root = path.parent().unwrap();
+    let missing: Vec<&str> = config
+        .deploy
+        .paths
+        .iter()
+        .filter(|p| !root.join(p).exists())
+        .map(String::as_str)
+        .collect();
+    if !missing.is_empty() {
+        return Err(format!("[deploy] paths not found: {}", missing.join(", ")).into());
     }
 
-    // try toml validation
-    let contents = fs::read_to_string(toml_path)?;
-    let _: MonorepoConfig = toml::from_str(&contents)?;
-
-    println!("monorepo.toml loaded successfully");
+    println!("{} loaded successfully", path.display());
     Ok(())
+}
+
+/// Loads the manifest from `--manifest`, or `$PENNAIR_MONOREPO_PATH/monorepo.toml` if not given.
+pub fn load_config(manifest: Option<&Path>) -> Result<(PathBuf, MonorepoConfig), Box<dyn Error>> {
+    let path = match manifest {
+        Some(p) => p.to_path_buf(),
+        None => {
+            let root = env::var("PENNAIR_MONOREPO_PATH")
+                .map_err(|_| "PENNAIR_MONOREPO_PATH is not set; pass --manifest")?;
+            Path::new(&root).join("monorepo.toml")
+        }
+    };
+    // make it absolute, so push and pull can cd to the manifest's directory
+    let path =
+        fs::canonicalize(&path).map_err(|e| format!("failed to read {}: {e}", path.display()))?;
+    let contents = fs::read_to_string(&path)?;
+    let config = toml::from_str(&contents)
+        .map_err(|e| format!("failed to parse {}: {e}", path.display()))?;
+    Ok((path, config))
 }
 
 /// Target Ubuntu release and supported architectures from `[target]`.
@@ -53,6 +79,18 @@ pub struct DependencyGroup {
     pub repositories: Option<Vec<String>>,
     pub packages: Vec<String>,
     pub python_packages: Vec<String>,
+    #[serde(default)]
+    pub debs: Vec<Deb>,
+}
+
+/// A .deb from a pennaerial/Dependencies release, from `debs` in a group.
+#[derive(Debug, Deserialize)]
+pub struct Deb {
+    pub package: String,
+    /// The installed version has to start with this, e.g. "2.4.3"
+    pub version: String,
+    /// Release tarball with the .deb and a SHA256SUMS file
+    pub url: String,
 }
 
 /// Platform constraints and dependency selection from `[environments.<name>]`.
@@ -88,6 +126,13 @@ pub struct Apt {
     pub repositories: BTreeMap<String, AptRepository>,
 }
 
+/// Source that `pennair push` copies to Pis, from `[deploy]`.
+#[derive(Debug, Deserialize)]
+pub struct Deploy {
+    /// Paths relative to the monorepo root
+    pub paths: Vec<String>,
+}
+
 /// The complete `monorepo.toml` manifest.
 #[derive(Debug, Deserialize)]
 pub struct MonorepoConfig {
@@ -95,4 +140,5 @@ pub struct MonorepoConfig {
     pub groups: BTreeMap<String, DependencyGroup>,
     pub environments: BTreeMap<String, Environment>,
     pub apt: Apt,
+    pub deploy: Deploy,
 }
