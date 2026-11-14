@@ -44,7 +44,7 @@ public:
   virtual ~LazyCameraPublisher() = default;
 
   /// Check VisionPlugin
-  void initialize(rclcpp::Node& node, const std::string& camera_topic, double debug_image_rate) override;
+  void initialize(rclcpp::Node& node, const std::string& camera_topic, std::optional<double> debug_image_rate) override;
 
   /// Subscribes to camera frames and processes them when output subscribers exist. See VisionPlugin
   /// Processes at full speed for result subscribers, or at the debug rate for debug-only subscribers
@@ -61,7 +61,7 @@ protected:
 
 private:
   /// Wall-clock limit, independent of camera timestamps or simulation time jumps.
-  std::chrono::duration<double> debug_period_{0.0};
+  std::optional<std::chrono::duration<double>> debug_period_;
   std::optional<std::chrono::steady_clock::time_point> last_debug_time_;
   /// Publishes result of cv object
   typename rclcpp::Publisher<MessageT>::SharedPtr cv_result_pub_;
@@ -75,11 +75,14 @@ template <RosMessage MessageT>
 void LazyCameraPublisher<MessageT>::initialize(
     rclcpp::Node& node,
     const std::string& camera_topic,
-    double debug_image_rate
+    std::optional<double> debug_image_rate
 )
 {
-  /// convert hz to seconds
-  debug_period_ = std::chrono::duration<double>(debug_image_rate > 0.0 ? 1.0 / debug_image_rate : 0.0);
+  if (debug_image_rate) {
+    debug_period_ = std::chrono::duration<double>(1.0 / *debug_image_rate);
+  } else {
+    debug_period_.reset();
+  }
   last_debug_time_.reset();
   camera_topic_ = camera_topic;
   node_ = &node;
@@ -99,9 +102,12 @@ void LazyCameraPublisher<MessageT>::start()
         const bool want_result = cv_result_pub_->get_subscription_count() > 0;
         const bool want_debug = cv_debug_pub_.getNumSubscribers() > 0;
         const auto now = std::chrono::steady_clock::now();
-        const bool generate_debug = want_debug && (!last_debug_time_ || now - *last_debug_time_ >= debug_period_);
+        // Generate debug if there are debug subscribers and debug_period_ has passed since the last debug attempt
+        const bool generate_debug =
+            want_debug && (!debug_period_ || !last_debug_time_ || now - *last_debug_time_ >= *debug_period_);
+        
+        // don't process image if no subscribers
         if (!want_result && !generate_debug) {
-          // don't process image if no subscribers
           return;
         }
 

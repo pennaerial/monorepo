@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <rclcpp/node.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/image.hpp>
@@ -12,8 +13,8 @@ class VisionPlugin
 public:
   virtual ~VisionPlugin() = default;
 
-  /// Initialize plugin with a ROS node, camera topic and maximum debug rate in Hz (0 means unlimited).
-  virtual void initialize(rclcpp::Node& node, const std::string& topic, double debug_image_rate) = 0;
+  /// Initialize plugin with a ROS node, camera topic and maximum debug rate in Hz (nullopt means unlimited).
+  virtual void initialize(rclcpp::Node& node, const std::string& topic, std::optional<double> debug_image_rate) = 0;
 
   virtual void start() = 0;
 };
