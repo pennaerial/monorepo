@@ -66,8 +66,9 @@ pub fn sync(
         let requirements: Vec<String> = missing.python.iter().map(|r| format!("'{r}'")).collect();
         sh::run(
             host,
+            // TODO: Fix this numpy workaround
             &format!(
-                "python3 -m pip install --break-system-packages {} \
+                "python3 -m pip install --user --break-system-packages {} \
                  \"numpy==$(python3 -c 'import numpy; print(numpy.__version__)')\"",
                 requirements.join(" ")
             ),
