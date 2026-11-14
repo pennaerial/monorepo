@@ -230,6 +230,26 @@ Build and run the ROS workspace
    source install/setup.bash
    ros2 launch uav uav_sitl.launch.py
 
+Install the pennair CLI
+```````````````````````
+
+``pennair`` checks dependencies, flashes Pi SD cards, and pushes code to Pis. It's written in Rust.
+
+1. Install Rust:
+
+.. code-block:: bash
+
+   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+   source ~/.cargo/env
+
+2. Build and install the CLI to ``~/.cargo/bin/pennair``. Rerun this after pulling changes to ``rust/cli``.
+
+.. code-block:: bash
+
+   # from monorepo root
+   cargo install --path rust/cli
+   pennair --help
+
 Install ESP-IDF Toolchain
 ```````````````````````````
 
