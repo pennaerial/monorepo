@@ -36,12 +36,9 @@ pub fn push(
         deps::check(&config, "prod", Some(h))?;
 
         // Pis have no hardware clock, and make compares file times to decide what to rebuild.
-        // Setting the clock needs sudo, which may ask for a password, so only do it when it's off.
+        // sudo asks for the Pi's password here unless the Pi has passwordless sudo.
         let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
-        let pi_time: u64 = sh::output(Some(h), "date +%s")?.trim().parse()?;
-        if pi_time.abs_diff(now) > 5 {
-            sh::run(Some(h), &format!("sudo date -s @{now} > /dev/null"))?;
-        }
+        sh::run(Some(h), &format!("sudo date -s @{now} > /dev/null"))?;
 
         sh::run(None, &format!("{RSYNC} {paths} {h}:{REMOTE_ROOT}/"))?;
 
