@@ -2,6 +2,7 @@
 # Builds the Pi base image from the official Ubuntu 24.04 server image.
 # Run as root on arm64 Ubuntu:
 #   image/build.sh <pennair binary> <output.img.xz>
+# Writes <output.img.xz>.part0, .part1, ... and <output.img.xz>.sha256.
 set -euo pipefail
 
 UBUNTU="ubuntu-24.04.5-preinstalled-server-arm64+raspi.img"
@@ -68,15 +69,7 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y network-manager avahi-daemon dnsmasq iw batctl
 pennair --manifest /tmp/monorepo.toml deps sync --prod
-# Nothing on a Pi uses snaps, and they take a few hundred MB.
-apt-get purge -y snapd
-rm -rf /snap /var/snap /var/lib/snapd
 apt-get clean
-
-# The image is close to GitHub's 2 GiB limit, so print what takes the space.
-dpkg-query -W -f='${Installed-Size}\t${Package}\n' | sort -rn | head -25
-du -xsh /usr/lib/firmware /usr/lib/modules /opt/ros /usr/share /var 2>/dev/null
-df -h /
 EOF
 
 cp -a "$HERE/rootfs/." "$root/"
@@ -99,6 +92,8 @@ fstrim "$root"
 umount -R "$root"
 losetup -d "$loop"
 
-xz -T0 -c "$UBUNTU" >"$OUT"
-(cd "$(dirname "$OUT")" && sha256sum "$(basename "$OUT")" >"$OUT.sha256")
-ls -lh "$OUT"
+# GitHub rejects release files over 2 GiB, so the compressed image is cut into parts.
+# `pennair flash` joins them with cat. The .sha256 file lists the parts in order.
+xz -T0 -c "$UBUNTU" | split -b 1900M -d -a 1 - "$OUT.part"
+(cd "$(dirname "$OUT")" && sha256sum "$(basename "$OUT")".part* >"$OUT.sha256")
+ls -lh "$OUT".part*

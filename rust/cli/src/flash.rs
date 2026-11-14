@@ -8,8 +8,7 @@ use std::{
     path::Path,
 };
 
-const IMAGE_URL: &str =
-    "https://github.com/pennaerial/monorepo/releases/download/image-latest/pennair-pi.img.xz";
+const RELEASE_URL: &str = "https://github.com/pennaerial/monorepo/releases/download/image-latest";
 const USER_DATA: &str = include_str!("../../../image/user-data");
 const NETWORK_CONFIG: &str = include_str!("../../../image/network-config");
 
@@ -20,6 +19,7 @@ pub fn flash(id: u8, device: &str, image: Option<&Path>) -> Result<(), Box<dyn E
     }
     let name = format!("air-{id:02}");
 
+    // one .img.xz file, or the parts of one in order
     let image = match image {
         Some(path) => path.display().to_string(),
         None => download()?,
@@ -41,7 +41,7 @@ pub fn flash(id: u8, device: &str, image: Option<&Path>) -> Result<(), Box<dyn E
     sh::run(None, &format!("sudo umount {device}?* 2>/dev/null || true"))?;
     sh::run(
         None,
-        &format!("xz -dc {image} | sudo dd of={device} bs=4M conv=fsync status=progress"),
+        &format!("cat {image} | xz -dc | sudo dd of={device} bs=4M conv=fsync status=progress"),
     )?;
 
     // cloud-init reads these two files from the boot partition on first boot
@@ -67,19 +67,27 @@ pub fn flash(id: u8, device: &str, image: Option<&Path>) -> Result<(), Box<dyn E
     Ok(())
 }
 
-/// Downloads the latest image into ~/.cache/pennair if it changed, and returns its path.
+/// Downloads the latest image's parts into ~/.cache/pennair if they changed,
+/// and returns their paths in order.
 fn download() -> Result<String, Box<dyn Error>> {
     let cache = sh::output(None, "echo $HOME/.cache/pennair")?
         .trim()
         .to_string();
+    // the .sha256 file lists the parts in order
     sh::run(
         None,
         &format!(
             "set -e; mkdir -p {cache}; cd {cache}; \
-             curl -fL -z pennair-pi.img.xz -o pennair-pi.img.xz {IMAGE_URL}; \
-             curl -fsSL -o pennair-pi.img.xz.sha256 {IMAGE_URL}.sha256; \
+             curl -fsSL -o pennair-pi.img.xz.sha256 {RELEASE_URL}/pennair-pi.img.xz.sha256; \
+             for part in $(awk '{{print $2}}' pennair-pi.img.xz.sha256); do \
+                 curl -fL -z $part -o $part {RELEASE_URL}/$part; \
+             done; \
              sha256sum -c pennair-pi.img.xz.sha256"
         ),
     )?;
-    Ok(format!("{cache}/pennair-pi.img.xz"))
+    let parts = sh::output(
+        None,
+        &format!("cd {cache}; awk '{{print \"{cache}/\" $2}}' pennair-pi.img.xz.sha256"),
+    )?;
+    Ok(parts.split_whitespace().collect::<Vec<_>>().join(" "))
 }
