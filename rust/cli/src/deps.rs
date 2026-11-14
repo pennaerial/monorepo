@@ -68,7 +68,7 @@ pub fn sync(
             host,
             // TODO: Fix this numpy workaround
             &format!(
-                "python3 -m pip install --user --break-system-packages {} \
+                "python3 -m pip install --break-system-packages {} \
                  \"numpy==$(python3 -c 'import numpy; print(numpy.__version__)')\"",
                 requirements.join(" ")
             ),
