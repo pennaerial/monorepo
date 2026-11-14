@@ -54,7 +54,7 @@ pub fn flash(id: u8, device: &str, image: Option<&Path>) -> Result<(), Box<dyn E
     sh::run(
         None,
         &format!(
-            "set -e; sudo partprobe {device}; sleep 2; \
+            "set -e; sudo blockdev --rereadpt {device}; sleep 2; \
              boot=$(lsblk -lnpo NAME {device} | sed -n 2p); mnt=$(mktemp -d); \
              sudo mount $boot $mnt; \
              sudo cp {0}/user-data {0}/network-config $mnt/; \
