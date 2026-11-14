@@ -263,6 +263,7 @@ def _load_referenced_messages(messages, idl_root):
 def _render_raw_struct(message):
     structure = message.structure
     name = get_rs_name(structure.namespaced_type.name)
+    type_name = "/".join(structure.namespaced_type.namespaced_name())
     lines = [
         "#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]",
         f"pub struct {name} {{",
@@ -285,6 +286,12 @@ def _render_raw_struct(message):
         [
             "",
             f"impl crate::RosMessage for {name} {{",
+            f'    const TYPE_NAME: &\'static str = "{type_name}";',
+            "",
+            "    fn serialize(&self) -> Result<Vec<u8>, cdr::Error> {",
+            "        cdr::serialize::<_, _, cdr::CdrLe>(self, cdr::Infinite)",
+            "    }",
+            "",
             "    fn deserialize(bytes: &[u8]) -> Result<Self, cdr::Error> {",
             "        cdr::deserialize(bytes)",
             "    }",
@@ -294,19 +301,61 @@ def _render_raw_struct(message):
     return "\n".join(lines)
 
 
-def _write_raw_crate(messages, crate_name, output_dir, package_version):
+def _render_service_marker(service):
+    namespaced_type = service.namespaced_type
+    name = get_rs_name(namespaced_type.name)
+    type_name = "/".join(namespaced_type.namespaced_name())
+    request = get_rs_name(service.request_message.structure.namespaced_type.name)
+    response = get_rs_name(service.response_message.structure.namespaced_type.name)
+    return "\n".join(
+        [
+            f"/// Marker type for the `{type_name}` service.",
+            f"pub struct {name};",
+            "",
+            f"impl crate::RosService for {name} {{",
+            f"    type Request = {request};",
+            f"    type Response = {response};",
+            f'    const TYPE_NAME: &\'static str = "{type_name}";',
+            "}",
+        ]
+    )
+
+
+def _write_raw_crate(messages, crate_name, output_dir, package_version, services=()):
+    # package -> namespace ("msg" / "srv") -> list of (sort key, rendered item)
     grouped = {}
+
+    def add(namespaced_type, sort_key, rendered):
+        package, namespace = namespaced_type.namespaces
+        grouped.setdefault(package, {}).setdefault(namespace, []).append((sort_key, rendered))
+
     for message in messages:
         namespaced_type = message.structure.namespaced_type
-        package, namespace = namespaced_type.namespaces
-        grouped.setdefault(package, {}).setdefault(namespace, []).append(message)
+        add(namespaced_type, namespaced_type.name, _render_raw_struct(message))
+    for service in services:
+        # Sorts the marker just before its <Name>_Request / <Name>_Response structs.
+        add(service.namespaced_type, service.namespaced_type.name, _render_service_marker(service))
 
     source = [
         "// Generated raw Rust structs. No ROS runtime is required.",
         "",
-        "/// A ROS message that can be decoded from encapsulated CDR bytes.",
+        "// Service structs follow ROS naming (e.g. Trigger_Request).",
+        "#![allow(non_camel_case_types)]",
+        "",
+        "/// A ROS message that can be encoded to and decoded from encapsulated CDR bytes.",
         "pub trait RosMessage: Sized + Send + 'static {",
+        "    /// Full ROS message type name, e.g. `std_msgs/msg/Int32`.",
+        "    const TYPE_NAME: &'static str;",
+        "    fn serialize(&self) -> Result<Vec<u8>, cdr::Error>;",
         "    fn deserialize(bytes: &[u8]) -> Result<Self, cdr::Error>;",
+        "}",
+        "",
+        "/// A ROS service type, tying its request and response messages together.",
+        "pub trait RosService {",
+        "    type Request: RosMessage;",
+        "    type Response: RosMessage;",
+        "    /// Full ROS type name, e.g. `std_srvs/srv/Trigger`.",
+        "    const TYPE_NAME: &'static str;",
         "}",
         "",
     ]
@@ -315,10 +364,7 @@ def _write_raw_crate(messages, crate_name, output_dir, package_version):
         indent = "    "
         for namespace in sorted(grouped[package]):
             source.append(f"{indent}pub mod {get_rs_name(namespace)} {{")
-            for message in sorted(
-                grouped[package][namespace], key=lambda item: item.structure.namespaced_type.name
-            ):
-                rendered = _render_raw_struct(message)
+            for _, rendered in sorted(grouped[package][namespace], key=lambda item: item[0]):
                 source.extend(
                     indent + "    " + line if line else "" for line in rendered.splitlines()
                 )
@@ -384,6 +430,7 @@ def generate_rs(
         raise ValueError(f"Invalid Rust crate name: {crate_name!r}")
 
     messages = {}
+    services = {}
     for package in packages:
         if not package.isascii() or not package.isidentifier():
             raise ValueError(f"Invalid ROS package name: {package!r}")
@@ -405,9 +452,18 @@ def generate_rs(
             for message in parsed.content.get_elements_of_type(Message):
                 key = tuple(message.structure.namespaced_type.namespaced_name())
                 messages[key] = message
+            # A service becomes <Name>_Request / <Name>_Response structs plus a
+            # <Name> marker implementing RosService.
+            for service in parsed.content.get_elements_of_type(Service):
+                services[tuple(service.namespaced_type.namespaced_name())] = service
+                for message in (service.request_message, service.response_message):
+                    key = tuple(message.structure.namespaced_type.namespaced_name())
+                    messages[key] = message
 
     messages = _load_referenced_messages(messages.values(), idl_root)
-    _write_raw_crate(messages, crate_name, output_dir, package_version)
+    _write_raw_crate(
+        messages, crate_name, output_dir, package_version, services=list(services.values())
+    )
     return 0
 
 

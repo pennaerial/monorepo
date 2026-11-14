@@ -1,7 +1,6 @@
 use dioxus::prelude::*;
 use ros_interfaces::RosMessage;
 use std::marker::PhantomData;
-use std::sync::Arc;
 
 use crate::ros::{NodeError, NodeHandle, SubscriptionHandle};
 
@@ -21,12 +20,10 @@ pub struct UseSubscription<T> {
     _message: PhantomData<fn(T)>,
 }
 impl<T: RosMessage> UseSubscription<T> {
-
     pub async fn subscribe(
         &mut self,
         callback: impl FnMut(T) + Send + 'static,
     ) -> Result<(), NodeError> {
-
         // already subscribed, so keep existing callback
         if self.signal.peek().is_some() {
             return Ok(());

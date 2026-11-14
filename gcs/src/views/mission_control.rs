@@ -1,54 +1,10 @@
 use crate::components::{Button, LogPanel, SideBar};
 use crate::hooks::{use_ros_node, use_subscription};
-use crate::ros::server_types::ServerMessage;
-use crate::ros::FoxgloveClient;
 use dioxus::prelude::*;
-use ros_interfaces::{geometry_msgs, std_msgs};
+use ros_interfaces::{example_interfaces, std_msgs};
+use std::time::Duration;
 
-// / * `url`: e.g. "localhost:8765"
-async fn run_client(url: &str) {
-    let mut client = FoxgloveClient::new();
-
-    info!(%url, "Connecting to Foxglove bridge");
-    if let Err(error) = client.connect(url).await {
-        error!(%url, error = %error, "Foxglove connection failed");
-        return;
-    }
-
-    info!(%url, "Connected to Foxglove bridge");
-
-    // testing a hardcoded 4 id
-    match client.subscribe(4).await {
-        Ok(id) => info!(subscription_id = id, "Subscribed to channel 4"),
-        Err(err) => error!(error = %err, "Subscription failed"),
-    }
-
-    let mut receiver = client.get_receiver();
-    tokio::spawn(async move {
-        loop {
-            let msg = receiver.recv().await;
-            match msg {
-                Ok(ServerMessage::MessageData(data)) => {
-                    match cdr::deserialize::<geometry_msgs::msg::Pose>(data.data.as_ref()) {
-                        Ok(decoded) => trace!(?decoded, "Received pose"),
-                        Err(error) => warn!(%error, "Failed to deserialize pose"),
-                    }
-                }
-                Ok(ServerMessage::Advertise(adv)) => {
-                    debug!(?adv, "Received channel advertisement")
-                }
-                Err(tokio::sync::broadcast::error::RecvError::Closed) => {
-                    debug!("Message channel closed; stopping receiver");
-                    break;
-                }
-                Err(tokio::sync::broadcast::error::RecvError::Lagged(count)) => {
-                    warn!(count, "Receiver missed messages");
-                }
-                _ => (),
-            }
-        }
-    });
-}
+const SERVICE_TIMEOUT: Duration = Duration::from_secs(5);
 
 #[component]
 pub fn MissionControl() -> Element {
@@ -56,6 +12,7 @@ pub fn MissionControl() -> Element {
     let mut string_msg = use_signal_sync(String::new);
     let chatter_sub =
         use_subscription::<std_msgs::msg::String>(node.read().clone(), "/chatter", 10);
+    let mut service_result = use_signal(String::new);
 
     rsx! {
 
@@ -92,6 +49,34 @@ pub fn MissionControl() -> Element {
                     },
                 }
                 p { "{string_msg}" }
+
+                // TODO: Think about creating some ServiceClient abstraction on top such that you
+                // can repeat service calls to an initiailzed service, similar to create_client in ROS
+                // Service call demos
+                Button {
+                    label: "Add 2 + 3",
+                    onclick: move |_| {
+                        let node = node.read().clone();
+                        async move {
+                            let request = example_interfaces::srv::AddTwoInts_Request { a: 2, b: 3 };
+                            let result = node
+                                .call_service::<example_interfaces::srv::AddTwoInts>(
+                                    "/add_two_ints",
+                                    &request,
+                                    SERVICE_TIMEOUT,
+                                )
+                                .await;
+                            service_result
+                                .set(
+                                    match result {
+                                        Ok(response) => format!("/add_two_ints: 2 + 3 = {}", response.sum),
+                                        Err(e) => format!("/add_two_ints: {e}"),
+                                    },
+                                );
+                        }
+                    },
+                }
+                p { "{service_result}" }
                 LogPanel {}
 
             }

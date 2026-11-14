@@ -307,7 +307,7 @@ Use the PennAiR CLI to list the registered modes:
 .. code-block:: bash
    :caption: Bash
 
-   pennair mode ls
+   ros2 run pennair_cli pennair mode ls
 
 .. warning::
 
@@ -354,7 +354,7 @@ Automatic discovery succeeds when:
 * The module imports without errors.
 * The registered ID is unique.
 
-The ``pennair mode ls`` command reads this registry. Seeing
+The ``ros2 run pennair_cli pennair mode ls`` command reads this registry. Seeing
 ``uav.FlyToPointMode`` in its output confirms that the file was imported and the
 decorator registered the class.
 

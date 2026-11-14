@@ -1,8 +1,22 @@
 // Generated raw Rust structs. No ROS runtime is required.
 
-/// A ROS message that can be decoded from encapsulated CDR bytes.
+// Service structs follow ROS naming (e.g. Trigger_Request).
+#![allow(non_camel_case_types)]
+
+/// A ROS message that can be encoded to and decoded from encapsulated CDR bytes.
 pub trait RosMessage: Sized + Send + 'static {
+    /// Full ROS message type name, e.g. `std_msgs/msg/Int32`.
+    const TYPE_NAME: &'static str;
+    fn serialize(&self) -> Result<Vec<u8>, cdr::Error>;
     fn deserialize(bytes: &[u8]) -> Result<Self, cdr::Error>;
+}
+
+/// A ROS service type, tying its request and response messages together.
+pub trait RosService {
+    type Request: RosMessage;
+    type Response: RosMessage;
+    /// Full ROS type name, e.g. `std_srvs/srv/Trigger`.
+    const TYPE_NAME: &'static str;
 }
 
 pub mod builtin_interfaces {
@@ -15,11 +29,70 @@ pub mod builtin_interfaces {
         }
 
         impl crate::RosMessage for Time {
+            const TYPE_NAME: &'static str = "builtin_interfaces/msg/Time";
+
+            fn serialize(&self) -> Result<Vec<u8>, cdr::Error> {
+                cdr::serialize::<_, _, cdr::CdrLe>(self, cdr::Infinite)
+            }
+
             fn deserialize(bytes: &[u8]) -> Result<Self, cdr::Error> {
                 cdr::deserialize(bytes)
             }
         }
+
     }
+
+}
+
+pub mod example_interfaces {
+
+    pub mod srv {
+        /// Marker type for the `example_interfaces/srv/AddTwoInts` service.
+        pub struct AddTwoInts;
+
+        impl crate::RosService for AddTwoInts {
+            type Request = AddTwoInts_Request;
+            type Response = AddTwoInts_Response;
+            const TYPE_NAME: &'static str = "example_interfaces/srv/AddTwoInts";
+        }
+
+        #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+        pub struct AddTwoInts_Request {
+            pub a: i64,
+            pub b: i64,
+        }
+
+        impl crate::RosMessage for AddTwoInts_Request {
+            const TYPE_NAME: &'static str = "example_interfaces/srv/AddTwoInts_Request";
+
+            fn serialize(&self) -> Result<Vec<u8>, cdr::Error> {
+                cdr::serialize::<_, _, cdr::CdrLe>(self, cdr::Infinite)
+            }
+
+            fn deserialize(bytes: &[u8]) -> Result<Self, cdr::Error> {
+                cdr::deserialize(bytes)
+            }
+        }
+
+        #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+        pub struct AddTwoInts_Response {
+            pub sum: i64,
+        }
+
+        impl crate::RosMessage for AddTwoInts_Response {
+            const TYPE_NAME: &'static str = "example_interfaces/srv/AddTwoInts_Response";
+
+            fn serialize(&self) -> Result<Vec<u8>, cdr::Error> {
+                cdr::serialize::<_, _, cdr::CdrLe>(self, cdr::Infinite)
+            }
+
+            fn deserialize(bytes: &[u8]) -> Result<Self, cdr::Error> {
+                cdr::deserialize(bytes)
+            }
+        }
+
+    }
+
 }
 
 pub mod geometry_msgs {
@@ -33,6 +106,12 @@ pub mod geometry_msgs {
         }
 
         impl crate::RosMessage for Point {
+            const TYPE_NAME: &'static str = "geometry_msgs/msg/Point";
+
+            fn serialize(&self) -> Result<Vec<u8>, cdr::Error> {
+                cdr::serialize::<_, _, cdr::CdrLe>(self, cdr::Infinite)
+            }
+
             fn deserialize(bytes: &[u8]) -> Result<Self, cdr::Error> {
                 cdr::deserialize(bytes)
             }
@@ -45,6 +124,12 @@ pub mod geometry_msgs {
         }
 
         impl crate::RosMessage for Pose {
+            const TYPE_NAME: &'static str = "geometry_msgs/msg/Pose";
+
+            fn serialize(&self) -> Result<Vec<u8>, cdr::Error> {
+                cdr::serialize::<_, _, cdr::CdrLe>(self, cdr::Infinite)
+            }
+
             fn deserialize(bytes: &[u8]) -> Result<Self, cdr::Error> {
                 cdr::deserialize(bytes)
             }
@@ -59,11 +144,19 @@ pub mod geometry_msgs {
         }
 
         impl crate::RosMessage for Quaternion {
+            const TYPE_NAME: &'static str = "geometry_msgs/msg/Quaternion";
+
+            fn serialize(&self) -> Result<Vec<u8>, cdr::Error> {
+                cdr::serialize::<_, _, cdr::CdrLe>(self, cdr::Infinite)
+            }
+
             fn deserialize(bytes: &[u8]) -> Result<Self, cdr::Error> {
                 cdr::deserialize(bytes)
             }
         }
+
     }
+
 }
 
 pub mod rcl_interfaces {
@@ -89,11 +182,19 @@ pub mod rcl_interfaces {
         }
 
         impl crate::RosMessage for Log {
+            const TYPE_NAME: &'static str = "rcl_interfaces/msg/Log";
+
+            fn serialize(&self) -> Result<Vec<u8>, cdr::Error> {
+                cdr::serialize::<_, _, cdr::CdrLe>(self, cdr::Infinite)
+            }
+
             fn deserialize(bytes: &[u8]) -> Result<Self, cdr::Error> {
                 cdr::deserialize(bytes)
             }
         }
+
     }
+
 }
 
 pub mod std_msgs {
@@ -105,6 +206,12 @@ pub mod std_msgs {
         }
 
         impl crate::RosMessage for Float64 {
+            const TYPE_NAME: &'static str = "std_msgs/msg/Float64";
+
+            fn serialize(&self) -> Result<Vec<u8>, cdr::Error> {
+                cdr::serialize::<_, _, cdr::CdrLe>(self, cdr::Infinite)
+            }
+
             fn deserialize(bytes: &[u8]) -> Result<Self, cdr::Error> {
                 cdr::deserialize(bytes)
             }
@@ -116,6 +223,12 @@ pub mod std_msgs {
         }
 
         impl crate::RosMessage for Int32 {
+            const TYPE_NAME: &'static str = "std_msgs/msg/Int32";
+
+            fn serialize(&self) -> Result<Vec<u8>, cdr::Error> {
+                cdr::serialize::<_, _, cdr::CdrLe>(self, cdr::Infinite)
+            }
+
             fn deserialize(bytes: &[u8]) -> Result<Self, cdr::Error> {
                 cdr::deserialize(bytes)
             }
@@ -127,9 +240,17 @@ pub mod std_msgs {
         }
 
         impl crate::RosMessage for String {
+            const TYPE_NAME: &'static str = "std_msgs/msg/String";
+
+            fn serialize(&self) -> Result<Vec<u8>, cdr::Error> {
+                cdr::serialize::<_, _, cdr::CdrLe>(self, cdr::Infinite)
+            }
+
             fn deserialize(bytes: &[u8]) -> Result<Self, cdr::Error> {
                 cdr::deserialize(bytes)
             }
         }
+
     }
+
 }
