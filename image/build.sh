@@ -68,7 +68,15 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y network-manager avahi-daemon dnsmasq iw batctl
 pennair --manifest /tmp/monorepo.toml deps sync --prod
+# Nothing on a Pi uses snaps, and they take a few hundred MB.
+apt-get purge -y snapd
+rm -rf /snap /var/snap /var/lib/snapd
 apt-get clean
+
+# The image is close to GitHub's 2 GiB limit, so print what takes the space.
+dpkg-query -W -f='${Installed-Size}\t${Package}\n' | sort -rn | head -25
+du -xsh /usr/lib/firmware /usr/lib/modules /opt/ros /usr/share /var 2>/dev/null
+df -h /
 EOF
 
 cp -a "$HERE/rootfs/." "$root/"
