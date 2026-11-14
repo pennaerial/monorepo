@@ -110,13 +110,16 @@ def unwrap_yaws(yaws: list[float]) -> np.ndarray:
 class PiecewisePolynomial:
     def __init__(self, coeffs: np.ndarray, T: np.ndarray) -> None:
         self.c, self.T, self.knots = coeffs, T, np.r_[0.0, np.cumsum(T)]
+        self._d: dict[int, list[np.ndarray]] = {}  # derivative cache
 
     def __call__(self, t: float, m: int = 0) -> np.ndarray:
         """m-th time derivative at t (clamped to the trajectory)."""
+        if m not in self._d:
+            self._d[m] = [P.polyder(ck, m, axis=0) for ck in self.c]
         t = min(max(t, 0.0), self.knots[-1])
         k = min(np.searchsorted(self.knots, t, side="right") - 1, len(self.T) - 1)
         s = (t - self.knots[k]) / self.T[k]
-        return P.polyval(s, P.polyder(self.c[k], m, axis=0)) / self.T[k] ** m
+        return P.polyval(s, self._d[m][k]) / self.T[k] ** m
 
 
 class MinSnap(Trajectory):
