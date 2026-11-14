@@ -67,7 +67,7 @@ cp "$HERE/../monorepo.toml" "$root/tmp/monorepo.toml"
 chroot "$root" /bin/bash -e <<'EOF'
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
-apt-get install -y network-manager avahi-daemon dnsmasq iw batctl
+apt-get install -y network-manager avahi-daemon dnsmasq iw batctl rfkill
 pennair --manifest /tmp/monorepo.toml deps sync --prod
 apt-get clean
 EOF
