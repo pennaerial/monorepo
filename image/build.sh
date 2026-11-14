@@ -43,6 +43,17 @@ cp /etc/resolv.conf "$root/run/systemd/resolve/stub-resolv.conf"
 printf '#!/bin/sh\nexit 101\n' >"$root/usr/sbin/policy-rc.d"
 chmod +x "$root/usr/sbin/policy-rc.d"
 
+# The stock image only lists noble and noble-security until cloud-init's first boot,
+# but it ships packages from noble-updates, so apt needs that suite to install anything.
+: >"$root/etc/apt/sources.list"
+cat >"$root/etc/apt/sources.list.d/ubuntu.sources" <<'SOURCES'
+Types: deb
+URIs: http://ports.ubuntu.com/ubuntu-ports
+Suites: noble noble-updates noble-backports noble-security
+Components: main universe restricted multiverse
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+SOURCES
+
 curl -fsSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key |
 	gpg --dearmor -o "$root/usr/share/keyrings/ros2-archive-keyring.gpg"
 echo "deb [signed-by=/usr/share/keyrings/ros2-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu noble main" \
