@@ -40,7 +40,7 @@ jobs:
               - '**/*.hh'
             rust:
               - 'rust/**'
-              - 'monorepo.toml'
+              - 'monorepo.toml' # TODO: should be separate branch
 
       - name: Install Ruff
         if: ${{ steps.filter.outputs.python == 'true' }}
@@ -76,6 +76,7 @@ jobs:
           source "$PENNAIR_MONOREPO_PATH/.aliasrc" # imports the bash testing functions
           cppfmt --check
 
+        # TODO: Add clippy, dx fmt, cargo check. Move build to mergebuild.yml
       - name: Rust format & build
         if: ${{ steps.filter.outputs.rust == 'true' }}
         working-directory: rust/cli
