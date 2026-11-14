@@ -21,6 +21,11 @@ pub fn SideBar() -> Element {
                     span { class: "nav-icon", "-" }
                     "Mission Control"
                 }
+
+                Link { to: Route::MineMap {}, class: "sidebar-link",
+                    span { class: "nav-icon", "-" }
+                    "Map"
+                }
             }
         }
     }

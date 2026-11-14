@@ -1,4 +1,4 @@
-use crate::views::{Dashboard, MissionControl};
+use crate::views::{Dashboard, MineMap, MissionControl};
 use dioxus::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, Routable)]
@@ -8,4 +8,7 @@ pub enum Route {
 
     #[route("/mission_control")]
     MissionControl {},
+
+    #[route("/mine_map")]
+    MineMap {},
 }

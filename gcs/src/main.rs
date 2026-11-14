@@ -1,6 +1,7 @@
 mod components;
 mod hooks;
 use gcs::ros;
+mod map;
 mod routes;
 mod views;
 
@@ -31,6 +32,7 @@ fn App() -> Element {
         });
         node_handle
     });
+    map::provide_map_state();
 
     rsx! {
         document::Link { rel: "stylesheet", href: TAILWIND_CSS }
