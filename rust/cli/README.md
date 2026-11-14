@@ -14,3 +14,5 @@ cargo build --release   # target/release/pennair
 | `push <ssh target>... [--no-restart]` | Check deps, rsync `[deploy]` paths to `~/monorepo` on each Pi, `colcon build`, restart `pennair-autonomy.service`. |
 | `pull <ssh target> [--force]` | Rsync `[deploy]` paths from a Pi back into the checkout. Refuses on uncommitted changes unless `--force`. |
 | `status <ssh target>...` | Show the last push and files edited on the Pi since. |
+| `flash <id> <device> [--image <file>]` | Write the Pi image to an SD card as `air-<id>` (mesh `10.10.0.<id>`, Ethernet `192.168.50.<id>`). Linux only. |
+| `gateway on\|off` | Share this laptop's internet with Pis over Ethernet and the mesh. Linux only. |

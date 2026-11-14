@@ -1,0 +1,11 @@
+#cloud-config
+# `pennair flash` fills in @NAME@ and writes this to the boot partition.
+hostname: @NAME@
+manage_etc_hosts: true
+ssh_pwauth: true
+users:
+  - name: penn
+    groups: [adm, dialout, sudo, video, render, plugdev]
+    shell: /bin/bash
+    lock_passwd: false
+    plain_text_passwd: "123"

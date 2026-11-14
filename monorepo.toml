@@ -103,8 +103,8 @@ python_packages = [
 debs = [
     # must match PX4 1.17's XRCE client
     { package = "pennair-micro-xrce-dds-agent", version = "2.4.3", url = "https://github.com/pennaerial/Dependencies/releases/download/microxrceagent-dec8a4071c8a693c96ebaa961b43dd298919cbbc/microxrceagent-pi4-noble-arm64.tar.gz" },
-    # Raspberry Pi fork, used by camera_ros
-    { package = "pennair-libcamera-rpi", version = "0.8.0", url = "https://github.com/pennaerial/Dependencies/releases/download/libcamera-d638b39fafdf54075995b1293c217d6a701de851/libcamera-pi4-noble-arm64.tar.gz" },
+    # Raspberry Pi fork, used by camera_ros. Built for both Pi 4 and Pi 5.
+    { package = "pennair-libcamera-rpi", version = "0.8.0", url = "https://github.com/pennaerial/Dependencies/releases/download/libcamera-de22840a56cd59d6826e1f918e327b8de2192cd0/libcamera-pi4-noble-arm64.tar.gz" },
 ]
 
 # Source that `pennair push` copies to ~/monorepo on each Pi and builds there.
@@ -117,8 +117,6 @@ paths = [
     "ros_ws/src/common/vehicle_common",
     "ros_ws/src/common/uav",
     "ros_ws/src/iarc/iarc_flight",
-    "ros_ws/src/sae/payload_interfaces",
-    "ros_ws/src/sae/payload_controller",
 ]
 
 [environments.dev]

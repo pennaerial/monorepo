@@ -1,6 +1,7 @@
 use crate::config::{ConfigArgs, run_config};
 use crate::deps::{DepsArgs, run_deps};
-use crate::push;
+use crate::gateway::{self, State};
+use crate::{flash, push};
 use clap::{Parser, Subcommand};
 use std::error::Error;
 use std::path::PathBuf;
@@ -43,6 +44,18 @@ pub enum Commands {
         #[arg(required = true)]
         hosts: Vec<String>,
     },
+    /// Write the Pi image to an SD card and name it air-<ID>
+    Flash {
+        /// Pi number, e.g. 6 for air-06
+        id: u8,
+        /// SD card device, e.g. /dev/sda
+        device: String,
+        /// Use a local .img.xz instead of downloading the latest release
+        #[arg(long)]
+        image: Option<PathBuf>,
+    },
+    /// Share this laptop's internet with Pis over Ethernet and the mesh (Linux only)
+    Gateway { state: State },
 }
 
 impl PennairCli {
@@ -54,6 +67,8 @@ impl PennairCli {
             Commands::Push { hosts, no_restart } => push::push(manifest, &hosts, !no_restart),
             Commands::Pull { host, force } => push::pull(manifest, &host, force),
             Commands::Status { hosts } => push::status(&hosts),
+            Commands::Flash { id, device, image } => flash::flash(id, &device, image.as_deref()),
+            Commands::Gateway { state } => gateway::gateway(state),
         }
     }
 }

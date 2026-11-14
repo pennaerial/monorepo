@@ -1,0 +1,14 @@
+# `pennair flash` fills in @ID@ and writes this to the boot partition.
+# The laptop (192.168.50.254) is the second choice for internet, after Wi-Fi (metric 600).
+network:
+  version: 2
+  ethernets:
+    eth0:
+      optional: true
+      addresses: [192.168.50.@ID@/24]
+      nameservers:
+        addresses: [1.1.1.1]
+      routes:
+        - to: default
+          via: 192.168.50.254
+          metric: 700
