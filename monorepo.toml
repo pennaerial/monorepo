@@ -86,9 +86,40 @@ python_packages = [
     "ruff==0.16.7",
 ]
 
+# Pis build the source pushed by `pennair push`, so prod needs build tools too.
 [groups.prod]
-packages = []
-python_packages = []
+packages = [
+    "build-essential",
+    "cmake",
+    "python3-colcon-common-extensions",
+    "python3-pip",  # deps sync installs python packages with it
+    "pkg-config",  # camera_ros finds libcamera with it
+    "rsync",
+]
+python_packages = [
+    "pymavlink",  # uav ulog streaming
+]
+# Built by pennaerial/Dependencies CI. deps sync installs them from these releases.
+debs = [
+    # must match PX4 1.17's XRCE client
+    { package = "pennair-micro-xrce-dds-agent", version = "2.4.3", url = "https://github.com/pennaerial/Dependencies/releases/download/microxrceagent-dec8a4071c8a693c96ebaa961b43dd298919cbbc/microxrceagent-pi4-noble-arm64.tar.gz" },
+    # Raspberry Pi fork, used by camera_ros
+    { package = "pennair-libcamera-rpi", version = "0.8.0", url = "https://github.com/pennaerial/Dependencies/releases/download/libcamera-d638b39fafdf54075995b1293c217d6a701de851/libcamera-pi4-noble-arm64.tar.gz" },
+]
+
+# Source that `pennair push` copies to ~/monorepo on each Pi and builds there.
+[deploy]
+paths = [
+    "monorepo.toml",
+    "ros_ws/src/common/px4_msgs",
+    "ros_ws/src/common/camera_ros",
+    "ros_ws/src/common/pennair_vision",
+    "ros_ws/src/common/vehicle_common",
+    "ros_ws/src/common/uav",
+    "ros_ws/src/iarc/iarc_flight",
+    "ros_ws/src/sae/payload_interfaces",
+    "ros_ws/src/sae/payload_controller",
+]
 
 [environments.dev]
 os = ["linux", "macos"]
