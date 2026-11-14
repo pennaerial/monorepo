@@ -6,6 +6,13 @@ leg i stays under its v_max[i] and a_max[i]
 SNOPT (via Drake) over T with limits.
 K(T) z = rhs, so dz/dT_j = -K^-1 (dK/dT_j) z, where each entry of K scales
 as a power of one T_j. If SNOPT fails, the initial guess is used.
+
+This problem has
+ - few variables
+ - many (mostly inactive) ineq constraints
+ - exact gradients
+ - a good initial guess
+which snopt (sparse sqp) is good for
 """
 
 from __future__ import annotations
@@ -67,6 +74,8 @@ def _limit_ratios(w, T, v_max, a_max, s):
     dc = dc.reshape(len(z), D, M)[: M * N].reshape(M, N, D, M)
     c = c.reshape(M, N, D)
     g, dg = [], []
+
+    # compute |v|^2/v_max^2 and |a|^2/a_max^2 and their gradients
     for m, lim in ((1, v_max), (2, a_max)):
         X = _derivs(c, T, s, m)
         dX = np.einsum("sn,kndj->ksdj", _basis(s, m), dc) / T[:, None, None, None] ** m
@@ -132,7 +141,7 @@ def optimize_times(points, v_max, a_max, yaw_rate_max: float | None = None) -> T
             g, dg = _limit_ratios(w, ExtractValue(Tv).ravel(), v_max, a_max, s)
             return InitializeAutoDiff(g.ravel(), dg.reshape(-1, M) @ ExtractGradient(Tv)).ravel()
 
-        # Drake Solve
+        # Drake Solve provides access to https://ccom.ucsd.edu/~optimizers/solvers/snopt/
         prog = MathematicalProgram()
         T = prog.NewContinuousVariables(M, "T")
         prog.AddBoundingBoxConstraint(lo, np.full(M, np.inf), T)
