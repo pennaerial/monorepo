@@ -53,6 +53,22 @@ void Encoder_SITL::make_encoder_topic(char* buf, std::size_t size)
 
 void Encoder_SITL::on_encoder_msg(const gz::msgs::Model& gz_msg)
 {
+  util::StaticMutexGuard lock(pending_mutex_);
+  pending_ = gz_msg;
+  pending_available_ = true;
+}
+
+void Encoder_SITL::update()
+{
+  gz::msgs::Model gz_msg;
+  {
+    util::StaticMutexGuard lock(pending_mutex_);
+    if (!pending_available_) {
+      return;
+    }
+    gz_msg.Swap(&pending_);
+    pending_available_ = false;
+  }
   for (int i = 0; i < gz_msg.joint_size(); ++i) {
     const gz::msgs::Joint& joint = gz_msg.joint(i);
     if (!joint.has_axis1() || joint.name() != joint_name_) {

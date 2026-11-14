@@ -5,6 +5,7 @@
 #include "Eigen/Dense"
 #include "Eigen/Geometry"
 #include "esp_log.h"
+#include "imu.hpp"
 
 class EKF
 {
@@ -34,6 +35,8 @@ private:
   Clock::time_point last_camera_update;
   Clock::time_point last_encoder_update;
   bool first_update = true;
+  uint32_t last_imu_update_ = 0;
+  sensor_msgs_msg_Imu imu_sample_{};
 
   const Eigen::Matrix3f I = Eigen::Matrix3f::Identity();
 

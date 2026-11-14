@@ -7,6 +7,7 @@
 
 #include "imu.hpp"
 #include "sitl_runtime.hpp"
+#include "static_mutex.hpp"
 
 namespace drivers
 {
@@ -17,6 +18,7 @@ public:
   IMU_SITL();
 
   void start() override;
+  void update() override;
 
 private:
   /**
@@ -36,10 +38,14 @@ private:
    */
   void on_imu_msg(const gz::msgs::IMU& gz_msg);
 
-  /// gz node instance for communicating with gazebo
-  gz::transport::Node gz_node_;
+  util::StaticMutex pending_mutex_;
+  sensor_msgs_msg_Imu pending_{};
+  bool pending_available_ = false;
+
   /// Contains Simulation Configuration (e.g. entity and world name)
   const sitl::SimConfig sitl_config_;
+  /// Declared last so callbacks stop before pending sample storage is destroyed.
+  gz::transport::Node gz_node_;
 };
 
 }  // namespace drivers

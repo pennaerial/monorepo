@@ -23,10 +23,6 @@ static const char* TAG = "Kalman Filter";
 
 namespace
 {
-// Provisional maximum correction rates; match these to the sensors later.
-constexpr auto ENCODER_UPDATE_PERIOD = std::chrono::milliseconds(20);
-constexpr auto CAMERA_UPDATE_PERIOD = std::chrono::milliseconds(100);
-
 // Covariance Initialization
 float INITIAL_POSITION_ERROR_SD = 0.1f;
 float INITIAL_VELOCITY_ERROR_SD = 0.2f;
@@ -57,6 +53,7 @@ Eigen::Vector3f CENTER_AXLE_OFFSET_FROM_IMU(0.0, 0.0, 0.0);
 void EKF::init()
 {
   first_update = true;
+  last_imu_update_ = 0;
   position = Eigen::Vector3f::Zero();
   velocity = Eigen::Vector3f::Zero();
   rotation = Eigen::Quaternionf::Identity();
@@ -75,6 +72,9 @@ void EKF::init()
 
 void EKF::update()
 {
+  if (!drivers::IMU::instance()->get_latest_if_updated(last_imu_update_, imu_sample_)) {
+    return;
+  }
   // Monotonic elapsed time on both hardware and Linux SITL, independent of Gazebo.
   const auto now = Clock::now();
   if (first_update) {
@@ -89,19 +89,9 @@ void EKF::update()
   }
   last_update = now;
 
-  // TODO Populate the measurement placeholders before calling this loop in Payload.
-  // Prediction runs on each call; corrections run at most once per period.
-  // THIS CODEBELOW WILL BE HIGHLY CHANGED IN UPCOMING PR
   base_adjustment(deltaT);
-  if (now - last_encoder_update >= ENCODER_UPDATE_PERIOD) {
-    last_encoder_update = now;
-    encoder_adjustment();
-  }
-  if (now - last_camera_update >= CAMERA_UPDATE_PERIOD) {
-    last_camera_update = now;
-    camera_adjustment();
-  }
-  // Magnetometer and stationary corrections still need measurement models/conditions.
+  // TODO Enable encoder/camera corrections once their measurements, geometry,
+  // and noise parameters are connected. Their current placeholders are not usable.
 }
 
 Eigen::Matrix3f skew(const Eigen::Ref<Eigen::Vector3f> v)
@@ -234,8 +224,12 @@ void EKF::apply_rotation_vector(Eigen::Ref<Eigen::Vector3f> rot_vec)
 
 void EKF::base_adjustment(float deltaT)
 {
-  Eigen::Vector3f raw_gyro;
-  Eigen::Vector3f raw_accelero;
+  Eigen::Vector3f raw_gyro(
+      imu_sample_.angular_velocity.x, imu_sample_.angular_velocity.y, imu_sample_.angular_velocity.z
+  );
+  Eigen::Vector3f raw_accelero(
+      imu_sample_.linear_acceleration.x, imu_sample_.linear_acceleration.y, imu_sample_.linear_acceleration.z
+  );
 
   // Rotation body -> world
   Eigen::Matrix3f R_BW = rotation.normalized().toRotationMatrix();

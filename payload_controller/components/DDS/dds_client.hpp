@@ -5,8 +5,11 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 
 #include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
 #include "sdkconfig.h"
 #include "topics.h"
 
@@ -44,14 +47,14 @@ public:
   /// Opens transport/session streams and creates the configured XRCE-DDS entities.
   void init();
 
-  /// Writes a sample for a writer topic matched by TopicId.
+  /// Queues the latest sample; only the DDS task accesses the XRCE session.
   template <TopicId Id>
   bool publish(const typename TopicMsg<Id>::Message& msg);
 
   /// Services incoming data and reliable stream bookkeeping.
   void update();
 
-  /// Binds a callback for a reader topic matched by name or TopicId.
+  /// Binds a reader callback before starting the DDS task.
   bool set_reader_callback(TopicId topic_id, ReaderCallback callback, void* args);
 
 private:
@@ -118,6 +121,15 @@ private:
   /// uxrStreamId associated with input reliable buffer
   uxrStreamId reliable_in_;
 
+  // One latest-value mailbox per topic keeps publishing independent of network waits.
+  struct PendingSample {
+    alignas(std::max_align_t) uint8_t data[max_topic_message_size()];
+  };
+  std::array<StaticQueue_t, TOPIC_COUNT> queue_buffers_{};
+  std::array<PendingSample, TOPIC_COUNT> queue_storage_{};
+  std::array<QueueHandle_t, TOPIC_COUNT> queues_{};
+  bool publish_pending(std::size_t topic_index, const void* msg);
+  bool initialized_ = false;
   bool delivery_pending_ = false;
   std::array<ReaderCallback, TOPIC_COUNT> reader_callbacks_{};
   std::array<void*, TOPIC_COUNT> reader_callback_args_{};
@@ -126,39 +138,11 @@ private:
 template <TopicId Id>
 bool DDSClient::publish(const typename TopicMsg<Id>::Message& msg)
 {
-  constexpr const char* TAG = "DDSClient";
-  constexpr std::size_t topic_index = TopicMsg<Id>::index;
-  const Topic& topic = TOPICS[topic_index];
-
-  if (topic.dir != Topic::Direction::WRITER) {
-    ESP_LOGE(TAG, "DDS topic %s is not configured as a writer", topic.name);
-    return false;
-  }
-
-  if (topic.size_of_topic == nullptr || topic.serialize_topic == nullptr) {
-    ESP_LOGE(TAG, "DDS topic %s is missing serializer hooks", topic.name);
-    return false;
-  }
-
-  ucdrBuffer ub;
-  const uint32_t topic_size = topic.size_of_topic(&msg, 0);
-  if (topic_size + ESTIMATED_XRCE_WRITE_OVERHEAD > RELIABLE_STREAM_BLOCK_SIZE) {
-    ESP_LOGE(TAG, "DDS topic %s is too large for one XRCE reliable stream block", topic.name);
-    return false;
-  }
-
-  uint16_t request_id =
-      uxr_prepare_output_stream(&session_, reliable_out_, datawriter_id(topic_index), &ub, topic_size);
-  if (request_id == UXR_INVALID_REQUEST_ID) {
-    ESP_LOGW(TAG, "XRCE reliable output stream is full; dropping DDS topic %s", topic.name);
-    return false;
-  }
-
-  if (!topic.serialize_topic(&ub, &msg)) {
-    ESP_LOGE(TAG, "Failed to serialize DDS topic %s", topic.name);
-    return false;
-  }
-
-  delivery_pending_ = true;
-  return true;
+  constexpr std::size_t index = TopicMsg<Id>::index;
+  static_assert(TOPICS[index].dir == Topic::Direction::WRITER);
+  static_assert(sizeof(msg) <= sizeof(PendingSample));
+  static_assert(std::is_trivially_copyable_v<typename TopicMsg<Id>::Message>);
+  PendingSample sample{};
+  std::memcpy(sample.data, &msg, sizeof(msg));
+  return xQueueOverwrite(queues_[index], &sample) == pdPASS;
 }

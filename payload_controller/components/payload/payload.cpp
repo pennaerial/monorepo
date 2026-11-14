@@ -4,8 +4,6 @@
 #include <cstring>
 #include <initializer_list>
 
-#include "ekf.hpp"
-
 static const char* TAG = "Payload";
 
 namespace
@@ -104,9 +102,6 @@ void encoderCallback(const Topic& topic, const void* msg, uint16_t length, void*
 
 void Payload::init()
 {
-  EKF ekf = EKF();
-  ekf.init();
-
   ESP_LOGI(
       TAG, "Speed config: left=%.3f right=%.3f full_duty=%.3f rad/s kp=%.3f ki=%.3f", LEFT_SETPOINT_RAD_S,
       RIGHT_SETPOINT_RAD_S, FULL_DUTY_SPEED_RAD_S, SPEED_KP, SPEED_KI
@@ -136,8 +131,6 @@ void Payload::init()
 void Payload::update()
 {
   publish_sensor_debug();
-
-  motor_updates();
 }
 
 void Payload::motor_updates()
@@ -166,7 +159,8 @@ void Payload::update_motor(
       if (now_us - motor.last_debug_timestamp_us >= 100000) {
         ESP_LOGI(
             TAG, "%s motor: setpoint=%.3f rad/s measured=%.3f rad/s error=%.3f rad/s pwm=%.3f", motor.debug_name,
-            setpoint_rad_s, angular_velocity_rad_s, setpoint_rad_s - angular_velocity_rad_s, motor.pwm
+            setpoint_rad_s, angular_velocity_rad_s, setpoint_rad_s - angular_velocity_rad_s,
+            motor.pwm.load(std::memory_order_relaxed)
         );
         motor.last_debug_timestamp_us = now_us;
       }
@@ -179,9 +173,13 @@ void Payload::update_motor(
     }
     motor.last_control_timestamp_us = now_us;
   }
+}
 
-  // Keep publishing the last duty between encoder samples; do not integrate stale feedback.
-  motor.motor.publish(motor.pwm);
+void Payload::motor_output(Side side)
+{
+  MotorWrapper& motor = side == Side::LEFT ? left_motor_ : right_motor_;
+  // Keep applying the last duty between encoder samples without integrating stale feedback.
+  motor.motor.publish(motor.pwm.load(std::memory_order_relaxed));
 }
 
 void Payload::publish_sensor_debug()

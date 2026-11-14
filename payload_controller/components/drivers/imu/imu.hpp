@@ -3,7 +3,7 @@
 #include <cstdint>
 
 #include "sensor_msgs/msg/Imu.h"
-#include "static_mutex.hpp"
+#include "task_mutex.hpp"
 
 class DDSClient;
 
@@ -43,7 +43,7 @@ protected:
 private:
   sensor_msgs_msg_Imu reading_{};
   uint32_t update_count_ = 0;
-  util::StaticMutex mtx_;
+  util::TaskMutex mtx_;
 };
 
 }  // namespace drivers

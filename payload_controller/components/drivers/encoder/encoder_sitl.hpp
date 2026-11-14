@@ -8,6 +8,7 @@
 
 #include "encoder.hpp"
 #include "sitl_runtime.hpp"
+#include "static_mutex.hpp"
 
 namespace drivers
 {
@@ -18,6 +19,7 @@ public:
   Encoder_SITL(Side side);
 
   void start() override;
+  void update() override;
 
 private:
   /**
@@ -53,6 +55,9 @@ private:
   int64_t previous_ticks_ = 0;
   /// Gazebo simulation time at the start of the velocity measurement window.
   int64_t previous_sample_time_ns_ = 0;
+  util::StaticMutex pending_mutex_;
+  gz::msgs::Model pending_;
+  bool pending_available_ = false;
   /// Declared last so callbacks stop before the state above is destroyed.
   gz::transport::Node gz_node_;
 };

@@ -3,7 +3,7 @@
 #include <cstdint>
 
 #include "payload_corner.hpp"
-#include "static_mutex.hpp"
+#include "task_mutex.hpp"
 
 namespace drivers
 {
@@ -27,6 +27,8 @@ public:
 
   /// Starts the encoder. It should immediately start writing encoder messages to internal buffer
   virtual void start() = 0;
+  /// Polls the encoder; interrupt-driven hardware can leave this empty.
+  virtual void update() {}
   /// Caches the latest encoder tick count.
   void write_latest(int64_t ticks);
   /// Atomically caches ticks and output-shaft angular velocity in rad/s.
@@ -51,7 +53,7 @@ private:
   double angular_velocity_rad_s_ = 0.0;
   uint32_t update_count_ = 0;
   uint32_t velocity_update_count_ = 0;
-  util::StaticMutex mtx_;
+  util::TaskMutex mtx_;
 };
 
 }  // namespace drivers

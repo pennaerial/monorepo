@@ -34,7 +34,23 @@ void IMU_SITL::make_imu_topic(char* buf, std::size_t size)
 void IMU_SITL::on_imu_msg(const gz::msgs::IMU& gz_msg)
 {
   sensor_msgs_msg_Imu msg = gz_to_dds(gz_msg);
-  write_latest(msg);  // update our latest imu value
+  util::StaticMutexGuard lock(pending_mutex_);
+  pending_ = msg;
+  pending_available_ = true;
+}
+
+void IMU_SITL::update()
+{
+  sensor_msgs_msg_Imu sample{};
+  {
+    util::StaticMutexGuard lock(pending_mutex_);
+    if (!pending_available_) {
+      return;
+    }
+    sample = pending_;
+    pending_available_ = false;
+  }
+  write_latest(sample);
 }
 
 IMU* IMU::instance()

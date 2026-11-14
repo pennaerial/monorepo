@@ -1,5 +1,7 @@
 #pragma once
 
+#include <atomic>
+
 #include "dds_client.hpp"
 #include "encoder.hpp"
 #include "esp_log.h"
@@ -38,7 +40,7 @@ struct MotorWrapper {
   const Side side;
   const char* const debug_name;
   drivers::Motor& motor;
-  float pwm = 0.0f;
+  std::atomic<float> pwm{0.0f};
   int64_t last_control_timestamp_us = 0;
   int64_t last_debug_timestamp_us = 0;
 };
@@ -49,7 +51,10 @@ public:
   void init();
   void update();
   void publish_sensor_debug();
+  /// Runs both PWM controllers; called only by the PWM task.
   void motor_updates();
+  /// Applies the cached duty; called by the task for this motor.
+  void motor_output(Side side);
 
   static Payload* instance();
 

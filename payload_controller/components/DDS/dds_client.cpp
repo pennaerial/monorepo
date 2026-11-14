@@ -38,7 +38,13 @@ const char* status_name(const uint8_t status)
 }  // namespace
 
 
-DDSClient::DDSClient(const char* ip, const char* port) : ip_(ip), port_(port) {}
+DDSClient::DDSClient(const char* ip, const char* port) : ip_(ip), port_(port)
+{
+  for (std::size_t i = 0; i < TOPIC_COUNT; ++i) {
+    queues_[i] = xQueueCreateStatic(1, sizeof(PendingSample), queue_storage_[i].data, &queue_buffers_[i]);
+    configASSERT(queues_[i] != nullptr);
+  }
+}
 
 DDSClient& DDSClient::instance()
 {
@@ -132,6 +138,7 @@ void DDSClient::init()
     return;
   }
 
+  initialized_ = true;
   ESP_LOGI(TAG, "Entities creation success");
 }
 
@@ -190,6 +197,15 @@ void DDSClient::generate_readers(uint16_t requests[], std::size_t& request_count
 
 void DDSClient::update()
 {
+  if (!initialized_) {
+    return;
+  }
+  PendingSample sample{};
+  for (std::size_t i = 0; i < TOPIC_COUNT; ++i) {
+    if (xQueueReceive(queues_[i], &sample, 0) == pdPASS) {
+      publish_pending(i, sample.data);
+    }
+  }
   if (delivery_pending_) {
     delivery_pending_ = !confirm_delivery();
   }
@@ -199,9 +215,9 @@ void DDSClient::update()
 
 bool DDSClient::confirm_delivery()
 {
-  const bool delivered = uxr_run_session_until_confirm_delivery(&session_, 1000);
+  const bool delivered = uxr_run_session_until_confirm_delivery(&session_, 10);
   if (!delivered) {
-    ESP_LOGW(TAG, "Timed out waiting for XRCE reliable output delivery");
+    // Retry on the next DDS update without holding up other tasks.
   }
   return delivered;
 }
@@ -286,4 +302,28 @@ void DDSClient::handle_topic(
 
   callback(topic, msg_buffer, length, reader_callback_args_[topic_index]);
   return;
+}
+
+bool DDSClient::publish_pending(std::size_t topic_index, const void* msg)
+{
+  const Topic& topic = TOPICS[topic_index];
+  if (topic.size_of_topic == nullptr || topic.serialize_topic == nullptr) {
+    return false;
+  }
+  const uint32_t size = topic.size_of_topic(msg, 0);
+  if (size + ESTIMATED_XRCE_WRITE_OVERHEAD > RELIABLE_STREAM_BLOCK_SIZE) {
+    ESP_LOGE(TAG, "DDS topic %s exceeds one reliable stream block", topic.name);
+    return false;
+  }
+  ucdrBuffer ub;
+  if (uxr_prepare_output_stream(&session_, reliable_out_, datawriter_id(topic_index), &ub, size) ==
+      UXR_INVALID_REQUEST_ID) {
+    ESP_LOGW(TAG, "XRCE output full; dropping %s", topic.name);
+    return false;
+  }
+  if (!topic.serialize_topic(&ub, msg)) {
+    return false;
+  }
+  delivery_pending_ = true;
+  return true;
 }
