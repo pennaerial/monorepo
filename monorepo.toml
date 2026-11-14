@@ -101,7 +101,6 @@ python_packages = [
 # These are built from source and installed by hand for now. deps check looks for
 # each name in `ldconfig -p`, so a versioned name like "libfoo.so.2.4" also checks the version.
 libraries = [
-    "libpigpiod_if2.so",  # payload_controller GPIO
     "libmicroxrcedds_agent.so.2.4",  # MicroXRCEAgent, must match PX4 1.17's client
 ]
 
