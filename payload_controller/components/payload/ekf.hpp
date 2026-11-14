@@ -7,6 +7,10 @@
 #include "esp_log.h"
 #include "imu.hpp"
 
+#if defined(CONFIG_IDF_TARGET_LINUX)
+#include "static_mutex.hpp"
+#endif
+
 class EKF
 {
 public:
@@ -16,7 +20,12 @@ public:
   void init();
 
   void base_adjustment(float deltaT);
+#if defined(CONFIG_IDF_TARGET_LINUX)
+  /// Supplies a simulated camera position in the EKF world frame, in meters.
+  /// May be called by a native simulator callback; only the latest sample is kept.
+  void set_camera_position(const Eigen::Vector3f& camera_position);
   void camera_adjustment();
+#endif
   void magnetometer_adjustment();
   void encoder_adjustment();
   void stationary_adjustment();
@@ -32,11 +41,22 @@ public:
 private:
   using Clock = std::chrono::steady_clock;
   Clock::time_point last_update;
+#if defined(CONFIG_IDF_TARGET_LINUX)
   Clock::time_point last_camera_update;
+  util::StaticMutex camera_mutex_;
+  Eigen::Vector3f pending_camera_position_ = Eigen::Vector3f::Zero();
+  bool camera_pending_ = false;
+#endif
   Clock::time_point last_encoder_update;
   bool first_update = true;
   uint32_t last_imu_update_ = 0;
   sensor_msgs_msg_Imu imu_sample_{};
+  uint32_t last_left_encoder_update_ = 0;
+  uint32_t last_right_encoder_update_ = 0;
+  double left_encoder_velocity_ = 0.0;
+  double right_encoder_velocity_ = 0.0;
+  bool left_encoder_pending_ = false;
+  bool right_encoder_pending_ = false;
 
   const Eigen::Matrix3f I = Eigen::Matrix3f::Identity();
 

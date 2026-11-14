@@ -3,8 +3,9 @@
 #include <Eigen/Geometry>
 #include <limits>
 
-// TODO Measurement Collection  & GPS fake camera position gen for gazebo sitl
-// TODO have camera update whenever data available (not every 100ms)
+#include "encoder.hpp"
+
+// TODO Connect the simulated camera position source to set_camera_position().
 // ==================================================================
 // TODO later: One important detail: Since the predicted axle velocity uses the gyroscope measurement, gyro noise also
 // enters this measurement model. A more complete \(R_z\) includes the contribution:
@@ -23,6 +24,11 @@ static const char* TAG = "Kalman Filter";
 
 namespace
 {
+constexpr auto ENCODER_UPDATE_PERIOD = std::chrono::milliseconds(20);
+#if defined(CONFIG_IDF_TARGET_LINUX)
+constexpr auto CAMERA_UPDATE_PERIOD = std::chrono::milliseconds(100);
+#endif
+
 // Covariance Initialization
 float INITIAL_POSITION_ERROR_SD = 0.1f;
 float INITIAL_VELOCITY_ERROR_SD = 0.2f;
@@ -37,16 +43,21 @@ float GYRO_BIAS_RANDOM_WALK_SD = 0.0f;
 float ACCEL_BIAS_RANDOM_WALK_SD = 0.0f;
 
 // Low rate sensor noise (Rz matrix noise -> when computing kalman gain)
-float CAMERA_READING_ERROR_SD_X = 0;
-float CAMERA_READING_ERROR_SD_Y = 0;
-float CAMERA_READING_ERROR_SD_Z = 0;
+#if defined(CONFIG_IDF_TARGET_LINUX)
+// Provisional measurement noise; tune against the simulated position source.
+float CAMERA_READING_ERROR_SD_X = 0.1f;
+float CAMERA_READING_ERROR_SD_Y = 0.1f;
+float CAMERA_READING_ERROR_SD_Z = 0.1f;
+Eigen::Vector3f CAMERA_OFFSET_FROM_IMU(0.0, 0.0, 0.0);
+#endif
 
-float ENCODER_READING_ERROR_SD_X = 0;
-float ENCODER_READING_ERROR_SD_Y = 0;
+// Provisional body-velocity measurement noise in m/s; tune for the encoder backend.
+float ENCODER_READING_ERROR_SD_X = 0.05f;
+float ENCODER_READING_ERROR_SD_Y = 0.05f;
 
 // Offsets / payload construction
-float WHEEL_RADIUS = 0;
-Eigen::Vector3f CAMERA_OFFSET_FROM_IMU(0.0, 0.0, 0.0);
+// Matches gz-models/models/payload/model.sdf; verify against the physical wheels.
+float WHEEL_RADIUS = 0.01611839f;
 Eigen::Vector3f CENTER_AXLE_OFFSET_FROM_IMU(0.0, 0.0, 0.0);
 }  // namespace
 
@@ -54,6 +65,15 @@ void EKF::init()
 {
   first_update = true;
   last_imu_update_ = 0;
+  last_left_encoder_update_ = last_right_encoder_update_ = 0;
+  left_encoder_velocity_ = right_encoder_velocity_ = 0.0;
+  left_encoder_pending_ = right_encoder_pending_ = false;
+#if defined(CONFIG_IDF_TARGET_LINUX)
+  {
+    util::StaticMutexGuard lock(camera_mutex_);
+    camera_pending_ = false;
+  }
+#endif
   position = Eigen::Vector3f::Zero();
   velocity = Eigen::Vector3f::Zero();
   rotation = Eigen::Quaternionf::Identity();
@@ -72,26 +92,39 @@ void EKF::init()
 
 void EKF::update()
 {
-  if (!drivers::IMU::instance()->get_latest_if_updated(last_imu_update_, imu_sample_)) {
-    return;
-  }
-  // Monotonic elapsed time on both hardware and Linux SITL, independent of Gazebo.
+  const bool imu_updated = drivers::IMU::instance()->get_latest_if_updated(last_imu_update_, imu_sample_);
   const auto now = Clock::now();
   if (first_update) {
-    last_update = last_camera_update = last_encoder_update = now;
+    if (!imu_updated) {
+      return;
+    }
+    last_update = last_encoder_update = now;
+#if defined(CONFIG_IDF_TARGET_LINUX)
+    last_camera_update = now;
+#endif
     first_update = false;
     return;
   }
 
-  const float deltaT = std::chrono::duration<float>(now - last_update).count();
-  if (deltaT <= 0.0f) {
-    return;
+  if (imu_updated) {
+    const float deltaT = std::chrono::duration<float>(now - last_update).count();
+    if (deltaT > 0.0f) {
+      last_update = now;
+      base_adjustment(deltaT);
+    }
   }
-  last_update = now;
 
-  base_adjustment(deltaT);
-  // TODO Enable encoder/camera corrections once their measurements, geometry,
-  // and noise parameters are connected. Their current placeholders are not usable.
+  // Corrections can consume new measurements even when no new IMU sample arrived.
+  if (now - last_encoder_update >= ENCODER_UPDATE_PERIOD) {
+    last_encoder_update = now;
+    encoder_adjustment();
+  }
+#if defined(CONFIG_IDF_TARGET_LINUX)
+  if (now - last_camera_update >= CAMERA_UPDATE_PERIOD) {
+    last_camera_update = now;
+    camera_adjustment();
+  }
+#endif
 }
 
 Eigen::Matrix3f skew(const Eigen::Ref<Eigen::Vector3f> v)
@@ -101,9 +134,28 @@ Eigen::Matrix3f skew(const Eigen::Ref<Eigen::Vector3f> v)
   return M;
 }
 
+#if defined(CONFIG_IDF_TARGET_LINUX)
+void EKF::set_camera_position(const Eigen::Vector3f& camera_position)
+{
+  if (!camera_position.allFinite()) {
+    return;
+  }
+  util::StaticMutexGuard lock(camera_mutex_);
+  pending_camera_position_ = camera_position;
+  camera_pending_ = true;
+}
+
 void EKF::camera_adjustment()
 {
   Eigen::Vector3f camera_pos;
+  {
+    util::StaticMutexGuard lock(camera_mutex_);
+    if (!camera_pending_) {
+      return;
+    }
+    camera_pos = pending_camera_position_;
+    camera_pending_ = false;
+  }
 
   Eigen::Matrix<float, 3, 15> H = Eigen::Matrix<float, 3, 15>::Zero();
   H.block<3, 3>(0, 0) = I;
@@ -122,16 +174,32 @@ void EKF::camera_adjustment()
   compute_gain(H, noise, residual);
 }
 
+#endif
+
 void EKF::encoder_adjustment()
 {
-  float left_encoder_velo = 0;  // TEMP
-  float right_encoder_velo = 0;
-  Eigen::Vector3f raw_gyro;
+  // Use the same backend-independent interface on hardware and in simulation.
+  // Independent cursors prevent EKF reads from consuming PWM/telemetry feedback.
+  if (drivers::Encoder::instance(Side::LEFT)
+          .get_latest_angular_velocity_if_updated(last_left_encoder_update_, left_encoder_velocity_)) {
+    left_encoder_pending_ = true;
+  }
+  if (drivers::Encoder::instance(Side::RIGHT)
+          .get_latest_angular_velocity_if_updated(last_right_encoder_update_, right_encoder_velocity_)) {
+    right_encoder_pending_ = true;
+  }
+  if (!left_encoder_pending_ || !right_encoder_pending_) {
+    return;
+  }
+  left_encoder_pending_ = right_encoder_pending_ = false;
+  Eigen::Vector3f raw_gyro(
+      imu_sample_.angular_velocity.x, imu_sample_.angular_velocity.y, imu_sample_.angular_velocity.z
+  );
 
   Eigen::Matrix3f R_WB = rotation.normalized().toRotationMatrix().transpose();
 
   Eigen::Vector3f corrected_angular_velo = raw_gyro - gyro_bias;
-  float forward_body_velo = WHEEL_RADIUS * (left_encoder_velo + right_encoder_velo) / 2.0f;
+  float forward_body_velo = WHEEL_RADIUS * (left_encoder_velocity_ + right_encoder_velocity_) / 2.0f;
   Eigen::Vector3f nominal_body_velo = R_WB * velocity;
 
   Eigen::Matrix<float, 2, 15> H = Eigen::Matrix<float, 2, 15>::Zero();
