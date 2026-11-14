@@ -2,4 +2,7 @@
   <class type="pennair_vision::BasicVision" base_class_type="pennair_vision::VisionPlugin">
     <description>Basic VisionPlugin example</description>
   </class>
+  <class type="pennair_vision::VisionRepublisher" base_class_type="pennair_vision::VisionPlugin">
+    <description>Republishes raw camera frames on /cv/debug at debug_image_rate</description>
+  </class>
 </library>
