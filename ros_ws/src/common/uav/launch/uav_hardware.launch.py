@@ -89,8 +89,10 @@ def launch_setup(context) -> list[Action]:
 
     middleware = ExecuteProcess(
         # -b 921600 = baud rate of UART connection
-        # /dev/ttyAMA0 is the UART on GPIO pins 14/15 when the Pi's config.txt has
-        # dtoverlay=disable-bt. Without that line, ttyAMA0 is the Bluetooth chip.
+        # on Pi 4, /dev/serial0 is a symlink to /dev/ttyAMA0
+        # on Pi 5, /dev/serial0 is a different port entirely 
+        # while /dev/ttyAMA0 is still where the Pixhawk is attached
+        # Thus always use /dev/ttyAMA0 in place of /dev/serial0
         cmd=["MicroXRCEAgent", "serial", "--dev", "/dev/ttyAMA0", "-b", "921600"],
         output="screen",
         name="MicroXRCEAgent",
