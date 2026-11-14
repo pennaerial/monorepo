@@ -28,6 +28,8 @@ resize2fs "${loop}p2"
 root="$work/root"
 mkdir "$root"
 mount "${loop}p2" "$root"
+# the stock root filesystem doesn't have this folder until first boot
+mkdir -p "$root/boot/firmware"
 mount "${loop}p1" "$root/boot/firmware"
 for dir in dev dev/pts proc sys; do
 	mount --bind "/$dir" "$root/$dir"
