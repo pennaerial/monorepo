@@ -117,8 +117,6 @@ paths = [
     "ros_ws/src/common/vehicle_common",
     "ros_ws/src/common/uav",
     "ros_ws/src/iarc/iarc_flight",
-    "ros_ws/src/sae/payload_interfaces",
-    "ros_ws/src/sae/payload_controller",
 ]
 
 [environments.dev]
