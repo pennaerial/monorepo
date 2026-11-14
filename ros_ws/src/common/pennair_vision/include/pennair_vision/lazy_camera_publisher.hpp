@@ -72,7 +72,11 @@ private:
 };
 
 template <RosMessage MessageT>
-void LazyCameraPublisher<MessageT>::initialize(rclcpp::Node& node, const std::string& camera_topic, double debug_image_rate)
+void LazyCameraPublisher<MessageT>::initialize(
+    rclcpp::Node& node,
+    const std::string& camera_topic,
+    double debug_image_rate
+)
 {
   /// convert hz to seconds
   debug_period_ = std::chrono::duration<double>(debug_image_rate > 0.0 ? 1.0 / debug_image_rate : 0.0);
