@@ -1,0 +1,31 @@
+modes:
+  start:
+    mode: uav.VerticalTakeoffMode
+    params:
+      takeoff_height: 4.0
+    transitions:
+      complete: gentle
+      
+  gentle:
+    mode: iarc_flight.TrackMode
+    params:
+      trajectory:
+        type: min_snap
+        time_optimal: true # chooses leg durations to minimize total time within limits
+        v_max: # max speed for each leg in given mode
+          standard: 1.0
+        a_max: # max acceleration
+          standard: 0.5
+        keyframes: # points the curve must pass through, mode defines constraints for the preceeding leg to that point
+          - {x: 0, y: 0, z: -4, yaw: 0.0, mode: standard}
+          - {x: 3, y: 0, z: -4, yaw: 0.0, mode: standard}
+          - {x: 3, y: 3, z: -4, yaw: 0.0, mode: standard}
+      controller:
+        type: mpc # MPC limits should be set higher than trajectory constraints to avoid saturating the controller
+        max_speed: 3.0
+        max_vertical_accel: 3.0
+    transitions:
+      complete: land
+
+  land:
+    mode: uav.LandingMode

@@ -6,6 +6,8 @@ dependencies = [ # these should be packages that AREN'T already installed system
     "apriltag",
     "junitparser",
     "cvxpy>=1.6,<1.7",  # iarc_flight MPC controller; 1.6 works with Ubuntu 24.04's numpy 1.26
+    "drake==1.58.0",  # iarc_flight SNOPT solver
+    "threadpoolctl",  # iarc_flight for BLAS (~3x faster this way)
 ]
 
 [dependency-groups]
