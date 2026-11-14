@@ -93,6 +93,7 @@ packages = [
     "cmake",
     "python3-colcon-common-extensions",
     "python3-pip",  # deps sync installs python packages with it
+    "pkg-config",  # camera_ros finds libcamera with it
     "rsync",
 ]
 python_packages = [
@@ -102,6 +103,7 @@ python_packages = [
 # each name in `ldconfig -p`, so a versioned name like "libfoo.so.2.4" also checks the version.
 libraries = [
     "libmicroxrcedds_agent.so.2.4",  # MicroXRCEAgent, must match PX4 1.17's client
+    "libcamera.so.0.7",  # Raspberry Pi fork, used by camera_ros
 ]
 
 # Source that `pennair push` copies to ~/monorepo on each Pi and builds there.
@@ -109,6 +111,8 @@ libraries = [
 paths = [
     "monorepo.toml",
     "ros_ws/src/common/px4_msgs",
+    "ros_ws/src/common/camera_ros",
+    "ros_ws/src/common/pennair_vision",
     "ros_ws/src/common/vehicle_common",
     "ros_ws/src/common/uav",
     "ros_ws/src/iarc/iarc_flight",
