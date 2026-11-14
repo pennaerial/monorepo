@@ -1,5 +1,6 @@
 #include "pennair_vision/vision_manager.hpp"
 
+#include <optional>
 #include <string>
 
 #include "rclcpp_components/register_node_macro.hpp"
@@ -19,12 +20,18 @@ VisionManager::VisionManager(const rclcpp::NodeOptions& options)
 
 void VisionManager::init_plugins()
 {
+  // Translate the ROS parameter's unlimited value into an absent rate for the plugin API.
+  std::optional<double> debug_image_rate;
+  if (params_.debug_image_rate != 0.0) {
+    debug_image_rate = params_.debug_image_rate;
+  }
+
   // initialize a single plugin by name (e.g. pennair_vision::BasicVision) and add it to the plugin_map_
-  auto initialize_plugin = [this](const std::string& plugin_name) {
+  auto initialize_plugin = [this, debug_image_rate](const std::string& plugin_name) {
     try {
       RCLCPP_DEBUG(this->get_logger(), "Initializing plugin: %s", plugin_name.c_str());
       plugin_map_[plugin_name].plugin_instance_ = plugin_loader_.createUniqueInstance(plugin_name);
-      plugin_map_[plugin_name].plugin_instance_->initialize(*this, params_.camera_topic);
+      plugin_map_[plugin_name].plugin_instance_->initialize(*this, params_.camera_topic, debug_image_rate);
       // TODO: add better error handling for plugins that don't exist or fail to initialize
     } catch (const pluginlib::PluginlibException& ex) {
       RCLCPP_ERROR(get_logger(), "Failed to create plugin: %s", ex.what());
