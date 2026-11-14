@@ -35,15 +35,13 @@ pub fn push(
         println!("== {h}");
         deps::check(&config, "prod", Some(h))?;
 
-        // Pis have no hardware clock, and make compares file times to decide what to rebuild
+        // Pis have no hardware clock, and make compares file times to decide what to rebuild.
+        // Setting the clock needs sudo, which may ask for a password, so only do it when it's off.
         let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
-        sh::run(
-            Some(h),
-            &format!(
-                "sudo -n date -s @{now} > /dev/null || \
-                 echo 'warning: no passwordless sudo, so the clock was not set'"
-            ),
-        )?;
+        let pi_time: u64 = sh::output(Some(h), "date +%s")?.trim().parse()?;
+        if pi_time.abs_diff(now) > 5 {
+            sh::run(Some(h), &format!("sudo date -s @{now} > /dev/null"))?;
+        }
 
         sh::run(None, &format!("{RSYNC} {paths} {h}:{REMOTE_ROOT}/"))?;
 
@@ -67,7 +65,7 @@ pub fn push(
         )?;
 
         if restart {
-            sh::run(Some(h), &format!("sudo -n systemctl restart {SERVICE}"))?;
+            sh::run(Some(h), &format!("sudo systemctl restart {SERVICE}"))?;
         }
         println!("pushed to {h}");
     }
