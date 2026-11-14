@@ -99,11 +99,12 @@ packages = [
 python_packages = [
     "pymavlink",  # uav ulog streaming
 ]
-# These are built from source and installed by hand for now. deps check looks for
-# each name in `ldconfig -p`, so a versioned name like "libfoo.so.2.4" also checks the version.
-libraries = [
-    "libmicroxrcedds_agent.so.2.4",  # MicroXRCEAgent, must match PX4 1.17's client
-    "libcamera.so.0.7",  # Raspberry Pi fork, used by camera_ros
+# Built by pennaerial/Dependencies CI. deps sync installs them from these releases.
+debs = [
+    # must match PX4 1.17's XRCE client
+    { package = "pennair-micro-xrce-dds-agent", version = "2.4.3", url = "https://github.com/pennaerial/Dependencies/releases/download/microxrceagent-dec8a4071c8a693c96ebaa961b43dd298919cbbc/microxrceagent-pi4-noble-arm64.tar.gz" },
+    # Raspberry Pi fork, used by camera_ros
+    { package = "pennair-libcamera-rpi", version = "0.7.2", url = "https://github.com/pennaerial/Dependencies/releases/download/libcamera-677fa22911518d86ccf8c2c20d198c86e996f1e1/libcamera-pi4-noble-arm64.tar.gz" },
 ]
 
 # Source that `pennair push` copies to ~/monorepo on each Pi and builds there.

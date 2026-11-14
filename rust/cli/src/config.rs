@@ -79,9 +79,18 @@ pub struct DependencyGroup {
     pub repositories: Option<Vec<String>>,
     pub packages: Vec<String>,
     pub python_packages: Vec<String>,
-    /// Shared libraries installed outside apt, e.g. "libpigpiod_if2.so"
     #[serde(default)]
-    pub libraries: Vec<String>,
+    pub debs: Vec<Deb>,
+}
+
+/// A .deb from a pennaerial/Dependencies release, from `debs` in a group.
+#[derive(Debug, Deserialize)]
+pub struct Deb {
+    pub package: String,
+    /// The installed version has to start with this, e.g. "2.4.3"
+    pub version: String,
+    /// Release tarball with the .deb and a SHA256SUMS file
+    pub url: String,
 }
 
 /// Platform constraints and dependency selection from `[environments.<name>]`.

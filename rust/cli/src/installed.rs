@@ -1,17 +1,27 @@
 //! What's installed on this machine, or on `host` over ssh.
 
 use crate::sh;
-use std::{collections::HashSet, error::Error};
+use std::{
+    collections::{HashMap, HashSet},
+    error::Error,
+};
 
-/// Names of fully installed apt packages.
-pub fn apt(host: Option<&str>) -> Result<HashSet<String>, Box<dyn Error>> {
-    let out = sh::output(host, r"dpkg-query -W -f='${Package} ${db:Status-Abbrev}\n'")?;
+/// Fully installed apt packages and their versions.
+pub fn apt(host: Option<&str>) -> Result<HashMap<String, String>, Box<dyn Error>> {
+    let out = sh::output(
+        host,
+        r"dpkg-query -W -f='${Package} ${Version} ${db:Status-Abbrev}\n'",
+    )?;
     // "ii" means installed. Removed packages that left config files behind show "rc" and are skipped.
     Ok(out
         .lines()
-        .filter_map(|line| line.split_once(' '))
-        .filter(|(_, status)| status.starts_with("ii"))
-        .map(|(name, _)| name.to_string())
+        .filter_map(|line| {
+            let mut fields = line.split(' ');
+            let (name, version, status) = (fields.next()?, fields.next()?, fields.next()?);
+            status
+                .starts_with("ii")
+                .then(|| (name.to_string(), version.to_string()))
+        })
         .collect())
 }
 
@@ -22,18 +32,6 @@ pub fn python(host: Option<&str>) -> Result<HashSet<String>, Box<dyn Error>> {
         r#"python3 -c 'import importlib.metadata as m; print(*(d.metadata["Name"] for d in m.distributions()), sep="\n")'"#,
     )?;
     Ok(out.lines().map(normalize).collect())
-}
-
-/// Shared libraries known to the dynamic linker, e.g. "libfoo.so" and "libfoo.so.2.4".
-pub fn libraries(host: Option<&str>) -> Result<HashSet<String>, Box<dyn Error>> {
-    let out = sh::output(host, "ldconfig -p")?;
-    // lines look like "\tlibfoo.so.2.4 (libc6,AArch64) => /usr/lib/libfoo.so.2.4"
-    Ok(out
-        .lines()
-        .skip(1)
-        .filter_map(|line| line.split_whitespace().next())
-        .map(String::from)
-        .collect())
 }
 
 /// Package name from a requirement like "pydantic>=2,<3".

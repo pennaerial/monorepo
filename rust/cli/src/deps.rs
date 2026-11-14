@@ -1,7 +1,7 @@
-use crate::config::{MonorepoConfig, load_config};
+use crate::config::{Deb, MonorepoConfig, load_config};
 use crate::{installed, sh};
 use clap::{Args, Subcommand};
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 use std::error::Error;
 use std::path::Path;
 
@@ -43,22 +43,22 @@ pub fn sync(
         println!("all dependencies installed");
         return Ok(());
     }
-    if !missing.libraries.is_empty() {
-        return Err(format!(
-            "install these by hand, they're built from source: {}",
-            missing.libraries.join(", ")
-        )
-        .into());
-    }
-
-    if !missing.apt.is_empty() {
-        sh::run(
-            host,
-            &format!(
-                "sudo apt-get update && sudo apt-get install -y {}",
-                missing.apt.join(" ")
-            ),
-        )?;
+    if !missing.apt.is_empty() || !missing.debs.is_empty() {
+        // download each release tarball and check its .deb, then install everything with one apt call
+        let mut cmd = String::from("set -e; cd $(mktemp -d); ");
+        for url in &missing.debs {
+            cmd += &format!("curl -fsSL {url} | tar -xz; sha256sum -c SHA256SUMS; ");
+        }
+        let debs = if missing.debs.is_empty() {
+            ""
+        } else {
+            "./*.deb"
+        };
+        cmd += &format!(
+            "sudo apt-get update && sudo apt-get install -y {} {debs}",
+            missing.apt.join(" ")
+        );
+        sh::run(host, &cmd)?;
     }
     if !missing.python.is_empty() {
         // pin numpy to the apt version. Without the pin, pip installs numpy 2, which breaks ROS.
@@ -79,12 +79,13 @@ pub fn sync(
 struct Missing {
     apt: Vec<String>,
     python: Vec<String>,
-    libraries: Vec<String>,
+    /// release URLs
+    debs: Vec<String>,
 }
 
 impl Missing {
     fn count(&self) -> usize {
-        self.apt.len() + self.python.len() + self.libraries.len()
+        self.apt.len() + self.python.len() + self.debs.len()
     }
 }
 
@@ -103,27 +104,25 @@ fn find_missing(
         .get(env_name)
         .ok_or(format!("no [environments.{env_name}] in manifest"))?;
 
-    let (mut packages, mut python, mut libraries) =
-        (BTreeSet::new(), BTreeSet::new(), BTreeSet::new());
+    let (mut packages, mut python, mut debs) = (BTreeSet::new(), BTreeSet::new(), Vec::new());
     for name in &env.groups {
         let group = config.groups.get(name).ok_or(format!(
             "environment '{env_name}' uses unknown group '{name}'"
         ))?;
         packages.extend(&group.packages);
         python.extend(&group.python_packages);
-        libraries.extend(&group.libraries);
+        debs.extend(&group.debs);
     }
 
     let apt_installed = installed::apt(host)?;
     let python_installed = installed::python(host)?;
-    let libraries_installed = installed::libraries(host)?;
 
     Ok(Missing {
-        apt: report("apt", &packages, |p| apt_installed.contains(p)),
+        apt: report("apt", &packages, |p| apt_installed.contains_key(p)),
         python: report("python", &python, |r| {
             python_installed.contains(&installed::requirement_name(r))
         }),
-        libraries: report("libraries", &libraries, |l| libraries_installed.contains(l)),
+        debs: report_debs(&debs, &apt_installed),
     })
 }
 
@@ -143,6 +142,30 @@ fn report(kind: &str, wanted: &BTreeSet<&String>, installed: impl Fn(&str) -> bo
         println!("  missing: {name}");
     }
     missing
+}
+
+/// Prints how many debs are installed at the right version and returns the URLs of the rest.
+fn report_debs(wanted: &[&Deb], installed: &HashMap<String, String>) -> Vec<String> {
+    let missing: Vec<&&Deb> = wanted
+        .iter()
+        .filter(|d| {
+            !installed
+                .get(&d.package)
+                .is_some_and(|v| v.starts_with(&d.version))
+        })
+        .collect();
+    println!(
+        "debs: {}/{} installed",
+        wanted.len() - missing.len(),
+        wanted.len()
+    );
+    for d in &missing {
+        let have = installed
+            .get(&d.package)
+            .map_or("not installed", String::as_str);
+        println!("  missing: {} {} (have {have})", d.package, d.version);
+    }
+    missing.iter().map(|d| d.url.clone()).collect()
 }
 
 #[derive(Args, Debug)]
