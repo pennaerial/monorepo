@@ -105,7 +105,7 @@ void LazyCameraPublisher<MessageT>::start()
         // Generate debug if there are debug subscribers and debug_period_ has passed since the last debug attempt
         const bool generate_debug =
             want_debug && (!debug_period_ || !last_debug_time_ || now - *last_debug_time_ >= *debug_period_);
-        
+
         // don't process image if no subscribers
         if (!want_result && !generate_debug) {
           return;
