@@ -76,6 +76,7 @@ ament_target_dependencies(vision_manager
 # Dynamically loaded plugins
 add_library(vision_plugins SHARED
     src/plugins/basic_vision.cpp
+    src/plugins/vision_republisher.cpp
 )
 
 add_library(lazy_camera_publisher SHARED
@@ -96,6 +97,7 @@ ament_target_dependencies(vision_plugins
     rclcpp
     rosidl_runtime_cpp
     pluginlib
+    std_msgs
     sensor_msgs
     image_transport
     cv_bridge
