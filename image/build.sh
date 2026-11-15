@@ -67,12 +67,25 @@ cp "$HERE/../monorepo.toml" "$root/tmp/monorepo.toml"
 chroot "$root" /bin/bash -e <<'EOF'
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
-apt-get install -y network-manager avahi-daemon dnsmasq iw batctl rfkill
+apt-get install -y network-manager avahi-daemon dnsmasq iw batctl
 pennair --manifest /tmp/monorepo.toml deps sync --prod
 apt-get clean
 EOF
 
 cp -a "$HERE/rootfs/." "$root/"
+
+# cloud-init copies /etc/skel into penn's home on first boot.
+cat >>"$root/etc/skel/.bashrc" <<'EOF'
+
+# pennair
+export PENNAIR_MONOREPO_PATH="$HOME/monorepo"
+export PENNAIR_ROS_WS_PATH="$PENNAIR_MONOREPO_PATH/ros_ws"
+source /opt/ros/jazzy/setup.bash
+# built by `pennair push`
+if [ -f "$PENNAIR_ROS_WS_PATH/install/setup.bash" ]; then
+	source "$PENNAIR_ROS_WS_PATH/install/setup.bash"
+fi
+EOF
 
 # Free the serial port for PX4, and turn on the camera.
 sed -i 's/console=serial0,115200 //' "$root/boot/firmware/cmdline.txt"

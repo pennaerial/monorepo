@@ -12,7 +12,6 @@ fi
 # 10# reads the digits as decimal: 06 -> 6, 08 -> 8.
 NODE_ID=$((10#${BASH_REMATCH[1]}))
 
-rfkill unblock wifi
 iw reg set US
 ip link set "$WIFI" down
 iw dev "$WIFI" set type mp
