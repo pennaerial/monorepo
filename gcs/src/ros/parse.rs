@@ -34,14 +34,7 @@ pub fn parse_binary_message(bytes: &Bytes) -> Result<ServerMessage, ParseError> 
 
     match binary_opcode {
         BinaryOpcode::MessageData => {
-            let subscription_id: u32 = u32::from_le_bytes(
-                bytes
-                    .get(offset..offset + 4)
-                    .ok_or(ParseError::TooShort)?
-                    .try_into()
-                    .unwrap(),
-            );
-            offset += 4;
+            let subscription_id = read_u32(bytes, &mut offset)?;
             let timestamp: u64 = u64::from_le_bytes(
                 bytes
                     .get(offset..offset + 8)
@@ -118,4 +111,176 @@ pub fn encode_service_call_request(
     frame.extend_from_slice(encoding.as_bytes());
     frame.extend_from_slice(payload);
     frame
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn empty_bytes_returns_too_short() {
+        assert!(matches!(
+            parse_binary_message(&Bytes::new()),
+            Err(ParseError::TooShort)
+        ));
+    }
+
+    #[test]
+    fn invalid_opcode_returns_original_byte() {
+        for opcode in 0u8..=u8::MAX {
+            if matches!(opcode, 1 | 3) {
+                continue;
+            }
+
+            let bytes = Bytes::copy_from_slice(&[opcode]);
+            assert!(
+                matches!(
+                    parse_binary_message(&bytes),
+                    Err(ParseError::InvalidOpcode(value)) if value == opcode
+                ),
+                "expected InvalidOpcode({opcode})"
+            );
+        }
+    }
+
+    #[test]
+    fn message_data_with_short_subscription_id_returns_too_short() {
+        let bytes = Bytes::from_static(&[1, 0x12, 0x34, 0x56]);
+        assert!(matches!(
+            parse_binary_message(&bytes),
+            Err(ParseError::TooShort)
+        ));
+    }
+
+    #[test]
+    fn message_data_with_short_timestamp_returns_too_short() {
+        let bytes = Bytes::from_static(&[
+            1, // MessageData opcode
+            1, 0, 0, 0, // subscription ID
+            0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, // seven timestamp bytes
+        ]);
+        assert!(matches!(
+            parse_binary_message(&bytes),
+            Err(ParseError::TooShort)
+        ));
+    }
+
+    #[test]
+    fn parses_valid_message_data() {
+        let bytes = Bytes::from_static(&[
+            1, // MessageData opcode
+            0x12, 0x34, 0x56, 0x78, // subscription ID
+            0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, // timestamp
+            0xaa, 0xbb, 0xcc, // payload
+        ]);
+        let ServerMessage::MessageData(message) = parse_binary_message(&bytes).unwrap() else {
+            panic!("expected MessageData");
+        };
+        assert_eq!(message.subscription_id, 0x78563412);
+        assert_eq!(message.timestamp, 0xefcdab8967452301);
+        assert_eq!(message.data.as_ref(), &[0xaa, 0xbb, 0xcc]);
+    }
+
+    #[test]
+    fn read_u32_with_short_input_returns_too_short() {
+        let bytes = Bytes::from_static(&[0x12, 0x34, 0x56]);
+        let mut offset = 0;
+        assert!(matches!(
+            read_u32(&bytes, &mut offset),
+            Err(ParseError::TooShort)
+        ));
+    }
+
+    #[test]
+    fn read_u32_correct_and_incr_offset() {
+        let bytes = Bytes::from_static(&[0, 0x12, 0x34, 0x56, 0x78]);
+        let mut offset = 1;
+        assert_eq!(read_u32(&bytes, &mut offset).unwrap(), 0x78563412);
+        assert_eq!(offset, 5);
+    }
+
+    #[test]
+    fn parse_service_bad_service_id() {
+        let bytes = Bytes::from_static(&[1, 0, 0]);
+        assert!(matches!(
+            parse_service_call_response(&bytes, 0),
+            Err(ParseError::TooShort)
+        ));
+    }
+
+    #[test]
+    fn parse_service_bad_call_id() {
+        let bytes = Bytes::from_static(&[1, 0, 0, 0, 2, 0, 0]);
+        assert!(matches!(
+            parse_service_call_response(&bytes, 0),
+            Err(ParseError::TooShort)
+        ));
+    }
+
+    #[test]
+    fn parse_service_bad_encoding_length() {
+        let bytes = Bytes::from_static(&[1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0]);
+        assert!(matches!(
+            parse_service_call_response(&bytes, 0),
+            Err(ParseError::TooShort)
+        ));
+    }
+
+    #[test]
+    fn parse_service_bad_encoding_bytes() {
+        let bytes = Bytes::from_static(&[1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, b'c', b'd']);
+        assert!(matches!(
+            parse_service_call_response(&bytes, 0),
+            Err(ParseError::TooShort)
+        ));
+    }
+
+    #[test]
+    fn parse_service_invalid_encoding() {
+        // No opcode: this calls the response parser directly at offset 0.
+        let bytes = Bytes::from_static(&[
+            1, 0, 0, 0, // service ID = 1
+            2, 0, 0, 0, // call ID = 2
+            1, 0, 0, 0,    // encoding length = 1 byte
+            0xff, // invalid UTF-8: 0xff is never a valid UTF-8 byte
+        ]);
+        assert!(matches!(
+            parse_service_call_response(&bytes, 0),
+            Err(ParseError::InvalidEncoding)
+        ));
+    }
+
+    #[test]
+    fn parses_valid_service_response() {
+        let bytes = Bytes::from_static(&[
+            3, // ServiceCallResponse opcode
+            0x12, 0x34, 0x56, 0x78, // service ID
+            0x01, 0x23, 0x45, 0x67, // call ID
+            3, 0, 0, 0, b'c', b'd', b'r', // encoding length and encoding
+            0xaa, 0xbb, // payload
+        ]);
+        let ServerMessage::ServiceCallResponse(response) = parse_binary_message(&bytes).unwrap()
+        else {
+            panic!("expected ServiceCallResponse");
+        };
+        assert_eq!(response.service_id, 0x78563412);
+        assert_eq!(response.call_id, 0x67452301);
+        assert_eq!(response.encoding, "cdr");
+        assert_eq!(response.data.as_ref(), &[0xaa, 0xbb]);
+    }
+
+    #[test]
+    fn encode_service_request_frame() {
+        let frame = encode_service_call_request(0x78563412, 0x67452301, "cdr", &[0xaa, 0xbb]);
+        assert_eq!(
+            frame,
+            [
+                2, // ServiceCallRequest opcode
+                0x12, 0x34, 0x56, 0x78, // service ID
+                0x01, 0x23, 0x45, 0x67, // call ID
+                3, 0, 0, 0, b'c', b'd', b'r', // encoding length and encoding
+                0xaa, 0xbb, // payload
+            ]
+        );
+    }
 }

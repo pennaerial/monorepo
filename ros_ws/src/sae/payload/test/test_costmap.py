@@ -22,7 +22,7 @@ class TestCostmap(Node):
         msg = OccupancyGrid()
 
         msg.header.stamp = self.get_clock().now().to_msg()
-        msg.header.frame_id = "map"
+        msg.header.frame_id = "world"
 
         msg.info.resolution = 0.5
         msg.info.width = 10

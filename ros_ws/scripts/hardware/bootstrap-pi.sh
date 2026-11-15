@@ -363,8 +363,9 @@ After=network-online.target pigpiod.service
 Type=simple
 User=${DEPLOY_USER}
 Group=${DEPLOY_USER}
-WorkingDirectory=${DEPLOY_ROOT}/current
+WorkingDirectory=${ROS_WORKSPACE}
 Environment=DEPLOY_ROOT=${DEPLOY_ROOT}
+Environment=CURRENT_RELEASE=${ROS_WORKSPACE}
 Environment=RUNTIME_FLEET_CONFIG=${DEPLOY_ROOT}/config/runtime_fleet.yaml
 Environment=PENNAIR_MISSION_STARTED_MARKER_PATH=${MISSION_STARTED_MARKER}
 ExecStart=${DEPLOY_ROOT}/bin/runtime_fleet
@@ -483,6 +484,11 @@ fi
 
 if [[ -z "$MISSION_STARTED_MARKER" ]]; then
     MISSION_STARTED_MARKER="${DEPLOY_ROOT%/}/state/mission-started"
+fi
+
+# colcon workspace that `pennair push` syncs and builds
+if [[ -z "${ROS_WORKSPACE:-}" ]]; then
+    ROS_WORKSPACE="$(getent passwd "$DEPLOY_USER" | cut -d: -f6)/monorepo/ros_ws"
 fi
 
 deploy_init_paths

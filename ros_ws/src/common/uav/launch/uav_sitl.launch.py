@@ -208,7 +208,7 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 Args.MISSION,
                 default_value="basic",
-                description="Name of the mission to load. Run 'pennair mission <mission_package>' to see the available missions.",
+                description="Name of the mission to load. Run 'ros2 run pennair_cli pennair mission <mission_package>' to see the available missions.",
             ),
             DeclareLaunchArgument(
                 Args.MISSION_PACKAGE,
@@ -223,7 +223,7 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 Args.AIRFRAME,
                 default_value="quadcopter",
-                description="UAV airframe to load. Run 'pennair airframe ls' to see all available airframes.",
+                description="UAV airframe to load. Run 'ros2 run pennair_cli pennair airframe ls' to see all available airframes.",
             ),
             DeclareLaunchArgument(
                 Args.WORLD,

@@ -11,6 +11,9 @@ find_package(generate_parameter_library REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(payload_interfaces REQUIRED)
 find_package(pluginlib REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_ros REQUIRED)
 
 set(PAYLOAD_BUILD_SIM_CONTROLLER "AUTO" CACHE STRING
   "Build the SimController backend (AUTO, ON, OFF)")

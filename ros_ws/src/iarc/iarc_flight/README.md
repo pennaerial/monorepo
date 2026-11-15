@@ -18,7 +18,7 @@ When the trajectory is done it logs the position error and controller step time.
 
 ## Run in sim
 
-IARC missions live in `iarc_flight/missions` (`pennair mission iarc_flight` lists them).
+IARC missions live in `iarc_flight/missions` (`ros2 run pennair_cli pennair mission iarc_flight` lists them).
 
 Start QGroundControl first, then four UAVs flying the circle in the `iarc` world:
 

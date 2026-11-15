@@ -20,8 +20,10 @@ tokio = { version = "1.53.1", features = ["net", "sync", "macros", "time"] }
 tokio-tungstenite = "0.30.0"
 tungstenite = "0.30.0"
 cdr = "0.2.4"
+chrono = { version = "0.4.45", default-features = false, features = ["clock"] }
 
 [dev-dependencies]
+foxglove = { version = "0.30.3", default-features = false, features = ["websocket"] }
 # runtime for #[tokio::test]
 tokio = { version = "1.53.1", features = ["rt", "macros", "time", "net"] }
 
