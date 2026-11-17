@@ -18,6 +18,7 @@ exclude = [
     "ros_ws/src/ros_gz",
     "ros_ws/src/actuator_msgs",
     "ros_ws/src/common/px4_msgs",
+    "ros_ws/src/common/camera_ros",
     "PX4-Autopilot",
     "gz-models",
     "Dependencies"

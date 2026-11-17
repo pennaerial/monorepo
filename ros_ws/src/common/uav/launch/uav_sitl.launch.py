@@ -146,8 +146,9 @@ def launch_setup(context) -> list[Action]:
         output="screen",
         arguments=[
             "--ros-args",
-            "--log-level", "info",
             "--log-level",
+            "info",
+            "--log-level",  # only set mode_manager log level to debug, to avoid rcl debug message bloat
             f"{vehicle_ns}.mode_manager:={'debug' if is_truthy(debug) else 'info'}",
         ],
     )
