@@ -59,7 +59,12 @@ pub fn sync(
         };
         cmd += &format!(
             "sudo apt-get update && sudo apt-get install -y {} {debs}",
-            missing.apt.iter().map(String::as_str).collect::<Vec<_>>().join(" ")
+            missing
+                .apt
+                .iter()
+                .map(String::as_str)
+                .collect::<Vec<_>>()
+                .join(" ")
         );
         sh::run(host, &cmd)?;
     }
@@ -120,13 +125,15 @@ fn find_missing(
     }
 
     let apt_installed = apt::installed_packages(host)?;
-    let missing_system_apt = apt::find_missing_system_packages(&apt_required_packages, &apt_installed);
+    let missing_system_apt =
+        apt::find_missing_system_packages(&apt_required_packages, &apt_installed);
     let unsatisfied_debs = apt::find_unsatisfied_custom_debs(&debs, &apt_installed);
 
     // Validate requirements before querying system
     let python_required = python::parse_requirements(&python_requirement_strings)?;
     let python_installed = python::installed_packages(host)?;
-    let python_unsatisfied = python::find_unsatisfied_requirements(&python_required, &python_installed)?;
+    let python_unsatisfied =
+        python::find_unsatisfied_requirements(&python_required, &python_installed)?;
 
     // show status reports
     report_system_apt(&apt_required_packages, &missing_system_apt);
@@ -176,11 +183,7 @@ fn report_python(
 }
 
 /// Reports missing or incompatible custom deb requirements.
-fn report_custom_debs(
-    required: &[Deb],
-    installed: &BTreeMap<String, String>,
-    unsatisfied: &[Deb],
-) {
+fn report_custom_debs(required: &[Deb], installed: &BTreeMap<String, String>, unsatisfied: &[Deb]) {
     println!(
         "debs: {}/{} satisfied",
         required.len() - unsatisfied.len(),

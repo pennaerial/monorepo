@@ -1,14 +1,15 @@
 use crate::config::Deb;
 use crate::sh;
-use std::{collections::{BTreeMap, BTreeSet}, error::Error};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    error::Error,
+};
 
 const LIST_INSTALLED_PACKAGES: &str =
     r"dpkg-query -W -f='${Package} ${Version} ${db:Status-Abbrev}\n'";
 
 /// Fully installed APT packages and their versions.
-pub fn installed_packages(
-    host: Option<&str>,
-) -> Result<BTreeMap<String, String>, Box<dyn Error>> {
+pub fn installed_packages(host: Option<&str>) -> Result<BTreeMap<String, String>, Box<dyn Error>> {
     let out = sh::output(host, LIST_INSTALLED_PACKAGES)?;
     // "ii" means installed. Skip removed packages with leftover config files.
     Ok(out

@@ -3,7 +3,8 @@ use pep508_rs::{PackageName, Requirement, VersionOrUrl};
 
 use crate::sh;
 use std::{
-    collections::{BTreeMap, BTreeSet}, error::Error,
+    collections::{BTreeMap, BTreeSet},
+    error::Error,
 };
 
 const LIST_INSTALLED_PACKAGES: &str = r#"
@@ -20,16 +21,19 @@ for name, version in sorted(packages):
 "#;
 
 /// Normalized names of python packages visible to python3.
-pub fn installed_packages(host: Option<&str>) -> Result<BTreeMap<PackageName, Version>, Box<dyn Error>> {
-    let command = format!(
-        "python3 - <<'PENNAIR_PYTHON'\n{LIST_INSTALLED_PACKAGES}\nPENNAIR_PYTHON"
-    );
+pub fn installed_packages(
+    host: Option<&str>,
+) -> Result<BTreeMap<PackageName, Version>, Box<dyn Error>> {
+    let command =
+        format!("python3 - <<'PENNAIR_PYTHON'\n{LIST_INSTALLED_PACKAGES}\nPENNAIR_PYTHON");
     let out = sh::output(host, &command)?;
 
     let mut packages = BTreeMap::new();
 
     for line in out.lines() {
-        let (name, version) = line.split_once("==").ok_or("expected format package==version")?;
+        let (name, version) = line
+            .split_once("==")
+            .ok_or("expected format package==version")?;
         let name: PackageName = name.parse()?;
         let version: Version = version.parse()?;
         packages.insert(name, version);
@@ -38,7 +42,9 @@ pub fn installed_packages(host: Option<&str>) -> Result<BTreeMap<PackageName, Ve
 }
 
 /// Uses pep508_rs to parse all python requirement strings
-pub fn parse_requirements(requirements: &BTreeSet<String>) -> Result<BTreeSet<Requirement>, Box<dyn Error>> {
+pub fn parse_requirements(
+    requirements: &BTreeSet<String>,
+) -> Result<BTreeSet<Requirement>, Box<dyn Error>> {
     let mut parsed = BTreeSet::new();
     for requirement in requirements {
         let requirement = requirement
@@ -51,11 +57,12 @@ pub fn parse_requirements(requirements: &BTreeSet<String>) -> Result<BTreeSet<Re
 
 /// Checks a set of parsed requirements against detected python packages. Returns a set of
 /// unsatisfied requirements if successful
-pub fn find_unsatisfied_requirements(required: &BTreeSet<Requirement>, installed: &BTreeMap<PackageName, Version>) -> Result<BTreeSet<Requirement>, Box<dyn Error>>{
-
+pub fn find_unsatisfied_requirements(
+    required: &BTreeSet<Requirement>,
+    installed: &BTreeMap<PackageName, Version>,
+) -> Result<BTreeSet<Requirement>, Box<dyn Error>> {
     let mut unsatisfied = BTreeSet::new();
     for requirement in required {
-
         // checks if installed has a package that satisfies each requirement
         let satisfied = match installed.get(&requirement.name) {
             None => false,
@@ -63,9 +70,10 @@ pub fn find_unsatisfied_requirements(required: &BTreeSet<Requirement>, installed
                 None => true,
                 Some(VersionOrUrl::VersionSpecifier(specifiers)) => {
                     specifiers.contains(version) // only pass if the specifiers allow the installed
-                                                 // version
+                    // version
                 }
-                Some(VersionOrUrl::Url(_)) => { // don't allow URLs
+                Some(VersionOrUrl::Url(_)) => {
+                    // don't allow URLs
                     return Err("URL requirements are unsupported".into());
                 }
             },
