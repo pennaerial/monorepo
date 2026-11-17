@@ -1,8 +1,9 @@
 modes:
   start:
-    mode: uav.vtol.TakeoffMode
+    mode: uav.VerticalTakeoffMode
     params:
-      takeoff_type: vertical
+      takeoff_height: 5.0
+      takeoff_method: PX4_AUTO
     transitions:
       complete: GPS
 

@@ -1,19 +1,21 @@
 modes:
   start:
-    mode: uav.vtol.TakeoffMode
+    mode: uav.VerticalTakeoffMode
     params:
-      takeoff_type: vertical
+      takeoff_height: 6.0
+      takeoff_method: OFFBOARD
     transitions:
-      complete: GPS
+      complete: triangle
 
-  GPS:
+  triangle:
     mode: uav.NavGPSMode
     params:
+      # Right triangle in NED LOCAL frame: +X north, +Y east, -Z up
+      # All corners at 10 m altitude (z = -10)
       coordinates:
-        - [[5, 3, -10], 5, LOCAL]
-        - [[10, 1, -1], 20, LOCAL]
-        - [[-5, 3, -10], 3, LOCAL]
-        - [[5, 3, -10], 3, LOCAL]
+        - [[10, 0, -6.0], 2, LOCAL]   # corner A — 10 m north
+        - [[10, 10, -6.0], 2, LOCAL]  # corner B — 10 m north, 10 m east
+        - [[0, 0, -6.0], 2, LOCAL]   # corner C — 10 m east
     transitions:
       complete: land
 
