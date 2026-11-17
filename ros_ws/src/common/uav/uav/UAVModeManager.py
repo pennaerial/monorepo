@@ -94,7 +94,7 @@ class UAVModeManager(ModeManager):
                 or self.vehicle.arm_state != VehicleStatus.ARMING_STATE_ARMED
             ):
                 self.vehicle.land()
-                self.get_logger().warn("Failsafe: Initiating landing.")
+                self.get_logger().warn("FAILSAFE: Initiating landing.")
             return
 
         if self.servo_only:
@@ -138,7 +138,7 @@ class UAVModeManager(ModeManager):
         self.run_active_mode(current_time)
 
         if self.vehicle.nav_state == VehicleStatus.NAVIGATION_STATE_AUTO_LAND:
-            self.get_logger().info("Landing")
+            self.get_logger().info("Landing", throttle_duration_sec=1.0)
 
     def handle_mode_state(self, state: str) -> None:
         if state == "error":
