@@ -3,6 +3,7 @@ from abc import abstractmethod
 
 import numpy as np
 from px4_msgs.msg import (
+    GotoSetpoint,
     OffboardControlMode,
     SensorGps,
     TrajectorySetpoint,
@@ -11,7 +12,6 @@ from px4_msgs.msg import (
     VehicleGlobalPosition,
     VehicleLocalPosition,
     VehicleStatus,
-    GotoSetpoint,
 )
 from rclpy.clock import Clock
 from rclpy.node import Node

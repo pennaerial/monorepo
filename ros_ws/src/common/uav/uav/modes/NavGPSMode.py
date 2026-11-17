@@ -86,7 +86,13 @@ class NavGPSMode(Mode[UAV, NavGPSParams]):
 
         # Always publish setpoints to maintain offboard connection (PX4 requires continuous stream)
         if self.target is not None:
-            self.vehicle.publish_goto_setpoint(self.target, self.p.max_horizontal_speed, self.p.max_vertical_speed, self.p.max_heading_rate, lock_yaw=waiting)
+            self.vehicle.publish_goto_setpoint(
+                self.target,
+                self.p.max_horizontal_speed,
+                self.p.max_vertical_speed,
+                self.p.max_heading_rate,
+                lock_yaw=waiting,
+            )
         elif self.vehicle.local_position:
             # Fallback: maintain current position until first waypoint is set
             self.vehicle.publish_goto_setpoint(
