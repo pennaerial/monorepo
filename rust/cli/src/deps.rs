@@ -1,7 +1,9 @@
 use crate::config::{Deb, MonorepoConfig, load_config};
-use crate::{installed, sh};
+use crate::{apt, python, sh};
 use clap::{Args, Subcommand};
-use std::collections::{BTreeSet, HashMap};
+use pep440_rs::Version;
+use pep508_rs::{PackageName, Requirement};
+use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
 use std::path::Path;
 
@@ -46,7 +48,8 @@ pub fn sync(
     if !missing.apt.is_empty() || !missing.debs.is_empty() {
         // download each release tarball and check its .deb, then install everything with one apt call
         let mut cmd = String::from("set -e; cd $(mktemp -d); ");
-        for url in &missing.debs {
+        for deb in &missing.debs {
+            let url = &deb.url;
             cmd += &format!("curl -fsSL {url} | tar -xz; sha256sum -c SHA256SUMS; ");
         }
         let debs = if missing.debs.is_empty() {
@@ -56,7 +59,7 @@ pub fn sync(
         };
         cmd += &format!(
             "sudo apt-get update && sudo apt-get install -y {} {debs}",
-            missing.apt.join(" ")
+            missing.apt.iter().map(String::as_str).collect::<Vec<_>>().join(" ")
         );
         sh::run(host, &cmd)?;
     }
@@ -78,10 +81,9 @@ pub fn sync(
 
 /// What the environment needs that isn't installed.
 struct Missing {
-    apt: Vec<String>,
-    python: Vec<String>,
-    /// release URLs
-    debs: Vec<String>,
+    apt: BTreeSet<String>,
+    python: BTreeSet<Requirement>,
+    debs: Vec<Deb>,
 }
 
 impl Missing {
@@ -105,68 +107,94 @@ fn find_missing(
         .get(env_name)
         .ok_or(format!("no [environments.{env_name}] in manifest"))?;
 
-    let (mut packages, mut python, mut debs) = (BTreeSet::new(), BTreeSet::new(), Vec::new());
+    let mut apt_required_packages = BTreeSet::new();
+    let mut python_requirement_strings = BTreeSet::new();
+    let mut debs = Vec::new();
     for name in &env.groups {
         let group = config.groups.get(name).ok_or(format!(
             "environment '{env_name}' uses unknown group '{name}'"
         ))?;
-        packages.extend(&group.packages);
-        python.extend(&group.python_packages);
-        debs.extend(&group.debs);
+        apt_required_packages.extend(group.packages.iter().cloned());
+        python_requirement_strings.extend(group.python_packages.iter().cloned());
+        debs.extend(group.debs.iter().cloned());
     }
 
-    let apt_installed = installed::apt(host)?;
-    let python_installed = installed::python(host)?;
+    let apt_installed = apt::installed_packages(host)?;
+    let missing_system_apt = apt::find_missing_system_packages(&apt_required_packages, &apt_installed);
+    let unsatisfied_debs = apt::find_unsatisfied_custom_debs(&debs, &apt_installed);
+
+    // Validate requirements before querying system
+    let python_required = python::parse_requirements(&python_requirement_strings)?;
+    let python_installed = python::installed_packages(host)?;
+    let python_unsatisfied = python::find_unsatisfied_requirements(&python_required, &python_installed)?;
+
+    // show status reports
+    report_system_apt(&apt_required_packages, &missing_system_apt);
+    report_custom_debs(&debs, &apt_installed, &unsatisfied_debs);
+    report_python(&python_required, &python_installed, &python_unsatisfied);
 
     Ok(Missing {
-        apt: report("apt", &packages, |p| apt_installed.contains_key(p)),
-        python: report("python", &python, |r| {
-            python_installed.contains(&installed::requirement_name(r))
-        }),
-        debs: report_debs(&debs, &apt_installed),
+        apt: missing_system_apt,
+        python: python_unsatisfied,
+        debs: unsatisfied_debs,
     })
 }
 
-/// Prints how many of `wanted` are installed and returns the missing ones.
-fn report(kind: &str, wanted: &BTreeSet<&String>, installed: impl Fn(&str) -> bool) -> Vec<String> {
-    let missing: Vec<String> = wanted
-        .iter()
-        .filter(|w| !installed(w))
-        .map(|w| w.to_string())
-        .collect();
+/// Reports required system APT packages that are not installed.
+fn report_system_apt(required: &BTreeSet<String>, missing: &BTreeSet<String>) {
     println!(
-        "{kind}: {}/{} installed",
-        wanted.len() - missing.len(),
-        wanted.len()
+        "apt: {}/{} installed",
+        required.len() - missing.len(),
+        required.len()
     );
-    for name in &missing {
+
+    for name in missing {
         println!("  missing: {name}");
     }
-    missing
 }
 
-/// Prints how many debs are installed at the right version and returns the URLs of the rest.
-fn report_debs(wanted: &[&Deb], installed: &HashMap<String, String>) -> Vec<String> {
-    let missing: Vec<&&Deb> = wanted
-        .iter()
-        .filter(|d| {
-            !installed
-                .get(&d.package)
-                .is_some_and(|v| v.starts_with(&d.version))
-        })
-        .collect();
+/// Reports missing or incompatible Python requirements.
+fn report_python(
+    required: &BTreeSet<Requirement>,
+    installed: &BTreeMap<PackageName, Version>,
+    unsatisfied: &BTreeSet<Requirement>,
+) {
     println!(
-        "debs: {}/{} installed",
-        wanted.len() - missing.len(),
-        wanted.len()
+        "python: {}/{} satisfied",
+        required.len() - unsatisfied.len(),
+        required.len()
     );
-    for d in &missing {
-        let have = installed
-            .get(&d.package)
-            .map_or("not installed", String::as_str);
-        println!("  missing: {} {} (have {have})", d.package, d.version);
+
+    for requirement in unsatisfied {
+        match installed.get(&requirement.name) {
+            Some(version) => {
+                println!("  incompatible: {requirement} (installed: {version})");
+            }
+            None => println!("  missing: {requirement}"),
+        }
     }
-    missing.iter().map(|d| d.url.clone()).collect()
+}
+
+/// Reports missing or incompatible custom deb requirements.
+fn report_custom_debs(
+    required: &[Deb],
+    installed: &BTreeMap<String, String>,
+    unsatisfied: &[Deb],
+) {
+    println!(
+        "debs: {}/{} satisfied",
+        required.len() - unsatisfied.len(),
+        required.len()
+    );
+    for deb in unsatisfied {
+        match installed.get(&deb.package) {
+            Some(version) => println!(
+                "  incompatible: {} {} (installed: {version})",
+                deb.package, deb.version
+            ),
+            None => println!("  missing: {} {}", deb.package, deb.version),
+        }
+    }
 }
 
 #[derive(Args, Debug)]
