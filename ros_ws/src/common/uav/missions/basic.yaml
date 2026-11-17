@@ -10,6 +10,9 @@ modes:
   GPS:
     mode: uav.NavGPSMode
     params:
+      max_horizontal_speed: 3.0  # m/s
+      max_vertical_speed: 3.0    # m/s
+      max_heading_rate: 0.5     # rad/s
       coordinates:
         - [[5, 0, -5], 1, LOCAL]
     transitions:
