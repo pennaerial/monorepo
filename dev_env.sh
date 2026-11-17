@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# Enable colored ROS console logs unless explicitly overridden.
+export RCUTILS_COLORIZED_OUTPUT="${RCUTILS_COLORIZED_OUTPUT:-1}"
+
 export PENNAIR_MONOREPO_PATH="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)" # current dir of dev_env.sh
 export PENNAIR_ROS_WS_PATH="${PENNAIR_MONOREPO_PATH}/ros_ws"
 export PENNAIR_SAE_WS_PATH="${PENNAIR_ROS_WS_PATH}" # old name, kept so existing setups keep working
