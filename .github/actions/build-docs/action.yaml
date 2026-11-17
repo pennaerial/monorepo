@@ -32,8 +32,9 @@ runs:
       shell: bash
       run: |
         source dev_env.sh
+        source .venv/bin/activate
         cd docs
-        uv run make html
+        make html
 
     - name: Upload Pages Artifact
       if: inputs.deploy == 'true'
