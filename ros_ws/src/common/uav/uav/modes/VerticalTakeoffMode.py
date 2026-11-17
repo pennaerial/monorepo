@@ -50,7 +50,7 @@ class VerticalTakeoffMode(Mode):
         self.sent_px4_tko_command = False
 
         # used by offboard tko only
-        self.tko_waypoint_ned = (0, 0, -abs(params.takeoff_height))
+        self.tko_waypoint_ned = (0.0, 0.0, -abs(params.takeoff_height))
         self.last_arm_attempt_t = 0.0
         self.last_offboard_attempt_t = 0.0
 
@@ -85,7 +85,7 @@ class VerticalTakeoffMode(Mode):
             self.sent_px4_tko_command = True
             return
 
-        self.logger.info(" PX4 vertical auto takeoff in progress.", throttle_duration_sec=1.0)
+        self.logger.info("PX4 vertical auto takeoff in progress.", throttle_duration_sec=1.0)
 
         if (
             self.elapsed >= 1.0
@@ -118,6 +118,7 @@ class VerticalTakeoffMode(Mode):
             self.vehicle.engage_offboard_mode()
             self.last_offboard_attempt_t = self.elapsed
 
+        self.logger.info(f"Commanding takeoff to x={self.tko_waypoint_ned[0]:.2f}, y={self.tko_waypoint_ned[1]:.2f}, z={self.tko_waypoint_ned[2]:.2f}", throttle_duration_sec=1.0)
         self.vehicle.publish_position_setpoint(self.tko_waypoint_ned)
 
     def check_status(self) -> str:
