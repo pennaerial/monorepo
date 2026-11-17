@@ -1,6 +1,7 @@
 use clap::Parser;
 use std::process::ExitCode;
 
+mod apt;
 mod cli;
 mod config;
 mod deps;

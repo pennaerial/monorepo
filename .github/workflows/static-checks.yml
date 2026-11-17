@@ -86,4 +86,4 @@ jobs:
 
       - name: Check monorepo.toml
         if: ${{ steps.filter.outputs.rust == 'true' }}
-        run: rust/cli/target/debug/pennair --manifest monorepo.toml config check
+        run: rust/target/debug/pennair --manifest monorepo.toml config check
