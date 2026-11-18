@@ -23,6 +23,8 @@ import time
 from dataclasses import dataclass
 
 import numpy as np
+from pydrake.autodiffutils import ExtractGradient, ExtractValue, InitializeAutoDiff
+from pydrake.solvers import MathematicalProgram, SnoptSolver
 from scipy.linalg import lu_factor, lu_solve
 
 from iarc_flight.trajectories.min_snap import min_derivative_kkt, solve_min_derivative, unwrap_yaws
@@ -50,37 +52,47 @@ def _derivs(c: np.ndarray, T: np.ndarray, s: np.ndarray, m: int) -> np.ndarray:
 
 
 def _limit_ratios(w, T, v_max, a_max, s):
-    """|v|^2/v_max^2 and |a|^2/a_max^2 at samples s, (2, M, S), and d/dT, (2, M, S, M)."""
-    M, D = len(T), w.shape[1]
-    K, rhs, order = min_derivative_kkt(w, T, R)
-    lu = lu_factor(K)
-    z = lu_solve(lu, rhs)
-    c = z[: M * N]
-    lam = z[M * N :]
-    A = K[M * N :, : M * N]
-    p = -order[:, None]
+    """Limit ratios at samples s of every leg, and their gradients with respect to T.
 
-    # U[..., j] = (dK/dT_j) z, without forming dK/dT_j.
+    g (2, M, S): g[0] = |v|^2 / v_max^2, g[1] = |a|^2 / a_max^2; the limits hold where g <= 1.
+    dg (2, M, S, M): dg[..., j] = dg / dT_j.
+
+    Gradient by implicit differentiation of K(T) z = rhs (rhs does not depend on T):
+        dz/dT_j = -K^-1 (dK/dT_j) z
+    Only leg j's entries of K depend on T_j, each as a power of T_j, so on those entries
+    dK/dT_j = (power / T_j) K:
+        cost block 2H_j            ~ T_j^(1-2R)
+        order-m constraint entries ~ T_j^(-m)
+    """
+    M, D = len(T), w.shape[1]
+    n = M * N  # polynomial coefficients; the rest of z is the Lagrange multipliers
+    K, rhs, order = min_derivative_kkt(w, T, R)
+    lu = lu_factor(K)  # factor once, reused for z and all M gradient solves
+    z = lu_solve(lu, rhs)
+    c, lam = z[:n], z[n:]
+    A = K[n:, :n]
+    power = -order[:, None]  # each constraint row scales as T^-order
+
+    # dKz[..., j] = (dK/dT_j) z, from leg j's blocks only
     dKz = np.zeros((len(z), D, M))
     for j in range(M):
-        coeff_slice = slice(j * N, (j + 1) * N)
-        dKz[coeff_slice, :, j] = (
-            (1 - 2 * R) * K[coeff_slice, coeff_slice] @ c[coeff_slice]
-            + A[:, coeff_slice].T @ (p * lam)
-        ) / T[j]
-        dKz[M * N :, :, j] = p * (A[:, coeff_slice] @ c[coeff_slice]) / T[j]
+        leg = slice(j * N, (j + 1) * N)
+        H2_j, A_j = K[leg, leg], A[:, leg]
+        dKz[leg, :, j] = ((1 - 2 * R) * H2_j @ c[leg] + A_j.T @ (power * lam)) / T[j]
+        dKz[n:, :, j] = power * (A_j @ c[leg]) / T[j]
 
-    dc = -lu_solve(lu, dKz.reshape(len(z), -1))
-    dc = dc.reshape(len(z), D, M)[: M * N].reshape(M, N, D, M)
+    dz = -lu_solve(lu, dKz.reshape(len(z), -1)).reshape(len(z), D, M)
+    dc = dz[:n].reshape(M, N, D, M)  # dc[..., j] = d coeffs / dT_j
     c = c.reshape(M, N, D)
-    g, dg = [], []
 
-    # compute |v|^2/v_max^2 and |a|^2/a_max^2 and their gradients
-    for m, lim in ((1, v_max), (2, a_max)):
-        X = _derivs(c, T, s, m)
+    g, dg = [], []
+    for m, lim in ((1, v_max), (2, a_max)):  # m = 1: velocity, m = 2: acceleration
+        X = _derivs(c, T, s, m)  # (M, S, D)
+        # X_k = B c_k / T_k^m: the coefficients move with every T_j, and T_k^-m adds
+        # -m X_k / T_k when j == k
         dX = np.einsum("sn,kndj->ksdj", _basis(s, m), dc) / T[:, None, None, None] ** m
-        dX[np.arange(M), :, :, np.arange(M)] -= m * X / T[:, None, None]  # from the T^-m factor
-        g.append((X**2).sum(2) / lim[:, None] ** 2)
+        dX[np.arange(M), :, :, np.arange(M)] -= m * X / T[:, None, None]
+        g.append((X**2).sum(axis=2) / lim[:, None] ** 2)
         dg.append(2 * np.einsum("ksd,ksdj->ksj", X, dX) / lim[:, None, None] ** 2)
     return np.stack(g), np.stack(dg)
 
@@ -114,9 +126,6 @@ class TimeAllocation:
 
 def optimize_times(points, v_max, a_max, yaw_rate_max: float | None = None) -> TimeAllocation:
     """points (M+1, 4) of x, y, z, yaw; v_max, a_max scalars or (M,), leg i is points[i] -> [i+1]."""
-    from pydrake.autodiffutils import ExtractGradient, ExtractValue, InitializeAutoDiff
-    from pydrake.solvers import MathematicalProgram, SnoptSolver
-
     t0 = time.perf_counter()
     # Limit BLAS to one thread (~3x faster for small solves on my laptop)
     blas = threadpool_limits(1, user_api="blas") if threadpool_limits else contextlib.nullcontext()

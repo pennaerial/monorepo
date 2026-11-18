@@ -68,7 +68,17 @@ class MinSnapConfig(BaseModel):
 
 
 def min_derivative_kkt(w: np.ndarray, T: np.ndarray, r: int):
-    """KKT matrix for min-derivative problem"""
+    """KKT system for the min-derivative QP: minimize c^T H c subject to A c = b.
+
+    c: polynomial coefficients of every leg
+    H: integral of the squared r-th derivative
+    A c = b: pass through keyframes, start/end at rest, smooth (continuous derivatives) at joins.
+    Setting the gradient of the Lagrangian c^T H c + l^T (A c - b) to zero gives one
+    linear system:
+        [2H  A^T; A  0] [c; l] = [0; b]
+    see https://www.stat.cmu.edu/~ryantibs/convexopt-F16/scribes/kkt-scribed.pdf
+    https://en.wikipedia.org/wiki/Karush%E2%80%93Kuhn%E2%80%93Tucker_conditions
+    """
     M, D, n = len(T), w.shape[1], 2 * r
     i = np.arange(r, n)  # exact Hessian on s in [0, 1], scaled by T^(1-2r) per leg
     f = np.array([math.perm(k, r) for k in i])

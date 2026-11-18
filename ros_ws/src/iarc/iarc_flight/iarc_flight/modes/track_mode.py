@@ -37,14 +37,13 @@ class TrackMode(Mode[UAV, TrackParams]):
     def initialize(self, node: Node, vehicle: UAV, params: TrackParams) -> None:
         self.node = node
         self.vehicle = vehicle
-        self.p = params
+        self.params = params
         # Built at startup so the MPC's slow first solve isn't mid-flight
         self.controller = params.controller.build()
         self.trajectory = None  # placed at the drone on the first update
         # Planning can take a while (time_optimal min snap runs SNOPT), so it runs off the control
         # loop while the drone holds where tracking started
-        self.planning: Future | None = None
-        self.hold: tuple[np.ndarray, float] | None = None
+        self.planning: tuple[Future, np.ndarray, float] | None = None  # (build, hold pos, yaw)
         self.plan_start = 0.0  # perf_counter when planning began
         self.plan_time = 0.0  # s spent building the trajectory
         self.t = 0.0
@@ -68,18 +67,16 @@ class TrackMode(Mode[UAV, TrackParams]):
         if self.trajectory is None:
             if self.planning is None:
                 yaw = self.vehicle.yaw if self.vehicle.yaw is not None else pos.heading
-                self.hold = (state[:3].copy(), yaw)
+                hold = state[:3].copy()
                 pool = ThreadPoolExecutor(max_workers=1)  # plan on seperate thread
                 self.plan_start = time.perf_counter()
-                self.planning = pool.submit(self.timed_build, self.hold[0], yaw)
+                self.planning = (pool.submit(self.timed_build, hold, yaw), hold, yaw)
                 pool.shutdown(wait=False)  # the worker exits once the build returns
-            if not self.planning.done():
-                assert self.hold is not None
-                self.vehicle.publish_trajectory_setpoint(
-                    self.hold[0], np.zeros(3), np.zeros(3), self.hold[1]
-                )
+            build, hold, hold_yaw = self.planning
+            if not build.done():
+                self.vehicle.publish_trajectory_setpoint(hold, np.zeros(3), np.zeros(3), hold_yaw)
                 return
-            self.trajectory, self.plan_time = self.planning.result()  # re-raises a planning error
+            self.trajectory, self.plan_time = build.result()  # re-raises a planning error
             self.log_plan()
         else:
             self.t += time_delta
@@ -99,13 +96,13 @@ class TrackMode(Mode[UAV, TrackParams]):
     def timed_build(self, start: np.ndarray, yaw: float) -> tuple[Trajectory, float]:
         """Builds the trajectory and returns it with the build's wall time in seconds."""
         t0 = time.perf_counter()
-        traj = self.p.trajectory.build(start, yaw)
+        traj = self.params.trajectory.build(start, yaw)
         return traj, time.perf_counter() - t0
 
     def log_plan(self) -> None:
         held = time.perf_counter() - self.plan_start
         self.log(
-            f"Tracking {self.p.trajectory.type} with {self.p.controller.type}, "
+            f"Tracking {self.params.trajectory.type} with {self.params.controller.type}, "
             f"path generated in {self.plan_time * 1000:.0f} ms (held {held * 1000:.0f} ms)"
         )
         alloc = getattr(self.trajectory, "time_allocation", None)
