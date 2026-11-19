@@ -1,8 +1,15 @@
-<library path="vision_plugins">
-  <class type="pennair_vision::BasicVision" base_class_type="pennair_vision::VisionPlugin">
-    <description>Basic VisionPlugin example</description>
-  </class>
-  <class type="pennair_vision::VisionRepublisher" base_class_type="pennair_vision::VisionPlugin">
-    <description>Republishes raw camera frames on /cv/debug at debug_image_rate</description>
-  </class>
-</library>
+<class_libraries>
+  <library path="vision_plugins">
+    <class type="pennair_vision::BasicVision" base_class_type="pennair_vision::VisionPlugin">
+      <description>Basic VisionPlugin example</description>
+    </class>
+    <class type="pennair_vision::VisionRepublisher" base_class_type="pennair_vision::VisionPlugin">
+      <description>Republishes raw camera frames on /cv/debug at debug_image_rate</description>
+    </class>
+  </library>
+  <library path="yolo_vision_plugins">
+    <class type="pennair_vision::YoloMineDetector" base_class_type="pennair_vision::VisionPlugin">
+      <description>YOLO26 NCNN detector: detections on /cv/result, annotated frames on /cv/debug at debug_image_rate</description>
+    </class>
+  </library>
+</class_libraries>

@@ -22,12 +22,21 @@ find_package(rclcpp_components REQUIRED) # for vision_manager_component
 find_package(ament_cmake_python REQUIRED) # for pennair_vision python module
 find_package(cv_bridge REQUIRED)
 find_package(image_transport REQUIRED) # for pennair_vision lazy publisher
+find_package(pennair_vision_msgs REQUIRED) # detection results
+# NCNN has no Ubuntu 24.04 apt package or rosdep key; it comes from the pennaerial/Dependencies .deb.
+# Optional so the rest of the package still builds where it is not installed.
+find_package(ncnn QUIET) # for YoloMineDetector
 
 include_directories(include)
 
 generate_parameter_library(
     vision_manager_parameters
     config/vision_manager_params.schema.yaml
+)
+
+generate_parameter_library(
+    yolo_mine_detector_parameters
+    config/yolo_mine_detector_params.schema.yaml
 )
 
 add_library(vision_manager_component SHARED
@@ -136,10 +145,55 @@ install(TARGETS vision_plugins
     RUNTIME DESTINATION bin
 )
 
+# YOLO plugins live in their own library so they can be skipped when NCNN is missing
+if(ncnn_FOUND)
+    add_library(yolo_vision_plugins SHARED
+        src/plugins/yolo_mine_detector.cpp
+    )
+    target_include_directories(yolo_vision_plugins PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include>
+    )
+    target_link_libraries(yolo_vision_plugins
+        yolo_mine_detector_parameters
+        ncnn
+    )
+    ament_target_dependencies(yolo_vision_plugins
+        rclcpp
+        rosidl_runtime_cpp
+        pluginlib
+        sensor_msgs
+        image_transport
+        cv_bridge
+        pennair_vision_msgs
+    )
+    target_compile_features(yolo_vision_plugins PUBLIC cxx_std_20)
+    install(TARGETS yolo_vision_plugins
+        ARCHIVE DESTINATION lib
+        LIBRARY DESTINATION lib
+        RUNTIME DESTINATION bin
+    )
+else()
+    message(WARNING "ncnn not found: YoloMineDetector will not be built. Install the pennair ncnn package.")
+endif()
+
 install(DIRECTORY
     launch
+    config
     DESTINATION share/${PROJECT_NAME}
 )
+
+if(BUILD_TESTING)
+    find_package(ament_cmake_gtest REQUIRED)
+    # pure YOLO math; needs no ROS, NCNN or model files
+    ament_add_gtest(test_yolo_postprocess
+        test/test_yolo_postprocess.cpp
+    )
+    if(TARGET test_yolo_postprocess)
+        target_include_directories(test_yolo_postprocess PRIVATE include)
+        target_compile_features(test_yolo_postprocess PRIVATE cxx_std_20)
+    endif()
+endif()
 
 # Make headers available to other packages
 install(
@@ -156,6 +210,6 @@ install_python_entry_point(basic_vision_py pennair_vision.basic_vision main)
 
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
 ament_export_include_directories(include)
-ament_export_dependencies(rosidl_runtime_cpp rclcpp std_msgs sensor_msgs pluginlib image_transport cv_bridge)
+ament_export_dependencies(rosidl_runtime_cpp rclcpp std_msgs sensor_msgs pluginlib image_transport cv_bridge pennair_vision_msgs)
 
 ament_package()
