@@ -25,87 +25,126 @@ pub fn MissionControl() -> Element {
 
                 h1 { class: "page-title", "Mission Control Page" }
 
-                Button {
-                    label: "Connect",
-                    onclick: move |_| {
-                        let node = node.read().clone();
-                        async move {
-                            if let Err(e) = node.connect("ws://localhost:8765").await {
-                                info!("Failed: {:?},", e);
-                            } else {
-                                info!("Successful connect")
-                            }
+                section {class: "rounded-lg border border-slate-200 bg-whitebg p-4",
+                
+                    h2 {class: "mb-3 font-semibold", "Connecting and Subscribing"}
+
+                    div {class: "flex flex-wrap items-center gap-3",
+    
+                        Button {
+                            label: "Connect",
+                            onclick: move |_| {
+                                let node = node.read().clone();
+                                async move {
+                                    if let Err(e) = node.connect("ws://localhost:8765").await {
+                                        info!("Failed: {:?},", e);
+                                    } else {
+                                        info!("Successful connect")
+                                    }
+                                }
+                            },
                         }
-                    },
-                }
-                Button {
-                    label: "Subscribe",
-                    onclick: move |_| {
-                        let mut sub = chatter_sub.clone();
-                        async move {
-                            if let Err(e) = sub.subscribe(move |msg| { string_msg.set(msg.data) }).await
-                            {
-                                error!("failed to subscribe to chatter!: {:?}", e);
-                            }
+                        Button {
+                            label: "Subscribe",
+                            onclick: move |_| {
+                                let mut sub = chatter_sub.clone();
+                                async move {
+                                    if let Err(e) = sub.subscribe(move |msg| { string_msg.set(msg.data) }).await
+                                    {
+                                        error!("failed to subscribe to chatter!: {:?}", e);
+                                    }
+                                }
+                            },
                         }
-                    },
+                    }
+
+                    if !string_msg.read().is_empty() {
+                        p { class: "mb-3 break-words text-sm text-slate-600", 
+                        "{string_msg}" }
+                    }   
+
                 }
-                p { "{string_msg}" }
+
+
 
                 // TODO: Think about creating some ServiceClient abstraction on top such that you
                 // can repeat service calls to an initiailzed service, similar to create_client in ROS
                 // Service call demos
-                Button {
-                    label: "Add 2 + 3",
-                    onclick: move |_| {
-                        let node = node.read().clone();
-                        async move {
-                            let request = example_interfaces::srv::AddTwoInts_Request { a: 2, b: 3 };
-                            let result = node
-                                .call_service::<example_interfaces::srv::AddTwoInts>(
-                                    "/add_two_ints",
-                                    &request,
-                                    SERVICE_TIMEOUT,
-                                )
-                                .await;
-                            service_result
-                                .set(
-                                    match result {
-                                        Ok(response) => format!("/add_two_ints: 2 + 3 = {}", response.sum),
-                                        Err(e) => format!("/add_two_ints: {e}"),
-                                    },
-                                );
-                        }
-                    },
-                }
-                p { "{service_result}" }
 
-                Button {
-                    label: "Launch (requires auto-launch off)",
-                    onclick: move |_| {
-                        let node = node.read().clone();
-                        async move {
-                            let request = std_srvs::srv::Trigger_Request { structure_needs_at_least_one_member: 0 };
-                            let result = node
-                                .call_service::<std_srvs::srv::Trigger>(
-                                    &format!("/{DRONE_ONE}/mode_manager/start_mission"),
-                                    &request,
-                                    SERVICE_TIMEOUT,
-                                )
-                                .await;
-                            trigger_result
-                                .set(
-                                    match result {
-                                        Ok(response) => format!("/{DRONE_ONE}/mode_manager/start_mission: launch success = {}", response.success),
-                                        Err(e) => format!("/{DRONE_ONE}/mode_manager/start_mission: {e}"),
-                                    },
-                                );
-                        }
-                    },
-                }
-                p { "{trigger_result}" }
-                LogPanel {}
 
+                section {class: "rounded-lg border border-slate-200 bg-whitebg p-4",
+
+                    h2 {class: "mb-3 font-semibold", "Service Call"}
+
+                    Button {
+                        label: "Add 2 + 3",
+                        onclick: move |_| {
+                            let node = node.read().clone();
+                            async move {
+                                let request = example_interfaces::srv::AddTwoInts_Request { a: 2, b: 3 };
+                                let result = node
+                                    .call_service::<example_interfaces::srv::AddTwoInts>(
+                                        "/add_two_ints",
+                                        &request,
+                                        SERVICE_TIMEOUT,
+                                    )
+                                    .await;
+                                service_result
+                                    .set(
+                                        match result {
+                                            Ok(response) => format!("/add_two_ints: 2 + 3 = {}", response.sum),
+                                            Err(e) => format!("/add_two_ints: {e}"),
+                                        },
+                                    );
+                            }
+                        },
+                    }
+
+                    if !service_result.read().is_empty() {
+                        p { class: "mb-3 break-words text-sm text-slate-600", 
+                        "{service_result}" }
+                    }    
+                }
+
+                section {class: "rounded-lg border border-slate-200 bg-whitebg p-4",
+                
+                    h2 {class: "mb-3 font-semibold", "Launching"}
+
+                    Button {
+                        label: "Launch (requires auto-launch off)",
+                        onclick: move |_| {
+                            let node = node.read().clone();
+                            async move {
+                                let request = std_srvs::srv::Trigger_Request { structure_needs_at_least_one_member: 0 };
+                                let result = node
+                                    .call_service::<std_srvs::srv::Trigger>(
+                                        &format!("/{DRONE_ONE}/mode_manager/start_mission"),
+                                        &request,
+                                        SERVICE_TIMEOUT,
+                                    )
+                                    .await;
+                                trigger_result
+                                    .set(
+                                        match result {
+                                            Ok(response) => format!("/{DRONE_ONE}/mode_manager/start_mission: launch success = {}", response.success),
+                                            Err(e) => format!("/{DRONE_ONE}/mode_manager/start_mission: {e}"),
+                                        },
+                                    );
+                            }
+                        },
+                    }
+
+                    if !trigger_result.read().is_empty() {
+                        p { class: "mb-3 break-words text-sm text-slate-600", 
+                        "{trigger_result}" }
+                    }   
+
+                }
+
+                section { class: "mt-8",
+                    h2{class: "mb-3 text-lg font-semibold", "Log Panel"}
+                    LogPanel {}
+                }
             }
         }
 
