@@ -2,6 +2,14 @@
 
 # aliases for faster development
 
+# DIRECTORY JUMPS
+_pennair_alias_root="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)" || return
+alias jm='cd -- "${_pennair_alias_root}"'
+alias jros='cd -- "${_pennair_alias_root}/ros_ws"'
+alias jrs='cd -- "${_pennair_alias_root}/rust"'
+alias jpc='cd -- "${_pennair_alias_root}/payload_controller"'
+alias jpx='cd -- "${_pennair_alias_root}/PX4-Autopilot"'
+
 # SOURCING
 alias sr='source /opt/ros/jazzy/setup.bash'
 alias si='source install/setup.bash'
