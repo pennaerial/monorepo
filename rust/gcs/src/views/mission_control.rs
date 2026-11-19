@@ -1,10 +1,11 @@
 use crate::components::{Button, LogPanel, SideBar};
 use crate::hooks::{use_ros_node, use_subscription};
 use dioxus::prelude::*;
-use ros_interfaces::{example_interfaces, std_msgs};
+use ros_interfaces::{example_interfaces, std_msgs, std_srvs};
 use std::time::Duration;
 
 const SERVICE_TIMEOUT: Duration = Duration::from_secs(5);
+const DRONE_ONE: &'static str = "uav_0";
 
 #[component]
 pub fn MissionControl() -> Element {
@@ -13,6 +14,7 @@ pub fn MissionControl() -> Element {
     let chatter_sub =
         use_subscription::<std_msgs::msg::String>(node.read().clone(), "/chatter", 10);
     let mut service_result = use_signal(String::new);
+    let mut trigger_result = use_signal(String::new);
 
     rsx! {
 
@@ -77,6 +79,31 @@ pub fn MissionControl() -> Element {
                     },
                 }
                 p { "{service_result}" }
+
+                Button {
+                    label: "Launch (requires auto-launch off)",
+                    onclick: move |_| {
+                        let node = node.read().clone();
+                        async move {
+                            let request = std_srvs::srv::Trigger_Request { structure_needs_at_least_one_member: 0 };
+                            let result = node
+                                .call_service::<std_srvs::srv::Trigger>(
+                                    &format!("/{DRONE_ONE}/mode_manager/start_mission"),
+                                    &request,
+                                    SERVICE_TIMEOUT,
+                                )
+                                .await;
+                            trigger_result
+                                .set(
+                                    match result {
+                                        Ok(response) => format!("/{DRONE_ONE}/mode_manager/start_mission: launch success = {}", response.success),
+                                        Err(e) => format!("/{DRONE_ONE}/mode_manager/start_mission: {e}"),
+                                    },
+                                );
+                        }
+                    },
+                }
+                p { "{trigger_result}" }
                 LogPanel {}
 
             }

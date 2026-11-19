@@ -22,7 +22,7 @@ import shutil
 from pathlib import Path
 
 DEFAULT_IDL_ROOT = Path(__file__).resolve().parent / "idl"
-DEFAULT_OUTPUT_DIR = Path(__file__).resolve().parent / "crates" / "ros_interfaces"
+DEFAULT_OUTPUT_DIR = Path(__file__).resolve().parent
 
 if os.environ["ROS_DISTRO"] <= "humble":
     import rosidl_cmake as rosidl_pycommon
@@ -739,7 +739,7 @@ def main(argv=None):
         "--output-dir",
         type=pathlib.Path,
         default=DEFAULT_OUTPUT_DIR,
-        help="Crate directory (default: crates/ros_interfaces beside this script).",
+        help="Crate directory (default: directory containing this script).",
     )
     parser.add_argument(
         "--package-version", default="0.0.0", help="Version written to Cargo.toml (default: 0.0.0)."

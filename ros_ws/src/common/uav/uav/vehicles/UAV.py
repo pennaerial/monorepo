@@ -3,6 +3,7 @@ from abc import abstractmethod
 
 import numpy as np
 from px4_msgs.msg import (
+    GotoSetpoint,
     OffboardControlMode,
     SensorGps,
     TrajectorySetpoint,
@@ -223,6 +224,49 @@ class UAV(Vehicle):
         self._send_vehicle_command(
             VehicleCommand.VEHICLE_CMD_DO_SET_ACTUATOR, params={"param1": 0.0}
         )
+
+    def publish_goto_setpoint(
+        self,
+        setpoint: tuple[float, float, float],
+        max_horizontal_speed: float | None = None,
+        max_vertical_speed: float | None = None,
+        max_heading_rate: float | None = None,
+        lock_yaw=False,
+    ):
+        """Sends a x, y, z, GoToSetpoint, which allows PX4 to handle trajectory smoothing
+
+        Args:
+            setpoint: (x, y, z) tuple representing local NED coordinates to go to
+            max_horizontal_speed: Maximum horizontal speed in m/s; None uses PX4 defaults.
+            max_vertical_speed: Maximum vertical speed in m/s; None uses PX4 defaults.
+            max_heading_rate: Maximum yaw rate in rad/s; None uses PX4 defaults.
+            lock_yaw: If True, maintain current yaw instead of recalculating (prevents spinning when hovering).
+        """
+        x, y, z = setpoint
+        msg = GotoSetpoint()
+        msg.position = [float(x), float(y), float(z)]
+        msg.timestamp = int(self.node.get_clock().now().nanoseconds / 1000)
+
+        # conditionally set max XY speed
+        msg.flag_set_max_horizontal_speed = max_horizontal_speed is not None
+        if max_horizontal_speed is not None:
+            msg.max_horizontal_speed = float(max_horizontal_speed)
+
+        # conditionally set max vert speed
+        msg.flag_set_max_vertical_speed = max_vertical_speed is not None
+        if max_vertical_speed is not None:
+            msg.max_vertical_speed = float(max_vertical_speed)
+
+        # conditionally set heading rate
+        msg.flag_set_max_heading_rate = max_heading_rate is not None
+        if max_heading_rate is not None:
+            msg.max_heading_rate = float(max_heading_rate)
+
+        # lock yaw logic. See publish_position_setpoint()
+        if lock_yaw and self.yaw is not None:
+            msg.flag_control_heading = True
+            msg.heading = float(self.yaw)
+        self.goto_setpoint_publisher.publish(msg)
 
     def publish_position_setpoint(self, coordinate, relative=False, lock_yaw=False):
         """Publish the trajectory setpoint.
@@ -583,6 +627,12 @@ class UAV(Vehicle):
             self.px4_transport_path("in/offboard_control_mode"),
             10,
         )
+
+        # GoToSetpoint lets px4 handle trajectory smoothing
+        self.goto_setpoint_publisher = self.node.create_publisher(
+            GotoSetpoint, self.px4_transport_path("in/goto_setpoint"), 10
+        )
+
         self.trajectory_publisher = self.node.create_publisher(
             TrajectorySetpoint, self.px4_transport_path("in/trajectory_setpoint"), 10
         )
