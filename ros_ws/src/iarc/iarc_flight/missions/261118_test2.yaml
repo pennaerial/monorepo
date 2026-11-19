@@ -14,12 +14,9 @@ modes:
         time_optimal: true # chooses leg durations to minimize total time within limits
         v_max: # max speed for each leg in given mode
           standard: 3.0
-          slow: 0.1
         a_max: # max acceleration
           standard: 0.5
-          slow: 0.5
         keyframes: # points the curve must pass through, mode defines constraints for the preceeding leg to that point
-          - {x: 0, y: 0, z: -5, yaw: 0.0, mode: slow}
           - {x: 3, y: 0, z: -5, yaw: 0.0, mode: standard}
       controller:
         type: mpc # MPC limits should be set higher than trajectory constraints to avoid saturating the controller

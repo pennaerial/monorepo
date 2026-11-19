@@ -14,12 +14,9 @@ modes:
         time_optimal: true
         v_max:
           standard: 3.0
-          slow: 0.1
         a_max:
           standard: 0.5
-          slow: 0.5
         keyframes:
-          - {x: 0, y: 0, z: -5, yaw: 0.0, mode: slow}
           - {x: 3, y: 0, z: -5, yaw: 0.0, mode: standard}
           - {x: 0, y: 0, z: -5, yaw: 0.0, mode: standard}
       controller:
