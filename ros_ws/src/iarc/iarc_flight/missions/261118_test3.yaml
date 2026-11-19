@@ -14,10 +14,12 @@ modes:
         time_optimal: true # chooses leg durations to minimize total time within limits
         v_max: # max speed for each leg in given mode
           standard: 3.0
+          slow: 0.1
         a_max: # max acceleration
           standard: 0.5
+          slow: 0.5
         keyframes: # circle (x-2)^2 + y^2 = 2^2 every 30 deg, starting and ending at the takeoff point (0, 0)
-          - {x: 0.0, y: 0.0, z: -5.0, yaw: 0.0, mode: standard}
+          - {x: 0.0, y: 0.0, z: -5.0, yaw: 0.0, mode: slow}
           - {x: 0.268, y: -1.0, z: -5.0, yaw: 0.0, mode: standard}
           - {x: 1.0, y: -1.732, z: -5.0, yaw: 0.0, mode: standard}
           - {x: 2.0, y: -2.0, z: -5.0, yaw: 0.0, mode: standard}
