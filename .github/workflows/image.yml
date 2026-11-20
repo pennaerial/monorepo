@@ -38,7 +38,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y cloud-guest-utils
-          sudo image/build.sh rust/cli/target/release/pennair pennair-pi.img.xz
+          sudo image/build.sh rust/target/release/pennair pennair-pi.img.xz
 
       # lets a PR's image be downloaded and flashed before it merges
       - name: Upload image
