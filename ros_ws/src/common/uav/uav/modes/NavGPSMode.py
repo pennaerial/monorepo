@@ -2,21 +2,30 @@ from __future__ import annotations
 
 from typing import Literal, override
 
+from px4_msgs.msg import VtolVehicleStatus
 from rclpy.node import Node
 from vehicle_common.mode import Mode
 from vehicle_common.mode_loader import ParamsBase, register_mode
 
 from uav.vehicles.UAV import UAV
+from uav.vehicles.VTOL import VTOL
 
 
 class NavGPSParams(ParamsBase):
     """
     coordinates: The coordinates to navigate to (x/y/z or lon/lat/alt, wait time, GPS/LOCAL).
         Local are NED coordinates, relative to the starting position (https://docs.px4.io/main/en/ros2/user_guide.html#ros-2-px4-frame-conventions).
+    max_horizontal_speed: Maximum horizontal speed in m/s.
+    max_vertical_speed: Maximum vertical speed in m/s.
+    max_heading_rate: Maximum yaw rate in rad/s.
     margin: The margin of error for the GPS coordinate.
+
     """
 
     coordinates: list[tuple[tuple[float, float, float], float, Literal["GPS", "LOCAL"]]]
+    max_horizontal_speed: float = 5
+    max_vertical_speed: float = 3
+    max_heading_rate: float = 0.5
     margin: float = 1
 
 
@@ -44,11 +53,29 @@ class NavGPSMode(Mode[UAV, NavGPSParams]):
         self.coordinate_system = None
         self.target = None
         self.wait_time = 0.0
+        self.navigation_error = False
 
     def on_update(self, time_delta: float) -> None:
         """
         Periodic logic for setting gps coord.
         """
+        if self.navigation_error:
+            return
+
+        # if vehicle is a VTOL and in fixed wing mode, failsafe because GoToSetpoint doesn't work for non Multicopter controller
+        if (
+            isinstance(self.vehicle, VTOL)
+            and self.vehicle.vtol_vehicle_status is not None
+            and self.vehicle.vtol_vehicle_status.vehicle_vtol_state
+            == VtolVehicleStatus.VEHICLE_VTOL_STATE_FW
+        ):
+            self.node.get_logger().error(
+                "NavGPSMode goto navigation requires multicopter flight; "
+                "VTOL is in fixed-wing mode. Triggering failsafe."
+            )
+            self.navigation_error = True  # causes check_status() to return "error"
+            return
+
         dist = 0
         if self.index != -1:
             dist = self.vehicle.distance_to_waypoint(self.coordinate_system, self.goal)
@@ -59,15 +86,24 @@ class NavGPSMode(Mode[UAV, NavGPSParams]):
 
         # Always publish setpoints to maintain offboard connection (PX4 requires continuous stream)
         if self.target is not None:
-            self.vehicle.publish_position_setpoint(self.target, lock_yaw=waiting)
+            self.vehicle.publish_goto_setpoint(
+                self.target,
+                self.p.max_horizontal_speed,
+                self.p.max_vertical_speed,
+                self.p.max_heading_rate,
+                lock_yaw=waiting,
+            )
         elif self.vehicle.local_position:
             # Fallback: maintain current position until first waypoint is set
-            self.vehicle.publish_position_setpoint(
+            self.vehicle.publish_goto_setpoint(
                 (
                     self.vehicle.local_position.x,
                     self.vehicle.local_position.y,
                     self.vehicle.local_position.z,
                 ),
+                max_horizontal_speed=self.p.max_horizontal_speed,
+                max_vertical_speed=self.p.max_vertical_speed,
+                max_heading_rate=self.p.max_heading_rate,
                 lock_yaw=True,
             )
 
@@ -147,6 +183,8 @@ class NavGPSMode(Mode[UAV, NavGPSParams]):
         Returns:
             str: The status of the mode.
         """
+        if self.navigation_error:
+            return "error"
         if self.index >= len(self.p.coordinates):
             return "complete"
         else:

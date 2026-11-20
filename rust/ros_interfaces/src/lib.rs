@@ -39,9 +39,7 @@ pub mod builtin_interfaces {
                 cdr::deserialize(bytes)
             }
         }
-
     }
-
 }
 
 pub mod example_interfaces {
@@ -90,9 +88,7 @@ pub mod example_interfaces {
                 cdr::deserialize(bytes)
             }
         }
-
     }
-
 }
 
 pub mod geometry_msgs {
@@ -154,9 +150,7 @@ pub mod geometry_msgs {
                 cdr::deserialize(bytes)
             }
         }
-
     }
-
 }
 
 pub mod rcl_interfaces {
@@ -192,9 +186,7 @@ pub mod rcl_interfaces {
                 cdr::deserialize(bytes)
             }
         }
-
     }
-
 }
 
 pub mod std_msgs {
@@ -250,7 +242,54 @@ pub mod std_msgs {
                 cdr::deserialize(bytes)
             }
         }
-
     }
+}
 
+pub mod std_srvs {
+
+    pub mod srv {
+        /// Marker type for the `std_srvs/srv/Trigger` service.
+        pub struct Trigger;
+
+        impl crate::RosService for Trigger {
+            type Request = Trigger_Request;
+            type Response = Trigger_Response;
+            const TYPE_NAME: &'static str = "std_srvs/srv/Trigger";
+        }
+
+        #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+        pub struct Trigger_Request {
+            pub structure_needs_at_least_one_member: u8,
+        }
+
+        impl crate::RosMessage for Trigger_Request {
+            const TYPE_NAME: &'static str = "std_srvs/srv/Trigger_Request";
+
+            fn serialize(&self) -> Result<Vec<u8>, cdr::Error> {
+                cdr::serialize::<_, _, cdr::CdrLe>(self, cdr::Infinite)
+            }
+
+            fn deserialize(bytes: &[u8]) -> Result<Self, cdr::Error> {
+                cdr::deserialize(bytes)
+            }
+        }
+
+        #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+        pub struct Trigger_Response {
+            pub success: bool,
+            pub message: std::string::String,
+        }
+
+        impl crate::RosMessage for Trigger_Response {
+            const TYPE_NAME: &'static str = "std_srvs/srv/Trigger_Response";
+
+            fn serialize(&self) -> Result<Vec<u8>, cdr::Error> {
+                cdr::serialize::<_, _, cdr::CdrLe>(self, cdr::Infinite)
+            }
+
+            fn deserialize(bytes: &[u8]) -> Result<Self, cdr::Error> {
+                cdr::deserialize(bytes)
+            }
+        }
+    }
 }

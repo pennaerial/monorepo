@@ -54,7 +54,7 @@ packages = [
     "python3-rosdep",
     "python3-venv",
     "libeigen3-dev",
-    "libcamera-dev",
+    "ros-jazzy-libcamera",
 
     # Tests
     "python3-pytest",
@@ -68,13 +68,10 @@ packages = [
     "ros-jazzy-ament-copyright",
     "ros-jazzy-ament-flake8",
     "ros-jazzy-ament-pep257",
-    "ros-jazzy-ament-cmake-clang-format",
     "ros-jazzy-ament-cmake-cppcheck",
     "ros-jazzy-ament-cmake-flake8",
     "ros-jazzy-ament-cmake-lint-cmake",
-    "ros-jazzy-ament-cmake-mypy",
     "ros-jazzy-ament-cmake-pep257",
-    "ros-jazzy-ament-cmake-pyflakes",
     "ros-jazzy-ament-cmake-uncrustify",
     "ros-jazzy-ament-cmake-xmllint",
     "clang-format",
