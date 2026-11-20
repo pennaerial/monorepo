@@ -7,7 +7,6 @@ mod config;
 mod deps;
 mod flash;
 mod gateway;
-mod installed;
 mod push;
 mod python;
 mod sh;
