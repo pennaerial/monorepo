@@ -5,8 +5,8 @@ mod apt;
 mod cli;
 mod config;
 mod deps;
-mod installed;
 mod push;
+mod python;
 mod sh;
 use cli::PennairCli;
 
