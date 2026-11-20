@@ -6,6 +6,8 @@
 _pennair_alias_root="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)" || return
 alias jm='cd -- "${_pennair_alias_root}"'
 alias jros='cd -- "${_pennair_alias_root}/ros_ws"'
+alias jui='cd -- "${_pennair_alias_root}/ros_ws/install/uav/"'
+alias jif='cd -- "${_pennair_alias_root}/ros_ws/install/iarc_flight/"'
 alias jrs='cd -- "${_pennair_alias_root}/rust"'
 alias jpc='cd -- "${_pennair_alias_root}/payload_controller"'
 alias jpx='cd -- "${_pennair_alias_root}/PX4-Autopilot"'
