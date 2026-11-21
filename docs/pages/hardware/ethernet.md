@@ -1,97 +1,97 @@
-# Ethernet and SSH
+# Ethernet, Mesh, and SSH
 
-Connect your laptop directly to a Pi over Ethernet and SSH. Connect one Pi at a
-time.
+Every Pi's addresses end in its number. For example, `air-09` is `192.168.50.9`
+on Ethernet and `10.10.0.9` on the mesh. A laptop is `.254` on both.
 
-## 1. Connect the cable
+## Ethernet
 
-Connect the Pi to your laptop's Ethernet port or a USB Ethernet adapter, then
-power on the Pi.
-
-## 2. Set up Ethernet and SSH on the Pi
-
-> **Using the club image? Skip this section and continue to step 3.** Ethernet
-> and SSH should already be configured.
-
-These steps are for Ubuntu using [NetworkManager](https://networkmanager.dev/docs/api/latest/nm-settings-nmcli.html).
-Run them on the Pi with a monitor and keyboard.
-
-Find the connection name for the Pi's Ethernet port (`eth0`):
+Connect the Pi to your laptop with an Ethernet cable, then connect using your
+Pi's name (e.g. `air-09`):
 
 ```bash
-nmcli -f NAME,DEVICE connection show
+ssh penn@air-09.local    # or ssh penn@192.168.50.9
 ```
 
-Replace `Wired connection 1` below with that name. Set the Pi's address and save
-it for future boots:
+The password is `123`. The Pi gives your laptop `192.168.50.254` when you plug in.
+
+**Only plug a Pi's Ethernet into a laptop or a switch with nothing but Pis on it.**
+The Pi hands out addresses on that port, which disrupts other networks.
+
+If the laptop doesn't get an address, set it by hand.
+
+Linux, replacing `<adapter>` with the wired interface from `ip -br link` (likely `eth0`):
 
 ```bash
-sudo nmcli connection modify "Wired connection 1" \
-  ipv4.method manual ipv4.addresses 192.168.50.2/24 \
-  ipv4.gateway "" ipv4.never-default yes connection.autoconnect yes
-sudo nmcli connection up "Wired connection 1"
+sudo ip addr add 192.168.50.254/24 dev <adapter>
 ```
 
-Enable SSH:
+macOS: **System Settings → Network → your Ethernet adapter → Details → TCP/IP**.
+Set **Configure IPv4** to **Manually**, IP address `192.168.50.254`, subnet mask
+`255.255.255.0`, and leave Router blank.
+
+## Mesh
+
+A Pi joins the mesh by itself when its USB Wi-Fi adapter is plugged in.
+
+A Linux laptop needs a mesh-capable USB Wi-Fi adapter (e.g. the MediaTek MT7612U
+the Pis use) and `iw` (`sudo apt install iw`). Save this script as `~/mesh-up.sh`:
 
 ```bash
-sudo systemctl enable --now ssh
+#!/bin/bash
+# Joins the Pi mesh from a Linux laptop.
+#   sudo bash ~/mesh-up.sh <wifi interface> [mesh ip]
+# Without an IP, the laptop takes 10.10.0.254.
+set -e
+
+WIFI="${1:?Usage: mesh-up.sh <wifi interface> [mesh ip]}"
+MESH_IP="${2:-10.10.0.254}"
+
+# stop NetworkManager from taking the adapter back
+nmcli device set "$WIFI" managed no
+iw reg set US
+ip link set "$WIFI" down
+iw dev "$WIFI" set type mp
+ip link set "$WIFI" mtu 1532
+ip link set "$WIFI" up
+iw dev "$WIFI" mesh join rosmesh freq 2437 HT20
+iw dev "$WIFI" set mesh_param mesh_fwding 0
+
+ip link show bat0 > /dev/null 2>&1 || ip link add bat0 type batadv
+ip link set "$WIFI" master bat0
+ip link set bat0 up
+ip addr replace "$MESH_IP/24" dev bat0
+
+echo "$WIFI joined the mesh as $MESH_IP"
 ```
 
-If the `ssh` service is missing, install it with `sudo apt install openssh-server`
-while the Pi has internet access, then retry the command above.
-
-Check the address:
+Find the adapter's interface name with `iw dev` (e.g. `wlx00c0cabe2451`), then run:
 
 ```bash
-ip -4 addr show eth0
+sudo bash ~/mesh-up.sh wlx00c0cabe2451
 ```
 
-You should see `192.168.50.2/24`.
-
-## 3. Set the laptop's address
-
-### Linux
-
-Find your wired interface:
+If a second laptop joins, give it a different address (e.g. `10.10.0.253`):
 
 ```bash
-ip -br link
+sudo bash ~/mesh-up.sh wlx00c0cabe2451 10.10.0.253
 ```
 
-A built-in Ethernet port usually has a name like `eno2` or `enp3s0`; a USB
-Ethernet adapter often starts with `enx`. Use the interface connected to the Pi.
-
-Replace `<adapter>` with that name:
+To check the mesh, ping a Pi that's powered on with its adapter plugged in
+(e.g. `air-09`):
 
 ```bash
-sudo ip -4 addr flush dev <adapter>
-sudo ip addr add 192.168.50.1/24 dev <adapter>
-sudo ip link set <adapter> up
+ping -c 4 10.10.0.9
 ```
 
-These settings are temporary. Repeat them after a reboot or if the connection
-resets.
+The laptop stays on the mesh until it reboots or the adapter is unplugged.
 
-### macOS
+## Sharing the laptop's internet
 
-Open **System Settings → Network → your Ethernet adapter → Details → TCP/IP**.
-Set **Configure IPv4** to **Manually**, then enter:
-
-- IP address: `192.168.50.1`
-- Subnet mask: `255.255.255.0`
-- Router: leave blank
-
-Apply the settings.
-
-## 4. Connect to the Pi
-
-Run on your laptop:
+A Pi uses its own Wi-Fi for internet if it has one. Otherwise it sends internet
+traffic to the laptop at `.254`, over Ethernet first and then the mesh. To make
+your Linux laptop pass that traffic on:
 
 ```bash
-ssh penn@192.168.50.2
+pennair gateway on
+pennair gateway off
 ```
-
-If your Pi uses a different username, replace `penn` with it. Accept the
-fingerprint prompt if shown, then enter your Pi account's password. For the club
-image, ask the software team if you need the password.

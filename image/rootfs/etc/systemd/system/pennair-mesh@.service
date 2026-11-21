@@ -1,0 +1,11 @@
+[Unit]
+Description=802.11s + batman-adv mesh on %i
+BindsTo=sys-subsystem-net-devices-%i.device
+After=sys-subsystem-net-devices-%i.device NetworkManager.service cloud-init.service
+Wants=NetworkManager.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/pennair-mesh %i
+ExecStop=-/bin/sh -c 'ip link del bat0; iw dev %i mesh leave'
+RemainAfterExit=yes
