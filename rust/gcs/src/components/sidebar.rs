@@ -5,9 +5,14 @@ const PANEL_LEFT_ICON: Asset = asset!("/assets/panel-left.svg");
 const DASHBOARD_ICON: Asset = asset!("/assets/layout-dashboard.svg");
 const PLANE_ICON: Asset = asset!("/assets/plane.svg");
 
+#[derive(Clone)]
+pub(crate) struct SidebarContext {
+    pub(crate) expanded: Signal<bool>,
+}
+
 #[component]
 pub fn SideBar() -> Element {
-    let mut expanded = use_context::<Signal<bool>>();
+    let mut expanded = use_context::<SidebarContext>().expanded;
 
     rsx! {
         aside {
