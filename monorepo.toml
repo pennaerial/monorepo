@@ -111,6 +111,7 @@ paths = [
     "ros_ws/src/common/px4_msgs",
     "ros_ws/src/common/camera_ros",
     "ros_ws/src/common/pennair_vision",
+    "ros_ws/src/common/pennair_vision_msgs",
     "ros_ws/src/common/vehicle_common",
     "ros_ws/src/common/uav",
     "ros_ws/src/iarc/iarc_flight",

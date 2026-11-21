@@ -1,0 +1,75 @@
+yolo_mine_detector:
+  model_param_path:
+    type: string
+    default_value: ""
+    read_only: true
+    description: "Absolute path to the NCNN .param file (e.g. model.ncnn.param from `yolo export format=ncnn`)."
+
+  model_bin_path:
+    type: string
+    default_value: ""
+    read_only: true
+    description: "Absolute path to the NCNN .bin weights file (e.g. model.ncnn.bin)."
+
+  class_labels:
+    type: string_array
+    default_value: []
+    read_only: true
+    description: "Class names indexed by class ID, in training order (see the export's metadata.yaml). If set, its length must match the model's class count. Empty means labels are drawn as numeric IDs."
+
+  input_size:
+    type: int
+    default_value: 640
+    read_only: true
+    description: "Square model input size in pixels; must match the export's imgsz."
+    validation:
+      gt<>: [0]
+
+  input_blob:
+    type: string
+    default_value: "in0"
+    read_only: true
+    description: "Name of the input blob in the .param file (Ultralytics NCNN exports use in0)."
+
+  output_blob:
+    type: string
+    default_value: "out0"
+    read_only: true
+    description: "Name of the output blob in the .param file (Ultralytics NCNN exports use out0)."
+
+  output_format:
+    type: string
+    default_value: "end2end"
+    read_only: true
+    description: "YOLO26 detection head the model was exported with. end2end: NMS-free one-to-one head, output [max_det, 6] = x1, y1, x2, y2, score, class_id (no NMS applied). one_to_many: output [4 + classes, anchors] (YOLOv8/YOLO11 layout), NMS applied with iou_threshold. Check the output blob shape to tell which one you have."
+    validation:
+      one_of<>: [["end2end", "one_to_many"]]
+
+  conf_threshold:
+    type: double
+    default_value: 0.25
+    description: "Minimum class score for a detection to be kept."
+    validation:
+      bounds<>: [0.0, 1.0]
+
+  iou_threshold:
+    type: double
+    default_value: 0.45
+    description: "IoU above which a lower-scoring box of the same class is suppressed by NMS. Only used when output_format is one_to_many."
+    validation:
+      bounds<>: [0.0, 1.0]
+
+  max_detections:
+    type: int
+    default_value: 100
+    description: "Maximum detections published per frame, highest scores first."
+    validation:
+      gt<>: [0]
+
+  num_threads:
+    type: int
+    default_value: 4
+    read_only: true
+    description: "NCNN CPU threads used for one inference. The Raspberry Pi 4 has 4 cores."
+    validation:
+      gt<>: [0]

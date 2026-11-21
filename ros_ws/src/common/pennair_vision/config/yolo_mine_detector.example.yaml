@@ -1,0 +1,16 @@
+# Example YoloMineDetector parameters. Copy, set the model paths and labels, and pass with
+#   ros2 launch pennair_vision vision.launch.py params_file:=/path/to/this.yaml plugins:="['pennair_vision::YoloMineDetector']"
+# See yolo_mine_detector_params.schema.yaml for every parameter.
+/**:
+  ros__parameters:
+    yolo_mine_detector:
+      model_param_path: "/home/ubuntu/models/mines_ncnn_model/model.ncnn.param"
+      model_bin_path: "/home/ubuntu/models/mines_ncnn_model/model.ncnn.bin"
+      # names from the export's metadata.yaml, in class-ID order
+      class_labels: ["mine_type_0", "mine_type_1"]
+      input_size: 640        # must match the export imgsz
+      output_format: "end2end"  # YOLO26 NMS-free head [300, 6]; "one_to_many" for a [4 + classes, 8400] output
+      conf_threshold: 0.25
+      iou_threshold: 0.45     # one_to_many only
+      max_detections: 100
+      num_threads: 4

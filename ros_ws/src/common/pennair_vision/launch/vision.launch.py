@@ -29,6 +29,7 @@ class Args(StrEnum):
     CAMERA_HEIGHT = "camera_height"
     CAMERA_ORIENTATION = "camera_orientation"
     RECORD_TOPICS = "record_topics"
+    PARAMS_FILE = "params_file"
 
 
 def launch_setup(context) -> list[Action]:
@@ -53,6 +54,7 @@ def launch_setup(context) -> list[Action]:
     plugins: list[str] = ast.literal_eval(plugins_arg) if plugins_arg else []
     record_topics_arg = config[Args.RECORD_TOPICS].strip()
     record_topics = ast.literal_eval(record_topics_arg) if record_topics_arg else []
+    params_file = config[Args.PARAMS_FILE].strip()
 
     # PRINTING HEADER
     logger.debug("LAUNCH PARAMS")
@@ -62,6 +64,7 @@ def launch_setup(context) -> list[Action]:
     logger.debug(f"Debug:               {debug_logs}")
     logger.debug(f"Image Debug Rate (Hz):     {debug_image_rate}")
     logger.debug(f"Sim:                 {sim}")
+    logger.debug(f"Params File:         {params_file}")
     if not sim:
         logger.debug(f"Camera Format:       {camera_format}")
         logger.debug(f"Camera Resolution:   {camera_width}x{camera_height}")
@@ -92,6 +95,8 @@ def launch_setup(context) -> list[Action]:
                     "debug_image_rate": debug_image_rate,
                 },
                 {"plugins": plugins} if plugins else {},
+                # plugin parameters (e.g. yolo_mine_detector.*); applied last so they win
+                *([params_file] if params_file else []),
             ],
             extra_arguments=[
                 {"use_intra_process_comms": True},
@@ -222,6 +227,11 @@ def generate_launch_description():
                 Args.RECORD_TOPICS,
                 default_value="[]",
                 description="List of topics to record in a rosbag",
+            ),
+            DeclareLaunchArgument(
+                Args.PARAMS_FILE,
+                default_value="",
+                description="Optional ROS parameter YAML for the vision manager and its plugins, e.g. config/yolo_mine_detector.example.yaml. Empty means none.",
             ),
             OpaqueFunction(function=launch_setup),
         ]
