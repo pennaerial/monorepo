@@ -13,43 +13,43 @@ modes:
         type: min_snap
         time_optimal: true
         v_max:
-          lap1: 5.0
-          lap2: 7.5
-          lap3: 10.0
+          lap1: 10.0
+          lap2: 12.5
+          lap3: 15.0
         a_max:
           lap1: 8.0
-          lap2: 8.0
-          lap3: 8.0
+          lap2: 9.0
+          lap3: 15.0
         keyframes:
-          - {x: 21.2, y: 12, z: -5, yaw: 0.0, mode: lap1}
-          - {x: 30, y: 0, z: -5, yaw: 0.0, mode: lap1}
-          - {x: 21.2, y: -12, z: -5, yaw: 0.0, mode: lap1}
+          - {x: 10.5, y: 8.5, z: -5, yaw: 0.0, mode: lap1}
+          - {x: 14.8, y: 0, z: -5, yaw: 0.0, mode: lap1}
+          - {x: 10.5, y: -8.5, z: -5, yaw: 0.0, mode: lap1}
           - {x: 0, y: 0, z: -5, yaw: 0.0, mode: lap1}
-          - {x: -21.2, y: 12, z: -5, yaw: 0.0, mode: lap1}
-          - {x: -30, y: 0, z: -5, yaw: 0.0, mode: lap1}
-          - {x: -21.2, y: -12, z: -5, yaw: 0.0, mode: lap1}
+          - {x: -10.5, y: 8.5, z: -5, yaw: 0.0, mode: lap1}
+          - {x: -14.8, y: 0, z: -5, yaw: 0.0, mode: lap1}
+          - {x: -10.5, y: -8.5, z: -5, yaw: 0.0, mode: lap1}
           - {x: 0, y: 0, z: -5, yaw: 0.0, mode: lap1}
-          - {x: 21.2, y: 12, z: -5, yaw: 0.0, mode: lap2}
-          - {x: 30, y: 0, z: -5, yaw: 0.0, mode: lap2}
-          - {x: 21.2, y: -12, z: -5, yaw: 0.0, mode: lap2}
+          - {x: 10.5, y: 8.5, z: -5, yaw: 0.0, mode: lap2}
+          - {x: 14.8, y: 0, z: -5, yaw: 0.0, mode: lap2}
+          - {x: 10.5, y: -8.5, z: -5, yaw: 0.0, mode: lap2}
           - {x: 0, y: 0, z: -5, yaw: 0.0, mode: lap2}
-          - {x: -21.2, y: 12, z: -5, yaw: 0.0, mode: lap2}
-          - {x: -30, y: 0, z: -5, yaw: 0.0, mode: lap2}
-          - {x: -21.2, y: -12, z: -5, yaw: 0.0, mode: lap2}
+          - {x: -10.5, y: 8.5, z: -5, yaw: 0.0, mode: lap2}
+          - {x: -14.8, y: 0, z: -5, yaw: 0.0, mode: lap2}
+          - {x: -10.5, y: -8.5, z: -5, yaw: 0.0, mode: lap2}
           - {x: 0, y: 0, z: -5, yaw: 0.0, mode: lap2}
-          - {x: 21.2, y: 12, z: -5, yaw: 0.0, mode: lap3}
-          - {x: 30, y: 0, z: -5, yaw: 0.0, mode: lap3}
-          - {x: 21.2, y: -12, z: -5, yaw: 0.0, mode: lap3}
+          - {x: 10.5, y: 8.5, z: -5, yaw: 0.0, mode: lap3}
+          - {x: 14.8, y: 0, z: -5, yaw: 0.0, mode: lap3}
+          - {x: 10.5, y: -8.5, z: -5, yaw: 0.0, mode: lap3}
           - {x: 0, y: 0, z: -5, yaw: 0.0, mode: lap3}
-          - {x: -21.2, y: 12, z: -5, yaw: 0.0, mode: lap3}
-          - {x: -30, y: 0, z: -5, yaw: 0.0, mode: lap3}
-          - {x: -21.2, y: -12, z: -5, yaw: 0.0, mode: lap3}
+          - {x: -10.5, y: 8.5, z: -5, yaw: 0.0, mode: lap3}
+          - {x: -14.8, y: 0, z: -5, yaw: 0.0, mode: lap3}
+          - {x: -10.5, y: -8.5, z: -5, yaw: 0.0, mode: lap3}
           - {x: 0, y: 0, z: -5, yaw: 0.0, mode: lap3}
       controller:
         type: mpc
-        max_speed: 12.0
+        max_speed: 20.0
         max_tilt_deg: 45.0
-        max_vertical_accel: 10.0
+        max_vertical_accel: 20.0
     transitions:
       complete: land
 
