@@ -33,9 +33,9 @@ QuadratureEncoder::~QuadratureEncoder()
   }
 }
 
-void QuadratureEncoder::alert_cb(int /*pi*/, unsigned gpio, unsigned level, uint32_t /*tick*/, void *userdata)
+void QuadratureEncoder::alert_cb(int /*pi*/, unsigned gpio, unsigned level, uint32_t /*tick*/, void* userdata)
 {
-  auto *self = static_cast<QuadratureEncoder *>(userdata);
+  auto* self = static_cast<QuadratureEncoder*>(userdata);
   if (!self) {
     return;
   }

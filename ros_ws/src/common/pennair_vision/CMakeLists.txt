@@ -12,7 +12,6 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
-find_package(generate_parameter_library REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rosidl_runtime_cpp REQUIRED)
 find_package(std_msgs REQUIRED)
@@ -22,8 +21,21 @@ find_package(rclcpp_components REQUIRED) # for vision_manager_component
 find_package(ament_cmake_python REQUIRED) # for pennair_vision python module
 find_package(cv_bridge REQUIRED)
 find_package(image_transport REQUIRED) # for pennair_vision lazy publisher
+find_package(apriltag REQUIRED) 
+find_package(geometry_msgs REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
+
+find_package(generate_parameter_library REQUIRED)
 
 include_directories(include)
+
+rosidl_generate_interfaces(${PROJECT_NAME}
+    "msg/AprilTag.msg"
+    "msg/AprilTagArray.msg"
+    DEPENDENCIES
+    geometry_msgs
+    std_msgs
+)
 
 generate_parameter_library(
     vision_manager_parameters
@@ -76,6 +88,7 @@ ament_target_dependencies(vision_manager
 # Dynamically loaded plugins
 add_library(vision_plugins SHARED
     src/plugins/basic_vision.cpp
+    src/plugins/april_tag_plugin.cpp
     src/plugins/vision_republisher.cpp
 )
 
@@ -101,10 +114,20 @@ ament_target_dependencies(vision_plugins
     sensor_msgs
     image_transport
     cv_bridge
+    apriltag 
+)
+
+rosidl_get_typesupport_target(cpp_typesupport_target
+    ${PROJECT_NAME} rosidl_typesupport_cpp
+)
+
+target_link_libraries(vision_plugins
+    "${cpp_typesupport_target}"
 )
 
 target_compile_features(vision_plugins PUBLIC cxx_std_20)
 target_compile_features(lazy_camera_publisher PUBLIC cxx_std_20)
+target_link_libraries(vision_plugins apriltag::apriltag)
 
 pluginlib_export_plugin_description_file(pennair_vision plugins.xml)
 
@@ -148,7 +171,13 @@ install(
 )
 
 ############## PENNAIR_VISION AMENT_PYTHON PACKAGE #############
-ament_python_install_package(${PROJECT_NAME})
+
+install(
+    DIRECTORY pennair_vision/
+    DESTINATION lib/python3.12/site-packages/pennair_vision
+    FILES_MATCHING
+    PATTERN "*.py"
+)
 
 include(cmake/install_python_entry_point.cmake)
 install_python_entry_point(basic_vision_py pennair_vision.basic_vision main)
@@ -156,6 +185,6 @@ install_python_entry_point(basic_vision_py pennair_vision.basic_vision main)
 
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
 ament_export_include_directories(include)
-ament_export_dependencies(rosidl_runtime_cpp rclcpp std_msgs sensor_msgs pluginlib image_transport cv_bridge)
+ament_export_dependencies(rosidl_runtime_cpp rclcpp std_msgs sensor_msgs pluginlib image_transport cv_bridge apriltag)
 
 ament_package()
