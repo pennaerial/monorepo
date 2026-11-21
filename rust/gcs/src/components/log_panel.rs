@@ -1,4 +1,5 @@
-use crate::hooks::{use_ros_node, use_subscription};
+use crate::hooks::use_subscription;
+use crate::ros::NodeHandle;
 use chrono::{DateTime, Local};
 use dioxus::prelude::*;
 use ros_interfaces::rcl_interfaces::msg::Log;
@@ -87,8 +88,8 @@ impl LogHistory {
 
 #[component]
 pub fn LogPanel() -> Element {
-    let node = use_ros_node();
-    let rosout_sub = use_subscription::<Log>(node.read().clone(), "/rosout", 10);
+    let node = use_context::<NodeHandle>();
+    let rosout_sub = use_subscription::<Log>(node, "/rosout", 10);
     let mut logs = use_signal_sync(LogHistory::new);
 
     use_future(move || {

@@ -17,8 +17,9 @@ pub fn SideBar() -> Element {
     rsx! {
         aside {
             class: if expanded() { "sidebar" } else { "sidebar w-16! px-2.5!" },
-            div { class: "flex items-center justify-between",
 
+            // sidebar header
+            div { class: "flex items-center justify-between",
                 if expanded() {
                     h2 { "PennAiR GCS" }
                 }
