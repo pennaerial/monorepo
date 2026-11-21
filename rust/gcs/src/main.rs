@@ -21,6 +21,9 @@ fn main() {
 
 #[component]
 fn App() -> Element {
+    use_context_provider(|| components::SidebarContext {
+        expanded: Signal::new(false), // sidebar is closed by default at launch
+    });
     use_context_provider(|| {
         let (node_handle, mut node) = RosNode::new(64); // channel depth 64
 

@@ -84,7 +84,7 @@ pub struct DependencyGroup {
 }
 
 /// A .deb from a pennaerial/Dependencies release, from `debs` in a group.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Deb {
     pub package: String,
     /// The installed version has to start with this, e.g. "2.4.3"
