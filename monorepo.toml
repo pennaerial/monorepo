@@ -92,6 +92,12 @@ packages = [
     "python3-pip",  # deps sync installs python packages with it
     "pkg-config",  # camera_ros finds libcamera with it
     "rsync",
+    # networking
+    "network-manager",
+    "avahi-daemon",  # air-NN.local names
+    "dnsmasq",  # DHCP for a laptop on eth0
+    "iw",  # mesh
+    "batctl",  # mesh
 ]
 python_packages = [
     "pymavlink",  # uav ulog streaming

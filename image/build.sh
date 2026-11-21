@@ -63,11 +63,9 @@ echo "deb [signed-by=/usr/share/keyrings/ros2-archive-keyring.gpg] http://packag
 install -m 755 "$PENNAIR" "$root/usr/local/bin/pennair"
 cp "$HERE/../monorepo.toml" "$root/tmp/monorepo.toml"
 
-# Networking tools the image needs, then everything monorepo.toml lists for prod.
+# Everything monorepo.toml lists for prod.
 chroot "$root" /bin/bash -e <<'EOF'
 export DEBIAN_FRONTEND=noninteractive
-apt-get update
-apt-get install -y network-manager avahi-daemon dnsmasq iw batctl
 pennair --manifest /tmp/monorepo.toml deps sync --prod
 apt-get clean
 EOF
