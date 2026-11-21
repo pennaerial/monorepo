@@ -17,7 +17,6 @@ ip link set "$WIFI" down
 iw dev "$WIFI" set type mp
 ip link set "$WIFI" mtu 1532
 ip link set "$WIFI" up
-iw dev "$WIFI" set power_save off
 iw dev "$WIFI" mesh join rosmesh freq 2437 HT20
 iw dev "$WIFI" set mesh_param mesh_fwding 0
 
