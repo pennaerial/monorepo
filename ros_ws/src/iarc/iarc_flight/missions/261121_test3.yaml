@@ -1,0 +1,32 @@
+# Test v_z max
+
+modes:
+  start:
+    mode: uav.VerticalTakeoffMode
+    params:
+      takeoff_height: 5.0
+    transitions:
+      complete: vz
+
+  vz:
+    mode: iarc_flight.TrackMode
+    params:
+      trajectory:
+        type: min_snap
+        time_optimal: true
+        v_max:
+          fast: 7.0
+        a_max:
+          fast: 8.0
+        keyframes:
+          - {x: 0, y: 0, z: -10, yaw: 0.0, mode: fast}
+          - {x: 0, y: 0, z: -5, yaw: 0.0, mode: fast}
+      controller:
+        type: mpc
+        max_speed: 10.0
+        max_vertical_accel: 10.0
+    transitions:
+      complete: land
+
+  land:
+    mode: uav.LandingMode

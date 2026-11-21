@@ -1,0 +1,57 @@
+modes:
+  start:
+    mode: uav.VerticalTakeoffMode
+    params:
+      takeoff_height: 5.0
+    transitions:
+      complete: figure8
+
+  figure8:
+    mode: iarc_flight.TrackMode
+    params:
+      trajectory:
+        type: min_snap
+        time_optimal: true
+        v_max:
+          lap1: 5.0
+          lap2: 7.5
+          lap3: 10.0
+        a_max:
+          lap1: 8.0
+          lap2: 8.0
+          lap3: 8.0
+        keyframes:
+          - {x: 21.2, y: 12, z: -5, yaw: 0.0, mode: lap1}
+          - {x: 30, y: 0, z: -5, yaw: 0.0, mode: lap1}
+          - {x: 21.2, y: -12, z: -5, yaw: 0.0, mode: lap1}
+          - {x: 0, y: 0, z: -5, yaw: 0.0, mode: lap1}
+          - {x: -21.2, y: 12, z: -5, yaw: 0.0, mode: lap1}
+          - {x: -30, y: 0, z: -5, yaw: 0.0, mode: lap1}
+          - {x: -21.2, y: -12, z: -5, yaw: 0.0, mode: lap1}
+          - {x: 0, y: 0, z: -5, yaw: 0.0, mode: lap1}
+          - {x: 21.2, y: 12, z: -5, yaw: 0.0, mode: lap2}
+          - {x: 30, y: 0, z: -5, yaw: 0.0, mode: lap2}
+          - {x: 21.2, y: -12, z: -5, yaw: 0.0, mode: lap2}
+          - {x: 0, y: 0, z: -5, yaw: 0.0, mode: lap2}
+          - {x: -21.2, y: 12, z: -5, yaw: 0.0, mode: lap2}
+          - {x: -30, y: 0, z: -5, yaw: 0.0, mode: lap2}
+          - {x: -21.2, y: -12, z: -5, yaw: 0.0, mode: lap2}
+          - {x: 0, y: 0, z: -5, yaw: 0.0, mode: lap2}
+          - {x: 21.2, y: 12, z: -5, yaw: 0.0, mode: lap3}
+          - {x: 30, y: 0, z: -5, yaw: 0.0, mode: lap3}
+          - {x: 21.2, y: -12, z: -5, yaw: 0.0, mode: lap3}
+          - {x: 0, y: 0, z: -5, yaw: 0.0, mode: lap3}
+          - {x: -21.2, y: 12, z: -5, yaw: 0.0, mode: lap3}
+          - {x: -30, y: 0, z: -5, yaw: 0.0, mode: lap3}
+          - {x: -21.2, y: -12, z: -5, yaw: 0.0, mode: lap3}
+          - {x: 0, y: 0, z: -5, yaw: 0.0, mode: lap3}
+      controller:
+        type: mpc
+        max_speed: 12.0
+        max_tilt_deg: 45.0
+        max_vertical_accel: 2.0
+    transitions:
+      complete: land
+
+  land:
+    mode: uav.LandingMode
