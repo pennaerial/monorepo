@@ -1,0 +1,55 @@
+modes:
+  start:
+    mode: uav.VerticalTakeoffMode
+    params:
+      takeoff_height: 5.0
+    transitions:
+      complete: spiral
+
+  spiral:
+    mode: iarc_flight.TrackMode
+    params:
+      trajectory:
+        type: min_snap
+        time_optimal: true
+        v_max:
+          standard: 5.0
+        a_max:
+          standard: 4.0
+        keyframes: # radius 6; two revolutions, z: -5 → -10 → -5
+          - {x: 0.804, y: -3.0, z: -5.417, yaw: 0.0, mode: standard}
+          - {x: 3.0, y: -5.196, z: -5.833, yaw: 0.0, mode: standard}
+          - {x: 6.0, y: -6.0, z: -6.25, yaw: 0.0, mode: standard}
+          - {x: 9.0, y: -5.196, z: -6.667, yaw: 0.0, mode: standard}
+          - {x: 11.196, y: -3.0, z: -7.083, yaw: 0.0, mode: standard}
+          - {x: 12.0, y: 0.0, z: -7.5, yaw: 0.0, mode: standard}
+          - {x: 11.196, y: 3.0, z: -7.917, yaw: 0.0, mode: standard}
+          - {x: 9.0, y: 5.196, z: -8.333, yaw: 0.0, mode: standard}
+          - {x: 6.0, y: 6.0, z: -8.75, yaw: 0.0, mode: standard}
+          - {x: 3.0, y: 5.196, z: -9.167, yaw: 0.0, mode: standard}
+          - {x: 0.804, y: 3.0, z: -9.583, yaw: 0.0, mode: standard}
+          - {x: 0.0, y: 0.0, z: -10.0, yaw: 0.0, mode: standard}
+
+          # Second revolution, same direction, returning to z = -5
+          - {x: 0.804, y: -3.0, z: -9.583, yaw: 0.0, mode: standard}
+          - {x: 3.0, y: -5.196, z: -9.167, yaw: 0.0, mode: standard}
+          - {x: 6.0, y: -6.0, z: -8.75, yaw: 0.0, mode: standard}
+          - {x: 9.0, y: -5.196, z: -8.333, yaw: 0.0, mode: standard}
+          - {x: 11.196, y: -3.0, z: -7.917, yaw: 0.0, mode: standard}
+          - {x: 12.0, y: 0.0, z: -7.5, yaw: 0.0, mode: standard}
+          - {x: 11.196, y: 3.0, z: -7.083, yaw: 0.0, mode: standard}
+          - {x: 9.0, y: 5.196, z: -6.667, yaw: 0.0, mode: standard}
+          - {x: 6.0, y: 6.0, z: -6.25, yaw: 0.0, mode: standard}
+          - {x: 3.0, y: 5.196, z: -5.833, yaw: 0.0, mode: standard}
+          - {x: 0.804, y: 3.0, z: -5.417, yaw: 0.0, mode: standard}
+          - {x: 0.0, y: 0.0, z: -5.0, yaw: 0.0, mode: standard}
+
+      controller:
+        type: mpc
+        max_speed: 6.0
+        max_vertical_accel: 7.0
+    transitions:
+      complete: land
+
+  land:
+    mode: uav.LandingMode
