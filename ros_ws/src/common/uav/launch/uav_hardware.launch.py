@@ -31,6 +31,7 @@ class Args(StrEnum):
     NS_ID = "ns_id"
     AIRFRAME = "airframe"
     ENABLE_ULOG = "enable_ulog"
+    MAVPROXY = "mavproxy"
 
 
 def launch_setup(context) -> list[Action]:
@@ -61,6 +62,7 @@ def launch_setup(context) -> list[Action]:
     vehicle_ns = f"uav_{ns_id}"
 
     enable_ulog = is_truthy(config[Args.ENABLE_ULOG])
+    enable_mavproxy = is_truthy(config[Args.MAVPROXY])
 
     # PRINTING HEADER
     # logger.debug(f"ENV VAR DETECTED: PENNAIR_PX4_PATH={PENNAIR_PX4_PATH}")
@@ -69,6 +71,7 @@ def launch_setup(context) -> list[Action]:
     logger.debug(f"Vehicle Namespace:   {vehicle_ns}")
     logger.debug(f"PX4 Airframe:        {airframe}")
     logger.debug(f"Enable ULOG:         {enable_ulog}")
+    logger.debug(f"Enable MAVProxy:     {enable_mavproxy}")
     ## create actions
 
     mode_manager = Node(
@@ -98,6 +101,21 @@ def launch_setup(context) -> list[Action]:
         mode_manager,
         middleware,
     ]
+
+    if enable_mavproxy:
+        mavproxy = ExecuteProcess(
+            cmd=[
+                "mavproxy.py",
+                "--master=/dev/ttyAMA5",
+                "--baudrate=57600",
+                "--out=udp:10.10.0.254:14550",
+                "--non-interactive",
+                "--default-modules=output",
+            ],
+            output="screen",
+            name="mavproxy",
+        )
+        actions.append(mavproxy)
 
     if enable_ulog:
         ulog_script = (
@@ -141,6 +159,11 @@ def generate_launch_description():
                 Args.ENABLE_ULOG,
                 default_value="false",
                 description="Enables px4 ulog transfer over MAVLink from flight controller to Pi. Needs a usb(Pi) to usb-c(FC) connection.",
+            ),
+            DeclareLaunchArgument(
+                Args.MAVPROXY,
+                default_value="false",
+                description="Forward MAVLink from /dev/ttyAMA5 at 57600 baud to QGC at 10.10.0.254:14550.",
             ),
             OpaqueFunction(function=launch_setup),
         ]
