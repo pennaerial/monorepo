@@ -11,6 +11,10 @@
 #include "task_mutex.hpp"
 #include "topics.h"
 
+#if !defined(CONFIG_IDF_TARGET_LINUX)
+#include "uart_transport.hpp"
+#endif
+
 /// Number of reliable XRCE stream blocks kept in the output/input history.
 // Startup creates 13 reliable XRCE requests with the current topic set.
 // Reliable-stream history must be a power of two and cover those requests.
@@ -35,24 +39,27 @@ constexpr uint32_t ESTIMATED_XRCE_WRITE_OVERHEAD = 32;
 class DDSClient
 {
 public:
-  // Called from update()/XRCE session servicing when a configured READER topic
-  // receives data. `msg` points to the deserialized generated message type
-  // associated with `topic`, and is only valid for the duration of the call.
+  // Called by the DDS task after releasing the session mutex. Callbacks may
+  // publish or change reader bindings, but must not call update() recursively.
+  // `msg` points to the generated message type and is valid only during the callback.
   using ReaderCallback = void (*)(const Topic& topic, const void* msg, uint16_t length, void* args);
 
   static DDSClient& instance();
 
   /// Opens transport/session streams and creates the configured XRCE-DDS entities.
-  void init();
+  /// Returns false on failure; failed attempts release transport resources for a later retry.
+  bool init();
 
   /// Writes a sample for a writer topic matched by TopicId.
   template <TopicId Id>
   bool publish(const typename TopicMsg<Id>::Message& msg);
 
-  /// Services incoming data and reliable stream bookkeeping.
+  /// Services the session for at most 10 ms of network waiting, then dispatches callbacks.
+  /// Called only by the DDS task; callback execution time is additional.
   void update();
 
-  /// Binds a callback for a reader topic matched by name or TopicId.
+  /// Binds a reader callback under the session lock; nullptr disables pending deliveries.
+  /// Caller-owned args must remain valid until any already executing callback finishes.
   bool set_reader_callback(TopicId topic_id, ReaderCallback callback, void* args);
 
 private:
@@ -68,8 +75,8 @@ private:
   /// Queues XRCE DataReader create and request-data requests for configured reader topics.
   void generate_readers(uint16_t requests[], std::size_t& request_count, uxrObjectId subscriber_id);
 
-  /// Runs the XRCE session until reliable output delivery is confirmed or times out.
-  bool confirm_delivery();
+  /// Closes an opened transport after an initialization failure.
+  void close_transport();
 
   /// Static XRCE topic callback that routes incoming samples back to this DDSClient.
   static void on_topic_callback(
@@ -82,7 +89,7 @@ private:
       void* args
   );
 
-  /// Deserializes an incoming reader sample and forwards it to the bound callback.
+  /// Deserializes into a bounded receive FIFO while session servicing holds the lock.
   void handle_topic(
       uxrSession* session,
       uxrObjectId object_id,
@@ -105,6 +112,8 @@ private:
   uxrUDPTransport transport_;
 #else
   uxrCustomTransport transport_;
+  // The custom transport retains this pointer beyond init(); keep it alive with the client.
+  UartTransportConfig uart_config_{};
 #endif
 
   /// the uxr session object. Interacts directly with DDS Agent
@@ -122,7 +131,18 @@ private:
   // Protect the session when telemetry publishes while the DDS task services it.
   util::TaskMutex session_mutex_;
   bool initialized_ = false;
-  bool delivery_pending_ = false;
+  // Receive-only FIFO: outgoing publish() still serializes directly into the XRCE stream.
+  // Keeping callbacks outside the session lock allows them to publish without deadlocking.
+  static constexpr std::size_t CALLBACK_CAPACITY = 8;
+  struct PendingCallback {
+    std::size_t topic_index;
+    uint16_t length;
+    alignas(std::max_align_t) uint8_t message[max_topic_message_size()];
+  };
+  std::array<PendingCallback, CALLBACK_CAPACITY> pending_callbacks_{};
+  std::size_t callback_head_ = 0;
+  std::size_t callback_count_ = 0;
+  std::size_t dropped_callbacks_ = 0;
   std::array<ReaderCallback, TOPIC_COUNT> reader_callbacks_{};
   std::array<void*, TOPIC_COUNT> reader_callback_args_{};
 };
@@ -167,6 +187,5 @@ bool DDSClient::publish(const typename TopicMsg<Id>::Message& msg)
     return false;
   }
 
-  delivery_pending_ = true;
   return true;
 }

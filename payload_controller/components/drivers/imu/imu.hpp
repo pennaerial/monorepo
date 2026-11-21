@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "sample_fifo.hpp"
 #include "sensor_msgs/msg/Imu.h"
 #include "task_mutex.hpp"
 
@@ -23,6 +24,18 @@ class IMU
 public:
   virtual ~IMU() = default;
 
+  /// Compact timestamped input for the estimator, without telemetry fields.
+  struct Sample {
+    int64_t timestamp_ns;
+    double angular_velocity[3];
+    double linear_acceleration[3];
+  };
+  static constexpr std::size_t SAMPLE_BUFFER_CAPACITY = 64;
+
+  /// Drains up to capacity samples in arrival order; only the estimator consumes this FIFO.
+  /// Reports overruns since the previous drain. Latest-value telemetry reads are independent.
+  std::size_t read_samples(Sample* samples, std::size_t capacity, std::size_t& dropped);
+
   /// Starts the IMU. It should immediately start writing imu messages to internal buffer
   virtual void start() = 0;
   /// Writes a new incoming imu reading to the local cache
@@ -43,6 +56,7 @@ protected:
 private:
   sensor_msgs_msg_Imu reading_{};
   uint32_t update_count_ = 0;
+  util::SampleFifo<Sample, SAMPLE_BUFFER_CAPACITY> estimator_samples_;
   util::TaskMutex mtx_;
 };
 

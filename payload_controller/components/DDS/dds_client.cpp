@@ -46,23 +46,26 @@ DDSClient& DDSClient::instance()
   return instance;
 }
 
-void DDSClient::init()
+bool DDSClient::init()
 {
   util::TaskMutexGuard lock(session_mutex_);
+  if (initialized_) {
+    return true;
+  }
+  callback_head_ = callback_count_ = dropped_callbacks_ = 0;
 #if defined(CONFIG_IDF_TARGET_LINUX)
   if (!uxr_init_udp_transport(&transport_, UXR_IPv4, ip_, port_)) {
     ESP_LOGE(TAG, "UXR UDP transport failed to init!");
-    return;
+    return false;
   }
   ESP_LOGI(TAG, "UXR UDP transport init success!");
 #else  // init custom transport
   uxr_set_custom_transport_callbacks(&transport_, true, uart_open, uart_close, uart_write, uart_read);
-  UartTransportConfig uart_config{};
-  if (!uxr_init_custom_transport(&transport_, &uart_config)) {
+  if (!uxr_init_custom_transport(&transport_, &uart_config_)) {
     ESP_LOGE(TAG, "Custom UART transport failed to initialize!");
-    return;
+    return false;
   }
-  ESP_LOGE(TAG, "Custom UART transport successfully initialized");
+  ESP_LOGI(TAG, "Custom UART transport successfully initialized");
 #endif
 
   // Bind the transport to an XRCE session. The session key identifies this
@@ -72,9 +75,10 @@ void DDSClient::init()
 
   // Handshake with the Agent so later create/read/write requests have a live
   // XRCE session to run on.
-  if (!uxr_create_session(&session_)) {
+  if (!uxr_create_session_retries(&session_, 1)) {
     ESP_LOGE(TAG, "Error creating session");
-    return;
+    close_transport();
+    return false;
   }
   ESP_LOGI(TAG, "UXR Session created");
 
@@ -130,11 +134,16 @@ void DDSClient::init()
           static_cast<unsigned>(status[i]), status_name(status[i])
       );
     }
-    return;
+    // Send deletion without another status wait, then release the local transport.
+    uxr_delete_session_retries(&session_, 0);
+    close_transport();
+    callback_head_ = callback_count_ = dropped_callbacks_ = 0;
+    return false;
   }
 
   initialized_ = true;
   ESP_LOGI(TAG, "Entities creation success");
+  return true;
 }
 
 void DDSClient::generate_topics(uint16_t requests[], std::size_t& request_count, const uxrObjectId participant_id)
@@ -190,30 +199,57 @@ void DDSClient::generate_readers(uint16_t requests[], std::size_t& request_count
   }
 }
 
-void DDSClient::update()
+void DDSClient::close_transport()
 {
-  util::TaskMutexGuard lock(session_mutex_);
-  if (!initialized_) {
-    return;
-  }
-  if (delivery_pending_) {
-    delivery_pending_ = !confirm_delivery();
-  }
-
-  uxr_run_session_time(&session_, 10);
+#if defined(CONFIG_IDF_TARGET_LINUX)
+  uxr_close_udp_transport(&transport_);
+#else
+  uxr_close_custom_transport(&transport_);
+#endif
 }
 
-bool DDSClient::confirm_delivery()
+void DDSClient::update()
 {
-  const bool delivered = uxr_run_session_until_confirm_delivery(&session_, 1000);
-  if (!delivered) {
-    ESP_LOGW(TAG, "Timed out waiting for XRCE reliable output delivery");
+  std::size_t callbacks_to_dispatch;
+  std::size_t dropped;
+  {
+    util::TaskMutexGuard lock(session_mutex_);
+    if (!initialized_) {
+      return;
+    }
+    // Unlike run_session_time(), this API uses a total timeout even under continuous traffic.
+    // It flushes output and services acknowledgements; unconfirmed writes remain in XRCE history.
+    uxr_run_session_timeout(&session_, 10);
+    callbacks_to_dispatch = callback_count_;
+    dropped = dropped_callbacks_;
+    dropped_callbacks_ = 0;
   }
-  return delivered;
+  if (dropped != 0) {
+    ESP_LOGW(TAG, "DDS receive callback FIFO full; dropped %u samples", static_cast<unsigned>(dropped));
+  }
+
+  // Bound each batch, and release the lock before entering application code.
+  for (std::size_t i = 0; i < callbacks_to_dispatch; ++i) {
+    PendingCallback pending;
+    ReaderCallback callback;
+    void* args;
+    {
+      util::TaskMutexGuard lock(session_mutex_);
+      pending = pending_callbacks_[callback_head_];
+      callback_head_ = (callback_head_ + 1) % CALLBACK_CAPACITY;
+      --callback_count_;
+      callback = reader_callbacks_[pending.topic_index];
+      args = reader_callback_args_[pending.topic_index];
+    }
+    if (callback != nullptr) {
+      callback(TOPICS[pending.topic_index], pending.message, pending.length, args);
+    }
+  }
 }
 
 bool DDSClient::set_reader_callback(const TopicId topic_id, ReaderCallback callback, void* args)
 {
+  util::TaskMutexGuard lock(session_mutex_);
   std::size_t topic_index = to_underlying(topic_id);
   const Topic* topic = get_topic(topic_id);
   if (topic == nullptr) {
@@ -278,18 +314,20 @@ void DDSClient::handle_topic(
     return;
   }
 
-  alignas(std::max_align_t) uint8_t msg_buffer[max_topic_message_size()];
-  if (!topic.deserialize_topic(ub, msg_buffer)) {
+  if (reader_callbacks_[topic_index] == nullptr) {
+    ESP_LOGW(TAG, "Received data for unbound DDS DataReader id=%u type=%u", object_id.id, object_id.type);
+    return;
+  }
+  if (callback_count_ == CALLBACK_CAPACITY) {
+    ++dropped_callbacks_;
+    return;
+  }
+  PendingCallback& pending = pending_callbacks_[(callback_head_ + callback_count_) % CALLBACK_CAPACITY];
+  if (!topic.deserialize_topic(ub, pending.message)) {
     ESP_LOGE(TAG, "Failed to deserialize DDS topic %s", topic.name);
     return;
   }
-
-  ReaderCallback callback = reader_callbacks_[topic_index];
-  if (callback == nullptr) {
-    ESP_LOGW(TAG, "Received data for unknown DDS DataReader id=%u type=%u", object_id.id, object_id.type);
-    return;
-  }
-
-  callback(topic, msg_buffer, length, reader_callback_args_[topic_index]);
-  return;
+  pending.topic_index = topic_index;
+  pending.length = length;
+  ++callback_count_;
 }

@@ -73,7 +73,6 @@ private:
   Payload(Payload&&) = delete;
   Payload& operator=(Payload&&) = delete;
 
-  uint32_t last_ekf_imu_update_ = 0;
   uint32_t last_ekf_left_update_ = 0;
   uint32_t last_ekf_right_update_ = 0;
   uint32_t last_ekf_camera_update_ = 0;

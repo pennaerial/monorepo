@@ -39,8 +39,7 @@ private:
   void on_imu_msg(const gz::msgs::IMU& gz_msg);
 
   util::StaticMutex pending_mutex_;
-  sensor_msgs_msg_Imu pending_{};
-  bool pending_available_ = false;
+  util::SampleFifo<sensor_msgs_msg_Imu, SAMPLE_BUFFER_CAPACITY> pending_;
 
   /// Contains Simulation Configuration (e.g. entity and world name)
   const sitl::SimConfig sitl_config_;

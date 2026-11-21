@@ -1,5 +1,6 @@
 #include "payload.hpp"
 
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <initializer_list>
@@ -87,21 +88,29 @@ void Payload::update()
 
 void Payload::update_estimator()
 {
-  EKF::Measurements measurements;
-  sensor_msgs_msg_Imu imu{};
-  if (imu_->get_latest_if_updated(last_ekf_imu_update_, imu)) {
+  std::array<drivers::IMU::Sample, drivers::IMU::SAMPLE_BUFFER_CAPACITY> imu_samples;
+  std::size_t dropped;
+  const auto count = imu_->read_samples(imu_samples.data(), imu_samples.size(), dropped);
+  if (dropped != 0) {
+    ESP_LOGW(TAG, "Estimator IMU FIFO overrun: dropped %u samples", static_cast<unsigned>(dropped));
+  }
+  // Predict once per queued sample using its sensor timestamp, before applying new corrections.
+  for (std::size_t i = 0; i < count; ++i) {
+    const auto& imu = imu_samples[i];
     EKF::ImuSample sample{
-        static_cast<int64_t>(imu.header.stamp.sec) * 1000000000LL + imu.header.stamp.nanosec,
-        Eigen::Vector3f(imu.angular_velocity.x, imu.angular_velocity.y, imu.angular_velocity.z),
-        Eigen::Vector3f(imu.linear_acceleration.x, imu.linear_acceleration.y, imu.linear_acceleration.z)
+        imu.timestamp_ns, Eigen::Vector3f(imu.angular_velocity[0], imu.angular_velocity[1], imu.angular_velocity[2]),
+        Eigen::Vector3f(imu.linear_acceleration[0], imu.linear_acceleration[1], imu.linear_acceleration[2])
     };
     if (sample.angular_velocity.allFinite() && sample.specific_force.allFinite()) {
-      measurements.imu = sample;
+      EKF::Measurements prediction;
+      prediction.imu = sample;
+      EKF::instance().update(prediction);
       ekf_gyro_ = sample.angular_velocity;
       ekf_has_gyro_ = true;
     }
   }
 
+  EKF::Measurements measurements;
   // Independent cursors: motor feedback and debug reads cannot consume EKF data.
   double speed;
   if (left_encoder_.encoder.get_latest_angular_velocity_if_updated(last_ekf_left_update_, speed) &&

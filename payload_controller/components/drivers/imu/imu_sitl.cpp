@@ -35,22 +35,30 @@ void IMU_SITL::on_imu_msg(const gz::msgs::IMU& gz_msg)
 {
   sensor_msgs_msg_Imu msg = gz_to_dds(gz_msg);
   util::StaticMutexGuard lock(pending_mutex_);
-  pending_ = msg;
-  pending_available_ = true;
+  pending_.push(msg);
 }
 
 void IMU_SITL::update()
 {
-  sensor_msgs_msg_Imu sample{};
+  std::size_t count;
+  std::size_t dropped;
   {
     util::StaticMutexGuard lock(pending_mutex_);
-    if (!pending_available_) {
-      return;
-    }
-    sample = pending_;
-    pending_available_ = false;
+    count = pending_.size();
+    dropped = pending_.take_dropped();
   }
-  write_latest(sample);
+  if (dropped != 0) {
+    ESP_LOGW(TAG, "Gazebo IMU FIFO overrun: dropped %u samples", static_cast<unsigned>(dropped));
+  }
+  // Drain a bounded snapshot so incoming Gazebo traffic cannot keep this task running forever.
+  for (std::size_t i = 0; i < count; ++i) {
+    sensor_msgs_msg_Imu sample{};
+    {
+      util::StaticMutexGuard lock(pending_mutex_);
+      pending_.pop(sample);
+    }
+    write_latest(sample);
+  }
 }
 
 IMU* IMU::instance()

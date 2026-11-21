@@ -1,3 +1,4 @@
+#include <chrono>
 #include <cstdlib>
 
 #include "ekf.hpp"
@@ -50,9 +51,17 @@ void dds_update()
 {
   // Transport/session initialization belongs to the DDS task as well.
   static bool started = false;
+  static std::chrono::steady_clock::time_point next_attempt{};
   if (!started) {
-    DDSClient::instance().init();
-    started = true;
+    if (std::chrono::steady_clock::now() < next_attempt) {
+      return;
+    }
+    started = DDSClient::instance().init();
+    if (!started) {
+      next_attempt = std::chrono::steady_clock::now() + std::chrono::seconds(1);
+      ESP_LOGW("Tasks", "DDS initialization failed; retrying in 1 second");
+      return;
+    }
   }
   DDSClient::instance().update();
 }
