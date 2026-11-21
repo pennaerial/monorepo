@@ -1,0 +1,2 @@
+# Start the mesh on any USB Wi-Fi adapter (their names start with wlx).
+ACTION!="remove", SUBSYSTEM=="net", ENV{ID_NET_NAME}=="wlx*", TAG+="systemd", ENV{SYSTEMD_WANTS}+="pennair-mesh@$env{ID_NET_NAME}.service"

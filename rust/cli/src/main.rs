@@ -5,6 +5,8 @@ mod apt;
 mod cli;
 mod config;
 mod deps;
+mod flash;
+mod gateway;
 mod push;
 mod python;
 mod sh;

@@ -89,8 +89,11 @@ def launch_setup(context) -> list[Action]:
 
     middleware = ExecuteProcess(
         # -b 921600 = baud rate of UART connection
-        # /dev/serial0 is the device name
-        cmd=["MicroXRCEAgent", "serial", "--dev", "/dev/serial0", "-b", "921600"],
+        # on Pi 4, /dev/serial0 is a symlink to /dev/ttyAMA0
+        # on Pi 5, /dev/serial0 is a different port entirely
+        # while /dev/ttyAMA0 is still where the Pixhawk is attached
+        # Thus always use /dev/ttyAMA0 in place of /dev/serial0
+        cmd=["MicroXRCEAgent", "serial", "--dev", "/dev/ttyAMA0", "-b", "921600"],
         output="screen",
         name="MicroXRCEAgent",
     )
