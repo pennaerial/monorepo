@@ -1,3 +1,4 @@
+import shutil
 from enum import StrEnum
 from pathlib import Path
 
@@ -7,6 +8,7 @@ from launch.actions import (
     DeclareLaunchArgument,
     ExecuteProcess,
     OpaqueFunction,
+    SetEnvironmentVariable,
 )
 from launch_ros.actions import Node
 from pydantic import ValidationError
@@ -18,7 +20,7 @@ from vehicle_common.launch_utils import (
     is_truthy,
 )
 from vehicle_common.mission_loader import RuntimeMission, get_mission_path
-from vehicle_common.utils import get_available_missions
+from vehicle_common.utils import get_available_missions, pi_id
 
 logger = get_logger("uav_sitl.launch")
 
@@ -31,6 +33,7 @@ class Args(StrEnum):
     NS_ID = "ns_id"
     AIRFRAME = "airframe"
     ENABLE_ULOG = "enable_ulog"
+    PEERS = "peers"
 
 
 def launch_setup(context) -> list[Action]:
@@ -59,6 +62,7 @@ def launch_setup(context) -> list[Action]:
 
     ns_id = int(config[Args.NS_ID])
     vehicle_ns = f"uav_{ns_id}"
+    pi = pi_id()  # 6 on air-06, None off a Pi
 
     enable_ulog = is_truthy(config[Args.ENABLE_ULOG])
 
@@ -67,6 +71,7 @@ def launch_setup(context) -> list[Action]:
     logger.debug("LAUNCH PARAMS")
     logger.debug(f"Mission:             {mission}")
     logger.debug(f"Vehicle Namespace:   {vehicle_ns}")
+    logger.debug(f"ROS Domain:          {pi if pi is not None else 'unchanged'}")
     logger.debug(f"PX4 Airframe:        {airframe}")
     logger.debug(f"Enable ULOG:         {enable_ulog}")
     ## create actions
@@ -91,10 +96,30 @@ def launch_setup(context) -> list[Action]:
         # -b 921600 = baud rate of UART connection
         # /dev/serial0 is the device name
         cmd=["MicroXRCEAgent", "serial", "--dev", "/dev/serial0", "-b", "921600"],
+        # puts PX4's topics in this drone's domain, whatever UXRCE_DDS_DOM_ID is set to
+        additional_env={"XRCE_DOMAIN_ID_OVERRIDE": str(pi)} if pi is not None else {},
         output="screen",
         name="MicroXRCEAgent",
     )
-    actions = [
+    actions = []
+    if pi is not None:
+        # The Pi's hostname gives the ROS domain: 6 on air-06.
+        # Each drone gets its own domain, so DDS never crosses the mesh.
+        # The bridge passes only the topics zenoh_bridge.json5 allows.
+        actions.append(SetEnvironmentVariable("ROS_DOMAIN_ID", str(pi)))
+        if shutil.which("zenoh-bridge-ros2dds"):
+            bridge_config = (
+                Path(get_package_share_directory("uav")) / "config" / "zenoh_bridge.json5"
+            )
+            cmd = ["zenoh-bridge-ros2dds", "-c", str(bridge_config), "-d", str(pi)]
+            cmd += ["-l", "tcp/0.0.0.0:7447"]
+            for peer in config[Args.PEERS].split(","):
+                if peer.strip():
+                    cmd += ["-e", f"tcp/10.10.0.{int(peer)}:7447"]
+            actions.append(ExecuteProcess(cmd=cmd, output="screen", name="zenoh_bridge"))
+        else:
+            logger.warning("zenoh-bridge-ros2dds is not installed. Other drones won't see this one.")  # fmt: skip
+    actions += [
         mode_manager,
         middleware,
     ]
@@ -141,6 +166,11 @@ def generate_launch_description():
                 Args.ENABLE_ULOG,
                 default_value="false",
                 description="Enables px4 ulog transfer over MAVLink from flight controller to Pi. Needs a usb(Pi) to usb-c(FC) connection.",
+            ),
+            DeclareLaunchArgument(
+                Args.PEERS,
+                default_value="",
+                description="Other drones' numbers for the Zenoh bridge to connect to, e.g. 4,6. Only needed if the drones don't find each other on the mesh.",
             ),
             OpaqueFunction(function=launch_setup),
         ]

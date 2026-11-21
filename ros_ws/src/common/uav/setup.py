@@ -54,6 +54,10 @@ setup(
             glob(os.path.join("config", "camera_calibrations", "*.yaml")),
         ),
         (
+            os.path.join("share", package_name, "config"),
+            [os.path.join("config", "zenoh_bridge.json5")],
+        ),
+        (
             os.path.join("share", package_name, "missions"),
             glob(os.path.join("missions", "*.yaml")),
         ),

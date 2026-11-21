@@ -1,0 +1,15 @@
+// zenoh-bridge-ros2dds config, the same on every drone.
+// uav_hardware.launch.py passes the drone's ROS domain with -d.
+{
+  mode: "peer",
+  plugins: {
+    ros2dds: {
+      nodename: "zenoh_bridge",
+      // Only topics under /uav_<n>/shared/ cross the mesh.
+      allow: {
+        publishers: ["/uav_[0-9]+/shared/.*"],
+        subscribers: ["/uav_[0-9]+/shared/.*"],
+      },
+    },
+  },
+}

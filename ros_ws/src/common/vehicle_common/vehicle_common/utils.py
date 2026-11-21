@@ -1,4 +1,6 @@
 import importlib
+import re
+import socket
 from pathlib import Path
 from typing import cast
 
@@ -50,3 +52,9 @@ def deserialize_type(path: str, base_cls: type | None = None) -> type:
 def get_available_missions(package: str) -> list[str]:
     path = Path(get_package_share_directory(package)) / "missions"
     return [mission.stem for mission in path.glob("*.yaml")]
+
+
+def pi_id() -> int | None:
+    """The drone's number from its Pi's hostname: 6 on air-06, None on a laptop."""
+    match = re.fullmatch(r"air-(\d{2})", socket.gethostname())
+    return int(match.group(1)) if match else None
