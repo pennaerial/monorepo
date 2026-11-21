@@ -3,16 +3,16 @@
 Solves the shortest leg times T for the min-snap path through given points such that each
 leg i stays under its v_max[i] and a_max[i]
 
-SNOPT (via Drake) over T with limits.
+SLSQP (scipy) over T with limits.
 K(T) z = rhs, so dz/dT_j = -K^-1 (dK/dT_j) z, where each entry of K scales
-as a power of one T_j. If SNOPT fails, the initial guess is used.
+as a power of one T_j. If SLSQP fails, the initial guess is used.
 
 This problem has
  - few variables
- - many (mostly inactive) ineq constraints
+ - many (mostly inactive) ineq constraints, a dense Jacobian
  - exact gradients
  - a good initial guess
-which snopt (sparse sqp) is good for
+SLSQP's dense QP subproblem handles that well. SNOPT via Drake gave the same T but was slow
 """
 
 from __future__ import annotations
@@ -23,9 +23,8 @@ import time
 from dataclasses import dataclass
 
 import numpy as np
-from pydrake.autodiffutils import ExtractGradient, ExtractValue, InitializeAutoDiff
-from pydrake.solvers import MathematicalProgram, SnoptSolver
 from scipy.linalg import lu_factor, lu_solve
+from scipy.optimize import minimize
 
 from iarc_flight.trajectories.min_snap import min_derivative_kkt, solve_min_derivative, unwrap_yaws
 
@@ -35,7 +34,7 @@ except ImportError:  # optional; planning is just slower without it
     threadpool_limits = None
 
 R, N = 4, 8  # snap derivative order, polynomial degree
-SAMPLES = 12  # SNOPT limit checks per leg (24 is ~2x slower for a ~0.5% shorter path)
+SAMPLES = 12  # limit checks per leg (24 is ~2x slower for a ~0.5% shorter path)
 T_MIN = 0.1  # s
 
 
@@ -112,9 +111,9 @@ def _stretch(w: np.ndarray, T: np.ndarray, v_max: np.ndarray, a_max: np.ndarray)
 @dataclass
 class TimeAllocation:
     durations: np.ndarray  # (M,) s
-    success: bool  # SNOPT converged
+    success: bool  # SLSQP converged
     status: str
-    stretch: float  # factor applied after SNOPT (1 = already within limits)
+    stretch: float  # factor applied after SLSQP (1 = already within limits)
     peak_speed: np.ndarray  # (M,) per leg, dense grid
     peak_accel: np.ndarray
     solve_time: float  # s
@@ -144,22 +143,34 @@ def optimize_times(points, v_max, a_max, yaw_rate_max: float | None = None) -> T
 
         s = np.linspace(0.0, 1.0, SAMPLES)
 
-        def limits(Tv: np.ndarray) -> np.ndarray:  # Drake passes floats or AutoDiffXd
-            if Tv.dtype != object:
-                return _limit_ratios(w, Tv, v_max, a_max, s)[0].ravel()
-            g, dg = _limit_ratios(w, ExtractValue(Tv).ravel(), v_max, a_max, s)
-            return InitializeAutoDiff(g.ravel(), dg.reshape(-1, M) @ ExtractGradient(Tv)).ravel()
+        # SLSQP asks for the constraint and its Jacobian separately at the same T, so cache the
+        # last evaluation (one KKT factorization gives both)
+        last: dict = {}
 
-        # Drake Solve provides access to https://ccom.ucsd.edu/~optimizers/solvers/snopt/
-        prog = MathematicalProgram()
-        T = prog.NewContinuousVariables(M, "T")
-        prog.AddBoundingBoxConstraint(lo, np.full(M, np.inf), T)
-        prog.AddCost(sum(T) ** 2)
-        prog.AddConstraint(limits, np.full(2 * M * SAMPLES, -np.inf), np.ones(2 * M * SAMPLES), T)
-        res = SnoptSolver().Solve(prog, T0)  # default tolerances
+        def ratios(T: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+            if last.get("T") is None or not np.array_equal(last["T"], T):
+                g, dg = _limit_ratios(w, T, v_max, a_max, s)
+                last.update(T=T.copy(), g=g.ravel(), dg=dg.reshape(-1, M))
+            return last["g"], last["dg"]
 
-        ok, status = res.is_success(), str(res.get_solution_result())
-        Tf = np.maximum(lo, res.GetSolution(T)) if ok else T0
+        res = minimize(
+            lambda T: T.sum(),  # same minimizer as the total time squared, better scaled
+            T0,
+            jac=lambda T: np.ones(M),
+            method="SLSQP",
+            bounds=[(lb, None) for lb in lo],
+            constraints=[  # SLSQP wants fun >= 0: 1 - g >= 0 where the limits hold
+                {
+                    "type": "ineq",
+                    "fun": lambda T: 1.0 - ratios(T)[0],
+                    "jac": lambda T: -ratios(T)[1],
+                }
+            ],
+            options={"ftol": 1e-6, "maxiter": 200},
+        )
+
+        ok, status = bool(res.success), str(res.message)
+        Tf = np.maximum(lo, res.x) if ok else T0
         Tf *= (k := max(1.0, _stretch(w, Tf, v_max, a_max)))
         v, a = segment_peaks(w, Tf)
     return TimeAllocation(Tf, ok, status, k, v, a, time.perf_counter() - t0)
