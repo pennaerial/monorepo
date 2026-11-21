@@ -23,7 +23,7 @@ modes:
         type: mpc
         max_speed: 6.0
         max_tilt_deg: 40.0
-        max_vertical_accel: 2.0
+        max_vertical_accel: 6.0
     transitions:
       complete: land
 
