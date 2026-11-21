@@ -131,6 +131,14 @@ class PiecewisePolynomial:
         s = (t - self.knots[k]) / self.T[k]
         return P.polyval(s, self._d[m][k]) / self.T[k] ** m
 
+    def peak(self, m: int, per_segment: int = 50) -> float:
+        """Largest norm of the m-th time derivative, sampled per_segment times on every leg."""
+        s = np.linspace(0.0, 1.0, per_segment)
+        return max(
+            float(np.linalg.norm(P.polyval(s, P.polyder(ck, m, axis=0)), axis=0).max()) / Tk**m
+            for ck, Tk in zip(self.c, self.T)
+        )
+
 
 class MinSnap(Trajectory):
     def __init__(self, c: MinSnapConfig, start: np.ndarray, yaw: float) -> None:
@@ -139,7 +147,8 @@ class MinSnap(Trajectory):
         yaws = unwrap_yaws([yaw] + [kf.yaw for kf in kfs])
         self.time_allocation = None
         if c.time_optimal:
-            from iarc_flight.trajectories.min_snap_time import optimize_times  # needs pydrake
+            # lazy: min_snap_time imports this module
+            from iarc_flight.trajectories.min_snap_time import optimize_times
 
             pts = np.column_stack([self.keyframes, yaws])
             self.time_allocation = optimize_times(pts, *c.limits(), c.yaw_rate_max)
@@ -149,9 +158,11 @@ class MinSnap(Trajectory):
         self.position = PiecewisePolynomial(solve_min_derivative(self.keyframes, T, 4), T)
         self.yaw = PiecewisePolynomial(solve_min_derivative(yaws[:, None], T, 2), T)
         self.total_time = float(self.position.knots[-1])
-        ts = np.linspace(0.0, self.total_time, 50 * len(kfs) + 1)  # peaks, for TrackMode's log
-        peak = lambda m: max(float(np.linalg.norm(self.position(t, m))) for t in ts)  # noqa: E731
-        self.max_speed, self.max_accel = peak(1), peak(2)
+        if self.time_allocation is not None:
+            self.max_speed = float(self.time_allocation.peak_speed.max())
+            self.max_accel = float(self.time_allocation.peak_accel.max())
+        else:
+            self.max_speed, self.max_accel = (self.position.peak(m) for m in (1, 2))
 
     def done(self, t: float) -> bool:
         return t >= self.total_time

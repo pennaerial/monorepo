@@ -1,5 +1,9 @@
+import multiprocessing as mp
+import os
+import signal
+import threading
 import time
-from concurrent.futures import Future, ThreadPoolExecutor
+from concurrent.futures import Future, ProcessPoolExecutor
 from typing import Annotated, override
 
 import numpy as np
@@ -17,6 +21,45 @@ from iarc_flight.trajectories.min_snap import MinSnapConfig
 
 ControllerConfig = Annotated[FeedforwardConfig | MPCConfig, Field(discriminator="type")]
 TrajectoryConfig = Annotated[CircleConfig | MinSnapConfig, Field(discriminator="type")]
+
+
+_planner: ProcessPoolExecutor | None = None  # shared by every trackmode in the mission
+
+
+def planner() -> ProcessPoolExecutor:
+    """One worker process that builds trajectories, started (and its imports loaded) on first use."""
+    global _planner
+    if _planner is None:
+        _planner = ProcessPoolExecutor(
+            max_workers=1, mp_context=mp.get_context("spawn"), initializer=_planner_init
+        )
+        _planner.submit(int)  # start the worker now, so its ~1 s of imports happens at mission load
+    return _planner
+
+
+def _planner_init() -> None:
+    signal.signal(signal.SIGINT, signal.SIG_IGN)  # Ignore Ctrl-C in the worker,
+    # The node's pid as the node recorded it: os.getppid() here could already be init's if the
+    # node died while this worker was still starting up
+    parent = mp.parent_process()
+    parent = parent.pid if parent is not None else os.getppid()
+
+    def exit_with_parent() -> None:
+        while os.getppid() == parent:
+            time.sleep(1.0)
+        os._exit(0)
+
+    threading.Thread(target=exit_with_parent, daemon=True).start()
+    import iarc_flight.trajectories.min_snap_time  # noqa: F401  preload scipy.optimize
+
+
+def timed_build(
+    config: "TrajectoryConfig", start: np.ndarray, yaw: float
+) -> tuple[Trajectory, float]:
+    """Builds the trajectory (in the planner process) and returns it with the build's wall time."""
+    t0 = time.perf_counter()
+    traj = config.build(start, yaw)
+    return traj, time.perf_counter() - t0
 
 
 class TrackParams(ParamsBase):
@@ -41,8 +84,9 @@ class TrackMode(Mode[UAV, TrackParams]):
         # Built at startup so the MPC's slow first solve isn't mid-flight
         self.controller = params.controller.build()
         self.trajectory = None  # placed at the drone on the first update
-        # Planning can take a while (time_optimal min snap runs SNOPT), so it runs off the control
-        # loop while the drone holds where tracking started
+        # Planning can take a while (time_optimal min snap runs SLSQP), so it runs in another
+        # process while the drone holds where tracking started
+        planner()
         self.planning: tuple[Future, np.ndarray, float] | None = None  # (build, hold pos, yaw)
         self.plan_start = 0.0  # perf_counter when planning began
         self.plan_time = 0.0  # s spent building the trajectory
@@ -68,10 +112,9 @@ class TrackMode(Mode[UAV, TrackParams]):
             if self.planning is None:
                 yaw = self.vehicle.yaw if self.vehicle.yaw is not None else pos.heading
                 hold = state[:3].copy()
-                pool = ThreadPoolExecutor(max_workers=1)  # plan on seperate thread
                 self.plan_start = time.perf_counter()
-                self.planning = (pool.submit(self.timed_build, hold, yaw), hold, yaw)
-                pool.shutdown(wait=False)  # the worker exits once the build returns
+                build = planner().submit(timed_build, self.params.trajectory, hold, yaw)
+                self.planning = (build, hold, yaw)
             build, hold, hold_yaw = self.planning
             if not build.done():
                 self.vehicle.publish_trajectory_setpoint(hold, np.zeros(3), np.zeros(3), hold_yaw)
@@ -92,12 +135,6 @@ class TrackMode(Mode[UAV, TrackParams]):
         self.vehicle.publish_trajectory_setpoint(
             setpoint.position, setpoint.velocity, setpoint.acceleration, setpoint.yaw
         )
-
-    def timed_build(self, start: np.ndarray, yaw: float) -> tuple[Trajectory, float]:
-        """Builds the trajectory and returns it with the build's wall time in seconds."""
-        t0 = time.perf_counter()
-        traj = self.params.trajectory.build(start, yaw)
-        return traj, time.perf_counter() - t0
 
     def log_plan(self) -> None:
         held = time.perf_counter() - self.plan_start
