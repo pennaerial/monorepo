@@ -1,5 +1,5 @@
 [workspace]
-members = ["cli", "gcs", "ros_interfaces"]
+members = ["agent", "cli", "gcs", "protocol", "ros_interfaces"]
 resolver = "3"
 
 [workspace.dependencies]

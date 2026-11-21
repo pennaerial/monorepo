@@ -11,3 +11,4 @@ Hardware Setup
 
    Raspberry Pi Setup <raspberry-pi>
    Ethernet and SSH <ethernet>
+   Foxglove Deployment <websocket-deployment>

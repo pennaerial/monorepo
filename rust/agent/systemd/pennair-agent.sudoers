@@ -1,0 +1,1 @@
+penn ALL=(root) NOPASSWD: /usr/bin/systemctl restart pennair-autonomy.service

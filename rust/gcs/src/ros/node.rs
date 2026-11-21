@@ -1,17 +1,18 @@
 use crate::ros::server_types::{CallId, Channel, ChannelId, ServerMessage, Service, ServiceId};
 use crate::ros::subscription::DeliveryError;
+use crate::ros::subscription::SubscriptionTask;
 use crate::ros::SubscriptionSink;
 use crate::ros::{
     foxglove_client::FoxgloveClientError, node_command::NodeCommand, FoxgloveClient,
     SubscriptionHandle, SubscriptionId, SubscriptionSinkBase,
 };
+use bytes::Bytes;
 use dioxus::logger::tracing::{debug, error, info, warn};
 use ros_interfaces::{RosMessage, RosService};
 use std::collections::HashMap;
 use std::fmt;
 use std::time::Duration;
 use tokio::sync::{mpsc, oneshot};
-use tungstenite::Bytes;
 
 pub type NodeCommandReceiver = mpsc::Receiver<NodeCommand>;
 pub type NodeCommandSender = mpsc::Sender<NodeCommand>;
@@ -180,7 +181,7 @@ impl RosNode {
                 request,
                 reply,
             } => match self
-                .send_service_call(&service_name, expected_type, &request)
+                .send_service_call(&service_name, expected_type.as_deref(), &request)
                 .await
             {
                 Ok((call_id, service_id)) => {
@@ -227,7 +228,7 @@ impl RosNode {
     async fn send_service_call(
         &mut self,
         service_name: &str,
-        expected_type: Option<&'static str>, // TODO: likely don't need expected_type here either
+        expected_type: Option<&str>,
         request: &[u8],
     ) -> Result<(CallId, ServiceId), NodeError> {
         let service = self
@@ -418,7 +419,7 @@ impl NodeHandle {
             })
             .await?;
 
-        let task = tokio::spawn(async move {
+        let task = SubscriptionTask::spawn(async move {
             while let Some(message) = receiver.recv().await {
                 callback(message);
             }
@@ -449,30 +450,44 @@ impl NodeHandle {
     {
         let request = request.serialize().map_err(NodeError::Encode)?;
         let response = self
-            .call_service_bytes(service_name, Some(S::TYPE_NAME), request, timeout)
+            .call_raw_service(service_name, Some(S::TYPE_NAME), request, timeout)
             .await?;
         S::Response::deserialize(&response).map_err(NodeError::Decode)
     }
 
-    // TODO: Merge into call_service<S>() because we may not need expected_type to be an Option
-    async fn call_service_bytes(
+    /// Calls an advertised Foxglove service with already encoded request bytes.
+    pub async fn call_raw_service(
         &self,
         service_name: &str,
-        expected_type: Option<&'static str>,
+        expected_type: Option<&str>,
         request: Vec<u8>,
         timeout: Duration,
     ) -> Result<Bytes, NodeError> {
         // Future of byte result from oneshot sender
         let call = self.send_request::<Bytes>(|reply| NodeCommand::CallService {
             service_name: service_name.to_owned(),
-            expected_type,
+            expected_type: expected_type.map(str::to_owned),
             request,
             reply,
         });
         // On timeout the reply receiver is dropped, the node drops the pending call later
-        tokio::time::timeout(timeout, call)
-            .await
-            .map_err(|_| NodeError::Timeout)?
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            tokio::time::timeout(timeout, call)
+                .await
+                .map_err(|_| NodeError::Timeout)?
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            use futures_util::{select, FutureExt};
+            let call = call.fuse();
+            let timer = gloo_timers::future::TimeoutFuture::new(timeout.as_millis() as u32).fuse();
+            futures_util::pin_mut!(call, timer);
+            select! {
+                result = call => result,
+                _ = timer => Err(NodeError::Timeout),
+            }
+        }
     }
 
     /// Generic helper for sending node commands

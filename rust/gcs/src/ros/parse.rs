@@ -1,5 +1,5 @@
+use bytes::Bytes;
 use std::fmt;
-use tungstenite::Bytes;
 
 use crate::ros::server_types::{
     BinaryOpcode, CallId, ClientBinaryOpcode, MessageData, ServerMessage, ServiceCallResponse,

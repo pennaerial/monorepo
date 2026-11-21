@@ -24,7 +24,7 @@ fn App() -> Element {
     use_context_provider(|| {
         let (node_handle, mut node) = RosNode::new(64); // channel depth 64
 
-        tokio::spawn(async move {
+        dioxus::prelude::spawn(async move {
             if let Err(e) = node.spin().await {
                 error!("Node stopped: {:?}", e);
             }

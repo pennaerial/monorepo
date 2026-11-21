@@ -1,7 +1,7 @@
+use bytes::Bytes;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fmt;
-use tungstenite::Bytes;
 
 use crate::ros::parse::ParseError;
 use crate::ros::subscription::SubscriptionId;

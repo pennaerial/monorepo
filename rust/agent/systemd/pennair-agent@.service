@@ -1,0 +1,28 @@
+[Unit]
+Description=PennAir Foxglove server and deployment agent for %i
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=%i
+Group=%i
+EnvironmentFile=/etc/pennair/agent.env
+Environment=PENNAIR_AGENT_ROOT=/home/%i/monorepo
+WorkingDirectory=/home/%i
+ExecStart=/usr/local/bin/pennair-agent
+Restart=on-failure
+RestartSec=2
+UMask=0077
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/%i/monorepo
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=multi-user.target
