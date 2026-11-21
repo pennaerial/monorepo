@@ -4,12 +4,6 @@ use std::marker::PhantomData;
 
 use crate::ros::{NodeError, NodeHandle, SubscriptionHandle};
 
-/// Stores the shared node handle in a copyable signal for UI callbacks.
-pub fn use_ros_node() -> Signal<NodeHandle> {
-    let node = use_context::<NodeHandle>();
-    use_signal(move || node)
-}
-
 #[derive(Clone)]
 pub struct UseSubscription<T> {
     node: NodeHandle,
