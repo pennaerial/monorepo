@@ -11,6 +11,7 @@ You can find the website **[here.](https://pennaerial.github.io/monorepo/)**
 Breakdown of docs:
 | Section | Description |
 | --- | --- |
-| 🛠️ **[Installation](https://pennaerial.github.io/monorepo/installation/index.html)** | Set up the development environment and install required dependencies. |
+| 🛠️ **[Developer Setup](https://pennaerial.github.io/monorepo/installation/index.html)** | Set up the development environment and install required dependencies. |
+| 🔧 **[Hardware Setup](https://pennaerial.github.io/monorepo/hardware/index.html)** | Prepare Raspberry Pis using the club image and check their mesh connection. |
 | 📚 **[Tutorials](https://pennaerial.github.io/monorepo/tutorials/index.html)** | Step-by-step guides for working with our software, tools, and systems. |
 | 📐 **[Development Guidelines](https://pennaerial.github.io/monorepo/development-guide.html)** | Coding standards, Git workflows, pull requests, testing, and other development practices. |

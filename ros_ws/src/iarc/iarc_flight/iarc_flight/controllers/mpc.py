@@ -18,7 +18,7 @@ class MPCConfig(BaseModel):
     max_speed: float = 3.0  # m/s per axis
     position_weight: float = 10.0
     velocity_weight: float = 1.0
-    accel_weight: float = 0.1
+    accel_weight: float = 0.5
 
     def build(self) -> MPCController:
         return MPCController(self)

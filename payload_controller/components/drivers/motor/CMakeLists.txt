@@ -6,7 +6,8 @@ if(IDF_TARGET STREQUAL "linux")
     list(APPEND srcs "motor_sitl.cpp")
     list(APPEND priv_requires sitl)
 else()
-    list(APPEND srcs "motor_hw.cpp")
+    list(APPEND srcs "DRV8833.cpp")
+    list(APPEND priv_requires esp_driver_ledc esp_driver_gpio)
 endif()
 
 idf_component_register(

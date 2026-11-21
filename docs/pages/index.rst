@@ -25,15 +25,21 @@ PennAiR Monorepo
 Quick Links
 -----------
 
-.. grid:: 1 1 2 3
+.. grid:: 1 1 2 2
     :gutter: 2
     :padding: 0
 
-    .. grid-item-card:: :iconify:`lucide:download` Installation
+    .. grid-item-card:: :iconify:`lucide:download` Developer Setup
         :link: installation/index
         :link-type: doc
 
-        Installation Guide for Linux/macOS. Includes ROS 2, PX4, Gazebo Simulation, and ESP-32 toolchain for payload firmware.
+        Set up your development laptop on Ubuntu, macOS, or Windows. Includes ROS 2, PX4, Gazebo Simulation, and the ESP-32 toolchain for payload firmware.
+
+    .. grid-item-card:: :iconify:`lucide:cpu` Hardware Setup
+        :link: hardware/index
+        :link-type: doc
+
+        Prepare a Raspberry Pi using the club image, assign its hostname, and check its mesh connection.
 
     .. grid-item-card:: :iconify:`lucide:book-open` Tutorials
         :link: tutorials/index
@@ -53,6 +59,7 @@ Quick Links
    :caption: GETTING STARTED
 
    installation/index
+   hardware/index
    tutorials/index
    concepts/index
 

@@ -1,11 +1,14 @@
 #pragma once
 
+#include "camera.hpp"
 #include "dds_client.hpp"
+#include "ekf.hpp"
 #include "encoder.hpp"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "imu.hpp"
+#include "log_rate_limiter.hpp"
 #include "motor.hpp"
 #include "payload_corner.hpp"
 #include "payload_interfaces/msg/MotorState.h"
@@ -40,13 +43,14 @@ struct MotorWrapper {
   drivers::Motor& motor;
   float pwm = 0.0f;
   int64_t last_control_timestamp_us = 0;
-  int64_t last_debug_timestamp_us = 0;
+  util::LogRateLimiter debug_rate;
 };
 
 class Payload
 {
 public:
-  void init();
+  // Initial IMU position in world XYZ metres (Z-up); initial attitude is identity.
+  void init(const Eigen::Vector3f& start_position);
   void update();
   void publish_sensor_debug();
   void motor_updates();
@@ -61,6 +65,24 @@ private:
   Payload& operator=(const Payload&) = delete;
   Payload(Payload&&) = delete;
   Payload& operator=(Payload&&) = delete;
+
+  // Single consumer of EKF cursors/state; may be moved to an estimator task later.
+  void update_estimator();
+
+  uint32_t last_ekf_imu_update_ = 0;
+  uint32_t last_ekf_left_update_ = 0;
+  uint32_t last_ekf_right_update_ = 0;
+  uint32_t last_ekf_camera_update_ = 0;
+  bool ekf_left_pending_ = false;
+  bool ekf_right_pending_ = false;
+  bool ekf_has_gyro_ = false;
+  double ekf_left_rad_s_ = 0;
+  double ekf_right_rad_s_ = 0;
+  Eigen::Vector3f ekf_gyro_ = Eigen::Vector3f::Zero();
+  util::LogRateLimiter imu_debug_rate_;
+  util::LogRateLimiter encoder_debug_rate_;
+  util::LogRateLimiter camera_debug_rate_;
+  util::LogRateLimiter publish_warning_rate_;
 
   /// Copies a new encoder reading into latest_motor_state_. Returns true if it was new.
   bool read_encoder(EncoderWrapper& wrapper);

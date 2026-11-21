@@ -16,6 +16,6 @@ dependencies:
 direct_dependencies:
 - espressif/eigen
 - idf
-manifest_hash: 35c31dd2abef4d8e8004a896c6459ffa925fb3f7510aed6cc0fad9784eb843f1
+manifest_hash: 2c707f9d7d545fca684a21f1355401f6c1aa6baba48bb753f935bde854577bc1
 target: linux
 version: 3.0.0

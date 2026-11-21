@@ -15,7 +15,7 @@ extern "C" void app_main(void)
   DDSClient::instance().init();
 
   Payload* payload = Payload::instance();
-  payload->init();
+  payload->init(Eigen::Vector3f::Zero());  // Set to the known initial world position.
 #else
   drivers::IMU* imu = drivers::IMU::instance();
   imu->start();
