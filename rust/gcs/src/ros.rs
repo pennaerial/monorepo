@@ -1,3 +1,7 @@
+#[cfg(not(target_arch = "wasm32"))]
+mod foxglove_client;
+#[cfg(target_arch = "wasm32")]
+#[path = "ros/foxglove_client_web.rs"]
 mod foxglove_client;
 mod node;
 mod node_command;

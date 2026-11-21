@@ -77,12 +77,19 @@ jobs:
           cppfmt --check
 
         # TODO: Add clippy, dx fmt, cargo check. Move build to mergebuild.yml
-      - name: Rust format & build
+      - name: Rust format, build, and test
         if: ${{ steps.filter.outputs.rust == 'true' }}
-        working-directory: rust/cli
         run: |
-          cargo fmt --check
-          cargo build --locked
+          cargo fmt --manifest-path rust/Cargo.toml --all --check
+          cargo build --manifest-path rust/agent/Cargo.toml --locked
+          cargo build --manifest-path rust/cli/Cargo.toml --locked
+          cargo build --manifest-path rust/gcs/Cargo.toml --no-default-features --locked
+          cargo test --manifest-path rust/protocol/Cargo.toml --locked
+          cargo test --manifest-path rust/agent/Cargo.toml --locked
+          cargo test --manifest-path rust/cli/Cargo.toml --locked
+          cargo test --manifest-path rust/gcs/Cargo.toml --no-default-features --locked
+          rustup target add wasm32-unknown-unknown
+          cargo check --manifest-path rust/gcs/Cargo.toml --target wasm32-unknown-unknown --no-default-features --features web --locked
 
       - name: Check monorepo.toml
         if: ${{ steps.filter.outputs.rust == 'true' }}

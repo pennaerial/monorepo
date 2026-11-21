@@ -83,7 +83,7 @@ python_packages = [
     "ruff==0.16.7",
 ]
 
-# Pis build the source pushed by `pennair push`, so prod needs build tools too.
+# Pis build source deployed by the GCS, so prod needs build tools too.
 [groups.prod]
 packages = [
     "build-essential",
@@ -104,7 +104,7 @@ debs = [
     { package = "pennair-libcamera-rpi", version = "0.8.0", url = "https://github.com/pennaerial/Dependencies/releases/download/libcamera-d638b39fafdf54075995b1293c217d6a701de851/libcamera-pi4-noble-arm64.tar.gz" },
 ]
 
-# Source that `pennair push` copies to ~/monorepo on each Pi and builds there.
+# Source that the GCS deploys to ~/monorepo on each Pi and builds there.
 [deploy]
 paths = [
     "monorepo.toml",

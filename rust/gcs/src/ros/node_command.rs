@@ -1,6 +1,6 @@
 use crate::ros::{node::NodeError, SubscriptionId, SubscriptionSinkBase};
+use bytes::Bytes;
 use tokio::sync::oneshot;
-use tungstenite::Bytes;
 
 pub enum NodeCommand {
     Connect {
@@ -20,10 +20,10 @@ pub enum NodeCommand {
     CallService {
         service_name: String,
         /// When set, the call fails unless the service is advertised with this type
-        expected_type: Option<&'static str>,
-        /// CDR-encoded request
+        expected_type: Option<String>,
+        /// Request encoded using the service's advertised request encoding
         request: Vec<u8>,
-        /// CDR-encoded response
+        /// Response bytes using the service's advertised response encoding
         reply: oneshot::Sender<Result<Bytes, NodeError>>,
     },
 }

@@ -1,4 +1,5 @@
 use ros_interfaces::RosMessage;
+use std::future::Future;
 use tokio::sync::mpsc;
 
 pub type SubscriptionId = u32;
@@ -54,14 +55,14 @@ impl<T: RosMessage> SubscriptionSinkBase for SubscriptionSink<T> {
 pub struct SubscriptionHandle {
     subscription_id: SubscriptionId,
     topic_name: String,
-    task: tokio::task::JoinHandle<()>,
+    task: SubscriptionTask,
 }
 
 impl SubscriptionHandle {
-    pub fn new(
+    pub(crate) fn new(
         subscription_id: SubscriptionId,
         topic_name: String,
-        task: tokio::task::JoinHandle<()>,
+        task: SubscriptionTask,
     ) -> Self {
         Self {
             subscription_id,
@@ -75,6 +76,36 @@ impl Drop for SubscriptionHandle {
     fn drop(&mut self) {
         // TODO: Notify RosNode to remove this subscription and unsubscribe from the
         // server when no listeners remain, so remounting does not leak subscriptions.
-        self.task.abort();
+        self.task.cancel();
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) struct SubscriptionTask(tokio::task::JoinHandle<()>);
+
+#[cfg(not(target_arch = "wasm32"))]
+impl SubscriptionTask {
+    pub fn spawn(future: impl Future<Output = ()> + Send + 'static) -> Self {
+        Self(tokio::spawn(future))
+    }
+
+    fn cancel(&mut self) {
+        self.0.abort();
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+pub(crate) struct SubscriptionTask(Option<dioxus::dioxus_core::Task>);
+
+#[cfg(target_arch = "wasm32")]
+impl SubscriptionTask {
+    pub fn spawn(future: impl Future<Output = ()> + 'static) -> Self {
+        Self(Some(dioxus::prelude::spawn(future)))
+    }
+
+    fn cancel(&mut self) {
+        if let Some(task) = self.0.take() {
+            task.cancel();
+        }
     }
 }
