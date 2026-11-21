@@ -27,9 +27,10 @@
   width: 250px;
   min-height: 100vh;
   box-sizing: border-box;
-  padding: 24px 16px;
-  background: #111827;
-  color: #e5e7eb;
+  padding: 0 16px 24px;
+  background: #fff;
+  color: #0f172a;
+  border-right: 1px solid #cbd5e1;
 }
 .sidebar-nav {
   display: flex;
@@ -43,6 +44,10 @@
   gap: 12px;
   padding: 12px;
   border-radius: 7px;
-  color: #cbd5e1;
+  color: #334155;
   text-decoration: none;
+}
+
+.sidebar-link-active {
+  background-color: #e2e8f0;
 }
