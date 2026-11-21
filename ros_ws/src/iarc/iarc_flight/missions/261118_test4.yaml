@@ -1,4 +1,5 @@
-start:
+modes:
+  start:
     mode: uav.VerticalTakeoffMode
     params:
       takeoff_height: 5.0
