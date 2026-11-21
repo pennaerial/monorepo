@@ -5,5 +5,7 @@
 
    <class type="pennair_vision::AprilTagPlugin" base_class_type="pennair_vision::VisionPlugin">
     <description>AprilTag Vision Plugin</description>
+  <class type="pennair_vision::VisionRepublisher" base_class_type="pennair_vision::VisionPlugin">
+    <description>Republishes raw camera frames on /cv/debug at debug_image_rate</description>
   </class>
 </library>

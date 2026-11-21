@@ -37,6 +37,7 @@ class Args(StrEnum):
     WORLD = "world"
     MODEL_POSE = "model_pose"
     RUN_MW = "run_mw"
+    AUTO_LAUNCH = "auto_launch"
     LAUNCH_SIM = "launch_sim"
     STANDALONE = "standalone"
     HEADLESS = "headless"
@@ -78,6 +79,7 @@ def px4_sitl_action(
 def launch_setup(context) -> list[Action]:
     config = context.launch_configurations  # dict containing declared launch arguments
     debug: str = config[Args.DEBUG]
+    auto_launch: str = config[Args.AUTO_LAUNCH]
     logger = get_logger("uav_sitl.launch", logging.DEBUG if is_truthy(debug) else logging.INFO)
     check_unknown_launch_args(Args, config, logger)  # warn for unknown args
 
@@ -138,15 +140,27 @@ def launch_setup(context) -> list[Action]:
                 "mode_map": str(mission_path),
                 "vehicle_name": vehicle_ns,
                 "vehicle_class": airframe.airframe_class.name,
-                "auto_launch": True,
+                "auto_launch": is_truthy(auto_launch),
             }
         ],
         output="screen",
-        arguments=["--ros-args", "--log-level", "debug" if is_truthy(debug) else "info"],
+        arguments=[
+            "--ros-args",
+            "--log-level",
+            "info",
+            "--log-level",  # only set mode_manager log level to debug, to avoid rcl debug message bloat
+            f"{vehicle_ns}.mode_manager:={'debug' if is_truthy(debug) else 'info'}",
+        ],
     )
 
+    middleware_cmd = ["MicroXRCEAgent", "udp4", "-p", "8888"]
+
+    # if not debug set Agent verbosity level to 3 to reduce log bloat in sim
+    if not is_truthy(debug):
+        middleware_cmd.extend(["-v", "3"])
+
     middleware = ExecuteProcess(
-        cmd=["MicroXRCEAgent", "udp4", "-p", "8888"],
+        cmd=middleware_cmd,
         output="screen",
         name="MicroXRCEAgent",
     )
@@ -208,7 +222,7 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 Args.MISSION,
                 default_value="basic",
-                description="Name of the mission to load. Run 'pennair mission <mission_package>' to see the available missions.",
+                description="Name of the mission to load. Run 'ros2 run pennair_cli pennair mission <mission_package>' to see the available missions.",
             ),
             DeclareLaunchArgument(
                 Args.MISSION_PACKAGE,
@@ -223,7 +237,7 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 Args.AIRFRAME,
                 default_value="quadcopter",
-                description="UAV airframe to load. Run 'pennair airframe ls' to see all available airframes.",
+                description="UAV airframe to load. Run 'ros2 run pennair_cli pennair airframe ls' to see all available airframes.",
             ),
             DeclareLaunchArgument(
                 Args.WORLD,
@@ -239,6 +253,12 @@ def generate_launch_description():
                 Args.RUN_MW,
                 default_value="false",
                 description="if this or standalone is true, runs the MicroXRCEAgent middleware to bridge ROS to PX4 SITL",
+                choices=["true", "false", "t", "f", "0", "1"],
+            ),
+            DeclareLaunchArgument(
+                Args.AUTO_LAUNCH,
+                default_value="true",
+                description="If true, attempts to auto start mode manager control loop once all preflight conditions have passed",
                 choices=["true", "false", "t", "f", "0", "1"],
             ),
             DeclareLaunchArgument(

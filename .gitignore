@@ -31,6 +31,8 @@ crash course/data/MNIST/raw/*
 .cache/
 version.json
 
+# rust
+target
 
 # submodules
 .gitmodules
