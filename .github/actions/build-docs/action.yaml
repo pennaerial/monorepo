@@ -20,6 +20,11 @@ runs:
         python-version: "3.12"
         enable-cache: true
 
+    - name: Set up Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: "22"
+
     - name: Install Dependencies
       shell: bash
       run: |

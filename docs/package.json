@@ -1,0 +1,9 @@
+{
+  "name": "pennair-docs-browser-assets",
+  "private": true,
+  "description": "Pinned browser dependencies for locally rendered documentation diagrams",
+  "dependencies": {
+    "mermaid": "11.17.2",
+    "d3": "7.9.0"
+  }
+}

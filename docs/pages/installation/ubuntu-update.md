@@ -1,3 +1,10 @@
+---
+doc-status: evolving
+status-reason: Legacy Ubuntu migration notes require review for each existing installation.
+---
+
+# Upgrading an Existing Ubuntu Setup
+
 ## Updating from `22.04`
 First update the system
 ```bash

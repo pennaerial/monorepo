@@ -1,0 +1,63 @@
+/* Status has a visible WIP label as well as color. */
+.globaltoc a.docs-status-evolving,
+a.docs-status-evolving {
+  color: #775000;
+  background-color: #fff3c4;
+  border-radius: 0.25rem;
+  box-decoration-break: clone;
+}
+.globaltoc a.docs-status-evolving:hover {
+  background-color: #ffe69a;
+  color: #513600;
+}
+.docs-status-badge {
+  font-size: 0.72em;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.docs-status-banner {
+  border-left: 0.3rem solid #d69e00;
+  background: #fff3c4;
+  color: #513600;
+  padding: 0.85rem 1rem;
+  border-radius: 0.3rem;
+  margin-block: 1rem;
+}
+.docs-status-banner .admonition-title {
+  font-weight: 700;
+  margin-top: 0;
+}
+html.dark .globaltoc a.docs-status-evolving,
+html.dark a.docs-status-evolving,
+html[data-theme="dark"] a.docs-status-evolving {
+  background-color: #493600;
+  color: #ffe49a;
+}
+html.dark .docs-status-banner,
+html[data-theme="dark"] .docs-status-banner {
+  background: #493600;
+  color: #ffe49a;
+}
+
+/* Review is separate from WIP. Missing review metadata always means unverified. */
+.docs-review-badge {
+  display: block;
+  width: fit-content;
+  font-size: 0.68rem;
+  line-height: 1.3;
+  font-weight: 500;
+  color: var(--sy-c-light, #64748b);
+  margin-block: 0.12rem 0.2rem;
+}
+.docs-human-verified .docs-review-badge { color: #187343; }
+.docs-review-banner {
+  border-left: 0.25rem solid #94a3b8;
+  border-radius: 0.3rem;
+  padding: 0.65rem 1rem;
+  margin-block: 1rem;
+  background: #f1f5f9;
+  color: #334155;
+}
+.docs-review-verified { border-color: #16a34a; }
+html.dark .docs-review-banner { background: #26313e; color: #e2e8f0; }
+html.dark .docs-human-verified .docs-review-badge { color: #86efac; }

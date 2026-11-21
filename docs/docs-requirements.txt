@@ -10,3 +10,6 @@ sphinx-copybutton
 sphinx-tabs
 sphinx-iconify
 sphinx-docsearch
+requests
+PyYAML
+sphinxcontrib-mermaid>=2.1.1,<3

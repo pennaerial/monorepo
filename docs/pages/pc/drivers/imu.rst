@@ -1,19 +1,7 @@
-IMU Interface
-===============
+:orphan:
 
-IMU sensor abstraction layer.
+IMU Guide Has Moved
+===================
 
-This module provides a common interface for IMU drivers (Hardware and SITL).
-
-
-IMU Implementations:
-
-.. toctree::
-   :maxdepth: 2
-
-   imu_sitl
-
-
-.. doxygenfile:: imu.hpp
-   :project: payload_controller
-
+Read :doc:`../sensors/imu/index`, then choose :doc:`../sensors/imu/sitl` or
+:doc:`../sensors/imu/hardware`. Function declarations are in :doc:`../reference/drivers`.

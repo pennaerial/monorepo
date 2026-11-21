@@ -15,8 +15,9 @@ Setting Up Docs Environment
 
 Making changes to the documentation requires you to be able to run the docs locally. This lets you verify that your changes are working properly.
 
-Follow the **Running Docs Locally** section in our guide for :doc:`Contributing to Docs <../docs-contribution>`. Make sure that run the
-``SKIP_AUTOAPI_BUILD=1 make serve`` command for faster builds.
+Follow :doc:`Editing and Previewing Docs <../docs-contribution>` to install the
+requirements and run ``make start`` from ``docs/``. It skips Python API generation
+by default for faster previews while you edit contributor information.
 
 Creating a Branch
 `````````````````

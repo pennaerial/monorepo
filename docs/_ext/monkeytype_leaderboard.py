@@ -82,8 +82,9 @@ class MonkeytypeLeaderboard(SphinxDirective):
             rst.extend(
                 [
                     "",
-                    "   +++",
-                    "   Self-reported WPM. Equal scores share a rank.",
+                    "   .. card-footer::",
+                    "",
+                    "      Self-reported WPM. Equal scores share a rank.",
                     "",
                 ]
             )

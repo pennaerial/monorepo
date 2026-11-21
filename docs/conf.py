@@ -18,7 +18,8 @@ exclude_patterns = ["build", "_build", "Thumbs.db", ".DS_Store"]
 # -- Options for HTML output --------------------------------------------------
 html_theme = "shibuya"
 html_title = "PennAiR Monorepo Documentation"
-html_static_path = ["_static"]  # path for extra static html elements, like favicons
+html_css_files = ["docs-api.css"]
+html_static_path = ["_static", "build/browser-assets"]  # path for extra static html elements, like favicons
 html_logo = "_static/penn-air-full-logo.png"
 html_favicon = "_static/pennair-preview-150x150.png"
 html_theme_options = {
@@ -36,7 +37,13 @@ html_theme_options = {
 # if 1, skips autoapi build for faster local iteration on handwritten docs
 SKIP_AUTOAPI_BUILD = os.environ.get("SKIP_AUTOAPI_BUILD") == "1"
 
-ROS_WS_PATH = os.environ["PENNAIR_ROS_WS_PATH"]
+REPO_ROOT = Path(__file__).resolve().parent.parent
+ROS_WS_PATH = os.environ.get("PENNAIR_ROS_WS_PATH", str(REPO_ROOT / "ros_ws"))
+
+
+def setup(app):
+    app.add_config_value("skip_autoapi_build", SKIP_AUTOAPI_BUILD, "env")
+
 
 sys.path.insert(0, str(Path(__file__).parent / "_ext"))  # make _ext modules discoverable
 
@@ -53,6 +60,9 @@ extensions = [
     # "sphinx_docsearch",
     # CUSTOM EXTENSIONS
     "pennair_contributors",
+    "docs_status",
+    "sphinxcontrib.mermaid",
+    "sphinx.ext.mathjax",
 ]
 #
 # docsearch_app_id = "<DOCSEARCH_APP_ID>"
@@ -75,7 +85,7 @@ if not SKIP_AUTOAPI_BUILD:
         f"{ROS_WS_PATH}/src/iarc/iarc_flight/iarc_flight",
     ]
     # Custom templates dir (only overrides python/module.rst). Used to customize names (favoring displaying short names over full module path names)
-    autoapi_template_dir = "../sphinx/_templates/autoapi"
+    autoapi_template_dir = "_templates/autoapi"
     autoapi_options = [
         "members",
         "undoc-members",
@@ -92,5 +102,17 @@ if not SKIP_AUTOAPI_BUILD:
 # =============================================================================
 
 breathe_projects = {
-    "payload_controller": f"{os.environ['PENNAIR_PAYLOAD_CONTROLLER_PATH']}/doxygen/xml"
+    "payload_controller": str(Path(os.environ.get("PENNAIR_PAYLOAD_CONTROLLER_PATH", REPO_ROOT / "payload_controller")) / "doxygen/xml")
 }
+
+# Mermaid diagrams share a restrained palette and adapt to the site's color mode.
+mermaid_version = "11.17.2"
+mermaid_use_local = "mermaid/mermaid.esm.min.mjs"
+d3_use_local = "d3/d3.min.js"
+mermaid_init_config = {
+    "startOnLoad": False,
+    "flowchart": {"curve": "basis", "htmlLabels": False, "nodeSpacing": 28, "rankSpacing": 42},
+    "themeVariables": {"fontFamily": "system-ui, sans-serif", "fontSize": "15px"},
+}
+mermaid_d3_zoom = True
+mermaid_fullscreen = True

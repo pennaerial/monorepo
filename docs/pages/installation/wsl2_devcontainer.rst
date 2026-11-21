@@ -1,9 +1,10 @@
-Windows Devcontainer Installation 
-====================
+Windows Devcontainer Installation
+=================================
 
 .. rst-class:: lead
 
    Installation Guide for Windows using WSL2 and Docker Devcontainer.
+
 ----
 
 Prerequisites

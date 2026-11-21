@@ -1,10 +1,7 @@
-Drivers
-========
+:orphan:
 
+Driver Guide Has Moved
+======================
 
-.. toctree::
-   :maxdepth: 2
-   :caption: Driver Modules
-
-   imu
-
+Continue to :doc:`../sensors/index` for the sensor/actuator overview, SITL and
+hardware guides, or :doc:`../reference/drivers` for generated declarations.

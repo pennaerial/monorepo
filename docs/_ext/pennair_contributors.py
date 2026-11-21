@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 import requests
@@ -10,6 +11,10 @@ from sphinx.util.docutils import SphinxDirective
 
 
 def get_github_contributions(repo: str) -> dict[str, int]:
+    # Offline previews still render every contributor, sorted alphabetically.
+    if os.environ.get("PENNAIR_DOCS_OFFLINE") == "1":
+        return {}
+
     response = requests.get(
         f"https://api.github.com/repos/{repo}/contributors",
         headers={

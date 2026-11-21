@@ -1,0 +1,72 @@
+/* Compact Breathe's nested API lists without altering prose learning pages. */
+.yue dl.cpp {
+  margin-block: 0.65rem;
+}
+.yue dl.cpp dl.cpp {
+  margin-block: 0.4rem;
+}
+.yue dl.cpp > dd {
+  margin-left: 1.1rem;
+}
+.yue dl.cpp > dd > p {
+  margin-block: 0.3rem 0.55rem;
+}
+.yue dl.cpp > dd > div {
+  margin-bottom: 0.5rem;
+}
+.yue dl.cpp .breathe-sectiondef-title {
+  margin-block: 0.8rem 0.35rem;
+}
+.yue dl.cpp dd:empty {
+  display: none;
+}
+/* Shibuya puts source links on a new line; C++ type links must stay inline. */
+.yue dt.sig.cpp > a.reference.internal {
+  font-size: inherit;
+}
+.yue dt.sig.cpp > a.reference.internal::before {
+  content: none;
+}
+.yue dt.sig.cpp {
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+.yue dt.sig.cpp > br:last-child {
+  display: none;
+}
+
+/* Mermaid already renders a dark theme; Shibuya's SVG inversion would invert it twice. */
+html.dark pre.mermaid > svg {
+  filter: none;
+}
+pre.mermaid .edgeLabel text {
+  fill: #334155 !important;
+}
+pre.mermaid .edgeLabel rect {
+  fill: #f1f5f9 !important;
+  opacity: 1;
+}
+pre.mermaid .flowchart-link {
+  stroke: #64748b !important;
+}
+
+pre.mermaid .cluster-label text,
+pre.mermaid .cluster-label tspan {
+  fill: #334155 !important;
+}
+pre.mermaid .edgeLabel .labelBkg {
+  fill: #f1f5f9 !important;
+  opacity: 1 !important;
+}
+pre.mermaid marker path {
+  fill: #64748b !important;
+  stroke: #64748b !important;
+}
+pre.mermaid .edgeLabels rect {
+  fill: #f1f5f9 !important;
+  opacity: 1 !important;
+}
+pre.mermaid .edgeLabel {
+  background-color: #f1f5f9 !important;
+  color: #334155 !important;
+}

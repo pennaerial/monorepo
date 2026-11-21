@@ -19,7 +19,7 @@ PennAiR Monorepo
 
 .. container:: buttons
 
-    :doc:`Get Started <installation/index>`
+    :doc:`Get Started <getting-started/index>`
     `GitHub <https://github.com/pennaerial/monorepo>`_
 
 Quick Links
@@ -29,61 +29,37 @@ Quick Links
     :gutter: 2
     :padding: 0
 
-    .. grid-item-card:: :iconify:`lucide:download` Developer Setup
-        :link: installation/index
+    .. grid-item-card:: :iconify:`lucide:compass` Getting Started
+        :link: getting-started/index
         :link-type: doc
 
-        Set up your development laptop on Ubuntu, macOS, or Windows. Includes ROS 2, PX4, Gazebo Simulation, and the ESP-32 toolchain for payload firmware.
+        Understand the monorepo, set up software and hardware, and make your first contribution.
 
-    .. grid-item-card:: :iconify:`lucide:cpu` Hardware Setup
-        :link: hardware/index
+    .. grid-item-card:: :iconify:`lucide:map` Documentation Map
+        :link: getting-started/organization
         :link-type: doc
 
-        Prepare a Raspberry Pi using the club image, assign its hostname, and check its mesh connection.
+        Find each learning path and understand the yellow in-progress page markers.
 
-    .. grid-item-card:: :iconify:`lucide:book-open` Tutorials
-        :link: tutorials/index
+    .. grid-item-card:: :iconify:`lucide:cpu` Payload Controller ESP
+        :link: pc/index
         :link-type: doc
 
-        Beginner Tutorials for monorepo development. Includes making your first contribution, creating modes, mission, etc.
+        Build and simulate the C++ controller, then learn drivers, DDS, estimation, and motor control.
 
-    .. grid-item-card:: :iconify:`material-symbols:rule` Contributing
-        :link: development-guide
+    .. grid-item-card:: :iconify:`lucide:network` ROS
+        :link: ros/index
         :link-type: doc
 
-        General guidelines for development and any contributions. Covers Git workflow and writing docs.
+        Explore the existing mission, mode, and Python API guides.
 
 .. toctree::
    :hidden:
-   :maxdepth: 2
-   :caption: GETTING STARTED
+   :maxdepth: 4
 
-   installation/index
-   hardware/index
-   tutorials/index
-   concepts/index
-
-.. toctree::
-   :hidden:
-   :maxdepth: 2
-   :caption: SAE 2025 WORKSPACE
-
-   Python API Reference <autoapi/index>
-
-.. toctree::
-   :hidden:
-   :maxdepth: 2
-   :caption: PAYLOAD CONTROLLER
-
-   C++ API Reference <pc/index>
-
-.. toctree::
-    :hidden:
-    :maxdepth: 2
-    :caption: CONTRIBUTING
-
-    development-guide
-    docs-contribution
+   Getting Started <getting-started/index>
+   Payload Controller ESP <pc/index>
+   ROS <ros/index>
 
 
 Active Contributors
