@@ -1,18 +1,8 @@
 name: Pi image
 
+# Run by hand from the Actions tab. A run on main publishes the image-latest release.
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - 'image/**'
-      - 'monorepo.toml'
-      - '.github/workflows/image.yml'
-  pull_request:
-    paths:
-      - 'image/**'
-      - 'monorepo.toml'
-      - '.github/workflows/image.yml'
 
 permissions:
   contents: write
@@ -40,7 +30,7 @@ jobs:
           sudo apt-get install -y cloud-guest-utils
           sudo image/build.sh rust/target/release/pennair pennair-pi.img.xz
 
-      # lets a PR's image be downloaded and flashed before it merges
+      # lets a branch's image be downloaded and flashed before it merges
       - name: Upload image
         uses: actions/upload-artifact@v4
         with:
@@ -50,7 +40,7 @@ jobs:
           retention-days: 7
 
       - name: Publish releases
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
