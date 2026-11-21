@@ -16,17 +16,15 @@ pub fn SideBar() -> Element {
 
     rsx! {
         aside {
-            class: "sidebar",
-            style: if !expanded() { "width: 64px; padding-inline: 10px;" },
-            div { class: "sidebar-header",
-                style: "display: flex; align-items: center; justify-content: space-between;",
+            class: if expanded() { "sidebar" } else { "sidebar w-16! px-2.5!" },
+            div { class: "flex items-center justify-between",
 
                 if expanded() {
                     h2 { "PennAiR GCS" }
                 }
                 button {
                     r#type: "button",
-                    style: "display: grid; place-items: center; width: 44px; height: 44px; margin-inline-start: auto; flex-shrink: 0; cursor: pointer;",
+                    class: "ms-auto grid size-11 shrink-0 cursor-pointer place-items-center",
                     // aria_label: toggle_label,
                     aria_expanded: if expanded() { "true" } else { "false" },
                     aria_controls: "sidebar-navigation",
@@ -42,12 +40,16 @@ pub fn SideBar() -> Element {
 
             // version label
             p {
-                style: format!("color: #64748b; font-size: 12px; line-height: 16px; text-align: {};", if expanded() { "left" } else { "center" }),
+                class: if expanded() {
+                    "text-left text-xs leading-4 text-[#64748b]"
+                } else {
+                    "text-center text-xs leading-4 text-[#64748b]"
+                },
                 {concat!("v", env!("CARGO_PKG_VERSION"))}
             }
 
             // horizontal line separator
-            hr { style: "border: 0; border-top: 1px solid #cbd5e1;" }
+            hr { class: "border-0 border-t border-solid border-[#cbd5e1]" }
 
             // sidebar items
             nav { class: "sidebar-nav",
