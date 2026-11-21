@@ -23,7 +23,7 @@ AprilTagPlugin::AprilTagPlugin()
   td_ = apriltag_detector_create();
   apriltag_detector_add_family(td_, tf_);
 
-  //estimated parameters for apriltag detection for now
+  // estimated parameters for apriltag detection for now
   td_->quad_decimate = 2.0;
   td_->quad_sigma = 0.0;
   td_->nthreads = 2;
@@ -102,10 +102,10 @@ AprilTagPlugin::process(const CameraImage& image, const CameraInfo& info, bool g
     estimate_tag_pose(&det_info, &pose);
     tag.pose_valid = (pose.R != nullptr && pose.t != nullptr);
     if (tag.pose_valid) {
-      tag.pose.position.x = pose.t->data[0]; //3D position of tag in camera frame
+      tag.pose.position.x = pose.t->data[0];  // 3D position of tag in camera frame
       tag.pose.position.y = pose.t->data[1];
       tag.pose.position.z = pose.t->data[2];
-      double r00 = pose.R->data[0]; //extracts all elements of the 3x3 rotation matrix
+      double r00 = pose.R->data[0];  // extracts all elements of the 3x3 rotation matrix
       double r01 = pose.R->data[1];
       double r02 = pose.R->data[2];
       double r10 = pose.R->data[3];
@@ -117,31 +117,31 @@ AprilTagPlugin::process(const CameraImage& image, const CameraInfo& info, bool g
 
       // converts rotation matrix to four quaternion values (qx, qy, qz, qw)
       // since ROS uses quaternions to represent 3D orientation
-      double trace = r00 + r11 + r22; // adds diagonal elements of rotation matrix
+      double trace = r00 + r11 + r22;  // adds diagonal elements of rotation matrix
       double qx, qy, qz, qw;
 
       // calculates quaternion values based on the trace
       // of the rotation matrix to improve numerical stability
       // s represents the scale factor for the quaternion values
-      if (trace > 0.0) { // positive trace, qw calculated first
+      if (trace > 0.0) {  // positive trace, qw calculated first
         double s = 2.0 * std::sqrt(trace + 1.0);
         qw = 0.25 * s;
         qx = (r21 - r12) / s;
         qy = (r02 - r20) / s;
         qz = (r10 - r01) / s;
-      } else if (r00 > r11 && r00 > r22) { // r00 is the largest diagonal element, qx calculated first
+      } else if (r00 > r11 && r00 > r22) {  // r00 is the largest diagonal element, qx calculated first
         double s = 2.0 * std::sqrt(1.0 + r00 - r11 - r22);
         qw = (r21 - r12) / s;
         qx = 0.25 * s;
         qy = (r01 + r10) / s;
         qz = (r02 + r20) / s;
-      } else if (r11 > r22) { // r11 is the largest diagonal element, qy calculated first
+      } else if (r11 > r22) {  // r11 is the largest diagonal element, qy calculated first
         double s = 2.0 * std::sqrt(1.0 + r11 - r00 - r22);
         qw = (r02 - r20) / s;
         qx = (r01 + r10) / s;
         qy = 0.25 * s;
         qz = (r12 + r21) / s;
-      } else { // r22 is the largest diagonal element, qz calculated first
+      } else {  // r22 is the largest diagonal element, qz calculated first
         double s = 2.0 * std::sqrt(1.0 + r22 - r00 - r11);
         qw = (r10 - r01) / s;
         qx = (r02 + r20) / s;
@@ -159,7 +159,7 @@ AprilTagPlugin::process(const CameraImage& image, const CameraInfo& info, bool g
         qw /= norm;
       }
 
-      tag.pose.orientation.x = qx; //stores quaternion values in tag message
+      tag.pose.orientation.x = qx;  // stores quaternion values in tag message
       tag.pose.orientation.y = qy;
       tag.pose.orientation.z = qz;
       tag.pose.orientation.w = qw;
@@ -182,7 +182,7 @@ AprilTagPlugin::process(const CameraImage& image, const CameraInfo& info, bool g
           0.5, cv::Scalar(0, 0, 255), 2
       );
 
-      //transforms points from tag coords to camera coords, and then projects them into img pixels
+      // transforms points from tag coords to camera coords, and then projects them into img pixels
       if (tag.pose_valid) {
         auto project_point = [&](double x, double y, double z) -> cv::Point {
           double X = pose.R->data[0] * x + pose.R->data[1] * y + pose.R->data[2] * z + pose.t->data[0];
