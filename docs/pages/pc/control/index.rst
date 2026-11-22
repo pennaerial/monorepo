@@ -1,3 +1,5 @@
+:doc-priority: key
+:key-reason: Start here for wheel-control work: understand the feedforward, feedback, and motor-output connections.
 :doc-status: evolving
 :status-reason: Fixed speed targets and provisional gains are used; hardware feedback integration and stale-feedback handling remain unfinished.
 

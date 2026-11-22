@@ -387,3 +387,30 @@ Further reading
 * `MyST syntax guide <https://myst-parser.readthedocs.io/en/latest/syntax/syntax.html>`_
 * `Mermaid flowchart guide <https://mermaid.js.org/syntax/flowchart.html>`_
 * `Shibuya writing guide <https://shibuya.lepture.com/writing/>`_
+
+Mark key reading pages
+----------------------
+
+Use a blue **Key** marker for architecture and behavior explanations that a new
+contributor should prioritize for a subsystem. Do not mark installation, setup,
+vocabulary, or exhaustive API pages merely because they are useful. In RST, put
+this metadata before the title, adjacent to any existing page metadata:
+
+.. code-block:: rst
+
+   :doc-priority: key
+   :key-reason: Read before changing the subsystem's data ownership and update order.
+
+   Page Title
+   ==========
+
+For Markdown, use the equivalent front matter fields ``doc-priority: key`` and
+``key-reason: ...``. The marker adds a blue sidebar badge and an explanatory page
+banner; it also adds the page to the Documentation Map's generated key-reading
+list. Removing the metadata removes the marker on rebuild. Update the project's
+short reading path when changing what contributors should read first.
+
+Priority is independent of ``doc-status: evolving`` and human-review metadata.
+A Key page can still be WIP and Not human verified; yellow WIP highlighting is
+retained alongside the blue Key badge. See :doc:`getting-started/organization`
+for the complete color key.

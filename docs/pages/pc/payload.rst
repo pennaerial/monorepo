@@ -1,3 +1,5 @@
+:doc-priority: key
+:key-reason: Read before changing update order, sample ownership, or connections between subsystems.
 :doc-status: evolving
 :status-reason: Payload currently connects the simulation path; setpoints are fixed and full hardware startup is not enabled.
 

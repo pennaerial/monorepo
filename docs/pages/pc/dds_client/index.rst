@@ -1,3 +1,5 @@
+:doc-priority: key
+:key-reason: Start here for DDS work: separate local sensor data from the Agent and message-publication path.
 :doc-status: evolving
 :status-reason: The simulation uses a working UDP network connection. The hardware UART serial connection is unfinished; the client identity and address are fixed.
 

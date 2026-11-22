@@ -1,3 +1,6 @@
+:doc-priority: key
+:key-reason: Read before changing checks or diagnosing a PR failure: path filters and actual test coverage matter.
+
 Automatic Checks and Local Reproduction
 =======================================
 

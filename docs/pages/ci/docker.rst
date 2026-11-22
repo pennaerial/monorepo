@@ -1,3 +1,6 @@
+:doc-priority: key
+:key-reason: Read before changing CI dependencies: distinguish cached image contents, live submodule refs, and PR-time builds.
+
 Docker Images and the Nightly Build
 ===================================
 

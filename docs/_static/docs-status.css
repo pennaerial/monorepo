@@ -61,3 +61,69 @@ html[data-theme="dark"] .docs-status-banner {
 .docs-review-verified { border-color: #16a34a; }
 html.dark .docs-review-banner { background: #26313e; color: #e2e8f0; }
 html.dark .docs-human-verified .docs-review-badge { color: #86efac; }
+
+/* Reading priority is independent of review and WIP. Keep yellow WIP backgrounds. */
+a.docs-reading-key {
+  border-inline-start: 0.2rem solid #2563eb;
+  padding-inline-start: 0.35rem;
+  border-radius: 0.25rem;
+}
+.globaltoc a.docs-reading-key:not(.docs-status-evolving),
+a.docs-reading-key:not(.docs-status-evolving) {
+  color: #1e40af;
+  background-color: #eff6ff;
+}
+.docs-key-badge {
+  display: inline-block;
+  margin-inline-start: 0.4rem;
+  padding: 0.05rem 0.35rem;
+  border-radius: 0.25rem;
+  background: #dbeafe;
+  color: #1e40af;
+  font-size: 0.68rem;
+  line-height: 1.4;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.docs-key-banner {
+  border-left: 0.25rem solid #2563eb;
+  border-radius: 0.3rem;
+  padding: 0.65rem 1rem;
+  margin-block: 1rem;
+  background: #eff6ff;
+  color: #1e3a8a;
+}
+.docs-key-banner .admonition-title { font-weight: 700; }
+html.dark .globaltoc a.docs-reading-key:not(.docs-status-evolving),
+html.dark a.docs-reading-key:not(.docs-status-evolving),
+html[data-theme="dark"] a.docs-reading-key:not(.docs-status-evolving) {
+  color: #bfdbfe;
+  background-color: #172b49;
+}
+html.dark .docs-key-badge,
+html[data-theme="dark"] .docs-key-badge {
+  background: #1e40af;
+  color: #dbeafe;
+}
+html.dark .docs-key-banner,
+html[data-theme="dark"] .docs-key-banner {
+  background: #172b49;
+  color: #dbeafe;
+}
+
+/* Sidebar links contain block-level review labels. Keep the whole link in one
+   box so wrapped titles cannot split the highlight or leave an empty border. */
+.globaltoc a.docs-reading-key,
+.globaltoc a.docs-status-evolving {
+  display: block;
+  box-decoration-break: slice;
+  padding: 0.2rem 0.4rem;
+  line-height: 1.45;
+}
+.globaltoc a.docs-reading-key .docs-key-badge {
+  vertical-align: 0.08em;
+}
+.globaltoc li:has(> button) > a.docs-reading-key,
+.globaltoc li:has(> button) > a.docs-status-evolving {
+  padding-inline-end: 1.6rem;
+}

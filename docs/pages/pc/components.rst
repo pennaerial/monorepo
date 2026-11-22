@@ -1,3 +1,5 @@
+:doc-priority: key
+:key-reason: Read before adding a component or changing its public/private dependencies.
 :human-verified: true
 :verified-by: User (review confirmed in chat)
 :verified-on: 2026-11-21

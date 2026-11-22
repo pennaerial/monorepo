@@ -1,3 +1,5 @@
+:doc-priority: key
+:key-reason: Start here for the sensor, estimation, control, and communication paths and their current hardware limits.
 :human-verified: true
 :verified-by: User (review confirmed in chat)
 :verified-on: 2026-11-21

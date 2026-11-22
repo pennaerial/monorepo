@@ -1,3 +1,6 @@
+:doc-priority: key
+:key-reason: Start here for automation work: see which workflows validate, build images, or publish outputs.
+
 CI/CD, Docker, and Automatic Checks
 ===================================
 
@@ -31,6 +34,11 @@ runners, and its **steps** invoke shell commands or reusable actions. Jobs can
 run in parallel unless ``needs`` makes one wait for another. CI means continuous
 integration: checking changes together. CD here includes publishing the docs
 and build images; the ARM archive is delivered for a separate hardware install.
+
+For a contribution, prioritize the blue Key :doc:`checks` page. For CI image
+changes, also read the blue Key :doc:`docker` page. Delivery and maintenance are
+follow-up references for the task you are doing. Key is reading priority, not a
+review or completeness claim.
 
 Read in this order
 ------------------

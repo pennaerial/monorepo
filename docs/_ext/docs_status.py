@@ -28,6 +28,11 @@ class StatusListDirective(SphinxDirective):
         return [StatusList()]
 
 
+class KeyListDirective(SphinxDirective):
+    def run(self):
+        return [StatusList(kind="key")]
+
+
 def evolving_pages(env):
     return {
         docname: metadata.get("status-reason", "This page is under active development.")
@@ -57,6 +62,8 @@ def page_statuses(env):
             continue
         verified, reviewer, date = review_status(env, name)
         result[name] = {
+            "key": env.metadata.get(name, {}).get("doc-priority") == "key",
+            "key_reason": env.metadata.get(name, {}).get("key-reason", "Read this page to understand the subsystem before changing it."),
             "reason": evolving.get(name),
             "verified": verified,
             "reviewer": reviewer,
@@ -79,6 +86,11 @@ def resolve_status(app, doctree, docname):
             banner += nodes.title(text="Not human verified")
             banner += nodes.paragraph(text="This page has not been recorded as reviewed by a club member. Check its instructions and assumptions before relying on them.")
         section.insert(1, banner)
+        if state["key"]:
+            key = nodes.admonition(classes=["docs-key-banner"])
+            key += nodes.title(text="Key reading")
+            key += nodes.paragraph(text=state["key_reason"])
+            section.insert(1, key)
         if state["reason"]:
             evolving = nodes.admonition(classes=["docs-status-banner"])
             evolving += nodes.title(text="In progress / likely to change")
@@ -87,16 +99,19 @@ def resolve_status(app, doctree, docname):
 
     for placeholder in list(doctree.findall(StatusList)):
         listing = nodes.bullet_list()
+        key_list = placeholder.get("kind") == "key"
         for target, state in sorted(statuses.items()):
-            if not state["reason"]:
+            if not (state["key"] if key_list else state["reason"]):
                 continue
             title = app.env.titles[target].astext()
             uri = app.builder.get_relative_uri(docname, target)
-            label = title + " · WIP" + (" · Human verified" if state["verified"] else " · Not human verified")
-            link = nodes.reference("", label, refuri=uri, classes=["docs-status-evolving"])
+            label = title + (" · Key" if state["key"] else "") + (" · WIP" if state["reason"] else "")
+            label += " · Human verified" if state["verified"] else " · Not human verified"
+            css = ["docs-reading-key"] if key_list else ["docs-status-evolving"]
+            link = nodes.reference("", label, refuri=uri, classes=css)
             paragraph = nodes.paragraph()
             paragraph += link
-            paragraph += nodes.Text(" — " + state["reason"])
+            paragraph += nodes.Text(" — " + (state["key_reason"] if key_list else state["reason"]))
             listing += nodes.list_item("", paragraph)
         placeholder.replace_self(listing)
 
@@ -118,8 +133,12 @@ class StatusNavigation(HTMLParser):
         if tag == "a" and state is not None:
             css = "docs-status-evolving" if state["reason"] else ""
             css += " docs-human-verified" if state["verified"] else " docs-not-verified"
+            if state["key"]:
+                css += " docs-reading-key"
             attributes["class"] = (attributes.get("class", "") + " " + css).strip()
             labels = []
+            if state["key"]:
+                labels.append("Key reading: " + state["key_reason"])
             if state["reason"]:
                 labels.append("In progress: " + state["reason"])
             labels.append(f'Human verified by {state["reviewer"]} on {state["date"]}' if state["verified"] else "Not human verified")
@@ -136,6 +155,8 @@ class StatusNavigation(HTMLParser):
     def handle_endtag(self, tag):
         if tag == "a" and self.active:
             state = self.active
+            if state["key"]:
+                self.output.append('<span class="docs-key-badge">Key</span>')
             if state["reason"]:
                 self.output.append('<span class="docs-status-badge"> · WIP</span>')
             label = "Human verified" if state["verified"] else "Not human verified"
@@ -179,6 +200,7 @@ def page_context(app, pagename, templatename, context, doctree):
 
 def setup(app):
     app.add_directive("docs-status-list", StatusListDirective)
+    app.add_directive("docs-key-list", KeyListDirective)
     app.add_directive("docs-python-api", PythonAPITocTree)
     app.add_css_file("docs-status.css")
     app.connect("doctree-resolved", resolve_status)

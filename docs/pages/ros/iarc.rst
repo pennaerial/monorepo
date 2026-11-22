@@ -1,3 +1,5 @@
+:doc-priority: key
+:key-reason: Read before IARC work to understand trajectory, tracking controller, mode, and shared UAV responsibilities.
 :doc-status: evolving
 :status-reason: IARC trajectories, controllers, mission parameters, and competition behavior change frequently. This page is a structural guide.
 

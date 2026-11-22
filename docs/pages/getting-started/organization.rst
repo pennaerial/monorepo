@@ -9,6 +9,10 @@ when looking up a particular function.
 Status color key
 ----------------
 
+* **Blue, with “Key” text:** recommended architecture or behavior reading for
+  the subsystem you want to change. Choose the relevant project reading path;
+  this is not a requirement to read every blue page. Setup and vocabulary pages
+  are deliberately not marked. Blue does not indicate reliability or review.
 * **Yellow, with “WIP” text:** the page is in progress or describes a system with
   incomplete implementation, provisional calibration, or likely interface changes.
   Its banner explains what remains uncertain. Yellow does not mean the page is empty.
@@ -18,7 +22,7 @@ Status color key
   their name and review date. This does not mean every linked page was reviewed,
   and a correct explanation can still describe unfinished software.
 
-Review and WIP are separate: a human-reviewed page may still be yellow if the
+Reading priority, review, and WIP are separate: a human-reviewed page may still be yellow if the
 system is changing. No page is treated as verified just because it has normal
 colors, passes a build, or was checked by an automated tool. Reviews are recorded
 per page; pages without a recorded review remain unverified.
@@ -71,8 +75,9 @@ ROS
 
 * :doc:`../ros/getting-started`: basic ROS tools, build/source steps, one UAV
   simulation, and a short introduction to missions and modes.
-* :doc:`../ros/common`: shared mission framework, UAV adapters, launch files,
-  simulation, interfaces, and evolving vision/planning packages.
+* :doc:`../ros/common`: focused tabs for mission loading/lifecycle, UAV runtime,
+  vehicle APIs, flight modes, launches, simulation, Gazebo bridges, vision,
+  planning, package builds, and tools. Blue Key markers identify core reading.
 * :doc:`../ros/iarc`: broad IARC trajectory/controller/mode structure (WIP).
 * :doc:`../ros/sae`: broad SAE payload/control/interface structure (WIP).
 * :doc:`../concepts/index` and the mission/mode tutorials deepen the behavior model.
@@ -86,6 +91,14 @@ CI/CD and Docker
 * :doc:`../ci/docker`: image contents, nightly refresh, submodules, and local inspection.
 * :doc:`../ci/delivery`: docs publication, ARM archives, and current packaging limitations.
 * :doc:`../ci/maintenance`: failure diagnosis and extending checks safely.
+
+Key architecture and behavior pages
+-----------------------------------
+
+This list follows page metadata. Start with the overview of your project, then
+choose the key pages relevant to your task. A page can be both Key and WIP.
+
+.. docs-key-list::
 
 Pages under active development
 ------------------------------

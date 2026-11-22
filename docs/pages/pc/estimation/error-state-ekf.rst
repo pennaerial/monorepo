@@ -1,3 +1,5 @@
+:doc-priority: key
+:key-reason: Start here for estimation work: understand nominal state, local error, and prediction/correction before the implementation.
 :doc-status: evolving
 :status-reason: This explains the current ES-EKF design; process-noise tuning, hardware integration, and some planned corrections remain unfinished.
 

@@ -1,3 +1,6 @@
+:doc-priority: key
+:key-reason: Read before driver changes to understand units, sample freshness, caches, and backend contracts.
+
 Sensors and Actuators
 =====================
 

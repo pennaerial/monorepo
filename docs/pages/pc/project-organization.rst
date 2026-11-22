@@ -1,3 +1,5 @@
+:doc-priority: key
+:key-reason: Read before locating or moving a feature: it maps runtime responsibilities to source components.
 :human-verified: true
 :verified-by: User (review confirmed in chat)
 :verified-on: 2026-11-21

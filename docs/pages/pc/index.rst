@@ -18,6 +18,21 @@ to run them. Follow the pages in order for an introduction, or jump to
 :doc:`reference/index` for function signatures. This is a different project from
 the Python ROS package at ``ros_ws/src/sae/payload``.
 
+Key reading for your task
+-------------------------
+
+Blue **Key** markers identify core architecture and behavior pages. Start with
+:doc:`overview` and :doc:`project-organization`, then choose a path:
+
+* **Drivers:** :doc:`sensors/index` → the device/backend page → :doc:`payload`.
+* **Communication:** :doc:`dds_client/index` → connection/topics → sending/receiving.
+* **Estimation:** :doc:`estimation/error-state-ekf` → implementation/integration.
+* **Motor control:** :doc:`control/index` → feedforward/PID/PWMController.
+* **Component/build changes:** :doc:`components` → :doc:`build-system` as needed.
+
+Key describes reading priority; WIP and human verification remain independent.
+Setup, vocabulary, and API lookup pages remain available without Key markers.
+
 .. toctree::
    :maxdepth: 3
 

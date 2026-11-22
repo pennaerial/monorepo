@@ -1,3 +1,5 @@
+:doc-priority: key
+:key-reason: Read before SAE work to distinguish payload behavior, ROS control backends, interfaces, and the separate ESP project.
 :doc-status: evolving
 :status-reason: SAE mission wiring, payload control, perception, and competition interfaces are changing. This page describes ownership and current structure.
 
