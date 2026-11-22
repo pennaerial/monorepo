@@ -51,7 +51,13 @@ Quick Links
         :link: ros/index
         :link-type: doc
 
-        Explore the existing mission, mode, and Python API guides.
+        Build and inspect ROS nodes, then learn the shared framework and IARC/SAE structure.
+
+    .. grid-item-card:: :iconify:`lucide:git-pull-request` CI/CD and Docker
+        :link: ci/index
+        :link-type: doc
+
+        Understand automatic checks, reproduce failures, and follow image and docs delivery.
 
 .. toctree::
    :hidden:
@@ -60,6 +66,7 @@ Quick Links
    Getting Started <getting-started/index>
    Payload Controller ESP <pc/index>
    ROS <ros/index>
+   CI/CD and Docker <ci/index>
 
 
 Active Contributors

@@ -8,12 +8,9 @@ An estimator answers “where are we, and how are we moving?” Sensors provide
 partial, noisy evidence: the IMU predicts rapid changes, wheels constrain motion
 along the ground, and camera position corrects accumulated drift.
 
-This project implements an **error-state extended Kalman filter (ES-EKF)**,
-also called an **ESKF**. The C++ class is named ``EKF``. Its **nominal state** is
-the main motion estimate; the **error state** describes small corrections to it.
-**Covariance** records uncertainty in those errors. **Bias** is a persistent
-sensor offset, such as a gyro reading a small rotation rate while stationary. Estimation is
-currently independent of wheel speed control: the controller uses encoders directly.
+The ``EKF`` class implements an ES-EKF. Start with :doc:`error-state-ekf` for
+its nominal state, error state, and uncertainty model. Estimation is currently
+independent of wheel speed control: the controller uses encoders directly.
 
 .. mermaid::
 

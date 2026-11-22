@@ -1,22 +1,19 @@
+:doc-status: evolving
+:status-reason: The make gz_payload launch wrapper is unreliable; use the manual existing-world workflow in Getting Started.
+
 Simulation Runtime and Message Conversion
 =========================================
 
-Here **simulation** means running the ``linux`` build on your computer, with
-Gazebo replacing the physical body, motors, and sensors. Linux is the operating
-system hosting the program; **SITL** means software-in-the-loop, this style of
-testing a controller with simulated devices. **Gazebo Transport** is the message
-library that connects the running simulator and the driver callbacks.
-
 Use :doc:`getting-started` for launch commands. This page explains the code behind
-those commands so you can change a model or debug a missing sample.
+those commands so you can change a model or debug a missing sample. The wrapper
+is currently WIP; use the manual ``sae`` / ``payload_2`` workflow there instead.
 
-What sim.sh starts
-------------------
+What sim.sh is intended to start
+--------------------------------
 
 ``scripts/sim.sh`` takes a model name and an optional world name. It verifies the
 model SDF, world SDF, and Linux executable exist, then exports Gazebo's resource
-path and ``gz-models/server.config``. An **SDF** describes bodies, joints, sensors,
-and simulation properties; the server config supplies simulation systems.
+path and ``gz-models/server.config``.
 
 It checks for ``/world/<world>/create``. If that service already exists, it reuses
 the running world. Otherwise it starts ``gz sim -r`` and waits up to 60 seconds
@@ -32,9 +29,7 @@ unique names on every rerun, so an old model can conflict with a later spawn.
 Why transport initialization comes first
 ----------------------------------------
 
-**FreeRTOS** is the controller's small operating system/task scheduler. Its
-**Linux port** is the version adapted to run on a Linux computer. It uses
-**SIGALRM**, an operating-system notification delivered to a process, to schedule tasks. Gazebo creates
+FreeRTOS's Linux port uses SIGALRM for task scheduling. Gazebo creates
 native worker threads that can hold internal locks. If its worker receives that
 scheduling signal while holding a lock, another task can become stuck waiting.
 
@@ -50,9 +45,8 @@ to those environment variables do not reconfigure already-created drivers.
 Conversion is copying, not filtering
 ------------------------------------
 
-``convert.hpp`` / ``convert.cpp`` translate Gazebo **protobuf** messages (data structures generated using Protocol Buffers)
-into the C message structs generated from **IDL**, the schema language used to
-declare this project's DDS message fields:
+``convert.hpp`` / ``convert.cpp`` translate Gazebo protobuf messages into the
+C structs generated from IDL:
 
 * Time copies seconds and converts nanoseconds to the destination integer type.
 * Vector3 and Quaternion copy their named coordinates/coefficients.

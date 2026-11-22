@@ -1,9 +1,10 @@
 Words and Tools Used in These Guides
 ====================================
 
-Use this page for a quick lookup. Each learning guide also explains the terms
-needed for its next step; you do not need to memorize this list before starting.
-For the two build targets, begin with :doc:`index`.
+Use this page to look up vocabulary used throughout the Payload Controller
+guides. The other pages focus on how the code works; they explain a term again
+only when it helps with a particular algorithm or decision. You do not need to
+memorize this list before starting. For the learning path, begin with :doc:`index`.
 
 .. glossary::
    :sorted:
@@ -111,7 +112,8 @@ For the two build targets, begin with :doc:`index`.
 
    QoS
       Quality of service: message delivery/history settings. The current DDS
-      topics use best-effort delivery and keep only the latest sample.
+      topics use best-effort delivery, volatile durability, and keep-last history
+      with depth 1. See the entries for these policies below.
 
    GPIO
       General-purpose input/output: a configurable chip pin for reading or driving
@@ -171,3 +173,212 @@ For the two build targets, begin with :doc:`index`.
    Feedforward
       An estimate of required motor effort made from the desired motion before
       waiting for a measured error. Feedback then corrects what that estimate missed.
+
+   Build target
+      The platform selected when building. Here ``linux`` produces a computer executable
+      and ``esp32s3`` produces firmware for the physical controller.
+
+   Component
+      An ESP-IDF build unit with its own sources, headers, and dependency declarations
+      in a ``CMakeLists.txt`` file.
+
+   Library
+      Reusable code linked into a program or included through headers. A header-only
+      library, such as Eigen, has no separate runtime process.
+
+   Header
+      A C/C++ file, usually ending in ``.h`` or ``.hpp``, that declares types and
+      functions. Public headers form the interface offered to other components.
+
+   Compiler and linker
+      The compiler translates source into object code. The linker combines that code and
+      its libraries into the final executable or firmware.
+
+   Assembler
+      The tool that translates assembly instructions into object code; it is normally
+      invoked by the compiler toolchain.
+
+   PATH
+      The shell setting listing directories to search for commands. Sourcing the
+      development environment adds the required tools to it.
+
+   ELF
+      Executable and Linkable Format, the file format used by the built
+      ``payload_controller.elf``. The Linux version can be run on the host computer.
+
+   Interface
+      The operations and data a piece of code offers to callers, separate from how it
+      implements them.
+
+   Sensor
+      A device or simulated source that measures a quantity, such as rotation rate or
+      wheel motion.
+
+   Actuator
+      A device that acts on the physical system. Here the motors apply forces through
+      the wheels.
+
+   Angular speed
+      Rotation rate, usually in radians per second (rad/s) in this project. A full turn
+      is 2π radians.
+
+   Duty
+      The fraction of a PWM cycle spent high. The motor API uses a signed normalized
+      request from -1 to +1 to express direction and effort.
+
+   Bias
+      A persistent offset in a measurement. For example, a stationary gyroscope can
+      report a small nonzero rate.
+
+   Noise
+      Unwanted variation in a measurement or process. The estimator models its
+      uncertainty rather than assuming each reading is exact.
+
+   Pose
+      Position and orientation together. A position-only camera message does not supply
+      a full pose.
+
+   Ground truth
+      The simulator's underlying state, used as a reference for comparison or to
+      generate simulated measurements.
+
+   SDF
+      Simulation Description Format, the files that describe Gazebo worlds, models,
+      links, joints, and sensors.
+
+   FreeRTOS Linux port
+      The implementation that lets FreeRTOS tasks run on Linux. This project uses
+      SIGALRM for scheduling; it is still a host program, not ESP hardware.
+
+   SIGALRM
+      A Unix signal used by this FreeRTOS Linux port to trigger scheduling. Gazebo
+      worker threads must block it to avoid interfering with their locks.
+
+   Thread
+      An independently scheduled sequence of work within a process. Gazebo callbacks and
+      controller tasks can access data at different times.
+
+   Static allocation
+      Reserving storage ahead of time rather than requesting it dynamically while the
+      program runs.
+
+   RAII
+      Resource Acquisition Is Initialization: a C++ pattern that acquires a resource in
+      an object's constructor and releases it in its destructor. Lock guards use it to
+      release mutexes automatically.
+
+   Function pointer
+      A value identifying a function to call. The DDS subscription registry uses
+      callbacks to handle incoming messages.
+
+   Template parameter
+      A compile-time argument to C++ code, such as a message type or matrix size.
+      Different arguments can produce different compiled implementations.
+
+   Tuple
+      A fixed-size collection whose elements can have different types. The DDS registry
+      groups topic descriptions this way.
+
+   CDR
+      Common Data Representation, the byte encoding used for DDS messages. Micro-CDR
+      supplies serialization helpers for the embedded client.
+
+   Topic
+      A named message channel with an agreed message type. Publishers and subscribers
+      must use compatible names, types, and settings.
+
+   DataWriter and DataReader
+      DDS entities that send and receive topic samples. A writer belongs to a publisher;
+      a reader belongs to a subscriber.
+
+   Participant
+      A DDS entity representing an application's participation in a DDS domain. The XRCE
+      Agent creates it on behalf of this client.
+
+   Publisher and subscriber
+      DDS entities that group writers and readers respectively. More generally,
+      publishing means sending samples and subscribing means registering to receive
+      them.
+
+   XRCE session
+      The connection state between a client and its Agent, including identifiers and
+      message streams.
+
+   Stream
+      An XRCE channel for moving protocol messages between client and Agent. Its buffers
+      and delivery mode are configured separately from a DDS topic.
+
+   MTU
+      Maximum transmission unit: the packet size limit used for a transport or buffer
+      configuration.
+
+   Socket
+      An operating-system endpoint for network communication. The Linux client uses a
+      UDP socket to contact the Agent.
+
+   Port
+      A number identifying a network endpoint on a host. UDP port 7777 is the Agent
+      endpoint used in these instructions.
+
+   DDS domain
+      A numbered logical DDS network. Programs generally need matching domain IDs to
+      discover each other; this is separate from the Agent's UDP port.
+
+   Best effort
+      A delivery policy that does not guarantee every sample arrives. Consumers must
+      cope with missing updates.
+
+   Volatile durability
+      A DDS policy that does not retain historical samples for a subscriber that joins
+      later.
+
+   Keep last
+      A DDS history policy retaining only a configured number of recent samples. Depth 1
+      keeps the latest sample.
+
+   Polling
+      Checking repeatedly for available work or new data. The client must service its
+      XRCE session for incoming callbacks to run.
+
+   Encoder
+      A sensor that measures shaft motion, often by counting pulses. The controller uses
+      counts and angular speed for wheel feedback.
+
+   Quadrature
+      Two encoder signals offset in phase. Their order indicates direction, and their
+      transitions can be counted to measure rotation.
+
+   Interrupt
+      An event that makes a processor run a handler promptly, such as when an encoder
+      input changes.
+
+   Standard deviation
+      A measure of spread in a distribution, expressed in the same units as the
+      quantity. Variance is its square.
+
+   Random seed
+      The starting value for a pseudo-random generator. Reusing it helps reproduce a
+      simulated noise sequence.
+
+   Lever arm
+      The displacement between a sensor and the reference point whose motion is being
+      estimated. Rotation can make those points move differently.
+
+   Hz
+      Hertz: events or cycles per second. A 10 Hz loop runs ten times per second when
+      timing permits.
+
+   Toolchain
+      The compiler, assembler, linker, and related tools selected to build for
+      a particular platform.
+
+   Register
+      A numbered location in a device for a configuration setting or measurement.
+      Drivers read and write these locations over a bus such as I2C.
+
+   Reliable stream
+      An XRCE stream that tracks delivery between client and Agent. This does
+      not by itself make the associated DDS topic's delivery policy reliable.
+
+   Unity
+      The C/C++ assertion framework used by the project's test helper.

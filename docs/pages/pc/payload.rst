@@ -4,16 +4,15 @@
 The Payload Class
 =================
 
-``Payload`` is the coordinator, not a device driver. A **driver** reads or controls
-one device; Payload connects those drivers to the estimator, controller, and message
-sender. A **setpoint** is a requested value, such as the desired wheel speed. It owns left/right motor
+``Payload`` connects the drivers to the estimator, controllers, and DDS debug
+publishing. It owns left/right motor
 controllers and wrappers, reads shared sensor caches, passes measurements to the
-EKF, and publishes debug messages through **DDS**, the system for sharing typed data between programs. Read :doc:`overview` for the complete loop.
+EKF, and publishes DDS debug messages. Read :doc:`overview` for the complete loop.
 
 Initialization and ownership
 ----------------------------
 
-``Payload::instance()`` returns a pointer to one static instance, called a **singleton**: a single shared object reused by all callers.
+``Payload::instance()`` returns a pointer to one shared static instance.
 The constructor pairs each wheel's motor and encoder with ``Side::LEFT`` or
 ``Side::RIGHT`` and constructs a speed controller for each. ``init(start_position)``
 resets the EKF, starts the camera and IMU, then starts both encoders and motors.

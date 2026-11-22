@@ -20,8 +20,8 @@ Status color key
 
 Review and WIP are separate: a human-reviewed page may still be yellow if the
 system is changing. No page is treated as verified just because it has normal
-colors, passes a build, or was checked by an automated tool. All pages in this
-refactor remain unverified until a person reviews them.
+colors, passes a build, or was checked by an automated tool. Reviews are recorded
+per page; pages without a recorded review remain unverified.
 
 Status appears on sidebar links, on the page itself, and in the live list below.
 The text label makes the distinction usable without relying on color. Status is
@@ -67,9 +67,25 @@ complete pass through the system.
 ROS
 ---
 
-:doc:`../ros/index` groups the existing mission, mode, and Python reference
-material. Its learning-path refactor is deferred; the Payload Controller and
-Getting Started sections are the current priority.
+:doc:`../ros/index` maps the workspace and its learning paths.
+
+* :doc:`../ros/getting-started`: basic ROS tools, build/source steps, one UAV
+  simulation, and a short introduction to missions and modes.
+* :doc:`../ros/common`: shared mission framework, UAV adapters, launch files,
+  simulation, interfaces, and evolving vision/planning packages.
+* :doc:`../ros/iarc`: broad IARC trajectory/controller/mode structure (WIP).
+* :doc:`../ros/sae`: broad SAE payload/control/interface structure (WIP).
+* :doc:`../concepts/index` and the mission/mode tutorials deepen the behavior model.
+
+CI/CD and Docker
+----------------
+
+:doc:`../ci/index` maps the GitHub workflows and their relationships.
+
+* :doc:`../ci/checks`: path filters, formatting/lint, builds, tests, and local commands.
+* :doc:`../ci/docker`: image contents, nightly refresh, submodules, and local inspection.
+* :doc:`../ci/delivery`: docs publication, ARM archives, and current packaging limitations.
+* :doc:`../ci/maintenance`: failure diagnosis and extending checks safely.
 
 Pages under active development
 ------------------------------

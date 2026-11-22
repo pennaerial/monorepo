@@ -1,10 +1,6 @@
 PID and PI Feedback
 ===================
 
-**PID** stands for proportional, integral, derivative. **PI** uses the first two
-terms only. A **gain** is the multiplier controlling how strongly one term acts;
-``dt`` or ``deltaT`` is elapsed time in seconds, not the number of loop iterations.
-
 Feedback adjusts effort using measured error ``e = setpoint - reading``.
 Proportional control reacts to today's error, integral control accumulates a
 persistent error, and derivative control reacts to changing measured speed.

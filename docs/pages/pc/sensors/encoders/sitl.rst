@@ -1,10 +1,6 @@
 Encoders in SITL
 ================
 
-In the ``linux`` simulation target, Gazebo represents each rotating wheel connection
-as a **joint**. A **joint-state message** reports joint position and motion at a
-timestamp. A subscription asks the message system to call this driver when one arrives.
-
 ``Encoder_SITL`` subscribes to ``/world/<world>/model/<model>/joint_state`` and
 selects ``front_left_wheel_joint`` or ``front_right_wheel_joint``. It rounds joint
 position in radians into counts using 617 counts/revolution.
@@ -19,7 +15,7 @@ Run :doc:`../../getting-started`, then inspect:
 
 .. code-block:: bash
 
-   gz topic -e -t /world/default/model/payload_0/joint_state
+   gz topic -e -t /world/sae/model/payload_2/joint_state
 
 Verify both wheel joint names and a progressing header timestamp. Counts should
 track wheel position; velocity should appear after an averaging window. At

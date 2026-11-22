@@ -1,5 +1,8 @@
+:human-verified: true
+:verified-by: User (review confirmed in chat)
+:verified-on: 2026-11-21
 :doc-status: evolving
-:status-reason: Hardware commands currently exercise IMU bring-up; integrated hardware control and wiring validation are unfinished.
+:status-reason: Simulation startup is WIP: make gz_payload is unreliable and the manual run requires an existing sae/payload_2 simulation. Hardware integration is also unfinished.
 
 Getting Started with Payload Controller
 =======================================
@@ -7,17 +10,6 @@ Getting Started with Payload Controller
 Goal: build both targets, run the computer-hosted simulation with Gazebo, and understand
 which executable and configuration you are using. Read :doc:`overview` first.
 All commands below use Bash on the project's Ubuntu 24.04 environment.
-
-Names used in the commands
---------------------------
-
-``linux`` is this project's simulation build target; ``esp32s3`` is its physical
-board target. **Gazebo** simulates the body, wheels, and sensors. **ESP-IDF** is the
-board's build/runtime framework, and **EIM** installs it and its compiler tools.
-A **toolchain** is the compiler and related tools needed to build for a machine.
-The **DDS Agent** is a separate program that passes the controller's messages to
-other robot programs. The parent :doc:`index` explains the two targets, and the
-:doc:`glossary` is a quick lookup for these names.
 
 Prepare the tools once
 ----------------------
@@ -59,9 +51,8 @@ From the repository root:
 
 ``dev_env.sh`` exports repository paths. The ESP activation script selects the
 compiler tools and Python environment; it is unrelated to ROS's ``setup.bash``.
-``PATH`` lists folders the shell searches for commands. The PATH line ensures
-simulation builds find the host assembler (which translates assembly instructions
-into machine code) and the actual ``idf.py`` script. Alternatively, configure direnv as described in the Ubuntu
+The PATH line selects the host assembler for simulation builds and makes
+``idf.py`` available as a command. Alternatively, configure direnv as described in the Ubuntu
 guide; ``payload_controller/.envrc`` handles these tool paths automatically.
 Repeat repository/toolchain setup in new terminals as needed.
 
@@ -75,9 +66,8 @@ Run inside ``payload_controller/``:
    make linux
    make esp32s3
 
-``linux`` builds ``build/linux/payload_controller.elf`` for your computer.
-**ELF** is the executable-file format used for this program;
-``esp32s3`` builds firmware in ``build/esp32s3/``. Each has its own **CMake cache**, saved build settings, and
+``linux`` builds ``build/linux/payload_controller.elf`` for your computer;
+``esp32s3`` builds firmware in ``build/esp32s3/``. Each has its own CMake cache and
 ``sdkconfig.linux`` or ``sdkconfig.esp32s3``. Switching is simply running the other
 Make target; do not run a bare ``idf.py set-target`` over these separate build trees.
 
@@ -92,41 +82,38 @@ Switch the editor back to an already-built target without rebuilding:
 This changes editor configuration only, not the executable running in another terminal.
 See :doc:`build-system` for the underlying commands and cache behavior.
 
-Run the standalone Gazebo simulation
-------------------------------------
+Run against an existing Gazebo simulation (WIP)
+-----------------------------------------------
 
-First terminal, after the dependency tools are installed:
+.. warning::
+
+   **WIP:** ``make gz_payload`` is not working reliably. Use the manual command
+   below for now. This workflow is also in progress: it assumes a running
+   ``sae`` world with a model named ``payload_2``. The command starts only the
+   controller; it does not start Gazebo or spawn the model.
+
+First terminal, after installing the DDS tools:
 
 .. code-block:: bash
 
    MicroXRCEAgent udp4 -p 7777
 
-Second terminal, after preparing the payload environment above:
+Second terminal, after preparing the payload environment, from ``payload_controller/``:
 
 .. code-block:: bash
 
-   make gz_payload
-   # Without a GUI:
-   # HEADLESS=1 make gz_payload
-   # Select another existing world:
-   # make gz_payload WORLD=sae
+   make linux
+   GZ_WORLD=sae GZ_MODEL=payload_2 ./build/linux/payload_controller.elf
 
-``gz_payload`` depends on ``linux``, so it builds first. The simulation script
-starts a running world, waits for its create service, spawns the model as
-``payload_0`` at Z=0.1 m, and runs the Linux executable with ``GZ_MODEL`` and
-``GZ_WORLD`` set. It also supplies the resource paths and server system config.
-The model name must match the sensor/joint conventions described in :doc:`sensors/index`.
+The environment values select the world/model whose topics the drivers use.
+Confirm those names match the running simulation. Expect driver subscription
+messages, encoder readings, camera positions, and ``Kalman Filter`` state logs.
+The current speed targets are 7 rad/s left and 3 rad/s right, so asymmetric motion
+is intentional. The EKF currently starts at world position zero; a different
+spawn pose can cause early camera corrections.
 
-Expect driver subscription messages, encoder readings, camera positions, and
-``Kalman Filter`` state logs. The current speed targets are 7 rad/s left and
-3 rad/s right, so asymmetric motion is intentional. The EKF initial position is
-currently zero even though spawning uses Z=0.1 m; early camera corrections may
-reflect that initial mismatch.
-
-Press ``Ctrl+C`` to stop. The script cleans up Gazebo processes it started; a
-pre-existing world is reused and left running. If you rerun against that world,
-remove the previously spawned model or restart the world first: the script always
-requests the same model name.
+Press ``Ctrl+C`` to stop the controller. Gazebo remains running independently.
+See :doc:`simulation` for the launch wrapper's intended behavior and current limits.
 
 Inspect the connections
 -----------------------
@@ -136,7 +123,7 @@ In another terminal:
 .. code-block:: bash
 
    gz topic -l
-   gz topic -e -t /world/default/model/payload_0/joint_state
+   gz topic -e -t /world/sae/model/payload_2/joint_state
 
 For ROS inspection (ROS and any needed custom interfaces must be built/installed):
 
@@ -150,8 +137,7 @@ For ROS inspection (ROS and any needed custom interfaces must be built/installed
    ros2 topic echo /imu --qos-reliability best_effort
    ros2 topic echo /motor_state --qos-reliability best_effort
 
-A **DDS domain** separates groups of communicating programs; a **port** selects
-which network service receives a packet. Domain 0 and port 7777 are fixed in the current client. Gazebo topic traffic
+DDS domain 0 and Agent port 7777 are fixed in the current client. Gazebo topic traffic
 can work even if the Agent connection fails. See :doc:`dds_client/index` for that boundary.
 
 Build, flash, and monitor the ESP

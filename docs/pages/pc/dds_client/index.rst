@@ -4,14 +4,9 @@
 DDS Client
 ==========
 
-**DDS (Data Distribution Service)** exchanges named, typed messages between
-programs. “Typed” means sender and receiver agree on the fields, such as three
-acceleration values. **Micro XRCE-DDS** lets a small device use DDS through an
-**Agent**, a helper program on a larger computer that creates the DDS endpoints
-for it. Here the ``linux`` target is the computer-hosted simulation build;
-the ESP32-S3 target is firmware for the physical board.
-Read :doc:`../overview` first: Gazebo driver traffic and DDS debug traffic are
-separate paths. A local sensor cache does not need DDS delivery to feed the EKF.
+The DDS component manages the XRCE session, message encoding, and reader/writer
+endpoints used by Payload. Gazebo driver traffic is a separate path; the EKF
+reads local sensor caches without depending on DDS delivery.
 
 .. mermaid::
 
@@ -41,7 +36,7 @@ Start the Agent before the Linux application:
 
    MicroXRCEAgent udp4 -p 7777
 
-Then follow :doc:`../getting-started` to run ``make gz_payload``. The current
+Then follow the WIP manual simulation workflow in :doc:`../getting-started`. The current
 client uses ``127.0.0.1:7777`` and DDS domain 0. The session key is the fixed
 ``0xABCDABCD``; multiple simultaneous clients need distinct keys, which are not
 currently selected by an environment variable.
@@ -61,16 +56,14 @@ The registry in ``components/DDS/topics.h`` defines:
      - ``payload_interfaces/msg/MotorState``
      - Writer and reader configured; Payload publishes encoder counts
 
-**QoS** means quality of service, the delivery/history settings. Here **volatile**
-means old samples are not promised to a newly connected reader, **best effort**
-means missing DDS samples may be lost, and **keep last 1** means keep only the newest. The reliable XRCE streams
+The topic QoS is volatile, best effort, keep last 1. Reliable XRCE streams
 used between client and Agent do not make those DDS topics reliable. Match reader
 QoS when using ``ros2 topic echo`` as shown in the getting-started guide.
 
 Learn DDS in small steps
 ------------------------
 
-Start with the connection and the vocabulary, then follow one outgoing and one
+Start with the connection lifecycle, then follow one outgoing and one
 incoming sample. The pages below explain the corresponding functions in the code.
 You can return to this page for launch commands and topic names.
 
@@ -107,9 +100,7 @@ Add or change a message
 Hardware transport boundary
 ---------------------------
 
-Hardware builds select **UART**, a serial byte connection using transmit/receive
-wires, rather than **UDP**, a network protocol that sends packets to an address
-and port. A **transport** is this lower-level way of carrying the bytes. However,
+Hardware builds select custom UART transport instead of UDP. However,
 ``uart_read`` and ``uart_write`` currently return zero and have TODO bodies;
 ``uart_open``/``uart_close`` are also placeholders. No working serial DDS setup
 is established by the existing code, and the ESP entry point does not call DDS

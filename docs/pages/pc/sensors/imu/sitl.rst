@@ -1,9 +1,6 @@
 IMU in SITL
 ===========
 
-This backend runs in the ``linux`` simulation build. **Gazebo Transport** carries
-messages from the robot simulator to driver code. To **subscribe** is to register
-a function to receive each new message on a named channel, or **topic**.
 ``imu_sitl.cpp`` subscribes to:
 
 .. code-block:: text
@@ -12,21 +9,20 @@ a function to receive each new message on a named channel, or **topic**.
 
 ``IMU_SITL::on_imu_msg`` converts ``gz::msgs::IMU`` using ``gz_to_dds`` in
 ``components/sitl/convert.cpp``, then calls ``write_latest``. Conversion copies
-timestamps, vectors, quaternion (four values representing rotation), and covariance (measurement
-uncertainty) fields; it is not a fusion algorithm.
+timestamps, vectors, quaternion, and covariance fields; it is not a fusion algorithm.
 The resulting C struct remains a local cached value until Payload optionally
 publishes it through DDS.
 
 Run and observe
 ---------------
 
-Follow :doc:`../../getting-started` to launch the Agent and ``make gz_payload``.
+Follow :doc:`../../getting-started` to launch the Agent and controller manually.
 Then, in another terminal:
 
 .. code-block:: bash
 
    gz topic -l
-   gz topic -e -t /world/default/model/payload_0/link/base_link/sensor/imu_sensor/imu
+   gz topic -e -t /world/sae/model/payload_2/link/base_link/sensor/imu_sensor/imu
 
 Check that simulation is running, timestamps advance, and values change as the
 model moves. Compare the backend's startup topic log with the actual topic list.

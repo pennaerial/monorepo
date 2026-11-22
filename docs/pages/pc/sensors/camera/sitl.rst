@@ -4,16 +4,10 @@
 Camera Position in SITL
 =======================
 
-This backend belongs to the ``linux`` simulation target. **Ground truth** is the
-position known by the simulator before sensor noise is added. A **pose** combines
-position and orientation; SceneBroadcaster is the Gazebo system that publishes
-poses. **10 Hz** means ten samples per simulated second.
-
 ``SimCamera`` listens to ``/world/<world>/pose/info`` from SceneBroadcaster,
 selects the configured model, and takes at most one position sample per 100 ms
 of simulation time. Each axis receives 0.05 m standard-deviation white noise
-and a fixed random bias drawn with 0.02 m standard deviation. **Standard deviation**
-describes the spread of random errors; **bias** is a persistent offset. A fixed **seed** (42), the starting value for the random generator,
+and a fixed random bias drawn with 0.02 m standard deviation. A fixed seed (42)
 makes the random sequence repeatable for a matching callback sequence.
 
 It writes those synthetic positions into ``Camera::write_latest``. The current

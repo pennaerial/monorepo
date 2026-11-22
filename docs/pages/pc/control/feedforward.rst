@@ -1,10 +1,6 @@
 Feedforward
 ===========
 
-Here **duty** is the normalized effort request from -1 to +1, and **setpoint**
-is desired wheel speed in rad/s. A **calibration** is a parameter chosen from
-measurements so a model better matches the device.
-
 Feedforward estimates duty from the requested speed before waiting for an error.
 It is a model of expected effort, so changing the load or battery can leave an
 error for feedback to correct. It is not an estimate of the robot's position.

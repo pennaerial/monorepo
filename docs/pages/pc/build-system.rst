@@ -3,12 +3,6 @@ How the Build Works
 
 Use :doc:`getting-started` for the short commands. This page explains what each
 layer does, so a build failure can be traced to its owner.
-A **build** turns source text into a runnable program. **Make** runs the named
-project commands; ``idf.py`` is ESP-IDF's command-line tool; **CMake** works out
-which pieces depend on which others; **Ninja** runs the compiler/linker commands.
-The **compiler** translates C++ into machine code, and the **linker** combines
-compiled pieces. The ``linux`` target runs on your computer for simulation;
-``esp32s3`` runs on the physical board. See :doc:`glossary` for a quick reference.
 
 From Make to an executable
 --------------------------
@@ -49,6 +43,10 @@ Inspect the wrapper without running its recipes:
 
    make -n linux
    make -n gz_payload WORLD=default
+
+The simulation wrapper is currently WIP and unreliable. The dry-run command
+above is only for inspecting its recipe. To run the controller, use the manual
+command and existing-world prerequisites in :doc:`getting-started`.
 
 Source and configuration layers
 -------------------------------

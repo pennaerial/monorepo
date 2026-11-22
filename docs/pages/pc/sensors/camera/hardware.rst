@@ -4,14 +4,14 @@
 Camera Position on Hardware
 ===========================
 
-In the ``esp32s3`` hardware target, ``Camera::start()`` is an empty function. The common **cache** (storage for the latest reading) exists,
+In the ``esp32s3`` hardware target, ``Camera::start()`` is an empty function. The common cache exists,
 but stays empty until a producer calls ``write_latest``. There is no camera
 capture, calibration, image processing, or localization transport in this component.
 
 A future producer must define how image observations become a position estimate,
 which coordinate frame that estimate uses, and where the camera sits relative
 to the IMU. It must transform into the filter's Z-up world frame, convert to
-metres, and publish only valid results. ``Vector3`` holds three coordinates. The current cache has no timestamp,
+metres, and publish only valid results. The current Vector3 cache has no timestamp,
 quality, or covariance fields; delayed or low-quality measurements will need a
 richer contract before reliable real-world fusion.
 

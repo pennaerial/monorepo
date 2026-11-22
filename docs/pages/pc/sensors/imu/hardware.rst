@@ -4,11 +4,6 @@
 IMU on Hardware
 ===============
 
-Here **I2C** is the chip-to-sensor bus: **SDA** carries data and **SCL** supplies
-its clock. **GPIO** means a general-purpose chip pin; a power-enable pin switches
-on the sensor's supply. **FreeRTOS** schedules the read task on the physical board.
-**CMake** selects which driver source is compiled; its cache saves that selection.
-
 The IMU component selects one backend using CMake's ``IMU_MODEL`` cache variable:
 ``icm20948`` (default) or ``lsm6dso``. This choice is independent of the ESP chip
 target. From ``payload_controller/``, build the target once, then choose a backend:
@@ -60,10 +55,9 @@ and `ICM20948 <https://github.com/pennaerial/monorepo/blob/main/payload_controll
 How the physical read becomes a measurement
 -------------------------------------------
 
-I2C is a two-signal bus: the controller addresses a device, writes a register
-number, and reads/writes bytes at that location. A register is a numbered device
-setting or result. “WHO_AM_I” is a fixed identity register used to check that the
-expected chip answered; it does not measure motion.
+The driver uses I2C register reads and writes to configure the chip and obtain
+samples. Reading “WHO_AM_I” checks that the expected chip answered; it does not
+measure motion.
 
 For LSM6DSO, ``initialize`` adds the device, checks identity, enables coherent
 multi-byte reads and address auto-increment, then configures the accelerometer

@@ -4,16 +4,8 @@
 Motors on Hardware
 ==================
 
-``DRV8833`` is the motor-driver chip. **ESP-IDF** is the board's development
-framework; **LEDC** is its PWM-generating peripheral. **PWM** means pulse-width
-modulation: rapidly switch a pin and vary the high-time fraction. **GPIO** means
-a general-purpose chip pin; an LEDC **channel** chooses the waveform driven on it.
-
-``DRV8833`` controls two H-bridges using those PWM channels. An H-bridge selects
-current direction through a motor; rapidly switching its inputs controls the
-average drive. This backend uses a shared 20 kHz timer with 10-bit duty resolution: 20,000 cycles per second and roughly
-1,024 duty steps. **Coast** lets the motor turn freely; **brake** electrically
-resists its motion.
+``DRV8833`` drives both H-bridges using LEDC PWM. The bridges share a 20 kHz
+timer with 10-bit duty resolution.
 
 The source's current bridge mapping is:
 

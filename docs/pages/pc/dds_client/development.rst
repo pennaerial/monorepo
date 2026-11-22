@@ -2,9 +2,6 @@ Changing and Debugging DDS
 ==========================
 
 Use :doc:`connection` and :doc:`sending-receiving` to locate the stage that failed.
-The **Agent** bridges the small client to DDS, while **ROS** tools let you inspect
-robot messages from another program. A **schema** describes the message fields
-and their types. Use :doc:`../glossary` if a networking/build term is unfamiliar.
 Keep the Agent, the application, and ROS inspection in separate terminals so their
 logs stay readable. Launch commands are on :doc:`index`.
 

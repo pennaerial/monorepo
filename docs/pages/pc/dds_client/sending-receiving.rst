@@ -1,9 +1,6 @@
 Sending and Receiving Samples
 =============================
 
-A **callback** is a function the communication library runs when a message
-arrives. A **queue** holds work to send later. **Serialization** turns message
-fields into bytes for sending; deserialization turns received bytes back into fields.
 Read :doc:`topics` for message types and encoding. This page follows the exact
 call path for outgoing and incoming samples, including what a success result means.
 
@@ -17,8 +14,7 @@ freshness cursor. It calls:
 
    DDSClient::instance().publish<TopicId::IMU_WRITER>(latest_imu);
 
-A **template parameter** selects a C++ type or value while compiling the program.
-Here that parameter chooses the registry entry and the required message type.
+The template parameter selects the registry entry and required message type.
 ``publish()`` is defined in ``dds_client.hpp`` so the compiler can instantiate it
 for each selected ID. It performs these steps:
 

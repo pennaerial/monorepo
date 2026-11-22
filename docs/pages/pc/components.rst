@@ -1,39 +1,57 @@
+:human-verified: true
+:verified-by: User (review confirmed in chat)
+:verified-on: 2026-11-21
+
 Components and Dependencies
 ===========================
 
-A component groups source files, public headers, and dependencies into a library.
-A **library** is reusable compiled code. **ESP-IDF**, the board development
-framework, builds those libraries and **links** them into one application: it
-joins the compiled pieces so their function calls can reach each other.
-**CMake** reads each component's build instructions. A **header** declares the
-interface other components can use; an implementation file supplies the code. Start with
-:doc:`project-organization` to find the component that owns a feature.
+ESP-IDF builds the project's components and links them into one application.
+Start with :doc:`project-organization` to locate the component that owns a feature.
+This page explains how to declare its sources and dependencies.
 
 Read a component declaration
 ----------------------------
 
 The motor component selects ``motor_sitl.cpp`` for Linux and ``DRV8833.cpp`` for
 hardware. Both provide ``Motor::instance(Side)``; compiling both would define the
-same factory (the function returning the selected driver) twice. Its common header lets Payload use either implementation.
+same factory twice. Its common header lets Payload use either implementation.
+
+The declaration below registers ``my_sensor.cpp`` and exports the current
+folder as a public header search path through ``INCLUDE_DIRS``. Adding a new
+``.cpp`` file to the folder also requires adding it to ``SRCS``.
+
+In this example, you are editing **the my_sensor component's own**
+``CMakeLists.txt``. It needs ``imu`` and ``esp_driver_i2c`` for different reasons:
 
 .. code-block:: cmake
 
+   # components/my_sensor/CMakeLists.txt
    idf_component_register(
        SRCS "my_sensor.cpp"
        INCLUDE_DIRS "."
-       REQUIRES util
+       REQUIRES imu
        PRIV_REQUIRES esp_driver_i2c
    )
 
-* ``SRCS`` lists C++ source files to compile. Adding a ``.cpp`` file to the
-  directory alone does not add it to this explicit source list.
-* ``INCLUDE_DIRS`` exports public header search paths.
-* ``REQUIRES`` expresses public dependencies, needed by a consumer reading your headers.
-* ``PRIV_REQUIRES`` expresses dependencies used inside your implementation.
+* Use ``REQUIRES imu`` if **my_sensor's public header**, ``my_sensor.hpp``,
+  includes ``imu.hpp`` or exposes an IMU type. Both my_sensor itself and any
+  component including that public header need access to the IMU headers.
+  The public dependency makes those headers available to downstream consumers too.
+* Use ``PRIV_REQUIRES esp_driver_i2c`` if the I2C include is **only in
+  my_sensor.cpp**. The my_sensor component still needs the I2C dependency to
+  compile its implementation, but a consumer of ``my_sensor.hpp`` does not need
+  I2C headers through my_sensor's public interface.
 
-For example, if ``my_sensor.hpp`` includes ``imu.hpp``, expose ``imu`` with
-``REQUIRES``. If only ``my_sensor.cpp`` uses I2C, keep ``esp_driver_i2c`` private.
-Declare actual direct dependencies instead of relying on headers pulled in indirectly by another component.
+Now consider a **different component**, such as ``payload``, that uses my_sensor.
+In ``components/payload/CMakeLists.txt``, declare ``my_sensor`` as a dependency.
+Use ``REQUIRES my_sensor`` if payload's public headers expose it, or
+``PRIV_REQUIRES my_sensor`` if only payload's implementation uses it. Make that
+choice from the perspective of the component whose CMake file you are editing.
+
+A dependency being private does not remove it from the build; it limits what is
+passed through the component's public interface. If payload directly includes
+``imu.hpp`` or an I2C header for its own work, declare that dependency in payload
+as well instead of depending on an unrelated component to supply it indirectly.
 
 Add or change a component
 -------------------------

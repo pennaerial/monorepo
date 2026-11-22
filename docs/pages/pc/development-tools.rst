@@ -1,11 +1,6 @@
 Build Checks and Development Tools
 ==================================
 
-The ``linux`` target runs on your computer for simulation; ``esp32s3`` produces
-firmware for the board. **Static analysis** inspects source code without running
-the robot. A **test assertion** checks whether an observed result matches an
-expected one. Build success means code compiled, not that those behaviors were tested.
-
 Start with the normal build commands in :doc:`getting-started` and the dependency
 explanation in :doc:`build-system`. A compiler check, static analysis, and a
 running simulation answer different questions; none alone verifies a physical robot.

@@ -4,10 +4,7 @@
 Camera Position
 ===============
 
-The current camera interface supplies a **world-frame XYZ position** in metres:
-three coordinates measured along axes fixed in the room/simulation, rather than
-axes that turn with the camera. A **lever arm** is the physical offset from the
-IMU to the camera; rotating the payload changes that offset's world direction.
+The current camera interface supplies world-frame XYZ position in metres.
 It does not deliver images or implement feature detection, visual odometry,
 or an AprilTag pipeline. This distinction matters when interpreting estimator accuracy.
 

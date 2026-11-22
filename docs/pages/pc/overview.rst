@@ -1,3 +1,6 @@
+:human-verified: true
+:verified-by: User (review confirmed in chat)
+:verified-on: 2026-11-21
 :doc-status: evolving
 :status-reason: The computer-hosted simulation runs the full loop. The physical board currently runs an IMU sensor test; several hardware drivers are unfinished.
 
@@ -6,29 +9,6 @@ System Overview
 
 A payload controller reads sensors, estimates motion, and controls two wheel
 motors. Begin with the data flow before looking at individual classes.
-
-Reading the diagram
--------------------
-
-* **Backend / driver:** code that reads or controls a device. The simulation
-  backend talks to Gazebo; the hardware backend talks to physical electronics.
-* **IMU (inertial measurement unit):** a sensor that measures rotation rate and
-  specific force, the acceleration-like signal that includes support against gravity.
-* **Encoder:** a sensor that counts wheel or shaft rotation to estimate speed.
-* **Cache:** storage for the latest reading. Several parts of the program can
-  read it without asking the sensor to measure again.
-* **EKF (extended Kalman filter):** the estimator that combines sensor readings
-  to estimate position, velocity, and orientation.
-* **PI + feedforward:** the speed controller. PI corrects the difference between
-  desired and measured speed; feedforward estimates the effort needed in advance.
-* **DDS (Data Distribution Service):** a system for sharing named, typed messages
-  between programs. Here it sends debug readings to other robot software.
-* **XRCE Agent:** a helper program that connects the small DDS client to the
-  wider DDS network. **ROS** provides robot software tools that can read that data.
-* **Motor duty:** a signed effort request from -1 to +1; **torque** is turning force.
-
-These names describe different jobs: the EKF estimates motion, the controller
-chooses motor effort, and DDS carries messages. Follow :doc:`glossary` for more terms.
 
 .. mermaid::
 
@@ -71,7 +51,7 @@ chooses motor effort, and DDS carries messages. Follow :doc:`glossary` for more 
 
 The diagram shows the shared design for simulation and physical hardware.
 SITL backends read Gazebo data and apply simulated torque. Hardware backends
-read devices and drive an **H-bridge**, a circuit that controls motor direction and drive; the full hardware loop and some producers
+read devices and drive an H-bridge; the full hardware loop and some producers
 are still unfinished, as described below. “Position source” currently means
 the simulated camera stand-in, not a completed hardware camera pipeline.
 
@@ -86,15 +66,12 @@ What runs today
 ---------------
 
 ``main/payload_controller.cpp`` defines ``app_main()``, the application entry point.
-On the ``linux`` simulation target it starts **Gazebo Transport**, the simulator's
-message system for sensor readings and motor commands. It also starts the DDS
+On the ``linux`` simulation target it starts Gazebo Transport and the DDS
 connection and initializes Payload at world position ``(0,0,0)``. It then
 repeatedly services DDS and calls ``Payload::update()``.
-**FreeRTOS** is the small operating system used to schedule tasks in the controller;
-its Linux version lets those tasks run on your computer. The loop asks FreeRTOS
-to wait 100 ms between passes. That delay alone corresponds to about ten passes
-per second (10 Hz); DDS work and scheduling can make the loop slower. A **callback** is a function run when an event occurs;
-sensor callbacks can receive new readings between passes through this loop.
+The loop requests a 100 ms FreeRTOS delay between passes: at most about 10 Hz
+before DDS work and scheduling add time. Sensor callbacks may receive readings
+between passes through this loop.
 
 On the physical ESP32-S3 board, the current entry point only obtains the IMU, calls ``start()``, then
 calls ``update()`` in the loop. It does not initialize the full Payload, motors,
@@ -103,20 +80,8 @@ parity with Linux.
 
 The simulation path has simulated IMU and encoders, torque-producing motors, and a
 provisional noisy position camera. Hardware encoder acquisition, camera production,
-and **UART** DDS transfer are still unimplemented. UART is a serial connection
-that sends bytes over transmit/receive wires between electronic devices. See each :doc:`sensors/index`
-page before choosing a bench task.
-
-Words, units, and frames
-------------------------
-
-* **SITL:** software-in-the-loop; run application code against simulated devices.
-* **Backend:** an implementation of the same driver interface for one environment.
-* **Body frame:** axes attached to the payload; X is forward in the estimator.
-* **World frame:** fixed room/simulation coordinates, with Z pointing up.
-* **Angular speed:** radians/second; one revolution is ``2*pi`` radians.
-* **Duty:** signed normalized motor request in ``[-1,1]``; not a speed in rad/s.
-* **Bias:** a persistent measurement offset; **noise** varies between readings.
+and UART DDS transfer are still unimplemented. See :doc:`sensors/index` before
+choosing a bench task.
 
 Next steps
 ----------

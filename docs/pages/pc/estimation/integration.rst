@@ -4,15 +4,10 @@
 EKF Integration and Timing
 ==========================
 
-**Gazebo** is the simulator, and to **subscribe** means ask its message system
-to call your code when new data arrives. To **poll** hardware means actively ask
-a physical device for a reading. The EKF does neither itself. Payload creates an
-``EKF::Measurements`` snapshot containing optional IMU, encoder, and camera fields,
-then calls ``EKF::update`` from one owner. Here **owner** means the thread/task
-responsible for changing filter state. **Optional** means a field may contain
-no new measurement on that pass; **fresh** means a consumer has not seen that
-reading's update counter before. Read :doc:`error-state-ekf` for the filter idea. Keep state reads and writes on that
-same thread: the EKF singleton is not a multi-thread synchronization mechanism.
+Payload collects fresh measurements into ``EKF::Measurements`` and calls
+``EKF::update`` from one owning thread. Keep all filter-state reads and writes
+on that thread; the singleton does not provide synchronization. Optional fields
+allow a pass to proceed without waiting for every sensor.
 
 How fresh samples are assembled
 -------------------------------
@@ -57,7 +52,7 @@ Debug in data-flow order
 4. Verify initialization matches the simulated pose and physical sensor offsets.
 5. Only then evaluate covariance/noise settings described in :doc:`ekf`.
 
-The current **API** (the functions offered to callers) exposes estimated position through ``get_position()``; no
+The current API exposes estimated position through ``get_position()``; no
 estimator-pose DDS topic or position feedback controller is wired here. Add an
 explicit owner-safe output path if another subsystem needs more state.
 

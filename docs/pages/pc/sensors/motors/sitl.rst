@@ -4,11 +4,6 @@
 Motors in SITL
 ==============
 
-This is the ``linux`` simulation backend. **Gazebo Transport** carries its motor
-commands to the simulator. **Torque** is turning force, measured in newton-metres
-(N·m); it is different from speed (rad/s) or duty (a unitless drive request).
-To **publish** means send a message on a named channel.
-
 ``Motor_SITL`` publishes ``gz::msgs::Double`` torque commands on:
 
 .. code-block:: text
@@ -37,7 +32,7 @@ Run :doc:`../../getting-started` and inspect the left torque channel:
 
 .. code-block:: bash
 
-   gz topic -e -t /model/payload_0/joint/front_left_wheel_joint/cmd_force
+   gz topic -e -t /model/payload_2/joint/front_left_wheel_joint/cmd_force
 
 Compare torque with measured speed and the controller's duty logs. Changing the
 feedforward full-speed calibration changes the requested duty estimate; it does

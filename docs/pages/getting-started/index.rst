@@ -34,7 +34,10 @@ Your first path through the docs
 3. Read :doc:`hardware setup <../hardware/index>` before working with physical
    devices; simulation can be your first step without hardware.
 4. Make your :doc:`first contribution <../tutorials/making-first-contrib>`.
-5. For embedded work, continue to :doc:`Payload Controller ESP <../pc/index>`.
+5. Choose :doc:`Payload Controller ESP <../pc/index>` or
+   :doc:`Getting Started with ROS <../ros/getting-started>`.
+6. Read :doc:`CI/CD and Docker <../ci/index>` to understand the automatic checks
+   on your contribution.
 
 .. toctree::
    :maxdepth: 2

@@ -1,13 +1,12 @@
+:human-verified: true
+:verified-by: User (review confirmed in chat)
+:verified-on: 2026-11-21
+
 Project Organization
 ====================
 
 Read :doc:`overview` for runtime flow. This page maps that flow onto files.
 All paths below are relative to ``payload_controller/``.
-A ``.hpp`` header declares the types and functions other files can use; a ``.cpp``
-file contains their implementation. A **component** groups related code into a
-buildable module. A **dependency** is another component or library that it needs.
-**CMake** reads the build descriptions; **ESP-IDF** supplies the board-specific
-build tools and runtime. See :doc:`index` for the simulation/hardware targets.
 
 .. list-table:: Source map
    :header-rows: 1
@@ -57,8 +56,7 @@ chain. The payload component depends on ``DDS``, ``encoder``, ``imu``, ``motor``
 ``DDS`` supplies generated message headers also used as local data structures.
 Using a message structure locally does not mean every sample travels over DDS.
 
-A **component** is a buildable module with a ``CMakeLists.txt``; it is not
-necessarily a single class. ``payload`` contains both Payload and EKF.
+A component can contain several classes: ``payload`` contains both Payload and EKF.
 ``components/drivers`` is a grouping directory; its children are the components
 found through ``EXTRA_COMPONENT_DIRS`` in the top-level CMake file.
 

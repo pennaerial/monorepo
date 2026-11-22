@@ -4,37 +4,9 @@
 The DDS Connection, Step by Step
 ================================
 
-A **topic** is a named channel carrying one message type. A writer sends samples;
-a reader receives them. DDS lets processes find matching writers/readers without
-the application addressing each receiving process individually.
-
-The small C++ controller uses **Micro XRCE-DDS**, a client protocol for devices
-that cannot afford a full DDS implementation. An **Agent** runs on a computer and
-creates DDS objects for the client. **UDP (User Datagram Protocol)** is the network transport carrying XRCE
-packets between this Linux client and the Agent. These are different layers:
-a working UDP **socket** (the program's endpoint for sending/receiving network packets) alone does not establish DDS readers, writers, or matching types.
-
-What the objects mean
----------------------
-
-.. list-table:: Objects created during startup
-   :header-rows: 1
-   :widths: 25 75
-
-   * - Object
-     - Purpose in this project
-   * - Session
-     - The XRCE connection identified by the client key; carries requests and responses.
-   * - Domain participant
-     - The Agent-side entry into DDS domain 0, the group of DDS participants that can communicate.
-   * - Topic
-     - A channel name plus a type name, such as ``rt/imu`` and its Imu DDS type.
-   * - Publisher / subscriber
-     - Containers that own writers / readers; they are not sensor samples themselves.
-   * - DataWriter / DataReader
-     - Endpoints that send / receive samples on a topic.
-   * - Stream
-     - An XRCE queue used to move requests or data between client and Agent.
+The Linux client connects to the Agent over UDP at ``127.0.0.1:7777`` and asks
+it to create DDS entities in domain 0. A working UDP socket alone does not prove
+that the session and reader/writer creation succeeded.
 
 Read ``DDSClient::init()`` in this order
 ----------------------------------------

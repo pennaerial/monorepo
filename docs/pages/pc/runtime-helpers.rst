@@ -8,14 +8,12 @@ Read :doc:`sensors/index` and :doc:`payload` first for the overall data flow.
 A mutex protects a consistent snapshot
 --------------------------------------
 
-A **thread** is an independently scheduled flow of code. Gazebo may deliver a
-sensor **callback** (a function run when a reading arrives) while the application is reading the previous sample. Without
+Gazebo may deliver a sensor callback while the application reads the previous
+sample. Without
 coordination, the application could read part of an old sample and part of a new one.
 
 ``StaticMutex`` wraps the appropriate lock: ``std::mutex`` for native Linux
-threads, or a FreeRTOS mutex on the physical board. **FreeRTOS** schedules work on the
-microcontroller. **Statically allocated** means storage is reserved ahead of use,
-instead of requested from a general memory allocator when needed. ``lock()`` waits until
+threads, or a statically allocated FreeRTOS mutex on the physical board. ``lock()`` waits until
 the caller can enter the protected section; ``unlock()`` allows another caller in.
 The object cannot be copied or moved because each cache must retain its own lock.
 

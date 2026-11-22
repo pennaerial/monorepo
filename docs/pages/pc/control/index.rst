@@ -5,15 +5,9 @@ Motor Control
 =============
 
 A controller answers “how hard should the motor drive to reach the desired speed?”
-A **setpoint** is the requested value: here, wheel/output-shaft speed in
-**rad/s** (radians per second; one full turn is ``2*pi`` radians). **Duty** is
-a unitless effort request from -1 to +1, not a speed. **PI** means proportional
-plus integral feedback; **PID** adds a derivative term. **PWM** is the electrical
-switching method used by the physical motor driver. **Feedforward** estimates
-needed effort from the requested speed before a measured error is available.
-
-Encoders provide measured speed; PWMController returns normalized signed duty. The motor backend turns that
-into simulated torque or hardware bridge signals.
+Payload sends wheel-speed setpoints to PWMController, which combines encoder
+feedback with feedforward and returns signed duty. The selected motor backend
+turns that duty into simulated torque or physical bridge signals.
 
 .. mermaid::
 

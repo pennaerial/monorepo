@@ -3,8 +3,7 @@ Encoders
 
 An encoder measures shaft rotation as counts (ticks). Differencing counts over
 time estimates angular speed. The project uses **617 counts per output-shaft
-revolution**, including **quadrature decoding**, which uses two offset electrical pulse signals
-to count rotation and determine its direction; do not apply the gearbox ratio again
+revolution**, including quadrature decoding; do not apply the gearbox ratio again
 when interpreting that output-shaft speed.
 
 For a count change ``delta_n`` over ``dt`` seconds:

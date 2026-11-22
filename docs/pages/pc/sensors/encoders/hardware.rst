@@ -4,11 +4,6 @@
 Encoders on Hardware
 ====================
 
-The **hardware build** is the ``esp32s3`` firmware installed on the board, not
-the ``linux`` simulation. A **pulse counter** counts electrical edges; an
-**interrupt** is a hardware event that asks the processor to handle new input.
-These are possible tools for reading real encoder signals, not implemented features here.
-
 The hardware build selects ``encoder_hw.cpp``. It creates a left/right
 ``Encoder_HW`` instance, but its constructor and ``start()`` have TODO bodies.
 There are no configured input pins, pulse counter, interrupts, or velocity

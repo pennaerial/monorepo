@@ -4,11 +4,9 @@
 PWMController: Feedforward Plus PI
 ==================================
 
-``PWMController`` composes :doc:`feedforward` and :doc:`pid`. PWM means
-pulse-width modulation; the class returns a normalized request rather than
-configuring **GPIO** waveforms itself. GPIO means a general-purpose chip pin;
-a waveform is the changing electrical signal driven on it. **Saturation** means
-hitting the actuator's allowed effort limit, here -1 or +1. Hardware PWM belongs to
+``PWMController`` composes :doc:`feedforward` and :doc:`pid`. The class returns
+a normalized request rather than
+configuring GPIO waveforms itself. Hardware PWM belongs to
 :doc:`../sensors/motors/hardware`.
 
 For each new speed sample, ``command(dt, reading)``:
@@ -44,7 +42,8 @@ Debug log level for the Linux build through:
 .. code-block:: bash
 
    idf.py -B build/linux -D SDKCONFIG=sdkconfig.linux menuconfig
-   make gz_payload
+   make linux
+   GZ_WORLD=sae GZ_MODEL=payload_2 ./build/linux/payload_controller.elf
 
 Choose the appropriate log verbosity in the IDF menu. A saturated request tells
 you the controller cannot provide its desired effort; inspect target speed, load,

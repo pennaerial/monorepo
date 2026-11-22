@@ -8,9 +8,7 @@ is why the :doc:`../../estimation/index` filter also uses other sensors.
 
 The common ``drivers::IMU`` interface exposes ``start()``, ``update()``, and a
 latest-sample cache using ``sensor_msgs_msg_Imu``. ``instance()`` is supplied by
-the selected backend. **SITL** is simulation running on your computer. It receives **callbacks**,
-functions called when simulator messages arrive. Hardware may **poll** (actively
-ask for a reading) or use a scheduled **task** to acquire samples.
+the selected backend. SITL receives callbacks; hardware may poll or use a task.
 A sample's units and timestamp matter more to the estimator than its C++ type.
 
 A stationary, upright accelerometer normally reports about +9.81 m/s² on its up
