@@ -120,8 +120,16 @@ html[data-theme="dark"] .docs-key-banner {
   padding: 0.2rem 0.4rem;
   line-height: 1.45;
 }
-.globaltoc a.docs-reading-key .docs-key-badge {
+.docs-nav-badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-inline-start: 0.35rem;
   vertical-align: 0.08em;
+  white-space: nowrap;
+}
+.docs-nav-badges .docs-key-badge {
+  margin-inline-start: 0;
 }
 .globaltoc li:has(> button) > a.docs-reading-key,
 .globaltoc li:has(> button) > a.docs-status-evolving {

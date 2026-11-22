@@ -155,10 +155,14 @@ class StatusNavigation(HTMLParser):
     def handle_endtag(self, tag):
         if tag == "a" and self.active:
             state = self.active
+            if state["key"] or state["reason"]:
+                self.output.append('<span class="docs-nav-badges">')
             if state["key"]:
                 self.output.append('<span class="docs-key-badge">Key</span>')
             if state["reason"]:
-                self.output.append('<span class="docs-status-badge"> · WIP</span>')
+                self.output.append('<span class="docs-status-badge">WIP</span>')
+            if state["key"] or state["reason"]:
+                self.output.append('</span>')
             label = "Human verified" if state["verified"] else "Not human verified"
             self.output.append(f'<span class="docs-review-badge">{label}</span>')
             self.active = False
