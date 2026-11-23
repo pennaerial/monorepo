@@ -125,11 +125,20 @@ def launch_setup(context) -> list[Action]:
         actions.append(mavproxy)
 
         if enable_ulog:
-            ulog_script = Path(get_package_share_directory("uav")) / "scripts" / "mavlink_ulog_streaming.py"
+            ulog_script = (
+                Path(get_package_share_directory("uav")) / "scripts" / "mavlink_ulog_streaming.py"
+            )
             ulog_dir = Path.home() / "px4-logs"
             ulog_dir.mkdir(parents=True, exist_ok=True)
             ulog_logger = ExecuteProcess(
-                cmd=["/usr/bin/python3", "-u", str(ulog_script), "udpin:127.0.0.1:14551", "-o", str(ulog_dir)],
+                cmd=[
+                    "/usr/bin/python3",
+                    "-u",
+                    str(ulog_script),
+                    "udpin:127.0.0.1:14551",
+                    "-o",
+                    str(ulog_dir),
+                ],
                 output="screen",
                 name="ulog_logger",
             )
@@ -164,19 +173,12 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 Args.ENABLE_ULOG,
                 default_value="false",
-                description=(
-                    "Stream PX4 ULog to the Pi over UART5 through MAVProxy and local UDP. "
-                    "Starts MAVProxy even when mavproxy:=false. "
-                    "Requires PX4 MAVLink logging and sufficient UART bandwidth."
-                ),
+                description="Record PX4 ULog over UART5; starts MAVProxy.",
             ),
             DeclareLaunchArgument(
                 Args.MAVPROXY,
                 default_value="false",
-                description=(
-                    "Forward MAVLink from /dev/ttyAMA5 at 921600 baud "
-                    "to QGC at 10.10.0.254:14550. Independent of enable_ulog."
-                ),
+                description="Forward UART5 MAVLink to QGC at 10.10.0.254:14550.",
             ),
             OpaqueFunction(function=launch_setup),
         ]
