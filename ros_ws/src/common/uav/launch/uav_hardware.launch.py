@@ -30,7 +30,7 @@ class Args(StrEnum):
     MISSION_PACKAGE = "mission_package"
     NS_ID = "ns_id"
     AIRFRAME = "airframe"
-    ENABLE_ULOG = "enable_ulog"
+    ENABLE_ULOG = "ulog"
     MAVPROXY = "mavproxy"
 
 
@@ -71,7 +71,7 @@ def launch_setup(context) -> list[Action]:
     logger.debug(f"Vehicle Namespace:   {vehicle_ns}")
     logger.debug(f"PX4 Airframe:        {airframe}")
     logger.debug(f"Enable ULOG:         {enable_ulog}")
-    logger.debug(f"Enable MAVProxy:     {enable_mavproxy}")
+    logger.debug(f"Forward to QGC:      {enable_mavproxy}")
     ## create actions
 
     mode_manager = Node(
@@ -92,8 +92,8 @@ def launch_setup(context) -> list[Action]:
 
     middleware = ExecuteProcess(
         # -b 921600 = baud rate of UART connection
-        # /dev/serial0 is the device name
-        cmd=["MicroXRCEAgent", "serial", "--dev", "/dev/serial0", "-b", "921600"],
+        # /dev/ttyAMA0 is the Pi UART used for the XRCE-DDS connection.
+        cmd=["MicroXRCEAgent", "serial", "--dev", "/dev/ttyAMA0", "-b", "921600"],
         output="screen",
         name="MicroXRCEAgent",
     )
@@ -102,33 +102,39 @@ def launch_setup(context) -> list[Action]:
         middleware,
     ]
 
-    if enable_mavproxy:
+    # /dev/ttyAMA5 is the Pi UART used for the MAVLink connection.
+    # one process owns UART5 and the flags select its UDP destinations
+    if enable_mavproxy or enable_ulog:
+        mavproxy_cmd = [
+            "mavproxy.py",
+            "--master=/dev/ttyAMA5",
+            "--baudrate=921600",
+            "--non-interactive",
+            "--default-modules=output",
+        ]
+        if enable_mavproxy:
+            mavproxy_cmd.append("--out=udp:10.10.0.254:14550")
+        if enable_ulog:
+            mavproxy_cmd.append("--out=udp:127.0.0.1:14551")
+
         mavproxy = ExecuteProcess(
-            cmd=[
-                "mavproxy.py",
-                "--master=/dev/ttyAMA5",
-                "--baudrate=57600",
-                "--out=udp:10.10.0.254:14550",
-                "--non-interactive",
-                "--default-modules=output",
-            ],
+            cmd=mavproxy_cmd,
             output="screen",
             name="mavproxy",
         )
         actions.append(mavproxy)
 
-    if enable_ulog:
-        ulog_script = (
-            Path(get_package_share_directory("uav")) / "scripts" / "mavlink_ulog_streaming.py"
-        )
-        ulog_dir = Path.home() / "px4-logs"
-        ulog_dir.mkdir(parents=True, exist_ok=True)
-        ulog_logger = ExecuteProcess(
-            cmd=["/usr/bin/python3", "-u", str(ulog_script), "/dev/ttyACM0", "-o", str(ulog_dir)],
-            output="screen",
-            name="ulog_logger",
-        )
-        actions.append(ulog_logger)
+        if enable_ulog:
+            ulog_script = Path(get_package_share_directory("uav")) / "scripts" / "mavlink_ulog_streaming.py"
+            ulog_dir = Path.home() / "px4-logs"
+            ulog_dir.mkdir(parents=True, exist_ok=True)
+            ulog_logger = ExecuteProcess(
+                cmd=["/usr/bin/python3", "-u", str(ulog_script), "udpin:127.0.0.1:14551", "-o", str(ulog_dir)],
+                output="screen",
+                name="ulog_logger",
+            )
+            actions.append(ulog_logger)
+
     return actions
 
 
@@ -158,12 +164,19 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 Args.ENABLE_ULOG,
                 default_value="false",
-                description="Enables px4 ulog transfer over MAVLink from flight controller to Pi. Needs a usb(Pi) to usb-c(FC) connection.",
+                description=(
+                    "Stream PX4 ULog to the Pi over UART5 through MAVProxy and local UDP. "
+                    "Starts MAVProxy even when mavproxy:=false. "
+                    "Requires PX4 MAVLink logging and sufficient UART bandwidth."
+                ),
             ),
             DeclareLaunchArgument(
                 Args.MAVPROXY,
                 default_value="false",
-                description="Forward MAVLink from /dev/ttyAMA5 at 57600 baud to QGC at 10.10.0.254:14550.",
+                description=(
+                    "Forward MAVLink from /dev/ttyAMA5 at 921600 baud "
+                    "to QGC at 10.10.0.254:14550. Independent of enable_ulog."
+                ),
             ),
             OpaqueFunction(function=launch_setup),
         ]

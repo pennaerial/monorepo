@@ -1,6 +1,9 @@
 # **Complete Guide for Hardware Integration**
 This page contains all of our knowledge of setting up drones/planes for our ROS2/PX4 stack. Steps for setting up flight controllers, hardware testing between Pis and FCs, and common flight test failures and how to fix them.
 
+For Pi 4B / CM4 UART pins and the MicroXRCEAgent / MAVProxy connections,
+see [Flight Controller and Pi](hardware/flight-controller.md).
+
 
 ## **PX4 Flight Controller Setup**
 
