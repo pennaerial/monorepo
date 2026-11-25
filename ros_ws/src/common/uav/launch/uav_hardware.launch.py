@@ -1,3 +1,4 @@
+import signal
 from enum import StrEnum
 from pathlib import Path
 
@@ -8,6 +9,8 @@ from launch.actions import (
     ExecuteProcess,
     OpaqueFunction,
 )
+from launch.events import matches_action
+from launch.events.process import SignalProcess
 from launch_ros.actions import Node
 from pydantic import ValidationError
 from uav.vehicles.AirframeClass import PX4Airframe
@@ -111,6 +114,9 @@ def launch_setup(context) -> list[Action]:
             "--baudrate=921600",
             "--non-interactive",
             "--default-modules=output",
+            # Disable mavproxy sending gcs heartbeat by itself
+            "--heartbeat-rate=0",
+            "--nowait",
         ]
         if enable_mavproxy:
             mavproxy_cmd.append("--out=udp:10.10.0.254:14550")
@@ -119,12 +125,23 @@ def launch_setup(context) -> list[Action]:
 
         mavproxy = ExecuteProcess(
             cmd=mavproxy_cmd,
+            # Keep UART5 available for LOGGING_STOP while the logger handles Ctrl+C.
+            prefix="/usr/bin/env --block-signal=INT" if enable_ulog else None,
             output="screen",
             name="mavproxy",
         )
         actions.append(mavproxy)
 
         if enable_ulog:
+
+            def stop_proxy_after_logger(_event, context):
+                if context.is_shutdown or not enable_mavproxy:
+                    context.emit_event_sync(
+                        SignalProcess(
+                            signal_number=signal.SIGTERM, process_matcher=matches_action(mavproxy)
+                        )
+                    )
+
             ulog_script = (
                 Path(get_package_share_directory("uav")) / "scripts" / "mavlink_ulog_streaming.py"
             )
@@ -141,6 +158,7 @@ def launch_setup(context) -> list[Action]:
                 ],
                 output="screen",
                 name="ulog_logger",
+                on_exit=stop_proxy_after_logger,
             )
             actions.append(ulog_logger)
 
