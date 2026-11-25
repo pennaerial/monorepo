@@ -95,6 +95,7 @@ packages = [
 ]
 python_packages = [
     "pymavlink",  # uav ulog streaming
+    "MAVProxy==1.8.74",  # UART MAVLink forwarding for QGC and ULog streaming
 ]
 # Built by pennaerial/Dependencies CI. deps sync installs them from these releases.
 debs = [

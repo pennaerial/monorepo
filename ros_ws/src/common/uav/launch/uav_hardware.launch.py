@@ -1,3 +1,4 @@
+import signal
 from enum import StrEnum
 from pathlib import Path
 
@@ -8,6 +9,8 @@ from launch.actions import (
     ExecuteProcess,
     OpaqueFunction,
 )
+from launch.events import matches_action
+from launch.events.process import SignalProcess
 from launch_ros.actions import Node
 from pydantic import ValidationError
 from uav.vehicles.AirframeClass import PX4Airframe
@@ -30,7 +33,8 @@ class Args(StrEnum):
     MISSION_PACKAGE = "mission_package"
     NS_ID = "ns_id"
     AIRFRAME = "airframe"
-    ENABLE_ULOG = "enable_ulog"
+    ENABLE_ULOG = "ulog"
+    MAVPROXY = "mavproxy"
 
 
 def launch_setup(context) -> list[Action]:
@@ -61,6 +65,7 @@ def launch_setup(context) -> list[Action]:
     vehicle_ns = f"uav_{ns_id}"
 
     enable_ulog = is_truthy(config[Args.ENABLE_ULOG])
+    enable_mavproxy = is_truthy(config[Args.MAVPROXY])
 
     # PRINTING HEADER
     # logger.debug(f"ENV VAR DETECTED: PENNAIR_PX4_PATH={PENNAIR_PX4_PATH}")
@@ -69,6 +74,7 @@ def launch_setup(context) -> list[Action]:
     logger.debug(f"Vehicle Namespace:   {vehicle_ns}")
     logger.debug(f"PX4 Airframe:        {airframe}")
     logger.debug(f"Enable ULOG:         {enable_ulog}")
+    logger.debug(f"Forward to QGC:      {enable_mavproxy}")
     ## create actions
 
     mode_manager = Node(
@@ -89,8 +95,8 @@ def launch_setup(context) -> list[Action]:
 
     middleware = ExecuteProcess(
         # -b 921600 = baud rate of UART connection
-        # /dev/serial0 is the device name
-        cmd=["MicroXRCEAgent", "serial", "--dev", "/dev/serial0", "-b", "921600"],
+        # /dev/ttyAMA0 is the Pi UART used for the XRCE-DDS connection.
+        cmd=["MicroXRCEAgent", "serial", "--dev", "/dev/ttyAMA0", "-b", "921600"],
         output="screen",
         name="MicroXRCEAgent",
     )
@@ -99,18 +105,63 @@ def launch_setup(context) -> list[Action]:
         middleware,
     ]
 
-    if enable_ulog:
-        ulog_script = (
-            Path(get_package_share_directory("uav")) / "scripts" / "mavlink_ulog_streaming.py"
-        )
-        ulog_dir = Path.home() / "px4-logs"
-        ulog_dir.mkdir(parents=True, exist_ok=True)
-        ulog_logger = ExecuteProcess(
-            cmd=["/usr/bin/python3", "-u", str(ulog_script), "/dev/ttyACM0", "-o", str(ulog_dir)],
+    # /dev/ttyAMA5 is the Pi UART used for the MAVLink connection.
+    # one process owns UART5 and the flags select its UDP destinations
+    if enable_mavproxy or enable_ulog:
+        mavproxy_cmd = [
+            "mavproxy.py",
+            "--master=/dev/ttyAMA5",
+            "--baudrate=921600",
+            "--non-interactive",
+            "--default-modules=output",
+            # Disable mavproxy sending gcs heartbeat by itself
+            "--heartbeat-rate=0",
+            "--nowait",
+        ]
+        if enable_mavproxy:
+            mavproxy_cmd.append("--out=udp:10.10.0.254:14550")
+        if enable_ulog:
+            mavproxy_cmd.append("--out=udp:127.0.0.1:14551")
+
+        mavproxy = ExecuteProcess(
+            cmd=mavproxy_cmd,
+            # Keep UART5 available for LOGGING_STOP while the logger handles Ctrl+C.
+            prefix="/usr/bin/env --block-signal=INT" if enable_ulog else None,
             output="screen",
-            name="ulog_logger",
+            name="mavproxy",
         )
-        actions.append(ulog_logger)
+        actions.append(mavproxy)
+
+        if enable_ulog:
+
+            def stop_proxy_after_logger(_event, context):
+                if context.is_shutdown or not enable_mavproxy:
+                    context.emit_event_sync(
+                        SignalProcess(
+                            signal_number=signal.SIGTERM, process_matcher=matches_action(mavproxy)
+                        )
+                    )
+
+            ulog_script = (
+                Path(get_package_share_directory("uav")) / "scripts" / "mavlink_ulog_streaming.py"
+            )
+            ulog_dir = Path.home() / "px4-logs"
+            ulog_dir.mkdir(parents=True, exist_ok=True)
+            ulog_logger = ExecuteProcess(
+                cmd=[
+                    "/usr/bin/python3",
+                    "-u",
+                    str(ulog_script),
+                    "udpin:127.0.0.1:14551",
+                    "-o",
+                    str(ulog_dir),
+                ],
+                output="screen",
+                name="ulog_logger",
+                on_exit=stop_proxy_after_logger,
+            )
+            actions.append(ulog_logger)
+
     return actions
 
 
@@ -140,7 +191,12 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 Args.ENABLE_ULOG,
                 default_value="false",
-                description="Enables px4 ulog transfer over MAVLink from flight controller to Pi. Needs a usb(Pi) to usb-c(FC) connection.",
+                description="Record PX4 ULog over UART5; starts MAVProxy.",
+            ),
+            DeclareLaunchArgument(
+                Args.MAVPROXY,
+                default_value="false",
+                description="Forward UART5 MAVLink to QGC at 10.10.0.254:14550.",
             ),
             OpaqueFunction(function=launch_setup),
         ]

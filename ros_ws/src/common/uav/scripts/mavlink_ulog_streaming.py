@@ -28,6 +28,9 @@ except ImportError as e:
     sys.exit(1)
 
 
+STOP_TIMEOUT = 2.0  # Finish before ROS launch's default 5-second SIGTERM escalation.
+
+
 class LoggingCompleted(Exception):
     pass
 
@@ -38,16 +41,27 @@ class MavlinkLogStreaming:
     - the sender only sends one acked message at a time
     - the data is in the ULog format"""
 
-    def __init__(self, portname, baudrate, output_filename, debug=0):
-        self.baudrate = 0
+    def __init__(self, debug=0):
         self._debug = debug
-        self.buf = ""
+        self.mav = None
+        self.file = None
+        self.got_ulog_header = False
+        self.got_header_section = False
+        self.ulog_message = []
+        self.start_time = 0
+        self.last_sequence = -1
+        self.logging_started = False
+        self.num_dropouts = 0
+        self.shutdown_signal = None
+
+    def connect(self, portname, baudrate, output_filename):
+        """Wait for PX4, allowing shutdown before a heartbeat arrives."""
         self.debug("Connecting with MAVLink to %s ..." % portname)
         self.mav = mavutil.mavlink_connection(portname, autoreconnect=True, baud=baudrate)
         # PX4 can forward other components' heartbeats over this connection.
         # A GCS heartbeat satisfies wait_heartbeat() without setting a vehicle target.
-        while True:
-            heartbeat = self.mav.wait_heartbeat()
+        while self.shutdown_signal is None:
+            heartbeat = self.mav.wait_heartbeat(timeout=0.1)
             if (
                 heartbeat is not None
                 and heartbeat.autopilot == mavutil.mavlink.MAV_AUTOPILOT_PX4
@@ -60,22 +74,22 @@ class MavlinkLogStreaming:
                 self.mav.target_system = self.target_system
                 self.mav.target_component = self.target_component
                 break
-        print(
-            "Connected to PX4: system {}, component {}".format(
-                self.target_system, self.target_component
-            )
-        )
+        else:
+            return False
+        print(f"Connected to PX4: system {self.target_system}, component {self.target_component}")
         self.debug("Locked serial device\n")
 
-        self.got_ulog_header = False
-        self.got_header_section = False
-        self.ulog_message = []
         self.file = open(output_filename, "wb")
         self.start_time = timer()
-        self.last_sequence = -1
-        self.logging_started = False
-        self.num_dropouts = 0
-        self.got_sig_int = False
+        return True
+
+    def close(self):
+        try:
+            if self.file is not None:
+                self.file.close()  # Flush buffered writes; omit any incomplete ULog record.
+        finally:
+            if self.mav is not None:
+                self.mav.close()
 
     def debug(self, s, level=1):
         """write some debug text"""
@@ -112,23 +126,26 @@ class MavlinkLogStreaming:
             0,
         )
 
-    def _int_handler(self, sig, frame):
-        self.got_sig_int = True
+    def _handle_signal(self, sig, frame):
+        if self.shutdown_signal != signal.SIGTERM:
+            self.shutdown_signal = sig
 
     def read_messages(self):
         """main loop reading messages"""
         measure_time_start = timer()
         measured_data = 0
+        deadline = None
 
-        old_handler = signal.signal(signal.SIGINT, self._int_handler)
-
-        while True:
-            if self.got_sig_int:
-                signal.signal(signal.SIGINT, old_handler)
-                self.got_sig_int = False
+        while self.shutdown_signal != signal.SIGTERM:
+            if self.shutdown_signal == signal.SIGINT and deadline is None:
+                deadline = timer() + STOP_TIMEOUT
                 print("\nStopping log...")
                 self.stop_log()
-                # Continue reading until we get an ACK
+                # Keep reading until PX4 acknowledges or the shutdown deadline expires.
+
+            if deadline is not None and timer() >= deadline:
+                print("\nStop not confirmed; closing local log.")
+                return
 
             m, first_msg_start, num_drops = self.read_message()
             if m is not None:
@@ -149,7 +166,7 @@ class MavlinkLogStreaming:
                         measure_time_start = measure_time_cur
                         measured_data = 0
 
-            if not self.logging_started and timer() - self.start_time > 15:
+            if deadline is None and not self.logging_started and timer() - self.start_time > 15:
                 raise Exception("Start timed out. Is the logger running in MAVLink mode?")
 
     def read_message(self):
@@ -330,16 +347,25 @@ def main():
         args.port = serial_list[0].device
 
     print("Connecting to MAVLINK...")
-    mav_log_streaming = MavlinkLogStreaming(args.port, args.baudrate, filename)
-
+    stream = MavlinkLogStreaming()
+    signals = (signal.SIGINT, signal.SIGTERM)
+    old_handlers = {sig: signal.signal(sig, stream._handle_signal) for sig in signals}
     try:
+        if not stream.connect(args.port, args.baudrate, filename) or stream.shutdown_signal:
+            return
         print("Starting log...")
-        mav_log_streaming.start_log()
-        mav_log_streaming.read_messages()
+        stream.start_log()
+        stream.read_messages()
     except KeyboardInterrupt:
         print("Aborting")
     except LoggingCompleted:
         print("Done")
+    finally:
+        try:
+            stream.close()
+        finally:
+            for sig, handler in old_handlers.items():
+                signal.signal(sig, handler)
 
 
 if __name__ == "__main__":
