@@ -1,9 +1,9 @@
 use crate::components::{Button, LogPanel, SideBar};
 use crate::ros::NodeHandle;
 use dioxus::prelude::*;
+use futures_util::future::join_all;
 use ros_interfaces::std_srvs;
 use std::time::Duration;
-use futures_util::future::join_all;
 
 const SERVICE_TIMEOUT: Duration = Duration::from_secs(5);
 const DRONE_ONE: &'static str = "uav_0";
@@ -19,7 +19,7 @@ impl MissionControlMode {
     fn label(&self) -> &'static str {
         match self {
             Self::Standalone => "Standalone",
-            Self::Fleet => "Fleet"
+            Self::Fleet => "Fleet",
         }
     }
 }
