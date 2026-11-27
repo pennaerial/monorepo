@@ -260,6 +260,11 @@
   .justify-center {
     justify-content: center;
   }
+  .truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
   .overflow-auto {
     overflow: auto;
   }
@@ -370,9 +375,6 @@
   }
   .whitespace-pre-line {
     white-space: pre-line;
-  }
-  .whitespace-pre-wrap {
-    white-space: pre-wrap;
   }
   .text-\[\#64748b\] {
     color: #64748b;

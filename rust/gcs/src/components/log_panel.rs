@@ -1,4 +1,4 @@
-use crate::hooks::use_subscription;
+use crate::hooks::{use_subscription, UseSubscription};
 use crate::ros::NodeHandle;
 use chrono::{DateTime, Local};
 use dioxus::prelude::*;
@@ -11,7 +11,7 @@ const MAX_LOG_MESSAGES_DISPLAY: usize = 10_000;
 struct LogEntry {
     id: u64, // want stable indexing/ids to avoid re-rendering
     line: String,
-    level_class: &'static str
+    level_class: &'static str,
 }
 
 impl LogEntry {
@@ -56,14 +56,14 @@ impl LogEntry {
     }
 }
 
-struct LogHistory {
+pub(crate) struct LogHistory {
     logs: VecDeque<LogEntry>,
     next_id: u64,
     cap: usize,
 }
 
 impl LogHistory {
-    fn new() -> Self {
+    pub(crate) fn new() -> Self {
         LogHistory {
             logs: VecDeque::new(),
             next_id: 0,
@@ -71,14 +71,14 @@ impl LogHistory {
         }
     }
 
-    fn add_log(&mut self, log: Log) {
+    pub(crate) fn add_log(&mut self, log: Log) {
         if self.logs.len() == self.cap {
             self.logs.pop_front();
         }
         self.logs.push_back(LogEntry {
             id: self.next_id,
-            line: LogEntry::display_line(&log), 
-            level_class: LogEntry::level_color_class(&log)
+            line: LogEntry::display_line(&log),
+            level_class: LogEntry::level_color_class(&log),
         });
         self.next_id += 1;
     }
@@ -90,27 +90,10 @@ impl LogHistory {
 
 #[component]
 pub fn LogPanel() -> Element {
-    let node = use_context::<NodeHandle>();
-    let rosout_sub = use_subscription::<Log>(node, "/rosout", 10);
-    let mut logs = use_signal_sync(LogHistory::new);
+    let logs = use_context::<SyncSignal<LogHistory>>();
 
     let mut scroll_top = use_signal(|| 0_usize);
     let mut viewport_height = use_signal(|| 0_usize);
-
-    use_future(move || {
-        let mut sub = rosout_sub.clone();
-        async move {
-            let res = sub
-                .subscribe(move |msg| {
-                    logs.write().add_log(msg);
-                })
-                .await;
-
-            if let Err(error) = res {
-                error!("Failed to subscribe to /rosout: {error:?}");
-            }
-        }
-    });
 
     let scroll_top_px = scroll_top();
     let viewport_height_px = viewport_height();
@@ -131,7 +114,6 @@ pub fn LogPanel() -> Element {
     let end = visible_end.saturating_add(OVERSCAN_ROWS).clamp(start, len);
     let top_px = start * ROW_HEIGHT_PX;
     let bottom_px = (len - end) * ROW_HEIGHT_PX;
-
 
     rsx! {
 
@@ -155,7 +137,7 @@ pub fn LogPanel() -> Element {
                 if len == 0 {
                     p { class: "text-zinc-500", "Waiting for log messages" }
                 }
-                
+
                 div { style: "height: {top_px}px;" }
 
                 for entry in entries.range(start..end) {
@@ -167,7 +149,7 @@ pub fn LogPanel() -> Element {
                         {entry.line.as_str()}
                     }
                 }
-    
+
                 div { style: "height: {bottom_px}px;" }
 
             }
