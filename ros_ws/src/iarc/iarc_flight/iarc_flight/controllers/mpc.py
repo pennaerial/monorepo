@@ -17,6 +17,8 @@ class MPCConfig(BaseModel):
     max_vertical_accel: float = 4.0  # m/s^2
     max_speed: float = 3.0  # m/s per axis
     position_weight: float = 10.0
+    # Per axis (x, y, z), overrides position_weight
+    position_weights: tuple[float, float, float] | None = None
     velocity_weight: float = 1.0
     accel_weight: float = 0.5
 
@@ -44,7 +46,8 @@ class MPCController(Controller):
         self.x = cp.Variable((6, n + 1))
         self.u = cp.Variable((3, n))
 
-        w = np.sqrt([c.position_weight] * 3 + [c.velocity_weight] * 3).reshape(6, 1)
+        position = c.position_weights or (c.position_weight,) * 3
+        w = np.sqrt([*position] + [c.velocity_weight] * 3).reshape(6, 1)
         tracking = cp.sum_squares(cp.multiply(w, self.x - self.ref))
         cost = tracking + c.accel_weight * cp.sum_squares(self.u)
         a_xy_max = 9.81 * np.tan(np.deg2rad(c.max_tilt_deg))

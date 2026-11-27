@@ -4,7 +4,7 @@ import signal
 import threading
 import time
 from concurrent.futures import Future, ProcessPoolExecutor
-from typing import Annotated, override
+from typing import Annotated, Literal, override
 
 import numpy as np
 from pydantic import Field
@@ -15,6 +15,8 @@ from vehicle_common.mode_loader import ParamsBase, register_mode
 
 from iarc_flight.controllers.feedforward import FeedforwardConfig
 from iarc_flight.controllers.mpc import MPCConfig
+from iarc_flight.runtime.gps import RtkMonitor
+from iarc_flight.runtime.stop import StopPlanner, StopTrigger
 from iarc_flight.trajectories.base import Trajectory
 from iarc_flight.trajectories.circle import CircleConfig
 from iarc_flight.trajectories.min_snap import MinSnapConfig
@@ -65,13 +67,17 @@ def timed_build(
 class TrackParams(ParamsBase):
     trajectory: TrajectoryConfig
     controller: ControllerConfig = FeedforwardConfig()
+    # What brakes it at once and returns `stop` (map it to an iarc_flight.StopMode)
+    stop_on: list[Literal["service", "rtk_loss"]] = []
+    gps_topic: str | None = None  # None = PX4's vehicle_gps_position
+    gps_timeout: float = Field(default=1.0, gt=0)  # s
 
 
 @register_mode(
     id="iarc_flight.TrackMode",
     params_cls=TrackParams,
     targets=[UAV],
-    transition_labels=["complete"],
+    transition_labels=["complete", "stop"],
 )
 class TrackMode(Mode[UAV, TrackParams]):
     """Flies a trajectory with a controller, both picked by `type` in the mission."""
@@ -94,6 +100,22 @@ class TrackMode(Mode[UAV, TrackParams]):
         self.errors: list[float] = []
         self.step_ms: list[float] = []
         self.speeds: list[float] = []
+        self.trigger = StopTrigger.get(node) if params.stop_on else None
+        if "rtk_loss" in params.stop_on:
+            self.rtk = RtkMonitor.get(node, vehicle, params.gps_topic, params.gps_timeout)
+
+    @override
+    def on_enter(self) -> None:
+        self.stop_planner = None
+        if self.trigger is not None:
+            self.stop_planner = StopPlanner.existing(self.node)  # configured by the StopMode
+            self.trigger.arm(self.params.stop_on)
+            if "rtk_loss" in self.params.stop_on:
+                self.rtk.watch(True)  # not RTK fixed on entry stops right away
+
+    @property
+    def stopping(self) -> bool:
+        return self.trigger is not None and self.trigger.fired is not None
 
     @override
     def on_update(self, time_delta: float) -> None:
@@ -105,6 +127,11 @@ class TrackMode(Mode[UAV, TrackParams]):
             return
         # Local NED position and velocity
         state = np.array([pos.x, pos.y, pos.z, pos.vx, pos.vy, pos.vz])
+
+        # Stopping: brake until the `stop` transition, never track again
+        if self.stopping:
+            self.stop_planner.publish(self.stop_planner.step(state))
+            return
 
         # First update plans the trajectory from the drone, holding until it is ready; later
         # updates advance time along it
@@ -118,6 +145,7 @@ class TrackMode(Mode[UAV, TrackParams]):
             build, hold, hold_yaw = self.planning
             if not build.done():
                 self.vehicle.publish_trajectory_setpoint(hold, np.zeros(3), np.zeros(3), hold_yaw)
+                self.step_stop(state)
                 return
             self.trajectory, self.plan_time = build.result()  # re-raises a planning error
             self.log_plan()
@@ -135,6 +163,12 @@ class TrackMode(Mode[UAV, TrackParams]):
         self.vehicle.publish_trajectory_setpoint(
             setpoint.position, setpoint.velocity, setpoint.acceleration, setpoint.yaw
         )
+        self.step_stop(state)
+
+    def step_stop(self, state: np.ndarray) -> None:
+        """Keep a stop setpoint from this state ready for a trigger to send immediately."""
+        if self.stop_planner is not None:
+            self.stop_planner.step(state)
 
     def log_plan(self) -> None:
         held = time.perf_counter() - self.plan_start
@@ -157,6 +191,10 @@ class TrackMode(Mode[UAV, TrackParams]):
 
     @override
     def on_exit(self) -> None:
+        if self.trigger is not None:
+            self.trigger.disarm()
+        if "rtk_loss" in self.params.stop_on:
+            self.rtk.watch(False)
         if self.errors:
             e = np.array(self.errors)
             self.log(
@@ -166,5 +204,7 @@ class TrackMode(Mode[UAV, TrackParams]):
 
     @override
     def check_status(self) -> str:
+        if self.stopping:
+            return "stop"
         done = self.trajectory is not None and self.trajectory.done(self.t)
         return "complete" if done else "continue"

@@ -16,6 +16,7 @@ setup(
     install_requires=["setuptools", "pydantic>=2,<3"],
     zip_safe=True,
     extras_require={"test": ["pytest"]},
+    entry_points={"console_scripts": ["gps_spoof = iarc_flight.tools.gps_spoof:main"]},
     maintainer="ubuntu",
     maintainer_email="ubuntu@todo.todo",
     description="IARC trajectories, controllers and flight modes",
