@@ -11,6 +11,8 @@
   <depend>px4_msgs</depend>
   <depend>uav</depend>
   <depend>vehicle_common</depend>
+  <depend>std_srvs</depend>
+  <depend>rcl_interfaces</depend>
   <depend>python3-numpy</depend>
   <depend>python3-matplotlib</depend>
   <depend>python3-scipy</depend>

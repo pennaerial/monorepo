@@ -1,0 +1,44 @@
+# SITL test for mpc_stop. PX4 SITL only reports a 3D fix, so TrackMode watches the gps_spoof
+# node instead of PX4's GPS. Start the spoof before the mission reaches the circle:
+#   ros2 run iarc_flight gps_spoof --ros-args -r __ns:=/uav_0
+# then drop the fix or call the stop service to trigger the stop:
+#   ros2 param set /uav_0/gps_spoof fix rtk_float     # or dgps, 3d, no_fix, off
+# or
+#   ros2 service call /uav_0/mpc_stop std_srvs/srv/Trigger
+# On hardware, delete gps_topic so it watches PX4's real vehicle_gps_position.
+
+modes:
+  start:
+    mode: uav.VerticalTakeoffMode
+    params:
+      takeoff_height: 3.0
+    transitions:
+      complete: circle
+
+  circle:
+    mode: iarc_flight.TrackMode
+    params:
+      trajectory:
+        type: circle
+        radius: 8
+        initial_speed: 0
+        tangential_accel: 0.5
+        max_speed: 5
+        altitude: 3
+        laps: 2
+      controller:
+        type: mpc
+        max_speed: 6.0
+      stop_on: [service, rtk_loss]
+      gps_topic: spoof/vehicle_gps_position # SITL spoof
+    transitions:
+      complete: land
+      stop: stop
+
+  stop:
+    mode: iarc_flight.StopMode
+    transitions:
+      complete: land
+
+  land:
+    mode: uav.LandingMode
