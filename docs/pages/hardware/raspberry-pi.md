@@ -1,12 +1,32 @@
 # Raspberry Pi Setup
 
 Use the club image, which already includes Ubuntu 24.04 and the Wi-Fi
-mesh setup. Ask the software team for the image and login password.
+mesh setup.
 
-The most recent image is `nov7.img` (November 7, 2026).
+The most recent image is `nov7-backup.img` (November 7, 2026).
 
 This setup was tested on a Raspberry Pi 4 with a MediaTek MT7612U USB Wi-Fi adapter.
-You will also need a 32 GB or larger SD card, a card reader, and an Ethernet cable.
+You will also need a 64 GB SD card, an SD card reader, and an Ethernet cable.
+
+## Download the image
+
+If you don't have access to the Foxglove organization, ask one of the leads.
+
+
+1. Sign in to [Foxglove](https://app.foxglove.dev), select **Penn Aerial Robotics**,
+   and open **Recordings → nov7-backup.mcap**.
+2. Choose **Download → Download .mcap**, keeping the full recording range and all
+   topics, and save `nov7-backup.mcap` in your `Downloads` folder.
+3. From your monorepo root, run the included restore helper with
+   [uv](https://docs.astral.sh/uv/getting-started/installation/):
+
+   ```bash
+   uv run ros_ws/scripts/hardware/image_mcap.py restore \
+     "$HOME/Downloads/nov7-backup.mcap" "$HOME/Downloads/nov7-backup.img"
+   ```
+
+`image_mcap.py` restores the `.img` file from compressed parts in the MCAP backup and verifies its checksum. Allow at least 31 GB of free space for the download and restored image. Use the resulting `~/Downloads/nov7-backup.img` for the flashing steps
+below.
 
 ## Assigned hostnames
 
